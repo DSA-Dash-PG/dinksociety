@@ -254,8 +254,28 @@
     }
     .admin-pill--confirmed { background: rgba(29, 158, 117, 0.12); color: #0F6E56; }
     .admin-pill--pending { background: rgba(232, 181, 66, 0.2); color: #854F0B; }
+    .admin-pill--paid { background: rgba(29, 158, 117, 0.2); color: #0F6E56; }
+    .admin-pill--approved { background: rgba(29, 158, 117, 0.12); color: #0F6E56; }
     .admin-pill--team { background: rgba(13, 59, 64, 0.08); color: var(--teal-900); }
     .admin-pill--agent { background: rgba(83, 74, 183, 0.12); color: #3C3489; }
+
+    .admin-action-btn {
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1px solid rgba(13,59,64,0.2);
+      background: #fff;
+      color: var(--teal-900);
+      transition: background 0.15s;
+    }
+    .admin-action-btn:hover { background: rgba(13,59,64,0.05); }
+    .admin-action-btn--gold { background: rgba(232,181,66,0.15); border-color: rgba(232,181,66,0.4); color: #854F0B; }
+    .admin-action-btn--gold:hover { background: rgba(232,181,66,0.25); }
+    .admin-action-btn--green { background: rgba(29,158,117,0.12); border-color: rgba(29,158,117,0.3); color: #0F6E56; }
+    .admin-action-btn--green:hover { background: rgba(29,158,117,0.2); }
 
     /* ===== Forms ===== */
     .admin-field { margin-bottom: 16px; }
@@ -663,7 +683,7 @@
         <div class="stat">
           <div class="stat__label">Revenue (Circuit I)</div>
           <div class="stat__value stat__value--gold" id="stat-revenue">—</div>
-          <div class="stat__sub">confirmed payments</div>
+          <div class="stat__sub">confirmed registrations</div>
         </div>
         <div class="stat">
           <div class="stat__label">Photos uploaded</div>
@@ -688,7 +708,7 @@
           <span class="admin-card__sub">Creates team records so captains can sign in</span>
         </div>
         <p style="font-size: 13px; opacity: 0.75; margin: 0 0 16px; line-height: 1.6;">
-          Reads confirmed registrations, creates a <code>team</code> record for each one. Captains can then request a magic link at <code>/captain.html</code>. Safe to run multiple times — teams that already exist are skipped.
+          Reads confirmed registrations (approved + Zelle paid), creates a <code>team</code> record for each one. Captains can then log in at <code>/captain.html</code> to build their roster. Safe to run multiple times &mdash; existing teams are skipped.
         </p>
         <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
           <button class="admin-btn admin-btn--secondary" id="seed-dryrun-btn">Preview plan</button>
@@ -717,8 +737,10 @@
           <div>
             <select id="reg-status-filter" style="padding: 6px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 12px; font-family: inherit; margin-right: 8px;">
               <option value="all">All statuses</option>
-              <option value="confirmed">Confirmed</option>
-              <option value="pending">Pending</option>
+              <option value="pending">Pending review</option>
+              <option value="approved">Approved (awaiting Zelle)</option>
+              <option value="paid">Paid</option>
+              <option value="confirmed">Confirmed (active)</option>
             </select>
             <select id="reg-division-filter" style="padding: 6px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 12px; font-family: inherit;">
               <option value="all">All divisions</option>
@@ -1079,27 +1101,42 @@
 
       const rows = filtered.map(r => {
         const name = r.path === 'team'
-          ? `${escapeHtml(r.team?.name || '—')} <span style="opacity: 0.6; font-weight: 400; font-size: 12px;">(${escapeHtml(r.team?.captain || '')})</span>`
+          ? `${escapeHtml(r.team?.name || '—')} <span style="opacity: 0.6; font-weight: 400; font-size: 12px;">(${escapeHtml(r.team?.captain?.name || r.team?.captain || '')})</span>`
           : escapeHtml(r.agent?.name || '—');
         const contact = r.path === 'team'
-          ? (r.team?.players?.[0]?.email || '—')
+          ? (r.team?.captain?.email || r.team?.players?.[0]?.email || '—')
           : (r.agent?.email || '—');
+        const days = (r.dayPrefs || []).map(d => ({monday:'Mon',thursday:'Thu',saturday:'Sat'}[d] || d)).join(', ');
+
+        // Action buttons based on status
+        let actions = '';
+        if (r.status === 'pending') {
+          actions = `<button class="admin-action-btn" onclick="updateRegStatus('${r.id}','approved')" title="Approve application">Approve</button>`;
+        } else if (r.status === 'approved') {
+          actions = `<button class="admin-action-btn admin-action-btn--gold" onclick="updateRegStatus('${r.id}','paid')" title="Mark Zelle payment received">Zelle received</button>`;
+        } else if (r.status === 'paid') {
+          actions = `<button class="admin-action-btn admin-action-btn--green" onclick="updateRegStatus('${r.id}','confirmed')" title="Confirm — grants captain portal access">Confirm</button>`;
+        } else if (r.status === 'confirmed') {
+          actions = `<span style="font-size: 11px; color: #0F6E56;">&#10003; Active</span>`;
+        }
+
         return `
           <tr>
             <td><code style="font-size: 11px; opacity: 0.6;">${(r.id || '').slice(0, 8)}</code></td>
             <td>${name}</td>
             <td><span class="admin-pill admin-pill--${r.path}">${r.path === 'team' ? 'Team' : 'Agent'}</span></td>
             <td>${escapeHtml(r.divisionLabel || r.division || '—')}</td>
+            <td style="font-size: 12px;">${days || '—'}</td>
             <td><span class="admin-pill admin-pill--${r.status}">${r.status}</span></td>
             <td style="font-size: 12px;">${escapeHtml(contact)}</td>
-            <td style="font-size: 12px; opacity: 0.7;">${formatDate(r.createdAt)}</td>
+            <td>${actions}</td>
           </tr>
         `;
       }).join('');
 
       $id('registrations-table').innerHTML = `
         <table class="admin-table">
-          <thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Contact</th><th>When</th></tr></thead>
+          <thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Div</th><th>Nights</th><th>Status</th><th>Contact</th><th>Actions</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       `;
@@ -1107,6 +1144,32 @@
 
     $id('reg-status-filter').addEventListener('change', renderRegistrations);
     $id('reg-division-filter').addEventListener('change', renderRegistrations);
+
+    // ===== Registration status update (approve → paid → confirmed) =====
+    async function updateRegStatus(regId, newStatus) {
+      const labels = { approved: 'Approve', paid: 'Mark as paid', confirmed: 'Confirm' };
+      if (!confirm(`${labels[newStatus] || newStatus} this registration?`)) return;
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-registrations', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: regId, status: newStatus }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+
+        // Update local state and re-render
+        const reg = state.registrations.find(r => r.id === regId);
+        if (reg) reg.status = newStatus;
+        renderRegistrations();
+        loadOverview(); // refresh stats
+      } catch (err) {
+        alert('Failed to update: ' + err.message);
+      }
+    }
+    // Expose to inline onclick handlers
+    window.updateRegStatus = updateRegStatus;
 
     // ===== Schedule =====
     // Generator panel loads confirmed teams into the division picker and
