@@ -1,4 +1,4 @@
-# The Dink Society 
+# The Dink Society — Architecture B Bundle
 
 Complete file set for Circuit I. Drop-in replacement for the `netlify/functions/` folder plus fresh/updated page files.
 
