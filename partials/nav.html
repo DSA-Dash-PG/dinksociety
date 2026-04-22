@@ -1,0 +1,100 @@
+<!-- ===========================================================
+     Public site navigation with mobile hamburger drawer
+     Drops into partial slots via data-partial="nav"
+     Requires: /css/shared.css (or shared-nav.css) for .ds-* styles
+     =========================================================== -->
+
+<nav class="site-nav" style="background: #0D3B40; color: #F5EBD4; padding: 14px 20px;">
+  <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; gap: 16px;">
+
+    <a href="/" style="text-decoration: none; color: #E8B542; font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 20px; font-weight: 500;">
+      The Dink Society
+    </a>
+
+    <!-- Inline desktop nav — hidden on mobile via .ds-nav-inline media query -->
+    <div class="ds-nav-inline" style="display: flex; gap: 4px; align-items: center;">
+      <a href="/" style="color: #F5EBD4; text-decoration: none; padding: 8px 14px; font-size: 14px; border-radius: 6px;">Home</a>
+      <a href="/moments.html" style="color: #F5EBD4; text-decoration: none; padding: 8px 14px; font-size: 14px; border-radius: 6px;">Moments</a>
+      <a href="/leaderboard.html" style="color: #F5EBD4; text-decoration: none; padding: 8px 14px; font-size: 14px; border-radius: 6px;">Leaderboard</a>
+      <a href="/rules.html" style="color: #F5EBD4; text-decoration: none; padding: 8px 14px; font-size: 14px; border-radius: 6px;">Rules</a>
+      <a href="/register.html" style="background: #E8B542; color: #0D3B40; text-decoration: none; padding: 8px 16px; font-size: 14px; font-weight: 500; border-radius: 6px; margin-left: 8px;">Register</a>
+      <a href="/captain.html" style="color: #F5EBD4; text-decoration: none; padding: 8px 14px; font-size: 14px; border-radius: 6px; opacity: 0.75;">Captain sign-in</a>
+    </div>
+
+    <!-- Hamburger — hidden on desktop, shown on mobile -->
+    <button class="ds-hamburger" id="ds-hamburger-public" aria-label="Open menu" aria-expanded="false" style="color: #F5EBD4;">
+      <span class="ds-hamburger__line"></span>
+      <span class="ds-hamburger__line"></span>
+      <span class="ds-hamburger__line"></span>
+    </button>
+  </div>
+</nav>
+
+<!-- Drawer backdrop -->
+<div class="ds-drawer-backdrop" id="ds-drawer-backdrop-public"></div>
+
+<!-- Drawer panel -->
+<aside class="ds-drawer" id="ds-drawer-public" role="dialog" aria-modal="true" aria-label="Navigation menu">
+  <div class="ds-drawer__header">
+    <div class="ds-drawer__brand">The Dink Society</div>
+    <button class="ds-drawer__close" aria-label="Close menu" data-ds-drawer-close>&times;</button>
+  </div>
+  <nav class="ds-drawer__body">
+    <div class="ds-drawer__section">
+      <a class="ds-drawer__link" href="/">Home</a>
+      <a class="ds-drawer__link" href="/moments.html">Moments</a>
+      <a class="ds-drawer__link" href="/leaderboard.html">Leaderboard</a>
+      <a class="ds-drawer__link" href="/rules.html">Rules</a>
+    </div>
+    <div class="ds-drawer__section">
+      <div class="ds-drawer__section-label">Join</div>
+      <a class="ds-drawer__link" href="/register.html" style="color: #E8B542; font-weight: 500;">Register a team</a>
+    </div>
+    <div class="ds-drawer__section">
+      <div class="ds-drawer__section-label">Sign in</div>
+      <a class="ds-drawer__link" href="/captain.html">Captain portal</a>
+    </div>
+  </nav>
+  <div class="ds-drawer__footer">
+    &copy; The Dink Society &middot; <a href="https://instagram.com/dinksociety.pb" style="color: inherit; text-decoration: underline;">@dinksociety.pb</a>
+  </div>
+</aside>
+
+<script>
+  (function () {
+    const ham = document.getElementById('ds-hamburger-public');
+    const drawer = document.getElementById('ds-drawer-public');
+    const backdrop = document.getElementById('ds-drawer-backdrop-public');
+    if (!ham || !drawer || !backdrop) return;
+
+    function open() {
+      ham.classList.add('is-open');
+      ham.setAttribute('aria-expanded', 'true');
+      drawer.classList.add('is-open');
+      backdrop.classList.add('is-open');
+      document.body.classList.add('ds-drawer-open');
+    }
+    function close() {
+      ham.classList.remove('is-open');
+      ham.setAttribute('aria-expanded', 'false');
+      drawer.classList.remove('is-open');
+      backdrop.classList.remove('is-open');
+      document.body.classList.remove('ds-drawer-open');
+    }
+
+    ham.addEventListener('click', () => {
+      drawer.classList.contains('is-open') ? close() : open();
+    });
+    backdrop.addEventListener('click', close);
+    drawer.querySelectorAll('[data-ds-drawer-close]').forEach(btn =>
+      btn.addEventListener('click', close)
+    );
+    // Close on nav link tap (so in-page nav feels instant)
+    drawer.querySelectorAll('.ds-drawer__link').forEach(link =>
+      link.addEventListener('click', close)
+    );
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && drawer.classList.contains('is-open')) close();
+    });
+  })();
+</script>
