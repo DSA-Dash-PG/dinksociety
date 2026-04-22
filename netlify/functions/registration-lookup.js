@@ -67,8 +67,7 @@ export default async (req, context) => {
     if (reg.path === 'team' && reg.team) {
       safe.team = {
         name: reg.team.name,
-        captain: reg.team.players?.[0]?.name || null,
-        rosterSize: reg.team.players?.length || 0,
+        captain: reg.team.captainName || null,
       };
     } else if (reg.path === 'agent' && reg.agent) {
       safe.agent = {

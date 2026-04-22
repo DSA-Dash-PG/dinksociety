@@ -51,13 +51,11 @@ export default async (req, context) => {
     }
 
     if (path === 'team') {
-      if (!team?.name || !Array.isArray(team?.players) || team.players.length !== 4) {
-        return json({ error: 'Team must have a name and exactly 4 players' }, 400, headers);
+      if (!team?.name) {
+        return json({ error: 'Team must have a name' }, 400, headers);
       }
-      for (const p of team.players) {
-        if (!p.name || !p.email) {
-          return json({ error: 'Every player needs a name and email' }, 400, headers);
-        }
+      if (!team?.captainName || !team?.captainEmail) {
+        return json({ error: 'Captain name and email are required' }, 400, headers);
       }
     } else {
       if (!agent?.name || !agent?.email) {
@@ -93,7 +91,7 @@ export default async (req, context) => {
       + `?id=${registrationId}&session={CHECKOUT_SESSION_ID}`;
     const cancelUrl = Netlify.env.get('STRIPE_CANCEL_URL') || `${siteUrl}/register.html`;
 
-    const customerEmail = path === 'team' ? team.players[0].email : agent.email;
+    const customerEmail = path === 'team' ? team.captainEmail : agent.email;
     const productName = path === 'team'
       ? `The Dink Society — Circuit ${circuit} team entry (${DIVISION_LABELS[division]})`
       : `The Dink Society — Circuit ${circuit} free agent (${DIVISION_LABELS[division]})`;
@@ -109,7 +107,7 @@ export default async (req, context) => {
           product_data: {
             name: productName,
             description: path === 'team'
-              ? `Team: ${team.name} · Captain: ${team.players[0].name}`
+              ? `Team: ${team.name} · Captain: ${team.captainName}`
               : `Free agent: ${agent.name}`,
           },
         },
