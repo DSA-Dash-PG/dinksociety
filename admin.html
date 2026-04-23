@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -204,6 +205,7 @@
     }
     .admin-pill--confirmed { background: rgba(29, 158, 117, 0.12); color: #0F6E56; }
     .admin-pill--pending { background: rgba(232, 181, 66, 0.2); color: #854F0B; }
+    .admin-pill--rejected { background: rgba(231, 70, 70, 0.12); color: #a32d2d; }
     .admin-pill--team { background: rgba(13, 59, 64, 0.08); color: var(--teal-900); }
     .admin-pill--agent { background: rgba(83, 74, 183, 0.12); color: #3C3489; }
 
@@ -523,18 +525,19 @@
     <div class="login-card">
       <div class="login-card__brand">The Dink Society</div>
       <h1 class="login-card__title">Admin</h1>
-      <p class="login-card__sub">Members only. You know the drill.</p>
+      <p class="login-card__sub">No password, no hassle.</p>
+
+      <div id="login-sent" style="display:none; background: rgba(232,181,66,0.15); border: 1px solid rgba(232,181,66,0.4); color: var(--gold); padding: 16px; border-radius: 6px; text-align: left; font-size: 14px; line-height: 1.55;">
+        <strong style="display:block; margin-bottom: 4px; color: var(--gold);">Link on the way.</strong>
+        Check the inbox for <span id="login-sent-email" style="font-weight: 500;"></span>. The link expires in 15 minutes. If it doesn't show up, check spam or make sure you're using an admin email on file.
+      </div>
 
       <form id="login-form" onsubmit="return false;" style="text-align: left;">
         <div class="admin-field">
           <label for="login-email">Email</label>
-          <input type="email" id="login-email" autocomplete="email" required>
+          <input type="email" id="login-email" autocomplete="email" required placeholder="admin@example.com">
         </div>
-        <div class="admin-field">
-          <label for="login-password">Password</label>
-          <input type="password" id="login-password" autocomplete="current-password" required>
-        </div>
-        <button type="submit" class="admin-btn admin-btn--primary" id="login-submit">Sign in</button>
+        <button type="submit" class="admin-btn admin-btn--primary" id="login-submit">Send sign-in link</button>
         <div class="admin-status" id="login-status"></div>
       </form>
     </div>
@@ -669,6 +672,7 @@
               <option value="all">All statuses</option>
               <option value="confirmed">Confirmed</option>
               <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
             </select>
             <select id="reg-division-filter" style="padding: 6px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 12px; font-family: inherit;">
               <option value="all">All divisions</option>
@@ -826,15 +830,17 @@
     // =============================================================
     // DINK SOCIETY - ADMIN PORTAL
     //
-    // Auth model: Supabase session. A serverless function
+    // Auth model: Magic link session. A serverless function
     // (admin-whoami) validates the user is an admin and returns
     // their email. The UI stays locked until that succeeds.
     //
     // Required Netlify Functions (see /netlify/functions/):
     //   GET  admin-whoami              → { admin: true, email }
-    //   POST admin-login               → { token }
+    //   POST admin-login               → sends magic link email
+    //   GET  admin-link?token=xxx      → consumes token, sets cookie
     //   POST admin-logout              → { ok: true }
     //   GET  admin-registrations       → { registrations: [...] }
+    //   PATCH admin-registration-update → approve/reject/move
     //   GET  admin-overview            → { stats, divisionFill, recent }
     //   GET  admin-scores?week=N&div=X → { matches: [...] }
     //   POST admin-scores              → saves scores
@@ -883,29 +889,50 @@
     $id('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = $id('login-email').value.trim();
-      const password = $id('login-password').value;
       const status = $id('login-status');
       const btn = $id('login-submit');
+      if (!email) return;
 
       btn.disabled = true;
       status.className = 'admin-status is-info';
-      status.textContent = 'Signing in…';
+      status.textContent = 'Sending link…';
 
       try {
         const res = await fetch('/.netlify/functions/admin-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ email, password }),
+          body: JSON.stringify({ email }),
         });
-        if (!res.ok) throw new Error((await res.text()) || 'Sign-in failed');
-        await checkAuth();
+        if (!res.ok) throw new Error('Could not send link — try again.');
+
+        status.className = 'admin-status';
+        status.textContent = '';
+        $id('login-sent-email').textContent = email;
+        $id('login-sent').style.display = 'block';
+        $id('login-form').style.display = 'none';
       } catch (err) {
         status.className = 'admin-status is-error';
-        status.textContent = err.message || 'Invalid credentials';
+        status.textContent = err.message;
         btn.disabled = false;
       }
     });
+
+    // Handle redirect error params from the magic-link consumer
+    (function handleAuthErrors() {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (!err) return;
+      const messages = {
+        missing: 'That link was missing a token. Try requesting a new one.',
+        invalid: 'That link is invalid or has already been used. Try requesting a new one.',
+        expired: 'That link has expired. Request a fresh one below.',
+        server: 'Something went wrong. Try again in a moment.',
+      };
+      const status = $id('login-status');
+      status.className = 'admin-status is-error';
+      status.textContent = messages[err] || 'Sign-in failed. Try requesting a new link.';
+      window.history.replaceState({}, '', window.location.pathname);
+    })();
 
     $id('sign-out-link').addEventListener('click', async (e) => {
       e.preventDefault();
@@ -1034,13 +1061,36 @@
         const contact = r.path === 'team'
           ? (r.team?.players?.[0]?.email || '—')
           : (r.agent?.email || '—');
+
+        // Division dropdown
+        const divOptions = ['3.0M', '3.5M', '3.5W'].map(d =>
+          `<option value="${d}"${r.division === d ? ' selected' : ''}>${d === '3.0M' ? '3.0 Mixed' : d === '3.5M' ? '3.5 Mixed' : "3.5 Women's"}</option>`
+        ).join('');
+        const divSelect = `<select class="reg-div-select" data-reg-id="${escapeAttr(r.id)}" style="padding: 4px 6px; border: 1px solid rgba(13,59,64,0.2); border-radius: 4px; font-size: 11px; font-family: inherit; background: #fff;">${divOptions}</select>`;
+
+        // Action buttons
+        let actions = '';
+        if (r.status === 'pending') {
+          actions = `
+            <button class="admin-btn admin-btn--primary reg-action-btn" data-reg-id="${escapeAttr(r.id)}" data-action="approve" style="padding: 4px 10px; font-size: 11px;">Approve</button>
+            <button class="admin-btn admin-btn--danger reg-action-btn" data-reg-id="${escapeAttr(r.id)}" data-action="reject" style="padding: 4px 10px; font-size: 11px;">Reject</button>
+          `;
+        } else if (r.status === 'confirmed') {
+          actions = `<span class="admin-pill admin-pill--confirmed">Confirmed</span>`;
+        } else if (r.status === 'rejected') {
+          actions = `
+            <span class="admin-pill admin-pill--rejected">Rejected</span>
+            <button class="admin-btn admin-btn--secondary reg-action-btn" data-reg-id="${escapeAttr(r.id)}" data-action="approve" style="padding: 4px 10px; font-size: 11px; margin-left: 6px;">Restore</button>
+          `;
+        }
+
         return `
           <tr>
             <td><code style="font-size: 11px; opacity: 0.6;">${(r.id || '').slice(0, 8)}</code></td>
             <td>${name}</td>
             <td><span class="admin-pill admin-pill--${r.path}">${r.path === 'team' ? 'Team' : 'Agent'}</span></td>
-            <td>${escapeHtml(r.divisionLabel || r.division || '—')}</td>
-            <td><span class="admin-pill admin-pill--${r.status}">${r.status}</span></td>
+            <td>${divSelect}</td>
+            <td style="white-space: nowrap;">${actions}</td>
             <td style="font-size: 12px;">${escapeHtml(contact)}</td>
             <td style="font-size: 12px; opacity: 0.7;">${formatDate(r.createdAt)}</td>
           </tr>
@@ -1053,6 +1103,52 @@
           <tbody>${rows}</tbody>
         </table>
       `;
+
+      // Wire up action buttons
+      $id('registrations-table').querySelectorAll('.reg-action-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const regId = btn.dataset.regId;
+          const action = btn.dataset.action;
+          const label = action === 'approve' ? 'Approve this registration?' : 'Reject this registration?';
+          if (!confirm(label)) return;
+          updateRegistration(regId, action);
+        });
+      });
+
+      // Wire up division dropdowns
+      $id('registrations-table').querySelectorAll('.reg-div-select').forEach(sel => {
+        const originalValue = sel.value;
+        sel.addEventListener('change', () => {
+          const regId = sel.dataset.regId;
+          const newDiv = sel.value;
+          if (!confirm(`Move this registration to ${sel.options[sel.selectedIndex].text}?`)) {
+            sel.value = originalValue;
+            return;
+          }
+          updateRegistration(regId, 'move', newDiv);
+        });
+      });
+    }
+
+    async function updateRegistration(id, action, division) {
+      try {
+        const body = { id, action };
+        if (division) body.division = division;
+
+        const res = await fetch('/.netlify/functions/admin-registration-update', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Update failed');
+
+        // Refresh registrations list
+        await loadRegistrations();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
     }
 
     $id('reg-status-filter').addEventListener('change', renderRegistrations);
