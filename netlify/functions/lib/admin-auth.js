@@ -1,81 +1,117 @@
 // netlify/functions/lib/admin-auth.js
-// Shared admin auth helper. Validates a Supabase session from the incoming
-// request and returns the user if they're an admin, null otherwise.
-//
-// Required env vars:
-//   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY   — service role key (server-side only, never in frontend)
-//   ADMIN_EMAILS                — comma-separated list of admin email addresses
+// Magic-link auth for admins. No Supabase dependency.
+// Mirrors the captain-auth.js pattern exactly.
 
-import { createClient } from '@supabase/supabase-js';
+import { getStore } from '@netlify/blobs';
 
 const COOKIE_NAME = 'ds_admin_session';
+const SESSION_DAYS = 7;
+const TOKEN_MINUTES = 15;
 
-/**
- * Get the admin user from a request, or null if not authenticated / not admin.
- * Call this at the top of any admin function.
- */
-export async function requireAdmin(req) {
-  const token = getSessionToken(req);
-  if (!token) return null;
+// ===== Cookie helpers =====
 
-  const supabaseUrl = Netlify.env.get('SUPABASE_URL');
-  const serviceKey = Netlify.env.get('SUPABASE_SERVICE_ROLE_KEY');
-  const adminEmails = (Netlify.env.get('ADMIN_EMAILS') || '')
-    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-
-  if (!supabaseUrl || !serviceKey) {
-    console.error('Supabase env vars missing');
-    return null;
-  }
-
-  const supabase = createClient(supabaseUrl, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-
-  try {
-    const { data, error } = await supabase.auth.getUser(token);
-    if (error || !data?.user) return null;
-
-    const email = (data.user.email || '').toLowerCase();
-    if (!adminEmails.includes(email)) return null;
-
-    return { id: data.user.id, email: data.user.email };
-  } catch (err) {
-    console.error('Auth check failed:', err);
-    return null;
-  }
-}
-
-/** Extract session token from cookies */
 export function getSessionToken(req) {
   const cookieHeader = req.headers.get('cookie') || '';
   const match = cookieHeader.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
   return match ? decodeURIComponent(match[1]) : null;
 }
 
-/** Build a Set-Cookie header value for the session */
-export function buildSessionCookie(token, { maxAge = 60 * 60 * 24 * 7 } = {}) {
-  const parts = [
-    `${COOKIE_NAME}=${encodeURIComponent(token)}`,
-    'Path=/',
-    'HttpOnly',
-    'Secure',
-    'SameSite=Strict',
-    `Max-Age=${maxAge}`,
-  ];
-  return parts.join('; ');
+export function buildSessionCookie(sessionId) {
+  return [
+    `${COOKIE_NAME}=${encodeURIComponent(sessionId)}`,
+    'Path=/', 'HttpOnly', 'Secure', 'SameSite=Strict',
+    `Max-Age=${SESSION_DAYS * 24 * 60 * 60}`,
+  ].join('; ');
 }
 
-/** Build a Set-Cookie header value that clears the session */
 export function buildClearCookie() {
   return `${COOKIE_NAME}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0`;
 }
 
-/** Standard unauth response */
+// ===== Session lifecycle =====
+
+export async function createSession(email) {
+  const sessionId = randomId(20);
+  const store = getStore('admin-sessions');
+  await store.setJSON(`session/${sessionId}.json`, {
+    id: sessionId,
+    email: email.toLowerCase(),
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+  });
+  return sessionId;
+}
+
+export async function deleteSession(sessionId) {
+  if (!sessionId) return;
+  const store = getStore('admin-sessions');
+  await store.delete(`session/${sessionId}.json`).catch(() => null);
+}
+
+// ===== Magic-link tokens =====
+
+export async function createMagicToken(email) {
+  const token = randomId(24);
+  const store = getStore('admin-tokens');
+  await store.setJSON(`token/${token}.json`, {
+    token,
+    email: email.toLowerCase(),
+    createdAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + TOKEN_MINUTES * 60 * 1000).toISOString(),
+  });
+  return token;
+}
+
+export async function consumeMagicToken(token) {
+  if (!token || !/^[a-f0-9]{48}$/.test(token)) return null;
+  const store = getStore('admin-tokens');
+  const record = await store.get(`token/${token}.json`, { type: 'json' }).catch(() => null);
+  if (!record) return null;
+  if (new Date(record.expiresAt).getTime() < Date.now()) return null;
+  // One-time use — delete immediately
+  await store.delete(`token/${token}.json`).catch(() => null);
+  return { email: record.email };
+}
+
+// ===== Auth guard =====
+
+function getAdminEmails() {
+  return (Netlify.env.get('ADMIN_EMAILS') || '')
+    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+
+export async function requireAdmin(req) {
+  const sessionId = getSessionToken(req);
+  if (!sessionId) return null;
+
+  const store = getStore('admin-sessions');
+  const session = await store.get(`session/${sessionId}.json`, { type: 'json' }).catch(() => null);
+  if (!session) return null;
+  if (new Date(session.expiresAt).getTime() < Date.now()) {
+    await store.delete(`session/${sessionId}.json`).catch(() => null);
+    return null;
+  }
+
+  // Double-check the email is still in the admin list
+  const adminEmails = getAdminEmails();
+  if (!adminEmails.includes(session.email)) return null;
+
+  return { id: sessionId, email: session.email };
+}
+
+// ===== Standard responses =====
+
 export function unauthResponse() {
   return new Response(JSON.stringify({ error: 'Unauthorized' }), {
     status: 401,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+// ===== Utilities =====
+
+function randomId(bytes) {
+  const arr = new Uint8Array(bytes);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
 }
