@@ -523,19 +523,18 @@
     <div class="login-card">
       <div class="login-card__brand">The Dink Society</div>
       <h1 class="login-card__title">Admin</h1>
-      <p class="login-card__sub">No password, no hassle.</p>
-
-      <div id="login-sent" style="display:none; background: rgba(232,181,66,0.15); border: 1px solid rgba(232,181,66,0.4); color: var(--gold); padding: 16px; border-radius: 6px; text-align: left; font-size: 14px; line-height: 1.55;">
-        <strong style="display:block; margin-bottom: 4px; color: var(--gold);">Link on the way.</strong>
-        Check the inbox for <span id="login-sent-email" style="font-weight: 500;"></span>. The link expires in 15 minutes. If it doesn't show up, check spam or make sure you're using an admin email on file.
-      </div>
+      <p class="login-card__sub">Members only. You know the drill.</p>
 
       <form id="login-form" onsubmit="return false;" style="text-align: left;">
         <div class="admin-field">
           <label for="login-email">Email</label>
-          <input type="email" id="login-email" autocomplete="email" required placeholder="admin@example.com">
+          <input type="email" id="login-email" autocomplete="email" required>
         </div>
-        <button type="submit" class="admin-btn admin-btn--primary" id="login-submit">Send sign-in link</button>
+        <div class="admin-field">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="admin-btn admin-btn--primary" id="login-submit">Sign in</button>
         <div class="admin-status" id="login-status"></div>
       </form>
     </div>
@@ -833,7 +832,7 @@
     //
     // Required Netlify Functions (see /netlify/functions/):
     //   GET  admin-whoami              → { admin: true, email }
-    //   POST admin-login               → sends magic link email
+    //   POST admin-login               → { token }
     //   POST admin-logout              → { ok: true }
     //   GET  admin-registrations       → { registrations: [...] }
     //   GET  admin-overview            → { stats, divisionFill, recent }
@@ -884,53 +883,29 @@
     $id('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const email = $id('login-email').value.trim();
+      const password = $id('login-password').value;
       const status = $id('login-status');
       const btn = $id('login-submit');
-      if (!email) return;
 
       btn.disabled = true;
       status.className = 'admin-status is-info';
-      status.textContent = 'Sending link…';
+      status.textContent = 'Signing in…';
 
       try {
         const res = await fetch('/.netlify/functions/admin-login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+          credentials: 'include',
+          body: JSON.stringify({ email, password }),
         });
-        // Response is always 200 with a generic message (prevents enumeration)
-        if (!res.ok) throw new Error('Could not send link — try again.');
-
-        // Show sent state regardless of whether the email was actually an admin
-        status.className = 'admin-status';
-        status.textContent = '';
-        $id('login-sent-email').textContent = email;
-        $id('login-sent').style.display = 'block';
-        $id('login-form').style.display = 'none';
+        if (!res.ok) throw new Error((await res.text()) || 'Sign-in failed');
+        await checkAuth();
       } catch (err) {
         status.className = 'admin-status is-error';
-        status.textContent = err.message;
+        status.textContent = err.message || 'Invalid credentials';
         btn.disabled = false;
       }
     });
-
-    // Handle redirect error params from the magic-link consumer
-    (function handleAuthErrors() {
-      const params = new URLSearchParams(window.location.search);
-      const err = params.get('error');
-      if (!err) return;
-      const messages = {
-        missing: 'That link was missing a token. Try requesting a new one.',
-        invalid: 'That link is invalid or has already been used. Try requesting a new one.',
-        expired: 'That link has expired. Request a fresh one below.',
-        server: 'Something went wrong. Try again in a moment.',
-      };
-      const status = $id('login-status');
-      status.className = 'admin-status is-error';
-      status.textContent = messages[err] || 'Sign-in failed. Try requesting a new link.';
-      // Clean the URL
-      window.history.replaceState({}, '', window.location.pathname);
-    })();
 
     $id('sign-out-link').addEventListener('click', async (e) => {
       e.preventDefault();
