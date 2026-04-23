@@ -1,31 +1,28 @@
 // netlify/functions/admin-registrations.js
-// Returns all registrations (confirmed + pending) with full details.
+// Returns all registrations (confirmed + pending + rejected) with full details.
 // Admin-only — returns more than the public registration-lookup endpoint.
-
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
-
 export default async (req) => {
   const admin = await requireAdmin(req);
   if (!admin) return unauthResponse();
-
   try {
     const store = getStore('registrations');
-
     const { blobs: confirmedBlobs } = await store.list({ prefix: 'confirmed/' });
     const { blobs: pendingBlobs } = await store.list({ prefix: 'pending/' });
-
+    const { blobs: rejectedBlobs } = await store.list({ prefix: 'rejected/' });
     const confirmed = await Promise.all(
       confirmedBlobs.map(b => store.get(b.key, { type: 'json' }))
     );
     const pending = await Promise.all(
       pendingBlobs.map(b => store.get(b.key, { type: 'json' }))
     );
-
-    const all = [...confirmed, ...pending]
+    const rejected = await Promise.all(
+      rejectedBlobs.map(b => store.get(b.key, { type: 'json' }))
+    );
+    const all = [...confirmed, ...pending, ...rejected]
       .filter(Boolean)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
     // For admin we include emails + phone (but scrub Stripe internals)
     const projected = all.map(r => ({
       id: r.id,
@@ -37,6 +34,11 @@ export default async (req) => {
       amountPaid: r.amountPaid,
       createdAt: r.createdAt,
       confirmedAt: r.confirmedAt || null,
+      approvedBy: r.approvedBy || null,
+      rejectedAt: r.rejectedAt || null,
+      rejectedBy: r.rejectedBy || null,
+      movedAt: r.movedAt || null,
+      movedBy: r.movedBy || null,
       team: r.team ? {
         name: r.team.name,
         captain: r.team.players?.[0]?.name || null,
@@ -55,7 +57,6 @@ export default async (req) => {
         notes: r.agent.notes || null,
       } : null,
     }));
-
     return new Response(JSON.stringify({ registrations: projected }), {
       status: 200,
       headers: {
@@ -71,5 +72,4 @@ export default async (req) => {
     });
   }
 };
-
 export const config = { path: '/.netlify/functions/admin-registrations' };
