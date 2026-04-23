@@ -1,0 +1,1816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin &middot; The Dink Society</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="stylesheet" href="/css/shared.css" />
+
+  <style>
+    /* =========================================================
+       ADMIN PORTAL
+       Reuses shared.css tokens: --cream, --gold, --gold-deep,
+       --teal-900, --sage, --sage-700, --radius-sm, --gutter, --max-w
+       ========================================================= */
+    body { background: var(--cream); }
+
+    .admin-shell {
+      max-width: var(--max-w);
+      margin: 0 auto;
+      padding: 24px var(--gutter) 80px;
+    }
+
+    /* ===== Header ===== */
+    .admin-header {
+      background: #0D3B40;
+      color: var(--cream);
+      padding: 28px 32px;
+      border-radius: var(--radius-sm);
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+    .admin-header__brand {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 18px;
+      color: var(--gold);
+      margin-bottom: 4px;
+    }
+    .admin-header__title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 32px;
+      font-weight: 500;
+      margin: 0;
+      line-height: 1.1;
+    }
+    .admin-header__meta {
+      text-align: right;
+      font-size: 12px;
+      opacity: 0.75;
+    }
+    .admin-header__meta .user { color: var(--gold); font-weight: 500; }
+    .admin-header__meta a {
+      color: var(--cream);
+      text-decoration: none;
+      opacity: 0.7;
+      font-size: 12px;
+      margin-left: 12px;
+    }
+    .admin-header__meta a:hover { opacity: 1; }
+
+    /* ===== Tabs ===== */
+    .admin-tabs {
+      display: flex;
+      gap: 4px;
+      background: #fff;
+      border: 1px solid rgba(13, 59, 64, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 6px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+    .admin-tab {
+      background: transparent;
+      border: none;
+      color: var(--teal-900);
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+      opacity: 0.7;
+      transition: all 0.15s;
+    }
+    .admin-tab:hover { opacity: 1; background: rgba(13, 59, 64, 0.04); }
+    .admin-tab.is-active {
+      background: #0D3B40;
+      color: var(--gold);
+      opacity: 1;
+    }
+
+    /* ===== Cards ===== */
+    .admin-card {
+      background: #fff;
+      border: 1px solid rgba(13, 59, 64, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 24px;
+      margin-bottom: 16px;
+    }
+
+    .admin-card__header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 20px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(13, 59, 64, 0.08);
+    }
+    .admin-card__title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 24px;
+      font-weight: 500;
+      margin: 0;
+    }
+    .admin-card__sub {
+      font-size: 12px;
+      opacity: 0.6;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* ===== Section visibility ===== */
+    .admin-section { display: none; }
+    .admin-section.is-active { display: block; }
+
+    /* ===== Overview stats ===== */
+    .overview-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .stat {
+      background: #fff;
+      border: 1px solid rgba(13, 59, 64, 0.1);
+      border-radius: var(--radius-sm);
+      padding: 20px;
+    }
+    .stat__label {
+      font-size: 10px;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      opacity: 0.6;
+      font-weight: 500;
+      margin-bottom: 10px;
+    }
+    .stat__value {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 32px;
+      font-weight: 500;
+      line-height: 1;
+      color: var(--teal-900);
+    }
+    .stat__value--gold { color: var(--gold-deep, #C9972E); }
+    .stat__sub {
+      font-size: 12px;
+      opacity: 0.7;
+      margin-top: 6px;
+    }
+
+    /* ===== Tables ===== */
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .admin-table th {
+      text-align: left;
+      padding: 10px 12px;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--teal-900);
+      opacity: 0.6;
+      font-weight: 500;
+      border-bottom: 1px solid rgba(13, 59, 64, 0.1);
+      background: rgba(13, 59, 64, 0.02);
+    }
+    .admin-table td {
+      padding: 12px;
+      border-bottom: 1px solid rgba(13, 59, 64, 0.06);
+      vertical-align: top;
+    }
+    .admin-table tr:last-child td { border-bottom: none; }
+    .admin-table tr:hover td { background: rgba(13, 59, 64, 0.02); }
+
+    .admin-pill {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 100px;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.05em;
+    }
+    .admin-pill--confirmed { background: rgba(29, 158, 117, 0.12); color: #0F6E56; }
+    .admin-pill--pending { background: rgba(232, 181, 66, 0.2); color: #854F0B; }
+    .admin-pill--rejected { background: rgba(231, 70, 70, 0.12); color: #a32d2d; }
+    .admin-pill--team { background: rgba(13, 59, 64, 0.08); color: var(--teal-900); }
+    .admin-pill--agent { background: rgba(83, 74, 183, 0.12); color: #3C3489; }
+
+    /* ===== Forms ===== */
+    .admin-field { margin-bottom: 16px; }
+    .admin-field label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      opacity: 0.7;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .admin-field input,
+    .admin-field select,
+    .admin-field textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(13, 59, 64, 0.2);
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #fff;
+      color: var(--teal-900);
+    }
+    .admin-field input[type="file"] {
+      padding: 8px;
+      background: rgba(13, 59, 64, 0.04);
+      cursor: pointer;
+    }
+    .admin-field__row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .admin-btn {
+      padding: 10px 20px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: inherit;
+      border: 1px solid transparent;
+    }
+    .admin-btn--primary {
+      background: #0D3B40;
+      color: var(--gold);
+      border-color: #0D3B40;
+    }
+    .admin-btn--primary:hover:not(:disabled) { opacity: 0.9; }
+    .admin-btn--primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .admin-btn--secondary {
+      background: transparent;
+      color: var(--teal-900);
+      border-color: rgba(13, 59, 64, 0.2);
+    }
+    .admin-btn--danger {
+      background: rgba(231, 70, 70, 0.1);
+      color: #a32d2d;
+      border-color: rgba(231, 70, 70, 0.25);
+    }
+
+    .admin-status {
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+    .admin-status.is-info { display: block; background: rgba(13, 59, 64, 0.08); color: var(--teal-900); }
+    .admin-status.is-success { display: block; background: rgba(29, 158, 117, 0.12); color: #0F6E56; }
+    .admin-status.is-error { display: block; background: rgba(231, 70, 70, 0.1); color: #a32d2d; }
+
+    /* ===== Login screen ===== */
+    .login-wrap {
+      max-width: 420px;
+      margin: 80px auto;
+      padding: 0 var(--gutter);
+    }
+    .login-card {
+      background: linear-gradient(135deg, #0D3B40 0%, #000000 100%);
+      color: var(--cream);
+      padding: 40px 36px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(232, 181, 66, 0.2);
+      text-align: center;
+    }
+    .login-card__brand {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 18px;
+      color: var(--gold);
+      margin-bottom: 24px;
+    }
+    .login-card__title {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic;
+      font-size: 32px;
+      font-weight: 500;
+      margin: 0 0 10px;
+    }
+    .login-card__sub {
+      font-size: 14px;
+      opacity: 0.75;
+      margin: 0 0 28px;
+    }
+    .login-card .admin-field label {
+      color: var(--cream);
+      opacity: 0.75;
+      text-align: left;
+    }
+    .login-card .admin-field input {
+      background: rgba(245, 235, 212, 0.05);
+      border-color: rgba(245, 235, 212, 0.2);
+      color: var(--cream);
+    }
+    .login-card .admin-field input:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+    .login-card .admin-btn--primary {
+      background: var(--gold);
+      color: #0D3B40;
+      border-color: var(--gold);
+      width: 100%;
+      padding: 14px 20px;
+      font-size: 14px;
+      margin-top: 12px;
+    }
+
+    /* ===== Match entry ===== */
+    .match-entry {
+      display: grid;
+      grid-template-columns: 1fr 60px 1fr;
+      gap: 12px;
+      align-items: center;
+      padding: 14px 16px;
+      background: rgba(13, 59, 64, 0.02);
+      border-radius: 6px;
+      margin-bottom: 8px;
+    }
+    .match-entry__team {
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .match-entry__team--right { text-align: right; }
+    .match-entry__score {
+      width: 56px;
+      padding: 6px 8px !important;
+      text-align: center;
+      font-weight: 500;
+    }
+    .match-entry__vs {
+      text-align: center;
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      opacity: 0.5;
+    }
+    .match-entry__scores {
+      display: flex;
+      gap: 6px;
+      justify-content: center;
+    }
+
+    /* ===== Moments grid preview ===== */
+    .moments-admin-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .moments-admin-tile {
+      aspect-ratio: 1;
+      background: rgba(13, 59, 64, 0.05);
+      border-radius: 4px;
+      position: relative;
+      overflow: hidden;
+    }
+    .moments-admin-tile img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .moments-admin-tile__delete {
+      position: absolute;
+      top: 4px;
+      right: 4px;
+      background: rgba(0,0,0,0.7);
+      color: white;
+      border: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 12px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+    .moments-admin-tile:hover .moments-admin-tile__delete { opacity: 1; }
+
+    .empty-state {
+      text-align: center;
+      padding: 48px 20px;
+      opacity: 0.6;
+    }
+
+    @media (max-width: 720px) {
+      .admin-header { padding: 16px 18px; flex-wrap: nowrap; }
+      .admin-header__title { font-size: 22px; }
+      .admin-header__meta { display: none; }
+      .admin-tabs { display: none; }
+      .admin-card { padding: 18px; }
+      .admin-field__row { grid-template-columns: 1fr; }
+      .match-entry { grid-template-columns: 1fr; gap: 8px; }
+      .match-entry__team--right { text-align: left; }
+    }
+
+    /* ===== Shared hamburger + drawer ===== */
+    .ds-hamburger {
+      display: none;
+      width: 44px; height: 44px; padding: 10px;
+      background: transparent; border: none; cursor: pointer;
+      border-radius: 6px;
+      align-items: center; justify-content: center;
+      flex-direction: column; gap: 5px;
+      color: var(--cream);
+    }
+    .ds-hamburger:hover { background: rgba(245, 235, 212, 0.08); }
+    .ds-hamburger__line {
+      display: block; width: 22px; height: 2px;
+      background: currentColor; border-radius: 1px;
+      transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    .ds-hamburger.is-open .ds-hamburger__line:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .ds-hamburger.is-open .ds-hamburger__line:nth-child(2) { opacity: 0; }
+    .ds-hamburger.is-open .ds-hamburger__line:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+    .ds-drawer-backdrop {
+      position: fixed; inset: 0;
+      background: rgba(13, 59, 64, 0.5);
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.2s ease;
+      z-index: 998;
+    }
+    .ds-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+    .ds-drawer {
+      position: fixed; top: 0; right: 0; bottom: 0;
+      width: 280px; max-width: 85vw;
+      background: #0D3B40; color: #F5EBD4;
+      transform: translateX(100%);
+      transition: transform 0.25s ease;
+      z-index: 999;
+      display: flex; flex-direction: column;
+      box-shadow: -8px 0 24px rgba(0, 0, 0, 0.15);
+    }
+    .ds-drawer.is-open { transform: translateX(0); }
+    .ds-drawer__header {
+      padding: 20px 24px;
+      display: flex; justify-content: space-between; align-items: center;
+      border-bottom: 1px solid rgba(232, 181, 66, 0.2);
+    }
+    .ds-drawer__brand {
+      font-family: 'Cormorant Garamond', Georgia, serif;
+      font-style: italic; font-size: 18px; color: #E8B542; font-weight: 500;
+    }
+    .ds-drawer__close {
+      background: transparent; border: none;
+      color: #F5EBD4; font-size: 28px; line-height: 1;
+      padding: 0; cursor: pointer;
+      width: 32px; height: 32px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px;
+    }
+    .ds-drawer__close:hover { background: rgba(245, 235, 212, 0.08); }
+    .ds-drawer__body { flex: 1; overflow-y: auto; padding: 16px 12px; display: flex; flex-direction: column; }
+    .ds-drawer__section { padding: 8px 0; }
+    .ds-drawer__section + .ds-drawer__section {
+      border-top: 1px solid rgba(245, 235, 212, 0.1);
+      margin-top: 8px; padding-top: 16px;
+    }
+    .ds-drawer__section-label {
+      font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase;
+      color: #E8B542; opacity: 0.7; font-weight: 500;
+      padding: 4px 12px 10px;
+    }
+    .ds-drawer__link {
+      display: block;
+      padding: 12px 14px; border-radius: 6px;
+      color: #F5EBD4; text-decoration: none;
+      font-size: 15px; font-weight: 400;
+      background: transparent; border: none;
+      width: 100%; text-align: left;
+      font-family: inherit; cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .ds-drawer__link:hover, .ds-drawer__link:focus {
+      background: rgba(245, 235, 212, 0.08); outline: none;
+    }
+    .ds-drawer__link.is-active {
+      background: rgba(232, 181, 66, 0.15);
+      color: #E8B542; font-weight: 500;
+    }
+    .ds-drawer__meta { padding: 12px 14px; font-size: 11px; opacity: 0.6; line-height: 1.5; }
+    body.ds-drawer-open { overflow: hidden; }
+
+    @media (max-width: 720px) { .ds-hamburger { display: flex; } }
+  </style>
+</head>
+<body data-page="admin">
+
+  <!-- =========================================================
+       LOGIN SCREEN (shown when no session)
+       ========================================================= -->
+  <div id="login-screen" class="login-wrap" style="display: none;">
+    <div class="login-card">
+      <div class="login-card__brand">The Dink Society</div>
+      <h1 class="login-card__title">Admin</h1>
+      <p class="login-card__sub">No password, no hassle.</p>
+
+      <div id="login-sent" style="display:none; background: rgba(232,181,66,0.15); border: 1px solid rgba(232,181,66,0.4); color: var(--gold); padding: 16px; border-radius: 6px; text-align: left; font-size: 14px; line-height: 1.55;">
+        <strong style="display:block; margin-bottom: 4px; color: var(--gold);">Link on the way.</strong>
+        Check the inbox for <span id="login-sent-email" style="font-weight: 500;"></span>. The link expires in 15 minutes. If it doesn't show up, check spam or make sure you're using an admin email on file.
+      </div>
+
+      <form id="login-form" onsubmit="return false;" style="text-align: left;">
+        <div class="admin-field">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" autocomplete="email" required placeholder="admin@example.com">
+        </div>
+        <button type="submit" class="admin-btn admin-btn--primary" id="login-submit">Send sign-in link</button>
+        <div class="admin-status" id="login-status"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =========================================================
+       ADMIN SHELL (shown when authed)
+       ========================================================= -->
+  <div id="admin-shell" class="admin-shell" style="display: none;">
+
+    <header class="admin-header">
+      <div>
+        <div class="admin-header__brand">The Dink Society</div>
+        <h1 class="admin-header__title">Admin portal</h1>
+      </div>
+      <div class="admin-header__meta">
+        <div>Signed in as <span class="user" id="user-email">&mdash;</span></div>
+        <a href="/">&larr; Back to site</a>
+        <a href="#" id="sign-out-link">Sign out</a>
+      </div>
+      <button class="ds-hamburger" id="ds-hamburger-admin" aria-label="Open menu" aria-expanded="false">
+        <span class="ds-hamburger__line"></span>
+        <span class="ds-hamburger__line"></span>
+        <span class="ds-hamburger__line"></span>
+      </button>
+    </header>
+
+    <div class="ds-drawer-backdrop" id="ds-drawer-backdrop-admin"></div>
+    <aside class="ds-drawer" id="ds-drawer-admin" role="dialog" aria-modal="true" aria-label="Admin menu">
+      <div class="ds-drawer__header">
+        <div class="ds-drawer__brand">Admin portal</div>
+        <button class="ds-drawer__close" aria-label="Close menu" data-ds-drawer-close>&times;</button>
+      </div>
+      <nav class="ds-drawer__body">
+        <div class="ds-drawer__section">
+          <div class="ds-drawer__section-label">Sections</div>
+          <button class="ds-drawer__link is-active" data-drawer-tab="overview">Overview</button>
+          <button class="ds-drawer__link" data-drawer-tab="registrations">Registrations</button>
+          <button class="ds-drawer__link" data-drawer-tab="schedule">Schedule</button>
+          <button class="ds-drawer__link" data-drawer-tab="moments">Moments</button>
+        </div>
+        <div class="ds-drawer__section">
+          <div class="ds-drawer__section-label">League</div>
+          <a class="ds-drawer__link" href="/leaderboard.html" target="_blank">Leaderboard &#8599;</a>
+          <a class="ds-drawer__link" href="/rules.html" target="_blank">Rules &#8599;</a>
+        </div>
+        <div class="ds-drawer__section">
+          <div class="ds-drawer__section-label">Account</div>
+          <div class="ds-drawer__meta" id="ds-drawer-admin-email">&mdash;</div>
+          <a class="ds-drawer__link" href="/">&larr; Back to site</a>
+          <button class="ds-drawer__link" id="ds-drawer-admin-signout">Sign out</button>
+        </div>
+      </nav>
+    </aside>
+
+    <nav class="admin-tabs">
+      <button class="admin-tab is-active" data-tab="overview">Overview</button>
+      <button class="admin-tab" data-tab="registrations">Registrations</button>
+      <button class="admin-tab" data-tab="schedule">Schedule</button>
+      <button class="admin-tab" data-tab="moments">Moments</button>
+    </nav>
+
+    <!-- ===== OVERVIEW ===== -->
+    <section class="admin-section is-active" data-section="overview">
+      <div class="overview-stats" id="overview-stats">
+        <div class="stat">
+          <div class="stat__label">Teams registered</div>
+          <div class="stat__value" id="stat-teams">—</div>
+          <div class="stat__sub" id="stat-teams-sub">&nbsp;</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Free agents</div>
+          <div class="stat__value" id="stat-agents">—</div>
+          <div class="stat__sub">solo signups</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Revenue (Circuit I)</div>
+          <div class="stat__value stat__value--gold" id="stat-revenue">—</div>
+          <div class="stat__sub">confirmed payments</div>
+        </div>
+        <div class="stat">
+          <div class="stat__label">Photos uploaded</div>
+          <div class="stat__value" id="stat-photos">—</div>
+          <div class="stat__sub">across all weeks</div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Division fill</h2>
+          <span class="admin-card__sub">Circuit I &middot; 6 teams each</span>
+        </div>
+        <div id="division-fill">
+          <div class="empty-state">Loading&hellip;</div>
+        </div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Seed teams from registrations</h2>
+          <span class="admin-card__sub">Creates team records so captains can sign in</span>
+        </div>
+        <p style="font-size: 13px; opacity: 0.75; margin: 0 0 16px; line-height: 1.6;">
+          Reads confirmed registrations, creates a <code>team</code> record for each one. Captains can then request a magic link at <code>/captain.html</code>. Safe to run multiple times — teams that already exist are skipped.
+        </p>
+        <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+          <button class="admin-btn admin-btn--secondary" id="seed-dryrun-btn">Preview plan</button>
+          <button class="admin-btn admin-btn--primary" id="seed-apply-btn" disabled>Apply plan</button>
+        </div>
+        <div class="admin-status" id="seed-status"></div>
+        <div id="seed-results" style="margin-top: 14px;"></div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Latest registrations</h2>
+          <span class="admin-card__sub">Last 10</span>
+        </div>
+        <div id="recent-registrations">
+          <div class="empty-state">Loading&hellip;</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== REGISTRATIONS ===== -->
+    <section class="admin-section" data-section="registrations">
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">All registrations</h2>
+          <div>
+            <select id="reg-status-filter" style="padding: 6px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 12px; font-family: inherit; margin-right: 8px;">
+              <option value="all">All statuses</option>
+              <option value="confirmed">Confirmed</option>
+              <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
+            </select>
+            <select id="reg-division-filter" style="padding: 6px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 12px; font-family: inherit;">
+              <option value="all">All divisions</option>
+              <option value="3.0M">3.0 Mixed</option>
+              <option value="3.5M">3.5 Mixed</option>
+              <option value="3.5W">3.5 Women's</option>
+            </select>
+          </div>
+        </div>
+        <div id="registrations-table">
+          <div class="empty-state">Loading&hellip;</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== SCHEDULE ===== -->
+    <section class="admin-section" data-section="schedule">
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Generate schedule</h2>
+          <span class="admin-card__sub">Round-robin pairing</span>
+        </div>
+        <p style="font-size: 13px; opacity: 0.75; margin: 0 0 16px; line-height: 1.6;">
+          Pick a division, confirm the teams, and generate a full round-robin. For 6 teams this produces 5 weeks. Weeks 6 and 7 are reserved for crossover + championship and stay empty &mdash; schedule those manually once standings settle.
+        </p>
+
+        <div class="admin-field__row">
+          <div class="admin-field">
+            <label for="sg-circuit">Circuit</label>
+            <select id="sg-circuit">
+              <option value="I">Circuit I</option>
+            </select>
+          </div>
+          <div class="admin-field">
+            <label for="sg-division">Division</label>
+            <select id="sg-division">
+              <option value="3.0M">3.0 Mixed</option>
+              <option value="3.5M">3.5 Mixed</option>
+              <option value="3.5W">3.5 Women's</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="sg-teams-list"><div class="empty-state">Pick a division to see teams.</div></div>
+
+        <div class="admin-field" style="margin-top: 14px;">
+          <label for="sg-courts">Courts (comma-separated)</label>
+          <input type="text" id="sg-courts" placeholder="Court 1, Court 2, Court 3">
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap;">
+          <button class="admin-btn admin-btn--primary" id="sg-generate-btn">Generate schedule</button>
+        </div>
+        <div class="admin-status" id="sg-status"></div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Edit schedule</h2>
+          <span class="admin-card__sub">Court, venue, time per match</span>
+        </div>
+
+        <div class="admin-field__row">
+          <div class="admin-field">
+            <label for="se-circuit">Circuit</label>
+            <select id="se-circuit">
+              <option value="I">Circuit I</option>
+            </select>
+          </div>
+          <div class="admin-field">
+            <label for="se-division">Division</label>
+            <select id="se-division">
+              <option value="3.0M">3.0 Mixed</option>
+              <option value="3.5M">3.5 Mixed</option>
+              <option value="3.5W">3.5 Women's</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="se-weeks-summary" style="margin-bottom: 16px;"></div>
+
+        <div class="admin-field">
+          <label for="se-week">Week</label>
+          <select id="se-week">
+            ${[1,2,3,4,5,6,7].map(w => `<option value="${w}">Week ${w}</option>`).join('')}
+          </select>
+        </div>
+
+        <div id="se-week-editor">
+          <div class="empty-state">Select a week to edit.</div>
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 12px; justify-content: flex-end;">
+          <button class="admin-btn admin-btn--primary" id="se-save-btn" disabled>Save edits</button>
+        </div>
+        <div class="admin-status" id="se-status"></div>
+      </div>
+    </section>
+
+    <!-- ===== MOMENTS ===== -->
+    <section class="admin-section" data-section="moments">
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Upload photos</h2>
+          <span class="admin-card__sub">League moments</span>
+        </div>
+        <div class="admin-field__row">
+          <div class="admin-field">
+            <label for="upload-circuit">Circuit</label>
+            <select id="upload-circuit">
+              <option value="I">Circuit I (May 2026)</option>
+            </select>
+          </div>
+          <div class="admin-field">
+            <label for="upload-week">Week</label>
+            <select id="upload-week">
+              <option value="1">Week 1</option>
+              <option value="2">Week 2</option>
+              <option value="3">Week 3</option>
+              <option value="4">Week 4</option>
+              <option value="5">Week 5</option>
+              <option value="6">Week 6</option>
+              <option value="7">Week 7 (Championship)</option>
+            </select>
+          </div>
+        </div>
+        <div class="admin-field">
+          <label for="upload-caption">Caption (optional)</label>
+          <input type="text" id="upload-caption" placeholder="e.g. Team Kickass with the sweep">
+        </div>
+        <div class="admin-field">
+          <label for="upload-files">Photos (JPG or PNG, max 10MB each)</label>
+          <input type="file" id="upload-files" accept="image/jpeg,image/png" multiple>
+        </div>
+        <div style="display: flex; gap: 10px; justify-content: flex-end;">
+          <button class="admin-btn admin-btn--primary" id="upload-submit">Upload</button>
+        </div>
+        <div class="admin-status" id="upload-status"></div>
+      </div>
+
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Recent photos</h2>
+          <a href="/moments.html" style="font-size: 12px; color: var(--teal-900); opacity: 0.7;">View public page &rarr;</a>
+        </div>
+        <div id="admin-moments-preview">
+          <div class="empty-state">Loading&hellip;</div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // =============================================================
+    // DINK SOCIETY - ADMIN PORTAL
+    //
+    // Auth model: Magic link session. A serverless function
+    // (admin-whoami) validates the user is an admin and returns
+    // their email. The UI stays locked until that succeeds.
+    //
+    // Required Netlify Functions (see /netlify/functions/):
+    //   GET  admin-whoami              → { admin: true, email }
+    //   POST admin-login               → sends magic link email
+    //   GET  admin-link?token=xxx      → consumes token, sets cookie
+    //   POST admin-logout              → { ok: true }
+    //   GET  admin-registrations       → { registrations: [...] }
+    //   PATCH admin-registration-update → approve/reject/move
+    //   GET  admin-overview            → { stats, divisionFill, recent }
+    //   GET  admin-scores?week=N&div=X → { matches: [...] }
+    //   POST admin-scores              → saves scores
+    //   POST moments-upload            → (existing; now admin-gated)
+    //   GET  moments-list              → (existing)
+    //   DELETE moments-delete          → { ok: true }
+    // =============================================================
+
+    const state = {
+      user: null,
+      registrations: [],
+      moments: [],
+    };
+
+    const $ = (sel) => document.querySelector(sel);
+    const $id = (id) => document.getElementById(id);
+
+    // ===== Auth =====
+    async function checkAuth() {
+      try {
+        const res = await fetch('/.netlify/functions/admin-whoami', {
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error('unauth');
+        const data = await res.json();
+        if (!data.admin) throw new Error('not-admin');
+        state.user = data;
+        showShell();
+      } catch (err) {
+        showLogin();
+      }
+    }
+
+    function showLogin() {
+      $id('login-screen').style.display = 'block';
+      $id('admin-shell').style.display = 'none';
+    }
+
+    function showShell() {
+      $id('login-screen').style.display = 'none';
+      $id('admin-shell').style.display = 'block';
+      $id('user-email').textContent = state.user?.email || 'admin';
+      loadOverview();
+    }
+
+    $id('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = $id('login-email').value.trim();
+      const status = $id('login-status');
+      const btn = $id('login-submit');
+      if (!email) return;
+
+      btn.disabled = true;
+      status.className = 'admin-status is-info';
+      status.textContent = 'Sending link…';
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+        if (!res.ok) throw new Error('Could not send link — try again.');
+
+        status.className = 'admin-status';
+        status.textContent = '';
+        $id('login-sent-email').textContent = email;
+        $id('login-sent').style.display = 'block';
+        $id('login-form').style.display = 'none';
+      } catch (err) {
+        status.className = 'admin-status is-error';
+        status.textContent = err.message;
+        btn.disabled = false;
+      }
+    });
+
+    // Handle redirect error params from the magic-link consumer
+    (function handleAuthErrors() {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (!err) return;
+      const messages = {
+        missing: 'That link was missing a token. Try requesting a new one.',
+        invalid: 'That link is invalid or has already been used. Try requesting a new one.',
+        expired: 'That link has expired. Request a fresh one below.',
+        server: 'Something went wrong. Try again in a moment.',
+      };
+      const status = $id('login-status');
+      status.className = 'admin-status is-error';
+      status.textContent = messages[err] || 'Sign-in failed. Try requesting a new link.';
+      window.history.replaceState({}, '', window.location.pathname);
+    })();
+
+    $id('sign-out-link').addEventListener('click', async (e) => {
+      e.preventDefault();
+      try {
+        await fetch('/.netlify/functions/admin-logout', {
+          method: 'POST',
+          credentials: 'include',
+        });
+      } catch {}
+      state.user = null;
+      window.location.reload();
+    });
+
+    // ===== Tabs =====
+    document.querySelectorAll('.admin-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.admin-tab').forEach(b => b.classList.remove('is-active'));
+        btn.classList.add('is-active');
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.admin-section').forEach(s => {
+          s.classList.toggle('is-active', s.dataset.section === tab);
+        });
+
+        if (tab === 'overview') loadOverview();
+        if (tab === 'registrations') loadRegistrations();
+        if (tab === 'schedule') setupScheduleTab();
+        if (tab === 'moments') loadMomentsPreview();
+      });
+    });
+
+    // ===== Overview =====
+    async function loadOverview() {
+      try {
+        const res = await fetch('/.netlify/functions/admin-overview', { credentials: 'include' });
+        if (!res.ok) throw new Error('failed');
+        const data = await res.json();
+
+        $id('stat-teams').textContent = data.stats.teams ?? 0;
+        $id('stat-teams-sub').textContent = `of ${data.stats.teamCapacity || 12} spots filled`;
+        $id('stat-agents').textContent = data.stats.agents ?? 0;
+        $id('stat-revenue').textContent = '$' + (data.stats.revenue ?? 0).toLocaleString();
+        $id('stat-photos').textContent = data.stats.photos ?? 0;
+
+        renderDivisionFill(data.divisionFill || []);
+        renderRecentRegistrations(data.recent || []);
+      } catch (err) {
+        $id('division-fill').innerHTML = '<div class="empty-state">Could not load overview.</div>';
+        $id('recent-registrations').innerHTML = '<div class="empty-state">Could not load registrations.</div>';
+      }
+    }
+
+    function renderDivisionFill(fills) {
+      if (!fills.length) {
+        $id('division-fill').innerHTML = '<div class="empty-state">No divisions with registrations yet.</div>';
+        return;
+      }
+      const rows = fills.map(d => {
+        const pct = Math.min(100, Math.round((d.filled / d.capacity) * 100));
+        return `
+          <div style="margin-bottom: 14px;">
+            <div style="display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 6px;">
+              <span style="font-weight: 500;">${escapeHtml(d.label)}</span>
+              <span style="opacity: 0.7;">${d.filled}/${d.capacity} teams</span>
+            </div>
+            <div style="height: 8px; background: rgba(13,59,64,0.08); border-radius: 100px; overflow: hidden;">
+              <div style="height: 100%; width: ${pct}%; background: ${pct >= 100 ? '#1D9E75' : 'var(--gold)'};"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      $id('division-fill').innerHTML = rows;
+    }
+
+    function renderRecentRegistrations(recent) {
+      if (!recent.length) {
+        $id('recent-registrations').innerHTML = '<div class="empty-state">No registrations yet.</div>';
+        return;
+      }
+      const rows = recent.map(r => `
+        <tr>
+          <td style="font-weight: 500;">${escapeHtml(r.displayName || '—')}</td>
+          <td><span class="admin-pill admin-pill--${r.path}">${r.path === 'team' ? 'Team' : 'Free agent'}</span></td>
+          <td>${escapeHtml(r.divisionLabel || r.division)}</td>
+          <td><span class="admin-pill admin-pill--${r.status}">${r.status}</span></td>
+          <td style="font-size: 12px; opacity: 0.7;">${formatDate(r.createdAt)}</td>
+        </tr>
+      `).join('');
+      $id('recent-registrations').innerHTML = `
+        <table class="admin-table">
+          <thead><tr><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>When</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+    }
+
+    // ===== Registrations =====
+    async function loadRegistrations() {
+      try {
+        const res = await fetch('/.netlify/functions/admin-registrations', { credentials: 'include' });
+        if (!res.ok) throw new Error('failed');
+        const data = await res.json();
+        state.registrations = data.registrations || [];
+        renderRegistrations();
+      } catch (err) {
+        $id('registrations-table').innerHTML = '<div class="empty-state">Could not load registrations.</div>';
+      }
+    }
+
+    function renderRegistrations() {
+      const statusFilter = $id('reg-status-filter').value;
+      const divFilter = $id('reg-division-filter').value;
+
+      let filtered = state.registrations;
+      if (statusFilter !== 'all') filtered = filtered.filter(r => r.status === statusFilter);
+      if (divFilter !== 'all') filtered = filtered.filter(r => r.division === divFilter);
+
+      if (!filtered.length) {
+        $id('registrations-table').innerHTML = '<div class="empty-state">No registrations match these filters.</div>';
+        return;
+      }
+
+      const rows = filtered.map(r => {
+        const name = r.path === 'team'
+          ? `${escapeHtml(r.team?.name || '—')} <span style="opacity: 0.6; font-weight: 400; font-size: 12px;">(${escapeHtml(r.team?.captain || '')})</span>`
+          : escapeHtml(r.agent?.name || '—');
+        const contact = r.path === 'team'
+          ? (r.team?.players?.[0]?.email || '—')
+          : (r.agent?.email || '—');
+
+        // Division dropdown
+        const divOptions = ['3.0M', '3.5M', '3.5W'].map(d =>
+          `<option value="${d}"${r.division === d ? ' selected' : ''}>${d === '3.0M' ? '3.0 Mixed' : d === '3.5M' ? '3.5 Mixed' : "3.5 Women's"}</option>`
+        ).join('');
+        const divSelect = `<select class="reg-div-select" data-reg-id="${escapeAttr(r.id)}" style="padding: 4px 6px; border: 1px solid rgba(13,59,64,0.2); border-radius: 4px; font-size: 11px; font-family: inherit; background: #fff;">${divOptions}</select>`;
+
+        // Action buttons
+        let actions = '';
+        if (r.status === 'pending') {
+          actions = `
+            <button class="admin-btn admin-btn--primary reg-action-btn" data-reg-id="${escapeAttr(r.id)}" data-action="approve" style="padding: 4px 10px; font-size: 11px;">Approve</button>
+            <button class="admin-btn admin-btn--danger reg-action-btn" data-reg-id="${escapeAttr(r.id)}" data-action="reject" style="padding: 4px 10px; font-size: 11px;">Reject</button>
+          `;
+        } else if (r.status === 'confirmed') {
+          actions = `<span class="admin-pill admin-pill--confirmed">Confirmed</span>`;
+        } else if (r.status === 'rejected') {
+          actions = `
+            <span class="admin-pill admin-pill--rejected">Rejected</span>
+            <button class="admin-btn admin-btn--secondary reg-action-btn" data-reg-id="${escapeAttr(r.id)}" data-action="approve" style="padding: 4px 10px; font-size: 11px; margin-left: 6px;">Restore</button>
+          `;
+        }
+
+        return `
+          <tr>
+            <td><code style="font-size: 11px; opacity: 0.6;">${(r.id || '').slice(0, 8)}</code></td>
+            <td>${name}</td>
+            <td><span class="admin-pill admin-pill--${r.path}">${r.path === 'team' ? 'Team' : 'Agent'}</span></td>
+            <td>${divSelect}</td>
+            <td style="white-space: nowrap;">${actions}</td>
+            <td style="font-size: 12px;">${escapeHtml(contact)}</td>
+            <td style="font-size: 12px; opacity: 0.7;">${formatDate(r.createdAt)}</td>
+          </tr>
+        `;
+      }).join('');
+
+      $id('registrations-table').innerHTML = `
+        <table class="admin-table">
+          <thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Contact</th><th>When</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      `;
+
+      // Wire up action buttons
+      $id('registrations-table').querySelectorAll('.reg-action-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const regId = btn.dataset.regId;
+          const action = btn.dataset.action;
+          const label = action === 'approve' ? 'Approve this registration?' : 'Reject this registration?';
+          if (!confirm(label)) return;
+          updateRegistration(regId, action);
+        });
+      });
+
+      // Wire up division dropdowns
+      $id('registrations-table').querySelectorAll('.reg-div-select').forEach(sel => {
+        const originalValue = sel.value;
+        sel.addEventListener('change', () => {
+          const regId = sel.dataset.regId;
+          const newDiv = sel.value;
+          if (!confirm(`Move this registration to ${sel.options[sel.selectedIndex].text}?`)) {
+            sel.value = originalValue;
+            return;
+          }
+          updateRegistration(regId, 'move', newDiv);
+        });
+      });
+    }
+
+    async function updateRegistration(id, action, division) {
+      try {
+        const body = { id, action };
+        if (division) body.division = division;
+
+        const res = await fetch('/.netlify/functions/admin-registration-update', {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Update failed');
+
+        // Refresh registrations list
+        await loadRegistrations();
+      } catch (err) {
+        alert('Error: ' + err.message);
+      }
+    }
+
+    $id('reg-status-filter').addEventListener('change', renderRegistrations);
+    $id('reg-division-filter').addEventListener('change', renderRegistrations);
+
+    // ===== Schedule =====
+    // Generator panel loads confirmed teams into the division picker and
+    // POSTs to /admin-generate-schedule. Editor panel loads existing
+    // schedule weeks and PATCHes individual matches.
+
+    let scheduleState = {
+      teams: [],          // confirmed teams in current division (generator)
+      weeks: [],          // current division's schedule weeks (editor)
+      dirtyMatchIds: new Set(),
+    };
+
+    function setupScheduleTab() {
+      const sgCircuit = $id('sg-circuit');
+      const sgDivision = $id('sg-division');
+      const seCircuit = $id('se-circuit');
+      const seDivision = $id('se-division');
+      const seWeek = $id('se-week');
+
+      // Remove any prior listeners by cloning
+      // (harmless if tab is opened multiple times)
+      if (!sgDivision.dataset.wired) {
+        sgDivision.addEventListener('change', loadGeneratorTeams);
+        sgCircuit.addEventListener('change', loadGeneratorTeams);
+        sgDivision.dataset.wired = '1';
+      }
+      if (!seDivision.dataset.wired) {
+        seDivision.addEventListener('change', loadEditorSchedule);
+        seCircuit.addEventListener('change', loadEditorSchedule);
+        seWeek.addEventListener('change', renderEditorWeek);
+        seDivision.dataset.wired = '1';
+      }
+
+      // Initial loads
+      loadGeneratorTeams();
+      loadEditorSchedule();
+    }
+
+    // ===== Generator =====
+    async function loadGeneratorTeams() {
+      const circuit = $id('sg-circuit').value;
+      const division = $id('sg-division').value;
+      const list = $id('sg-teams-list');
+
+      list.innerHTML = '<div class="empty-state">Loading teams&hellip;</div>';
+      scheduleState.teams = [];
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-registrations', { credentials: 'include' });
+        if (!res.ok) throw new Error('failed');
+        const data = await res.json();
+        const teams = (data.registrations || [])
+          .filter(r => r.path === 'team' && r.status === 'confirmed'
+                    && r.circuit === circuit && r.division === division)
+          .map(r => ({
+            id: deriveTeamId(r.team?.name || 'Team'),
+            name: r.team?.name || 'Team',
+            captainEmail: r.team?.players?.[0]?.email || null,
+            registrationId: r.id,
+          }));
+
+        // Dedupe IDs (same team name → suffix)
+        const seen = new Set();
+        for (const t of teams) {
+          let id = t.id;
+          let n = 2;
+          while (seen.has(id)) {
+            id = t.id + '-' + n;
+            n++;
+          }
+          t.id = id;
+          seen.add(id);
+        }
+
+        scheduleState.teams = teams;
+        renderGeneratorTeams();
+      } catch (err) {
+        list.innerHTML = '<div class="empty-state">Could not load teams.</div>';
+      }
+    }
+
+    function renderGeneratorTeams() {
+      const list = $id('sg-teams-list');
+      const teams = scheduleState.teams;
+      const generateBtn = $id('sg-generate-btn');
+
+      if (!teams.length) {
+        list.innerHTML = '<div class="empty-state">No confirmed teams in this division yet. Run the team seeder once registrations close.</div>';
+        generateBtn.disabled = true;
+        return;
+      }
+
+      const oddCount = teams.length % 2 !== 0;
+      const rows = teams.map((t, i) => `
+        <div style="padding: 8px 0; border-bottom: 1px solid rgba(13,59,64,0.06); display: flex; justify-content: space-between; gap: 10px; font-size: 13px;">
+          <span><strong style="font-weight: 500;">${i + 1}.</strong> ${escapeHtml(t.name)} <code style="font-size: 11px; opacity: 0.6;">${escapeHtml(t.id)}</code></span>
+          <span style="opacity: 0.7; font-size: 12px;">${escapeHtml(t.captainEmail || '—')}</span>
+        </div>
+      `).join('');
+
+      const warning = oddCount
+        ? `<div style="margin-bottom: 10px; padding: 10px 14px; background: rgba(231,70,70,0.08); border-radius: 6px; font-size: 12px; color: #a32d2d;">Round-robin needs an even number of teams. You have ${teams.length}.</div>`
+        : `<div style="margin-bottom: 10px; font-size: 12px; opacity: 0.7;">${teams.length} teams &middot; generating will produce ${teams.length - 1} weeks of play.</div>`;
+
+      list.innerHTML = warning + rows;
+      generateBtn.disabled = oddCount;
+    }
+
+    function deriveTeamId(name) {
+      return 't_' + String(name).toLowerCase()
+        .normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 30) || 'team';
+    }
+
+    $id('sg-generate-btn').addEventListener('click', async () => {
+      const circuit = $id('sg-circuit').value;
+      const division = $id('sg-division').value;
+      const courts = $id('sg-courts').value.split(',').map(s => s.trim()).filter(Boolean);
+      const teams = scheduleState.teams;
+      const status = $id('sg-status');
+      const btn = $id('sg-generate-btn');
+
+      if (!teams.length) return;
+      if (!confirm(`Generate schedule for ${division}, Circuit ${circuit} with ${teams.length} teams? This will overwrite any existing schedule for these weeks.`)) return;
+
+      btn.disabled = true;
+      status.className = 'admin-status is-info';
+      status.textContent = 'Generating…';
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-generate-schedule', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            circuit, division,
+            teams: teams.map(t => ({ id: t.id, name: t.name })),
+            courts,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Generation failed');
+
+        status.className = 'admin-status is-success';
+        status.textContent = `Generated ${data.weeksGenerated} weeks of matches. Check the Edit panel below to set times and venues.`;
+
+        // Auto-sync the editor to this division
+        $id('se-circuit').value = circuit;
+        $id('se-division').value = division;
+        loadEditorSchedule();
+      } catch (err) {
+        status.className = 'admin-status is-error';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // ===== Editor =====
+    async function loadEditorSchedule() {
+      const circuit = $id('se-circuit').value;
+      const division = $id('se-division').value;
+      const summary = $id('se-weeks-summary');
+      const editor = $id('se-week-editor');
+
+      summary.innerHTML = '<div class="empty-state">Loading&hellip;</div>';
+      scheduleState.weeks = [];
+      scheduleState.dirtyMatchIds.clear();
+      $id('se-save-btn').disabled = true;
+
+      try {
+        const res = await fetch(`/.netlify/functions/admin-matches?circuit=${circuit}&division=${encodeURIComponent(division)}`, {
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error('failed');
+        const data = await res.json();
+        scheduleState.weeks = data.weeks || [];
+        renderWeeksSummary();
+        renderEditorWeek();
+      } catch (err) {
+        summary.innerHTML = '<div class="empty-state">No schedule yet. Generate one above.</div>';
+        editor.innerHTML = '';
+      }
+    }
+
+    function renderWeeksSummary() {
+      const summary = $id('se-weeks-summary');
+      const weeks = scheduleState.weeks;
+      if (!weeks.length) {
+        summary.innerHTML = '<div class="empty-state">No schedule yet for this division. Generate one above.</div>';
+        return;
+      }
+      const chips = weeks.map(w => {
+        const finalized = (w.matches || []).filter(m => m.finalizedAt).length;
+        const total = (w.matches || []).length;
+        const done = total > 0 && finalized === total;
+        return `
+          <div style="padding: 10px 14px; background: rgba(13,59,64,0.04); border-radius: 6px; font-size: 12px; ${done ? 'border-left: 3px solid #1D9E75;' : ''}">
+            <div style="font-weight: 500; font-size: 13px;">Week ${w.week}</div>
+            <div style="opacity: 0.7; margin-top: 2px;">${finalized}/${total} matches final</div>
+          </div>
+        `;
+      }).join('');
+      summary.innerHTML = `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px;">${chips}</div>`;
+    }
+
+    function renderEditorWeek() {
+      const editor = $id('se-week-editor');
+      const weekNum = parseInt($id('se-week').value, 10);
+      const week = scheduleState.weeks.find(w => w.week === weekNum);
+
+      if (!week || !week.matches?.length) {
+        editor.innerHTML = '<div class="empty-state">No matches for this week yet.</div>';
+        return;
+      }
+
+      const rows = week.matches.map(m => {
+        const dtLocal = m.scheduledAt ? toDatetimeLocal(m.scheduledAt) : '';
+        return `
+          <div class="se-match" data-match-id="${escapeAttr(m.id)}" style="padding: 14px; border: 1px solid rgba(13,59,64,0.1); border-radius: 6px; margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px; gap: 10px; flex-wrap: wrap;">
+              <div style="font-size: 14px; font-weight: 500;">
+                ${escapeHtml(m.teamA?.name || 'TBD')} <span style="opacity: 0.5; font-size: 12px; margin: 0 6px;">vs</span> ${escapeHtml(m.teamB?.name || 'TBD')}
+              </div>
+              <div style="font-size: 11px; opacity: 0.6; letter-spacing: 0.08em;">
+                <code>${escapeHtml(m.id)}</code>
+                ${m.finalizedAt ? ' &middot; <span style="color: #0F6E56; font-weight: 500;">FINAL</span>' : ''}
+              </div>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
+              <div>
+                <label style="display:block; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.65; margin-bottom: 4px; font-weight: 500;">Court</label>
+                <input type="text" data-field="court" value="${escapeAttr(m.court || '')}"
+                  style="width: 100%; padding: 8px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 13px; font-family: inherit;">
+              </div>
+              <div>
+                <label style="display:block; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.65; margin-bottom: 4px; font-weight: 500;">Venue</label>
+                <input type="text" data-field="venue" value="${escapeAttr(m.venue || '')}" placeholder="Optional"
+                  style="width: 100%; padding: 8px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 13px; font-family: inherit;">
+              </div>
+              <div>
+                <label style="display:block; font-size: 10px; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.65; margin-bottom: 4px; font-weight: 500;">Scheduled</label>
+                <input type="datetime-local" data-field="scheduledAt" value="${dtLocal}"
+                  style="width: 100%; padding: 8px 10px; border: 1px solid rgba(13,59,64,0.2); border-radius: 6px; font-size: 13px; font-family: inherit;">
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      editor.innerHTML = rows;
+
+      // Wire change tracking
+      editor.querySelectorAll('.se-match input').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const matchEl = inp.closest('.se-match');
+          scheduleState.dirtyMatchIds.add(matchEl.dataset.matchId);
+          matchEl.style.borderColor = 'rgba(232,181,66,0.6)';
+          $id('se-save-btn').disabled = false;
+        });
+      });
+    }
+
+    function toDatetimeLocal(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      if (isNaN(d)) return '';
+      const pad = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function fromDatetimeLocal(v) {
+      if (!v) return null;
+      const d = new Date(v);
+      return isNaN(d) ? null : d.toISOString();
+    }
+
+    $id('se-save-btn').addEventListener('click', async () => {
+      const dirty = Array.from(scheduleState.dirtyMatchIds);
+      if (!dirty.length) return;
+
+      const btn = $id('se-save-btn');
+      const status = $id('se-status');
+      btn.disabled = true;
+      status.className = 'admin-status is-info';
+      status.textContent = `Saving ${dirty.length} match${dirty.length === 1 ? '' : 'es'}…`;
+
+      let ok = 0;
+      let errors = 0;
+      for (const matchId of dirty) {
+        const el = document.querySelector(`.se-match[data-match-id="${CSS.escape(matchId)}"]`);
+        if (!el) continue;
+        const payload = {
+          court: el.querySelector('[data-field="court"]').value.trim() || null,
+          venue: el.querySelector('[data-field="venue"]').value.trim() || null,
+          scheduledAt: fromDatetimeLocal(el.querySelector('[data-field="scheduledAt"]').value),
+        };
+        try {
+          const res = await fetch(`/.netlify/functions/admin-matches?matchId=${encodeURIComponent(matchId)}`, {
+            method: 'PATCH',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          ok++;
+          el.style.borderColor = '';
+        } catch (err) {
+          errors++;
+          console.error('Save failed for', matchId, err);
+        }
+      }
+
+      scheduleState.dirtyMatchIds.clear();
+      status.className = errors > 0 ? 'admin-status is-error' : 'admin-status is-success';
+      status.textContent = errors > 0
+        ? `Saved ${ok}, ${errors} errored. Check console.`
+        : `Saved ${ok} match${ok === 1 ? '' : 'es'}.`;
+
+      // Refresh data
+      await loadEditorSchedule();
+    });
+
+    // ===== Moments =====
+    async function loadMomentsPreview() {
+      try {
+        const res = await fetch('/.netlify/functions/moments-list', { credentials: 'include' });
+        if (!res.ok) throw new Error('failed');
+        const data = await res.json();
+        const recent = (data.moments || []).slice(0, 24);
+        if (!recent.length) {
+          $id('admin-moments-preview').innerHTML = '<div class="empty-state">No photos uploaded yet.</div>';
+          return;
+        }
+        $id('admin-moments-preview').innerHTML = `
+          <div class="moments-admin-grid">
+            ${recent.map(m => `
+              <div class="moments-admin-tile">
+                <img src="${m.url}" alt="">
+                <button class="moments-admin-tile__delete" data-id="${m.id}" title="Delete">&times;</button>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        document.querySelectorAll('.moments-admin-tile__delete').forEach(btn => {
+          btn.addEventListener('click', () => deleteMoment(btn.dataset.id));
+        });
+      } catch (err) {
+        $id('admin-moments-preview').innerHTML = '<div class="empty-state">Could not load photos.</div>';
+      }
+    }
+
+    async function deleteMoment(id) {
+      if (!confirm('Delete this photo? This cannot be undone.')) return;
+      try {
+        const res = await fetch(`/.netlify/functions/moments-delete?id=${encodeURIComponent(id)}`, {
+          method: 'DELETE',
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error();
+        loadMomentsPreview();
+      } catch {
+        alert('Delete failed.');
+      }
+    }
+
+    $id('upload-submit').addEventListener('click', async () => {
+      const circuit = $id('upload-circuit').value;
+      const week = $id('upload-week').value;
+      const caption = $id('upload-caption').value.trim();
+      const files = $id('upload-files').files;
+      const status = $id('upload-status');
+      const btn = $id('upload-submit');
+
+      if (!files.length) {
+        status.className = 'admin-status is-error';
+        status.textContent = 'Pick at least one photo first.';
+        return;
+      }
+
+      btn.disabled = true;
+      let uploaded = 0;
+
+      for (const file of files) {
+        status.className = 'admin-status is-info';
+        status.textContent = `Uploading ${uploaded + 1} of ${files.length}…`;
+        try {
+          const fd = new FormData();
+          fd.append('file', file);
+          fd.append('circuit', circuit);
+          fd.append('week', week);
+          fd.append('caption', caption);
+          const res = await fetch('/.netlify/functions/moments-upload', {
+            method: 'POST',
+            credentials: 'include',
+            body: fd,
+          });
+          if (!res.ok) throw new Error(await res.text());
+          uploaded++;
+        } catch (err) {
+          status.className = 'admin-status is-error';
+          status.textContent = `Upload ${uploaded + 1} failed: ${err.message}`;
+          btn.disabled = false;
+          return;
+        }
+      }
+
+      status.className = 'admin-status is-success';
+      status.textContent = `Uploaded ${uploaded} ${uploaded === 1 ? 'photo' : 'photos'}.`;
+      $id('upload-files').value = '';
+      $id('upload-caption').value = '';
+      btn.disabled = false;
+      loadMomentsPreview();
+    });
+
+    // ===== Seed teams from registrations =====
+    let seedPlan = null;
+
+    $id('seed-dryrun-btn').addEventListener('click', async () => {
+      const btn = $id('seed-dryrun-btn');
+      const applyBtn = $id('seed-apply-btn');
+      const status = $id('seed-status');
+      const results = $id('seed-results');
+
+      btn.disabled = true;
+      status.className = 'admin-status is-info';
+      status.textContent = 'Building plan…';
+      results.innerHTML = '';
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-seed-teams?dryRun=1', {
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Plan failed');
+        seedPlan = await res.json();
+
+        const c = seedPlan.toCreate?.length || 0;
+        const u = seedPlan.toUpdate?.length || 0;
+        const s = seedPlan.toSkip?.length || 0;
+        status.className = 'admin-status is-success';
+        status.textContent = `Plan ready: ${c} to create, ${u} to update, ${s} already in sync.`;
+        applyBtn.disabled = c + u === 0;
+
+        results.innerHTML = renderSeedPlan(seedPlan);
+      } catch (err) {
+        status.className = 'admin-status is-error';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $id('seed-apply-btn').addEventListener('click', async () => {
+      if (!seedPlan) return;
+      const c = seedPlan.toCreate?.length || 0;
+      const u = seedPlan.toUpdate?.length || 0;
+      if (!confirm(`Apply plan? This will create ${c} team${c === 1 ? '' : 's'} and update ${u}. Idempotent — safe to run again.`)) return;
+
+      const btn = $id('seed-apply-btn');
+      const dryBtn = $id('seed-dryrun-btn');
+      const status = $id('seed-status');
+      const results = $id('seed-results');
+
+      btn.disabled = true;
+      dryBtn.disabled = true;
+      status.className = 'admin-status is-info';
+      status.textContent = 'Applying plan…';
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-seed-teams', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'Apply failed');
+        const data = await res.json();
+
+        status.className = data.errors > 0 ? 'admin-status is-error' : 'admin-status is-success';
+        status.textContent = `Done: ${data.created} created, ${data.updated} updated, ${data.skipped} skipped${data.errors > 0 ? `, ${data.errors} errored` : ''}.`;
+        results.innerHTML = renderSeedResult(data);
+        seedPlan = null;
+
+        // Refresh overview stats to reflect new teams
+        loadOverview();
+      } catch (err) {
+        status.className = 'admin-status is-error';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = true; // Plan has been consumed
+        dryBtn.disabled = false;
+      }
+    });
+
+    function renderSeedPlan(plan) {
+      const toCreate = plan.toCreate || [];
+      const toUpdate = plan.toUpdate || [];
+      const toSkip = plan.toSkip || [];
+
+      const section = (title, items, renderRow) => {
+        if (!items.length) return '';
+        return `
+          <div style="margin-top: 14px;">
+            <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.6; margin-bottom: 8px; font-weight: 500;">${title} (${items.length})</div>
+            <div style="font-size: 13px;">
+              ${items.map(renderRow).join('')}
+            </div>
+          </div>
+        `;
+      };
+
+      return [
+        section('To create', toCreate, (i) => `
+          <div style="padding: 8px 0; border-bottom: 1px solid rgba(13,59,64,0.06); display: flex; justify-content: space-between; gap: 10px;">
+            <span><strong style="font-weight: 500;">${escapeHtml(i.teamName)}</strong> <code style="font-size: 11px; opacity: 0.6;">${escapeHtml(i.teamId)}</code></span>
+            <span style="opacity: 0.7; font-size: 12px;">${escapeHtml(i.divisionLabel || i.division)} · ${escapeHtml(i.captainEmail)}</span>
+          </div>
+        `),
+        section('To update', toUpdate, (i) => `
+          <div style="padding: 8px 0; border-bottom: 1px solid rgba(13,59,64,0.06);">
+            <div style="display: flex; justify-content: space-between; gap: 10px;">
+              <span><strong style="font-weight: 500;">${escapeHtml(i.teamName)}</strong> <code style="font-size: 11px; opacity: 0.6;">${escapeHtml(i.teamId)}</code></span>
+              <span style="opacity: 0.7; font-size: 12px;">${escapeHtml(i.captainEmail)}</span>
+            </div>
+            ${(i.changes || []).map(c => `<div style="font-size: 12px; opacity: 0.7; margin-top: 4px;">&mdash; ${escapeHtml(c)}</div>`).join('')}
+          </div>
+        `),
+        section('Already in sync', toSkip, (i) => `
+          <div style="padding: 6px 0; font-size: 12px; opacity: 0.65;">
+            ${escapeHtml(i.teamName || i.reason)} ${i.captainEmail ? '<span style="opacity: 0.6;">· ' + escapeHtml(i.captainEmail) + '</span>' : ''}
+          </div>
+        `),
+        plan.freeAgentsCount > 0
+          ? `<div style="margin-top: 14px; padding: 10px 14px; background: rgba(232,181,66,0.1); border-radius: 6px; font-size: 12px; color: #854F0B;">Note: ${plan.freeAgentsCount} free agent${plan.freeAgentsCount === 1 ? '' : 's'} not seeded. Free agents get drafted onto teams separately.</div>`
+          : '',
+      ].join('');
+    }
+
+    function renderSeedResult(data) {
+      const d = data.details || {};
+      const parts = [];
+      if (d.created?.length) {
+        parts.push(`
+          <div style="margin-top: 14px;">
+            <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.6; margin-bottom: 8px; font-weight: 500;">Created</div>
+            ${d.created.map(t => `
+              <div style="padding: 6px 0; font-size: 13px;">
+                <strong style="font-weight: 500;">${escapeHtml(t.name)}</strong>
+                <code style="font-size: 11px; opacity: 0.6; margin-left: 8px;">${escapeHtml(t.teamId)}</code>
+                <span style="font-size: 12px; opacity: 0.7; margin-left: 8px;">${escapeHtml(t.captainEmail)}</span>
+              </div>
+            `).join('')}
+          </div>
+        `);
+      }
+      if (d.errors?.length) {
+        parts.push(`
+          <div style="margin-top: 14px;">
+            <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #a32d2d; margin-bottom: 8px; font-weight: 500;">Errors</div>
+            ${d.errors.map(e => `
+              <div style="padding: 6px 0; font-size: 12px; color: #a32d2d;">
+                ${escapeHtml(e.teamName || 'unknown')}: ${escapeHtml(e.error)}
+              </div>
+            `).join('')}
+          </div>
+        `);
+      }
+      return parts.join('');
+    }
+
+    // ===== Utils =====
+    function escapeHtml(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+      }[c]));
+    }
+    function escapeAttr(s) { return escapeHtml(s); }
+    function formatDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    // ===== Mobile drawer =====
+    (function setupAdminDrawer() {
+      const ham = document.getElementById('ds-hamburger-admin');
+      const drawer = document.getElementById('ds-drawer-admin');
+      const backdrop = document.getElementById('ds-drawer-backdrop-admin');
+      if (!ham || !drawer || !backdrop) return;
+
+      function openDrawer() {
+        ham.classList.add('is-open');
+        ham.setAttribute('aria-expanded', 'true');
+        drawer.classList.add('is-open');
+        backdrop.classList.add('is-open');
+        document.body.classList.add('ds-drawer-open');
+      }
+      function closeDrawer() {
+        ham.classList.remove('is-open');
+        ham.setAttribute('aria-expanded', 'false');
+        drawer.classList.remove('is-open');
+        backdrop.classList.remove('is-open');
+        document.body.classList.remove('ds-drawer-open');
+      }
+
+      ham.addEventListener('click', () => {
+        drawer.classList.contains('is-open') ? closeDrawer() : openDrawer();
+      });
+      backdrop.addEventListener('click', closeDrawer);
+      drawer.querySelectorAll('[data-ds-drawer-close]').forEach(btn =>
+        btn.addEventListener('click', closeDrawer)
+      );
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && drawer.classList.contains('is-open')) closeDrawer();
+      });
+
+      // Drawer tab buttons trigger the matching top-bar tab
+      drawer.querySelectorAll('[data-drawer-tab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.drawerTab;
+          drawer.querySelectorAll('[data-drawer-tab]').forEach(b =>
+            b.classList.toggle('is-active', b.dataset.drawerTab === tab)
+          );
+          const topTab = document.querySelector(`.admin-tab[data-tab="${tab}"]`);
+          if (topTab) topTab.click();
+          closeDrawer();
+        });
+      });
+
+      // Keep drawer highlight in sync with top tab bar
+      document.querySelectorAll('.admin-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          drawer.querySelectorAll('[data-drawer-tab]').forEach(b =>
+            b.classList.toggle('is-active', b.dataset.drawerTab === btn.dataset.tab)
+          );
+        });
+      });
+
+      // Sign out
+      const drawerSignout = document.getElementById('ds-drawer-admin-signout');
+      if (drawerSignout) {
+        drawerSignout.addEventListener('click', () => {
+          document.getElementById('sign-out-link').click();
+        });
+      }
+
+      // Mirror admin email into drawer
+      const emailObserver = new MutationObserver(() => {
+        const email = document.getElementById('user-email')?.textContent || '';
+        const drawerEmail = document.getElementById('ds-drawer-admin-email');
+        if (drawerEmail) drawerEmail.textContent = email ? `Signed in as ${email}` : '';
+      });
+      const emailEl = document.getElementById('user-email');
+      if (emailEl) emailObserver.observe(emailEl, { childList: true, characterData: true, subtree: true });
+    })();
+
+    // ===== Init =====
+    checkAuth();
+  </script>
+</body>
+</html>
