@@ -23,6 +23,16 @@ function getCookie(req, name) {
 }
 
 /**
+ * Standard 401 response used by admin endpoints.
+ */
+export function unauthResponse(msg = 'Unauthorized') {
+  return new Response(JSON.stringify({ error: msg }), {
+    status: 401,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/**
  * Validate the admin session. Returns { email } or throws.
  */
 export async function requireAdmin(req) {
