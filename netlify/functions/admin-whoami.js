@@ -1,20 +1,24 @@
-// netlify/functions/admin-whoami.js
-// Validates the admin session cookie and returns the admin's email.
-// Returns 401 if no valid session.
+// =============================================================
+// GET /api/admin-whoami
+//
+// Returns { admin: true, email } if the request has a valid
+// admin session cookie. Returns 401 otherwise.
+// =============================================================
 
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { requireAdmin } from './lib/admin-auth.js';
 
 export default async (req) => {
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  if (req.method !== 'GET') {
+    return new Response('Method not allowed', { status: 405 });
+  }
 
-  return new Response(JSON.stringify({ admin: true, email: admin.email }), {
-    status: 200,
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'private, no-store',
-    },
-  });
+  try {
+    const admin = await requireAdmin(req);
+    return new Response(JSON.stringify({ admin: true, email: admin.email }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch {
+    return new Response('Unauthorized', { status: 401 });
+  }
 };
-
-export const config = { path: '/.netlify/functions/admin-whoami' };

@@ -1,131 +1,87 @@
-// netlify/functions/admin-login.js
-// Accepts an email, creates a magic-link token, emails the admin a
-// one-tap sign-in URL. ALWAYS returns 200 with a generic success message
-// regardless of whether the email is an admin — prevents enumeration.
+// =============================================================
+// POST /api/admin-login
+//
+// Magic-link login for admins. Accepts { email }, checks if the
+// email is in the ADMIN_EMAILS env var, generates a one-time
+// token, stores it in Netlify Blobs, and emails a sign-in link
+// via Resend.
+//
+// Always returns 200 with a generic message to prevent email
+// enumeration — same pattern as captain-login.
+// =============================================================
 
-import { createMagicToken } from './lib/admin-auth.js';
+import { getStore } from '@netlify/blobs';
 import { sendEmail } from './lib/email.js';
-
-const BRAND = {
-  teal: '#0D3B40',
-  black: '#000000',
-  gold: '#E8B542',
-  cream: '#F5EBD4',
-};
-
-const GENERIC_RESPONSE = {
-  ok: true,
-  message: "If that email is registered as an admin, we just sent a sign-in link. Check your inbox.",
-};
+import crypto from 'crypto';
 
 export default async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 });
+  }
 
   try {
     const { email } = await req.json();
-    const normalized = (email || '').toString().trim().toLowerCase();
-
-    if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
-      return json({ error: 'Valid email required' }, 400);
+    if (!email) {
+      return new Response(JSON.stringify({ ok: true, message: 'If that email is an admin, a link is on its way.' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    const adminEmails = (Netlify.env.get('ADMIN_EMAILS') || '')
-      .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    const normalized = email.trim().toLowerCase();
 
-    // Always succeed externally. Only send the email if it's a real admin.
-    if (!adminEmails.includes(normalized)) {
-      await new Promise(r => setTimeout(r, 300));
-      return json(GENERIC_RESPONSE);
+    // Check against ADMIN_EMAILS env var (comma-separated)
+    const adminEmails = (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean);
+
+    if (adminEmails.includes(normalized)) {
+      // Generate a one-time token
+      const token = crypto.randomBytes(32).toString('hex');
+      const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
+
+      // Store in Netlify Blobs
+      const store = getStore('admin-magic-links');
+      await store.set(token, JSON.stringify({
+        email: normalized,
+        expiresAt,
+        used: false,
+      }));
+
+      // Build the magic link URL
+      const siteUrl = process.env.SITE_URL || `https://${process.env.URL || 'localhost:8888'}`;
+      const magicLink = `${siteUrl}/.netlify/functions/admin-link?token=${token}`;
+
+      // Send the email
+      await sendEmail({
+        to: normalized,
+        subject: 'Your Dink Society admin sign-in link',
+        html: `
+          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
+            <div style="font-family: Georgia, serif; font-style: italic; font-size: 20px; color: #0F4D3A; margin-bottom: 24px;">The Dink Society</div>
+            <h1 style="font-size: 24px; color: #0F4D3A; margin: 0 0 12px;">Admin sign-in</h1>
+            <p style="font-size: 15px; color: #333; line-height: 1.6; margin: 0 0 24px;">
+              Tap the button below to sign into the admin portal. This link expires in 15 minutes and can only be used once.
+            </p>
+            <a href="${magicLink}" style="display: inline-block; padding: 14px 28px; background: #E8B542; color: #0F4D3A; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 6px;">
+              Sign in to Admin
+            </a>
+            <p style="font-size: 12px; color: #888; margin-top: 24px; line-height: 1.5;">
+              If you didn't request this, you can safely ignore it. The link will expire on its own.
+            </p>
+          </div>
+        `,
+      });
     }
 
-    const token = await createMagicToken(normalized);
-    const siteUrl = (Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app').replace(/\/+$/, '');
-    const magicUrl = `${siteUrl}/.netlify/functions/admin-link?token=${token}`;
-
-    await sendEmail({
-      to: normalized,
-      subject: 'Sign in to Admin — The Dink Society',
-      html: renderAdminMagicLink(magicUrl),
+    // Always return success (prevents enumeration)
+    return new Response(JSON.stringify({ ok: true, message: 'If that email is an admin, a link is on its way.' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
     });
-
-    return json(GENERIC_RESPONSE);
   } catch (err) {
     console.error('admin-login error:', err);
-    return json(GENERIC_RESPONSE);
+    return new Response('Server error', { status: 500 });
   }
 };
-
-function renderAdminMagicLink(magicUrl) {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sign in &middot; The Dink Society</title>
-</head>
-<body style="margin:0; padding:0; background:${BRAND.cream}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:${BRAND.cream}; padding: 32px 16px;">
-    <tr><td align="center">
-      <table role="presentation" width="520" cellspacing="0" cellpadding="0" border="0" style="max-width: 520px; width: 100%;">
-
-        <tr><td style="background: linear-gradient(135deg, ${BRAND.teal} 0%, ${BRAND.black} 100%); border-radius: 12px 12px 0 0; padding: 36px 32px; color: ${BRAND.cream}; text-align: left;">
-          <div style="font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 18px; color: ${BRAND.gold}; margin-bottom: 24px;">
-            The Dink Society
-          </div>
-          <div style="font-size: 11px; letter-spacing: 0.25em; text-transform: uppercase; color: ${BRAND.gold}; margin-bottom: 12px; font-weight: 500;">
-            Admin sign-in
-          </div>
-          <h1 style="font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 36px; line-height: 1.1; font-weight: 500; margin: 0; color: ${BRAND.cream};">
-            One-tap to Admin.
-          </h1>
-        </td></tr>
-
-        <tr><td style="background: #ffffff; padding: 32px; color: ${BRAND.teal}; text-align: left;">
-          <p style="margin: 0 0 20px; font-size: 15px; line-height: 1.65;">
-            Tap the button below to sign in to the admin portal. This link is good for the next 15 minutes and can only be used once.
-          </p>
-
-          <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin: 28px 0;">
-            <tr><td align="center">
-              <a href="${magicUrl}" style="display: inline-block; background: ${BRAND.gold}; color: ${BRAND.teal}; padding: 14px 36px; border-radius: 8px; font-size: 15px; font-weight: 500; text-decoration: none;">
-                Sign in to admin portal
-              </a>
-            </td></tr>
-          </table>
-
-          <p style="margin: 0 0 12px; font-size: 13px; line-height: 1.65; color: ${BRAND.teal}; opacity: 0.75;">
-            If the button doesn't work, copy and paste this link:
-          </p>
-          <p style="margin: 0 0 20px; font-size: 12px; line-height: 1.5; word-break: break-all; color: ${BRAND.teal}; opacity: 0.6;">
-            ${magicUrl}
-          </p>
-
-          <div style="margin: 28px 0 0; padding: 16px 20px; background: rgba(13, 59, 64, 0.04); border-radius: 8px; font-size: 13px; line-height: 1.6; color: ${BRAND.teal};">
-            <strong style="font-weight: 500;">Didn't request this?</strong> Someone typed your email into the admin sign-in page. You can ignore this email &mdash; no action needed.
-          </div>
-        </td></tr>
-
-        <tr><td style="background: ${BRAND.cream}; border-radius: 0 0 12px 12px; padding: 20px 32px; text-align: center; font-size: 12px; color: ${BRAND.teal};">
-          <div style="font-family: Georgia, 'Times New Roman', serif; font-style: italic; font-size: 14px; color: ${BRAND.teal}; margin-bottom: 6px;">
-            The Dink Society
-          </div>
-          <div style="opacity: 0.7;">
-            <a href="https://instagram.com/dinksociety.pb" style="color: ${BRAND.teal}; text-decoration: none; font-weight: 500;">@dinksociety.pb</a>
-          </div>
-        </td></tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
-}
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-}
-
-export const config = { path: '/.netlify/functions/admin-login' };

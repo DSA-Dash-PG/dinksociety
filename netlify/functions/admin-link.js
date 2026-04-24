@@ -1,48 +1,79 @@
-// netlify/functions/admin-link.js
-// Consumes a one-time magic-link token, creates a session, sets an
-// HttpOnly cookie, and redirects to /admin.html.
-// On failure, redirects with ?error=<code>.
+// =============================================================
+// GET /api/admin-link?token=xxx
+//
+// Consumes a one-time admin magic-link token. If valid and not
+// expired, creates a session token, stores it in Blobs, sets it
+// as an httpOnly cookie, and redirects to /admin.html.
+//
+// On failure, redirects to /admin.html?error=<reason>.
+// =============================================================
 
-import { consumeMagicToken, createSession, buildSessionCookie } from './lib/admin-auth.js';
+import { getStore } from '@netlify/blobs';
+import crypto from 'crypto';
 
 export default async (req) => {
   const url = new URL(req.url);
   const token = url.searchParams.get('token');
+  const redirectBase = '/admin.html';
 
-  const redirect = (error) =>
-    new Response(null, {
-      status: 302,
-      headers: { Location: `/admin.html${error ? `?error=${error}` : ''}` },
-    });
-
-  if (!token) return redirect('missing');
+  if (!token) {
+    return Response.redirect(new URL(`${redirectBase}?error=missing`, url.origin), 302);
+  }
 
   try {
-    const result = await consumeMagicToken(token);
+    const store = getStore('admin-magic-links');
+    const raw = await store.get(token);
 
-    if (!result) return redirect('invalid');
+    if (!raw) {
+      return Response.redirect(new URL(`${redirectBase}?error=invalid`, url.origin), 302);
+    }
 
-    // Verify the email is still in the admin list
-    const adminEmails = (Netlify.env.get('ADMIN_EMAILS') || '')
-      .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+    const record = JSON.parse(raw);
 
-    if (!adminEmails.includes(result.email)) return redirect('invalid');
+    // Check expiry
+    if (Date.now() > record.expiresAt) {
+      await store.delete(token); // clean up
+      return Response.redirect(new URL(`${redirectBase}?error=expired`, url.origin), 302);
+    }
 
-    // Create session and set cookie
-    const sessionId = await createSession(result.email);
-    const cookie = buildSessionCookie(sessionId);
+    // Check if already used
+    if (record.used) {
+      return Response.redirect(new URL(`${redirectBase}?error=invalid`, url.origin), 302);
+    }
+
+    // Mark as used
+    await store.set(token, JSON.stringify({ ...record, used: true }));
+
+    // Create a session token
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const sessionExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+
+    const sessionStore = getStore('admin-sessions');
+    await sessionStore.set(sessionToken, JSON.stringify({
+      email: record.email,
+      expiresAt: sessionExpiry,
+    }));
+
+    // Set the session cookie and redirect
+    const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
+    const cookie = [
+      `admin_session=${sessionToken}`,
+      'Path=/',
+      'HttpOnly',
+      `Max-Age=${24 * 60 * 60}`,
+      'SameSite=Lax',
+      ...(isLocal ? [] : ['Secure']),
+    ].join('; ');
 
     return new Response(null, {
       status: 302,
       headers: {
-        Location: '/admin.html',
+        Location: redirectBase,
         'Set-Cookie': cookie,
       },
     });
   } catch (err) {
     console.error('admin-link error:', err);
-    return redirect('server');
+    return Response.redirect(new URL(`${redirectBase}?error=server`, url.origin), 302);
   }
 };
-
-export const config = { path: '/.netlify/functions/admin-link' };
