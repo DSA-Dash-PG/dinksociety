@@ -628,7 +628,10 @@
       <div class="admin-card">
         <div class="admin-card__header">
           <h2 class="admin-card__title">Seasons</h2>
-          <button class="admin-btn admin-btn--primary" id="create-season-btn">+ New season</button>
+          <div style="display: flex; gap: 8px;">
+            <button class="admin-btn admin-btn--secondary" id="seed-demo-btn" style="font-size: 11px;">Seed demo data</button>
+            <button class="admin-btn admin-btn--primary" id="create-season-btn">+ New season</button>
+          </div>
         </div>
         <div id="seasons-list">
           <div class="empty-state">Loading&hellip;</div>
@@ -2185,6 +2188,26 @@
         loadRegistrations();
       } catch (err) { alert(err.message); }
     }
+
+    // ===== Seed demo data =====
+    $id('seed-demo-btn').addEventListener('click', async () => {
+      if (!confirm('This will populate Circuit I with 12 teams, 72 players, 36 matches, standings, and registrations. Existing demo data will be overwritten. Continue?')) return;
+      const btn = $id('seed-demo-btn');
+      btn.disabled = true;
+      btn.textContent = 'Seeding…';
+      try {
+        const res = await fetch('/.netlify/functions/seed-demo-data', { method: 'POST', credentials: 'include' });
+        if (!res.ok) throw new Error((await res.text()) || 'Seed failed');
+        const data = await res.json();
+        btn.textContent = `Seeded! ${data.seeded.teams} teams, ${data.seeded.matches} matches`;
+        loadSeasons();
+        setTimeout(() => { btn.textContent = 'Seed demo data'; btn.disabled = false; }, 3000);
+      } catch (err) {
+        alert('Seed failed: ' + err.message);
+        btn.textContent = 'Seed demo data';
+        btn.disabled = false;
+      }
+    });
 
     // ===== Init =====
     checkAuth();
