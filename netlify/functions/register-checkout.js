@@ -1,143 +1,155 @@
-// netlify/functions/register-checkout.js
-// Creates a Stripe Checkout Session for a Dink Society Circuit I registration.
-// Stashes the pending registration in Netlify Blobs so the webhook can retrieve it
-// and mark it confirmed once payment succeeds.
+// =============================================================
+// POST /api/register-checkout
 //
-// Required env vars (set in Netlify dashboard):
-//   STRIPE_SECRET_KEY      — sk_live_... or sk_test_...
-//   STRIPE_SUCCESS_URL     — e.g. https://justdinkit.netlify.app/register-success.html
-//   STRIPE_CANCEL_URL      — e.g. https://justdinkit.netlify.app/register.html
-//   SITE_URL               — used as fallback if the two above aren't set
+// Creates a Stripe Checkout Session for league registration.
+//
+// Payload from register.html:
+//   { seasonId, circuit, division, divisionLabel, path, price,
+//     team?: { name, captain, players: [{ name, email, phone?, role }] },
+//     agent?: { name, email, gender, dob?, dupr? } }
+//
+// Flow:
+//   1. Looks up the season from Blobs to get the Stripe price ID
+//   2. Creates a pending registration record in Blobs
+//   3. Creates a Stripe Checkout Session with the correct price
+//   4. Returns { checkoutUrl } for the frontend to redirect
+//
+// The stripe-webhook function handles checkout.session.completed
+// and marks the registration as 'confirmed'.
+// =============================================================
 
-import { getStore } from '@netlify/blobs';
 import Stripe from 'stripe';
+import { getStore } from '@netlify/blobs';
+import crypto from 'crypto';
 
-const PRICES = {
-  team: 45000,   // cents
-  agent: 7500,
-};
-
-const DIVISION_LABELS = {
-  '3.0M': '3.0 Mixed',
-  '3.5M': '3.5 Mixed',
-  '3.5W': "3.5 Women's",
-};
-
-export default async (req, context) => {
-  const headers = { 'Content-Type': 'application/json' };
-
+export default async (req) => {
   if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ error: 'Method not allowed' }), {
-      status: 405, headers,
-    });
+    return new Response('Method not allowed', { status: 405 });
+  }
+
+  const stripeKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeKey) {
+    return new Response('Stripe not configured', { status: 500 });
   }
 
   try {
     const body = await req.json();
-    const { path, division, circuit, team, agent } = body;
+    const { seasonId, circuit, division, divisionLabel, path, team, agent } = body;
 
-    // ===== Validate =====
-    if (!['team', 'agent'].includes(path)) {
-      return json({ error: 'Invalid path' }, 400, headers);
+    // Validate required fields
+    if (!seasonId || !division || !path) {
+      return new Response('Missing required fields: seasonId, division, path', { status: 400 });
     }
-    if (!Object.keys(DIVISION_LABELS).includes(division)) {
-      return json({ error: 'Invalid division' }, 400, headers);
+    if (path === 'team' && (!team?.name || !team?.players?.length)) {
+      return new Response('Team registration requires team name and at least one player', { status: 400 });
     }
-    if (division === '3.5W') {
-      return json({ error: "3.5 Women's division is not yet open for registration" }, 400, headers);
-    }
-    if (!circuit || !/^[IVX]+$/.test(circuit)) {
-      return json({ error: 'Invalid circuit' }, 400, headers);
+    if (path === 'agent' && (!agent?.name || !agent?.email)) {
+      return new Response('Free agent registration requires name and email', { status: 400 });
     }
 
-    if (path === 'team') {
-      if (!team?.name) {
-        return json({ error: 'Team must have a name' }, 400, headers);
+    // Look up the season to get the Stripe price ID
+    const seasonStore = getStore('seasons');
+    const seasonRaw = await seasonStore.get(seasonId);
+
+    let stripePriceId = null;
+    let resolvedPrice = path === 'team' ? 450 : 75; // fallback
+
+    if (seasonRaw) {
+      const season = JSON.parse(seasonRaw);
+
+      // Check registration is open
+      if (season.registration !== 'open') {
+        return new Response('Registration is not currently open for this season', { status: 400 });
       }
-      if (!team?.captainName || !team?.captainEmail) {
-        return json({ error: 'Captain name and email are required' }, 400, headers);
-      }
-    } else {
-      if (!agent?.name || !agent?.email) {
-        return json({ error: 'Free-agent registration needs a name and email' }, 400, headers);
+
+      const div = season.divisions.find(d => d.id === division);
+      if (div) {
+        stripePriceId = path === 'team' ? div.stripeTeamPriceId : div.stripeAgentPriceId;
+        resolvedPrice = path === 'team' ? div.teamPrice : div.agentPrice;
       }
     }
 
-    // ===== Stash pending registration =====
-    const registrationId = cryptoId();
-    const store = getStore('registrations');
-    const pending = {
-      id: registrationId,
-      circuit,
+    // Generate a registration ID
+    const regId = crypto.randomBytes(8).toString('hex');
+
+    // Create the registration record (pending until payment confirms)
+    const registration = {
+      id: regId,
+      seasonId: seasonId || null,
+      circuit: circuit || seasonId,
       division,
-      divisionLabel: DIVISION_LABELS[division],
+      divisionLabel: divisionLabel || division,
       path,
-      team: team || null,
-      agent: agent || null,
       status: 'pending',
+      price: resolvedPrice,
+      team: path === 'team' ? team : undefined,
+      agent: path === 'agent' ? agent : undefined,
       createdAt: new Date().toISOString(),
     };
-    await store.setJSON(`pending/${registrationId}.json`, pending);
 
-    // ===== Stripe Checkout =====
-    const stripeKey = Netlify.env.get('STRIPE_SECRET_KEY');
-    if (!stripeKey) {
-      return json({ error: 'Stripe not configured (STRIPE_SECRET_KEY missing)' }, 500, headers);
-    }
-    const stripe = new Stripe(stripeKey, { apiVersion: '2024-06-20' });
+    // Save to Blobs
+    const regStore = getStore('registrations');
+    await regStore.set(regId, JSON.stringify(registration));
 
-    const siteUrl = Netlify.env.get('SITE_URL') || 'https://justdinkit.netlify.app';
-    const successUrl = (Netlify.env.get('STRIPE_SUCCESS_URL') || `${siteUrl}/register-success.html`)
-      + `?id=${registrationId}&session={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = Netlify.env.get('STRIPE_CANCEL_URL') || `${siteUrl}/register.html`;
+    // Build the Stripe Checkout Session
+    const stripe = new Stripe(stripeKey);
+    const siteUrl = process.env.SITE_URL || `https://${process.env.URL || 'localhost:8888'}`;
 
-    const customerEmail = path === 'team' ? team.captainEmail : agent.email;
-    const productName = path === 'team'
-      ? `The Dink Society — Circuit ${circuit} team entry (${DIVISION_LABELS[division]})`
-      : `The Dink Society — Circuit ${circuit} free agent (${DIVISION_LABELS[division]})`;
+    const customerEmail = path === 'team'
+      ? team?.players?.[0]?.email
+      : agent?.email;
 
-    const session = await stripe.checkout.sessions.create({
+    const sessionParams = {
       mode: 'payment',
-      payment_method_types: ['card'],
-      customer_email: customerEmail,
-      line_items: [{
-        price_data: {
-          currency: 'usd',
-          unit_amount: PRICES[path],
-          product_data: {
-            name: productName,
-            description: path === 'team'
-              ? `Team: ${team.name} · Captain: ${team.captainName}`
-              : `Free agent: ${agent.name}`,
-          },
-        },
-        quantity: 1,
-      }],
+      success_url: `${siteUrl}/register-success.html?id=${regId}`,
+      cancel_url: `${siteUrl}/register.html`,
+      customer_email: customerEmail || undefined,
       metadata: {
-        registrationId,
-        circuit,
+        registrationId: regId,
+        seasonId: seasonId || '',
         division,
         path,
       },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-    });
+    };
 
-    return json({ checkoutUrl: session.url, registrationId }, 200, headers);
+    // Use the Stripe price ID from the season if available,
+    // otherwise fall back to price_data (inline pricing)
+    if (stripePriceId) {
+      sessionParams.line_items = [{
+        price: stripePriceId,
+        quantity: 1,
+      }];
+    } else {
+      // Fallback: create an inline price (works even without admin-created Stripe products)
+      const displayName = path === 'team'
+        ? `Dink Society — Team Registration (${divisionLabel || division})`
+        : `Dink Society — Free Agent Registration (${divisionLabel || division})`;
+
+      sessionParams.line_items = [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: displayName,
+            description: `${circuit || 'Dink Society'} · ${divisionLabel || division}`,
+          },
+          unit_amount: Math.round(resolvedPrice * 100),
+        },
+        quantity: 1,
+      }];
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
+
+    // Update registration with Stripe session ID
+    registration.stripeSessionId = session.id;
+    await regStore.set(regId, JSON.stringify(registration));
+
+    return new Response(JSON.stringify({ checkoutUrl: session.url }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
   } catch (err) {
     console.error('register-checkout error:', err);
-    return json({ error: 'Checkout failed', detail: err.message }, 500, headers);
+    return new Response(err.message || 'Server error', { status: 500 });
   }
 };
-
-function json(body, status, headers) {
-  return new Response(JSON.stringify(body), { status, headers });
-}
-
-function cryptoId() {
-  const bytes = new Uint8Array(10);
-  crypto.getRandomValues(bytes);
-  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-export const config = { path: '/.netlify/functions/register-checkout' };
