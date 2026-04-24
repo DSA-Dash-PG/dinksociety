@@ -1,170 +1,187 @@
-// netlify/functions/admin-registration-update.js
-// PATCH a registration: approve (pending→confirmed), reject, or change division.
-// Also supports updating a team's division in the teams blob store if already seeded.
+// =============================================================
+// /api/admin-registration-update
 //
-// Body: { id, action, division? }
-//   action: "approve" | "reject" | "move"
-//   division: required for "move", e.g. "3.0M", "3.5M", "3.5W"
+// Manage individual registrations: approve, reject, move to
+// different division, move players between teams.
+//
+// POST with { action, ... }
+//
+// Actions:
+//   reject     { id, reason }          → marks registration as rejected
+//   reinstate  { id }                  → marks rejected registration back to confirmed
+//   move-division { id, newDivision }  → moves a team/agent to a different division
+//   move-player   { playerId, fromTeamId, toTeamId } → moves a player between teams
+//   remove-player { playerId, teamId } → removes a player from a team
+// =============================================================
 
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 
-const VALID_DIVISIONS = ['3.0M', '3.5M', '3.5W'];
-const DIVISION_LABELS = {
-  '3.0M': '3.0 Mixed',
-  '3.5M': '3.5 Mixed',
-  '3.5W': "3.5 Women's",
-};
-
-export default async (req) => {
-  if (req.method !== 'PATCH' && req.method !== 'POST') {
-    return json({ error: 'Method not allowed' }, 405);
-  }
-
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
-
-  try {
-    const { id, action, division } = await req.json();
-
-    if (!id || !action) {
-      return json({ error: 'id and action required' }, 400);
-    }
-
-    if (!['approve', 'reject', 'move'].includes(action)) {
-      return json({ error: 'action must be approve, reject, or move' }, 400);
-    }
-
-    if (action === 'move' && (!division || !VALID_DIVISIONS.includes(division))) {
-      return json({ error: `division must be one of: ${VALID_DIVISIONS.join(', ')}` }, 400);
-    }
-
-    const store = getStore('registrations');
-
-    // Find the registration — could be in confirmed/ or pending/
-    let reg = null;
-    let currentKey = null;
-
-    for (const prefix of ['confirmed/', 'pending/']) {
-      const key = `${prefix}${id}.json`;
-      const data = await store.get(key, { type: 'json' }).catch(() => null);
-      if (data) {
-        reg = data;
-        currentKey = key;
-        break;
-      }
-    }
-
-    if (!reg) {
-      return json({ error: 'Registration not found' }, 404);
-    }
-
-    // === APPROVE ===
-    if (action === 'approve') {
-      if (reg.status === 'confirmed') {
-        return json({ ok: true, message: 'Already confirmed', registration: reg });
-      }
-
-      // Move from pending/ to confirmed/
-      reg.status = 'confirmed';
-      reg.confirmedAt = new Date().toISOString();
-      reg.approvedBy = admin.email;
-
-      const newKey = `confirmed/${id}.json`;
-      await store.setJSON(newKey, reg);
-
-      // Delete the old pending key if it was in pending/
-      if (currentKey.startsWith('pending/')) {
-        await store.delete(currentKey).catch(() => null);
-      }
-
-      return json({ ok: true, message: 'Registration approved', registration: reg });
-    }
-
-    // === REJECT ===
-    if (action === 'reject') {
-      reg.status = 'rejected';
-      reg.rejectedAt = new Date().toISOString();
-      reg.rejectedBy = admin.email;
-
-      // Move to a rejected/ prefix so it doesn't show in confirmed or pending
-      const newKey = `rejected/${id}.json`;
-      await store.setJSON(newKey, reg);
-
-      // Delete from old location
-      if (currentKey !== newKey) {
-        await store.delete(currentKey).catch(() => null);
-      }
-
-      return json({ ok: true, message: 'Registration rejected', registration: reg });
-    }
-
-    // === MOVE (change division) ===
-    if (action === 'move') {
-      const oldDivision = reg.division;
-      reg.division = division;
-      reg.divisionLabel = DIVISION_LABELS[division] || division;
-      reg.movedAt = new Date().toISOString();
-      reg.movedBy = admin.email;
-
-      // Save back to the same key
-      await store.setJSON(currentKey, reg);
-
-      // If the team has already been seeded, update the team record too
-      if (reg.path === 'team' && reg.team?.name) {
-        await updateTeamDivision(reg, division, oldDivision);
-      }
-
-      return json({
-        ok: true,
-        message: `Moved from ${oldDivision} to ${division}`,
-        registration: reg,
-      });
-    }
-  } catch (err) {
-    console.error('admin-registration-update error:', err);
-    return json({ error: 'Update failed: ' + err.message }, 500);
-  }
-};
-
-/**
- * If a team record exists in the teams store, update its division.
- */
-async function updateTeamDivision(reg, newDivision, oldDivision) {
-  const teamsStore = getStore('teams');
-  const { blobs } = await teamsStore.list({ prefix: 'team/' });
-
-  for (const b of blobs) {
-    const team = await teamsStore.get(b.key, { type: 'json' }).catch(() => null);
-    if (!team) continue;
-
-    // Match by captain email or team name
-    const captainEmail = reg.team?.players?.[0]?.email?.toLowerCase();
-    const teamCaptainEmail = (team.captainEmail || '').toLowerCase();
-
-    if (
-      (captainEmail && teamCaptainEmail === captainEmail) ||
-      (team.name === reg.team?.name)
-    ) {
-      team.division = newDivision;
-      team.divisionLabel = DIVISION_LABELS[newDivision] || newDivision;
-      team.divisionMovedAt = new Date().toISOString();
-      team.previousDivision = oldDivision;
-      await teamsStore.setJSON(b.key, team);
-      console.log(`Updated team "${team.name}" division: ${oldDivision} → ${newDivision}`);
-      break;
-    }
-  }
-}
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
     status,
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'private, no-store',
-    },
+    headers: { 'Content-Type': 'application/json' },
   });
 }
 
-export const config = { path: '/.netlify/functions/admin-registration-update' };
+export default async (req) => {
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 });
+  }
+
+  try {
+    await requireAdmin(req);
+  } catch {
+    return unauthResponse();
+  }
+
+  const body = await req.json();
+  const { action } = body;
+
+  const regStore = getStore('registrations');
+  const teamStore = getStore('teams');
+
+  switch (action) {
+    // ─── Reject a registration ───
+    case 'reject': {
+      const { id, reason } = body;
+      if (!id) return json({ error: 'Registration id required' }, 400);
+
+      const raw = await regStore.get(id);
+      if (!raw) return json({ error: 'Registration not found' }, 404);
+
+      const reg = JSON.parse(raw);
+      reg.status = 'rejected';
+      reg.rejectedAt = new Date().toISOString();
+      reg.rejectReason = reason || '';
+      await regStore.set(id, JSON.stringify(reg));
+
+      return json({ ok: true, registration: reg });
+    }
+
+    // ─── Reinstate a rejected registration ───
+    case 'reinstate': {
+      const { id } = body;
+      if (!id) return json({ error: 'Registration id required' }, 400);
+
+      const raw = await regStore.get(id);
+      if (!raw) return json({ error: 'Registration not found' }, 404);
+
+      const reg = JSON.parse(raw);
+      if (reg.status !== 'rejected') {
+        return json({ error: 'Only rejected registrations can be reinstated' }, 400);
+      }
+      reg.status = 'confirmed';
+      delete reg.rejectedAt;
+      delete reg.rejectReason;
+      await regStore.set(id, JSON.stringify(reg));
+
+      return json({ ok: true, registration: reg });
+    }
+
+    // ─── Move to a different division ───
+    case 'move-division': {
+      const { id, newDivision } = body;
+      if (!id || !newDivision) return json({ error: 'Registration id and newDivision required' }, 400);
+
+      const raw = await regStore.get(id);
+      if (!raw) return json({ error: 'Registration not found' }, 404);
+
+      const reg = JSON.parse(raw);
+      const oldDivision = reg.division;
+      reg.division = newDivision;
+      reg.updatedAt = new Date().toISOString();
+      await regStore.set(id, JSON.stringify(reg));
+
+      // If there's a corresponding team record, update it too
+      if (reg.path === 'team' && reg.teamId) {
+        const teamRaw = await teamStore.get(reg.teamId);
+        if (teamRaw) {
+          const team = JSON.parse(teamRaw);
+          team.division = newDivision;
+          team.updatedAt = new Date().toISOString();
+          await teamStore.set(reg.teamId, JSON.stringify(team));
+        }
+      }
+
+      return json({ ok: true, registration: reg, moved: { from: oldDivision, to: newDivision } });
+    }
+
+    // ─── Move a player between teams ───
+    case 'move-player': {
+      const { playerId, fromTeamId, toTeamId } = body;
+      if (!playerId || !fromTeamId || !toTeamId) {
+        return json({ error: 'playerId, fromTeamId, and toTeamId are all required' }, 400);
+      }
+
+      // Load source team
+      const fromRaw = await teamStore.get(fromTeamId);
+      if (!fromRaw) return json({ error: 'Source team not found' }, 404);
+      const fromTeam = JSON.parse(fromRaw);
+
+      // Load destination team
+      const toRaw = await teamStore.get(toTeamId);
+      if (!toRaw) return json({ error: 'Destination team not found' }, 404);
+      const toTeam = JSON.parse(toRaw);
+
+      // Find the player in source roster
+      const roster = fromTeam.roster || [];
+      const playerIdx = roster.findIndex((p) => p.id === playerId);
+      if (playerIdx === -1) return json({ error: 'Player not found on source team' }, 404);
+
+      // Check destination capacity
+      const toRoster = toTeam.roster || [];
+      if (toRoster.length >= 10) {
+        return json({ error: 'Destination team is at max capacity (10 players)' }, 400);
+      }
+
+      // Move
+      const [player] = roster.splice(playerIdx, 1);
+      toRoster.push(player);
+
+      fromTeam.roster = roster;
+      fromTeam.updatedAt = new Date().toISOString();
+      toTeam.roster = toRoster;
+      toTeam.updatedAt = new Date().toISOString();
+
+      await teamStore.set(fromTeamId, JSON.stringify(fromTeam));
+      await teamStore.set(toTeamId, JSON.stringify(toTeam));
+
+      return json({
+        ok: true,
+        player,
+        from: { id: fromTeamId, name: fromTeam.name, rosterCount: roster.length },
+        to: { id: toTeamId, name: toTeam.name, rosterCount: toRoster.length },
+      });
+    }
+
+    // ─── Remove a player from a team ───
+    case 'remove-player': {
+      const { playerId, teamId } = body;
+      if (!playerId || !teamId) return json({ error: 'playerId and teamId required' }, 400);
+
+      const teamRaw = await teamStore.get(teamId);
+      if (!teamRaw) return json({ error: 'Team not found' }, 404);
+      const team = JSON.parse(teamRaw);
+
+      const roster = team.roster || [];
+      const playerIdx = roster.findIndex((p) => p.id === playerId);
+      if (playerIdx === -1) return json({ error: 'Player not found on team' }, 404);
+
+      // Don't allow removing below minimum
+      if (roster.length <= 4) {
+        return json({ error: 'Cannot remove — team is already at minimum roster size (4)' }, 400);
+      }
+
+      const [removed] = roster.splice(playerIdx, 1);
+      team.roster = roster;
+      team.updatedAt = new Date().toISOString();
+      await teamStore.set(teamId, JSON.stringify(team));
+
+      return json({ ok: true, removed, rosterCount: roster.length });
+    }
+
+    default:
+      return json({ error: `Unknown action: ${action}` }, 400);
+  }
+};

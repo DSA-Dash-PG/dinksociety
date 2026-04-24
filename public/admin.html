@@ -595,7 +595,8 @@
       <nav class="ds-drawer__body">
         <div class="ds-drawer__section">
           <div class="ds-drawer__section-label">Sections</div>
-          <button class="ds-drawer__link is-active" data-drawer-tab="overview">Overview</button>
+          <button class="ds-drawer__link is-active" data-drawer-tab="seasons">Seasons</button>
+          <button class="ds-drawer__link" data-drawer-tab="overview">Overview</button>
           <button class="ds-drawer__link" data-drawer-tab="registrations">Registrations</button>
           <button class="ds-drawer__link" data-drawer-tab="schedule">Schedule</button>
           <button class="ds-drawer__link" data-drawer-tab="moments">Moments</button>
@@ -615,14 +616,124 @@
     </aside>
 
     <nav class="admin-tabs">
-      <button class="admin-tab is-active" data-tab="overview">Overview</button>
+      <button class="admin-tab is-active" data-tab="seasons">Seasons</button>
+      <button class="admin-tab" data-tab="overview">Overview</button>
       <button class="admin-tab" data-tab="registrations">Registrations</button>
       <button class="admin-tab" data-tab="schedule">Schedule</button>
       <button class="admin-tab" data-tab="moments">Moments</button>
     </nav>
 
+    <!-- ===== SEASONS ===== -->
+    <section class="admin-section is-active" data-section="seasons">
+      <div class="admin-card">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title">Seasons</h2>
+          <button class="admin-btn admin-btn--primary" id="create-season-btn">+ New season</button>
+        </div>
+        <div id="seasons-list">
+          <div class="empty-state">Loading&hellip;</div>
+        </div>
+      </div>
+
+      <!-- Create/edit season form (hidden by default) -->
+      <div class="admin-card" id="season-form-card" style="display: none;">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title" id="season-form-title">New season</h2>
+          <button class="admin-btn admin-btn--secondary" onclick="hideSeasonForm()">Cancel</button>
+        </div>
+        <div class="admin-field">
+          <label for="sf-name">Season name</label>
+          <input type="text" id="sf-name" placeholder="e.g. Circuit I">
+        </div>
+        <div class="admin-field">
+          <label for="sf-label">Display label (optional)</label>
+          <input type="text" id="sf-label" placeholder="e.g. Circuit I (May 2026)">
+        </div>
+        <div class="admin-field__row">
+          <div class="admin-field">
+            <label for="sf-start">Start date</label>
+            <input type="date" id="sf-start">
+          </div>
+          <div class="admin-field">
+            <label for="sf-end">End date</label>
+            <input type="date" id="sf-end">
+          </div>
+        </div>
+        <button class="admin-btn admin-btn--primary" id="sf-save-btn" style="margin-top: 8px;">Create season</button>
+        <div class="admin-status" id="sf-status"></div>
+      </div>
+
+      <!-- Season detail (shown when a season is expanded) -->
+      <div class="admin-card" id="season-detail-card" style="display: none;">
+        <div class="admin-card__header">
+          <h2 class="admin-card__title" id="sd-title">&mdash;</h2>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span class="admin-pill" id="sd-status-pill">&mdash;</span>
+            <button class="admin-btn admin-btn--secondary" onclick="hideSeasonDetail()">Close</button>
+          </div>
+        </div>
+
+        <!-- Status controls -->
+        <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(15,77,58,0.06);">
+          <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; font-weight: 500;">Season status</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="sd-status-btns"></div>
+        </div>
+
+        <!-- Registration controls -->
+        <div style="margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid rgba(15,77,58,0.06);">
+          <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.5; margin-bottom: 8px; font-weight: 500;">Registration</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="sd-reg-btns"></div>
+          <div class="admin-status" id="sd-stripe-status" style="margin-top: 8px;"></div>
+        </div>
+
+        <!-- Divisions -->
+        <div style="margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.5; font-weight: 500;">Divisions</div>
+            <button class="admin-btn admin-btn--secondary" style="font-size: 11px; padding: 6px 12px;" id="sd-add-div-btn">+ Add division</button>
+          </div>
+          <div id="sd-divisions-list"></div>
+        </div>
+
+        <!-- Add division form -->
+        <div id="sd-add-div-form" style="display: none; background: rgba(15,77,58,0.03); border-radius: 6px; padding: 16px; margin-bottom: 16px;">
+          <div style="font-size: 11px; font-weight: 600; margin-bottom: 10px;">Add division</div>
+          <div class="admin-field__row">
+            <div class="admin-field">
+              <label for="sd-div-name">Division name</label>
+              <input type="text" id="sd-div-name" placeholder="e.g. 3.0 Mixed">
+            </div>
+            <div class="admin-field">
+              <label for="sd-div-capacity">Team capacity</label>
+              <input type="number" id="sd-div-capacity" value="6" min="2" max="20">
+            </div>
+          </div>
+          <div class="admin-field__row">
+            <div class="admin-field">
+              <label for="sd-div-team-price">Team price ($)</label>
+              <input type="number" id="sd-div-team-price" value="450" min="0" step="1">
+            </div>
+            <div class="admin-field">
+              <label for="sd-div-agent-price">Agent price ($)</label>
+              <input type="number" id="sd-div-agent-price" value="75" min="0" step="1">
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="admin-btn admin-btn--primary" id="sd-div-save-btn" style="font-size: 12px; padding: 8px 16px;">Add</button>
+            <button class="admin-btn admin-btn--secondary" style="font-size: 12px; padding: 8px 16px;" onclick="$id('sd-add-div-form').style.display='none'">Cancel</button>
+          </div>
+          <div class="admin-status" id="sd-div-status"></div>
+        </div>
+
+        <!-- Archive -->
+        <div style="padding-top: 16px; border-top: 1px solid rgba(15,77,58,0.06);">
+          <button class="admin-btn admin-btn--danger" id="sd-archive-btn">Archive this season</button>
+        </div>
+      </div>
+    </section>
+
     <!-- ===== OVERVIEW ===== -->
-    <section class="admin-section is-active" data-section="overview">
+    <section class="admin-section" data-section="overview">
       <div class="overview-stats" id="overview-stats">
         <div class="stat">
           <div class="stat__label">Teams registered</div>
@@ -693,6 +804,7 @@
               <option value="all">All statuses</option>
               <option value="confirmed">Confirmed</option>
               <option value="pending">Pending</option>
+              <option value="rejected">Rejected</option>
             </select>
             <select id="reg-division-filter" style="padding: 6px 10px; border: 1px solid rgba(15,77,58,0.2); border-radius: 6px; font-size: 12px; font-family: inherit;">
               <option value="all">All divisions</option>
@@ -901,7 +1013,7 @@
       $id('login-screen').style.display = 'none';
       $id('admin-shell').style.display = 'block';
       $id('user-email').textContent = state.user?.email || 'admin';
-      loadOverview();
+      loadSeasons();
     }
 
     $id('login-form').addEventListener('submit', async (e) => {
@@ -976,6 +1088,7 @@
           s.classList.toggle('is-active', s.dataset.section === tab);
         });
 
+        if (tab === 'seasons') loadSeasons();
         if (tab === 'overview') loadOverview();
         if (tab === 'registrations') loadRegistrations();
         if (tab === 'schedule') setupScheduleTab();
@@ -1090,13 +1203,17 @@
             <td><span class="admin-pill admin-pill--${r.status}">${r.status}</span></td>
             <td style="font-size: 12px;">${escapeHtml(contact)}</td>
             <td style="font-size: 12px; opacity: 0.7;">${formatDate(r.createdAt)}</td>
+            <td style="white-space: nowrap;">
+              ${r.status === 'confirmed' ? `<button class="admin-btn admin-btn--danger" style="font-size: 10px; padding: 4px 8px;" onclick="rejectRegistration('${escapeAttr(r.id)}')">Reject</button>` : ''}
+              ${r.status === 'rejected' ? `<button class="admin-btn admin-btn--secondary" style="font-size: 10px; padding: 4px 8px;" onclick="reinstateRegistration('${escapeAttr(r.id)}')">Reinstate</button>` : ''}
+            </td>
           </tr>
         `;
       }).join('');
 
       $id('registrations-table').innerHTML = `
         <table class="admin-table">
-          <thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Contact</th><th>When</th></tr></thead>
+          <thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Contact</th><th>When</th><th>Actions</th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       `;
@@ -1760,6 +1877,314 @@
       const emailEl = document.getElementById('user-email');
       if (emailEl) emailObserver.observe(emailEl, { childList: true, characterData: true, subtree: true });
     })();
+
+    // ===== Seasons =====
+    let seasonsData = [];
+    let activeSeason = null;
+
+    async function loadSeasons() {
+      try {
+        const res = await fetch('/.netlify/functions/admin-seasons', { credentials: 'include' });
+        if (!res.ok) throw new Error('failed');
+        const data = await res.json();
+        seasonsData = data.seasons || [];
+        renderSeasons();
+      } catch (err) {
+        $id('seasons-list').innerHTML = '<div class="empty-state">Could not load seasons.</div>';
+      }
+    }
+
+    function renderSeasons() {
+      if (!seasonsData.length) {
+        $id('seasons-list').innerHTML = '<div class="empty-state">No seasons yet. Create your first season to get started.</div>';
+        return;
+      }
+
+      const statusColors = {
+        draft: 'background: rgba(15,77,58,0.08); color: var(--teal-900);',
+        open: 'background: rgba(29,158,117,0.12); color: #0F6E56;',
+        paused: 'background: rgba(232,181,66,0.2); color: #854F0B;',
+        closed: 'background: rgba(15,77,58,0.08); color: var(--teal-900); opacity: 0.6;',
+        archived: 'background: rgba(15,77,58,0.05); color: var(--teal-900); opacity: 0.4;',
+      };
+
+      const rows = seasonsData.map(s => {
+        const divCount = s.divisions?.length || 0;
+        const regLabel = s.registration === 'open' ? 'Reg open' : s.registration === 'paused' ? 'Reg paused' : 'Reg closed';
+        const regStyle = s.registration === 'open' ? 'color: #0F6E56;' : s.registration === 'paused' ? 'color: #854F0B;' : 'opacity: 0.5;';
+        return `
+          <div style="padding: 14px 0; border-bottom: 1px solid rgba(15,77,58,0.06); display: flex; justify-content: space-between; align-items: center; gap: 12px; cursor: pointer;" onclick="showSeasonDetail('${escapeAttr(s.id)}')">
+            <div>
+              <div style="font-weight: 500; font-size: 14px;">${escapeHtml(s.label || s.name)}</div>
+              <div style="font-size: 12px; opacity: 0.6; margin-top: 2px;">${divCount} division${divCount !== 1 ? 's' : ''} &middot; <span style="${regStyle}">${regLabel}</span></div>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span class="admin-pill" style="${statusColors[s.status] || ''}">${s.status}</span>
+              <span style="font-size: 16px; opacity: 0.3;">&rsaquo;</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      $id('seasons-list').innerHTML = rows;
+    }
+
+    // Create season
+    $id('create-season-btn').addEventListener('click', () => {
+      $id('season-form-card').style.display = 'block';
+      $id('season-detail-card').style.display = 'none';
+      $id('sf-name').value = '';
+      $id('sf-label').value = '';
+      $id('sf-start').value = '';
+      $id('sf-end').value = '';
+      $id('sf-status').className = 'admin-status';
+      $id('sf-status').textContent = '';
+      $id('sf-name').focus();
+    });
+
+    function hideSeasonForm() {
+      $id('season-form-card').style.display = 'none';
+    }
+
+    $id('sf-save-btn').addEventListener('click', async () => {
+      const name = $id('sf-name').value.trim();
+      const label = $id('sf-label').value.trim();
+      const startDate = $id('sf-start').value || null;
+      const endDate = $id('sf-end').value || null;
+      const status = $id('sf-status');
+      const btn = $id('sf-save-btn');
+
+      if (!name) { status.className = 'admin-status is-error'; status.textContent = 'Name is required.'; return; }
+
+      btn.disabled = true;
+      status.className = 'admin-status is-info';
+      status.textContent = 'Creating…';
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-seasons', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, label: label || name, startDate, endDate }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+
+        status.className = 'admin-status is-success';
+        status.textContent = 'Season created!';
+        await loadSeasons();
+        setTimeout(() => { hideSeasonForm(); showSeasonDetail(data.season.id); }, 600);
+      } catch (err) {
+        status.className = 'admin-status is-error';
+        status.textContent = err.message;
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    // Season detail
+    function hideSeasonDetail() {
+      $id('season-detail-card').style.display = 'none';
+      activeSeason = null;
+    }
+
+    async function showSeasonDetail(seasonId) {
+      // Refresh data
+      await loadSeasons();
+      const season = seasonsData.find(s => s.id === seasonId);
+      if (!season) return;
+      activeSeason = season;
+
+      $id('season-form-card').style.display = 'none';
+      $id('season-detail-card').style.display = 'block';
+      $id('sd-title').textContent = season.label || season.name;
+
+      const statusColors = { draft: '--pending', open: '--confirmed', paused: '--pending', closed: '--team', archived: '--team' };
+      $id('sd-status-pill').className = `admin-pill admin-pill${statusColors[season.status] || '--team'}`;
+      $id('sd-status-pill').textContent = season.status;
+
+      // Status buttons
+      const statuses = ['draft', 'open', 'paused', 'closed'];
+      $id('sd-status-btns').innerHTML = statuses.map(s =>
+        `<button class="admin-btn ${s === season.status ? 'admin-btn--primary' : 'admin-btn--secondary'}" style="font-size: 11px; padding: 6px 14px;" onclick="setSeasonStatus('${escapeAttr(season.id)}', '${s}')" ${s === season.status ? 'disabled' : ''}>${s}</button>`
+      ).join('');
+
+      // Registration buttons
+      const regStatuses = ['open', 'paused', 'closed'];
+      $id('sd-reg-btns').innerHTML = regStatuses.map(s =>
+        `<button class="admin-btn ${s === season.registration ? 'admin-btn--primary' : 'admin-btn--secondary'}" style="font-size: 11px; padding: 6px 14px;" onclick="setRegistration('${escapeAttr(season.id)}', '${s}')" ${s === season.registration ? 'disabled' : ''}>${s === 'open' ? 'Open registration' : s === 'paused' ? 'Pause' : 'Close'}</button>`
+      ).join('');
+
+      // Divisions
+      renderSeasonDivisions(season);
+    }
+
+    function renderSeasonDivisions(season) {
+      const list = $id('sd-divisions-list');
+      if (!season.divisions.length) {
+        list.innerHTML = '<div class="empty-state" style="padding: 20px 0;">No divisions yet. Add one to get started.</div>';
+        return;
+      }
+
+      list.innerHTML = season.divisions.map(d => {
+        const hasStripe = d.stripeTeamPriceId && d.stripeAgentPriceId;
+        return `
+          <div style="padding: 12px 0; border-bottom: 1px solid rgba(15,77,58,0.05); display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+            <div>
+              <div style="font-weight: 500; font-size: 13px;">${escapeHtml(d.name)}</div>
+              <div style="font-size: 11px; opacity: 0.55; margin-top: 2px;">
+                ${d.capacity} teams &middot; $${d.teamPrice} team &middot; $${d.agentPrice} agent
+                ${hasStripe ? ' &middot; <span style="color: #0F6E56;">Stripe ✓</span>' : ''}
+              </div>
+            </div>
+            <button class="admin-btn admin-btn--danger" style="font-size: 10px; padding: 4px 8px;" onclick="removeDivision('${escapeAttr(season.id)}', '${escapeAttr(d.id)}')">Remove</button>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Add division toggle
+    $id('sd-add-div-btn').addEventListener('click', () => {
+      $id('sd-add-div-form').style.display = 'block';
+      $id('sd-div-name').value = '';
+      $id('sd-div-capacity').value = '6';
+      $id('sd-div-team-price').value = '450';
+      $id('sd-div-agent-price').value = '75';
+      $id('sd-div-name').focus();
+    });
+
+    $id('sd-div-save-btn').addEventListener('click', async () => {
+      const divName = $id('sd-div-name').value.trim();
+      const capacity = $id('sd-div-capacity').value;
+      const teamPrice = $id('sd-div-team-price').value;
+      const agentPrice = $id('sd-div-agent-price').value;
+      const status = $id('sd-div-status');
+
+      if (!divName) { status.className = 'admin-status is-error'; status.textContent = 'Division name required.'; return; }
+      if (!activeSeason) return;
+
+      try {
+        const res = await fetch('/.netlify/functions/admin-seasons', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: activeSeason.id, action: 'add-division', divName, capacity, teamPrice, agentPrice }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+
+        $id('sd-add-div-form').style.display = 'none';
+        showSeasonDetail(activeSeason.id);
+      } catch (err) {
+        status.className = 'admin-status is-error';
+        status.textContent = err.message;
+      }
+    });
+
+    async function removeDivision(seasonId, divId) {
+      if (!confirm('Remove this division? This cannot be undone.')) return;
+      try {
+        const res = await fetch('/.netlify/functions/admin-seasons', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: seasonId, action: 'remove-division', divId }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+        showSeasonDetail(seasonId);
+      } catch (err) { alert(err.message); }
+    }
+
+    async function setSeasonStatus(seasonId, newStatus) {
+      try {
+        const res = await fetch('/.netlify/functions/admin-seasons', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: seasonId, action: 'set-status', status: newStatus }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+        showSeasonDetail(seasonId);
+        loadSeasons();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function setRegistration(seasonId, regStatus) {
+      const stripeStatus = $id('sd-stripe-status');
+      try {
+        // If opening registration, set up Stripe first
+        if (regStatus === 'open') {
+          stripeStatus.className = 'admin-status is-info';
+          stripeStatus.textContent = 'Setting up Stripe products…';
+
+          const stripeRes = await fetch('/.netlify/functions/admin-stripe-setup', {
+            method: 'POST', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ seasonId }),
+          });
+          const stripeData = await stripeRes.json();
+          if (!stripeRes.ok) throw new Error(stripeData.error || 'Stripe setup failed');
+
+          const errors = stripeData.results?.filter(r => r.status === 'error') || [];
+          if (errors.length) {
+            stripeStatus.className = 'admin-status is-error';
+            stripeStatus.textContent = `Stripe errors: ${errors.map(e => e.division + ': ' + e.error).join('; ')}`;
+            return;
+          }
+          stripeStatus.className = 'admin-status is-success';
+          stripeStatus.textContent = 'Stripe products ready.';
+        }
+
+        const res = await fetch('/.netlify/functions/admin-seasons', {
+          method: 'PATCH', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: seasonId, action: 'set-registration', registration: regStatus }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+        showSeasonDetail(seasonId);
+        loadSeasons();
+      } catch (err) {
+        stripeStatus.className = 'admin-status is-error';
+        stripeStatus.textContent = err.message;
+      }
+    }
+
+    $id('sd-archive-btn').addEventListener('click', async () => {
+      if (!activeSeason) return;
+      if (!confirm(`Archive "${activeSeason.name}"? Registration will be closed and the season will be hidden from public views.`)) return;
+      try {
+        const res = await fetch(`/.netlify/functions/admin-seasons?id=${encodeURIComponent(activeSeason.id)}`, {
+          method: 'DELETE', credentials: 'include',
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+        hideSeasonDetail();
+        loadSeasons();
+      } catch (err) { alert(err.message); }
+    });
+
+    // ===== Registration actions =====
+    async function rejectRegistration(id) {
+      const reason = prompt('Reason for rejection (optional):');
+      if (reason === null) return; // cancelled
+      try {
+        const res = await fetch('/.netlify/functions/admin-registration-update', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reject', id, reason }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+        loadRegistrations();
+      } catch (err) { alert(err.message); }
+    }
+
+    async function reinstateRegistration(id) {
+      if (!confirm('Reinstate this registration?')) return;
+      try {
+        const res = await fetch('/.netlify/functions/admin-registration-update', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'reinstate', id }),
+        });
+        if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+        loadRegistrations();
+      } catch (err) { alert(err.message); }
+    }
 
     // ===== Init =====
     checkAuth();
