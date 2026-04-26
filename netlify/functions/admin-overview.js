@@ -34,7 +34,9 @@ export default async (req) => {
     // Stats
     const teams = confirmed.filter(r => r?.path === 'team').length;
     const agents = confirmed.filter(r => r?.path === 'agent').length;
-    const revenue = confirmed.reduce((sum, r) => sum + ((r?.amountPaid || 0) / 100), 0);
+
+    // Revenue: amountPaid is already in dollars (webhook converts from cents)
+    const revenue = confirmed.reduce((sum, r) => sum + (r?.amountPaid || 0), 0);
 
     // Count photos
     const { blobs: photoBlobs } = await momentsStore.list({ prefix: 'meta/' });
@@ -72,7 +74,7 @@ export default async (req) => {
       stats: {
         teams,
         agents,
-        teamCapacity: 6 * Object.keys(DIVISION_LABELS).filter(k => k !== '3.5W').length, // 12 for now
+        teamCapacity: 6 * Object.keys(DIVISION_LABELS).length,
         revenue: Math.round(revenue),
         photos,
       },

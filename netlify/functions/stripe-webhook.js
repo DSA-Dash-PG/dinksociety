@@ -5,6 +5,10 @@
 //   checkout.session.completed → marks registration as confirmed
 //                                and sends confirmation email.
 //
+// KEY FORMAT: pending/{id}.json → confirmed/{id}.json
+//   On payment success, the blob is moved from the pending/ prefix
+//   to confirmed/ so admin-registrations and admin-overview can find it.
+//
 // Requires env vars:
 //   STRIPE_SECRET_KEY
 //   STRIPE_WEBHOOK_SECRET
@@ -53,10 +57,22 @@ export default async (req) => {
 
     try {
       const regStore = getStore('registrations');
-      const raw = await regStore.get(regId);
+
+      // Look for the registration — try prefixed key first, then bare key (legacy)
+      const pendingKey = `pending/${regId}.json`;
+      const confirmedKey = `confirmed/${regId}.json`;
+
+      let raw = await regStore.get(pendingKey);
+      let foundKey = pendingKey;
 
       if (!raw) {
-        console.warn(`Registration ${regId} not found in store`);
+        // Fallback: try bare key (registrations created before the prefix fix)
+        raw = await regStore.get(regId);
+        foundKey = regId;
+      }
+
+      if (!raw) {
+        console.warn(`Registration ${regId} not found in store (tried ${pendingKey} and bare ${regId})`);
         return new Response('OK', { status: 200 });
       }
 
@@ -69,8 +85,20 @@ export default async (req) => {
       reg.stripeCustomer = session.customer || null;
       reg.amountPaid = session.amount_total ? session.amount_total / 100 : reg.price;
 
-      await regStore.set(regId, JSON.stringify(reg));
-      console.log(`Registration ${regId} confirmed via Stripe`);
+      // Write to confirmed/ prefix
+      await regStore.set(confirmedKey, JSON.stringify(reg));
+
+      // Delete the old key (pending/ or bare) so there's no duplicate
+      if (foundKey !== confirmedKey) {
+        try {
+          await regStore.delete(foundKey);
+        } catch (delErr) {
+          console.warn(`Could not delete old key ${foundKey}:`, delErr.message);
+          // Non-fatal — the confirmed/ copy is what matters
+        }
+      }
+
+      console.log(`Registration ${regId} confirmed via Stripe (moved ${foundKey} → ${confirmedKey})`);
 
       // Send confirmation email
       const recipientEmail = reg.path === 'team'

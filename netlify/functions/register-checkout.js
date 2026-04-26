@@ -16,6 +16,8 @@
 //
 // The stripe-webhook function handles checkout.session.completed
 // and marks the registration as 'confirmed'.
+//
+// KEY FORMAT: pending/{id}.json → confirmed/{id}.json
 // =============================================================
 
 import Stripe from 'stripe';
@@ -87,9 +89,10 @@ export default async (req) => {
       createdAt: new Date().toISOString(),
     };
 
-    // Save to Blobs
+    // Save to Blobs with prefixed key: pending/{id}.json
     const regStore = getStore('registrations');
-    await regStore.set(regId, JSON.stringify(registration));
+    const pendingKey = `pending/${regId}.json`;
+    await regStore.set(pendingKey, JSON.stringify(registration));
 
     // Build the Stripe Checkout Session
     const stripe = new Stripe(stripeKey);
@@ -142,7 +145,7 @@ export default async (req) => {
 
     // Update registration with Stripe session ID
     registration.stripeSessionId = session.id;
-    await regStore.set(regId, JSON.stringify(registration));
+    await regStore.set(pendingKey, JSON.stringify(registration));
 
     return new Response(JSON.stringify({ checkoutUrl: session.url }), {
       status: 200,
