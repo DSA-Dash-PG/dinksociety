@@ -188,13 +188,16 @@
     <div class="login-card">
       <div class="login-card__brand">The Dink Society</div>
       <h1 class="login-card__title">Admin</h1>
-      <p class="login-card__sub">Members only. You know the drill.</p>
+      <p class="login-card__sub">No password, no hassle. We&rsquo;ll email you a sign-in link.</p>
       <form id="login-form" onsubmit="return false;" style="text-align:left;">
-        <div class="admin-field"><label for="login-email">Email</label><input type="email" id="login-email" autocomplete="email" required></div>
-        <div class="admin-field"><label for="login-password">Password</label><input type="password" id="login-password" autocomplete="current-password" required></div>
-        <button type="submit" class="btn btn--pri" id="login-submit">Sign in</button>
+        <div class="admin-field"><label for="login-email">Email</label><input type="email" id="login-email" autocomplete="email" required placeholder="admin@example.com"></div>
+        <button type="submit" class="btn btn--pri" id="login-submit">Send sign-in link</button>
         <div class="admin-status" id="login-status"></div>
       </form>
+      <div id="login-sent" style="display:none; margin-top: 20px; padding: 16px 20px; background: rgba(232,181,66,0.15); border: 1px solid rgba(232,181,66,0.3); border-radius: 8px; text-align: left;">
+        <div style="font-size: 15px; font-weight: 500; color: var(--gold); margin-bottom: 6px;">Link on the way</div>
+        <div style="font-size: 13px; opacity: 0.85; line-height: 1.5;">Check <strong id="login-sent-email"></strong> for a sign-in link. It expires in 15 minutes. If it doesn&rsquo;t show up, check spam or make sure you&rsquo;re using an admin email on file.</div>
+      </div>
     </div>
   </div>
 
@@ -396,14 +399,35 @@
 
     $id('login-form').addEventListener('submit', async e => {
       e.preventDefault();
-      const email=$id('login-email').value.trim(), pw=$id('login-password').value, st=$id('login-status'), btn=$id('login-submit');
-      btn.disabled=true; st.className='admin-status is-info'; st.textContent='Signing in…';
+      const email=$id('login-email').value.trim(), st=$id('login-status'), btn=$id('login-submit');
+      if(!email) return;
+      btn.disabled=true; st.className='admin-status is-info'; st.textContent='Sending link…';
       try {
-        const r = await fetch('/.netlify/functions/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email,password:pw})});
-        if (!r.ok) throw new Error((await r.text())||'Sign-in failed');
-        await checkAuth();
-      } catch(e) { st.className='admin-status is-error'; st.textContent=e.message||'Invalid credentials'; btn.disabled=false; }
+        const r = await fetch('/.netlify/functions/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+        if (!r.ok) throw new Error('Could not send link — try again.');
+        st.className='admin-status'; st.textContent='';
+        $id('login-sent-email').textContent=email;
+        $id('login-sent').style.display='block';
+        $id('login-form').style.display='none';
+      } catch(e) { st.className='admin-status is-error'; st.textContent=e.message; btn.disabled=false; }
     });
+
+    // Handle redirect error params from the magic-link consumer
+    (function handleAuthErrors() {
+      const params = new URLSearchParams(window.location.search);
+      const err = params.get('error');
+      if (!err) return;
+      const messages = {
+        missing: 'That link was missing a token. Try requesting a new one.',
+        invalid: 'That link is invalid or has already been used.',
+        expired: 'That link has expired. Request a fresh one below.',
+        server: 'Something went wrong. Try again in a moment.',
+      };
+      const st = $id('login-status');
+      st.className='admin-status is-error';
+      st.textContent = messages[err] || 'Sign-in failed. Try requesting a new link.';
+      window.history.replaceState({}, '', window.location.pathname);
+    })();
 
     $id('sign-out-link').addEventListener('click', async e => {
       e.preventDefault();
