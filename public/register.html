@@ -1,262 +1,425 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Register &middot; The Dink Society</title>
-  <meta name="description" content="Register your team or sign up as a free agent for The Dink Society Circuit I.">
-  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/shared.css">
-  <link rel="stylesheet" href="/css/shared-nav.css">
-  <link rel="stylesheet" href="/css/compat.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apply for membership · The Dink Society</title>
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .reg-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+
+    /* ── Hero ─────────────────────────────────────────── */
+    .reg-hero {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      padding: var(--space-8) var(--space-6); border-radius: var(--radius-lg);
+      margin-bottom: var(--space-4); max-width: 760px; margin-left: auto; margin-right: auto;
+    }
+    .reg-hero .eyebrow { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-teal); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+    .reg-hero .eyebrow::before { content:''; width:8px;height:8px;border-radius:50%;background:var(--color-teal);box-shadow:0 0 0 4px var(--color-teal-dim); }
+    .reg-hero h1 { font-size: var(--text-3xl); font-weight: 800; text-transform: uppercase; margin: 0 0 var(--space-2); }
+    .reg-hero p { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; max-width: 52ch; line-height: 1.6; }
+    .reg-hero__back { display: inline-block; font-size: 12px; color: var(--color-text-faint); margin-bottom: var(--space-4); }
+    .reg-hero__back:hover { color: var(--color-text); }
+
+    /* ── Card ─────────────────────────────────────────── */
+    .reg-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-8) var(--space-6);
+      max-width: 760px; margin: 0 auto;
+    }
+
+    /* ── Stepper ──────────────────────────────────────── */
+    .reg-stepper { display: flex; gap: 4px; margin-bottom: var(--space-6); padding-bottom: var(--space-5); border-bottom: 1px solid var(--color-border); }
+    .reg-step {
+      flex: 1; padding: 9px 10px; border-radius: var(--radius-full); text-align: center;
+      font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700;
+      color: var(--color-text-faint); background: var(--color-surface-2); border: 1px solid var(--color-border);
+      transition: all var(--transition);
+    }
+    .reg-step.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+    .reg-step.is-done { background: var(--color-teal-dim); color: var(--color-teal); border-color: rgba(23,215,176,0.2); }
+    .reg-step.is-done::after { content: ' ✓'; }
+
+    /* ── Sections ─────────────────────────────────────── */
+    .reg-section { display: none; }
+    .reg-section.is-active { display: block; }
+
+    .reg-h2 { font-size: var(--text-xl); font-weight: 800; text-transform: uppercase; margin: 0 0 var(--space-2); }
+    .reg-lede { font-size: 13px; line-height: 1.6; color: var(--color-text-muted); margin: 0 0 var(--space-6); }
+
+    /* ── Path cards ───────────────────────────────────── */
+    .reg-paths { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .reg-path {
+      border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 22px;
+      cursor: pointer; transition: all var(--transition); background: var(--color-surface-2);
+      text-align: left; font-family: inherit; color: var(--color-text);
+    }
+    .reg-path:hover { border-color: var(--color-border-strong); transform: translateY(-2px); }
+    .reg-path.is-selected { border-color: var(--color-lime); border-width: 2px; padding: 21px; background: var(--color-lime-ghost); }
+    .reg-path__header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+    .reg-path__label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; }
+    .reg-path__price { font-size: 24px; font-weight: 800; color: var(--color-lime); line-height: 1; }
+    .reg-path__title { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
+    .reg-path__desc { font-size: 12px; line-height: 1.5; color: var(--color-text-muted); margin: 0; }
+
+    /* ── Fields ───────────────────────────────────────── */
+    .reg-field { margin-bottom: 16px; }
+    .reg-field label, .reg-field__label {
+      display: block; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--color-text-faint); margin-bottom: 5px; font-weight: 700;
+    }
+    .reg-field input, .reg-field select, .reg-field textarea {
+      width: 100%; padding: 10px 13px; border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+      font-size: 13px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text);
+      transition: border-color 0.15s; box-sizing: border-box;
+    }
+    .reg-field input:focus, .reg-field select:focus, .reg-field textarea:focus { outline: none; border-color: var(--color-lime); }
+    .reg-field input.is-invalid, .reg-field select.is-invalid { border-color: var(--color-red); }
+    .reg-field__row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .reg-field__error { font-size: 11px; color: var(--color-red); margin-top: 4px; display: none; }
+    .reg-field__error.is-visible { display: block; }
+
+    /* ── Division tiles ───────────────────────────────── */
+    .reg-divs { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .reg-div {
+      border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 14px 10px;
+      cursor: pointer; background: var(--color-surface-2); text-align: center;
+      font-family: inherit; color: var(--color-text); transition: all var(--transition);
+    }
+    .reg-div:hover:not(:disabled) { border-color: var(--color-border-strong); }
+    .reg-div.is-selected { border-color: var(--color-lime); border-width: 2px; padding: 13px 9px; background: var(--color-lime-ghost); }
+    .reg-div:disabled { opacity: 0.35; cursor: not-allowed; }
+    .reg-div__name { font-size: 13px; font-weight: 700; margin-bottom: 3px; }
+    .reg-div__meta { font-size: 10px; color: var(--color-text-faint); letter-spacing: 0.05em; }
+
+    /* ── Player blocks ────────────────────────────────── */
+    .reg-player { padding: 18px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 12px; }
+    .reg-player__heading { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; color: var(--color-text-faint); }
+    .reg-player__heading .captain { color: var(--color-lime); margin-left: 6px; }
+
+    /* ── Waiver ────────────────────────────────────────── */
+    .reg-waiver {
+      max-height: 240px; overflow-y: auto;
+      border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+      padding: 18px; background: var(--color-surface-2); font-size: 12px; line-height: 1.65;
+      color: var(--color-text-muted); margin-bottom: 18px;
+    }
+    .reg-waiver h4 { font-size: 14px; font-weight: 800; text-transform: uppercase; margin: 0 0 6px; color: var(--color-text); }
+    .reg-waiver h4:not(:first-child) { margin-top: 18px; }
+    .reg-waiver p { margin: 0 0 10px; }
+
+    .reg-checkbox {
+      display: flex; align-items: flex-start; gap: 10px; padding: 12px;
+      background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+      cursor: pointer; margin-bottom: 8px;
+    }
+    .reg-checkbox input { margin-top: 2px; flex-shrink: 0; accent-color: var(--color-lime); }
+    .reg-checkbox__text { font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
+
+    /* ── Summary ───────────────────────────────────────── */
+    .reg-summary {
+      background: var(--color-surface-2); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); padding: 20px; margin-bottom: 20px;
+    }
+    .reg-summary__row { display: flex; justify-content: space-between; padding: 9px 0; font-size: 13px; border-bottom: 1px solid var(--color-border); }
+    .reg-summary__row:last-child { border-bottom: none; }
+    .reg-summary__row--total { font-size: 15px; font-weight: 800; padding-top: 14px; margin-top: 6px; border-top: 2px solid var(--color-lime); border-bottom: none; }
+    .reg-summary__label { color: var(--color-text-faint); }
+    .reg-summary__value { font-weight: 600; }
+    .reg-summary__row--total .reg-summary__value { color: var(--color-lime); }
+
+    /* ── Actions ───────────────────────────────────────── */
+    .reg-actions { display: flex; gap: 10px; margin-top: var(--space-6); padding-top: var(--space-5); border-top: 1px solid var(--color-border); }
+    .reg-btn {
+      padding: 12px 24px; border-radius: var(--radius-full); font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: inherit; border: 1px solid transparent; transition: all var(--transition);
+    }
+    .reg-btn--primary { background: var(--color-lime); color: var(--color-text-inverse); flex: 1; }
+    .reg-btn--primary:hover:not(:disabled) { background: var(--color-lime-hover); transform: translateY(-1px); }
+    .reg-btn--primary:disabled { opacity: 0.35; cursor: not-allowed; }
+    .reg-btn--secondary { background: transparent; color: var(--color-text); border-color: var(--color-border-strong); }
+    .reg-btn--secondary:hover { background: var(--color-surface-2); }
+
+    /* ── Status ────────────────────────────────────────── */
+    .reg-status { padding: 10px 14px; border-radius: var(--radius-sm); margin-top: 14px; font-size: 12px; display: none; }
+    .reg-status.is-info { display: block; background: var(--color-teal-dim); color: var(--color-teal); }
+    .reg-status.is-error { display: block; background: var(--color-red-dim); color: var(--color-red); }
+
+    @media (max-width: 640px) {
+      .reg-hero { padding: var(--space-6) var(--space-4); }
+      .reg-hero h1 { font-size: clamp(1.4rem, 5vw, 2rem); }
+      .reg-card { padding: var(--space-5) var(--space-4); }
+      .reg-stepper { gap: 3px; }
+      .reg-step { font-size: 8px; padding: 7px 4px; letter-spacing: 0.06em; }
+      .reg-step.is-done::after { display: none; }
+      .reg-paths { grid-template-columns: 1fr; }
+      .reg-divs { grid-template-columns: 1fr; }
+      .reg-field__row { grid-template-columns: 1fr; gap: 0; }
+      .reg-actions { flex-direction: column-reverse; }
+      .reg-btn { width: 100%; text-align: center; }
+    }
+  </style>
 </head>
-<body>
+<body data-page="register">
   <div data-partial="nav"></div>
 
   <div class="reg-shell">
     <div class="reg-hero">
-      <h1 id="reg-title">Register</h1>
-      <p>Register as a team or sign up as a free agent. Captains can complete full rosters later through the captain portal.</p>
+      <a href="/" class="reg-hero__back">← Back to home</a>
+      <div class="eyebrow">Circuit I · May 2026</div>
+      <h1>Apply for membership.</h1>
+      <p>Four quick steps. Secure a spot in Circuit I — as a full team or as a free agent. Payment via Stripe at the end.</p>
     </div>
 
-    <div class="reg-body">
-      <div class="loading-spinner" id="reg-loading">Loading available seasons&hellip;</div>
-
-      <div class="reg-closed" id="reg-closed" style="display: none;">
-        <div class="reg-closed__icon">🏓</div>
-        Registration is currently closed.<br>
-        Follow <a href="https://instagram.com/dinksociety.pb" target="_blank" rel="noopener" style="color: var(--gold-deep); font-weight: 500;">@dinksociety.pb</a> for announcements on the next Circuit.
+    <div class="reg-card">
+      <!-- Stepper -->
+      <div class="reg-stepper" id="stepper">
+        <div class="reg-step is-active" data-step="1">1 · Path</div>
+        <div class="reg-step" data-step="2">2 · Details</div>
+        <div class="reg-step" data-step="3">3 · Waiver</div>
+        <div class="reg-step" data-step="4">4 · Review</div>
       </div>
 
-      <div id="reg-flow" style="display: none;">
-        <div class="reg-season-picker" id="season-picker" style="display: none;"></div>
+      <!-- Step 1: Path -->
+      <section class="reg-section is-active" data-section="1">
+        <h2 class="reg-h2">How are you joining?</h2>
+        <p class="reg-lede">Register as a team of four or sign up solo as a free agent.</p>
+        <div class="reg-paths" id="paths">
+          <button type="button" class="reg-path" data-path="team">
+            <div class="reg-path__header"><span class="reg-path__label">Team</span><span class="reg-path__price">$450</span></div>
+            <div class="reg-path__title">Register your team of four</div>
+            <p class="reg-path__desc">You have a captain with three other players lined up. Roster locks at registration close.</p>
+          </button>
+          <button type="button" class="reg-path" data-path="agent">
+            <div class="reg-path__header"><span class="reg-path__label">Free agent</span><span class="reg-path__price">$75</span></div>
+            <div class="reg-path__title">Sign up solo</div>
+            <p class="reg-path__desc">We'll place you on a team from the free-agent pool. Captains draft before the Circuit begins.</p>
+          </button>
+        </div>
+        <div class="reg-actions"><button type="button" class="reg-btn reg-btn--primary" id="to-step-2" disabled>Continue</button></div>
+      </section>
 
-        <div class="reg-field" id="division-picker-wrap">
-          <label>Division <span class="req">*</span></label>
-          <select id="division-select" required>
-            <option value="">Select division</option>
-          </select>
+      <!-- Step 2: Details -->
+      <section class="reg-section" data-section="2">
+        <h2 class="reg-h2" id="details-title">Your details</h2>
+        <p class="reg-lede" id="details-lede">Start with the basics.</p>
+
+        <div class="reg-field">
+          <div class="reg-field__label">Division</div>
+          <div class="reg-divs" id="divisions">
+            <button type="button" class="reg-div" data-div="3.0M"><div class="reg-div__name">3.0 Mixed</div><div class="reg-div__meta">Open</div></button>
+            <button type="button" class="reg-div" data-div="3.5M"><div class="reg-div__name">3.5 Mixed</div><div class="reg-div__meta">Open</div></button>
+            <button type="button" class="reg-div" data-div="3.5W" disabled><div class="reg-div__name">3.5 Women's</div><div class="reg-div__meta">Coming soon</div></button>
+          </div>
+          <div class="reg-field__error" data-error="division">Pick a division to continue.</div>
         </div>
 
-        <div class="reg-types" id="reg-types">
-          <div class="reg-type is-active" data-type="team" onclick="selectType('team')">
-            <div class="reg-type__price" id="price-team">$450</div>
-            <div class="reg-type__label">Team</div>
-            <div class="reg-type__desc">4&ndash;10 players per roster. Only captain info needed now.</div>
-          </div>
-          <div class="reg-type" data-type="agent" onclick="selectType('agent')">
-            <div class="reg-type__price" id="price-agent">$75</div>
-            <div class="reg-type__label">Free Agent</div>
-            <div class="reg-type__desc">Solo signup. Get drafted onto a team before the season starts.</div>
-          </div>
+        <!-- Team fields -->
+        <div id="team-fields" style="display:none;">
+          <div class="reg-field"><label for="team-name">Team name</label><input type="text" id="team-name" placeholder="e.g. Dink Floyd" maxlength="40"><div class="reg-field__error" data-error="team-name">Team name is required.</div></div>
+          <div class="reg-player"><div class="reg-player__heading">Player 1 <span class="captain">· Captain</span></div><div class="reg-field__row"><div class="reg-field"><label for="p1-name">Full name</label><input type="text" id="p1-name" data-required="1"></div><div class="reg-field"><label for="p1-phone">Phone</label><input type="tel" id="p1-phone" data-required="1"></div></div><div class="reg-field"><label for="p1-email">Email</label><input type="email" id="p1-email" data-required="1"></div></div>
+          <div class="reg-player"><div class="reg-player__heading">Player 2</div><div class="reg-field__row"><div class="reg-field"><label for="p2-name">Full name</label><input type="text" id="p2-name" data-required="1"></div><div class="reg-field"><label for="p2-email">Email</label><input type="email" id="p2-email" data-required="1"></div></div></div>
+          <div class="reg-player"><div class="reg-player__heading">Player 3</div><div class="reg-field__row"><div class="reg-field"><label for="p3-name">Full name</label><input type="text" id="p3-name" data-required="1"></div><div class="reg-field"><label for="p3-email">Email</label><input type="email" id="p3-email" data-required="1"></div></div></div>
+          <div class="reg-player"><div class="reg-player__heading">Player 4</div><div class="reg-field__row"><div class="reg-field"><label for="p4-name">Full name</label><input type="text" id="p4-name" data-required="1"></div><div class="reg-field"><label for="p4-email">Email</label><input type="email" id="p4-email" data-required="1"></div></div></div>
         </div>
 
-        <!-- Team form -->
-        <form class="reg-form is-visible" id="form-team" onsubmit="return handleSubmit(event, 'team')">
-          <div class="reg-section-label">Captain information</div>
-          <div class="reg-row">
-            <div class="reg-field"><label>First name <span class="req">*</span></label><input type="text" id="t-captain-first" required /></div>
-            <div class="reg-field"><label>Last name <span class="req">*</span></label><input type="text" id="t-captain-last" required /></div>
-          </div>
-          <div class="reg-field"><label>Email <span class="req">*</span></label><input type="email" id="t-captain-email" required /></div>
-          <div class="reg-field"><label>Phone</label><input type="tel" id="t-captain-phone" /></div>
+        <!-- Agent fields -->
+        <div id="agent-fields" style="display:none;">
+          <div class="reg-field__row"><div class="reg-field"><label for="a-name">Full name</label><input type="text" id="a-name" data-required="1"></div><div class="reg-field"><label for="a-phone">Phone</label><input type="tel" id="a-phone" data-required="1"></div></div>
+          <div class="reg-field"><label for="a-email">Email</label><input type="email" id="a-email" data-required="1"></div>
+          <div class="reg-field"><label for="a-dupr">DUPR rating (optional)</label><input type="text" id="a-dupr" placeholder="e.g. 3.42"></div>
+          <div class="reg-field"><label for="a-notes">Anything we should know?</label><textarea id="a-notes" rows="3" placeholder="Preferred partners, scheduling conflicts, etc."></textarea></div>
+        </div>
 
-          <div class="reg-section-label">Team details</div>
-          <div class="reg-field"><label>Team name <span class="req">*</span></label><input type="text" id="t-team-name" required /></div>
+        <div class="reg-actions"><button type="button" class="reg-btn reg-btn--secondary" data-back="1">Back</button><button type="button" class="reg-btn reg-btn--primary" id="to-step-3">Continue</button></div>
+      </section>
 
-          <div class="reg-note">You don't need your full roster now. Once confirmed, you'll get a magic link to the captain portal to add players (4&ndash;10). Each player needs: full name, gender, email. Optional: DOB, DUPR.</div>
+      <!-- Step 3: Waiver -->
+      <section class="reg-section" data-section="3">
+        <h2 class="reg-h2">Waiver & code of conduct</h2>
+        <p class="reg-lede">Read through and check both boxes to continue.</p>
+        <div class="reg-waiver">
+          <h4>Liability waiver</h4>
+          <p>By participating in The Dink Society, I acknowledge that pickleball is a physical activity with inherent risks including, but not limited to, injury from falls, collisions with other players, contact with the ball or paddle, and environmental conditions. I voluntarily assume all such risks.</p>
+          <p>I release The Dink Society, its organizers, sponsors, facility hosts, and representatives from any and all claims arising from my participation, except in cases of gross negligence. I confirm I am physically fit to participate and carry my own health insurance.</p>
+          <h4>Code of conduct</h4>
+          <p>The Society is built on mutual respect. Members agree to call lines honestly, keep disputes civil, treat opponents and officials with courtesy, and represent the league well on and off the court. Trash talk is welcome; disrespect is not.</p>
+          <p>Members who repeatedly violate the code may be removed from the Circuit without refund, at the organizers' discretion. Photographs taken during league play may be used on league platforms unless a member opts out in writing.</p>
+          <h4>Refund policy</h4>
+          <p>Dues are non-refundable once Circuit I is underway. Full refunds available up to 7 days before the start date; 50% refunds up to 48 hours before. After that, no refunds will be issued except at organizers' discretion.</p>
+        </div>
+        <label class="reg-checkbox"><input type="checkbox" id="waiver-liability"><span class="reg-checkbox__text">I have read and agree to the liability waiver above.</span></label>
+        <label class="reg-checkbox"><input type="checkbox" id="waiver-conduct"><span class="reg-checkbox__text">I agree to the code of conduct and refund policy.</span></label>
+        <div class="reg-actions"><button type="button" class="reg-btn reg-btn--secondary" data-back="2">Back</button><button type="button" class="reg-btn reg-btn--primary" id="to-step-4" disabled>Continue</button></div>
+      </section>
 
-          <div class="reg-section-label">Waiver &amp; agreement</div>
-          <div class="reg-waiver">
-            <h4>Liability waiver</h4>
-            <p>By registering, I acknowledge that pickleball involves physical activity and inherent risk of injury. I voluntarily assume all risks and release The Dink Society, its organizers, and venue partners from any liability.</p>
-            <p>I confirm I am physically fit to participate and carry my own health insurance.</p>
-            <h4>Code of conduct</h4>
-            <p>The Society is built on mutual respect. Members agree to call lines honestly, keep disputes civil, and represent the league well on and off the court.</p>
-            <h4>Refund policy</h4>
-            <p>Dues are non-refundable once the Circuit is underway. Full refunds available up to 7 days before start; 50% up to 48 hours before.</p>
-          </div>
-          <label class="reg-checkbox"><input type="checkbox" id="t-waiver" required><span class="reg-checkbox__text">I agree to the liability waiver, code of conduct, and refund policy.</span></label>
-
-          <button type="submit" class="reg-submit" id="t-submit">Continue to payment</button>
-          <div class="reg-status" id="t-status"></div>
-        </form>
-
-        <!-- Agent form -->
-        <form class="reg-form" id="form-agent" onsubmit="return handleSubmit(event, 'agent')">
-          <div class="reg-section-label">Your information</div>
-          <div class="reg-row">
-            <div class="reg-field"><label>First name <span class="req">*</span></label><input type="text" id="a-first" required /></div>
-            <div class="reg-field"><label>Last name <span class="req">*</span></label><input type="text" id="a-last" required /></div>
-          </div>
-          <div class="reg-field"><label>Email <span class="req">*</span></label><input type="email" id="a-email" required /></div>
-          <div class="reg-field">
-            <label>Gender <span class="req">*</span></label>
-            <select id="a-gender" required><option value="">Select</option><option value="male">Male</option><option value="female">Female</option></select>
-          </div>
-
-          <div class="reg-section-label">Optional</div>
-          <div class="reg-row">
-            <div class="reg-field"><label>Date of birth</label><input type="date" id="a-dob" /></div>
-            <div class="reg-field"><label>DUPR rating</label><input type="text" id="a-dupr" placeholder="e.g. 3.25" /></div>
-          </div>
-
-          <div class="reg-section-label">Waiver &amp; agreement</div>
-          <div class="reg-waiver">
-            <h4>Liability waiver</h4>
-            <p>By registering, I acknowledge that pickleball involves physical activity and inherent risk of injury. I voluntarily assume all risks and release The Dink Society, its organizers, and venue partners from any liability.</p>
-            <p>I confirm I am physically fit to participate and carry my own health insurance.</p>
-            <h4>Code of conduct</h4>
-            <p>The Society is built on mutual respect. Members agree to call lines honestly, keep disputes civil, and represent the league well on and off the court.</p>
-            <h4>Refund policy</h4>
-            <p>Dues are non-refundable once the Circuit is underway. Full refunds available up to 7 days before start; 50% up to 48 hours before.</p>
-          </div>
-          <label class="reg-checkbox"><input type="checkbox" id="a-waiver" required><span class="reg-checkbox__text">I agree to the liability waiver, code of conduct, and refund policy.</span></label>
-
-          <button type="submit" class="reg-submit" id="a-submit">Continue to payment</button>
-          <div class="reg-status" id="a-status"></div>
-        </form>
-      </div>
+      <!-- Step 4: Review -->
+      <section class="reg-section" data-section="4">
+        <h2 class="reg-h2">Review & pay</h2>
+        <p class="reg-lede">Confirm the details, then pay via Stripe to lock in your spot.</p>
+        <div class="reg-summary" id="summary"></div>
+        <div class="reg-status" id="submit-status"></div>
+        <div class="reg-actions"><button type="button" class="reg-btn reg-btn--secondary" data-back="3">Back</button><button type="button" class="reg-btn reg-btn--primary" id="submit-btn">Pay & secure spot</button></div>
+      </section>
     </div>
   </div>
 
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
+
   <script>
-    const $id = (id) => document.getElementById(id);
-    let seasons = [], selectedSeason = null, selectedDivision = null, selectedType = 'team';
+    const DIVISION_LABELS = { '3.0M': '3.0 Mixed', '3.5M': '3.5 Mixed', '3.5W': "3.5 Women's" };
+    const state = { path: null, division: null, step: 1 };
 
-    async function init() {
-      try {
-        const res = await fetch('/.netlify/functions/public-seasons');
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        seasons = (data.seasons || []).filter(s => s.registration === 'open');
-        $id('reg-loading').style.display = 'none';
-
-        if (!seasons.length) { $id('reg-closed').style.display = 'block'; return; }
-
-        if (seasons.length === 1) {
-          selectedSeason = seasons[0];
-        } else {
-          renderSeasonPicker();
-          selectedSeason = seasons[0];
-        }
-
-        $id('reg-flow').style.display = 'block';
-        $id('reg-title').textContent = 'Apply for ' + (selectedSeason.label || selectedSeason.name);
-        populateDivisions();
-      } catch { $id('reg-loading').textContent = 'Could not load registration data. Please try again later.'; }
+    // Step navigation
+    function goToStep(n) {
+      state.step = n;
+      document.querySelectorAll('.reg-section').forEach(s => s.classList.toggle('is-active', Number(s.dataset.section) === n));
+      document.querySelectorAll('.reg-step').forEach(s => {
+        const sn = Number(s.dataset.step);
+        s.classList.toggle('is-active', sn === n);
+        s.classList.toggle('is-done', sn < n);
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    function renderSeasonPicker() {
-      const p = $id('season-picker');
-      p.style.display = 'block';
-      p.innerHTML = '<div style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-deep);font-weight:500;margin-bottom:10px;">Select season</div>' +
-        seasons.map((s, i) => `<div class="reg-season-card ${i===0?'is-active':''}" onclick="pickSeason(${i})"><div class="reg-season-card__name">${esc(s.label||s.name)}</div><div class="reg-season-card__meta">${s.divisions.length} division${s.divisions.length!==1?'s':''} open</div></div>`).join('');
-    }
-
-    function pickSeason(i) {
-      selectedSeason = seasons[i];
-      document.querySelectorAll('.reg-season-card').forEach((c,j) => c.classList.toggle('is-active', j===i));
-      $id('reg-title').textContent = 'Apply for ' + (selectedSeason.label || selectedSeason.name);
-      populateDivisions();
-    }
-
-    function populateDivisions() {
-      if (!selectedSeason) return;
-      $id('division-select').innerHTML = '<option value="">Select division</option>' +
-        selectedSeason.divisions.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('');
-      selectedDivision = null;
-      updatePrices();
-    }
-
-    $id('division-select').addEventListener('change', () => {
-      selectedDivision = selectedSeason?.divisions.find(d => d.id === $id('division-select').value) || null;
-      updatePrices();
+    document.querySelectorAll('[data-back]').forEach(btn => {
+      btn.addEventListener('click', () => goToStep(Number(btn.dataset.back)));
     });
 
-    function updatePrices() {
-      const tp = selectedDivision?.teamPrice || 450, ap = selectedDivision?.agentPrice || 75;
-      $id('price-team').textContent = '$' + tp;
-      $id('price-agent').textContent = '$' + ap;
-      $id('t-submit').textContent = 'Continue to payment \u2014 $' + tp;
-      $id('a-submit').textContent = 'Continue to payment \u2014 $' + ap;
-    }
-
-    function selectType(type) {
-      selectedType = type;
-      document.querySelectorAll('.reg-type').forEach(t => t.classList.remove('is-active'));
-      document.querySelector('.reg-type[data-type="'+type+'"]').classList.add('is-active');
-      $id('form-team').classList.toggle('is-visible', type === 'team');
-      $id('form-agent').classList.toggle('is-visible', type === 'agent');
-      updatePrices();
-    }
-
-    async function handleSubmit(e, type) {
-      e.preventDefault();
-      if (!selectedSeason || !selectedDivision) {
-        showStatus(type, 'error', 'Please select a division.'); return false;
-      }
-
-      const btn = $id(type==='team'?'t-submit':'a-submit');
-      btn.disabled = true;
-      showStatus(type, 'info', 'Creating checkout session\u2026');
-
-      const payload = {
-        seasonId: selectedSeason.id,
-        circuit: selectedSeason.name,
-        division: selectedDivision.id,
-        divisionLabel: selectedDivision.name,
-        path: type,
-        price: type==='team' ? selectedDivision.teamPrice : selectedDivision.agentPrice,
-      };
-
-      if (type === 'team') {
-        payload.team = {
-          name: $id('t-team-name').value.trim(),
-          captain: $id('t-captain-first').value.trim()+' '+$id('t-captain-last').value.trim(),
-          players: [{ name: $id('t-captain-first').value.trim()+' '+$id('t-captain-last').value.trim(), email: $id('t-captain-email').value.trim(), phone: $id('t-captain-phone').value.trim()||undefined, role: 'captain' }],
-        };
+    // Step 1: Path
+    const pathButtons = document.querySelectorAll('.reg-path');
+    const toStep2Btn = document.getElementById('to-step-2');
+    pathButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        pathButtons.forEach(b => b.classList.remove('is-selected'));
+        btn.classList.add('is-selected');
+        state.path = btn.dataset.path;
+        toStep2Btn.disabled = false;
+      });
+    });
+    toStep2Btn.addEventListener('click', () => {
+      document.getElementById('team-fields').style.display = state.path === 'team' ? 'block' : 'none';
+      document.getElementById('agent-fields').style.display = state.path === 'agent' ? 'block' : 'none';
+      const title = document.getElementById('details-title');
+      const lede = document.getElementById('details-lede');
+      if (state.path === 'team') {
+        title.textContent = 'Team details';
+        lede.textContent = 'Pick your division, name the team, and add all four players. Player 1 is the captain.';
       } else {
-        payload.agent = {
-          name: $id('a-first').value.trim()+' '+$id('a-last').value.trim(),
-          email: $id('a-email').value.trim(),
-          gender: $id('a-gender').value,
-          dob: $id('a-dob').value||undefined,
-          dupr: $id('a-dupr').value.trim()||undefined,
-        };
+        title.textContent = 'Your details';
+        lede.textContent = "Pick your division and tell us about yourself. We'll place you with a team.";
       }
+      goToStep(2);
+    });
 
+    // Step 2: Division + fields
+    const divButtons = document.querySelectorAll('.reg-div');
+    divButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.disabled) return;
+        divButtons.forEach(b => b.classList.remove('is-selected'));
+        btn.classList.add('is-selected');
+        state.division = btn.dataset.div;
+        clearError('division');
+      });
+    });
+
+    function clearError(key) { const el = document.querySelector(`[data-error="${key}"]`); if (el) el.classList.remove('is-visible'); }
+    function showError(key) { const el = document.querySelector(`[data-error="${key}"]`); if (el) el.classList.add('is-visible'); }
+
+    document.getElementById('to-step-3').addEventListener('click', () => {
+      let valid = true;
+      if (!state.division) { showError('division'); valid = false; }
+      const scope = state.path === 'team' ? document.getElementById('team-fields') : document.getElementById('agent-fields');
+      scope.querySelectorAll('input[data-required]').forEach(inp => {
+        if (!inp.value.trim()) { inp.classList.add('is-invalid'); valid = false; }
+        else inp.classList.remove('is-invalid');
+      });
+      if (state.path === 'team') {
+        const tn = document.getElementById('team-name');
+        if (!tn.value.trim()) { tn.classList.add('is-invalid'); showError('team-name'); valid = false; }
+        else { tn.classList.remove('is-invalid'); clearError('team-name'); }
+      }
+      scope.querySelectorAll('input[type="email"]').forEach(inp => {
+        if (inp.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inp.value)) { inp.classList.add('is-invalid'); valid = false; }
+      });
+      if (!valid) return;
+      goToStep(3);
+    });
+
+    document.addEventListener('input', e => {
+      if (e.target.classList.contains('is-invalid') && e.target.value.trim()) e.target.classList.remove('is-invalid');
+    });
+
+    // Step 3: Waiver
+    const wL = document.getElementById('waiver-liability');
+    const wC = document.getElementById('waiver-conduct');
+    const to4 = document.getElementById('to-step-4');
+    function chkW() { to4.disabled = !(wL.checked && wC.checked); }
+    wL.addEventListener('change', chkW);
+    wC.addEventListener('change', chkW);
+    to4.addEventListener('click', () => { buildSummary(); goToStep(4); });
+
+    // Step 4: Summary
+    function buildSummary() {
+      const rows = [];
+      rows.push(['Circuit', 'Circuit I · May 2026']);
+      rows.push(['Division', DIVISION_LABELS[state.division] || '—']);
+      rows.push(['Membership type', state.path === 'team' ? 'Team (4 players)' : 'Free agent']);
+      if (state.path === 'team') {
+        rows.push(['Team name', escapeHtml(document.getElementById('team-name').value.trim())]);
+        rows.push(['Captain', escapeHtml(document.getElementById('p1-name').value.trim())]);
+      } else {
+        rows.push(['Name', escapeHtml(document.getElementById('a-name').value.trim())]);
+      }
+      const price = state.path === 'team' ? 450 : 75;
+      document.getElementById('summary').innerHTML =
+        rows.map(([k, v]) => `<div class="reg-summary__row"><span class="reg-summary__label">${k}</span><span class="reg-summary__value">${v}</span></div>`).join('') +
+        `<div class="reg-summary__row reg-summary__row--total"><span class="reg-summary__label">Total due today</span><span class="reg-summary__value">$${price}</span></div>`;
+    }
+
+    // Submit → Stripe
+    document.getElementById('submit-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('submit-btn');
+      const status = document.getElementById('submit-status');
+      btn.disabled = true;
+      status.className = 'reg-status is-info';
+      status.textContent = 'Creating your Stripe checkout session…';
       try {
         const res = await fetch('/.netlify/functions/register-checkout', {
-          method: 'POST', headers: {'Content-Type':'application/json'},
-          body: JSON.stringify(payload),
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildPayload()),
         });
-        if (!res.ok) throw new Error((await res.text())||'Checkout failed');
+        if (!res.ok) throw new Error((await res.text()) || 'Checkout session failed');
         const data = await res.json();
         if (!data.checkoutUrl) throw new Error('No checkout URL returned');
-        showStatus(type, 'info', 'Redirecting to Stripe\u2026');
+        status.textContent = 'Redirecting to Stripe…';
         window.location.href = data.checkoutUrl;
       } catch (err) {
-        showStatus(type, 'error', 'Could not start checkout: ' + err.message);
+        status.className = 'reg-status is-error';
+        status.textContent = 'Could not start checkout: ' + err.message;
         btn.disabled = false;
       }
-      return false;
+    });
+
+    function buildPayload() {
+      const common = { circuit: 'I', division: state.division, path: state.path, price: state.path === 'team' ? 450 : 75, agreed: { liability: true, conduct: true } };
+      if (state.path === 'team') {
+        return { ...common, team: { name: val('team-name'), players: [
+          { name: val('p1-name'), email: val('p1-email'), phone: val('p1-phone'), captain: true },
+          { name: val('p2-name'), email: val('p2-email') },
+          { name: val('p3-name'), email: val('p3-email') },
+          { name: val('p4-name'), email: val('p4-email') },
+        ]}};
+      }
+      return { ...common, agent: { name: val('a-name'), email: val('a-email'), phone: val('a-phone'), dupr: val('a-dupr'), notes: val('a-notes') }};
     }
 
-    function showStatus(type, level, msg) {
-      const el = $id(type==='team'?'t-status':'a-status');
-      el.className = 'reg-status is-' + level;
-      el.textContent = msg;
-    }
-
-    function esc(s) { return String(s??'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-    init();
+    function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
+    function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
   </script>
 </body>
 </html>
