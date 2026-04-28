@@ -3,107 +3,127 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Schedule &middot; The Dink Society</title>
+  <title>Schedule · The Dink Society</title>
+  <meta name="description" content="Weekly match schedule for The Dink Society pickleball league." />
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <link rel="stylesheet" href="/css/shared-nav.css" />
   <style>
-    .sched-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 0 80px; }
+    .sched-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
 
     .sched-hero {
-      background: linear-gradient(150deg, var(--emerald) 0%, var(--emerald-dark) 100%);
-      color: var(--cream);
-      padding: 40px 40px 36px;
-      position: relative;
-      overflow: hidden;
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      padding: var(--space-8) var(--space-6); border-radius: var(--radius-lg); margin-bottom: var(--space-4);
     }
-    .sched-hero::after {
-      content: '';
-      position: absolute; inset: 0;
-      background-image: radial-gradient(circle, rgba(245,235,212,0.04) 1.5px, transparent 1.5px);
-      background-size: 18px 18px;
-      pointer-events: none;
-    }
-    .sched-hero > * { position: relative; z-index: 1; }
-    .sched-hero h1 {
-      font-family: var(--font-display); font-style: italic;
-      font-size: 36px; font-weight: 500; margin: 0 0 6px; line-height: 1.1;
-    }
-    .sched-hero p { font-size: 14px; opacity: 0.6; margin: 0; }
+    .sched-hero .eyebrow { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-teal); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+    .sched-hero .eyebrow::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--color-teal); box-shadow: 0 0 0 4px var(--color-teal-dim); }
+    .sched-hero h1 { font-size: var(--text-3xl); font-weight: 800; text-transform: uppercase; margin: 0 0 var(--space-2); }
+    .sched-hero p { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; }
 
-    .sched-body { padding: 24px var(--gutter); }
+    .sched-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: var(--space-4); }
+    .sched-controls select {
+      padding: 8px 14px; background: var(--color-surface-2); border: 1px solid var(--color-border);
+      color: var(--color-text); border-radius: var(--radius-sm); font-size: 12px; font-family: inherit; cursor: pointer;
+    }
+    .sched-controls select:focus { border-color: var(--color-lime); outline: none; }
 
-    .sched-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 0;
-      border-bottom: 1px solid rgba(15,77,58,0.06);
-      font-size: 14px;
+    .week-tabs { display: flex; gap: 3px; margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .week-tab {
+      padding: 8px 16px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700;
+      border: 1px solid var(--color-border); background: transparent; color: var(--color-text-faint);
+      cursor: pointer; transition: all var(--transition);
     }
-    .sched-wk {
-      font-size: 10px;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--gold-deep);
-      min-width: 50px;
-    }
-    .sched-teams { flex: 1; font-weight: 500; }
-    .sched-vs { color: rgba(15,77,58,0.3); font-weight: 400; }
-    .sched-date { font-size: 12px; opacity: 0.4; }
-    .sched-result {
-      font-size: 12px; font-weight: 600;
-      padding: 3px 8px; border-radius: 4px;
-      background: rgba(15,77,58,0.06);
-    }
+    .week-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
+    .week-tab.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
 
-    .empty-state {
-      text-align: center; padding: 48px 20px;
-      font-size: 14px; opacity: 0.5;
+    .match-card {
+      display: grid; grid-template-columns: 1fr auto 1fr;
+      gap: 16px; align-items: center; padding: 18px 20px;
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); margin-bottom: 8px;
+      transition: border-color var(--transition);
     }
+    .match-card:hover { border-color: var(--color-border-strong); }
+    .match-card__team { font-size: 14px; font-weight: 700; }
+    .match-card__team--right { text-align: right; }
+    .match-card__center { text-align: center; }
+    .match-card__vs { font-size: 9px; letter-spacing: 0.2em; color: var(--color-text-faint); font-weight: 700; }
+    .match-card__time { font-size: 11px; color: var(--color-text-faint); margin-top: 4px; }
+    .match-card__court { font-size: 10px; color: var(--color-text-faint); }
+    .match-card__final { font-size: 9px; color: var(--color-lime); font-weight: 700; letter-spacing: 0.1em; margin-top: 4px; text-transform: uppercase; }
 
-    @media (max-width: 600px) {
-      .sched-hero { padding: 28px 20px; }
-      .sched-hero h1 { font-size: 28px; }
+    @media (max-width: 720px) {
+      .sched-hero { padding: var(--space-6) var(--space-4); }
+      .sched-hero h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); }
+      .match-card { grid-template-columns: 1fr; text-align: center; gap: 8px; }
+      .match-card__team, .match-card__team--right { text-align: center; }
     }
   </style>
 </head>
-<body>
+<body data-page="schedule">
   <div data-partial="nav"></div>
-
-  <div class="sched-shell">
+  <main class="sched-shell">
     <div class="sched-hero">
-      <h1>Circuit I &mdash; weekly matchups</h1>
-      <p>Round-robin through week 6, championship week 7. Updated as matchups are set.</p>
-    </div>
-
-    <div class="sched-body">
-      <div class="tabs" id="sched-tabs">
-        <button class="tab is-active" data-division="3.0-mixed">3.0 Mixed</button>
-        <button class="tab" data-division="3.5-mixed">3.5 Mixed</button>
-      </div>
-
-      <div id="sched-list">
-        <div class="empty-state">Schedule will appear once the admin generates matchups for Circuit I.</div>
+      <div class="eyebrow">Schedule</div>
+      <h1>Circuit I</h1>
+      <p>May – Jun 2026 · Round-robin + Championship</p>
+      <div class="sched-controls">
+        <select id="sched-circuit"><option value="I">Circuit I</option></select>
+        <select id="sched-division">
+          <option value="">All divisions</option>
+          <option value="3.0M">3.0 Mixed</option>
+          <option value="3.5M">3.5 Mixed</option>
+        </select>
       </div>
     </div>
-  </div>
-
+    <nav class="week-tabs" id="week-tabs"></nav>
+    <div id="schedule-content"><div class="empty-state">Loading schedule…</div></div>
+  </main>
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
   <script>
-    // Tab switching
-    document.getElementById('sched-tabs')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.tab');
-      if (!btn) return;
-      document.querySelectorAll('#sched-tabs .tab').forEach(t => t.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      // Future: fetch schedule for btn.dataset.division
-    });
+    let scheduleData=null,currentWeek=1;
+    const $id=id=>document.getElementById(id);
+
+    async function loadSchedule(){
+      try{
+        const p=new URLSearchParams({circuit:$id('sched-circuit').value});
+        const d=$id('sched-division').value;if(d)p.set('division',d);
+        const r=await fetch(`/.netlify/functions/admin-matches?${p}`);
+        if(!r.ok)throw 0;scheduleData=await r.json();renderTabs();renderWeek(currentWeek);
+      }catch{$id('schedule-content').innerHTML='<div class="empty-state">Schedule not yet published. Check back closer to Circuit I.</div>';$id('week-tabs').innerHTML='';}
+    }
+
+    function renderTabs(){
+      const w=scheduleData?.weeks||[];if(!w.length){$id('week-tabs').innerHTML='';return;}
+      $id('week-tabs').innerHTML=w.map(x=>`<button class="week-tab ${x.week===currentWeek?'is-active':''}" data-week="${x.week}">Week ${x.week}${x.week===7?' (Finals)':''}</button>`).join('');
+      $id('week-tabs').querySelectorAll('.week-tab').forEach(b=>{b.addEventListener('click',()=>{currentWeek=parseInt(b.dataset.week);document.querySelectorAll('.week-tab').forEach(x=>x.classList.toggle('is-active',parseInt(x.dataset.week)===currentWeek));renderWeek(currentWeek);});});
+    }
+
+    function renderWeek(n){
+      const w=(scheduleData?.weeks||[]).find(x=>x.week===n),el=$id('schedule-content');
+      if(!w?.matches?.length){el.innerHTML='<div class="empty-state">No matches scheduled for this week.</div>';return;}
+      el.innerHTML=w.matches.map(m=>{
+        const dt=m.scheduledAt?new Date(m.scheduledAt):null;
+        const ds=dt?dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}):'';
+        const ts=dt?dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'';
+        return`<div class="match-card">
+          <div class="match-card__team">${esc(m.teamA?.name||'TBD')}</div>
+          <div class="match-card__center">
+            <div class="match-card__vs">VS</div>
+            ${m.court?`<div class="match-card__court">${esc(m.court)}</div>`:''}
+            ${ds?`<div class="match-card__time">${ds}<br>${ts}</div>`:''}
+            ${m.finalizedAt?'<div class="match-card__final">Final</div>':''}
+          </div>
+          <div class="match-card__team match-card__team--right">${esc(m.teamB?.name||'TBD')}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    $id('sched-division').addEventListener('change',loadSchedule);
+    $id('sched-circuit').addEventListener('change',loadSchedule);
+    loadSchedule();
   </script>
 </body>
 </html>

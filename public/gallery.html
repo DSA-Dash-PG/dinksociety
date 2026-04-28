@@ -1,76 +1,132 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Captain Portal &middot; The Dink Society</title>
-  <meta name="robots" content="noindex,nofollow">
-  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/shared.css">
-  <link rel="stylesheet" href="/css/shared-nav.css">
-  <link rel="stylesheet" href="/css/compat.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gallery · The Dink Society</title>
+  <meta name="description" content="Photos from league nights at The Dink Society." />
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <link rel="stylesheet" href="/css/compat.css" />
+  <style>
+    .gal-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+
+    .gal-hero {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      padding: var(--space-8) var(--space-6); border-radius: var(--radius-lg); margin-bottom: var(--space-4);
+    }
+    .gal-hero .eyebrow { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-teal); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+    .gal-hero .eyebrow::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--color-teal); box-shadow: 0 0 0 4px var(--color-teal-dim); }
+    .gal-hero h1 { font-size: var(--text-3xl); font-weight: 800; text-transform: uppercase; margin: 0 0 var(--space-2); }
+    .gal-hero p { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; }
+
+    .gal-filters { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-4); }
+    .gal-filter {
+      padding: 6px 14px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700;
+      border: 1px solid var(--color-border); background: transparent; color: var(--color-text-faint);
+      cursor: pointer; transition: all var(--transition);
+    }
+    .gal-filter:hover { color: var(--color-text); background: var(--color-surface-2); }
+    .gal-filter.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+
+    .gal-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3); }
+    .gal-item {
+      aspect-ratio: 1; border-radius: var(--radius-sm); overflow: hidden;
+      cursor: pointer; background: var(--color-surface-2); position: relative;
+    }
+    .gal-item img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.3s ease; }
+    .gal-item:hover img { transform: scale(1.04); }
+    .gal-item__overlay {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: linear-gradient(transparent, rgba(0,0,0,0.7));
+      padding: 20px 12px 10px; color: #fff;
+    }
+    .gal-item__week { font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; opacity: 0.7; font-weight: 700; margin-bottom: 2px; }
+    .gal-item__caption { font-size: 12px; }
+
+    .gal-lightbox {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.92);
+      display: none; align-items: center; justify-content: center; z-index: 300;
+    }
+    .gal-lightbox.is-open { display: flex; }
+    .gal-lightbox img { max-width: 90vw; max-height: 85vh; object-fit: contain; border-radius: 4px; }
+    .gal-lightbox__close {
+      position: absolute; top: 20px; right: 20px; background: none;
+      border: 1px solid var(--color-border); color: var(--color-text);
+      width: 40px; height: 40px; border-radius: 50%; cursor: pointer; font-size: 18px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .gal-lightbox__close:hover { background: var(--color-surface-2); }
+    .gal-lightbox__caption { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); color: var(--color-text-muted); font-size: 12px; text-align: center; max-width: 400px; }
+
+    @media (max-width: 720px) {
+      .gal-hero { padding: var(--space-6) var(--space-4); }
+      .gal-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+    }
+  </style>
 </head>
-<body>
+<body data-page="gallery">
   <div data-partial="nav"></div>
-
-  <div class="gal-shell">
+  <main class="gal-shell">
     <div class="gal-hero">
-      <h1>Moments from the court</h1>
-      <p>League nights, celebrations, and the post-match round.</p>
+      <div class="eyebrow">Gallery</div>
+      <h1>Moments</h1>
+      <p>From the court — and after.</p>
     </div>
 
-    <div class="gal-body">
-      <div class="gal-filters" id="gal-filters">
-        <button class="gal-filter is-active" data-week="all">All weeks</button>
-        <button class="gal-filter" data-week="1">Week 1</button>
-        <button class="gal-filter" data-week="2">Week 2</button>
-        <button class="gal-filter" data-week="3">Week 3</button>
-        <button class="gal-filter" data-week="4">Week 4</button>
-        <button class="gal-filter" data-week="5">Week 5</button>
-        <button class="gal-filter" data-week="6">Week 6</button>
-        <button class="gal-filter" data-week="7">Championship</button>
-      </div>
-
-      <div class="gal-grid" id="gal-grid">
-        <div class="empty-state" style="grid-column: 1 / -1;">
-          <div class="empty-state__icon">📸</div>
-          Photos will appear here once league nights begin.
-        </div>
-      </div>
+    <div class="gal-filters" id="gal-filters">
+      <button class="gal-filter is-active" data-week="">All weeks</button>
+      <button class="gal-filter" data-week="1">Week 1</button>
+      <button class="gal-filter" data-week="2">Week 2</button>
+      <button class="gal-filter" data-week="3">Week 3</button>
+      <button class="gal-filter" data-week="4">Week 4</button>
+      <button class="gal-filter" data-week="5">Week 5</button>
+      <button class="gal-filter" data-week="6">Week 6</button>
+      <button class="gal-filter" data-week="7">Finals</button>
     </div>
-  </div>
 
-  <!-- Lightbox -->
-  <div class="gal-lightbox" id="gal-lightbox" onclick="this.classList.remove('is-open')">
-    <button class="gal-lightbox__close" aria-label="Close">&times;</button>
-    <img id="gal-lightbox-img" src="" alt="" />
+    <div id="gal-content"><div class="empty-state">Loading gallery…</div></div>
+  </main>
+
+  <div class="gal-lightbox" id="lb">
+    <button class="gal-lightbox__close" id="lb-close">✕</button>
+    <img id="lb-img" src="" alt="">
+    <div class="gal-lightbox__caption" id="lb-cap"></div>
   </div>
 
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
   <script>
-    // Filter tabs
-    document.getElementById('gal-filters')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.gal-filter');
-      if (!btn) return;
-      document.querySelectorAll('.gal-filter').forEach(f => f.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      // Future: filter gallery by week
-    });
+    const $id=id=>document.getElementById(id);let activeWeek='';
 
-    // Lightbox
-    document.getElementById('gal-grid')?.addEventListener('click', (e) => {
-      const item = e.target.closest('.gal-item');
-      if (!item) return;
-      const img = item.querySelector('img');
-      if (!img) return;
-      document.getElementById('gal-lightbox-img').src = img.src;
-      document.getElementById('gal-lightbox').classList.add('is-open');
-    });
+    async function loadGallery(){
+      try{
+        const p=new URLSearchParams();if(activeWeek)p.set('week',activeWeek);
+        const r=await fetch(`/.netlify/functions/moments-list?${p}`);
+        if(!r.ok)throw 0;const d=await r.json(),mm=d.moments||[];
+        if(!mm.length){$id('gal-content').innerHTML='<div class="empty-state">No photos yet. Check back after league nights start.</div>';return;}
+        $id('gal-content').innerHTML=`<div class="gal-grid">${mm.map(m=>`
+          <div class="gal-item" onclick="openLb('${esc(m.url)}','${esc(m.caption||'')}')">
+            <img src="${esc(m.url)}" alt="${esc(m.caption||'')}" loading="lazy">
+            ${m.caption||m.week?`<div class="gal-item__overlay">${m.week?`<div class="gal-item__week">Week ${m.week}</div>`:''}${m.caption?`<div class="gal-item__caption">${esc(m.caption)}</div>`:''}</div>`:''}
+          </div>`).join('')}</div>`;
+      }catch{$id('gal-content').innerHTML='<div class="empty-state">Gallery coming soon.</div>';}
+    }
+
+    document.querySelectorAll('.gal-filter').forEach(b=>{b.addEventListener('click',()=>{
+      document.querySelectorAll('.gal-filter').forEach(x=>x.classList.remove('is-active'));b.classList.add('is-active');
+      activeWeek=b.dataset.week;loadGallery();
+    });});
+
+    function openLb(url,cap){$id('lb-img').src=url;$id('lb-cap').textContent=cap;$id('lb').classList.add('is-open');document.body.style.overflow='hidden';}
+    function closeLb(){$id('lb').classList.remove('is-open');document.body.style.overflow='';}
+    $id('lb-close').addEventListener('click',closeLb);
+    $id('lb').addEventListener('click',e=>{if(e.target===$id('lb'))closeLb();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape')closeLb();});
+
+    function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    loadGallery();
   </script>
 </body>
 </html>
