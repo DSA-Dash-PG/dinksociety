@@ -42,8 +42,8 @@ export default async (req) => {
     if (!division || !path) {
       return new Response('Missing required fields: division, path', { status: 400 });
     }
-    if (path === 'team' && (!team?.name || !team?.players?.length)) {
-      return new Response('Team registration requires team name and at least one player', { status: 400 });
+    if (path === 'team' && (!team?.name || !team?.players?.[0]?.email)) {
+      return new Response('Team registration requires team name and captain email', { status: 400 });
     }
     if (path === 'agent' && (!agent?.name || !agent?.email)) {
       return new Response('Free agent registration requires name and email', { status: 400 });
