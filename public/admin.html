@@ -7,6 +7,7 @@
   <meta name="robots" content="noindex,nofollow" />
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
   <link rel="stylesheet" href="/css/shared.css" />
+  <script>((t)=>{if(t==="light")document.documentElement.setAttribute("data-theme","light")})(localStorage.getItem("ds-theme"))</script>
   <style>
     /* ═══════════════════════════════════════════════════════════
        ADMIN PORTAL — Night-Match Design System
@@ -242,7 +243,7 @@
 
         <!-- OVERVIEW -->
         <section class="admin-section is-active" data-section="overview">
-          <div class="am-head"><h1 class="am-title">Overview</h1><span style="font-size:10px;color:var(--color-text-faint);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">Circuit I · May 2026</span></div>
+          <div class="am-head"><h1 class="am-title">Overview</h1><span class="ov-circuit-label" style="font-size:10px;color:var(--color-text-faint);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">Circuit I · May 2026</span></div>
           <div class="stats-row" id="ov-stats"></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col">
             <div class="ac"><div class="ac__h"><h2 class="ac__t">Division fill</h2><span class="ac__s">6 spots each</span></div><div id="ov-fill"></div></div>
@@ -312,18 +313,34 @@
             <div class="af"><label>Photos (JPG/PNG, max 10MB)</label><input type="file" id="up-files" accept="image/jpeg,image/png" multiple style="padding:8px;background:var(--color-surface-2);cursor:pointer;"></div>
             <div style="text-align:right;"><button class="ab ab--lime ab--sm" id="up-btn">Upload</button></div>
           </div>
-          <div class="ac"><div class="ac__h"><h2 class="ac__t">Gallery</h2><a href="/gallery.html" style="font-size:10px;color:var(--color-text-faint);">View public page →</a></div><div id="admin-gallery" class="empty">No photos uploaded yet.</div></div>
+          <div class="ac"><div class="ac__h"><h2 class="ac__t">Gallery</h2><a href='/gallery' style='font-size:10px;color:var(--color-text-faint);'>View public page →</a></div><div id="admin-gallery" class="empty">No photos uploaded yet.</div></div>
         </section>
 
         <!-- SETTINGS -->
         <section class="admin-section" data-section="settings">
           <div class="am-head"><h1 class="am-title">Settings</h1></div>
           <div class="ac">
-            <div class="ac__h"><h2 class="ac__t">Circuit Config</h2></div>
-            <div class="arow"><div class="af"><label>Circuit name</label><input type="text" value="Circuit I" disabled></div><div class="af"><label>Start date</label><input type="date" value="2026-05-12"></div></div>
-            <div class="arow"><div class="af"><label>Team fee</label><input type="text" value="$450"></div><div class="af"><label>Free agent fee</label><input type="text" value="$75"></div></div>
-            <div class="af"><label>Default venue</label><input type="text" value="South Bay Pickleball Courts"></div>
-            <div style="text-align:right;margin-top:8px;"><button class="ab ab--lime ab--sm">Save</button></div>
+            <div class="ac__h"><h2 class="ac__t">Circuit Config</h2><span class="ac__s" id="settings-saved-at"></span></div>
+            <div class="arow">
+              <div class="af"><label for="set-circuit-name">Circuit name</label><input type="text" id="set-circuit-name" value="Circuit I"></div>
+              <div class="af"><label for="set-start-date">Start date</label><input type="date" id="set-start-date" value="2026-05-12"></div>
+            </div>
+            <div class="arow">
+              <div class="af"><label for="set-team-fee">Team fee</label><input type="text" id="set-team-fee" value="$450"></div>
+              <div class="af"><label for="set-agent-fee">Free agent fee</label><input type="text" id="set-agent-fee" value="$75"></div>
+            </div>
+            <div class="arow">
+              <div class="af"><label for="set-venue">Default venue</label><input type="text" id="set-venue" value="South Bay Pickleball Courts"></div>
+              <div class="af"><label for="set-weeks">Total weeks</label><input type="number" id="set-weeks" value="7" min="1" max="20"></div>
+            </div>
+            <div class="arow">
+              <div class="af"><label for="set-teams-per-div">Teams per division</label><input type="number" id="set-teams-per-div" value="6" min="2" max="16"></div>
+              <div class="af"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <div class="a-status" id="settings-status" style="margin:0;flex:1;margin-right:12px;"></div>
+              <button class="ab ab--lime ab--sm" id="save-settings-btn">Save</button>
+            </div>
           </div>
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Admins</h2></div>
@@ -338,6 +355,111 @@
   <script>
   const $=s=>document.querySelector(s),$id=i=>document.getElementById(i),$$=s=>document.querySelectorAll(s);
   const TEST=true,DL={'3.0M':'3.0 Mixed','3.5M':'3.5 Mixed'};
+
+  // ─── Circuit settings (loaded from API or defaults in test mode) ───
+  let SETTINGS = {
+    circuitName: 'Circuit I',
+    startDate: '2026-05-12',
+    teamFee: '$450',
+    agentFee: '$75',
+    defaultVenue: 'South Bay Pickleball Courts',
+    divisions: ['3.0 Mixed', '3.5 Mixed'],
+    teamsPerDiv: 6,
+    weeks: 7,
+  };
+
+  async function loadSettings() {
+    if (TEST) {
+      // In test mode, check localStorage for saved test settings
+      const saved = localStorage.getItem('ds_test_settings');
+      if (saved) { try { SETTINGS = { ...SETTINGS, ...JSON.parse(saved) }; } catch(e) {} }
+    } else {
+      try {
+        const r = await fetch('/.netlify/functions/admin-settings', { credentials: 'include' });
+        if (r.ok) { const data = await r.json(); SETTINGS = { ...SETTINGS, ...data }; }
+      } catch(e) { console.warn('Failed to load settings, using defaults:', e); }
+    }
+    applySettings();
+  }
+
+  function applySettings() {
+    // Update Overview header
+    const dt = SETTINGS.startDate ? new Date(SETTINGS.startDate + 'T00:00:00') : null;
+    const monthStr = dt ? dt.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '';
+    document.querySelectorAll('.ov-circuit-label').forEach(el => {
+      el.textContent = `${SETTINGS.circuitName} · ${monthStr}`;
+    });
+
+    // Populate settings form fields
+    const f = (id, val) => { const el = $id(id); if (el) el.value = val; };
+    f('set-circuit-name', SETTINGS.circuitName);
+    f('set-start-date', SETTINGS.startDate);
+    f('set-team-fee', SETTINGS.teamFee);
+    f('set-agent-fee', SETTINGS.agentFee);
+    f('set-venue', SETTINGS.defaultVenue);
+    f('set-weeks', SETTINGS.weeks);
+    f('set-teams-per-div', SETTINGS.teamsPerDiv);
+
+    // Show last-saved timestamp
+    if (SETTINGS.updatedAt) {
+      const d = new Date(SETTINGS.updatedAt);
+      $id('settings-saved-at').textContent = `Saved ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+    }
+  }
+
+  async function saveSettings() {
+    const btn = $id('save-settings-btn');
+    const status = $id('settings-status');
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    status.className = 'a-status';
+    status.style.display = 'none';
+
+    const payload = {
+      circuitName:  $id('set-circuit-name').value.trim(),
+      startDate:    $id('set-start-date').value,
+      teamFee:      $id('set-team-fee').value.trim(),
+      agentFee:     $id('set-agent-fee').value.trim(),
+      defaultVenue: $id('set-venue').value.trim(),
+      weeks:        parseInt($id('set-weeks').value) || 7,
+      teamsPerDiv:  parseInt($id('set-teams-per-div').value) || 6,
+    };
+
+    try {
+      if (TEST) {
+        // In test mode, save to localStorage
+        SETTINGS = { ...SETTINGS, ...payload, updatedAt: new Date().toISOString(), updatedBy: 'test-admin' };
+        localStorage.setItem('ds_test_settings', JSON.stringify(SETTINGS));
+      } else {
+        const r = await fetch('/.netlify/functions/admin-settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload),
+        });
+        if (!r.ok) throw new Error('Save failed — ' + r.status);
+        const data = await r.json();
+        SETTINGS = { ...SETTINGS, ...data };
+      }
+
+      applySettings();
+      status.className = 'a-status is-ok';
+      status.textContent = 'Settings saved ✓';
+      status.style.display = 'block';
+    } catch(e) {
+      status.className = 'a-status is-err';
+      status.textContent = e.message || 'Failed to save';
+      status.style.display = 'block';
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Save';
+    setTimeout(() => { status.style.display = 'none'; }, 4000);
+  }
+
+  $id('save-settings-btn').addEventListener('click', saveSettings);
+
+  // ─── Test data (unchanged) ────────────────────────────────────
 
   const TT={'3.0M':[
     {id:'t_net-gains',name:'Net Gains',cap:'Marcus Chen',capE:'marcus@email.com',p:['Marcus Chen','Priya Patel','Dylan Torres','Sarah Kim']},
@@ -365,22 +487,28 @@
   const TSC={};
   for(const d of['3.0M','3.5M']){TSC[d]={};for(let w=1;w<=2;w++){const wk=TS[d].find(x=>x.w===w);if(!wk)continue;TSC[d][w]=wk.mm.map(m=>({...m,rp:{[m.tA.id]:w===1?3:2,[m.tB.id]:w===1?1:2},gm:Array.from({length:12},()=>({sA:7+Math.floor(Math.random()*5),sB:5+Math.floor(Math.random()*6)}))}));}}
 
+  // ─── Auth ─────────────────────────────────────────────────────
+
   function checkAuth(){if(TEST){showShell();return;}
   fetch('/.netlify/functions/admin-whoami',{credentials:'include'}).then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{if(!d.admin)throw 0;showShell();}).catch(()=>showLogin());}
   function showLogin(){$id('login-screen').style.display='block';$id('admin-shell').style.display='none';}
-  function showShell(){$id('login-screen').style.display='none';$id('admin-shell').style.display='block';$id('test-b').style.display=TEST?'flex':'none';renderOV();}
+  async function showShell(){$id('login-screen').style.display='none';$id('admin-shell').style.display='block';$id('test-b').style.display=TEST?'flex':'none';await loadSettings();renderOV();}
 
   $id('login-submit').addEventListener('click',()=>{if(TEST){showShell();return;}
   const e=$id('login-email').value.trim(),pw=$id('login-password').value,s=$id('login-status');s.className='a-status is-info';s.textContent='Signing in…';
   fetch('/.netlify/functions/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:e,password:pw})}).then(r=>{if(!r.ok)throw new Error('Invalid credentials');return r.json();}).then(()=>checkAuth()).catch(err=>{s.className='a-status is-err';s.textContent=err.message;});});
 
+  // ─── Tab navigation ───────────────────────────────────────────
+
   $$('.sb__link[data-tab]').forEach(b=>{b.addEventListener('click',()=>{$$('.sb__link').forEach(x=>x.classList.remove('is-active'));b.classList.add('is-active');const t=b.dataset.tab;$$('.admin-section').forEach(s=>s.classList.toggle('is-active',s.dataset.section===t));
-  if(t==='overview')renderOV();if(t==='registrations')renderReg();if(t==='teams')renderTeams();if(t==='schedule')renderSched();if(t==='scores')renderSC();
+  if(t==='overview')renderOV();if(t==='registrations')renderReg();if(t==='teams')renderTeams();if(t==='schedule')renderSched();if(t==='scores')renderSC();if(t==='settings')applySettings();
   $id('sb').classList.remove('is-open');$id('mob-overlay').classList.remove('is-open');});});
 
   $id('mob-ham')?.addEventListener('click',()=>{$id('sb').classList.toggle('is-open');$id('mob-overlay').classList.toggle('is-open');});
   $id('mob-overlay')?.addEventListener('click',()=>{$id('sb').classList.remove('is-open');$id('mob-overlay').classList.remove('is-open');});
   $id('sign-out-btn')?.addEventListener('click',()=>window.location.reload());
+
+  // ─── Overview ─────────────────────────────────────────────────
 
   function renderOV(){
     const tR=TR.filter(r=>r.path==='team'),aR=TR.filter(r=>r.path==='agent'),cf=tR.filter(r=>r.status==='confirmed'),pd=TR.filter(r=>r.pay?.st==='paid'),rv=pd.reduce((s,r)=>s+(r.pay?.amt||0),0);
@@ -389,8 +517,8 @@
       <div class="sc"><div class="sc__l">Teams</div><div class="sc__v">${tR.length}</div><div class="sc__sub">${cf.length} confirmed · ${tR.length-cf.length} pending</div></div>
       <div class="sc"><div class="sc__l">Free agents</div><div class="sc__v sc__v--teal">${aR.length}</div><div class="sc__sub">waiting for draft</div></div>
       <div class="sc"><div class="sc__l">Revenue</div><div class="sc__v sc__v--gold">$${rv.toLocaleString()}</div><div class="sc__sub">${pd.length} payments</div></div>
-      <div class="sc"><div class="sc__l">Weeks played</div><div class="sc__v">2</div><div class="sc__sub">of 7 total</div></div>`;
-    $id('ov-fill').innerHTML=[{l:'3.0 Mixed',f:TT['3.0M'].length,c:6},{l:'3.5 Mixed',f:TT['3.5M'].length,c:6}].map(f=>{const p=Math.min(100,Math.round(f.f/f.c*100)),co=p>=100?'var(--color-teal)':'var(--color-lime)';return`<div class="fb"><div class="fb__h"><strong>${h(f.l)}</strong><span>${f.f}/${f.c}</span></div><div class="fb__track"><div class="fb__fill" style="width:${p}%;background:${co};"></div></div></div>`;}).join('');
+      <div class="sc"><div class="sc__l">Weeks played</div><div class="sc__v">2</div><div class="sc__sub">of ${SETTINGS.weeks} total</div></div>`;
+    $id('ov-fill').innerHTML=[{l:'3.0 Mixed',f:TT['3.0M'].length,c:SETTINGS.teamsPerDiv},{l:'3.5 Mixed',f:TT['3.5M'].length,c:SETTINGS.teamsPerDiv}].map(f=>{const p=Math.min(100,Math.round(f.f/f.c*100)),co=p>=100?'var(--color-teal)':'var(--color-lime)';return`<div class="fb"><div class="fb__h"><strong>${h(f.l)}</strong><span>${f.f}/${f.c}</span></div><div class="fb__track"><div class="fb__fill" style="width:${p}%;background:${co};"></div></div></div>`;}).join('');
     $id('ov-activity').innerHTML=[
       {d:'g',t:'Baseline Bullies confirmed',w:'2h ago'},{d:'y',t:'Casey Hwang signed up (agent)',w:'5h ago'},
       {d:'b',t:'Week 2 scores finalized (3.0M)',w:'1d ago'},{d:'g',t:'Court Jesters paid $450',w:'2d ago'},
@@ -399,6 +527,8 @@
     const wm=TS['3.0M'].find(w=>w.w===3);
     $id('ov-week').innerHTML=wm?.mm.length?wm.mm.map(m=>`<div class="mr"><div class="mr__t">${h(m.tA.name)}</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">${h(m.tB.name)}</div><div class="mr__m">${h(m.ct||'')}</div></div>`).join(''):'<div class="empty">No matches.</div>';
   }
+
+  // ─── Registrations ────────────────────────────────────────────
 
   function renderReg(){
     let f=[...TR];const sf=$id('rf-st').value,df=$id('rf-dv').value;
@@ -414,6 +544,8 @@
   $id('rf-st').addEventListener('change',renderReg);$id('rf-dv').addEventListener('change',renderReg);
   window.cfmReg=function(id){const r=TR.find(x=>x.id===id);if(r){r.status='confirmed';renderReg();renderOV();}};
 
+  // ─── Teams ────────────────────────────────────────────────────
+
   function renderTeams(){
     const g=$id('teams-grid'),cards=[];
     for(const[div,teams]of Object.entries(TT)){teams.forEach(t=>{const reg=TR.find(r=>r.path==='team'&&r.team?.name===t.name);const paid=reg?.pay?.st==='paid';
@@ -423,6 +555,8 @@
     <div style="display:flex;gap:8px;align-items:center;font-size:11px">${paid?'<span class="p p--paid">$450 Paid</span>':'<span class="p p--unpaid">Unpaid</span>'}<span style="color:var(--color-text-faint);margin-left:auto;font-size:10px">${h(t.id)}</span></div></div>`);});}
     g.innerHTML=cards.join('');
   }
+
+  // ─── Schedule ─────────────────────────────────────────────────
 
   function renderSched(){
     const div=$id('sched-div').value,weeks=TS[div]||[],out=$id('sched-out');
@@ -434,6 +568,8 @@
   if(!wk?.mm.length){card.innerHTML='<div class="empty" style="padding:28px">No matches.</div>';return;}
   card.innerHTML=`<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ${n}</span><span class="ac__s">${wk.mm.length} matches</span></div>${wk.mm.map(m=>{const dt=m.dt?new Date(m.dt).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' '+new Date(m.dt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'—';return`<div class="mr"><div class="mr__t">${h(m.tA.name)}</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">${h(m.tB.name)}</div><div class="mr__m">${h(m.ct||'')}${m.fin?' · <span style="color:var(--color-teal);font-weight:700">FINAL</span>':''}<br><span style="font-size:9px">${dt}</span></div></div>`;}).join('')}</div>`;};
   $id('sched-div').addEventListener('change',renderSched);
+
+  // ─── Score Entry ──────────────────────────────────────────────
 
   function renderSC(){
     const wn=parseInt($id('sc-week').value),out=$id('sc-out');let html='';
@@ -450,6 +586,8 @@
     else{html+='<div style="text-align:center;padding:12px;color:var(--color-text-faint);font-size:11px">No scores entered</div>';}
     html+='</div>';});}html+='</div>';}out.innerHTML=html;}
   $id('sc-week').addEventListener('change',renderSC);
+
+  // ─── Helpers ──────────────────────────────────────────────────
 
   function h(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function fd(iso){if(!iso)return'—';return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
