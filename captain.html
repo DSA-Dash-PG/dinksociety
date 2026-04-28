@@ -14,6 +14,14 @@
   <link rel="stylesheet" href="/css/compat.css">
 </head>
 <body data-page="captain">
+  <script>
+    // Theme: read preference immediately to avoid flash
+    (function(){
+      var s=localStorage.getItem('ds-theme');
+      var d=s||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+      document.documentElement.setAttribute('data-theme',d);
+    })();
+  </script>
 
   <!-- LOGIN -->
   <div id="login-screen" class="login-wrap" style="display:none;">
@@ -22,7 +30,7 @@
       <h1 class="login-card__title">Captains</h1>
       <p class="login-card__sub">Enter your email and we'll send you a one-tap sign-in link. No password, no hassle.</p>
 
-      <div id="login-sent" style="display:none; background: rgba(232,181,66,0.15); border: 1px solid rgba(232,181,66,0.4); color: var(--gold); padding: 16px; border-radius: 6px; text-align: left; font-size: 14px; line-height: 1.55;">
+      <div id="login-sent" style="display:none; background: var(--color-lime-dim); border: 1px solid rgba(184,255,44,0.25); color: var(--gold); padding: 16px; border-radius: 6px; text-align: left; font-size: 14px; line-height: 1.55;">
         <strong style="display:block; margin-bottom: 4px; color: var(--gold);">Link on the way.</strong>
         Check the inbox for <span id="login-sent-email" style="font-weight: 500;"></span>. The link expires in 15 minutes. If it doesn't show up, check spam or make sure you're using the email on file with the Society.
       </div>
@@ -51,6 +59,10 @@
         <span id="cap-email">&mdash;</span>
         <a href="/">&larr; Site</a>
         <a href="#" id="cap-signout">Sign out</a>
+        <button class="ds-nav__theme-toggle" id="theme-toggle" aria-label="Toggle theme" style="margin-left:8px;">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </div>
       <button class="ds-hamburger" id="ds-hamburger-cap" aria-label="Open menu" aria-expanded="false">
         <span class="ds-hamburger__line"></span>
@@ -100,7 +112,7 @@
       <a id="go-to-roster">Fix roster &rarr;</a>
     </div>
 
-    <div id="gender-warning" style="display: none; background: rgba(232,181,66,0.15); border: 1px solid rgba(232,181,66,0.4); color: #854F0B; padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; line-height: 1.55;"></div>
+    <div id="gender-warning" style="display: none; background: var(--color-lime-dim); border: 1px solid rgba(184,255,44,0.25); color: var(--color-gold); padding: 14px 18px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: 13px; line-height: 1.55;"></div>
 
     <!-- NEXT MATCH (default landing) — uses the same section markup as match detail -->
     <section class="cap-section is-active" data-section="next">
@@ -281,7 +293,7 @@
       banner.innerHTML = `
         <div>
           <strong style="display: block; font-weight: 500; margin-bottom: 4px;">${missing.length} player${missing.length === 1 ? ' needs' : 's need'} a gender set.</strong>
-          Lineups won't lock until every player's gender is filled in (required for women's / men's / mixed slot assignment). Head to <a href="#" data-go-roster style="color: #854F0B; font-weight: 500; text-decoration: underline;">the Roster tab</a> to fix it.
+          Lineups won't lock until every player's gender is filled in (required for women's / men's / mixed slot assignment). Head to <a href="#" data-go-roster style="color: var(--color-gold); font-weight: 500; text-decoration: underline;">the Roster tab</a> to fix it.
         </div>
       `;
       banner.querySelector('[data-go-roster]')?.addEventListener('click', (e) => {
@@ -508,11 +520,11 @@
         .slice(0, 3);
 
       const upcomingHtml = upcoming.length ? `
-        <div style="padding: 20px 24px; border-top: 1px solid rgba(15,77,58,0.08); background: rgba(15,77,58,0.02);">
+        <div style="padding: 20px 24px; border-top: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03);">
           <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal-900); opacity: 0.55; font-weight: 500; margin-bottom: 10px;">Your schedule preview</div>
           ${upcoming.map(m => `
             <div style="display: grid; grid-template-columns: 60px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; font-size: 13px; color: var(--teal-900);">
-              <div style="font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 16px; color: var(--gold-deep, #C9972E);">W${m.week}</div>
+              <div style="font-weight: 900; text-transform: uppercase; font-size: 16px; color: var(--gold-deep, var(--color-lime-active));">W${m.week}</div>
               <div>vs ${escapeHtml(m.opponent.name)} <span style="opacity: 0.6; font-size: 12px;">${m.court ? '· ' + escapeHtml(m.court) : ''} ${m.scheduledAt ? '· ' + formatDateShort(m.scheduledAt) : ''}</span></div>
               <div style="font-size: 11px; opacity: 0.5;">Locked when ready</div>
             </div>
@@ -521,7 +533,7 @@
       ` : '';
 
       const heroBody = empty ? `
-        <h2 style="font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 30px; font-weight: 500; margin: 0 0 10px; line-height: 1.15;">Add your roster first.</h2>
+        <h2 style="font-weight: 900; text-transform: uppercase; font-size: 30px; font-weight: 500; margin: 0 0 10px; line-height: 1.15;">Add your roster first.</h2>
         <p style="font-size: 14px; opacity: 0.8; margin: 0 0 24px; line-height: 1.6; max-width: 400px; margin-left: auto; margin-right: auto;">
           Before you can lock a lineup, ${escapeHtml(teamName)} needs a roster of players with names and gender so we can enforce women's, men's, and mixed slots.
         </p>
@@ -529,11 +541,11 @@
           <button class="cap-btn cap-btn--gold" id="finish-roster-btn">Add players &rarr;</button>
         </div>
       ` : `
-        <h2 style="font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 30px; font-weight: 500; margin: 0 0 10px; line-height: 1.15;">Finish your roster first.</h2>
+        <h2 style="font-weight: 900; text-transform: uppercase; font-size: 30px; font-weight: 500; margin: 0 0 10px; line-height: 1.15;">Finish your roster first.</h2>
         <p style="font-size: 14px; opacity: 0.8; margin: 0 0 24px; line-height: 1.6; max-width: 420px; margin-left: auto; margin-right: auto;">
           <strong style="font-weight: 500; color: var(--gold);">${missing.length} of ${(state.roster || []).length} players</strong> don't have a gender set. We need this to enforce women's / men's / mixed slots when you lock a lineup.
         </p>
-        <div style="display: inline-block; text-align: left; padding: 16px 20px; background: rgba(245,235,212,0.05); border: 1px solid rgba(232,181,66,0.2); border-radius: 6px; font-size: 13px; margin-bottom: 24px; max-width: 420px;">
+        <div style="display: inline-block; text-align: left; padding: 16px 20px; background: rgba(255,255,255,0.04); border: 1px solid rgba(184,255,44,0.15); border-radius: 6px; font-size: 13px; margin-bottom: 24px; max-width: 420px;">
           <div style="font-size: 10px; letter-spacing: 0.15em; opacity: 0.65; margin-bottom: 4px;">Needs gender</div>
           <div>${missing.map(p => escapeHtml(p.name)).join(', ')}</div>
         </div>
@@ -543,8 +555,8 @@
       `;
 
       $id('next-landing-area').innerHTML = `
-        <div style="background: #fff; border: 1px solid rgba(15,77,58,0.1); border-radius: var(--radius-sm); overflow: hidden;">
-          <div style="padding: 48px 32px; text-align: center; background: linear-gradient(150deg, #0F4D3A 0%, #051810 100%); color: var(--cream);">
+        <div style="background: var(--color-surface); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-sm); overflow: hidden;">
+          <div style="padding: 48px 32px; text-align: center; background: var(--color-surface); color: var(--cream);">
             <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold); opacity: 0.85; font-weight: 500; margin-bottom: 14px;">Before you can play</div>
             ${heroBody}
           </div>
@@ -568,9 +580,9 @@
       const circuit = state.me.team.circuit || 'I';
 
       $id('next-landing-area').innerHTML = `
-        <div style="background: #fff; border: 1px solid rgba(15,77,58,0.1); border-radius: var(--radius-sm); padding: 60px 32px; text-align: center;">
+        <div style="background: var(--color-surface); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-sm); padding: 60px 32px; text-align: center;">
           <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--teal-900); opacity: 0.55; font-weight: 500; margin-bottom: 14px;">Schedule pending</div>
-          <h2 style="font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 30px; font-weight: 500; color: var(--teal-900); margin: 0 0 12px; line-height: 1.15;">No matches yet for ${escapeHtml(teamName)}.</h2>
+          <h2 style="font-weight: 900; text-transform: uppercase; font-size: 30px; font-weight: 500; color: var(--teal-900); margin: 0 0 12px; line-height: 1.15;">No matches yet for ${escapeHtml(teamName)}.</h2>
           <p style="font-size: 14px; color: var(--teal-900); opacity: 0.7; margin: 0 0 24px; line-height: 1.6; max-width: 420px; margin-left: auto; margin-right: auto;">
             Circuit ${escapeHtml(circuit)} ${division ? `(${escapeHtml(division)})` : ''} hasn't been scheduled yet. Once the schedule drops, your matches will show up here.
           </p>
@@ -585,9 +597,9 @@
     function renderAllDone() {
       const teamName = state.me.team.name;
       $id('next-landing-area').innerHTML = `
-        <div style="background: #fff; border: 1px solid rgba(15,77,58,0.1); border-radius: var(--radius-sm); padding: 60px 32px; text-align: center;">
-          <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold-deep, #C9972E); font-weight: 500; margin-bottom: 14px;">Circuit complete</div>
-          <h2 style="font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 30px; font-weight: 500; color: var(--teal-900); margin: 0 0 12px;">That's a wrap.</h2>
+        <div style="background: var(--color-surface); border: 1px solid rgba(255,255,255,0.08); border-radius: var(--radius-sm); padding: 60px 32px; text-align: center;">
+          <div style="font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--gold-deep, var(--color-lime-active)); font-weight: 500; margin-bottom: 14px;">Circuit complete</div>
+          <h2 style="font-weight: 900; text-transform: uppercase; font-size: 30px; font-weight: 500; color: var(--teal-900); margin: 0 0 12px;">That's a wrap.</h2>
           <p style="font-size: 14px; color: var(--teal-900); opacity: 0.7; margin: 0; line-height: 1.6;">
             All ${escapeHtml(teamName)} matches for this Circuit are final. Hit the Schedule tab to review the season.
           </p>
@@ -1142,10 +1154,10 @@
       ].filter(Boolean).join(' · ');
 
       return `
-        <div style="margin-top: 16px; border: 1px solid rgba(232,181,66,0.35); background: rgba(232,181,66,0.06); border-radius: var(--radius-sm); padding: 16px 20px;">
+        <div style="margin-top: 16px; border: 1px solid rgba(184,255,44,0.25); background: rgba(184,255,44,0.06); border-radius: var(--radius-sm); padding: 16px 20px;">
           <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--teal-900); opacity: 0.6; font-weight: 500; margin-bottom: 10px;">${label}</div>
           <div style="display: grid; grid-template-columns: auto 1fr auto; gap: 14px; align-items: center;">
-            <div style="font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 22px; color: var(--gold-deep, #C9972E); font-weight: 500;">W${next.week}</div>
+            <div style="font-weight: 900; text-transform: uppercase; font-size: 22px; color: var(--gold-deep, var(--color-lime-active)); font-weight: 500;">W${next.week}</div>
             <div>
               <div style="font-size: 14px; font-weight: 500; color: var(--teal-900);">${escapeHtml(sublabel)}</div>
               ${meta ? `<div style="font-size: 12px; color: var(--teal-900); opacity: 0.65; margin-top: 2px;">${escapeHtml(meta)}</div>` : ''}
@@ -1523,6 +1535,24 @@
 
     // ===== Init =====
     checkAuth();
+
+    // ===== Theme toggle =====
+    (function(){
+      var toggle = document.getElementById('theme-toggle');
+      if (!toggle) return;
+      var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+      updateIcon(theme);
+      toggle.addEventListener('click', function(){
+        theme = theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('ds-theme', theme);
+        updateIcon(theme);
+      });
+      function updateIcon(t) {
+        toggle.querySelector('.icon-sun').style.display = t === 'dark' ? 'block' : 'none';
+        toggle.querySelector('.icon-moon').style.display = t === 'light' ? 'block' : 'none';
+      }
+    })();
   </script>
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>

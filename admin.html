@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin · The Dink Society</title>
+  <title>Captain Portal &middot; The Dink Society</title>
   <meta name="robots" content="noindex,nofollow">
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,6 +14,14 @@
   <link rel="stylesheet" href="/css/compat.css">
 </head>
 <body data-page="admin">
+  <script>
+    // Theme: read preference immediately to avoid flash
+    (function(){
+      var s=localStorage.getItem('ds-theme');
+      var d=s||(window.matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light');
+      document.documentElement.setAttribute('data-theme',d);
+    })();
+  </script>
 
   <!-- LOGIN -->
   <div id="login-screen" class="login-wrap" style="display:none;">
@@ -26,7 +34,7 @@
         <button type="submit" class="btn btn--pri" id="login-submit">Send sign-in link</button>
         <div class="admin-status" id="login-status"></div>
       </form>
-      <div id="login-sent" style="display:none; margin-top: 20px; padding: 16px 20px; background: rgba(232,181,66,0.15); border: 1px solid rgba(232,181,66,0.3); border-radius: 8px; text-align: left;">
+      <div id="login-sent" style="display:none; margin-top: 20px; padding: 16px 20px; background: var(--color-lime-dim); border: 1px solid rgba(184,255,44,0.2); border-radius: 8px; text-align: left;">
         <div style="font-size: 15px; font-weight: 500; color: var(--gold); margin-bottom: 6px;">Link on the way</div>
         <div style="font-size: 13px; opacity: 0.85; line-height: 1.5;">Check <strong id="login-sent-email"></strong> for a sign-in link. It expires in 15 minutes. If it doesn&rsquo;t show up, check spam or make sure you&rsquo;re using an admin email on file.</div>
       </div>
@@ -44,6 +52,10 @@
         <div>Signed in as <span class="user" id="user-email">&mdash;</span></div>
         <a href="/">&larr; Back to site</a>
         <a href="#" id="sign-out-link">Sign out</a>
+        <button class="ds-nav__theme-toggle" id="theme-toggle" aria-label="Toggle theme" style="margin-left:8px;">
+          <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
       </div>
       <button class="ds-hamburger" id="ds-hamburger-admin" aria-label="Open menu" aria-expanded="false">
         <span class="ds-hamburger__line"></span><span class="ds-hamburger__line"></span><span class="ds-hamburger__line"></span>
@@ -335,7 +347,7 @@
       if (!fills.length) { $id('division-fill').innerHTML='<div class="empty-state">No divisions yet.</div>'; return; }
       $id('division-fill').innerHTML = fills.map(d=>{
         const p=Math.min(100,Math.round(d.filled/d.capacity*100));
-        return `<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="font-weight:500">${esc(d.label)}</span><span style="opacity:.7">${d.filled}/${d.capacity} teams</span></div><div style="height:8px;background:rgba(13,59,64,.08);border-radius:100px;overflow:hidden"><div style="height:100%;width:${p}%;background:${p>=100?'#1D9E75':'var(--gold)'}"></div></div></div>`;
+        return `<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="font-weight:500">${esc(d.label)}</span><span style="opacity:.7">${d.filled}/${d.capacity} teams</span></div><div style="height:8px;background:rgba(255,255,255,0.08);border-radius:100px;overflow:hidden"><div style="height:100%;width:${p}%;background:${p>=100?'var(--color-teal)':'var(--gold)'}"></div></div></div>`;
       }).join('');
     }
 
@@ -468,7 +480,7 @@
 
       // Notes
       h += `<div class="tdp-sec"><div class="tdp-sec__l">Notes</div>
-        <textarea data-e="notes" rows="3" style="width:100%;padding:8px 10px;border:1px solid rgba(13,59,64,.15);border-radius:5px;font-size:13px;font-family:inherit;resize:vertical">${esc(reg.notes||'')}</textarea>
+        <textarea data-e="notes" rows="3" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.1);border-radius:5px;font-size:13px;font-family:inherit;resize:vertical">${esc(reg.notes||'')}</textarea>
       </div>`;
 
       $id('tdp-body').innerHTML = h;
@@ -623,7 +635,7 @@
       const list=$id('sg-teams-list'), ts=schS.teams, btn=$id('sg-generate-btn');
       if(!ts.length){ list.innerHTML='<div class="empty-state">No confirmed teams in this division.</div>'; btn.disabled=true; return; }
       const odd=ts.length%2!==0;
-      list.innerHTML = (odd?`<div style="margin-bottom:10px;padding:10px 14px;background:rgba(231,70,70,.08);border-radius:6px;font-size:12px;color:#a32d2d">Need even number of teams. You have ${ts.length}.</div>`:`<div style="margin-bottom:10px;font-size:12px;opacity:.7">${ts.length} teams</div>`) + ts.map((t,i)=>`<div style="padding:8px 0;border-bottom:1px solid rgba(13,59,64,.06);display:flex;justify-content:space-between;gap:10px;font-size:13px"><span><strong style="font-weight:500">${i+1}.</strong> ${esc(t.name)} <code style="font-size:11px;opacity:.6">${esc(t.id)}</code></span><span style="opacity:.7;font-size:12px">${esc(t.email||'—')}</span></div>`).join('');
+      list.innerHTML = (odd?`<div style="margin-bottom:10px;padding:10px 14px;background:var(--color-red-dim);border-radius:6px;font-size:12px;color:var(--color-red)">Need even number of teams. You have ${ts.length}.</div>`:`<div style="margin-bottom:10px;font-size:12px;opacity:.7">${ts.length} teams</div>`) + ts.map((t,i)=>`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;gap:10px;font-size:13px"><span><strong style="font-weight:500">${i+1}.</strong> ${esc(t.name)} <code style="font-size:11px;opacity:.6">${esc(t.id)}</code></span><span style="opacity:.7;font-size:12px">${esc(t.email||'—')}</span></div>`).join('');
       btn.disabled=odd;
     }
 
@@ -659,7 +671,7 @@
       if(!w.length){ $id('se-weeks-summary').innerHTML='<div class="empty-state">No schedule yet.</div>'; return; }
       $id('se-weeks-summary').innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">${w.map(wk=>{
         const fin=(wk.matches||[]).filter(m=>m.finalizedAt).length, tot=(wk.matches||[]).length, done=tot>0&&fin===tot;
-        return `<div style="padding:10px 14px;background:rgba(13,59,64,.04);border-radius:6px;font-size:12px;${done?'border-left:3px solid #1D9E75':''}"><div style="font-weight:500;font-size:13px">Week ${wk.week}</div><div style="opacity:.7;margin-top:2px">${fin}/${tot} final</div></div>`;
+        return `<div style="padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:6px;font-size:12px;${done?'border-left:3px solid var(--color-teal)':''}"><div style="font-weight:500;font-size:13px">Week ${wk.week}</div><div style="opacity:.7;margin-top:2px">${fin}/${tot} final</div></div>`;
       }).join('')}</div>`;
     }
 
@@ -668,21 +680,21 @@
       if(!wk||!wk.matches?.length){ ed.innerHTML='<div class="empty-state">No matches for this week.</div>'; return; }
       ed.innerHTML=wk.matches.map(m=>{
         const dt=m.scheduledAt?toDTL(m.scheduledAt):'';
-        return `<div class="se-m" data-mid="${escA(m.id)}" style="padding:14px;border:1px solid rgba(13,59,64,.1);border-radius:6px;margin-bottom:10px">
+        return `<div class="se-m" data-mid="${escA(m.id)}" style="padding:14px;border:1px solid rgba(255,255,255,0.08);border-radius:6px;margin-bottom:10px">
           <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px;gap:10px;flex-wrap:wrap">
             <div style="font-size:14px;font-weight:500">${esc(m.teamA?.name||'TBD')} <span style="opacity:.5;font-size:12px;margin:0 6px">vs</span> ${esc(m.teamB?.name||'TBD')}</div>
-            <div style="font-size:11px;opacity:.6"><code>${esc(m.id)}</code>${m.finalizedAt?' · <span style="color:#0F6E56;font-weight:500">FINAL</span>':''}</div>
+            <div style="font-size:11px;opacity:.6"><code>${esc(m.id)}</code>${m.finalizedAt?' · <span style="color:var(--color-teal);font-weight:500">FINAL</span>':''}</div>
           </div>
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-            <div><label style="display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;opacity:.65;margin-bottom:4px;font-weight:500">Court</label><input type="text" data-f="court" value="${escA(m.court||'')}" style="width:100%;padding:8px 10px;border:1px solid rgba(13,59,64,.2);border-radius:6px;font-size:13px;font-family:inherit"></div>
-            <div><label style="display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;opacity:.65;margin-bottom:4px;font-weight:500">Venue</label><input type="text" data-f="venue" value="${escA(m.venue||'')}" style="width:100%;padding:8px 10px;border:1px solid rgba(13,59,64,.2);border-radius:6px;font-size:13px;font-family:inherit"></div>
-            <div><label style="display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;opacity:.65;margin-bottom:4px;font-weight:500">Date &amp; time</label><input type="datetime-local" data-f="scheduledAt" value="${dt}" style="width:100%;padding:8px 10px;border:1px solid rgba(13,59,64,.2);border-radius:6px;font-size:13px;font-family:inherit"></div>
+            <div><label style="display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;opacity:.65;margin-bottom:4px;font-weight:500">Court</label><input type="text" data-f="court" value="${escA(m.court||'')}" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-size:13px;font-family:inherit"></div>
+            <div><label style="display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;opacity:.65;margin-bottom:4px;font-weight:500">Venue</label><input type="text" data-f="venue" value="${escA(m.venue||'')}" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-size:13px;font-family:inherit"></div>
+            <div><label style="display:block;font-size:10px;letter-spacing:.15em;text-transform:uppercase;opacity:.65;margin-bottom:4px;font-weight:500">Date &amp; time</label><input type="datetime-local" data-f="scheduledAt" value="${dt}" style="width:100%;padding:8px 10px;border:1px solid rgba(255,255,255,0.12);border-radius:6px;font-size:13px;font-family:inherit"></div>
           </div>
         </div>`;
       }).join('');
       ed.querySelectorAll('.se-m input').forEach(inp=>{
         inp.addEventListener('input',()=>{
-          const me=inp.closest('.se-m'); schS.dirty.add(me.dataset.mid); me.style.borderColor='rgba(232,181,66,.6)'; $id('se-save-btn').disabled=false;
+          const me=inp.closest('.se-m'); schS.dirty.add(me.dataset.mid); me.style.borderColor='rgba(184,255,44,0.4)'; $id('se-save-btn').disabled=false;
         });
       });
     }
@@ -767,8 +779,8 @@
     function renderSeedPlan(p) {
       const sec=(t,items,fn)=>{ if(!items?.length) return ''; return `<div style="margin-top:14px"><div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;opacity:.6;margin-bottom:8px;font-weight:500">${t} (${items.length})</div><div style="font-size:13px">${items.map(fn).join('')}</div></div>`; };
       return [
-        sec('To create',p.toCreate,i=>`<div style="padding:8px 0;border-bottom:1px solid rgba(13,59,64,.06);display:flex;justify-content:space-between;gap:10px"><span><strong style="font-weight:500">${esc(i.teamName)}</strong> <code style="font-size:11px;opacity:.6">${esc(i.teamId)}</code></span><span style="opacity:.7;font-size:12px">${esc(i.captainEmail)}</span></div>`),
-        sec('To update',p.toUpdate,i=>`<div style="padding:8px 0;border-bottom:1px solid rgba(13,59,64,.06)"><strong style="font-weight:500">${esc(i.teamName)}</strong>${(i.changes||[]).map(c=>`<div style="font-size:12px;opacity:.7;margin-top:4px">— ${esc(c)}</div>`).join('')}</div>`),
+        sec('To create',p.toCreate,i=>`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06);display:flex;justify-content:space-between;gap:10px"><span><strong style="font-weight:500">${esc(i.teamName)}</strong> <code style="font-size:11px;opacity:.6">${esc(i.teamId)}</code></span><span style="opacity:.7;font-size:12px">${esc(i.captainEmail)}</span></div>`),
+        sec('To update',p.toUpdate,i=>`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.06)"><strong style="font-weight:500">${esc(i.teamName)}</strong>${(i.changes||[]).map(c=>`<div style="font-size:12px;opacity:.7;margin-top:4px">— ${esc(c)}</div>`).join('')}</div>`),
         sec('Already in sync',p.toSkip,i=>`<div style="padding:6px 0;font-size:12px;opacity:.65">${esc(i.teamName||i.reason)}</div>`),
       ].join('');
     }
@@ -776,7 +788,7 @@
     function renderSeedResult(d) {
       const dt=d.details||{}, p=[];
       if(dt.created?.length) p.push(`<div style="margin-top:14px"><div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;opacity:.6;margin-bottom:8px;font-weight:500">Created</div>${dt.created.map(t=>`<div style="padding:6px 0;font-size:13px"><strong style="font-weight:500">${esc(t.name)}</strong> <code style="font-size:11px;opacity:.6;margin-left:8px">${esc(t.teamId)}</code></div>`).join('')}</div>`);
-      if(dt.errors?.length) p.push(`<div style="margin-top:14px"><div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:#a32d2d;margin-bottom:8px;font-weight:500">Errors</div>${dt.errors.map(e=>`<div style="padding:6px 0;font-size:12px;color:#a32d2d">${esc(e.teamName||'unknown')}: ${esc(e.error)}</div>`).join('')}</div>`);
+      if(dt.errors?.length) p.push(`<div style="margin-top:14px"><div style="font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--color-red);margin-bottom:8px;font-weight:500">Errors</div>${dt.errors.map(e=>`<div style="padding:6px 0;font-size:12px;color:var(--color-red)">${esc(e.teamName||'unknown')}: ${esc(e.error)}</div>`).join('')}</div>`);
       return p.join('');
     }
 
@@ -818,8 +830,24 @@
 
     // === Init ===
     checkAuth();
+
+    // === Theme toggle ===
+    (function(){
+      var toggle = $id('theme-toggle');
+      if (!toggle) return;
+      var theme = document.documentElement.getAttribute('data-theme') || 'dark';
+      updateIcon(theme);
+      toggle.addEventListener('click', function(){
+        theme = theme === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('ds-theme', theme);
+        updateIcon(theme);
+      });
+      function updateIcon(t) {
+        toggle.querySelector('.icon-sun').style.display = t === 'dark' ? 'block' : 'none';
+        toggle.querySelector('.icon-moon').style.display = t === 'light' ? 'block' : 'none';
+      }
+    })();
   </script>
-  <div data-partial="footer"></div>
-  <script src="/js/partials.js"></script>
 </body>
 </html>
