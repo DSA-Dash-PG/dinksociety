@@ -3,271 +3,83 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Leaderboard &middot; The Dink Society</title>
+  <title>Standings · The Dink Society</title>
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
   <link rel="stylesheet" href="/css/shared.css" />
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <link rel="stylesheet" href="/css/compat.css" />
   <style>
-    body { background: var(--cream); color: var(--teal-900); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; margin: 0; }
+    .lb-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
 
-    .lb-shell { max-width: var(--max-w, 1100px); margin: 0 auto; padding: 24px var(--gutter, 20px) 80px; }
+    .lb-hero { background: var(--color-surface); border: 1px solid var(--color-border); padding: var(--space-8) var(--space-6); border-radius: var(--radius-lg); margin-bottom: var(--space-4); }
+    .lb-hero .eyebrow { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-teal); margin-bottom: var(--space-3); display: flex; align-items: center; gap: var(--space-2); }
+    .lb-hero .eyebrow::before { content:''; width:8px;height:8px;border-radius:50%;background:var(--color-teal);box-shadow:0 0 0 4px var(--color-teal-dim); }
+    .lb-hero__title { font-size: var(--text-3xl); font-weight: 800; text-transform: uppercase; margin: 0 0 var(--space-2); }
+    .lb-hero__sub { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; }
 
-    .lb-hero {
-      background: linear-gradient(135deg, #0D3B40 0%, #000 100%);
-      color: var(--cream);
-      padding: 40px 32px;
-      border-radius: var(--radius-sm, 8px);
-      margin-bottom: 24px;
-    }
-    .lb-hero__label {
-      font-size: 10px;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--gold, #E8B542);
-      font-weight: 500;
-      margin-bottom: 10px;
-    }
-    .lb-hero__title {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-style: italic;
-      font-size: 36px;
-      font-weight: 500;
-      margin: 0 0 6px;
-      line-height: 1.1;
-    }
-    .lb-hero__sub {
-      font-size: 14px;
-      opacity: 0.75;
-      margin: 0;
-    }
+    .lb-controls { display: flex; gap: 8px; flex-wrap: wrap; margin-top: var(--space-4); }
+    .lb-controls select { padding:8px 14px; background:var(--color-surface-2); border:1px solid var(--color-border); color:var(--color-text); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; cursor:pointer; }
+    .lb-controls select:focus { border-color:var(--color-lime); outline:none; }
 
-    .lb-controls {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-    .lb-controls select {
-      padding: 8px 12px;
-      background: rgba(245,235,212,0.05);
-      border: 1px solid rgba(232,181,66,0.3);
-      color: var(--cream);
-      border-radius: 6px;
-      font-size: 13px;
-      font-family: inherit;
-      cursor: pointer;
-    }
-    .lb-controls select:focus { outline: 1px solid var(--gold, #E8B542); outline-offset: 1px; }
-
-    .lb-tabs {
-      display: flex;
-      gap: 4px;
-      background: #fff;
-      border: 1px solid rgba(13,59,64,0.1);
-      border-radius: var(--radius-sm, 8px);
-      padding: 6px;
-      margin-bottom: 20px;
-      overflow-x: auto;
-    }
-    .lb-tab {
-      background: transparent;
-      border: none;
-      color: var(--teal-900);
-      padding: 10px 18px;
-      border-radius: 6px;
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      font-family: inherit;
-      white-space: nowrap;
-      opacity: 0.7;
-    }
-    .lb-tab:hover { opacity: 1; background: rgba(13,59,64,0.04); }
-    .lb-tab.is-active { background: #0D3B40; color: var(--gold, #E8B542); opacity: 1; }
+    .lb-tabs { display: flex; gap: 3px; margin-bottom: var(--space-4); }
+    .lb-tab { padding:8px 16px; border-radius:var(--radius-full); font-size:11px; font-weight:700; border:1px solid var(--color-border); background:transparent; color:var(--color-text-faint); cursor:pointer; transition:all var(--transition); font-family:inherit; }
+    .lb-tab:hover { color:var(--color-text); background:var(--color-surface-2); }
+    .lb-tab.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
 
     .lb-section { display: none; }
     .lb-section.is-active { display: block; }
 
-    .lb-card {
-      background: #fff;
-      border: 1px solid rgba(13,59,64,0.1);
-      border-radius: var(--radius-sm, 8px);
-      padding: 20px 24px;
-      margin-bottom: 16px;
-    }
-    .lb-card__title {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-style: italic;
-      font-size: 22px;
-      font-weight: 500;
-      margin: 0 0 14px;
-    }
+    .lb-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:var(--space-5); margin-bottom:var(--space-4); }
+    .lb-card__title { font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; margin:0 0 var(--space-4); }
 
-    .lb-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
-    .lb-table th {
-      padding: 8px 10px;
-      text-align: left;
-      font-size: 10px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      opacity: 0.6;
-      font-weight: 500;
-      border-bottom: 1px solid rgba(13,59,64,0.1);
-    }
-    .lb-table th.numeric, .lb-table td.numeric { text-align: right; }
-    .lb-table td {
-      padding: 10px;
-      border-bottom: 1px solid rgba(13,59,64,0.05);
-      vertical-align: middle;
-    }
-    .lb-table tr:last-child td { border-bottom: none; }
-    .lb-rank {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-style: italic;
-      font-size: 18px;
-      color: var(--gold-deep, #C9972E);
-      font-weight: 500;
-      width: 36px;
-    }
-    .lb-rank--top { color: var(--gold, #E8B542); }
-    .lb-team { font-weight: 500; }
-    .lb-team__meta { font-size: 11px; opacity: 0.55; font-weight: 400; margin-left: 6px; }
-    .lb-row--leader { background: rgba(232,181,66,0.05); }
-    .lb-row--leader td { border-bottom-color: rgba(232,181,66,0.15); }
+    .lb-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .lb-table th { text-align:left; padding:8px 6px; font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-text-faint); font-weight:600; border-bottom:1px solid var(--color-border-strong); }
+    .lb-table td { padding:9px 6px; border-bottom:1px solid var(--color-border); }
+    .lb-table tr:last-child td { border-bottom:none; }
+    .lb-table .numeric { text-align:right; font-variant-numeric:tabular-nums; }
+    .lb-rank { color:var(--color-text-faint); font-weight:800; min-width:24px; }
+    .lb-rank--top { color:var(--color-lime); }
+    .lb-row--leader td { background:var(--color-lime-ghost); }
+    .lb-team { font-weight:600; }
+    .lb-team__meta { font-size:10px; color:var(--color-text-faint); font-weight:400; margin-left:4px; }
+    .lb-pill { display:inline-block; padding:1px 6px; border-radius:3px; font-size:9px; font-weight:700; margin-left:6px; vertical-align:middle; }
+    .lb-pill--sweep { background:var(--color-gold-dim); color:var(--color-gold); }
 
-    .lb-pill {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 100px;
-      font-size: 10px;
-      font-weight: 500;
-      letter-spacing: 0.05em;
-    }
-    .lb-pill--sweep { background: rgba(232,181,66,0.2); color: #854F0B; }
+    .lb-col-optional {}
 
-    .empty-state { padding: 40px 20px; text-align: center; opacity: 0.6; font-size: 14px; }
+    .player-filter { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:var(--space-4); }
+    .player-filter__btn { padding:5px 12px; font-size:10px; border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent; color:var(--color-text-faint); cursor:pointer; font-family:inherit; font-weight:600; transition:all var(--transition); }
+    .player-filter__btn.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
 
-    .stat-cards {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 10px;
-      margin-bottom: 16px;
-    }
-    .stat-card {
-      background: rgba(13,59,64,0.03);
-      padding: 12px 14px;
-      border-radius: 6px;
-    }
-    .stat-card__label {
-      font-size: 10px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      opacity: 0.55;
-      font-weight: 500;
-      margin-bottom: 4px;
-    }
-    .stat-card__value {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-style: italic;
-      font-size: 22px;
-      color: var(--teal-900);
-      font-weight: 500;
-      line-height: 1.1;
-    }
+    .match-card { display:grid; grid-template-columns:40px 1fr auto 1fr; gap:10px; align-items:center; padding:12px 14px; background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-sm); margin-bottom:6px; }
+    .match-card--final { background:var(--color-teal-dim); border-color:rgba(23,215,176,0.2); }
+    .match-card__week { font-size:11px; font-weight:800; color:var(--color-lime); }
+    .match-card__team { font-size:12px; font-weight:600; }
+    .match-card__team--right { text-align:right; }
+    .match-card__score { font-size:18px; font-weight:800; text-align:center; min-width:60px; }
+    .match-card__meta { font-size:10px; color:var(--color-text-faint); margin-top:2px; }
 
-    .match-card {
-      display: grid;
-      grid-template-columns: 60px 1fr auto 1fr;
-      gap: 12px;
-      align-items: center;
-      padding: 12px 14px;
-      border: 1px solid rgba(13,59,64,0.08);
-      border-radius: 6px;
-      margin-bottom: 8px;
-      background: #fff;
-    }
-    .match-card--final { background: rgba(29,158,117,0.03); border-color: rgba(29,158,117,0.2); }
-    .match-card__week {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-style: italic;
-      font-size: 18px;
-      color: var(--gold-deep, #C9972E);
-      font-weight: 500;
-    }
-    .match-card__team { font-size: 13px; font-weight: 500; }
-    .match-card__team--right { text-align: right; }
-    .match-card__score {
-      font-family: 'Cormorant Garamond', Georgia, serif;
-      font-style: italic;
-      font-size: 22px;
-      font-weight: 500;
-      color: var(--teal-900);
-      min-width: 70px;
-      text-align: center;
-    }
-    .match-card__meta { font-size: 11px; opacity: 0.55; margin-top: 2px; }
-
-    .player-filter {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-bottom: 14px;
-    }
-    .player-filter__btn {
-      padding: 6px 12px;
-      font-size: 12px;
-      border-radius: 100px;
-      border: 1px solid rgba(13,59,64,0.2);
-      background: transparent;
-      color: var(--teal-900);
-      cursor: pointer;
-      font-family: inherit;
-      font-weight: 500;
-    }
-    .player-filter__btn.is-active {
-      background: #0D3B40;
-      color: var(--gold, #E8B542);
-      border-color: #0D3B40;
-    }
-
-    @media (max-width: 720px) {
-      .lb-hero { padding: 28px 20px; }
-      .lb-hero__title { font-size: 26px; }
-      .lb-card { padding: 16px; }
-      .lb-table { font-size: 12px; }
-      .lb-table th, .lb-table td { padding: 8px 6px; }
-      .lb-col-optional { display: none; }
-      .match-card { grid-template-columns: 40px 1fr auto 1fr; gap: 8px; }
-      .match-card__team { font-size: 12px; }
-      .match-card__score { font-size: 18px; min-width: 60px; }
+    @media(max-width:720px){
+      .lb-hero{padding:var(--space-6) var(--space-4);}
+      .lb-hero__title{font-size:clamp(1.5rem,5vw,2.5rem);}
+      .lb-card{padding:var(--space-4);}
+      .lb-table{font-size:11px;}
+      .lb-table th,.lb-table td{padding:7px 4px;}
+      .lb-col-optional{display:none;}
+      .match-card{grid-template-columns:32px 1fr auto 1fr;gap:6px;}
     }
   </style>
 </head>
 <body data-page="leaderboard">
-
-  <!-- Nav partial slot -->
   <div data-partial="nav"></div>
-
   <main class="lb-shell">
-
     <div class="lb-hero">
-      <div class="lb-hero__label">The Dink Society</div>
-      <h1 class="lb-hero__title" id="lb-title">Leaderboard</h1>
-      <p class="lb-hero__sub" id="lb-sub">Loading&hellip;</p>
+      <div class="eyebrow">Standings</div>
+      <h1 class="lb-hero__title" id="lb-title">Circuit I</h1>
+      <p class="lb-hero__sub" id="lb-sub">Loading…</p>
       <div class="lb-controls">
-        <select id="circuit-select" aria-label="Circuit">
-          <option value="I">Circuit I</option>
-        </select>
-        <select id="division-select" aria-label="Division">
-          <option value="">All divisions</option>
-          <option value="3.0M">3.0 Mixed</option>
-          <option value="3.5M">3.5 Mixed</option>
-          <option value="3.5W">3.5 Women's</option>
-        </select>
+        <select id="circuit-select"><option value="I">Circuit I</option></select>
+        <select id="division-select"><option value="">All divisions</option><option value="3.0M">3.0 Mixed</option><option value="3.5M">3.5 Mixed</option><option value="3.5W">3.5 Women's</option></select>
       </div>
     </div>
 
@@ -278,470 +90,75 @@
       <button class="lb-tab" data-tab="analytics">Analytics</button>
     </nav>
 
-    <section class="lb-section is-active" data-section="standings">
-      <div id="standings-content">
-        <div class="empty-state">Loading standings&hellip;</div>
-      </div>
-    </section>
-
-    <section class="lb-section" data-section="society">
-      <div id="society-content">
-        <div class="empty-state">Loading Society Circuit&hellip;</div>
-      </div>
-    </section>
-
-    <section class="lb-section" data-section="players">
-      <div id="players-content">
-        <div class="empty-state">Loading player stats&hellip;</div>
-      </div>
-    </section>
-
-    <section class="lb-section" data-section="analytics">
-      <div id="analytics-content">
-        <div class="empty-state">Loading analytics&hellip;</div>
-      </div>
-    </section>
-
+    <section class="lb-section is-active" data-section="standings"><div id="standings-content"><div class="empty-state">Loading standings…</div></div></section>
+    <section class="lb-section" data-section="society"><div id="society-content"><div class="empty-state">Loading Society Circuit…</div></div></section>
+    <section class="lb-section" data-section="players"><div id="players-content"><div class="empty-state">Loading player stats…</div></div></section>
+    <section class="lb-section" data-section="analytics"><div id="analytics-content"></div></section>
   </main>
 
+  <div data-partial="footer"></div>
+
   <script>
-    // ============================================================
-    // LEADERBOARD — public, read-only
-    // ============================================================
+    const DIVISION_LABELS={'3.0M':'3.0 Mixed','3.5M':'3.5 Mixed','3.5W':"3.5 Women's"};
+    const SLOT_TYPE_LABELS={womens:"Women's",mens:"Men's",mixed:'Mixed'};
+    const state={circuit:'I',division:'',tab:'standings',playerFilter:'all',standings:null,playerStats:null};
+    const $id=(id)=>document.getElementById(id);
 
-    const DIVISION_LABELS = {
-      '3.0M': '3.0 Mixed',
-      '3.5M': '3.5 Mixed',
-      '3.5W': "3.5 Women's",
-    };
-    const SLOT_TYPE_LABELS = { womens: "Women's", mens: "Men's", mixed: 'Mixed' };
+    function readUrl(){const p=new URLSearchParams(window.location.search);if(p.get('circuit'))state.circuit=p.get('circuit');if(p.get('division'))state.division=p.get('division');if(p.get('view'))state.tab=p.get('view');$id('circuit-select').value=state.circuit;$id('division-select').value=state.division||'';activateTab(state.tab);}
+    function writeUrl(){const p=new URLSearchParams();if(state.circuit!=='I')p.set('circuit',state.circuit);if(state.division)p.set('division',state.division);if(state.tab!=='standings')p.set('view',state.tab);const q=p.toString();history.replaceState({},'',q?`?${q}`:window.location.pathname);}
 
-    const state = {
-      circuit: 'I',
-      division: '',
-      tab: 'standings',
-      playerFilter: 'all', // all | womens | mens | mixed
-      standings: null,
-      playerStats: null,
-      schedule: null,
-    };
+    async function loadStandings(){try{const r=await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}`);if(!r.ok)throw 0;state.standings=await r.json();}catch{state.standings={empty:true};}}
+    async function loadPlayerStats(){try{const r=await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}&view=players`);if(!r.ok)throw 0;state.playerStats=await r.json();}catch{state.playerStats={empty:true};}}
 
-    const $id = (id) => document.getElementById(id);
+    function renderHero(){const c=state.circuit;const d=state.division?` · ${DIVISION_LABELS[state.division]||state.division}`:'';$id('lb-title').textContent=`Circuit ${c}${d}`;const u=state.standings?.lastUpdated?` · updated ${formatTime(state.standings.lastUpdated)}`:'';$id('lb-sub').textContent=`Standings, scores, and player stats${u}`;}
 
-    // ===== URL sync =====
-    function readUrl() {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('circuit')) state.circuit = params.get('circuit');
-      if (params.get('division')) state.division = params.get('division');
-      if (params.get('view')) state.tab = params.get('view');
-      $id('circuit-select').value = state.circuit;
-      $id('division-select').value = state.division || '';
-      activateTab(state.tab);
-    }
+    function renderStandings(){const el=$id('standings-content');if(!state.standings||state.standings.empty){el.innerHTML=`<div class="lb-card"><div class="empty-state">${escapeHtml(state.standings?.message||'No standings yet. Come back once matches are underway.')}</div></div>`;return;}
+    const divs=state.standings.divisions||{};if(!Object.keys(divs).length){el.innerHTML='<div class="lb-card"><div class="empty-state">No finalized matches yet.</div></div>';return;}
+    const vis=state.division?{[state.division]:divs[state.division]}:divs;const parts=[];for(const[d,data]of Object.entries(vis)){if(data)parts.push(renderDivStandings(d,data));}
+    el.innerHTML=parts.join('')||'<div class="lb-card"><div class="empty-state">No standings for this division.</div></div>';}
 
-    function writeUrl() {
-      const params = new URLSearchParams();
-      if (state.circuit !== 'I') params.set('circuit', state.circuit);
-      if (state.division) params.set('division', state.division);
-      if (state.tab !== 'standings') params.set('view', state.tab);
-      const qs = params.toString();
-      const next = qs ? `?${qs}` : window.location.pathname;
-      history.replaceState({}, '', next);
-    }
+    function renderDivStandings(dk,data){const teams=data.teams||[];if(!teams.length)return'';
+    const rows=teams.map(t=>{const diff=t.matchPointsFor-t.matchPointsAgainst;const ds=diff>0?`+${diff}`:String(diff);return`<tr class="${t.rank===1?'lb-row--leader':''}"><td class="lb-rank ${t.rank===1?'lb-rank--top':''}">${t.rank}</td><td class="lb-team">${escapeHtml(t.teamName)}${t.sweeps>0?` <span class="lb-pill lb-pill--sweep">${t.sweeps}× 4-0</span>`:''}</td><td class="numeric">${t.wins}–${t.losses}${t.ties?`–${t.ties}`:''}</td><td class="numeric"><strong>${t.matchPointsFor}</strong></td><td class="numeric lb-col-optional">${t.matchPointsAgainst}</td><td class="numeric lb-col-optional">${ds}</td><td class="numeric lb-col-optional">${t.totalGamesWon}</td></tr>`;}).join('');
+    return`<div class="lb-card"><h2 class="lb-card__title">${escapeHtml(DIVISION_LABELS[dk]||dk)}</h2><table class="lb-table"><thead><tr><th>#</th><th>Team</th><th class="numeric">W–L${teams.some(t=>t.ties)?'–T':''}</th><th class="numeric">MP</th><th class="numeric lb-col-optional">Against</th><th class="numeric lb-col-optional">Diff</th><th class="numeric lb-col-optional">Games won</th></tr></thead><tbody>${rows}</tbody></table></div>`;}
 
-    // ===== Data loads =====
-    async function loadStandings() {
-      try {
-        const res = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}`);
-        if (!res.ok) throw new Error();
-        state.standings = await res.json();
-      } catch {
-        state.standings = { empty: true };
-      }
-    }
+    function renderSociety(){const el=$id('society-content');if(!state.standings||state.standings.empty){el.innerHTML='<div class="lb-card"><div class="empty-state">No data yet.</div></div>';return;}
+    const divs=state.standings.divisions||{};const allTeams=[];const perDiv=[];
+    for(const[d,data]of Object.entries(divs)){(data.teams||[]).forEach(t=>allTeams.push({...t,division:d}));perDiv.push(renderSocDiv(d,data));}
+    allTeams.sort((a,b)=>b.societyCircuitPoints-a.societyCircuitPoints);
+    const rows=allTeams.slice(0,20).map((t,i)=>`<tr class="${i===0?'lb-row--leader':''}"><td class="lb-rank ${i===0?'lb-rank--top':''}">${i+1}</td><td class="lb-team">${escapeHtml(t.teamName)} <span class="lb-team__meta">${escapeHtml(DIVISION_LABELS[t.division]||t.division)}</span></td><td class="numeric"><strong>${t.societyCircuitPoints}</strong></td><td class="numeric lb-col-optional">${t.weeklyBonusPoints}</td><td class="numeric lb-col-optional">${t.placementBonus}</td></tr>`).join('');
+    el.innerHTML=`<div class="lb-card"><h2 class="lb-card__title">Overall Society Circuit ranking</h2><p style="font-size:11px;color:var(--color-text-faint);margin:0 0 12px;">Combined across all divisions. Projected while Circuit is live.</p><table class="lb-table"><thead><tr><th>#</th><th>Team</th><th class="numeric">SC pts</th><th class="numeric lb-col-optional">Bonus</th><th class="numeric lb-col-optional">Placement</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="empty-state">No data.</td></tr>'}</tbody></table></div>${perDiv.join('')}`;}
 
-    async function loadPlayerStats() {
-      try {
-        const res = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}&view=players`);
-        if (!res.ok) throw new Error();
-        state.playerStats = await res.json();
-      } catch {
-        state.playerStats = { empty: true };
-      }
-    }
+    function renderSocDiv(dk,data){const teams=data.teams||[];if(!teams.length)return'';
+    const rows=teams.map((t,i)=>`<tr class="${i===0?'lb-row--leader':''}"><td class="lb-rank ${i===0?'lb-rank--top':''}">${t.rank}</td><td class="lb-team">${escapeHtml(t.teamName)}</td><td class="numeric"><strong>${t.societyCircuitPoints}</strong></td><td class="numeric lb-col-optional">${t.weeklyBonusPoints}</td><td class="numeric lb-col-optional">${t.placementBonus}</td></tr>`).join('');
+    return`<div class="lb-card"><h2 class="lb-card__title">${escapeHtml(DIVISION_LABELS[dk]||dk)} Society Circuit</h2><table class="lb-table"><thead><tr><th>#</th><th>Team</th><th class="numeric">SC pts</th><th class="numeric lb-col-optional">Bonus</th><th class="numeric lb-col-optional">Placement</th></tr></thead><tbody>${rows}</tbody></table></div>`;}
 
-    async function loadSchedule() {
-      try {
-        const res = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}&view=schedule`);
-        if (!res.ok) throw new Error();
-        state.schedule = await res.json();
-      } catch {
-        state.schedule = { empty: true };
-      }
-    }
+    function renderPlayers(){const el=$id('players-content');if(!state.playerStats||state.playerStats.empty){el.innerHTML='<div class="lb-card"><div class="empty-state">No player stats yet.</div></div>';return;}
+    const players=Object.values(state.playerStats.players||{});if(!players.length){el.innerHTML='<div class="lb-card"><div class="empty-state">No player stats yet.</div></div>';return;}
+    const filter=state.playerFilter;const sf=p=>filter==='all'?{played:p.gamesPlayed,won:p.gamesWon}:(p.byType?.[filter]||{played:0,won:0});
+    const sorted=players.map(p=>({...p,_s:sf(p)})).filter(p=>p._s.played>0).sort((a,b)=>{const ra=a._s.played?a._s.won/a._s.played:0,rb=b._s.played?b._s.won/b._s.played:0;return rb!==ra?rb-ra:b._s.won-a._s.won;});
+    const fbtns=['all','womens','mens','mixed'].map(f=>`<button class="player-filter__btn ${filter===f?'is-active':''}" data-filter="${f}">${f==='all'?'All games':SLOT_TYPE_LABELS[f]}</button>`).join('');
+    const rows=sorted.slice(0,50).map((p,i)=>{const r=p._s.played?Math.round(100*p._s.won/p._s.played):0;return`<tr class="${i===0?'lb-row--leader':''}"><td class="lb-rank ${i===0?'lb-rank--top':''}">${i+1}</td><td class="lb-team">${escapeHtml(p.name)} <span class="lb-team__meta">${escapeHtml(p.teamName||'')}</span></td><td class="numeric"><strong>${p._s.won}–${p._s.played-p._s.won}</strong></td><td class="numeric">${r}%</td><td class="numeric lb-col-optional">${p.matchesPlayed||0}</td></tr>`;}).join('');
+    el.innerHTML=`<div class="lb-card"><h2 class="lb-card__title">Player standings</h2><div class="player-filter">${fbtns}</div><table class="lb-table"><thead><tr><th>#</th><th>Player</th><th class="numeric">W–L</th><th class="numeric">Win rate</th><th class="numeric lb-col-optional">Matches</th></tr></thead><tbody>${rows||'<tr><td colspan="5" class="empty-state">No games in this filter.</td></tr>'}</tbody></table></div>`;
+    el.querySelectorAll('[data-filter]').forEach(b=>{b.addEventListener('click',()=>{state.playerFilter=b.dataset.filter;renderPlayers();});});}
 
-    // ===== Renderers =====
-    function renderHero() {
-      const c = state.circuit;
-      const div = state.division ? ` · ${DIVISION_LABELS[state.division] || state.division}` : '';
-      $id('lb-title').textContent = `Circuit ${c}${div}`;
-      const updated = state.standings?.lastUpdated ? ` · updated ${formatTime(state.standings.lastUpdated)}` : '';
-      $id('lb-sub').textContent = `Standings, scores, and player stats${updated}`;
-    }
+    function renderAnalytics(){$id('analytics-content').innerHTML=`<div class="lb-card"><h2 class="lb-card__title">League analytics</h2><div class="empty-state" style="padding:var(--space-10)">Analytics will appear here once enough match data has been collected. Track scoring averages, team momentum, point differentials, and head-to-head records.</div></div>`;}
 
-    function renderStandings() {
-      const el = $id('standings-content');
-      if (!state.standings || state.standings.empty) {
-        el.innerHTML = `<div class="lb-card"><div class="empty-state">${escapeHtml(state.standings?.message || 'No standings yet. Come back once matches are underway.')}</div></div>`;
-        return;
-      }
-      const divisions = state.standings.divisions || {};
-      const divKeys = Object.keys(divisions);
-      if (divKeys.length === 0) {
-        el.innerHTML = `<div class="lb-card"><div class="empty-state">No finalized matches yet this Circuit.</div></div>`;
-        return;
-      }
+    function activateTab(name){state.tab=name;document.querySelectorAll('.lb-tab').forEach(b=>b.classList.toggle('is-active',b.dataset.tab===name));document.querySelectorAll('.lb-section').forEach(s=>s.classList.toggle('is-active',s.dataset.section===name));writeUrl();
+    if(name==='standings'||name==='society'){if(!state.standings)loadStandings().then(()=>{renderHero();renderStandings();renderSociety();});else{renderStandings();renderSociety();}}
+    if(name==='players'){if(!state.playerStats)loadPlayerStats().then(renderPlayers);else renderPlayers();}
+    if(name==='analytics')renderAnalytics();}
 
-      const filterDiv = state.division;
-      const visible = filterDiv ? { [filterDiv]: divisions[filterDiv] } : divisions;
-      const parts = [];
-      for (const [div, data] of Object.entries(visible)) {
-        if (!data) continue;
-        parts.push(renderDivisionStandings(div, data));
-      }
-      el.innerHTML = parts.join('') || `<div class="lb-card"><div class="empty-state">No standings for this division yet.</div></div>`;
-    }
+    document.querySelectorAll('.lb-tab').forEach(b=>{b.addEventListener('click',()=>activateTab(b.dataset.tab));});
+    $id('circuit-select').addEventListener('change',e=>{state.circuit=e.target.value;state.standings=null;state.playerStats=null;writeUrl();activateTab(state.tab);});
+    $id('division-select').addEventListener('change',e=>{state.division=e.target.value;writeUrl();renderStandings();});
 
-    function renderDivisionStandings(divKey, data) {
-      const teams = data.teams || [];
-      if (!teams.length) return '';
-      const rows = teams.map(t => {
-        const diff = (t.matchPointsFor - t.matchPointsAgainst);
-        const diffStr = diff > 0 ? `+${diff}` : String(diff);
-        const leaderClass = t.rank === 1 ? ' lb-row--leader' : '';
-        return `
-          <tr class="${leaderClass}">
-            <td class="lb-rank ${t.rank === 1 ? 'lb-rank--top' : ''}">${t.rank}</td>
-            <td class="lb-team">
-              ${escapeHtml(t.teamName)}
-              ${t.sweeps > 0 ? `<span class="lb-pill lb-pill--sweep" title="${t.sweeps} sweep${t.sweeps === 1 ? '' : 's'}">${t.sweeps}&times; 4&ndash;0</span>` : ''}
-            </td>
-            <td class="numeric">${t.wins}&ndash;${t.losses}${t.ties ? `&ndash;${t.ties}` : ''}</td>
-            <td class="numeric"><strong>${t.matchPointsFor}</strong></td>
-            <td class="numeric lb-col-optional">${t.matchPointsAgainst}</td>
-            <td class="numeric lb-col-optional">${diffStr}</td>
-            <td class="numeric lb-col-optional">${t.totalGamesWon}</td>
-          </tr>
-        `;
-      }).join('');
+    function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+    function formatTime(iso){if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
+    function formatDateShort(iso){if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
 
-      return `
-        <div class="lb-card">
-          <h2 class="lb-card__title">${escapeHtml(DIVISION_LABELS[divKey] || divKey)}</h2>
-          <table class="lb-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Team</th>
-                <th class="numeric">W&ndash;L${teams.some(t => t.ties) ? '&ndash;T' : ''}</th>
-                <th class="numeric">MP</th>
-                <th class="numeric lb-col-optional">Against</th>
-                <th class="numeric lb-col-optional">Diff</th>
-                <th class="numeric lb-col-optional">Games won</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    function renderSociety() {
-      const el = $id('society-content');
-      if (!state.standings || state.standings.empty) {
-        el.innerHTML = `<div class="lb-card"><div class="empty-state">No data yet for this Circuit.</div></div>`;
-        return;
-      }
-      const divisions = state.standings.divisions || {};
-      // Per-division cards
-      const perDivision = [];
-      // Cross-division ranking
-      const allTeams = [];
-      for (const [div, data] of Object.entries(divisions)) {
-        (data.teams || []).forEach(t => allTeams.push({ ...t, division: div }));
-        perDivision.push(renderSocietyDivision(div, data));
-      }
-      allTeams.sort((a, b) => b.societyCircuitPoints - a.societyCircuitPoints);
-
-      const overallRows = allTeams.slice(0, 20).map((t, idx) => `
-        <tr class="${idx === 0 ? 'lb-row--leader' : ''}">
-          <td class="lb-rank ${idx === 0 ? 'lb-rank--top' : ''}">${idx + 1}</td>
-          <td class="lb-team">${escapeHtml(t.teamName)} <span class="lb-team__meta">${escapeHtml(DIVISION_LABELS[t.division] || t.division)}</span></td>
-          <td class="numeric"><strong>${t.societyCircuitPoints}</strong></td>
-          <td class="numeric lb-col-optional">${t.weeklyBonusPoints}</td>
-          <td class="numeric lb-col-optional">${t.placementBonus}</td>
-        </tr>
-      `).join('');
-
-      el.innerHTML = `
-        <div class="lb-card">
-          <h2 class="lb-card__title">Overall Society Circuit ranking</h2>
-          <p style="font-size: 12px; opacity: 0.65; margin: 0 0 12px;">Combined across all divisions. Placement bonuses are projected while the Circuit is still live.</p>
-          <table class="lb-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Team</th>
-                <th class="numeric">SC pts</th>
-                <th class="numeric lb-col-optional">Bonus</th>
-                <th class="numeric lb-col-optional">Placement</th>
-              </tr>
-            </thead>
-            <tbody>${overallRows || '<tr><td colspan="5" class="empty-state">No data yet.</td></tr>'}</tbody>
-          </table>
-        </div>
-        ${perDivision.join('')}
-      `;
-    }
-
-    function renderSocietyDivision(divKey, data) {
-      const teams = data.teams || [];
-      if (!teams.length) return '';
-      const rows = teams.map((t, idx) => `
-        <tr class="${idx === 0 ? 'lb-row--leader' : ''}">
-          <td class="lb-rank ${idx === 0 ? 'lb-rank--top' : ''}">${t.rank}</td>
-          <td class="lb-team">${escapeHtml(t.teamName)}</td>
-          <td class="numeric"><strong>${t.societyCircuitPoints}</strong></td>
-          <td class="numeric lb-col-optional">${t.weeklyBonusPoints}</td>
-          <td class="numeric lb-col-optional">${t.placementBonus}</td>
-        </tr>
-      `).join('');
-      return `
-        <div class="lb-card">
-          <h2 class="lb-card__title">${escapeHtml(DIVISION_LABELS[divKey] || divKey)} Society Circuit</h2>
-          <table class="lb-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Team</th>
-                <th class="numeric">SC pts</th>
-                <th class="numeric lb-col-optional">Bonus</th>
-                <th class="numeric lb-col-optional">Placement</th>
-              </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>
-      `;
-    }
-
-    function renderPlayers() {
-      const el = $id('players-content');
-      if (!state.playerStats || state.playerStats.empty) {
-        el.innerHTML = `<div class="lb-card"><div class="empty-state">No player stats yet this Circuit.</div></div>`;
-        return;
-      }
-      const players = Object.values(state.playerStats.players || {});
-      if (!players.length) {
-        el.innerHTML = `<div class="lb-card"><div class="empty-state">No player stats yet this Circuit.</div></div>`;
-        return;
-      }
-
-      // Sort by the active filter
-      const filter = state.playerFilter;
-      const statForPlayer = (p) => {
-        if (filter === 'all') return { played: p.gamesPlayed, won: p.gamesWon };
-        return p.byType?.[filter] || { played: 0, won: 0 };
-      };
-      const sorted = players
-        .map(p => ({ ...p, _stat: statForPlayer(p) }))
-        .filter(p => p._stat.played > 0)
-        .sort((a, b) => {
-          const rateA = a._stat.played ? a._stat.won / a._stat.played : 0;
-          const rateB = b._stat.played ? b._stat.won / b._stat.played : 0;
-          if (rateB !== rateA) return rateB - rateA;
-          return b._stat.won - a._stat.won;
-        });
-
-      const filters = ['all', 'womens', 'mens', 'mixed'].map(f => `
-        <button class="player-filter__btn ${filter === f ? 'is-active' : ''}" data-filter="${f}">${f === 'all' ? 'All games' : SLOT_TYPE_LABELS[f]}</button>
-      `).join('');
-
-      const rows = sorted.slice(0, 50).map((p, idx) => {
-        const rate = p._stat.played ? Math.round(100 * p._stat.won / p._stat.played) : 0;
-        return `
-          <tr class="${idx === 0 ? 'lb-row--leader' : ''}">
-            <td class="lb-rank ${idx === 0 ? 'lb-rank--top' : ''}">${idx + 1}</td>
-            <td class="lb-team">
-              ${escapeHtml(p.name)}
-              <span class="lb-team__meta">${escapeHtml(p.teamName || '')}</span>
-            </td>
-            <td class="numeric"><strong>${p._stat.won}&ndash;${p._stat.played - p._stat.won}</strong></td>
-            <td class="numeric">${rate}%</td>
-            <td class="numeric lb-col-optional">${p.matchesPlayed || 0}</td>
-          </tr>
-        `;
-      }).join('');
-
-      el.innerHTML = `
-        <div class="lb-card">
-          <h2 class="lb-card__title">Player standings</h2>
-          <div class="player-filter">${filters}</div>
-          <table class="lb-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Player</th>
-                <th class="numeric">W&ndash;L</th>
-                <th class="numeric">Win rate</th>
-                <th class="numeric lb-col-optional">Matches</th>
-              </tr>
-            </thead>
-            <tbody>${rows || '<tr><td colspan="5" class="empty-state">No games played in this filter yet.</td></tr>'}</tbody>
-          </table>
-        </div>
-      `;
-
-      // Wire filter buttons
-      el.querySelectorAll('[data-filter]').forEach(btn => {
-        btn.addEventListener('click', () => {
-          state.playerFilter = btn.dataset.filter;
-          renderPlayers();
-        });
-      });
-    }
-
-    function renderSchedule() {
-      const el = $id('schedule-content');
-      if (!state.schedule || state.schedule.empty) {
-        el.innerHTML = `<div class="lb-card"><div class="empty-state">No schedule yet.</div></div>`;
-        return;
-      }
-      const { finalized = [], upcoming = [] } = state.schedule;
-      const div = state.division;
-      const filterFn = (m) => !div || m.division === div;
-      const f = finalized.filter(filterFn);
-      const u = upcoming.filter(filterFn);
-
-      const renderMatch = (m) => {
-        const finalHtml = m.finalizedAt
-          ? `<div class="match-card__score">${m.scoreA ?? 0} &ndash; ${m.scoreB ?? 0}</div>`
-          : `<div class="match-card__score" style="opacity:0.5; font-size: 14px;">vs</div>`;
-        return `
-          <div class="match-card ${m.finalizedAt ? 'match-card--final' : ''}">
-            <div class="match-card__week">W${m.week}</div>
-            <div>
-              <div class="match-card__team">${escapeHtml(m.teamA?.name || 'TBD')}</div>
-              <div class="match-card__meta">${escapeHtml(DIVISION_LABELS[m.division] || m.division || '')}${m.court ? ' · ' + escapeHtml(m.court) : ''}</div>
-            </div>
-            ${finalHtml}
-            <div>
-              <div class="match-card__team match-card__team--right">${escapeHtml(m.teamB?.name || 'TBD')}</div>
-              <div class="match-card__meta" style="text-align: right;">${m.scheduledAt ? formatDateShort(m.scheduledAt) : (m.finalizedAt ? 'Final' : 'Time TBD')}</div>
-            </div>
-          </div>
-        `;
-      };
-
-      const finalHtml = f.length ? `
-        <div class="lb-card">
-          <h2 class="lb-card__title">Recent results</h2>
-          ${f.slice(0, 12).map(renderMatch).join('')}
-        </div>
-      ` : '';
-
-      const upHtml = u.length ? `
-        <div class="lb-card">
-          <h2 class="lb-card__title">Upcoming</h2>
-          ${u.slice(0, 12).map(renderMatch).join('')}
-        </div>
-      ` : '';
-
-      el.innerHTML = (finalHtml + upHtml) || `<div class="lb-card"><div class="empty-state">No matches for this filter yet.</div></div>`;
-    }
-
-    function renderAnalytics() {
-      const el = $id('analytics-content');
-      el.innerHTML = `
-        <div class="lb-card">
-          <h2 class="lb-card__title">League analytics</h2>
-          <div class="empty-state" style="padding: 48px 20px;">
-            Analytics will appear here once enough match data has been collected. Track trends like scoring averages, team momentum, point differentials, and head-to-head records across the Circuit.
-          </div>
-        </div>
-      `;
-    }
-
-    // ===== Tabs =====
-    function activateTab(name) {
-      state.tab = name;
-      document.querySelectorAll('.lb-tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab === name));
-      document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === name));
-      writeUrl();
-
-      // Load-on-demand (but cache in state)
-      if (name === 'standings' || name === 'society') {
-        if (!state.standings) loadStandings().then(() => { renderHero(); renderStandings(); renderSociety(); });
-        else { renderStandings(); renderSociety(); }
-      }
-      if (name === 'players') {
-        if (!state.playerStats) loadPlayerStats().then(renderPlayers);
-        else renderPlayers();
-      }
-      if (name === 'analytics') {
-        renderAnalytics();
-      }
-    }
-
-    document.querySelectorAll('.lb-tab').forEach(btn => {
-      btn.addEventListener('click', () => activateTab(btn.dataset.tab));
-    });
-
-    $id('circuit-select').addEventListener('change', (e) => {
-      state.circuit = e.target.value;
-      // Invalidate caches — new circuit
-      state.standings = null;
-      state.playerStats = null;
-      state.schedule = null;
-      writeUrl();
-      activateTab(state.tab);
-    });
-
-    $id('division-select').addEventListener('change', (e) => {
-      state.division = e.target.value;
-      writeUrl();
-      renderStandings();
-    });
-
-    // ===== Utils =====
-    function escapeHtml(s) {
-      return String(s ?? '').replace(/[&<>"']/g, c => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
-      }[c]));
-    }
-    function formatTime(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    }
-    function formatDateShort(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      if (isNaN(d)) return '';
-      return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    }
-
-    // ===== Init =====
     readUrl();
-    loadStandings().then(() => {
-      renderHero();
-      renderStandings();
-      renderSociety();
-    });
+    loadStandings().then(()=>{renderHero();renderStandings();renderSociety();});
   </script>
-
-  <!-- Public nav partial loader (matches the pattern used on other pages) -->
   <script src="/js/partials.js"></script>
 </body>
 </html>
