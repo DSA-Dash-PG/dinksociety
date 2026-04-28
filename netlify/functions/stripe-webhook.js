@@ -100,6 +100,42 @@ export default async (req) => {
 
       console.log(`Registration ${regId} confirmed via Stripe (moved ${foundKey} → ${confirmedKey})`);
 
+      // ── Create team in the teams store (so captain magic-link login works) ──
+      if (reg.path === 'team' && reg.team?.name) {
+        try {
+          const teamsStore = getStore('teams');
+          const teamId = `team_${regId}`;
+          const captainEmail = (reg.team.players?.[0]?.email || '').toLowerCase().trim();
+
+          const teamRecord = {
+            id: teamId,
+            name: reg.team.name,
+            captainName: reg.team.captain || null,
+            captainEmail: captainEmail || null,
+            division: reg.division || null,
+            divisionLabel: reg.divisionLabel || null,
+            circuit: reg.circuit || 'I',
+            roster: (reg.team.players || []).map((p, i) => ({
+              id: `p_${regId}_${i}`,
+              name: p.name || '',
+              gender: '',       // captain fills this in later
+              email: p.email || '',
+              phone: p.phone || '',
+              dupr: '',
+            })),
+            registrationId: regId,
+            createdAt: new Date().toISOString(),
+            status: 'active',
+          };
+
+          await teamsStore.setJSON(`team/${teamId}.json`, teamRecord);
+          console.log(`Team created: ${teamId} (${reg.team.name}) captain=${captainEmail}`);
+        } catch (teamErr) {
+          console.error('Failed to create team record:', teamErr);
+          // Non-fatal — registration is still confirmed
+        }
+      }
+
       // Send confirmation email
       const recipientEmail = reg.path === 'team'
         ? reg.team?.players?.[0]?.email
