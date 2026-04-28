@@ -1,40 +1,36 @@
-/* =========================================================
-   Partials loader + active-nav highlighter
-   ========================================================= */
-(function () {
-  // Load partials
-  document.querySelectorAll('[data-partial]').forEach(async (el) => {
-    const name = el.getAttribute('data-partial');
-    try {
-      const res = await fetch(`/partials/${name}.html`);
-      if (res.ok) {
-        el.innerHTML = await res.text();
-        if (name === 'nav') highlightNav();
+// ═══════════════════════════════════════════════════════════════
+// partials.js — The Dink Society
+// Loads HTML partials into [data-partial] slots.
+// Example: <div data-partial="nav"></div> fetches /partials/nav.html
+// ═══════════════════════════════════════════════════════════════
+
+(async function loadPartials() {
+  const slots = document.querySelectorAll('[data-partial]');
+  if (!slots.length) return;
+
+  await Promise.all(
+    Array.from(slots).map(async (slot) => {
+      const name = slot.getAttribute('data-partial');
+      if (!name) return;
+      try {
+        const res = await fetch(`/partials/${name}.html`);
+        if (!res.ok) return; // Silently skip missing partials
+        const html = await res.text();
+        slot.innerHTML = html;
+
+        // Re-run any <script> tags inside the partial so event
+        // listeners (hamburger, drawer, etc.) get wired up.
+        slot.querySelectorAll('script').forEach((oldScript) => {
+          const newScript = document.createElement('script');
+          for (const attr of oldScript.attributes) {
+            newScript.setAttribute(attr.name, attr.value);
+          }
+          newScript.textContent = oldScript.textContent;
+          oldScript.parentNode.replaceChild(newScript, oldScript);
+        });
+      } catch (err) {
+        console.warn(`[partials] Could not load "${name}":`, err);
       }
-    } catch (e) {
-      console.warn(`Partial "${name}" failed to load`, e);
-    }
-  });
-
-  function highlightNav() {
-    const path = location.pathname;
-    let key = 'home';
-
-    if (path.includes('schedule'))    key = 'schedule';
-    else if (path.includes('standing'))  key = 'standings';
-    else if (path.includes('leaderboard')) key = 'leaderboard';
-    else if (path.includes('stats'))     key = 'stats';
-    else if (path.includes('team'))      key = 'teams';
-    else if (path.includes('gallery') || path.includes('moments')) key = 'gallery';
-    else if (path.includes('rules'))     key = 'rules';
-    else if (path.includes('contact'))   key = 'contact';
-    else if (path.includes('register'))  key = 'register';
-    else if (path === '/' || path.includes('index')) key = 'home';
-
-    document.querySelectorAll('[data-nav]').forEach((link) => {
-      if (link.getAttribute('data-nav') === key) {
-        link.classList.add('is-active');
-      }
-    });
-  }
+    })
+  );
 })();
