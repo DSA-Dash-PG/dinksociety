@@ -3,8 +3,8 @@
 // POST → save circuit settings (admin-only)
 
 import { getStore } from '@netlify/blobs';
-import { verifyAdmin } from './lib/admin-auth.js';
-import { ok, unauthorized, serverError } from './lib/response.js';
+import { verifyAdmin } from '../lib/admin-auth.js';
+import { ok, unauthorized, serverError } from '../lib/response.js';
 
 const STORE = 'config';
 const KEY   = 'circuit-settings';
