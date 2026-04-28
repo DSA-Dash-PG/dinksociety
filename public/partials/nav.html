@@ -1,18 +1,19 @@
-<!-- ═══════════════════════════════════════════════════════════
-     nav.html — shared top navigation partial
-     Night-Match design system · loaded by partials.js
-     ═══════════════════════════════════════════════════════════ -->
+<!-- nav.html — shared top nav partial · Night-Match design system -->
 <nav class="ds-nav">
   <a href="/" class="ds-nav__logo">Dink Society</a>
-
   <div class="ds-nav__center">
     <a href="/leaderboard.html" class="ds-nav__link" data-nav="leaderboard">Standings</a>
     <a href="/schedule.html" class="ds-nav__link" data-nav="schedule">Schedule</a>
     <a href="/rules.html" class="ds-nav__link" data-nav="rules">Rules</a>
     <a href="/gallery.html" class="ds-nav__link" data-nav="gallery">Gallery</a>
   </div>
-
   <a href="/register.html" class="ds-nav__register">Register</a>
+
+  <!-- Theme toggle -->
+  <button class="ds-nav__theme-toggle" id="ds-theme-toggle" aria-label="Toggle light/dark mode">
+    <svg class="icon-sun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+    <svg class="icon-moon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+  </button>
 
   <button class="ds-nav__hamburger" id="ds-nav-ham" aria-label="Open menu" aria-expanded="false">
     <svg viewBox="0 0 24 24"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
@@ -39,23 +40,61 @@
 
 <script>
 (function () {
-  const ham = document.getElementById('ds-nav-ham');
-  const drawer = document.getElementById('ds-nav-drawer');
-  const close = document.getElementById('ds-nav-drawer-close');
-  if (!ham || !drawer) return;
+  // — Hamburger / Drawer —
+  var ham = document.getElementById('ds-nav-ham');
+  var drawer = document.getElementById('ds-nav-drawer');
+  var close = document.getElementById('ds-nav-drawer-close');
+  if (ham && drawer) {
+    ham.addEventListener('click', function () { drawer.classList.add('is-open'); ham.setAttribute('aria-expanded', 'true'); document.body.style.overflow = 'hidden'; });
+    if (close) close.addEventListener('click', shut);
+    drawer.addEventListener('click', function (e) { if (e.target === drawer) shut(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') shut(); });
+  }
+  function shut() { if (!drawer) return; drawer.classList.remove('is-open'); if (ham) ham.setAttribute('aria-expanded', 'false'); document.body.style.overflow = ''; }
 
-  function open() { drawer.classList.add('is-open'); ham.setAttribute('aria-expanded', 'true'); document.body.style.overflow = 'hidden'; }
-  function shut() { drawer.classList.remove('is-open'); ham.setAttribute('aria-expanded', 'false'); document.body.style.overflow = ''; }
-
-  ham.addEventListener('click', open);
-  close?.addEventListener('click', shut);
-  drawer.addEventListener('click', function (e) { if (e.target === drawer) shut(); });
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') shut(); });
-
-  // Highlight active link
+  // — Active link —
   var page = document.body.getAttribute('data-page') || '';
   document.querySelectorAll('[data-nav]').forEach(function (a) {
     if (a.getAttribute('data-nav') === page) a.classList.add('is-active');
   });
+
+  // — Theme toggle —
+  var toggle = document.getElementById('ds-theme-toggle');
+  var html = document.documentElement;
+
+  function getTheme() {
+    var saved = localStorage.getItem('ds-theme');
+    if (saved) return saved;
+    // Default to dark
+    return 'dark';
+  }
+
+  function applyTheme(theme) {
+    if (theme === 'light') {
+      html.setAttribute('data-theme', 'light');
+    } else {
+      html.removeAttribute('data-theme');
+    }
+    updateToggleIcon(theme);
+    localStorage.setItem('ds-theme', theme);
+  }
+
+  function updateToggleIcon(theme) {
+    if (!toggle) return;
+    var sun = toggle.querySelector('.icon-sun');
+    var moon = toggle.querySelector('.icon-moon');
+    if (sun) sun.style.display = theme === 'dark' ? 'block' : 'none';
+    if (moon) moon.style.display = theme === 'light' ? 'block' : 'none';
+  }
+
+  // Apply on load
+  applyTheme(getTheme());
+
+  if (toggle) {
+    toggle.addEventListener('click', function () {
+      var current = html.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+      applyTheme(current === 'dark' ? 'light' : 'dark');
+    });
+  }
 })();
 </script>
