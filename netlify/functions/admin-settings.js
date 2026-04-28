@@ -4,7 +4,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdmin } from './lib/admin-auth.js';
-import { ok, err, noAuth } from './lib/response.js';
+import { ok, unauthorized, serverError } from './lib/response.js';
 
 const STORE = 'config';
 const KEY   = 'circuit-settings';
@@ -38,7 +38,7 @@ export async function handler(event) {
   // POST requires admin auth
   if (event.httpMethod === 'POST') {
     const admin = await verifyAdmin(event);
-    if (!admin) return noAuth();
+    if (!admin) return unauthorized();
 
     try {
       const body = JSON.parse(event.body || '{}');
@@ -66,9 +66,9 @@ export async function handler(event) {
       return ok(updated);
     } catch (e) {
       console.error('settings POST error:', e);
-      return err('Failed to save settings: ' + e.message);
+      return serverError(e);
     }
   }
 
-  return err('Method not allowed', 405);
+  return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
 }
