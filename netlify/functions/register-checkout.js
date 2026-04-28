@@ -38,9 +38,9 @@ export default async (req) => {
     const body = await req.json();
     const { seasonId, circuit, division, divisionLabel, path, team, agent } = body;
 
-    // Validate required fields
-    if (!seasonId || !division || !path) {
-      return new Response('Missing required fields: seasonId, division, path', { status: 400 });
+    // Validate required fields (seasonId is optional — falls back to circuit)
+    if (!division || !path) {
+      return new Response('Missing required fields: division, path', { status: 400 });
     }
     if (path === 'team' && (!team?.name || !team?.players?.length)) {
       return new Response('Team registration requires team name and at least one player', { status: 400 });
@@ -49,25 +49,27 @@ export default async (req) => {
       return new Response('Free agent registration requires name and email', { status: 400 });
     }
 
-    // Look up the season to get the Stripe price ID
+    // Look up the season to get the Stripe price ID (if seasonId provided)
     const seasonStore = getStore('seasons');
-    const seasonRaw = await seasonStore.get(seasonId);
-
     let stripePriceId = null;
     let resolvedPrice = path === 'team' ? 450 : 75; // fallback
 
-    if (seasonRaw) {
-      const season = JSON.parse(seasonRaw);
+    if (seasonId) {
+      const seasonRaw = await seasonStore.get(seasonId);
 
-      // Check registration is open
-      if (season.registration !== 'open') {
-        return new Response('Registration is not currently open for this season', { status: 400 });
-      }
+      if (seasonRaw) {
+        const season = JSON.parse(seasonRaw);
 
-      const div = season.divisions.find(d => d.id === division);
-      if (div) {
-        stripePriceId = path === 'team' ? div.stripeTeamPriceId : div.stripeAgentPriceId;
-        resolvedPrice = path === 'team' ? div.teamPrice : div.agentPrice;
+        // Check registration is open
+        if (season.registration !== 'open') {
+          return new Response('Registration is not currently open for this season', { status: 400 });
+        }
+
+        const div = season.divisions.find(d => d.id === division);
+        if (div) {
+          stripePriceId = path === 'team' ? div.stripeTeamPriceId : div.stripeAgentPriceId;
+          resolvedPrice = path === 'team' ? div.teamPrice : div.agentPrice;
+        }
       }
     }
 
