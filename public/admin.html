@@ -181,13 +181,18 @@
       <div class="login-card__logo">The Dink Society</div>
       <div class="login-card__tag">Admin Portal</div>
       <h1 class="login-card__title">Sign in</h1>
-      <p class="login-card__sub">League management access</p>
-      <div style="text-align:left;">
-        <div class="af"><label for="login-email">Email</label><input type="email" id="login-email" autocomplete="email" required></div>
-        <div class="af"><label for="login-password">Password</label><input type="password" id="login-password" autocomplete="current-password" required></div>
-        <button class="ab ab--lime" id="login-submit">Sign in</button>
-        <div class="a-status" id="login-status"></div>
+      <p class="login-card__sub">Enter your admin email and we'll send a one-tap sign-in link.</p>
+
+      <div id="login-sent" style="display:none; background: var(--color-gold-dim); border: 1px solid rgba(240,192,64,0.4); color: var(--color-gold); padding: 16px; border-radius: var(--radius-sm); text-align: left; font-size: 13px; line-height: 1.55;">
+        <strong style="display:block; margin-bottom: 4px;">Link on the way.</strong>
+        Check the inbox for <span id="login-sent-email" style="font-weight: 600;"></span>. The link expires in 15 minutes. If it doesn't show up, check spam or make sure you're using an authorized admin email.
       </div>
+
+      <form id="login-form" onsubmit="return false;" style="text-align:left;">
+        <div class="af"><label for="login-email">Email</label><input type="email" id="login-email" autocomplete="email" required placeholder="admin@dinksociety.com"></div>
+        <button class="ab ab--lime" id="login-submit" style="width:100%;margin-top:8px;">Send sign-in link</button>
+        <div class="a-status" id="login-status"></div>
+      </form>
     </div>
   </div>
 
@@ -494,9 +499,36 @@
   function showLogin(){$id('login-screen').style.display='block';$id('admin-shell').style.display='none';}
   async function showShell(){$id('login-screen').style.display='none';$id('admin-shell').style.display='block';$id('test-b').style.display=TEST?'flex':'none';await loadSettings();renderOV();}
 
-  $id('login-submit').addEventListener('click',()=>{if(TEST){showShell();return;}
-  const e=$id('login-email').value.trim(),pw=$id('login-password').value,s=$id('login-status');s.className='a-status is-info';s.textContent='Signing in…';
-  fetch('/.netlify/functions/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'include',body:JSON.stringify({email:e,password:pw})}).then(r=>{if(!r.ok)throw new Error('Invalid credentials');return r.json();}).then(()=>checkAuth()).catch(err=>{s.className='a-status is-err';s.textContent=err.message;});});
+  $id('login-form').addEventListener('submit',async(e)=>{e.preventDefault();if(TEST){showShell();return;}
+  const email=$id('login-email').value.trim(),s=$id('login-status'),btn=$id('login-submit');
+  if(!email)return;
+  btn.disabled=true;s.className='a-status is-info';s.textContent='Sending link…';
+  try{
+    const r=await fetch('/.netlify/functions/admin-link',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    if(!r.ok)throw new Error('Could not send link — try again.');
+    s.className='a-status';s.textContent='';
+    $id('login-sent-email').textContent=email;
+    $id('login-sent').style.display='block';
+    $id('login-form').style.display='none';
+  }catch(err){s.className='a-status is-err';s.textContent=err.message;btn.disabled=false;}
+  });
+
+  // Handle redirect error params from the magic-link consumer
+  (function handleAuthErrors(){
+    const params=new URLSearchParams(window.location.search);
+    const err=params.get('error');
+    if(!err)return;
+    const messages={
+      missing:'That link was missing a token. Try requesting a new one.',
+      invalid:'That link is invalid or has already been used. Try requesting a new one.',
+      expired:'That link has expired. Request a fresh one below.',
+      server:'Something went wrong. Try again in a moment.',
+    };
+    const s=$id('login-status');
+    s.className='a-status is-err';
+    s.textContent=messages[err]||'Sign-in failed. Try requesting a new link.';
+    history.replaceState({},'',window.location.pathname);
+  })();
 
   // ─── Tab navigation ───────────────────────────────────────────
 
