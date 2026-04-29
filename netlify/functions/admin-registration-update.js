@@ -1,12 +1,13 @@
 // =============================================================
 // /api/admin-registration-update
 //
-// Manage individual registrations: approve, reject, move to
-// different division, move players between teams.
+// Manage individual registrations: confirm, reject, reinstate,
+// move to different division, move players between teams.
 //
 // POST with { action, ... }
 //
 // Actions:
+//   confirm    { id }                  → moves pending → confirmed, creates team
 //   reject     { id, reason }          → marks registration as rejected
 //   reinstate  { id }                  → marks rejected registration back to confirmed
 //   move-division { id, newDivision }  → moves a team/agent to a different division
@@ -24,13 +25,29 @@ function json(data, status = 200) {
   });
 }
 
+/**
+ * Find a registration by ID across all prefixes (pending/, confirmed/, rejected/, bare).
+ * Returns { reg, foundKey } or null.
+ */
+async function findRegistration(regStore, id) {
+  const prefixes = [`pending/${id}.json`, `confirmed/${id}.json`, `rejected/${id}.json`, id];
+  for (const key of prefixes) {
+    try {
+      const raw = await regStore.get(key);
+      if (raw) return { reg: JSON.parse(raw), foundKey: key };
+    } catch { /* not found, try next */ }
+  }
+  return null;
+}
+
 export default async (req) => {
   if (req.method !== 'POST') {
     return new Response('Method not allowed', { status: 405 });
   }
 
+  let admin;
   try {
-    await requireAdmin(req);
+    admin = await requireAdmin(req);
   } catch {
     return unauthResponse();
   }
@@ -42,19 +59,91 @@ export default async (req) => {
   const teamStore = getStore('teams');
 
   switch (action) {
+    // ─── Confirm a pending registration ───
+    case 'confirm': {
+      const { id } = body;
+      if (!id) return json({ error: 'Registration id required' }, 400);
+
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
+
+      const { reg, foundKey } = found;
+
+      if (reg.status === 'confirmed') {
+        return json({ ok: true, message: 'Already confirmed', registration: reg });
+      }
+
+      // Mark as confirmed
+      reg.status = 'confirmed';
+      reg.confirmedAt = new Date().toISOString();
+      reg.approvedBy = admin.email;
+
+      // Write to confirmed/ prefix
+      const confirmedKey = `confirmed/${id}.json`;
+      await regStore.set(confirmedKey, JSON.stringify(reg));
+
+      // Delete the old key if different
+      if (foundKey !== confirmedKey) {
+        try { await regStore.delete(foundKey); } catch { /* ok */ }
+      }
+
+      // Create team record in teams store (so captain magic-link works)
+      if (reg.path === 'team' && reg.team?.name) {
+        try {
+          const teamId = `team_${id}`;
+          const captainEmail = (reg.team.players?.[0]?.email || '').toLowerCase().trim();
+          const teamRecord = {
+            id: teamId,
+            name: reg.team.name,
+            captainName: reg.team.captain || reg.team.players?.[0]?.name || null,
+            captainEmail: captainEmail || null,
+            division: reg.division || null,
+            divisionLabel: reg.divisionLabel || null,
+            circuit: reg.circuit || 'I',
+            roster: (reg.team.players || []).map((p, i) => ({
+              id: `p_${id}_${i}`,
+              name: p.name || '',
+              gender: '',
+              email: p.email || '',
+              phone: p.phone || '',
+              dupr: '',
+              isCaptain: i === 0,
+            })),
+            registrationId: id,
+            createdAt: new Date().toISOString(),
+            createdBy: admin.email,
+            status: 'active',
+          };
+          await teamStore.setJSON(`team/${teamId}.json`, teamRecord);
+          console.log(`Team created via admin confirm: ${teamId} (${reg.team.name})`);
+        } catch (teamErr) {
+          console.error('Failed to create team on confirm:', teamErr);
+        }
+      }
+
+      return json({ ok: true, registration: reg });
+    }
+
     // ─── Reject a registration ───
     case 'reject': {
       const { id, reason } = body;
       if (!id) return json({ error: 'Registration id required' }, 400);
 
-      const raw = await regStore.get(id);
-      if (!raw) return json({ error: 'Registration not found' }, 404);
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
 
-      const reg = JSON.parse(raw);
+      const { reg, foundKey } = found;
       reg.status = 'rejected';
       reg.rejectedAt = new Date().toISOString();
+      reg.rejectedBy = admin.email;
       reg.rejectReason = reason || '';
-      await regStore.set(id, JSON.stringify(reg));
+
+      // Write to rejected/ prefix
+      const rejectedKey = `rejected/${id}.json`;
+      await regStore.set(rejectedKey, JSON.stringify(reg));
+      if (foundKey !== rejectedKey) {
+        try { await regStore.delete(foundKey); } catch { /* ok */ }
+      }
 
       return json({ ok: true, registration: reg });
     }
@@ -64,17 +153,22 @@ export default async (req) => {
       const { id } = body;
       if (!id) return json({ error: 'Registration id required' }, 400);
 
-      const raw = await regStore.get(id);
-      if (!raw) return json({ error: 'Registration not found' }, 404);
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
 
-      const reg = JSON.parse(raw);
+      const { reg, foundKey } = found;
       if (reg.status !== 'rejected') {
         return json({ error: 'Only rejected registrations can be reinstated' }, 400);
       }
       reg.status = 'confirmed';
       delete reg.rejectedAt;
       delete reg.rejectReason;
-      await regStore.set(id, JSON.stringify(reg));
+
+      const confirmedKey = `confirmed/${id}.json`;
+      await regStore.set(confirmedKey, JSON.stringify(reg));
+      if (foundKey !== confirmedKey) {
+        try { await regStore.delete(foundKey); } catch { /* ok */ }
+      }
 
       return json({ ok: true, registration: reg });
     }
@@ -84,14 +178,14 @@ export default async (req) => {
       const { id, newDivision } = body;
       if (!id || !newDivision) return json({ error: 'Registration id and newDivision required' }, 400);
 
-      const raw = await regStore.get(id);
-      if (!raw) return json({ error: 'Registration not found' }, 404);
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
 
-      const reg = JSON.parse(raw);
+      const { reg, foundKey } = found;
       const oldDivision = reg.division;
       reg.division = newDivision;
       reg.updatedAt = new Date().toISOString();
-      await regStore.set(id, JSON.stringify(reg));
+      await regStore.set(foundKey, JSON.stringify(reg));
 
       // If there's a corresponding team record, update it too
       if (reg.path === 'team' && reg.teamId) {
