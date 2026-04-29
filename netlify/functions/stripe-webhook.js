@@ -94,7 +94,6 @@ export default async (req) => {
           await regStore.delete(foundKey);
         } catch (delErr) {
           console.warn(`Could not delete old key ${foundKey}:`, delErr.message);
-          // Non-fatal — the confirmed/ copy is what matters
         }
       }
 
@@ -118,7 +117,7 @@ export default async (req) => {
             roster: (reg.team.players || []).map((p, i) => ({
               id: `p_${regId}_${i}`,
               name: p.name || '',
-              gender: '',       // captain fills this in later
+              gender: '',
               email: p.email || '',
               phone: p.phone || '',
               dupr: '',
@@ -132,11 +131,10 @@ export default async (req) => {
           console.log(`Team created: ${teamId} (${reg.team.name}) captain=${captainEmail}`);
         } catch (teamErr) {
           console.error('Failed to create team record:', teamErr);
-          // Non-fatal — registration is still confirmed
         }
       }
 
-      // Send confirmation email
+      // Send confirmation email — Night-Match design system
       const recipientEmail = reg.path === 'team'
         ? reg.team?.players?.[0]?.email
         : reg.agent?.email;
@@ -154,52 +152,53 @@ export default async (req) => {
             to: recipientEmail,
             subject: `You're in — ${reg.circuit || 'Dink Society'} registration confirmed`,
             html: `
-              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 20px;">
-                <div style="font-family: Georgia, serif; font-style: italic; font-size: 20px; color: #0F4D3A; margin-bottom: 24px;">The Dink Society</div>
-                <h1 style="font-size: 24px; color: #0F4D3A; margin: 0 0 8px;">You're in${recipientName ? ', ' + recipientName.split(' ')[0] : ''}.</h1>
-                <p style="font-size: 15px; color: #333; line-height: 1.6; margin: 0 0 20px;">
-                  Your registration for <strong>${reg.circuit || 'the league'}</strong> (${reg.divisionLabel || reg.division}) is confirmed.
+              <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+                <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
+                <h1 style="font-size: 24px; font-weight: 800; text-transform: uppercase; color: #f5f5f5; margin: 0 0 8px;">You're in${recipientName ? ', ' + recipientName.split(' ')[0] : ''}.</h1>
+                <p style="font-size: 15px; color: #8a8a8a; line-height: 1.6; margin: 0 0 24px;">
+                  Your registration for <strong style="color: #f5f5f5;">${reg.circuit || 'the league'}</strong> (${reg.divisionLabel || reg.division}) is confirmed.
                 </p>
 
-                <div style="background: #f8f6f0; border: 1px solid #e8e4d8; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-                  <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #C9972E; margin-bottom: 12px; font-weight: 500;">Your membership</div>
-                  <table style="width: 100%; font-size: 14px; color: #333;">
-                    <tr><td style="padding: 6px 0; opacity: 0.6;">Season</td><td style="padding: 6px 0; text-align: right; font-weight: 500;">${reg.circuit || '—'}</td></tr>
-                    <tr><td style="padding: 6px 0; opacity: 0.6;">Division</td><td style="padding: 6px 0; text-align: right; font-weight: 500;">${reg.divisionLabel || reg.division}</td></tr>
-                    ${isTeam ? `<tr><td style="padding: 6px 0; opacity: 0.6;">Team</td><td style="padding: 6px 0; text-align: right; font-weight: 500;">${reg.team?.name || '—'}</td></tr>` : ''}
-                    <tr><td style="padding: 6px 0; opacity: 0.6;">Type</td><td style="padding: 6px 0; text-align: right; font-weight: 500;">${isTeam ? 'Team' : 'Free Agent'}</td></tr>
-                    <tr><td style="padding: 6px 0; opacity: 0.6;">Amount paid</td><td style="padding: 6px 0; text-align: right; font-weight: 500; color: #0F4D3A;">$${reg.amountPaid || reg.price}</td></tr>
-                    <tr><td style="padding: 6px 0; opacity: 0.6;">Reference</td><td style="padding: 6px 0; text-align: right; font-family: monospace; font-size: 12px;">${regId.toUpperCase()}</td></tr>
+                <div style="background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                  <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #b8ff2c; margin-bottom: 12px; font-weight: 700;">Your membership</div>
+                  <table style="width: 100%; font-size: 14px; color: #f5f5f5;">
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Season</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.circuit || '—'}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Division</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.divisionLabel || reg.division}</td></tr>
+                    ${isTeam ? `<tr><td style="padding: 6px 0; color: #8a8a8a;">Team</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.team?.name || '—'}</td></tr>` : ''}
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Type</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${isTeam ? 'Team' : 'Free Agent'}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Amount paid</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #b8ff2c;">$${reg.amountPaid || reg.price}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Reference</td><td style="padding: 6px 0; text-align: right; font-family: monospace; font-size: 12px; color: #8a8a8a;">${regId.toUpperCase()}</td></tr>
                   </table>
                 </div>
 
                 ${isTeam ? `
-                <div style="background: #0F4D3A; color: #F5EBD4; padding: 20px; border-radius: 8px; margin-bottom: 24px;">
-                  <p style="font-size: 14px; margin: 0 0 12px; line-height: 1.6;">
-                    <strong>Next step:</strong> Complete your roster (4–10 players) through the captain portal. You'll receive a separate magic link email for captain access, or you can request one at:
+                <div style="background: #1a1a1a; border: 1px solid #2a2a2a; border-left: 3px solid #b8ff2c; padding: 20px; border-radius: 0 12px 12px 0; margin-bottom: 24px;">
+                  <p style="font-size: 14px; margin: 0 0 12px; line-height: 1.6; color: #8a8a8a;">
+                    <strong style="color: #f5f5f5;">Next step:</strong> Complete your roster (4–10 players) through the captain portal. You'll receive a separate magic link email for captain access, or request one at:
                   </p>
-                  <a href="${siteUrl}/captain.html" style="color: #E8B542; font-weight: 500;">${siteUrl}/captain.html</a>
+                  <a href="${siteUrl}/captain.html" style="color: #b8ff2c; font-weight: 600; text-decoration: none;">${siteUrl}/captain.html</a>
                 </div>
                 ` : `
-                <p style="font-size: 14px; color: #333; line-height: 1.6; margin: 0 0 24px;">
-                  <strong>What's next:</strong> You'll be drafted onto a team before the season starts. Keep an eye on your inbox — your captain will reach out once teams are set.
+                <p style="font-size: 14px; color: #8a8a8a; line-height: 1.6; margin: 0 0 24px;">
+                  <strong style="color: #f5f5f5;">What's next:</strong> You'll be drafted onto a team before the season starts. Keep an eye on your inbox — your captain will reach out once teams are set.
                 </p>
                 `}
 
-                <p style="font-size: 12px; color: #888; line-height: 1.5;">
-                  Questions? Reply to this email or visit <a href="${siteUrl}/contact.html" style="color: #C9972E;">our contact page</a>.
+                <p style="font-size: 12px; color: #555; line-height: 1.5;">
+                  Questions? Reply to this email or visit <a href="${siteUrl}/contact.html" style="color: #17d7b0; text-decoration: none;">our contact page</a>.
                 </p>
+                <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+                  The Dink Society · Southern California Pickleball League
+                </div>
               </div>
             `,
           });
         } catch (emailErr) {
           console.error('Confirmation email failed:', emailErr);
-          // Don't fail the webhook — registration is already confirmed
         }
       }
     } catch (err) {
       console.error('Error processing checkout.session.completed:', err);
-      // Return 200 anyway so Stripe doesn't retry endlessly
     }
   }
 

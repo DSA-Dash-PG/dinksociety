@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>You're in · The Dink Society</title>
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <style>
@@ -21,19 +24,24 @@
     .success__row-value { font-weight: 600; }
     .success__note { font-size: 12px; color: var(--color-text-faint); margin: 0 0 var(--space-5); line-height: 1.6; }
     .success__ctas { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+    .success__loading { color: var(--color-text-faint); font-size: 13px; padding: 12px 0; }
   </style>
 </head>
 <body>
   <div class="success">
     <div class="success__badge">Registration confirmed</div>
     <h1 class="success__title">You're in.</h1>
-    <p class="success__sub">Payment received. Your registration for Circuit I is confirmed. Welcome to the Society.</p>
+    <p class="success__sub">Payment received. Your registration for <span id="s-circuit-text">Circuit I</span> is confirmed. Welcome to the Society.</p>
 
     <div class="success__detail" id="reg-detail">
-      <div class="success__row"><span class="success__row-label">Circuit</span><span class="success__row-value" id="s-circuit">I</span></div>
-      <div class="success__row"><span class="success__row-label">Division</span><span class="success__row-value" id="s-division">—</span></div>
-      <div class="success__row"><span class="success__row-label">Type</span><span class="success__row-value" id="s-type">—</span></div>
-      <div class="success__row"><span class="success__row-label">Amount</span><span class="success__row-value" id="s-amount">—</span></div>
+      <div class="success__loading" id="s-loading">Loading registration details…</div>
+      <div id="s-rows" style="display:none;">
+        <div class="success__row"><span class="success__row-label">Circuit</span><span class="success__row-value" id="s-circuit">—</span></div>
+        <div class="success__row"><span class="success__row-label">Division</span><span class="success__row-value" id="s-division">—</span></div>
+        <div class="success__row" id="s-team-row" style="display:none;"><span class="success__row-label">Team</span><span class="success__row-value" id="s-team">—</span></div>
+        <div class="success__row"><span class="success__row-label">Type</span><span class="success__row-value" id="s-type">—</span></div>
+        <div class="success__row"><span class="success__row-label">Amount</span><span class="success__row-value" id="s-amount">—</span></div>
+      </div>
     </div>
 
     <p class="success__note">Your captain will receive a magic link email to access the Captain Portal once the Circuit officially opens. Keep an eye on your inbox.</p>
@@ -45,16 +53,44 @@
   </div>
 
   <script>
-    // Parse URL params from Stripe redirect
-    const params = new URLSearchParams(window.location.search);
-    const divLabels = { '3.0M': '3.0 Mixed', '3.5M': '3.5 Mixed', '3.5W': "3.5 Women's" };
-    const div = params.get('division');
-    const type = params.get('type');
-    const amount = params.get('amount');
+    (function() {
+      var params = new URLSearchParams(window.location.search);
+      var regId = params.get('id');
 
-    if (div) document.getElementById('s-division').textContent = divLabels[div] || div;
-    if (type) document.getElementById('s-type').textContent = type === 'team' ? 'Team' : 'Free Agent';
-    if (amount) document.getElementById('s-amount').textContent = `$${amount}`;
+      if (!regId) {
+        document.getElementById('s-loading').textContent = 'No registration ID found.';
+        return;
+      }
+
+      // Fetch registration data from API
+      fetch('/.netlify/functions/registration-lookup?id=' + encodeURIComponent(regId))
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) {
+          if (!data || !data.registration) {
+            document.getElementById('s-loading').textContent = 'Could not load registration details.';
+            return;
+          }
+
+          var reg = data.registration;
+
+          document.getElementById('s-loading').style.display = 'none';
+          document.getElementById('s-rows').style.display = 'block';
+
+          document.getElementById('s-circuit').textContent = reg.circuit || 'I';
+          document.getElementById('s-circuit-text').textContent = reg.circuit || 'Circuit I';
+          document.getElementById('s-division').textContent = reg.divisionLabel || reg.division || '—';
+          document.getElementById('s-type').textContent = reg.path === 'team' ? 'Team' : 'Free Agent';
+          document.getElementById('s-amount').textContent = reg.amountPaid ? '$' + reg.amountPaid : '—';
+
+          if (reg.path === 'team' && reg.team && reg.team.name) {
+            document.getElementById('s-team').textContent = reg.team.name;
+            document.getElementById('s-team-row').style.display = 'flex';
+          }
+        })
+        .catch(function() {
+          document.getElementById('s-loading').textContent = 'Could not load registration details.';
+        });
+    })();
   </script>
 </body>
 </html>

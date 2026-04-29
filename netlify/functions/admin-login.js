@@ -53,23 +53,26 @@ export default async (req) => {
       const siteUrl = process.env.SITE_URL || `https://${process.env.URL || 'localhost:8888'}`;
       const magicLink = `${siteUrl}/.netlify/functions/admin-link?token=${token}`;
 
-      // Send the email
+      // Send the email — Night-Match design system
       await sendEmail({
         to: normalized,
         subject: 'Your Dink Society admin sign-in link',
         html: `
-          <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px;">
-            <div style="font-family: Georgia, serif; font-style: italic; font-size: 20px; color: #0F4D3A; margin-bottom: 24px;">The Dink Society</div>
-            <h1 style="font-size: 24px; color: #0F4D3A; margin: 0 0 12px;">Admin sign-in</h1>
-            <p style="font-size: 15px; color: #333; line-height: 1.6; margin: 0 0 24px;">
+          <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+            <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
+            <h1 style="font-size: 24px; font-weight: 800; text-transform: uppercase; color: #f5f5f5; margin: 0 0 12px;">Admin Sign-In</h1>
+            <p style="font-size: 15px; color: #8a8a8a; line-height: 1.6; margin: 0 0 28px;">
               Tap the button below to sign into the admin portal. This link expires in 15 minutes and can only be used once.
             </p>
-            <a href="${magicLink}" style="display: inline-block; padding: 14px 28px; background: #E8B542; color: #0F4D3A; font-size: 15px; font-weight: 600; text-decoration: none; border-radius: 6px;">
+            <a href="${magicLink}" style="display: inline-block; padding: 14px 32px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
               Sign in to Admin
             </a>
-            <p style="font-size: 12px; color: #888; margin-top: 24px; line-height: 1.5;">
+            <p style="font-size: 12px; color: #555; margin-top: 28px; line-height: 1.5;">
               If you didn't request this, you can safely ignore it. The link will expire on its own.
             </p>
+            <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+              The Dink Society · Southern California Pickleball League
+            </div>
           </div>
         `,
       });

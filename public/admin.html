@@ -171,6 +171,17 @@
       .stats-row { grid-template-columns: 1fr 1fr; }
       .two-col { grid-template-columns: 1fr !important; }
     }
+  
+    /* Site Images grid */
+    .si-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+    .si-grid.empty { display: block; font-size: 12px; color: var(--color-text-faint); padding: 24px 0; text-align: center; }
+    .si-card { position: relative; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface-2); }
+    .si-card img { width: 100%; height: 140px; object-fit: cover; display: block; }
+    .si-card__info { padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
+    .si-card__label { font-size: 10px; color: var(--color-text-muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+    .si-card__del { background: none; border: none; color: var(--color-red, #ef4444); cursor: pointer; font-size: 10px; font-weight: 600; font-family: inherit; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
+    .si-card__del:hover { background: var(--color-red-dim, rgba(239,68,68,0.12)); }
+    .si-card__order { position: absolute; top: 6px; left: 6px; background: rgba(14,14,14,0.8); color: var(--color-lime); font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
   </style>
 </head>
 <body data-page="admin">
@@ -230,6 +241,11 @@
           <button class="sb__link" data-tab="moments">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             Photos
+          </button>
+
+          <button class="sb__link" data-tab="site-images">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+            Site Images
           </button>
           <div class="sb__sec">Config</div>
           <button class="sb__link" data-tab="settings">
@@ -322,6 +338,114 @@
         </section>
 
         <!-- SETTINGS -->
+
+        <section class="admin-section" data-section="site-images">
+          <div class="am-head">
+            <h1 class="am-title">Site Images</h1>
+            <span class="ac__s">Hero slideshow, dividers & CTA backgrounds</span>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Upload</h2></div>
+            <div class="arow">
+              <div class="af">
+                <label for="si-slot">Section</label>
+                <select id="si-slot">
+                  <option value="" disabled>── Home Page ──</option>
+                  <option value="hero">Hero Slideshow</option>
+                  <option value="divider-1">Photo Divider 1</option>
+                  <option value="divider-2">Photo Divider 2</option>
+                  <option value="cta">Bottom CTA</option>
+                  <option value="" disabled>── Sub-Pages ──</option>
+                  <option value="schedule">Schedule Hero</option>
+                  <option value="standings">Standings Hero</option>
+                  <option value="stats">Stats Hero</option>
+                  <option value="teams">Teams Hero</option>
+                  <option value="rules">Rules Hero</option>
+                  <option value="gallery">Gallery Hero</option>
+                  <option value="register">Register Hero</option>
+                  <option value="leaderboard">Leaderboard Hero</option>
+                  <option value="contact">Contact Hero</option>
+                </select>
+              </div>
+              <div class="af">
+                <label for="si-label">Label (optional)</label>
+                <input type="text" id="si-label" placeholder="e.g. Kitchen rally, Week 3 action">
+              </div>
+            </div>
+            <div class="af">
+              <label>Image (JPG/PNG/WebP, max 10MB)</label>
+              <input type="file" id="si-file" accept="image/jpeg,image/png,image/webp" style="padding:8px;background:var(--color-surface-2);cursor:pointer;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <div id="si-status" style="font-size:11px;color:var(--color-text-faint);"></div>
+              <button class="ab ab--lime ab--sm" id="si-upload-btn">Upload image</button>
+            </div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Hero Slideshow</h2><span class="ac__s">Up to 8 images · auto-rotates every 5s</span></div>
+            <div id="si-grid-hero" class="si-grid empty">No images yet — upload one above.</div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Photo Divider 1</h2><span class="ac__s">"Twelve games. Every week." break</span></div>
+            <div id="si-grid-divider-1" class="si-grid empty">No images yet.</div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Photo Divider 2</h2><span class="ac__s">"Your ranking follows you." break</span></div>
+            <div id="si-grid-divider-2" class="si-grid empty">No images yet.</div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Bottom CTA</h2><span class="ac__s">Registration call-to-action background</span></div>
+            <div id="si-grid-cta" class="si-grid empty">No images yet.</div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Sub-Page Heroes</h2><span class="ac__s">Background images for page headers</span></div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Schedule</div>
+                <div id="si-grid-schedule" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Standings</div>
+                <div id="si-grid-standings" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Stats</div>
+                <div id="si-grid-stats" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Teams</div>
+                <div id="si-grid-teams" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Rules</div>
+                <div id="si-grid-rules" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Gallery</div>
+                <div id="si-grid-gallery" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Register</div>
+                <div id="si-grid-register" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Leaderboard</div>
+                <div id="si-grid-leaderboard" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+              <div>
+                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Contact</div>
+                <div id="si-grid-contact" class="si-grid empty" style="min-height:60px;">No image.</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <section class="admin-section" data-section="settings">
           <div class="am-head"><h1 class="am-title">Settings</h1></div>
           <div class="ac">
@@ -626,5 +750,119 @@
 
   checkAuth();
   </script>
+
+<script>
+(function siteImagesAdmin() {
+  const API_LIST  = '/.netlify/functions/site-images-list';
+  const API_UPLOAD = '/.netlify/functions/site-images-upload';
+  const SLOTS = ['hero', 'divider-1', 'divider-2', 'cta', 'schedule', 'standings', 'stats', 'teams', 'rules', 'gallery', 'register', 'leaderboard', 'contact'];
+  let allSlots = {};
+
+  async function loadSiteImages() {
+    try {
+      const r = await fetch(API_LIST, { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to load');
+      allSlots = await r.json();
+    } catch (e) {
+      console.error('site-images load:', e);
+      allSlots = {};
+    }
+    renderAll();
+  }
+
+  function renderAll() {
+    for (const slot of SLOTS) {
+      const grid = document.getElementById('si-grid-' + slot);
+      if (!grid) continue;
+      const images = allSlots[slot] || [];
+      if (images.length === 0) {
+        grid.className = 'si-grid empty';
+        grid.innerHTML = 'No images yet — upload one above.';
+        continue;
+      }
+      grid.className = 'si-grid';
+      grid.innerHTML = images.map(function(img, i) {
+        return '<div class="si-card" data-id="' + img.id + '">' +
+          '<span class="si-card__order">' + (i + 1) + '</span>' +
+          '<img src="' + img.url + '" alt="' + (img.label || 'Site image') + '" loading="lazy">' +
+          '<div class="si-card__info">' +
+            '<span class="si-card__label">' + (img.label || '(no label)') + '</span>' +
+            '<button class="si-card__del" data-id="' + img.id + '" data-slot="' + slot + '">Remove</button>' +
+          '</div>' +
+        '</div>';
+      }).join('');
+      grid.querySelectorAll('.si-card__del').forEach(function(btn) {
+        btn.addEventListener('click', function() { deleteSiteImage(btn.dataset.id, btn.dataset.slot); });
+      });
+    }
+  }
+
+  var uploadBtn = document.getElementById('si-upload-btn');
+  var statusEl  = document.getElementById('si-status');
+
+  if (uploadBtn) {
+    uploadBtn.addEventListener('click', async function() {
+      var fileInput = document.getElementById('si-file');
+      var slot  = document.getElementById('si-slot').value;
+      var label = document.getElementById('si-label').value.trim();
+      var file  = fileInput.files[0];
+      if (!file) { statusEl.textContent = 'Please select an image first.'; statusEl.style.color = 'var(--color-red, #ef4444)'; return; }
+      if (!slot) { statusEl.textContent = 'Please select a section.'; statusEl.style.color = 'var(--color-red, #ef4444)'; return; }
+      uploadBtn.disabled = true;
+      statusEl.textContent = 'Uploading...';
+      statusEl.style.color = 'var(--color-text-faint)';
+      try {
+        var fd = new FormData();
+        fd.append('file', file);
+        fd.append('slot', slot);
+        fd.append('label', label);
+        var r = await fetch(API_UPLOAD, { method: 'POST', body: fd, credentials: 'include' });
+        var data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Upload failed');
+        statusEl.textContent = 'Uploaded to ' + slot;
+        statusEl.style.color = 'var(--color-teal)';
+        fileInput.value = '';
+        document.getElementById('si-label').value = '';
+        await loadSiteImages();
+      } catch (e) {
+        statusEl.textContent = e.message;
+        statusEl.style.color = 'var(--color-red, #ef4444)';
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+  }
+
+  async function deleteSiteImage(id, slot) {
+    if (!confirm('Remove this image from the site?')) return;
+    try {
+      var r = await fetch(API_LIST, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'delete', id: id, slot: slot }),
+      });
+      if (!r.ok) throw new Error('Delete failed');
+      await loadSiteImages();
+    } catch (e) {
+      alert('Failed to delete: ' + e.message);
+    }
+  }
+
+  // Load when tab becomes active
+  var loaded = false;
+  var observer = new MutationObserver(function() {
+    var section = document.querySelector('[data-section="site-images"]');
+    if (section && section.classList.contains('is-active') && !loaded) {
+      loaded = true;
+      loadSiteImages();
+    }
+  });
+  var main = document.querySelector('.admin-main');
+  if (main) observer.observe(main, { subtree: true, attributes: true, attributeFilter: ['class'] });
+  var section = document.querySelector('[data-section="site-images"]');
+  if (section && section.classList.contains('is-active')) { loadSiteImages(); }
+})();
+</script>
 </body>
 </html>
