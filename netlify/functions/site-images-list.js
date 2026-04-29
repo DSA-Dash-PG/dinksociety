@@ -3,23 +3,30 @@
 // POST — Admin-only: delete an image by id + slot, or reorder images within a slot
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 
 export default async (req, context) => {
-  const headers = { 'Content-Type': 'application/json' };
-  const store = getStore('site-images');
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  };
 
-  // ── GET: return slot registry (public) ──
+  // ── GET: return slot registry (public, no auth) ──
   if (req.method === 'GET') {
     try {
+      const store = getStore('site-images');
       let slots = {};
       try {
-        slots = await store.get('slots.json', { type: 'json' }) || {};
-      } catch { /* empty */ }
+        const raw = await store.get('slots.json', { type: 'json' });
+        if (raw) slots = raw;
+      } catch (e) {
+        // Store or key doesn't exist yet — return empty
+        console.log('site-images slots.json not found (expected on first run):', e.message);
+      }
 
       // Build public-friendly response with image URLs
       const result = {};
       for (const [slot, images] of Object.entries(slots)) {
+        if (!Array.isArray(images)) continue;
         result[slot] = images.map(img => ({
           id: img.id,
           label: img.label || '',
@@ -36,16 +43,26 @@ export default async (req, context) => {
       });
     } catch (err) {
       console.error('site-images-list GET error:', err);
-      return new Response(JSON.stringify({ error: 'Failed to load images' }), { status: 500, headers });
+      // Return empty object instead of error so the frontend degrades gracefully
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: {
+          ...headers,
+          'Cache-Control': 'public, max-age=30',
+        },
+      });
     }
   }
 
   // ── POST: admin actions (delete, reorder) ──
   if (req.method === 'POST') {
+    // Lazy-import admin auth only when needed (avoids auth side-effects on public GET)
+    const { requireAdmin, unauthResponse } = await import('./lib/admin-auth.js');
     const admin = await requireAdmin(req);
     if (!admin) return unauthResponse();
 
     try {
+      const store = getStore('site-images');
       const body = await req.json();
       const { action } = body;
 
@@ -56,10 +73,10 @@ export default async (req, context) => {
           return new Response(JSON.stringify({ error: 'Missing id or slot' }), { status: 400, headers });
         }
 
-        // Remove from slot registry
         let slots = {};
         try {
-          slots = await store.get('slots.json', { type: 'json' }) || {};
+          const raw = await store.get('slots.json', { type: 'json' });
+          if (raw) slots = raw;
         } catch { /* empty */ }
 
         if (slots[slot]) {
@@ -67,7 +84,6 @@ export default async (req, context) => {
         }
         await store.setJSON('slots.json', slots);
 
-        // Delete binary and metadata (best-effort)
         try { await store.delete(`img/${id}`); } catch { /* ok */ }
         try { await store.delete(`meta/${id}.json`); } catch { /* ok */ }
 
@@ -83,14 +99,14 @@ export default async (req, context) => {
 
         let slots = {};
         try {
-          slots = await store.get('slots.json', { type: 'json' }) || {};
+          const raw = await store.get('slots.json', { type: 'json' });
+          if (raw) slots = raw;
         } catch { /* empty */ }
 
         if (!slots[slot]) {
           return new Response(JSON.stringify({ error: 'Slot not found' }), { status: 404, headers });
         }
 
-        // Rebuild array in the order of provided ids
         const byId = {};
         for (const img of slots[slot]) byId[img.id] = img;
 
@@ -98,7 +114,6 @@ export default async (req, context) => {
         for (const id of ids) {
           if (byId[id]) reordered.push(byId[id]);
         }
-        // Append any images not in the provided list at the end
         for (const img of slots[slot]) {
           if (!ids.includes(img.id)) reordered.push(img);
         }
