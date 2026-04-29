@@ -4,119 +4,188 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Standings &middot; The Dink Society</title>
+  <meta name="description" content="Division standings for The Dink Society pickleball league." />
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
   <style>
     .stand-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
-    .stand-body { padding-top: var(--space-4); }
 
-    .tabs { display: flex; gap: 3px; margin-bottom: var(--space-4); }
-    .tab {
+    .stand-hero {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      padding: var(--space-8) var(--space-6); border-radius: var(--radius-lg); margin-bottom: var(--space-4);
+    }
+    .stand-hero .eyebrow {
+      font-size: var(--text-xs); font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--color-teal); margin-bottom: var(--space-3);
+      display: flex; align-items: center; gap: var(--space-2);
+    }
+    .stand-hero .eyebrow::before {
+      content: ''; width: 8px; height: 8px; border-radius: 50%;
+      background: var(--color-teal); box-shadow: 0 0 0 4px var(--color-teal-dim);
+    }
+    .stand-hero h1 {
+      font-size: var(--text-3xl); font-weight: 800; text-transform: uppercase;
+      margin: 0 0 var(--space-2);
+    }
+    .stand-hero p { color: var(--color-text-muted); font-size: var(--text-sm); margin: 0; }
+
+    .div-tabs { display: flex; gap: 3px; margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .div-tab {
       padding: 8px 16px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700;
       border: 1px solid var(--color-border); background: transparent; color: var(--color-text-faint);
       cursor: pointer; transition: all var(--transition); font-family: inherit;
     }
-    .tab:hover { color: var(--color-text); background: var(--color-surface-2); }
-    .tab.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+    .div-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
+    .div-tab.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
 
-    .stand-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+    .stand-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4);
+    }
+    .stand-card__title {
+      font-size: 14px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.04em; margin: 0 0 var(--space-4);
+    }
+    .stand-card__updated {
+      font-size: 10px; color: var(--color-text-faint); font-weight: 400;
+      float: right; text-transform: none; letter-spacing: 0;
+    }
+
+    .stand-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .stand-table th {
-      text-align: left; font-size: 10px; text-transform: uppercase;
-      letter-spacing: 0.12em; color: var(--color-text-faint); padding: 10px 8px;
-      border-bottom: 1px solid var(--color-border-strong); font-weight: 600;
+      text-align: left; padding: 8px 6px; font-size: 9px;
+      letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint);
+      font-weight: 600; border-bottom: 1px solid var(--color-border-strong);
     }
-    .stand-table td {
-      padding: 14px 8px;
-      border-bottom: 1px solid var(--color-border);
+    .stand-table td { padding: 10px 6px; border-bottom: 1px solid var(--color-border); }
+    .stand-table tr:last-child td { border-bottom: none; }
+    .stand-table .numeric { text-align: right; font-variant-numeric: tabular-nums; }
+    .stand-rank { color: var(--color-text-faint); font-weight: 800; min-width: 24px; }
+    .stand-rank--top { color: var(--color-lime); }
+    .stand-row--leader td { background: var(--color-lime-ghost); }
+    .stand-team { font-weight: 700; }
+
+    .col-opt {}
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; font-size: 14px;
+      color: var(--color-text-faint);
     }
-    .stand-table tbody tr:first-child td { color: var(--color-lime); font-weight: 600; }
-    .stand-table tbody tr:hover td { background: var(--color-surface-2); }
 
-    .rank-num { font-size: 18px; font-weight: 900; color: var(--color-lime); }
-    .team-name { font-weight: 700; }
-
-    .empty-state { text-align: center; padding: 48px 20px; font-size: 14px; color: var(--color-text-faint); }
-
-    @media (max-width: 600px) {
-      .stand-table { font-size: 13px; }
+    @media (max-width: 720px) {
+      .stand-hero { padding: var(--space-6) var(--space-4); }
+      .stand-hero h1 { font-size: clamp(1.5rem, 5vw, 2.5rem); }
+      .stand-table { font-size: 12px; }
+      .stand-table th, .stand-table td { padding: 8px 4px; }
+      .col-opt { display: none; }
     }
   </style>
 </head>
 <body data-page="standings">
   <div data-partial="nav"></div>
 
-  <div class="page-hero">
-    <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="standings"></div>
-    <div class="page-hero__gradient"></div>
-    <div class="page-hero__content">
-      <div class="page-hero__eyebrow">Circuit I · May 2026</div>
-      <h1 class="page-hero__title">Standings</h1>
-      <p class="page-hero__sub">Updated live after each league night. W-L-T plus round point differential.</p>
-    </div>
-  </div>
-
   <div class="stand-shell">
-    <div class="stand-body">
-      <div class="tabs" id="stand-tabs">
-        <button class="tab is-active" data-division="3.0-mixed">3.0 Mixed</button>
-        <button class="tab" data-division="3.5-mixed">3.5 Mixed</button>
-      </div>
-      <div id="stand-content">
-        <div class="empty-state">Standings will populate once league play begins.</div>
-      </div>
+    <div class="stand-hero">
+      <div class="eyebrow">Standings</div>
+      <h1>Division Standings</h1>
+      <p>Updated live after each league night. W&ndash;L&ndash;T plus round point differential.</p>
+    </div>
+
+    <nav class="div-tabs" id="div-tabs"></nav>
+    <div id="stand-content">
+      <div class="empty-state">Loading standings&hellip;</div>
     </div>
   </div>
 
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
   <script>
-    let standingsData=null;let activeDivision='3.0-mixed';
-    const $id=id=>document.getElementById(id);
+    const DIVISION_LABELS = { '3-0-mixed': '3.0 Mixed', '3-5-mixed': '3.5 Mixed' };
+    let standingsData = null;
+    let activeDivision = '';
 
-    document.getElementById('stand-tabs')?.addEventListener('click',(e)=>{
-      const btn=e.target.closest('.tab');if(!btn)return;
-      document.querySelectorAll('#stand-tabs .tab').forEach(t=>t.classList.remove('is-active'));
-      btn.classList.add('is-active');
-      activeDivision=btn.dataset.division;
+    async function loadStandings() {
+      try {
+        const r = await fetch('/.netlify/functions/public-standings?season=circuit-i');
+        if (!r.ok) throw 0;
+        standingsData = await r.json();
+      } catch {
+        standingsData = { empty: true };
+      }
+      renderTabs();
       renderStandings();
-    });
-
-    async function loadStandings(){
-      try{
-        const r=await fetch('/.netlify/functions/public-leaderboard?view=standings&circuit=I');
-        if(!r.ok)throw 0;
-        standingsData=await r.json();
-        if(standingsData.empty)throw 0;
-        renderStandings();
-      }catch{
-        $id('stand-content').innerHTML='<div class="empty-state">Standings will populate once league play begins.</div>';
-      }
     }
 
-    function renderStandings(){
-      const el=$id('stand-content');
-      if(!standingsData||!standingsData.divisions){
-        el.innerHTML='<div class="empty-state">Standings will populate once league play begins.</div>';return;
-      }
-      // Map tab division key to data key
-      const divMap={'3.0-mixed':'3.0M','3.5-mixed':'3.5M','3.5-womens':'3.5W'};
-      const divKey=divMap[activeDivision]||activeDivision;
-      const teams=standingsData.divisions?.[divKey];
-      if(!teams||teams.length===0){
-        el.innerHTML='<div class="empty-state">No standings data for this division yet.</div>';return;
-      }
-      el.innerHTML='<table class="stand-table"><thead><tr><th>#</th><th>Team</th><th>W</th><th>L</th><th>T</th><th>Pts</th><th>GW</th><th>GL</th></tr></thead><tbody>'+
-        teams.map(function(t,i){
-          return '<tr><td class="rank-num">'+(i+1)+'</td><td class="team-name">'+esc(t.name||t.teamName)+'</td><td>'+(t.wins||0)+'</td><td>'+(t.losses||0)+'</td><td>'+(t.ties||0)+'</td><td style="color:var(--color-lime);font-weight:700">'+(t.points||0)+'</td><td>'+(t.gamesWon||0)+'</td><td>'+(t.gamesLost||0)+'</td></tr>';
-        }).join('')+'</tbody></table>';
+    function renderTabs() {
+      if (!standingsData?.divisions) { document.getElementById('div-tabs').innerHTML = ''; return; }
+      const divs = Object.keys(standingsData.divisions).sort();
+      if (!divs.length) return;
+      if (!activeDivision || !divs.includes(activeDivision)) activeDivision = divs[0];
+
+      document.getElementById('div-tabs').innerHTML = divs.map(d =>
+        `<button class="div-tab ${d === activeDivision ? 'is-active' : ''}" data-div="${esc(d)}">${esc(DIVISION_LABELS[d] || d)}</button>`
+      ).join('');
+
+      document.querySelectorAll('.div-tab').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeDivision = btn.dataset.div;
+          document.querySelectorAll('.div-tab').forEach(b => b.classList.toggle('is-active', b.dataset.div === activeDivision));
+          renderStandings();
+        });
+      });
     }
 
-    function esc(s){return String(s??'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
+    function renderStandings() {
+      const el = document.getElementById('stand-content');
+
+      if (!standingsData || standingsData.empty) {
+        el.innerHTML = `<div class="empty-state">${esc(standingsData?.message || 'Standings will populate once league play begins.')}</div>`;
+        return;
+      }
+
+      const divData = standingsData.divisions?.[activeDivision];
+      if (!divData?.teams?.length) {
+        el.innerHTML = '<div class="empty-state">No standings for this division yet.</div>';
+        return;
+      }
+
+      const updated = standingsData.lastUpdated
+        ? `<span class="stand-card__updated">Updated ${formatTime(standingsData.lastUpdated)}</span>`
+        : '';
+
+      const rows = divData.teams.map(t => {
+        const diff = t.pointDiff;
+        const ds = diff > 0 ? `+${diff}` : String(diff);
+        return `<tr class="${t.rank === 1 ? 'stand-row--leader' : ''}">
+          <td class="stand-rank ${t.rank === 1 ? 'stand-rank--top' : ''}">${t.rank}</td>
+          <td class="stand-team">${esc(t.teamName)}</td>
+          <td class="numeric">${t.wins}&ndash;${t.losses}${t.ties ? `&ndash;${t.ties}` : ''}</td>
+          <td class="numeric"><strong>${t.matchPointsFor}</strong></td>
+          <td class="numeric col-opt">${t.totalGamesWon}</td>
+          <td class="numeric col-opt">${ds}</td>
+        </tr>`;
+      }).join('');
+
+      el.innerHTML = `<div class="stand-card">
+        <h2 class="stand-card__title">${esc(DIVISION_LABELS[activeDivision] || activeDivision)} ${updated}</h2>
+        <table class="stand-table">
+          <thead><tr>
+            <th>#</th><th>Team</th>
+            <th class="numeric">Record</th><th class="numeric">Match Pts</th>
+            <th class="numeric col-opt">Games Won</th><th class="numeric col-opt">Pt Diff</th>
+          </tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`;
+    }
+
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function formatTime(iso) { if (!iso) return ''; const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
     loadStandings();
   </script>
 </body>

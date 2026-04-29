@@ -79,7 +79,7 @@
   <main class="lb-shell">
     <div class="lb-controls">
         <select id="circuit-select"><option value="I">Circuit I</option></select>
-        <select id="division-select"><option value="">All divisions</option><option value="3.0M">3.0 Mixed</option><option value="3.5M">3.5 Mixed</option><option value="3.5W">3.5 Women's</option></select>
+        <select id="division-select"><option value="">All divisions</option><option value="3-0-mixed">3.0 Mixed</option><option value="3-5-mixed">3.5 Mixed</option></select>
       </div>
 
 
@@ -99,7 +99,7 @@
   <div data-partial="footer"></div>
 
   <script>
-    const DIVISION_LABELS={'3.0M':'3.0 Mixed','3.5M':'3.5 Mixed','3.5W':"3.5 Women's"};
+    const DIVISION_LABELS={'3.0M':'3.0 Mixed','3.5M':'3.5 Mixed','3.5W':"3.5 Women's",'3-0-mixed':'3.0 Mixed','3-5-mixed':'3.5 Mixed'};
     const SLOT_TYPE_LABELS={womens:"Women's",mens:"Men's",mixed:'Mixed'};
     const state={circuit:'I',division:'',tab:'standings',playerFilter:'all',standings:null,playerStats:null};
     const $id=(id)=>document.getElementById(id);
@@ -107,7 +107,7 @@
     function readUrl(){const p=new URLSearchParams(window.location.search);if(p.get('circuit'))state.circuit=p.get('circuit');if(p.get('division'))state.division=p.get('division');if(p.get('view'))state.tab=p.get('view');$id('circuit-select').value=state.circuit;$id('division-select').value=state.division||'';activateTab(state.tab);}
     function writeUrl(){const p=new URLSearchParams();if(state.circuit!=='I')p.set('circuit',state.circuit);if(state.division)p.set('division',state.division);if(state.tab!=='standings')p.set('view',state.tab);const q=p.toString();history.replaceState({},'',q?`?${q}`:window.location.pathname);}
 
-    async function loadStandings(){try{const r=await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}`);if(!r.ok)throw 0;state.standings=await r.json();}catch{state.standings={empty:true};}}
+    async function loadStandings(){try{const r=await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}`);if(!r.ok)throw 0;state.standings=await r.json();if(state.standings.empty){const r2=await fetch('/.netlify/functions/public-standings?season=circuit-i');if(r2.ok){const d2=await r2.json();if(!d2.empty)state.standings=d2;}}}catch{try{const r2=await fetch('/.netlify/functions/public-standings?season=circuit-i');if(r2.ok){state.standings=await r2.json();}else{state.standings={empty:true};}}catch{state.standings={empty:true};}}}
     async function loadPlayerStats(){try{const r=await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}&view=players`);if(!r.ok)throw 0;state.playerStats=await r.json();}catch{state.playerStats={empty:true};}}
 
     function renderHero(){const c=state.circuit;const d=state.division?` · ${DIVISION_LABELS[state.division]||state.division}`:'';$id('lb-title').textContent=`Circuit ${c}${d}`;const u=state.standings?.lastUpdated?` · updated ${formatTime(state.standings.lastUpdated)}`:'';$id('lb-sub').textContent=`Standings, scores, and player stats${u}`;}
