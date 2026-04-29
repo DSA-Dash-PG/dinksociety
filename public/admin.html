@@ -347,7 +347,8 @@
               <div class="af"><label>Week</label><select id="up-week"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option><option value="7">Week 7</option></select></div>
               <div class="af"><label>Caption</label><input type="text" id="up-cap" placeholder="e.g. Team Kickass with the sweep"></div>
             </div>
-            <div class="af"><label>Photos (JPG/PNG, max 10MB)</label><input type="file" id="up-files" accept="image/jpeg,image/png" multiple style="padding:8px;background:var(--color-surface-2);cursor:pointer;"></div>
+            <div class="af"><label>Photos (any size — auto-compressed before upload)</label><input type="file" id="up-files" accept="image/*" multiple style="padding:8px;background:var(--color-surface-2);cursor:pointer;"></div>
+            <div class="a-status" id="up-status"></div>
             <div style="text-align:right;"><button class="ab ab--lime ab--sm" id="up-btn">Upload</button></div>
           </div>
           <div class="ac"><div class="ac__h"><h2 class="ac__t">Gallery</h2><a href='/gallery' style='font-size:10px;color:var(--color-text-faint);'>View public page →</a></div><div id="admin-gallery" class="empty">No photos uploaded yet.</div></div>
@@ -429,8 +430,8 @@
               </div>
             </div>
             <div class="af">
-              <label>Image (JPG/PNG/WebP, max 10MB)</label>
-              <input type="file" id="si-file" accept="image/jpeg,image/png,image/webp" style="padding:8px;background:var(--color-surface-2);cursor:pointer;">
+              <label>Image (any size — auto-compressed before upload)</label>
+              <input type="file" id="si-file" accept="image/*" style="padding:8px;background:var(--color-surface-2);cursor:pointer;">
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
               <div id="si-status" style="font-size:11px;color:var(--color-text-faint);"></div>
@@ -712,7 +713,7 @@
   // ─── Tab navigation ───────────────────────────────────────────
 
   $$('.sb__link[data-tab]').forEach(b=>{b.addEventListener('click',()=>{$$('.sb__link').forEach(x=>x.classList.remove('is-active'));b.classList.add('is-active');const t=b.dataset.tab;$$('.admin-section').forEach(s=>s.classList.toggle('is-active',s.dataset.section===t));
-  if(t==='overview')renderOV();if(t==='registrations')renderReg();if(t==='teams')renderTeams();if(t==='schedule')renderSched();if(t==='scores')renderSC();if(t==='settings')applySettings();
+  if(t==='overview')renderOV();if(t==='registrations')renderReg();if(t==='teams')renderTeams();if(t==='schedule')renderSched();if(t==='scores')renderSC();if(t==='settings')applySettings();if(t==='moments')loadAdminGallery();
   $id('sb').classList.remove('is-open');$id('mob-overlay').classList.remove('is-open');});});
 
   $id('mob-ham')?.addEventListener('click',()=>{$id('sb').classList.toggle('is-open');$id('mob-overlay').classList.toggle('is-open');});
@@ -803,6 +804,110 @@
   function h(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
   function fd(iso){if(!iso)return'—';return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
 
+  // ─── Image Compression ─────────────────────────────────────────
+  // Auto-compresses any image (even 30MB+ raw camera photos) to
+  // high-quality JPEG before uploading. Stays under 6MB Lambda limit.
+
+  var COMPRESS_MAX_DIM = 2500;
+  var COMPRESS_QUALITY = 0.92;
+  var COMPRESS_TARGET  = 5 * 1024 * 1024;
+
+  async function compressImage(file) {
+    if (file.size <= COMPRESS_TARGET && file.type === 'image/jpeg') return file;
+    var img = await new Promise(function(resolve, reject) {
+      var i = new Image(); var u = URL.createObjectURL(file);
+      i.onload = function() { URL.revokeObjectURL(u); resolve(i); };
+      i.onerror = function() { URL.revokeObjectURL(u); reject(new Error('Could not load image')); };
+      i.src = u;
+    });
+    var w = img.naturalWidth, ht = img.naturalHeight;
+    if (w > COMPRESS_MAX_DIM || ht > COMPRESS_MAX_DIM) {
+      var sc = COMPRESS_MAX_DIM / Math.max(w, ht); w = Math.round(w * sc); ht = Math.round(ht * sc);
+    }
+    var c = document.createElement('canvas'); c.width = w; c.height = ht;
+    c.getContext('2d').drawImage(img, 0, 0, w, ht);
+    var q = COMPRESS_QUALITY;
+    var blob = await new Promise(function(r) { c.toBlob(r, 'image/jpeg', q); });
+    while (blob.size > COMPRESS_TARGET && q > 0.6) {
+      q -= 0.05;
+      blob = await new Promise(function(r) { c.toBlob(r, 'image/jpeg', q); });
+    }
+    return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+  }
+
+  // ─── Moments Upload (Photos tab) ─────────────────────────────
+  (function() {
+    var btn = $id('up-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async function() {
+      var files = $id('up-files').files;
+      var week  = $id('up-week').value;
+      var cap   = $id('up-cap').value.trim();
+      var status = $id('up-status');
+      if (!files || files.length === 0) { status.className = 'a-status is-err'; status.textContent = 'Pick at least one photo.'; return; }
+      btn.disabled = true;
+      var uploaded = 0;
+      for (var i = 0; i < files.length; i++) {
+        status.className = 'a-status is-info';
+        status.textContent = 'Compressing ' + (i + 1) + ' of ' + files.length + '…';
+        try {
+          var compressed = await compressImage(files[i]);
+          status.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + '… (' + (compressed.size / 1024 / 1024).toFixed(1) + 'MB)';
+          var fd = new FormData();
+          fd.append('file', compressed);
+          fd.append('circuit', 'I');
+          fd.append('week', week);
+          fd.append('caption', cap);
+          var r = await fetch('/.netlify/functions/moments-upload', { method: 'POST', body: fd, credentials: 'include' });
+          if (!r.ok) { var err = await r.json().catch(function() { return {}; }); throw new Error(err.error || 'Upload failed'); }
+          uploaded++;
+        } catch (e) {
+          status.className = 'a-status is-err';
+          status.textContent = 'Failed on file ' + (i + 1) + ': ' + e.message;
+          btn.disabled = false;
+          return;
+        }
+      }
+      status.className = 'a-status is-ok';
+      status.textContent = 'Uploaded ' + uploaded + ' photo' + (uploaded === 1 ? '' : 's') + '!';
+      $id('up-files').value = '';
+      $id('up-cap').value = '';
+      btn.disabled = false;
+      loadAdminGallery();
+    });
+  })();
+
+  // ─── Admin Gallery (show recent moments) ──────────────────────
+  async function loadAdminGallery() {
+    var el = $id('admin-gallery');
+    if (!el) return;
+    try {
+      var r = await fetch('/.netlify/functions/moments-list', { credentials: 'include' });
+      var data = await r.json();
+      var moments = data.moments || [];
+      if (!moments.length) { el.className = 'empty'; el.innerHTML = 'No photos uploaded yet.'; return; }
+      moments.sort(function(a, b) { return (b.uploadedAt || '').localeCompare(a.uploadedAt || ''); });
+      el.className = 'si-grid';
+      el.innerHTML = moments.slice(0, 24).map(function(m) {
+        return '<div class="si-card">' +
+          '<img src="' + m.url + '" alt="' + h(m.caption || '') + '" loading="lazy">' +
+          '<div class="si-card__info">' +
+            '<span class="si-card__label">Wk ' + m.week + (m.caption ? ' · ' + h(m.caption) : '') + '</span>' +
+            '<button class="si-card__del" data-id="' + m.id + '">Delete</button>' +
+          '</div></div>';
+      }).join('');
+      el.querySelectorAll('.si-card__del').forEach(function(b) {
+        b.addEventListener('click', async function() {
+          if (!confirm('Delete this photo?')) return;
+          try {
+            await fetch('/.netlify/functions/moments-delete?id=' + b.dataset.id, { method: 'DELETE', credentials: 'include' });
+            loadAdminGallery();
+          } catch (e) { alert('Delete failed: ' + e.message); }
+        });
+      });
+    } catch (e) { el.className = 'empty'; el.innerHTML = 'Failed to load gallery.'; }
+  }
+
   checkAuth();
   </script>
 
@@ -864,11 +969,13 @@
       if (!file) { statusEl.textContent = 'Please select an image first.'; statusEl.style.color = 'var(--color-red, #ef4444)'; return; }
       if (!slot) { statusEl.textContent = 'Please select a section.'; statusEl.style.color = 'var(--color-red, #ef4444)'; return; }
       uploadBtn.disabled = true;
-      statusEl.textContent = 'Uploading...';
+      statusEl.textContent = 'Compressing…';
       statusEl.style.color = 'var(--color-text-faint)';
       try {
+        var compressed = await compressImage(file);
+        statusEl.textContent = 'Uploading (' + (compressed.size / 1024 / 1024).toFixed(1) + 'MB)…';
         var fd = new FormData();
-        fd.append('file', file);
+        fd.append('file', compressed);
         fd.append('slot', slot);
         fd.append('label', label);
         var r = await fetch(API_UPLOAD, { method: 'POST', body: fd, credentials: 'include' });

@@ -1,16 +1,16 @@
 // netlify/functions/moments-upload.js
-// Accepts a multipart/form-data POST with: file, week, caption
+// Accepts a multipart/form-data POST with: file, circuit, week, caption
 // Stores the image binary in the 'moments' Netlify Blobs store under "img/<id>"
 // Stores metadata JSON under "meta/<id>.json"
 //
-// NOTE: Gate this behind your supabase-auth admin check in production.
-// The stub below shows where to hook that in.
+// Client-side compression handles large files (30MB+) before they hit this function.
+// The 6MB limit here matches the real Lambda/Netlify payload ceiling.
 
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 
-const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
-const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png']);
+const MAX_BYTES = 6 * 1024 * 1024; // 6 MB — real Lambda payload ceiling
+const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
 export default async (req, context) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -43,10 +43,10 @@ export default async (req, context) => {
       return new Response(JSON.stringify({ error: 'Invalid week (must be 1-7)' }), { status: 400, headers });
     }
     if (!ALLOWED_TYPES.has(file.type)) {
-      return new Response(JSON.stringify({ error: 'Only JPG or PNG allowed' }), { status: 400, headers });
+      return new Response(JSON.stringify({ error: 'Only JPG, PNG, or WebP allowed' }), { status: 400, headers });
     }
     if (file.size > MAX_BYTES) {
-      return new Response(JSON.stringify({ error: 'File exceeds 10MB limit' }), { status: 400, headers });
+      return new Response(JSON.stringify({ error: `File is ${(file.size / 1024 / 1024).toFixed(1)}MB — exceeds the ${Math.round(MAX_BYTES / 1024 / 1024)}MB server limit. The admin panel should auto-compress before upload. Try refreshing the page and re-uploading.` }), { status: 400, headers });
     }
 
     const id = cryptoId();
@@ -83,7 +83,6 @@ export default async (req, context) => {
 };
 
 function cryptoId() {
-  // Short random ID — 16 hex chars
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);
   return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
