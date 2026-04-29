@@ -12,7 +12,11 @@ import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 
 const MAX_BYTES = 10 * 1024 * 1024; // 10 MB
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-const VALID_SLOTS = new Set(['hero', 'divider-1', 'divider-2', 'cta']);
+const VALID_SLOTS = new Set([
+  'hero', 'divider-1', 'divider-2', 'cta',          // home page
+  'schedule', 'standings', 'stats', 'teams', 'rules', 'gallery', // sub-page heroes
+  'register', 'leaderboard', 'contact', 'captain', 'admin'      // additional pages
+]);
 const MAX_PER_SLOT = 8; // max images per slot (hero slideshow limit)
 
 export default async (req, context) => {

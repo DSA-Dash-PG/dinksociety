@@ -1,8 +1,9 @@
 <!-- ═══════════════════════════════════════════════════════════
      nav.html — shared top navigation partial
      Night-Match design system · loaded by partials.js
+     Transparent → solid on scroll
      ═══════════════════════════════════════════════════════════ -->
-<nav class="ds-nav">
+<nav class="ds-nav" id="ds-nav">
   <div class="ds-nav-inner">
     <a href="/" class="ds-nav-brand">
       <div class="ds-nav-brand-text">
@@ -90,6 +91,20 @@
     });
   }
 
+  /* ── Nav scroll: transparent → solid ── */
+  var nav = document.getElementById('ds-nav');
+  var SOLID_THRESHOLD = 60;
+  function checkScroll() {
+    if (!nav) return;
+    if (window.scrollY > SOLID_THRESHOLD) {
+      nav.classList.add('is-solid');
+    } else {
+      nav.classList.remove('is-solid');
+    }
+  }
+  window.addEventListener('scroll', checkScroll, { passive: true });
+  checkScroll(); // run on load in case page is already scrolled
+
   /* ── Load circuit settings (public GET) ── */
   fetch('/.netlify/functions/admin-settings')
     .then(function (r) { return r.ok ? r.json() : fetch('/api/admin-settings').then(function(r2) { return r2.ok ? r2.json() : null; }); })
@@ -109,5 +124,26 @@
       });
     })
     .catch(function () { /* settings not available, defaults stay */ });
+
+  /* ── Page hero background images ── */
+  // Sub-pages use <div class="page-hero__bg" data-hero-slot="schedule">
+  // This fetches from the site-images API and sets the background-image.
+  // Slot names: schedule, standings, stats, teams, rules, gallery
+  // These are admin-managed via the Site Images admin tab.
+  var heroBg = document.querySelector('.page-hero__bg[data-hero-slot]');
+  if (heroBg) {
+    var slot = heroBg.getAttribute('data-hero-slot');
+    fetch('/.netlify/functions/site-images-list')
+      .then(function (r) { return r.ok ? r.json() : {}; })
+      .then(function (slots) {
+        var images = slots[slot];
+        if (images && images.length > 0) {
+          // Use the first image in the slot
+          heroBg.style.backgroundImage = 'url(' + images[0].url + ')';
+          heroBg.classList.remove('page-hero__bg--fallback');
+        }
+      })
+      .catch(function () { /* fallback gradient stays */ });
+  }
 })();
 </script>
