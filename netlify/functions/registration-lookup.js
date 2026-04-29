@@ -26,7 +26,7 @@ export default async (req, context) => {
   const url = new URL(req.url);
   const id = url.searchParams.get('id');
 
-  if (!id || !/^[a-f0-9]{20}$/.test(id)) {
+  if (!id || !/^[a-f0-9]{16,20}$/.test(id)) {
     return new Response(JSON.stringify({ error: 'Invalid id' }), {
       status: 400, headers,
     });
