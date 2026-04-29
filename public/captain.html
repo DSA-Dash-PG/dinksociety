@@ -75,6 +75,10 @@
     .cap-header__meta a:hover { color: var(--color-text-muted); }
     .cap-header__meta .team { color: var(--color-teal); font-weight: 600; }
 
+    /* ── Team switcher ───────────────────────────────────────── */
+    .cap-team-switcher { padding: 5px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; font-family: inherit; background: var(--color-surface-2); color: var(--color-lime); cursor: pointer; }
+    .cap-team-switcher:focus { outline: none; border-color: var(--color-lime); }
+
     /* ── Tabs ─────────────────────────────────────────────────── */
     .cap-tabs { display: flex; gap: 2px; padding: 0 24px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
     .cap-tab { padding: 10px 16px; font-size: 11px; font-weight: 600; color: var(--color-text-faint); background: transparent; border: none; cursor: pointer; font-family: inherit; border-bottom: 2px solid transparent; transition: all var(--transition); }
@@ -219,7 +223,7 @@
 
     /* ── Hero cards (JS-rendered state views) ─────────────────── */
     .cap-hero { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
-    .cap-hero__top { padding: 48px 32px; text-align: center; background: var(--color-bg, #0e0e0e); }
+    .cap-hero__top { padding: 48px 32px; text-align: center; background: linear-gradient(150deg, var(--color-surface-2) 0%, var(--color-bg, #0e0e0e) 100%); }
     .cap-hero__eyebrow { font-size: 10px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--color-gold); opacity: 0.85; font-weight: 500; margin-bottom: 14px; }
     .cap-hero__heading { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 30px; font-weight: 500; margin: 0 0 10px; line-height: 1.15; color: var(--color-text); }
     .cap-hero__body { font-size: 14px; opacity: 0.8; margin: 0 0 24px; line-height: 1.6; max-width: 420px; margin-left: auto; margin-right: auto; color: var(--color-text); }
@@ -263,35 +267,6 @@
       .ss-total { grid-template-columns: 1fr; gap: 10px; }
       .ss-total__team--right { text-align: center; }
     }
-
-    /* ── Hamburger button ────────────────────────────────────── */
-    .ds-hamburger { display: none; background: none; border: none; cursor: pointer; padding: 8px; width: 44px; height: 44px; flex-direction: column; justify-content: center; align-items: center; gap: 5px; position: relative; z-index: 1001; }
-    .ds-hamburger__line { display: block; width: 20px; height: 2px; background: var(--color-text); border-radius: 2px; transition: all 0.25s ease; }
-    .ds-hamburger.is-open .ds-hamburger__line:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-    .ds-hamburger.is-open .ds-hamburger__line:nth-child(2) { opacity: 0; }
-    .ds-hamburger.is-open .ds-hamburger__line:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-
-    /* ── Slide-out drawer ────────────────────────────────────── */
-    .ds-drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 998; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
-    .ds-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
-    .ds-drawer { position: fixed; top: 0; right: 0; bottom: 0; width: 280px; background: var(--color-surface); border-left: 1px solid var(--color-border); z-index: 999; transform: translateX(100%); transition: transform 0.25s ease; display: flex; flex-direction: column; overflow-y: auto; }
-    .ds-drawer.is-open { transform: translateX(0); }
-    .ds-drawer__header { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--color-border); }
-    .ds-drawer__brand { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text); }
-    .ds-drawer__close { background: none; border: none; color: var(--color-text-faint); font-size: 22px; cursor: pointer; padding: 4px 8px; line-height: 1; }
-    .ds-drawer__close:hover { color: var(--color-text); }
-    .ds-drawer__body { flex: 1; padding: 12px 10px; }
-    .ds-drawer__section { margin-bottom: 8px; }
-    .ds-drawer__section-label { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-text-faint); padding: 14px 12px 6px; font-weight: 700; }
-    .ds-drawer__link { display: block; width: 100%; text-align: left; padding: 9px 12px; border-radius: var(--radius-sm); color: var(--color-text-faint); font-size: 13px; font-weight: 500; cursor: pointer; background: transparent; border: none; font-family: inherit; transition: all var(--transition); text-decoration: none; }
-    .ds-drawer__link:hover { color: var(--color-text); background: var(--color-surface-2); }
-    .ds-drawer__link.is-active { color: var(--color-lime); background: var(--color-lime-dim, rgba(184,255,44,0.06)); font-weight: 600; }
-    .ds-drawer__meta { padding: 6px 12px; font-size: 11px; color: var(--color-text-faint); }
-    body.ds-drawer-open { overflow: hidden; }
-
-    @media (max-width: 860px) {
-      .ds-hamburger { display: flex; }
-    }
   </style>
 </head>
 <body data-page="captain">
@@ -326,6 +301,7 @@
         <h1 class="cap-header__title" id="cap-team-name">&mdash;</h1>
       </div>
       <div class="cap-header__meta">
+        <select id="cap-team-switcher" class="cap-team-switcher" style="display:none;"></select>
         <span class="team" id="cap-team-meta">&mdash;</span>
         <span id="cap-email">&mdash;</span>
         <a href="/">&larr; Site</a>
@@ -347,6 +323,9 @@
       <nav class="ds-drawer__body">
         <div class="ds-drawer__section">
           <div class="ds-drawer__section-label">Captain portal</div>
+          <div id="ds-drawer-team-switcher-wrap" style="display:none;padding:4px 12px 10px;">
+            <select id="ds-drawer-team-switcher" class="cap-team-switcher" style="width:100%;"></select>
+          </div>
           <button class="ds-drawer__link is-active" data-drawer-tab="next">Next match</button>
           <button class="ds-drawer__link" data-drawer-tab="roster">Roster</button>
           <button class="ds-drawer__link" data-drawer-tab="schedule">Schedule</button>
@@ -515,10 +494,71 @@
     function enterShell() {
       $id('login-screen').style.display = 'none';
       $id('cap-shell').style.display = 'block';
-      $id('cap-team-name').textContent = state.me.team.name;
-      $id('cap-team-meta').textContent = `Circuit ${state.me.team.circuit} · ${state.me.team.division}`;
       $id('cap-email').textContent = state.me.email;
-      // Load roster + schedule, then dispatch to the right state
+
+      // Multi-team support: populate team switcher if >1 team
+      const teams = state.me.teams || (state.me.team ? [state.me.team] : []);
+      state.teams = teams;
+
+      if (teams.length > 1) {
+        // Show switcher in header and drawer
+        const switcher = $id('cap-team-switcher');
+        const drawerSwitcher = $id('ds-drawer-team-switcher');
+        const drawerWrap = $id('ds-drawer-team-switcher-wrap');
+
+        const optionsHtml = teams.map(t =>
+          `<option value="${escapeAttr(t.id)}">${escapeHtml(t.name)} · ${escapeHtml(t.divisionLabel || t.division || '')}</option>`
+        ).join('');
+
+        switcher.innerHTML = optionsHtml;
+        switcher.style.display = '';
+        switcher.addEventListener('change', () => {
+          drawerSwitcher.value = switcher.value;
+          switchTeam(switcher.value);
+        });
+
+        if (drawerSwitcher && drawerWrap) {
+          drawerSwitcher.innerHTML = optionsHtml;
+          drawerWrap.style.display = '';
+          drawerSwitcher.addEventListener('change', () => {
+            switcher.value = drawerSwitcher.value;
+            switchTeam(drawerSwitcher.value);
+          });
+        }
+      }
+
+      // Activate first team
+      const activeTeam = teams[0] || state.me.team;
+      if (activeTeam) {
+        state.me.team = activeTeam;
+        applyActiveTeam(activeTeam);
+      }
+
+      // Load roster + schedule, then dispatch
+      Promise.all([loadRoster(true), loadMatches(true)]).then(() => {
+        updateGenderWarning();
+        dispatchToNext();
+      });
+    }
+
+    function applyActiveTeam(team) {
+      $id('cap-team-name').textContent = team.name;
+      $id('cap-team-meta').textContent = `Circuit ${team.circuit || 'I'} · ${team.divisionLabel || team.division || ''}`;
+    }
+
+    function switchTeam(teamId) {
+      const team = (state.teams || []).find(t => t.id === teamId);
+      if (!team) return;
+      state.me.team = team;
+      applyActiveTeam(team);
+      // Reset state and reload data for the new team
+      state.roster = [];
+      state.matches = [];
+      state.currentMatch = null;
+      state.currentLineup = null;
+      state.lineupDraft = {};
+      state.oppLineup = null;
+      stopPolling();
       Promise.all([loadRoster(true), loadMatches(true)]).then(() => {
         updateGenderWarning();
         dispatchToNext();
@@ -656,7 +696,7 @@
     // ===== Matches list =====
     async function loadMatches(silent) {
       try {
-        const res = await fetch('/.netlify/functions/captain-schedule', { credentials: 'include' });
+        const res = await fetch(`/.netlify/functions/captain-schedule?team=${encodeURIComponent(state.me.team.id)}`, { credentials: 'include' });
         if (!res.ok) throw new Error();
         const data = await res.json();
         state.matches = data.matches || [];
@@ -903,7 +943,7 @@
     async function refreshLineup() {
       if (!state.currentMatch) return;
       try {
-        const res = await fetch(`/.netlify/functions/captain-lineup?match=${encodeURIComponent(state.currentMatch.id)}`, {
+        const res = await fetch(`/.netlify/functions/captain-lineup?team=' + encodeURIComponent(state.me.team.id) + '&match=${encodeURIComponent(state.currentMatch.id)}`, {
           credentials: 'include',
         });
         if (!res.ok) throw new Error();
@@ -936,7 +976,7 @@
     async function refreshScoresheet() {
       if (!state.currentMatch) return;
       try {
-        const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, {
+        const res = await fetch(`/.netlify/functions/captain-score?team=' + encodeURIComponent(state.me.team.id) + '&match=${encodeURIComponent(state.currentMatch.id)}`, {
           credentials: 'include',
         });
         if (!res.ok) throw new Error();
@@ -1112,8 +1152,8 @@
 
     // ===== Scoresheet =====
     // Backend contract:
-    //   PUT  captain-score?match=<id>          → save my entries (one captain at a time)
-    //   POST captain-score?match=<id>&action=submit|withdraw
+    //   PUT  captain-score?team=' + encodeURIComponent(state.me.team.id) + '&match=<id>          → save my entries (one captain at a time)
+    //   POST captain-score?team=' + encodeURIComponent(state.me.team.id) + '&match=<id>&action=submit|withdraw
     // Both captains enter every game. System auto-validates per-game agreement.
     // Match finalizes only when all 12 games confirmed AND both captains submit.
 
@@ -1507,7 +1547,7 @@
 
       const status = $id('ss-status');
       try {
-        const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, {
+        const res = await fetch(`/.netlify/functions/captain-score?team=' + encodeURIComponent(state.me.team.id) + '&match=${encodeURIComponent(state.currentMatch.id)}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -1530,7 +1570,7 @@
 
       const status = $id('ss-status');
       try {
-        const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}&action=submit`, {
+        const res = await fetch(`/.netlify/functions/captain-score?team=' + encodeURIComponent(state.me.team.id) + '&match=${encodeURIComponent(state.currentMatch.id)}&action=submit`, {
           method: 'POST', credentials: 'include',
         });
         const data = await res.json();
@@ -1549,7 +1589,7 @@
       if (!confirm('Withdraw your submission? You can re-submit later.')) return;
       const status = $id('ss-status');
       try {
-        const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}&action=withdraw`, {
+        const res = await fetch(`/.netlify/functions/captain-score?team=' + encodeURIComponent(state.me.team.id) + '&match=${encodeURIComponent(state.currentMatch.id)}&action=withdraw`, {
           method: 'POST', credentials: 'include',
         });
         const data = await res.json();
@@ -1580,7 +1620,7 @@
       status.textContent = action === 'lock' ? 'Locking lineup…' : 'Saving draft…';
 
       try {
-        const res = await fetch(`/.netlify/functions/captain-lineup?match=${encodeURIComponent(state.currentMatch.id)}`, {
+        const res = await fetch(`/.netlify/functions/captain-lineup?team=' + encodeURIComponent(state.me.team.id) + '&match=${encodeURIComponent(state.currentMatch.id)}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
@@ -1624,7 +1664,7 @@
     // ===== Roster =====
     async function loadRoster(silent) {
       try {
-        const res = await fetch('/.netlify/functions/captain-roster', { credentials: 'include' });
+        const res = await fetch('/.netlify/functions/captain-roster?team=' + encodeURIComponent(state.me.team.id), { credentials: 'include' });
         if (!res.ok) throw new Error();
         const data = await res.json();
         state.roster = data.team?.roster || [];
@@ -1692,7 +1732,7 @@
       status.textContent = 'Saving roster…';
 
       try {
-        const res = await fetch('/.netlify/functions/captain-roster', {
+        const res = await fetch('/.netlify/functions/captain-roster?team=' + encodeURIComponent(state.me.team.id), {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
