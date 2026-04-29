@@ -1,0 +1,303 @@
+<!-- ═══════════════════════════════════════════════════════════════
+     ADMIN: Site Images Tab
+     
+     INSTALLATION:
+     1. Add the sidebar button below AFTER the "Photos" button (line ~228)
+        and BEFORE the <div class="sb__sec">Config</div> line.
+     2. Add the <section> block into <main class="admin-main"> after the
+        moments section and before the settings section.
+     3. Add the <script> block at the end of the existing admin <script>,
+        or just before </body>.
+     ═══════════════════════════════════════════════════════════════ -->
+
+
+<!-- ── 1. SIDEBAR BUTTON (add after the Photos button, before "Config" heading) ── -->
+
+          <button class="sb__link" data-tab="site-images">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+            Site Images
+          </button>
+
+
+<!-- ── 2. SECTION (add inside admin-main, after moments section, before settings section) ── -->
+
+        <section class="admin-section" data-section="site-images">
+          <div class="am-head">
+            <h1 class="am-title">Site Images</h1>
+            <span class="ac__s">Hero slideshow, dividers & CTA backgrounds</span>
+          </div>
+
+          <!-- Upload card -->
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Upload</h2></div>
+            <div class="arow">
+              <div class="af">
+                <label for="si-slot">Section</label>
+                <select id="si-slot">
+                  <option value="hero">Hero Slideshow</option>
+                  <option value="divider-1">Photo Divider 1</option>
+                  <option value="divider-2">Photo Divider 2</option>
+                  <option value="cta">Bottom CTA</option>
+                </select>
+              </div>
+              <div class="af">
+                <label for="si-label">Label (optional)</label>
+                <input type="text" id="si-label" placeholder="e.g. Kitchen rally, Week 3 action">
+              </div>
+            </div>
+            <div class="af">
+              <label>Image (JPG/PNG/WebP, max 10MB)</label>
+              <input type="file" id="si-file" accept="image/jpeg,image/png,image/webp" style="padding:8px;background:var(--color-surface-2);cursor:pointer;">
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+              <div id="si-status" style="font-size:11px;color:var(--color-text-faint);"></div>
+              <button class="ab ab--lime ab--sm" id="si-upload-btn">Upload image</button>
+            </div>
+          </div>
+
+          <!-- Slot sections -->
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Hero Slideshow</h2><span class="ac__s">Up to 8 images · auto-rotates every 5s</span></div>
+            <div id="si-grid-hero" class="si-grid empty">No images yet — upload one above.</div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Photo Divider 1</h2><span class="ac__s">"Twelve games. Every week." break</span></div>
+            <div id="si-grid-divider-1" class="si-grid empty">No images yet.</div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Photo Divider 2</h2><span class="ac__s">"Your ranking follows you." break</span></div>
+            <div id="si-grid-divider-2" class="si-grid empty">No images yet.</div>
+          </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Bottom CTA</h2><span class="ac__s">Registration call-to-action background</span></div>
+            <div id="si-grid-cta" class="si-grid empty">No images yet.</div>
+          </div>
+        </section>
+
+
+<!-- ── 3. STYLES (add to the admin <style> block) ── -->
+
+<style>
+  /* Site Images grid */
+  .si-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 10px;
+  }
+  .si-grid.empty {
+    display: block;
+    font-size: 12px;
+    color: var(--color-text-faint);
+    padding: 24px 0;
+    text-align: center;
+  }
+  .si-card {
+    position: relative;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    background: var(--color-surface-2);
+  }
+  .si-card img {
+    width: 100%;
+    height: 140px;
+    object-fit: cover;
+    display: block;
+  }
+  .si-card__info {
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .si-card__label {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 120px;
+  }
+  .si-card__del {
+    background: none;
+    border: none;
+    color: var(--color-red, #ef4444);
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: inherit;
+    padding: 2px 6px;
+    border-radius: 4px;
+    transition: background 0.15s;
+  }
+  .si-card__del:hover {
+    background: var(--color-red-dim, rgba(239,68,68,0.12));
+  }
+  .si-card--uploading img {
+    opacity: 0.4;
+  }
+  .si-card__order {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    background: rgba(14,14,14,0.8);
+    color: var(--color-lime);
+    font-size: 10px;
+    font-weight: 800;
+    padding: 2px 7px;
+    border-radius: 4px;
+  }
+</style>
+
+
+<!-- ── 4. JAVASCRIPT (add at end of admin script, or as separate <script>) ── -->
+
+<script>
+(function siteImagesAdmin() {
+  const API_LIST  = '/.netlify/functions/site-images-list';
+  const API_UPLOAD = '/.netlify/functions/site-images-upload';
+
+  const SLOTS = ['hero', 'divider-1', 'divider-2', 'cta'];
+  let allSlots = {}; // { hero: [{id, label, url}], ... }
+
+  // ── Load images ──
+  async function loadSiteImages() {
+    try {
+      const r = await fetch(API_LIST, { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to load');
+      allSlots = await r.json();
+    } catch (e) {
+      console.error('site-images load:', e);
+      allSlots = {};
+    }
+    renderAll();
+  }
+
+  // ── Render grids ──
+  function renderAll() {
+    for (const slot of SLOTS) {
+      const grid = document.getElementById(`si-grid-${slot}`);
+      if (!grid) continue;
+
+      const images = allSlots[slot] || [];
+      if (images.length === 0) {
+        grid.className = 'si-grid empty';
+        grid.innerHTML = 'No images yet — upload one above.';
+        continue;
+      }
+
+      grid.className = 'si-grid';
+      grid.innerHTML = images.map((img, i) => `
+        <div class="si-card" data-id="${img.id}">
+          <span class="si-card__order">${i + 1}</span>
+          <img src="${img.url}" alt="${img.label || 'Site image'}" loading="lazy">
+          <div class="si-card__info">
+            <span class="si-card__label">${img.label || '(no label)'}</span>
+            <button class="si-card__del" data-id="${img.id}" data-slot="${slot}">Remove</button>
+          </div>
+        </div>
+      `).join('');
+
+      // Delete handlers
+      grid.querySelectorAll('.si-card__del').forEach(btn => {
+        btn.addEventListener('click', () => deleteSiteImage(btn.dataset.id, btn.dataset.slot));
+      });
+    }
+  }
+
+  // ── Upload ──
+  const uploadBtn = document.getElementById('si-upload-btn');
+  const statusEl  = document.getElementById('si-status');
+
+  if (uploadBtn) {
+    uploadBtn.addEventListener('click', async () => {
+      const fileInput = document.getElementById('si-file');
+      const slot  = document.getElementById('si-slot').value;
+      const label = document.getElementById('si-label').value.trim();
+      const file  = fileInput.files[0];
+
+      if (!file) {
+        statusEl.textContent = 'Please select an image first.';
+        statusEl.style.color = 'var(--color-red, #ef4444)';
+        return;
+      }
+
+      uploadBtn.disabled = true;
+      statusEl.textContent = 'Uploading...';
+      statusEl.style.color = 'var(--color-text-faint)';
+
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('slot', slot);
+        fd.append('label', label);
+
+        const r = await fetch(API_UPLOAD, {
+          method: 'POST',
+          body: fd,
+          credentials: 'include',
+        });
+        const data = await r.json();
+
+        if (!r.ok) {
+          throw new Error(data.error || 'Upload failed');
+        }
+
+        statusEl.textContent = `Uploaded to ${slot}`;
+        statusEl.style.color = 'var(--color-teal)';
+        fileInput.value = '';
+        document.getElementById('si-label').value = '';
+
+        // Reload
+        await loadSiteImages();
+      } catch (e) {
+        statusEl.textContent = e.message;
+        statusEl.style.color = 'var(--color-red, #ef4444)';
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+  }
+
+  // ── Delete ──
+  async function deleteSiteImage(id, slot) {
+    if (!confirm('Remove this image from the site?')) return;
+
+    try {
+      const r = await fetch(API_LIST, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ action: 'delete', id, slot }),
+      });
+      if (!r.ok) throw new Error('Delete failed');
+      await loadSiteImages();
+    } catch (e) {
+      alert('Failed to delete: ' + e.message);
+    }
+  }
+
+  // ── Init on tab switch ──
+  // The admin tab system triggers is-active. We lazy-load on first view.
+  let loaded = false;
+  const observer = new MutationObserver(() => {
+    const section = document.querySelector('[data-section="site-images"]');
+    if (section && section.classList.contains('is-active') && !loaded) {
+      loaded = true;
+      loadSiteImages();
+    }
+  });
+  const main = document.querySelector('.admin-main');
+  if (main) observer.observe(main, { subtree: true, attributes: true, attributeFilter: ['class'] });
+
+  // Also load if the tab is already active (direct navigation)
+  const section = document.querySelector('[data-section="site-images"]');
+  if (section && section.classList.contains('is-active')) {
+    loadSiteImages();
+  }
+})();
+</script>
