@@ -243,6 +243,11 @@
             Photos
           </button>
 
+
+          <button class="sb__link" data-tab="scores">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            Score Entry
+          </button>
           <button class="sb__link" data-tab="site-images">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
             Site Images
@@ -292,6 +297,17 @@
         <!-- TEAMS -->
         <section class="admin-section" data-section="teams">
           <div class="am-head"><h1 class="am-title">Teams</h1><div class="am-actions"><button class="ab ab--outline ab--sm" id="seed-btn">Seed from registrations</button></div></div>
+          <div class="ac" style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-size:13px;font-weight:700;">Sync Teams from Registrations</div>
+              <div style="font-size:11px;color:var(--color-text-faint);margin-top:2px;">Creates team records for confirmed registrations so captains can log in and teams show on public pages.</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+              <span id="seed-status" style="font-size:11px;color:var(--color-text-faint);"></span>
+              <button class="ab ab--lime ab--sm" id="seed-teams-btn">Sync Teams</button>
+            </div>
+          </div>
+
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col" id="teams-grid"></div>
         </section>
 
@@ -338,6 +354,45 @@
         </section>
 
         <!-- SETTINGS -->
+
+
+        <section class="admin-section" data-section="scores">
+          <div class="am-head">
+            <h1 class="am-title">Score Entry</h1>
+            <span class="ac__s">Enter, edit, or override match scores. Select a division and week.</span>
+          </div>
+
+          <div class="ac">
+            <div class="arow">
+              <div class="af">
+                <label for="sc-division">Division</label>
+                <select id="sc-division">
+                  <option value="3.0M">3.0 Mixed</option>
+                  <option value="3.5M">3.5 Mixed</option>
+                </select>
+              </div>
+              <div class="af">
+                <label for="sc-week">Week</label>
+                <select id="sc-week">
+                  <option value="1">Week 1</option>
+                  <option value="2">Week 2</option>
+                  <option value="3">Week 3</option>
+                  <option value="4">Week 4</option>
+                  <option value="5">Week 5</option>
+                  <option value="6">Week 6</option>
+                  <option value="7">Week 7 (Finals)</option>
+                </select>
+              </div>
+              <div class="af" style="display:flex;align-items:flex-end;">
+                <button class="ab ab--lime ab--sm" id="sc-load-btn">Load Matches</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="sc-matches">
+            <div class="empty-state" style="padding:32px 0;font-size:13px;color:var(--color-text-faint);">Select a division and week, then click Load Matches.</div>
+          </div>
+        </section>
 
         <section class="admin-section" data-section="site-images">
           <div class="am-head">
@@ -862,6 +917,203 @@
   if (main) observer.observe(main, { subtree: true, attributes: true, attributeFilter: ['class'] });
   var section = document.querySelector('[data-section="site-images"]');
   if (section && section.classList.contains('is-active')) { loadSiteImages(); }
+})();
+</script>
+
+<script>
+// ── Seed Teams ──
+(function() {
+  var btn = document.getElementById('seed-teams-btn');
+  var status = document.getElementById('seed-status');
+  if (!btn) return;
+
+  btn.addEventListener('click', async function() {
+    btn.disabled = true;
+    status.textContent = 'Syncing...';
+    status.style.color = 'var(--color-text-faint)';
+    try {
+      var r = await fetch('/.netlify/functions/admin-seed-teams', {
+        method: 'POST', credentials: 'include'
+      });
+      var data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Sync failed');
+      status.textContent = 'Created: ' + (data.created||0) + ', Updated: ' + (data.updated||0) + ', Skipped: ' + (data.skipped||0);
+      status.style.color = 'var(--color-teal)';
+      if (data.errors > 0) {
+        status.textContent += ', Errors: ' + data.errors;
+        status.style.color = 'var(--color-gold)';
+      }
+    } catch(e) {
+      status.textContent = e.message;
+      status.style.color = 'var(--color-red, #ef4444)';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();
+
+// ── Score Entry ──
+(function() {
+  var loadBtn = document.getElementById('sc-load-btn');
+  var container = document.getElementById('sc-matches');
+  if (!loadBtn) return;
+
+  loadBtn.addEventListener('click', loadMatches);
+
+  async function loadMatches() {
+    var division = document.getElementById('sc-division').value;
+    var week = document.getElementById('sc-week').value;
+    container.innerHTML = '<div class="empty-state" style="padding:24px 0;font-size:13px;">Loading...</div>';
+
+    try {
+      var r = await fetch('/.netlify/functions/admin-matches?circuit=I&division=' + division, { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to load');
+      var data = await r.json();
+      var weekData = (data.weeks || []).find(function(w) { return w.week === parseInt(week); });
+
+      if (!weekData || !weekData.matches || weekData.matches.length === 0) {
+        container.innerHTML = '<div class="empty-state" style="padding:24px 0;font-size:13px;">No matches found for Week ' + week + '. Generate the schedule first.</div>';
+        return;
+      }
+
+      renderMatches(weekData.matches, week);
+    } catch(e) {
+      container.innerHTML = '<div class="empty-state" style="padding:24px 0;font-size:13px;color:var(--color-red,#ef4444);">' + e.message + '</div>';
+    }
+  }
+
+  function renderMatches(matches, week) {
+    container.innerHTML = matches.map(function(m) {
+      var isFinal = !!m.finalizedAt;
+      return '<div class="ac" data-match="' + m.id + '" style="margin-bottom:12px;">' +
+        '<div class="ac__h" style="margin-bottom:12px;">' +
+          '<h2 class="ac__t">' + esc(m.teamA.name) + ' vs ' + esc(m.teamB.name) + '</h2>' +
+          '<span class="ac__s">' + (m.court || '') + (isFinal ? ' · <span style="color:var(--color-lime);font-weight:700;">FINAL</span>' : '') + '</span>' +
+        '</div>' +
+        '<div id="sc-form-' + m.id + '">' +
+          '<div style="font-size:11px;color:var(--color-text-faint);margin-bottom:8px;">Loading scores...</div>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px;">' +
+          '<button class="ab ab--lime ab--sm" onclick="saveScores('' + m.id + '')">' + (isFinal ? 'Update & Re-finalize' : 'Save Scores') + '</button>' +
+          (isFinal
+            ? '<button class="ab ab--sm" style="background:var(--color-surface-2);color:var(--color-text);" onclick="reopenMatch('' + m.id + '')">Reopen</button>'
+            : '<button class="ab ab--sm" style="background:var(--color-teal-dim);color:var(--color-teal);" onclick="finalizeMatch('' + m.id + '')">Finalize</button>'
+          ) +
+        '</div>' +
+        '<div id="sc-status-' + m.id + '" style="font-size:11px;margin-top:6px;"></div>' +
+      '</div>';
+    }).join('');
+
+    // Load score data for each match
+    matches.forEach(function(m) { loadMatchScores(m.id); });
+  }
+
+  window.loadMatchScores = async function(matchId) {
+    var formEl = document.getElementById('sc-form-' + matchId);
+    if (!formEl) return;
+
+    try {
+      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId, { credentials: 'include' });
+      var data = await r.json();
+      var score = data.score || {};
+      var games = score.games || {};
+      var home = score.home || data.match?.home || {};
+      var away = score.away || data.match?.away || {};
+
+      var slots = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
+      var labels = ["R1 G1 · W Doubles","R1 G2 · M Doubles","R1 G3 · Mixed","R1 G4 · Mixed","R1 G5 · Mixed","R1 G6 · Mixed",
+                    "R2 G1 · W Doubles","R2 G2 · M Doubles","R2 G3 · Mixed","R2 G4 · Mixed","R2 G5 · Mixed","R2 G6 · Mixed"];
+
+      formEl.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px 8px;font-size:12px;align-items:center;">' +
+        '<div style="font-weight:700;padding:4px 0;">Game</div>' +
+        '<div style="font-weight:700;text-align:center;min-width:60px;">' + esc(home.name || 'Home') + '</div>' +
+        '<div style="font-weight:700;text-align:center;min-width:60px;">' + esc(away.name || 'Away') + '</div>' +
+        slots.map(function(slot, i) {
+          var g = games[slot] || {};
+          var hv = g.home ? g.home.entered : '';
+          var av = g.away ? g.away.entered : '';
+          var isR2 = slot.startsWith('r2');
+          return (isR2 && i === 6 ? '<div style="grid-column:1/-1;border-top:1px solid var(--color-border);margin:4px 0;"></div>' : '') +
+            '<div style="color:var(--color-text-muted);">' + labels[i] + '</div>' +
+            '<input type="number" min="0" max="30" value="' + hv + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="home" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">' +
+            '<input type="number" min="0" max="30" value="' + av + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="away" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">' ;
+        }).join('') +
+        '</div>';
+    } catch(e) {
+      formEl.innerHTML = '<div style="font-size:11px;color:var(--color-red,#ef4444);">Failed to load scores</div>';
+    }
+  };
+
+  window.saveScores = async function(matchId) {
+    var statusEl = document.getElementById('sc-status-' + matchId);
+    var inputs = document.querySelectorAll('input[data-match="' + matchId + '"]');
+    var games = {};
+    inputs.forEach(function(inp) {
+      var slot = inp.dataset.slot;
+      var side = inp.dataset.side;
+      if (!games[slot]) games[slot] = {};
+      games[slot][side] = inp.value === '' ? null : parseInt(inp.value);
+    });
+
+    statusEl.textContent = 'Saving...';
+    statusEl.style.color = 'var(--color-text-faint)';
+    try {
+      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ games: games }),
+      });
+      var data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Save failed');
+      statusEl.textContent = 'Saved';
+      statusEl.style.color = 'var(--color-teal)';
+    } catch(e) {
+      statusEl.textContent = e.message;
+      statusEl.style.color = 'var(--color-red, #ef4444)';
+    }
+  };
+
+  window.finalizeMatch = async function(matchId) {
+    if (!confirm('Finalize this match? This will update standings.')) return;
+    var statusEl = document.getElementById('sc-status-' + matchId);
+    statusEl.textContent = 'Finalizing...';
+    try {
+      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId + '&action=finalize', {
+        method: 'POST', credentials: 'include',
+      });
+      var data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Finalize failed');
+      statusEl.textContent = 'Finalized! Standings updated.';
+      statusEl.style.color = 'var(--color-lime)';
+      loadMatches(); // refresh
+    } catch(e) {
+      statusEl.textContent = e.message;
+      statusEl.style.color = 'var(--color-red, #ef4444)';
+    }
+  };
+
+  window.reopenMatch = async function(matchId) {
+    if (!confirm('Reopen this match for score editing? Current standings will be recalculated.')) return;
+    var statusEl = document.getElementById('sc-status-' + matchId);
+    statusEl.textContent = 'Reopening...';
+    try {
+      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId + '&action=reopen', {
+        method: 'POST', credentials: 'include',
+      });
+      var data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Reopen failed');
+      statusEl.textContent = 'Reopened. Edit scores and finalize again.';
+      statusEl.style.color = 'var(--color-gold)';
+      loadMatches(); // refresh
+    } catch(e) {
+      statusEl.textContent = e.message;
+      statusEl.style.color = 'var(--color-red, #ef4444)';
+    }
+  };
+
+  function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
 })();
 </script>
 </body>

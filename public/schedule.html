@@ -86,8 +86,20 @@
       try{
         const p=new URLSearchParams({circuit:$id('sched-circuit').value});
         const d=$id('sched-division').value;if(d)p.set('division',d);
-        const r=await fetch(`/.netlify/functions/admin-matches?${p}`);
-        if(!r.ok)throw 0;scheduleData=await r.json();renderTabs();renderWeek(currentWeek);
+        const r=await fetch(`/.netlify/functions/public-leaderboard?view=schedule&circuit=${$id('sched-circuit').value}`);
+        if(!r.ok)throw 0;
+      const raw=await r.json();
+      if(raw.empty){throw 0;}
+      // Group matches by week
+      const div=$id('sched-division').value;
+      const matches=(raw.matches||[]).filter(function(m){return !div||m.division===div;});
+      const weekMap={};
+      matches.forEach(function(m){
+        if(!weekMap[m.week])weekMap[m.week]={week:m.week,matches:[]};
+        weekMap[m.week].matches.push(m);
+      });
+      scheduleData={weeks:Object.values(weekMap).sort(function(a,b){return a.week-b.week;})};
+      renderTabs();renderWeek(currentWeek);
       }catch{$id('schedule-content').innerHTML='<div class="empty-state">Schedule not yet published. Check back closer to Circuit I.</div>';$id('week-tabs').innerHTML='';}
     }
 
@@ -104,15 +116,17 @@
         const dt=m.scheduledAt?new Date(m.scheduledAt):null;
         const ds=dt?dt.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}):'';
         const ts=dt?dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'';
+        const homeScore=m.scoreA!==null&&m.scoreA!==undefined?m.scoreA:'';
+        const awayScore=m.scoreB!==null&&m.scoreB!==undefined?m.scoreB:'';
+        const hasScore=homeScore!==''&&awayScore!=='';
         return`<div class="match-card">
-          <div class="match-card__team">${esc(m.teamA?.name||'TBD')}</div>
+          <div class="match-card__team">${esc(m.teamA?.name||'TBD')}${hasScore?' <strong style="color:var(--color-lime)">'+homeScore+'</strong>':''}</div>
           <div class="match-card__center">
-            <div class="match-card__vs">VS</div>
+            <div class="match-card__vs">${hasScore?'FINAL':'VS'}</div>
             ${m.court?`<div class="match-card__court">${esc(m.court)}</div>`:''}
             ${ds?`<div class="match-card__time">${ds}<br>${ts}</div>`:''}
-            ${m.finalizedAt?'<div class="match-card__final">Final</div>':''}
           </div>
-          <div class="match-card__team match-card__team--right">${esc(m.teamB?.name||'TBD')}</div>
+          <div class="match-card__team match-card__team--right">${hasScore?'<strong style="color:var(--color-lime)">'+awayScore+'</strong> ':''} ${esc(m.teamB?.name||'TBD')}</div>
         </div>`;
       }).join('');
     }

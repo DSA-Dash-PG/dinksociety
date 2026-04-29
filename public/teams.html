@@ -87,12 +87,57 @@
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
   <script>
-    document.getElementById('teams-tabs')?.addEventListener('click', (e) => {
-      const btn = e.target.closest('.tab');
-      if (!btn) return;
-      document.querySelectorAll('#teams-tabs .tab').forEach(t => t.classList.remove('is-active'));
+    let teamsData=null;let activeDivision='3.0-mixed';
+    const $id=id=>document.getElementById(id);
+
+    document.getElementById('teams-tabs')?.addEventListener('click',(e)=>{
+      const btn=e.target.closest('.tab');if(!btn)return;
+      document.querySelectorAll('#teams-tabs .tab').forEach(t=>t.classList.remove('is-active'));
       btn.classList.add('is-active');
+      activeDivision=btn.dataset.division;
+      renderTeams();
     });
+
+    async function loadTeams(){
+      try{
+        const r=await fetch('/.netlify/functions/public-teams?circuit=I');
+        if(!r.ok)throw 0;
+        teamsData=await r.json();
+        if(!teamsData.teamCount)throw 0;
+        renderTeams();
+      }catch{
+        $id('teams-grid').innerHTML='<div class="empty-state">Teams will appear once rosters are set for Circuit I.</div>';
+      }
+    }
+
+    function renderTeams(){
+      const el=$id('teams-grid');
+      if(!teamsData||!teamsData.divisions){
+        el.innerHTML='<div class="empty-state">Teams will appear once rosters are set.</div>';return;
+      }
+      const divMap={'3.0-mixed':'3.0M','3.5-mixed':'3.5M','3.5-womens':'3.5W'};
+      const divKey=divMap[activeDivision]||activeDivision;
+      const teams=teamsData.divisions?.[divKey];
+      if(!teams||teams.length===0){
+        el.innerHTML='<div class="empty-state">No teams in this division yet.</div>';return;
+      }
+      el.innerHTML='<div class="teams-grid">'+teams.map(function(t){
+        const captain=t.roster?.find(function(p){return p.isCaptain;});
+        const rosterNames=t.roster?.map(function(p){return esc(p.name);}).join(', ')||'Roster pending';
+        return '<div class="team-card">'+
+          '<div class="team-card__top">'+
+            '<div class="team-card__icon">'+esc(t.name.charAt(0))+'</div>'+
+            '<div><div class="team-card__name">'+esc(t.name)+'</div>'+
+            '<div class="team-card__record">'+esc(t.divisionLabel||t.division)+'</div></div>'+
+          '</div>'+
+          (captain?'<div class="team-card__captain">Captain: '+esc(captain.name)+'</div>':'')+
+          '<div class="team-card__roster">'+rosterNames+'</div>'+
+        '</div>';
+      }).join('')+'</div>';
+    }
+
+    function esc(s){return String(s??'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
+    loadTeams();
   </script>
 </body>
 </html>
