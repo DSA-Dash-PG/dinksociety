@@ -6,8 +6,10 @@
   <title>Admin · The Dink Society</title>
   <meta name="robots" content="noindex,nofollow" />
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
-  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <style>
     /* ═══════════════════════════════════════════════════════════
        ADMIN PORTAL — Night-Match Design System
@@ -71,6 +73,7 @@
     .at td { padding: 10px 12px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
     .at tr:last-child td { border-bottom: none; }
     .at tr:hover td { background: var(--color-surface-2); }
+    .at tr { cursor: pointer; }
 
     /* ── Pills ────────────────────────────────────────────────── */
     .p { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -91,14 +94,16 @@
     .ab--outline { border-color: var(--color-border-strong); color: var(--color-text); background: transparent; }
     .ab--outline:hover { background: var(--color-surface-2); }
     .ab--danger { background: var(--color-red-dim); color: var(--color-red); border-color: rgba(255,92,71,0.15); }
+    .ab--danger:hover { background: rgba(255,92,71,0.2); }
     .ab--sm { padding: 5px 12px; font-size: 10px; }
     .ab--ghost { background: var(--color-surface-2); color: var(--color-text-muted); }
+    .ab--teal { background: var(--color-teal-dim); color: var(--color-teal); }
 
     /* ── Forms ────────────────────────────────────────────────── */
     .af { margin-bottom: 12px; }
     .af label { display: block; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); margin-bottom: 5px; font-weight: 600; }
     .af input, .af select, .af textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 12px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); box-sizing: border-box; }
-    .af input:focus, .af select:focus { outline: none; border-color: var(--color-lime); }
+    .af input:focus, .af select:focus, .af textarea:focus { outline: none; border-color: var(--color-lime); }
     .arow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
     .a-status { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 11px; margin-top: 10px; display: none; }
@@ -107,6 +112,7 @@
     .a-status.is-err { display: block; background: var(--color-red-dim); color: var(--color-red); }
 
     .empty { text-align: center; padding: 40px 20px; color: var(--color-text-faint); font-size: 12px; }
+    .loading { text-align: center; padding: 40px 20px; color: var(--color-text-faint); font-size: 12px; }
 
     /* ── Fill bars ────────────────────────────────────────────── */
     .fb { margin-bottom: 14px; }
@@ -140,10 +146,6 @@
     .ai__dot--b { background: var(--color-lime); box-shadow: 0 0 0 3px var(--color-lime-dim); }
     .ai__time { font-size: 10px; color: var(--color-text-faint); margin-top: 2px; }
 
-    /* ── Test banner ──────────────────────────────────────────── */
-    .test-b { background: var(--color-lime-ghost); border: 1px solid rgba(184,255,44,0.15); border-radius: var(--radius-sm); padding: 10px 16px; margin-bottom: 18px; display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--color-lime); }
-    .test-b strong { font-weight: 700; }
-
     /* ── Login ────────────────────────────────────────────────── */
     .login-wrap { max-width: 380px; margin: 100px auto; padding: 0 20px; }
     .login-card { background: var(--color-surface); border: 1px solid var(--color-border); padding: 36px 28px; border-radius: var(--radius-lg); text-align: center; }
@@ -153,6 +155,51 @@
     .login-card__sub { font-size: 12px; color: var(--color-text-faint); margin: 0 0 24px; }
     .login-card .af label { text-align: left; }
     .login-card .ab--lime { width: 100%; padding: 12px 20px; font-size: 12px; margin-top: 8px; }
+
+    /* ── Slide-out Team Detail Panel ──────────────────────────── */
+    .tdp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 900; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+    .tdp-overlay.is-open { opacity: 1; pointer-events: auto; }
+    .tdp-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; max-width: 95vw; background: var(--color-surface); border-left: 1px solid var(--color-border); z-index: 901; transform: translateX(100%); transition: transform 0.25s ease; overflow-y: auto; display: flex; flex-direction: column; }
+    .tdp-panel.is-open { transform: translateX(0); }
+    .tdp-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--color-border); position: sticky; top: 0; background: var(--color-surface); z-index: 1; }
+    .tdp-close { background: none; border: none; color: var(--color-text-faint); cursor: pointer; font-size: 18px; padding: 4px 8px; border-radius: var(--radius-sm); transition: all 0.15s; }
+    .tdp-close:hover { background: var(--color-surface-2); color: var(--color-text); }
+    .tdp-body { padding: 20px; flex: 1; }
+    .tdp-foot { padding: 14px 20px; border-top: 1px solid var(--color-border); display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: 0; background: var(--color-surface); }
+
+    /* Roster list in panel */
+    .roster-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 6px; background: var(--color-surface-2); }
+    .roster-item__info { flex: 1; min-width: 0; }
+    .roster-item__name { font-size: 12px; font-weight: 600; }
+    .roster-item__meta { font-size: 10px; color: var(--color-text-faint); margin-top: 2px; }
+    .roster-item__badge { font-size: 8px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 6px; border-radius: 3px; }
+    .roster-item__badge--cap { background: var(--color-lime-dim); color: var(--color-lime); }
+    .roster-item__badge--cocap { background: var(--color-teal-dim); color: var(--color-teal); }
+    .roster-item__actions { display: flex; gap: 4px; }
+    .roster-item__actions button { background: none; border: none; font-size: 10px; cursor: pointer; padding: 3px 6px; border-radius: 3px; font-family: inherit; color: var(--color-text-faint); transition: all 0.15s; }
+    .roster-item__actions button:hover { background: var(--color-surface-3); color: var(--color-text); }
+    .roster-item__actions .act-danger:hover { background: var(--color-red-dim); color: var(--color-red); }
+
+    /* Color swatch input */
+    .color-input-row { display: flex; align-items: center; gap: 8px; }
+    .color-input-row input[type="color"] { width: 32px; height: 32px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 2px; cursor: pointer; background: transparent; }
+    .color-input-row input[type="text"] { flex: 1; }
+
+    /* Team cards in grid */
+    .team-card { cursor: pointer; transition: border-color 0.15s, transform 0.1s; }
+    .team-card:hover { border-color: var(--color-lime); transform: translateY(-1px); }
+    .team-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--color-border); display: inline-block; vertical-align: middle; }
+
+    /* ── Site Images grid ──────────────────────────────────────── */
+    .si-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
+    .si-grid.empty { display: block; font-size: 12px; color: var(--color-text-faint); padding: 24px 0; text-align: center; }
+    .si-card { position: relative; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface-2); }
+    .si-card img { width: 100%; height: 140px; object-fit: cover; display: block; }
+    .si-card__info { padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
+    .si-card__label { font-size: 10px; color: var(--color-text-muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+    .si-card__del { background: none; border: none; color: var(--color-red, #ef4444); cursor: pointer; font-size: 10px; font-weight: 600; font-family: inherit; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
+    .si-card__del:hover { background: var(--color-red-dim, rgba(239,68,68,0.12)); }
+    .si-card__order { position: absolute; top: 6px; left: 6px; background: rgba(14,14,14,0.8); color: var(--color-lime); font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
 
     /* ── Mobile ───────────────────────────────────────────────── */
     .mob-bar { display: none; background: var(--color-surface); border-bottom: 1px solid var(--color-border); padding: 12px 18px; align-items: center; justify-content: space-between; }
@@ -170,18 +217,8 @@
       .arow { grid-template-columns: 1fr; }
       .stats-row { grid-template-columns: 1fr 1fr; }
       .two-col { grid-template-columns: 1fr !important; }
+      .tdp-panel { width: 100vw; max-width: 100vw; }
     }
-  
-    /* Site Images grid */
-    .si-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
-    .si-grid.empty { display: block; font-size: 12px; color: var(--color-text-faint); padding: 24px 0; text-align: center; }
-    .si-card { position: relative; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--color-border); background: var(--color-surface-2); }
-    .si-card img { width: 100%; height: 140px; object-fit: cover; display: block; }
-    .si-card__info { padding: 8px 10px; display: flex; justify-content: space-between; align-items: center; }
-    .si-card__label { font-size: 10px; color: var(--color-text-muted); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
-    .si-card__del { background: none; border: none; color: var(--color-red, #ef4444); cursor: pointer; font-size: 10px; font-weight: 600; font-family: inherit; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
-    .si-card__del:hover { background: var(--color-red-dim, rgba(239,68,68,0.12)); }
-    .si-card__order { position: absolute; top: 6px; left: 6px; background: rgba(14,14,14,0.8); color: var(--color-lime); font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
   </style>
 </head>
 <body data-page="admin">
@@ -193,12 +230,10 @@
       <div class="login-card__tag">Admin Portal</div>
       <h1 class="login-card__title">Sign in</h1>
       <p class="login-card__sub">Enter your admin email and we'll send a one-tap sign-in link.</p>
-
       <div id="login-sent" style="display:none; background: var(--color-gold-dim); border: 1px solid rgba(240,192,64,0.4); color: var(--color-gold); padding: 16px; border-radius: var(--radius-sm); text-align: left; font-size: 13px; line-height: 1.55;">
         <strong style="display:block; margin-bottom: 4px;">Link on the way.</strong>
         Check the inbox for <span id="login-sent-email" style="font-weight: 600;"></span>. The link expires in 15 minutes. If it doesn't show up, check spam or make sure you're using an authorized admin email.
       </div>
-
       <form id="login-form" onsubmit="return false;" style="text-align:left;">
         <div class="af"><label for="login-email">Email</label><input type="email" id="login-email" autocomplete="email" required placeholder="admin@dinksociety.com"></div>
         <button class="ab ab--lime" id="login-submit" style="width:100%;margin-top:8px;">Send sign-in link</button>
@@ -242,12 +277,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             Photos
           </button>
-
-
-          <button class="sb__link" data-tab="scores">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            Score Entry
-          </button>
           <button class="sb__link" data-tab="site-images">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
             Site Images
@@ -265,17 +294,15 @@
       </aside>
 
       <main class="admin-main">
-        <div class="test-b" id="test-b"><span>⚡</span><div><strong>Test mode</strong> — sample data for Circuit I. API calls bypassed.</div></div>
 
         <!-- OVERVIEW -->
         <section class="admin-section is-active" data-section="overview">
-          <div class="am-head"><h1 class="am-title">Overview</h1><span class="ov-circuit-label" style="font-size:10px;color:var(--color-text-faint);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;">Circuit I · May 2026</span></div>
-          <div class="stats-row" id="ov-stats"></div>
+          <div class="am-head"><h1 class="am-title">Overview</h1><span class="ov-circuit-label" style="font-size:10px;color:var(--color-text-faint);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;" id="ov-circuit-label"></span></div>
+          <div class="stats-row" id="ov-stats"><div class="loading">Loading overview…</div></div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col">
-            <div class="ac"><div class="ac__h"><h2 class="ac__t">Division fill</h2><span class="ac__s">6 spots each</span></div><div id="ov-fill"></div></div>
-            <div class="ac"><div class="ac__h"><h2 class="ac__t">Activity</h2></div><div id="ov-activity"></div></div>
+            <div class="ac"><div class="ac__h"><h2 class="ac__t">Division fill</h2></div><div id="ov-fill"><div class="loading">Loading…</div></div></div>
+            <div class="ac"><div class="ac__h"><h2 class="ac__t">Recent Activity</h2></div><div id="ov-activity"><div class="loading">Loading…</div></div></div>
           </div>
-          <div class="ac"><div class="ac__h"><h2 class="ac__t">This week</h2><span class="ac__s" id="ov-wk-label">Week 3 · Jun 3</span></div><div id="ov-week"></div></div>
         </section>
 
         <!-- REGISTRATIONS -->
@@ -284,31 +311,28 @@
             <h1 class="am-title">Registrations</h1>
             <div class="am-actions">
               <select id="rf-st" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);">
-                <option value="all">All statuses</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option>
+                <option value="all">All statuses</option><option value="confirmed">Confirmed</option><option value="pending">Pending</option><option value="rejected">Rejected</option>
               </select>
               <select id="rf-dv" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);">
-                <option value="all">All divisions</option><option value="3.0M">3.0 Mixed</option><option value="3.5M">3.5 Mixed</option>
+                <option value="all">All divisions</option>
               </select>
             </div>
           </div>
-          <div class="ac ac--flush"><div id="reg-table"></div></div>
+          <div class="ac ac--flush"><div id="reg-table"><div class="loading">Loading registrations…</div></div></div>
         </section>
 
         <!-- TEAMS -->
         <section class="admin-section" data-section="teams">
-          <div class="am-head"><h1 class="am-title">Teams</h1><div class="am-actions"><button class="ab ab--outline ab--sm" id="seed-btn">Seed from registrations</button></div></div>
-          <div class="ac" style="padding:16px 20px;display:flex;justify-content:space-between;align-items:center;">
-            <div>
-              <div style="font-size:13px;font-weight:700;">Sync Teams from Registrations</div>
-              <div style="font-size:11px;color:var(--color-text-faint);margin-top:2px;">Creates team records for confirmed registrations so captains can log in and teams show on public pages.</div>
-            </div>
-            <div style="display:flex;gap:8px;align-items:center;">
+          <div class="am-head">
+            <h1 class="am-title">Teams</h1>
+            <div class="am-actions">
               <span id="seed-status" style="font-size:11px;color:var(--color-text-faint);"></span>
-              <button class="ab ab--lime ab--sm" id="seed-teams-btn">Sync Teams</button>
+              <button class="ab ab--outline ab--sm" id="seed-teams-btn">Sync from Registrations</button>
             </div>
           </div>
-
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col" id="teams-grid"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col" id="teams-grid">
+            <div class="loading" style="grid-column:1/-1;">Loading teams…</div>
+          </div>
         </section>
 
         <!-- SCHEDULE -->
@@ -316,26 +340,37 @@
           <div class="am-head">
             <h1 class="am-title">Schedule</h1>
             <div class="am-actions">
-              <select id="sched-div" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);">
-                <option value="3.0M">3.0 Mixed</option><option value="3.5M">3.5 Mixed</option>
-              </select>
+              <select id="sched-div" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);"></select>
               <button class="ab ab--lime ab--sm" id="gen-sched-btn">Generate round-robin</button>
             </div>
           </div>
-          <div id="sched-out"></div>
+          <div id="sched-out"><div class="loading">Select a division above.</div></div>
         </section>
 
         <!-- SCORE ENTRY -->
         <section class="admin-section" data-section="scores">
           <div class="am-head">
             <h1 class="am-title">Score Entry</h1>
-            <div class="am-actions">
-              <select id="sc-week" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);">
-                <option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option><option value="7">Week 7 — Championship</option>
-              </select>
+            <span class="ac__s">Enter, edit, or override match scores</span>
+          </div>
+          <div class="ac">
+            <div class="arow">
+              <div class="af">
+                <label for="sc-division">Division</label>
+                <select id="sc-division"></select>
+              </div>
+              <div class="af">
+                <label for="sc-week">Week</label>
+                <select id="sc-week"></select>
+              </div>
+              <div class="af" style="display:flex;align-items:flex-end;">
+                <button class="ab ab--lime ab--sm" id="sc-load-btn">Load Matches</button>
+              </div>
             </div>
           </div>
-          <div id="sc-out"></div>
+          <div id="sc-matches">
+            <div class="empty">Select a division and week, then click Load Matches.</div>
+          </div>
         </section>
 
         <!-- PHOTOS -->
@@ -344,63 +379,22 @@
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Upload</h2></div>
             <div class="arow">
-              <div class="af"><label>Week</label><select id="up-week"><option value="1">Week 1</option><option value="2">Week 2</option><option value="3">Week 3</option><option value="4">Week 4</option><option value="5">Week 5</option><option value="6">Week 6</option><option value="7">Week 7</option></select></div>
+              <div class="af"><label>Week</label><select id="up-week"></select></div>
               <div class="af"><label>Caption</label><input type="text" id="up-cap" placeholder="e.g. Team Kickass with the sweep"></div>
             </div>
             <div class="af"><label>Photos (any size — auto-compressed before upload)</label><input type="file" id="up-files" accept="image/*" multiple style="padding:8px;background:var(--color-surface-2);cursor:pointer;"></div>
             <div class="a-status" id="up-status"></div>
             <div style="text-align:right;"><button class="ab ab--lime ab--sm" id="up-btn">Upload</button></div>
           </div>
-          <div class="ac"><div class="ac__h"><h2 class="ac__t">Gallery</h2><a href='/gallery' style='font-size:10px;color:var(--color-text-faint);'>View public page →</a></div><div id="admin-gallery" class="empty">No photos uploaded yet.</div></div>
+          <div class="ac"><div class="ac__h"><h2 class="ac__t">Gallery</h2><a href="/gallery" style="font-size:10px;color:var(--color-text-faint);">View public page →</a></div><div id="admin-gallery" class="empty">No photos uploaded yet.</div></div>
         </section>
 
-        <!-- SETTINGS -->
-
-
-        <section class="admin-section" data-section="scores">
-          <div class="am-head">
-            <h1 class="am-title">Score Entry</h1>
-            <span class="ac__s">Enter, edit, or override match scores. Select a division and week.</span>
-          </div>
-
-          <div class="ac">
-            <div class="arow">
-              <div class="af">
-                <label for="sc-division">Division</label>
-                <select id="sc-division">
-                  <option value="3.0M">3.0 Mixed</option>
-                  <option value="3.5M">3.5 Mixed</option>
-                </select>
-              </div>
-              <div class="af">
-                <label for="sc-week">Week</label>
-                <select id="sc-week">
-                  <option value="1">Week 1</option>
-                  <option value="2">Week 2</option>
-                  <option value="3">Week 3</option>
-                  <option value="4">Week 4</option>
-                  <option value="5">Week 5</option>
-                  <option value="6">Week 6</option>
-                  <option value="7">Week 7 (Finals)</option>
-                </select>
-              </div>
-              <div class="af" style="display:flex;align-items:flex-end;">
-                <button class="ab ab--lime ab--sm" id="sc-load-btn">Load Matches</button>
-              </div>
-            </div>
-          </div>
-
-          <div id="sc-matches">
-            <div class="empty-state" style="padding:32px 0;font-size:13px;color:var(--color-text-faint);">Select a division and week, then click Load Matches.</div>
-          </div>
-        </section>
-
+        <!-- SITE IMAGES -->
         <section class="admin-section" data-section="site-images">
           <div class="am-head">
             <h1 class="am-title">Site Images</h1>
             <span class="ac__s">Hero slideshow, dividers & CTA backgrounds</span>
           </div>
-
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Upload</h2></div>
             <div class="arow">
@@ -438,88 +432,57 @@
               <button class="ab ab--lime ab--sm" id="si-upload-btn">Upload image</button>
             </div>
           </div>
-
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Hero Slideshow</h2><span class="ac__s">Up to 8 images · auto-rotates every 5s</span></div>
             <div id="si-grid-hero" class="si-grid empty">No images yet — upload one above.</div>
           </div>
-
           <div class="ac">
-            <div class="ac__h"><h2 class="ac__t">Photo Divider 1</h2><span class="ac__s">"Twelve games. Every week." break</span></div>
+            <div class="ac__h"><h2 class="ac__t">Photo Divider 1</h2></div>
             <div id="si-grid-divider-1" class="si-grid empty">No images yet.</div>
           </div>
-
           <div class="ac">
-            <div class="ac__h"><h2 class="ac__t">Photo Divider 2</h2><span class="ac__s">"Your ranking follows you." break</span></div>
+            <div class="ac__h"><h2 class="ac__t">Photo Divider 2</h2></div>
             <div id="si-grid-divider-2" class="si-grid empty">No images yet.</div>
           </div>
-
           <div class="ac">
-            <div class="ac__h"><h2 class="ac__t">Bottom CTA</h2><span class="ac__s">Registration call-to-action background</span></div>
+            <div class="ac__h"><h2 class="ac__t">Bottom CTA</h2></div>
             <div id="si-grid-cta" class="si-grid empty">No images yet.</div>
           </div>
-
           <div class="ac">
-            <div class="ac__h"><h2 class="ac__t">Sub-Page Heroes</h2><span class="ac__s">Background images for page headers</span></div>
+            <div class="ac__h"><h2 class="ac__t">Sub-Page Heroes</h2></div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Schedule</div>
-                <div id="si-grid-schedule" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Standings</div>
-                <div id="si-grid-standings" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Stats</div>
-                <div id="si-grid-stats" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Teams</div>
-                <div id="si-grid-teams" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Rules</div>
-                <div id="si-grid-rules" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Gallery</div>
-                <div id="si-grid-gallery" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Register</div>
-                <div id="si-grid-register" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Leaderboard</div>
-                <div id="si-grid-leaderboard" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
-              <div>
-                <div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Contact</div>
-                <div id="si-grid-contact" class="si-grid empty" style="min-height:60px;">No image.</div>
-              </div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Schedule</div><div id="si-grid-schedule" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Standings</div><div id="si-grid-standings" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Stats</div><div id="si-grid-stats" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Teams</div><div id="si-grid-teams" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Rules</div><div id="si-grid-rules" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Gallery</div><div id="si-grid-gallery" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Register</div><div id="si-grid-register" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Leaderboard</div><div id="si-grid-leaderboard" class="si-grid empty" style="min-height:60px;">No image.</div></div>
+              <div><div style="font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Contact</div><div id="si-grid-contact" class="si-grid empty" style="min-height:60px;">No image.</div></div>
             </div>
           </div>
         </section>
 
+        <!-- SETTINGS -->
         <section class="admin-section" data-section="settings">
           <div class="am-head"><h1 class="am-title">Settings</h1></div>
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Circuit Config</h2><span class="ac__s" id="settings-saved-at"></span></div>
             <div class="arow">
-              <div class="af"><label for="set-circuit-name">Circuit name</label><input type="text" id="set-circuit-name" value="Circuit I"></div>
-              <div class="af"><label for="set-start-date">Start date</label><input type="date" id="set-start-date" value="2026-05-12"></div>
+              <div class="af"><label for="set-circuit-name">Circuit name</label><input type="text" id="set-circuit-name"></div>
+              <div class="af"><label for="set-start-date">Start date</label><input type="date" id="set-start-date"></div>
             </div>
             <div class="arow">
-              <div class="af"><label for="set-team-fee">Team fee</label><input type="text" id="set-team-fee" value="$450"></div>
-              <div class="af"><label for="set-agent-fee">Free agent fee</label><input type="text" id="set-agent-fee" value="$75"></div>
+              <div class="af"><label for="set-team-fee">Team fee</label><input type="text" id="set-team-fee"></div>
+              <div class="af"><label for="set-agent-fee">Free agent fee</label><input type="text" id="set-agent-fee"></div>
             </div>
             <div class="arow">
-              <div class="af"><label for="set-venue">Default venue</label><input type="text" id="set-venue" value="South Bay Pickleball Courts"></div>
-              <div class="af"><label for="set-weeks">Total weeks</label><input type="number" id="set-weeks" value="7" min="1" max="20"></div>
+              <div class="af"><label for="set-venue">Default venue</label><input type="text" id="set-venue"></div>
+              <div class="af"><label for="set-weeks">Total weeks</label><input type="number" id="set-weeks" min="1" max="20"></div>
             </div>
             <div class="arow">
-              <div class="af"><label for="set-teams-per-div">Teams per division</label><input type="number" id="set-teams-per-div" value="6" min="2" max="16"></div>
+              <div class="af"><label for="set-teams-per-div">Teams per division</label><input type="number" id="set-teams-per-div" min="2" max="16"></div>
               <div class="af"></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
@@ -529,54 +492,129 @@
           </div>
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Admins</h2></div>
-            <table class="at"><thead><tr><th>Email</th><th>Role</th><th>Added</th></tr></thead>
-            <tbody><tr><td>richard@dinksociety.com</td><td><span class="p p--confirmed">Owner</span></td><td>Apr 2026</td></tr></tbody></table>
+            <table class="at"><thead><tr><th>Email</th><th>Role</th></tr></thead>
+            <tbody id="admins-list"><tr><td colspan="2" class="loading">Loading…</td></tr></tbody></table>
           </div>
         </section>
+
       </main>
     </div>
   </div>
 
-  <script>
-  const $=s=>document.querySelector(s),$id=i=>document.getElementById(i),$$=s=>document.querySelectorAll(s);
-  const TEST=false,DL={'3.0M':'3.0 Mixed','3.5M':'3.5 Mixed'};
+  <!-- Team Detail Panel (slide-out) -->
+  <div class="tdp-overlay" id="tdp-overlay"></div>
+  <div class="tdp-panel" id="tdp-panel">
+    <div class="tdp-head">
+      <h2 class="ac__t" id="tdp-title">Team Details</h2>
+      <button class="tdp-close" id="tdp-close">✕</button>
+    </div>
+    <div class="tdp-body" id="tdp-body"></div>
+    <div class="tdp-foot">
+      <div class="a-status" id="tdp-status" style="margin:0;flex:1;"></div>
+      <button class="ab ab--outline ab--sm" id="tdp-cancel">Cancel</button>
+      <button class="ab ab--lime ab--sm" id="tdp-save">Save Changes</button>
+    </div>
+  </div>
 
-  // ─── Circuit settings (loaded from API or defaults in test mode) ───
-  let SETTINGS = {
-    circuitName: 'Circuit I',
-    startDate: '2026-05-12',
-    teamFee: '$450',
-    agentFee: '$75',
-    defaultVenue: 'South Bay Pickleball Courts',
-    divisions: ['3.0 Mixed', '3.5 Mixed'],
-    teamsPerDiv: 6,
-    weeks: 7,
+<script>
+// ═══════════════════════════════════════════════════════════
+// ADMIN PORTAL — 100% LIVE DATA
+// ═══════════════════════════════════════════════════════════
+(function() {
+  'use strict';
+
+  const $id = id => document.getElementById(id);
+  const $$ = sel => document.querySelectorAll(sel);
+  const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const fd = iso => { if (!iso) return '—'; return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
+  const fdt = iso => { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  const api = (url, opts = {}) => fetch(url, { credentials: 'include', ...opts });
+  const apiJSON = async (url, opts = {}) => {
+    const r = await api(url, opts);
+    if (!r.ok) { const d = await r.json().catch(() => ({})); throw new Error(d.error || `Request failed (${r.status})`); }
+    return r.json();
   };
 
+  // ─── State ─────────────────────────────────────────────────
+  let SETTINGS = {};
+  let DIVISIONS = []; // { id, name } from seasons
+  let allTeams = [];
+  let allRegistrations = [];
+  let currentPanelTeam = null;
+
+  // ─── Auth ─────────────────────────────────────────────────
+  function checkAuth() {
+    api('/.netlify/functions/admin-whoami')
+      .then(r => { if (!r.ok) throw 0; return r.json(); })
+      .then(d => { if (!d.admin) throw 0; $id('sb-email').textContent = d.email || 'admin'; showShell(); })
+      .catch(() => showLogin());
+  }
+
+  function showLogin() { $id('login-screen').style.display = 'block'; $id('admin-shell').style.display = 'none'; }
+
+  async function showShell() {
+    $id('login-screen').style.display = 'none';
+    $id('admin-shell').style.display = 'block';
+    await Promise.all([loadSettings(), loadDivisions()]);
+    populateDivisionDropdowns();
+    populateWeekDropdowns();
+    renderOV();
+  }
+
+  $id('login-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $id('login-email').value.trim();
+    const s = $id('login-status'), btn = $id('login-submit');
+    if (!email) return;
+    btn.disabled = true; s.className = 'a-status is-info'; s.textContent = 'Sending link…';
+    try {
+      const r = await api('/.netlify/functions/admin-login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email })
+      });
+      if (!r.ok) throw new Error('Could not send link — try again.');
+      s.className = 'a-status'; s.textContent = '';
+      $id('login-sent-email').textContent = email;
+      $id('login-sent').style.display = 'block';
+      $id('login-form').style.display = 'none';
+    } catch (err) { s.className = 'a-status is-err'; s.textContent = err.message; btn.disabled = false; }
+  });
+
+  // Handle redirect error params
+  (function handleAuthErrors() {
+    const params = new URLSearchParams(window.location.search);
+    const err = params.get('error');
+    if (!err) return;
+    const messages = {
+      missing: 'That link was missing a token. Try requesting a new one.',
+      invalid: 'That link is invalid or has already been used. Try requesting a new one.',
+      expired: 'That link has expired. Request a fresh one below.',
+      server: 'Something went wrong. Try again in a moment.',
+    };
+    const s = $id('login-status');
+    s.className = 'a-status is-err';
+    s.textContent = messages[err] || 'Sign-in failed. Try requesting a new link.';
+    history.replaceState({}, '', window.location.pathname);
+  })();
+
+  // ─── Settings ─────────────────────────────────────────────
   async function loadSettings() {
-    if (TEST) {
-      // In test mode, check localStorage for saved test settings
-      const saved = localStorage.getItem('ds_test_settings');
-      if (saved) { try { SETTINGS = { ...SETTINGS, ...JSON.parse(saved) }; } catch(e) {} }
-    } else {
-      try {
-        const r = await fetch('/.netlify/functions/admin-settings', { credentials: 'include' });
-        if (r.ok) { const data = await r.json(); SETTINGS = { ...SETTINGS, ...data }; }
-      } catch(e) { console.warn('Failed to load settings, using defaults:', e); }
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-settings');
+      SETTINGS = { circuitName: 'Circuit I', startDate: '', teamFee: '$450', agentFee: '$75', defaultVenue: '', weeks: 7, teamsPerDiv: 6, ...data };
+    } catch (e) {
+      console.warn('Settings load failed, using defaults:', e);
+      SETTINGS = { circuitName: 'Circuit I', startDate: '', teamFee: '$450', agentFee: '$75', defaultVenue: '', weeks: 7, teamsPerDiv: 6 };
     }
     applySettings();
   }
 
   function applySettings() {
-    // Update Overview header
     const dt = SETTINGS.startDate ? new Date(SETTINGS.startDate + 'T00:00:00') : null;
     const monthStr = dt ? dt.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '';
-    document.querySelectorAll('.ov-circuit-label').forEach(el => {
-      el.textContent = `${SETTINGS.circuitName} · ${monthStr}`;
-    });
+    const label = $id('ov-circuit-label');
+    if (label) label.textContent = SETTINGS.circuitName + (monthStr ? ' · ' + monthStr : '');
 
-    // Populate settings form fields
-    const f = (id, val) => { const el = $id(id); if (el) el.value = val; };
+    const f = (id, val) => { const el = $id(id); if (el) el.value = val ?? ''; };
     f('set-circuit-name', SETTINGS.circuitName);
     f('set-start-date', SETTINGS.startDate);
     f('set-team-fee', SETTINGS.teamFee);
@@ -585,274 +623,613 @@
     f('set-weeks', SETTINGS.weeks);
     f('set-teams-per-div', SETTINGS.teamsPerDiv);
 
-    // Show last-saved timestamp
     if (SETTINGS.updatedAt) {
       const d = new Date(SETTINGS.updatedAt);
-      $id('settings-saved-at').textContent = `Saved ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+      $id('settings-saved-at').textContent = 'Saved ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     }
   }
 
   async function saveSettings() {
-    const btn = $id('save-settings-btn');
-    const status = $id('settings-status');
-    btn.disabled = true;
-    btn.textContent = 'Saving…';
-    status.className = 'a-status';
-    status.style.display = 'none';
-
+    const btn = $id('save-settings-btn'), status = $id('settings-status');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    status.className = 'a-status'; status.style.display = 'none';
     const payload = {
-      circuitName:  $id('set-circuit-name').value.trim(),
-      startDate:    $id('set-start-date').value,
-      teamFee:      $id('set-team-fee').value.trim(),
-      agentFee:     $id('set-agent-fee').value.trim(),
+      circuitName: $id('set-circuit-name').value.trim(),
+      startDate: $id('set-start-date').value,
+      teamFee: $id('set-team-fee').value.trim(),
+      agentFee: $id('set-agent-fee').value.trim(),
       defaultVenue: $id('set-venue').value.trim(),
-      weeks:        parseInt($id('set-weeks').value) || 7,
-      teamsPerDiv:  parseInt($id('set-teams-per-div').value) || 6,
+      weeks: parseInt($id('set-weeks').value) || 7,
+      teamsPerDiv: parseInt($id('set-teams-per-div').value) || 6,
     };
-
     try {
-      if (TEST) {
-        // In test mode, save to localStorage
-        SETTINGS = { ...SETTINGS, ...payload, updatedAt: new Date().toISOString(), updatedBy: 'test-admin' };
-        localStorage.setItem('ds_test_settings', JSON.stringify(SETTINGS));
-      } else {
-        const r = await fetch('/.netlify/functions/admin-settings', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error('Save failed — ' + r.status);
-        const data = await r.json();
-        SETTINGS = { ...SETTINGS, ...data };
-      }
-
+      const data = await apiJSON('/.netlify/functions/admin-settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      SETTINGS = { ...SETTINGS, ...data };
       applySettings();
-      status.className = 'a-status is-ok';
-      status.textContent = 'Settings saved ✓';
-      status.style.display = 'block';
-    } catch(e) {
-      status.className = 'a-status is-err';
-      status.textContent = e.message || 'Failed to save';
-      status.style.display = 'block';
+      populateWeekDropdowns();
+      status.className = 'a-status is-ok'; status.textContent = 'Settings saved ✓'; status.style.display = 'block';
+    } catch (e) {
+      status.className = 'a-status is-err'; status.textContent = e.message || 'Failed to save'; status.style.display = 'block';
     }
-
-    btn.disabled = false;
-    btn.textContent = 'Save';
+    btn.disabled = false; btn.textContent = 'Save';
     setTimeout(() => { status.style.display = 'none'; }, 4000);
   }
-
   $id('save-settings-btn').addEventListener('click', saveSettings);
 
-  // ─── Live data (fetched from API) ────────────────────────────
-  let TT = { '3.0M': [], '3.5M': [] };
-  let TR = [];
-  let TS = { '3.0M': [], '3.5M': [] };
-  let TSC = {};
-
-  async function loadRegistrations() {
+  // ─── Divisions (from Seasons API) ─────────────────────────
+  async function loadDivisions() {
     try {
-      const r = await fetch('/.netlify/functions/admin-registrations', { credentials: 'include' });
-      if (!r.ok) throw new Error('Failed');
-      const data = await r.json();
-      TR = (data.registrations || []).map(reg => ({
-        id: reg.id,
-        path: reg.path,
-        status: reg.status || 'pending',
-        division: reg.division,
-        divLabel: reg.divisionLabel || DL[reg.division] || reg.division,
-        circuit: reg.circuit || 'I',
-        team: reg.team ? {
-          name: reg.team.name,
-          captain: reg.team.captain || reg.team.players?.[0]?.name || '',
-          players: reg.team.players || [],
-        } : undefined,
-        agent: reg.agent || undefined,
-        pay: reg.amountPaid ? { st: 'paid', amt: reg.amountPaid } : { st: 'unpaid' },
-        at: reg.createdAt,
-      }));
+      const data = await apiJSON('/.netlify/functions/admin-seasons');
+      const seasons = data.seasons || [];
+      DIVISIONS = [];
+      for (const s of seasons) {
+        if (s.status === 'archived') continue;
+        for (const d of (s.divisions || [])) {
+          if (!DIVISIONS.find(x => x.id === d.id)) {
+            DIVISIONS.push({ id: d.id, name: d.name || d.id });
+          }
+        }
+      }
+      // Fallback if no divisions configured yet
+      if (DIVISIONS.length === 0) {
+        DIVISIONS = [{ id: '3.0M', name: '3.0 Mixed' }, { id: '3.5M', name: '3.5 Mixed' }];
+      }
     } catch (e) {
-      console.error('loadRegistrations:', e);
-      TR = [];
+      console.warn('Failed to load divisions:', e);
+      DIVISIONS = [{ id: '3.0M', name: '3.0 Mixed' }, { id: '3.5M', name: '3.5 Mixed' }];
     }
   }
 
-  async function loadTeams() {
-    try {
-      const r = await fetch('/.netlify/functions/admin-teams', { credentials: 'include' });
-      if (!r.ok) throw new Error('Failed');
-      const data = await r.json();
-      TT = { '3.0M': [], '3.5M': [] };
-      (data.teams || []).forEach(t => {
-        const div = t.division || '3.0M';
-        if (!TT[div]) TT[div] = [];
-        TT[div].push({
-          id: t.id,
-          name: t.name,
-          cap: t.captainName || t.roster?.[0]?.name || '',
-          capE: t.captainEmail || t.roster?.[0]?.email || '',
-          p: (t.roster || []).map(p => p.name).filter(Boolean),
-        });
-      });
-    } catch (e) {
-      console.error('loadTeams:', e);
-      TT = { '3.0M': [], '3.5M': [] };
+  function populateDivisionDropdowns() {
+    const selectors = ['sched-div', 'sc-division', 'rf-dv'];
+    for (const selId of selectors) {
+      const sel = $id(selId);
+      if (!sel) continue;
+      // For rf-dv, keep "All divisions" option
+      if (selId === 'rf-dv') {
+        sel.innerHTML = '<option value="all">All divisions</option>' + DIVISIONS.map(d => '<option value="' + h(d.id) + '">' + h(d.name) + '</option>').join('');
+      } else {
+        sel.innerHTML = DIVISIONS.map(d => '<option value="' + h(d.id) + '">' + h(d.name) + '</option>').join('');
+      }
     }
   }
 
-  async function loadSchedule() {
-    try {
-      const r = await fetch('/.netlify/functions/admin-schedule', { credentials: 'include' });
-      if (!r.ok) throw new Error('Failed');
-      const data = await r.json();
-      TS = data.schedule || { '3.0M': [], '3.5M': [] };
-    } catch (e) {
-      console.warn('loadSchedule:', e);
-      TS = { '3.0M': [], '3.5M': [] };
-    }
+  function populateWeekDropdowns() {
+    const weeks = SETTINGS.weeks || 7;
+    const weekOpts = Array.from({ length: weeks }, (_, i) => '<option value="' + (i + 1) + '">Week ' + (i + 1) + (i + 1 === weeks ? ' — Championship' : '') + '</option>').join('');
+    ['sc-week', 'up-week'].forEach(id => { const el = $id(id); if (el) el.innerHTML = weekOpts; });
   }
 
-  function rr(teams){const n=teams.length;if(n<2)return[];const rounds=[],list=[...teams];for(let r=0;r<n-1;r++){const mm=[];for(let i=0;i<n/2;i++){mm.push({id:'m_w'+(r+1)+'_'+(i+1),tA:{id:list[i].id,name:list[i].name},tB:{id:list[n-1-i].id,name:list[n-1-i].name},ct:'Court '+(i+1),vn:'South Bay Pickleball',dt:null,fin:false});}rounds.push({w:r+1,mm});list.splice(1,0,list.pop());}return rounds;}
-
-  // ─── Auth ─────────────────────────────────────────────────────
-
-  function checkAuth(){if(TEST){showShell();return;}
-  fetch('/.netlify/functions/admin-whoami',{credentials:'include'}).then(r=>{if(!r.ok)throw 0;return r.json();}).then(d=>{if(!d.admin)throw 0;showShell();}).catch(()=>showLogin());}
-  function showLogin(){$id('login-screen').style.display='block';$id('admin-shell').style.display='none';}
-  async function showShell(){$id('login-screen').style.display='none';$id('admin-shell').style.display='block';$id('test-b').style.display='none';await loadSettings();await Promise.all([loadRegistrations(),loadTeams(),loadSchedule()]);renderOV();}
-
-  $id('login-form').addEventListener('submit',async(e)=>{e.preventDefault();if(TEST){showShell();return;}
-  const email=$id('login-email').value.trim(),s=$id('login-status'),btn=$id('login-submit');
-  if(!email)return;
-  btn.disabled=true;s.className='a-status is-info';s.textContent='Sending link…';
-  try{
-    const r=await fetch('/.netlify/functions/admin-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
-    if(!r.ok)throw new Error('Could not send link — try again.');
-    s.className='a-status';s.textContent='';
-    $id('login-sent-email').textContent=email;
-    $id('login-sent').style.display='block';
-    $id('login-form').style.display='none';
-  }catch(err){s.className='a-status is-err';s.textContent=err.message;btn.disabled=false;}
+  // ─── Tab navigation ───────────────────────────────────────
+  $$('.sb__link[data-tab]').forEach(b => {
+    b.addEventListener('click', () => {
+      $$('.sb__link').forEach(x => x.classList.remove('is-active'));
+      b.classList.add('is-active');
+      const t = b.dataset.tab;
+      $$('.admin-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === t));
+      if (t === 'overview') renderOV();
+      if (t === 'registrations') renderReg();
+      if (t === 'teams') renderTeams();
+      if (t === 'schedule') renderSched();
+      if (t === 'scores') {}
+      if (t === 'settings') applySettings();
+      if (t === 'moments') loadAdminGallery();
+      $id('sb').classList.remove('is-open');
+      $id('mob-overlay').classList.remove('is-open');
+    });
   });
 
-  // Handle redirect error params from the magic-link consumer
-  (function handleAuthErrors(){
-    const params=new URLSearchParams(window.location.search);
-    const err=params.get('error');
-    if(!err)return;
-    const messages={
-      missing:'That link was missing a token. Try requesting a new one.',
-      invalid:'That link is invalid or has already been used. Try requesting a new one.',
-      expired:'That link has expired. Request a fresh one below.',
-      server:'Something went wrong. Try again in a moment.',
+  $id('mob-ham')?.addEventListener('click', () => { $id('sb').classList.toggle('is-open'); $id('mob-overlay').classList.toggle('is-open'); });
+  $id('mob-overlay')?.addEventListener('click', () => { $id('sb').classList.remove('is-open'); $id('mob-overlay').classList.remove('is-open'); });
+  $id('sign-out-btn')?.addEventListener('click', async () => {
+    try { await api('/.netlify/functions/admin-logout', { method: 'POST' }); } catch (e) {}
+    window.location.reload();
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // OVERVIEW — live from admin-overview endpoint
+  // ═══════════════════════════════════════════════════════════
+  async function renderOV() {
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-overview');
+      const s = data.stats || {};
+      const fill = data.divisionFill || [];
+      const recent = data.recent || [];
+
+      $id('sb-reg-ct').textContent = (s.teams || 0) + (s.agents || 0);
+      $id('ov-stats').innerHTML =
+        '<div class="sc"><div class="sc__l">Teams</div><div class="sc__v">' + (s.teams || 0) + '</div><div class="sc__sub">' + (s.teamCapacity || '—') + ' capacity</div></div>' +
+        '<div class="sc"><div class="sc__l">Free agents</div><div class="sc__v sc__v--teal">' + (s.agents || 0) + '</div><div class="sc__sub">waiting for draft</div></div>' +
+        '<div class="sc"><div class="sc__l">Revenue</div><div class="sc__v sc__v--gold">$' + (s.revenue || 0).toLocaleString() + '</div></div>' +
+        '<div class="sc"><div class="sc__l">Photos</div><div class="sc__v">' + (s.photos || 0) + '</div></div>';
+
+      $id('ov-fill').innerHTML = fill.length ? fill.map(f => {
+        const p = Math.min(100, Math.round(f.filled / (f.capacity || 6) * 100));
+        const co = p >= 100 ? 'var(--color-teal)' : 'var(--color-lime)';
+        return '<div class="fb"><div class="fb__h"><strong>' + h(f.label) + '</strong><span>' + f.filled + '/' + f.capacity + '</span></div><div class="fb__track"><div class="fb__fill" style="width:' + p + '%;background:' + co + ';"></div></div></div>';
+      }).join('') : '<div class="empty">No divisions yet.</div>';
+
+      $id('ov-activity').innerHTML = recent.length ? recent.map(r => {
+        const dot = r.status === 'confirmed' ? 'g' : r.status === 'pending' ? 'y' : 'b';
+        return '<div class="ai"><div class="ai__dot ai__dot--' + dot + '"></div><div><div>' + h(r.displayName) + ' · <span class="p p--' + (r.status || 'pending') + '">' + (r.status || 'pending') + '</span></div><div class="ai__time">' + h(r.divisionLabel || r.division) + ' · ' + fd(r.createdAt) + '</div></div></div>';
+      }).join('') : '<div class="empty">No recent activity.</div>';
+    } catch (e) {
+      $id('ov-stats').innerHTML = '<div class="empty">Failed to load overview: ' + h(e.message) + '</div>';
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // REGISTRATIONS — live from admin-registrations endpoint
+  // ═══════════════════════════════════════════════════════════
+  async function renderReg() {
+    const table = $id('reg-table');
+    table.innerHTML = '<div class="loading">Loading registrations…</div>';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-registrations');
+      allRegistrations = data.registrations || [];
+      filterAndShowReg();
+    } catch (e) {
+      table.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
+    }
+  }
+
+  function filterAndShowReg() {
+    let f = [...allRegistrations];
+    const sf = $id('rf-st').value, df = $id('rf-dv').value;
+    if (sf !== 'all') f = f.filter(r => r.status === sf);
+    if (df !== 'all') f = f.filter(r => r.division === df);
+
+    if (!f.length) { $id('reg-table').innerHTML = '<div class="empty">No registrations match.</div>'; return; }
+
+    $id('reg-table').innerHTML = '<table class="at"><thead><tr><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Payment</th><th>Contact</th><th>Date</th></tr></thead><tbody>' +
+      f.map(r => {
+        const nm = r.path === 'team'
+          ? '<strong style="font-weight:600">' + h(r.team?.name) + '</strong> <span style="color:var(--color-text-faint);font-size:10px">(' + h(r.team?.captain) + ')</span>'
+          : h(r.agent?.name);
+        const em = r.path === 'team' ? r.team?.players?.[0]?.email : r.agent?.email;
+        const paid = r.amountPaid > 0;
+        const pp = paid ? '<span class="p p--paid">$' + r.amountPaid + '</span>' : '<span class="p p--unpaid">Unpaid</span>';
+        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + (r.status || 'pending') + '">' + (r.status || 'pending') + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  $id('rf-st').addEventListener('change', filterAndShowReg);
+  $id('rf-dv').addEventListener('change', filterAndShowReg);
+
+  // ═══════════════════════════════════════════════════════════
+  // TEAMS — live from admin-teams endpoint + slide-out panel
+  // ═══════════════════════════════════════════════════════════
+  async function renderTeams() {
+    const grid = $id('teams-grid');
+    grid.innerHTML = '<div class="loading" style="grid-column:1/-1;">Loading teams…</div>';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-teams');
+      allTeams = data.teams || [];
+      showTeamCards();
+    } catch (e) {
+      grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">Failed to load teams: ' + h(e.message) + '</div>';
+    }
+  }
+
+  function showTeamCards() {
+    const grid = $id('teams-grid');
+    if (!allTeams.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No teams yet. Sync from registrations to create team records.</div>'; return; }
+
+    grid.innerHTML = allTeams.map(t => {
+      const captain = (t.roster || []).find(p => p.isCaptain);
+      const coCaptain = (t.roster || []).find(p => p.isCoCaptain);
+      const rosterCt = (t.roster || []).length;
+      const colorSwatch = t.color ? '<span class="team-swatch" style="background:' + h(t.color) + ';"></span> ' : '';
+      return '<div class="ac team-card" data-team-id="' + h(t.id) + '">' +
+        '<div class="ac__h"><span class="ac__t">' + colorSwatch + h(t.name) + '</span><span class="p p--div">' + h(t.divisionLabel || t.division) + '</span></div>' +
+        '<div style="font-size:11px;margin-bottom:8px;color:var(--color-text-muted)">' +
+          '<strong style="font-weight:600;color:var(--color-text)">Captain:</strong> ' + h(captain?.name || '—') +
+          (coCaptain ? ' · <strong style="font-weight:600;color:var(--color-text)">Co-Captain:</strong> ' + h(coCaptain.name) : '') +
+        '</div>' +
+        '<div style="font-size:11px;margin-bottom:8px">' +
+          (t.roster || []).map(p => {
+            const badge = p.isCaptain ? ' ★' : p.isCoCaptain ? ' ☆' : '';
+            return '<span style="display:inline-block;padding:2px 8px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-full);margin:2px;font-size:10px;color:var(--color-text-muted)">' + h(p.name) + badge + '</span>';
+          }).join('') +
+        '</div>' +
+        '<div style="font-size:10px;color:var(--color-text-faint)">' + rosterCt + ' players</div>' +
+      '</div>';
+    }).join('');
+
+    grid.querySelectorAll('.team-card').forEach(card => {
+      card.addEventListener('click', () => openTeamPanel(card.dataset.teamId));
+    });
+  }
+
+  // ── Seed Teams button ──
+  $id('seed-teams-btn').addEventListener('click', async () => {
+    const btn = $id('seed-teams-btn'), status = $id('seed-status');
+    btn.disabled = true; status.textContent = 'Syncing…'; status.style.color = 'var(--color-text-faint)';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-seed-teams', { method: 'POST' });
+      status.textContent = 'Created: ' + (data.created || 0) + ', Updated: ' + (data.updated || 0) + ', Skipped: ' + (data.skipped || 0);
+      status.style.color = 'var(--color-teal)';
+      if (data.errors > 0) { status.textContent += ', Errors: ' + data.errors; status.style.color = 'var(--color-gold)'; }
+      renderTeams();
+    } catch (e) {
+      status.textContent = e.message; status.style.color = 'var(--color-red, #ef4444)';
+    } finally { btn.disabled = false; }
+  });
+
+  // ── Team Detail Panel ──
+  function openTeamPanel(teamId) {
+    const team = allTeams.find(t => t.id === teamId);
+    if (!team) return;
+    currentPanelTeam = JSON.parse(JSON.stringify(team)); // deep copy for editing
+
+    $id('tdp-title').textContent = team.name;
+    renderPanelBody();
+    $id('tdp-overlay').classList.add('is-open');
+    $id('tdp-panel').classList.add('is-open');
+  }
+
+  function closePanel() {
+    $id('tdp-overlay').classList.remove('is-open');
+    $id('tdp-panel').classList.remove('is-open');
+    currentPanelTeam = null;
+    $id('tdp-status').className = 'a-status';
+  }
+
+  $id('tdp-close').addEventListener('click', closePanel);
+  $id('tdp-cancel').addEventListener('click', closePanel);
+  $id('tdp-overlay').addEventListener('click', closePanel);
+
+  function renderPanelBody() {
+    const t = currentPanelTeam;
+    if (!t) return;
+    const body = $id('tdp-body');
+
+    body.innerHTML =
+      '<div class="af"><label>Team Name</label><input type="text" id="tdp-name" value="' + h(t.name || '') + '"></div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Division</label><select id="tdp-division">' + DIVISIONS.map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
+        '<div class="af"><label>Notes</label><input type="text" id="tdp-notes" value="' + h(t.notes || '') + '"></div>' +
+      '</div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Primary Color</label><div class="color-input-row"><input type="color" id="tdp-color" value="' + (t.color || '#b8ff2c') + '"><input type="text" id="tdp-color-hex" value="' + h(t.color || '') + '" placeholder="#hex"></div></div>' +
+        '<div class="af"><label>Secondary Color</label><div class="color-input-row"><input type="color" id="tdp-color2" value="' + (t.secondaryColor || '#17d7b0') + '"><input type="text" id="tdp-color2-hex" value="' + h(t.secondaryColor || '') + '" placeholder="#hex"></div></div>' +
+      '</div>' +
+
+      '<div style="margin:20px 0 10px;"><div class="ac__h"><span class="ac__t">Roster (' + (t.roster || []).length + '/10)</span></div></div>' +
+
+      '<div id="tdp-roster">' + renderRosterItems(t.roster || []) + '</div>' +
+
+      '<div style="margin-top:12px;padding:14px;background:var(--color-surface-2);border-radius:var(--radius-sm);border:1px solid var(--color-border);">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Add Player</div>' +
+        '<div class="arow">' +
+          '<div class="af"><label>Name</label><input type="text" id="tdp-add-name" placeholder="Full name"></div>' +
+          '<div class="af"><label>Email</label><input type="email" id="tdp-add-email" placeholder="email@example.com"></div>' +
+        '</div>' +
+        '<div class="arow">' +
+          '<div class="af"><label>Gender</label><select id="tdp-add-gender"><option value="">—</option><option value="M">Male</option><option value="F">Female</option></select></div>' +
+          '<div class="af"><label>DUPR</label><input type="text" id="tdp-add-dupr" placeholder="e.g. 3.5"></div>' +
+        '</div>' +
+        '<div style="text-align:right;"><button class="ab ab--teal ab--sm" id="tdp-add-btn">Add to roster</button></div>' +
+      '</div>';
+
+    // Wire up color sync
+    $id('tdp-color').addEventListener('input', () => { $id('tdp-color-hex').value = $id('tdp-color').value; });
+    $id('tdp-color2').addEventListener('input', () => { $id('tdp-color2-hex').value = $id('tdp-color2').value; });
+    $id('tdp-color-hex').addEventListener('change', () => { const v = $id('tdp-color-hex').value; if (/^#[0-9a-f]{6}$/i.test(v)) $id('tdp-color').value = v; });
+    $id('tdp-color2-hex').addEventListener('change', () => { const v = $id('tdp-color2-hex').value; if (/^#[0-9a-f]{6}$/i.test(v)) $id('tdp-color2').value = v; });
+
+    // Wire up add player
+    $id('tdp-add-btn').addEventListener('click', () => {
+      const name = $id('tdp-add-name').value.trim();
+      if (!name) return;
+      if ((currentPanelTeam.roster || []).length >= 10) { alert('Team is at max capacity (10 players).'); return; }
+      const roster = currentPanelTeam.roster || [];
+      roster.push({
+        id: 'new_' + Date.now(),
+        name,
+        email: $id('tdp-add-email').value.trim() || null,
+        gender: $id('tdp-add-gender').value || '',
+        dupr: $id('tdp-add-dupr').value.trim() || null,
+        isCaptain: false,
+        isCoCaptain: false,
+      });
+      currentPanelTeam.roster = roster;
+      $id('tdp-add-name').value = '';
+      $id('tdp-add-email').value = '';
+      $id('tdp-add-gender').value = '';
+      $id('tdp-add-dupr').value = '';
+      $id('tdp-roster').innerHTML = renderRosterItems(roster);
+      wireRosterActions();
+    });
+
+    wireRosterActions();
+  }
+
+  function renderRosterItems(roster) {
+    if (!roster.length) return '<div class="empty" style="padding:12px;">No players on roster.</div>';
+    return roster.map((p, i) => {
+      const badges = [];
+      if (p.isCaptain) badges.push('<span class="roster-item__badge roster-item__badge--cap">Captain</span>');
+      if (p.isCoCaptain) badges.push('<span class="roster-item__badge roster-item__badge--cocap">Co-Captain</span>');
+      return '<div class="roster-item" data-idx="' + i + '">' +
+        '<div class="roster-item__info">' +
+          '<div class="roster-item__name">' + h(p.name) + ' ' + badges.join(' ') + '</div>' +
+          '<div class="roster-item__meta">' + [p.email, p.gender, p.dupr ? 'DUPR ' + p.dupr : ''].filter(Boolean).join(' · ') + '</div>' +
+        '</div>' +
+        '<div class="roster-item__actions">' +
+          (!p.isCaptain ? '<button data-action="set-captain" data-idx="' + i + '" title="Make Captain">★</button>' : '') +
+          (!p.isCoCaptain && !p.isCaptain ? '<button data-action="set-cocaptain" data-idx="' + i + '" title="Make Co-Captain">☆</button>' : '') +
+          '<button data-action="remove" data-idx="' + i + '" class="act-danger" title="Remove">✕</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function wireRosterActions() {
+    $id('tdp-roster').querySelectorAll('button[data-action]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        const action = btn.dataset.action;
+        const roster = currentPanelTeam.roster || [];
+        if (action === 'set-captain') {
+          roster.forEach(p => p.isCaptain = false);
+          if (roster[idx]) roster[idx].isCaptain = true;
+        } else if (action === 'set-cocaptain') {
+          roster.forEach(p => p.isCoCaptain = false);
+          if (roster[idx]) roster[idx].isCoCaptain = true;
+        } else if (action === 'remove') {
+          if (roster.length <= 4) { alert('Cannot remove — team needs at least 4 players.'); return; }
+          if (!confirm('Remove ' + roster[idx].name + ' from roster?')) return;
+          roster.splice(idx, 1);
+        }
+        currentPanelTeam.roster = roster;
+        $id('tdp-roster').innerHTML = renderRosterItems(roster);
+        wireRosterActions();
+      });
+    });
+  }
+
+  // ── Save panel changes ──
+  $id('tdp-save').addEventListener('click', async () => {
+    if (!currentPanelTeam) return;
+    const status = $id('tdp-status');
+    const btn = $id('tdp-save');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    status.className = 'a-status';
+
+    const payload = {
+      name: $id('tdp-name').value.trim(),
+      division: $id('tdp-division').value,
+      divisionLabel: DIVISIONS.find(d => d.id === $id('tdp-division').value)?.name || $id('tdp-division').value,
+      notes: $id('tdp-notes').value.trim(),
+      color: $id('tdp-color-hex').value.trim() || null,
+      secondaryColor: $id('tdp-color2-hex').value.trim() || null,
+      roster: currentPanelTeam.roster || [],
     };
-    const s=$id('login-status');
-    s.className='a-status is-err';
-    s.textContent=messages[err]||'Sign-in failed. Try requesting a new link.';
-    history.replaceState({},'',window.location.pathname);
-  })();
 
-  // ─── Tab navigation ───────────────────────────────────────────
+    try {
+      await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(currentPanelTeam.id), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      status.className = 'a-status is-ok'; status.textContent = 'Saved ✓';
+      renderTeams(); // refresh cards behind panel
+      setTimeout(closePanel, 800);
+    } catch (e) {
+      status.className = 'a-status is-err'; status.textContent = e.message || 'Save failed';
+    }
+    btn.disabled = false; btn.textContent = 'Save Changes';
+  });
 
-  $$('.sb__link[data-tab]').forEach(b=>{b.addEventListener('click',()=>{$$('.sb__link').forEach(x=>x.classList.remove('is-active'));b.classList.add('is-active');const t=b.dataset.tab;$$('.admin-section').forEach(s=>s.classList.toggle('is-active',s.dataset.section===t));
-  if(t==='overview'){loadRegistrations().then(()=>loadTeams().then(renderOV));}if(t==='registrations'){loadRegistrations().then(renderReg);}if(t==='teams'){loadTeams().then(()=>loadRegistrations().then(renderTeams));}if(t==='schedule')renderSched();if(t==='scores')renderSC();if(t==='settings')applySettings();if(t==='moments')loadAdminGallery();
-  $id('sb').classList.remove('is-open');$id('mob-overlay').classList.remove('is-open');});});
+  // ═══════════════════════════════════════════════════════════
+  // SCHEDULE — live from admin-matches endpoint
+  // ═══════════════════════════════════════════════════════════
+  async function renderSched() {
+    const div = $id('sched-div').value;
+    const out = $id('sched-out');
+    if (!div) { out.innerHTML = '<div class="empty">Select a division.</div>'; return; }
+    out.innerHTML = '<div class="loading">Loading schedule…</div>';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-matches?circuit=I&division=' + encodeURIComponent(div));
+      const weeks = data.weeks || [];
+      if (!weeks.length) { out.innerHTML = '<div class="empty">No schedule generated yet for this division. Click "Generate round-robin" to create one.</div>'; return; }
 
-  $id('mob-ham')?.addEventListener('click',()=>{$id('sb').classList.toggle('is-open');$id('mob-overlay').classList.toggle('is-open');});
-  $id('mob-overlay')?.addEventListener('click',()=>{$id('sb').classList.remove('is-open');$id('mob-overlay').classList.remove('is-open');});
-  $id('sign-out-btn')?.addEventListener('click',()=>window.location.reload());
+      out.innerHTML = '<div class="wc-grid">' + weeks.map((w, i) =>
+        '<div class="wc' + (i === 0 ? ' is-active' : '') + '" data-week="' + w.week + '"><div class="wc__n">Week ' + w.week + '</div><div class="wc__m">' + (w.matches.length ? w.matches.filter(m => m.finalizedAt).length + '/' + w.matches.length + ' final' : '—') + '</div></div>'
+      ).join('') + '</div><div class="ac" id="wk-card"></div>';
 
-  // ─── Overview ─────────────────────────────────────────────────
-
-  function renderOV(){
-    const tR=TR.filter(r=>r.path==='team'),aR=TR.filter(r=>r.path==='agent'),cf=tR.filter(r=>r.status==='confirmed'),pd=TR.filter(r=>r.pay?.st==='paid'),rv=pd.reduce((s,r)=>s+(r.pay?.amt||0),0);
-    $id('sb-reg-ct').textContent=TR.length;
-    $id('ov-stats').innerHTML=`
-      <div class="sc"><div class="sc__l">Teams</div><div class="sc__v">${tR.length}</div><div class="sc__sub">${cf.length} confirmed · ${tR.length-cf.length} pending</div></div>
-      <div class="sc"><div class="sc__l">Free agents</div><div class="sc__v sc__v--teal">${aR.length}</div><div class="sc__sub">waiting for draft</div></div>
-      <div class="sc"><div class="sc__l">Revenue</div><div class="sc__v sc__v--gold">$${rv.toLocaleString()}</div><div class="sc__sub">${pd.length} payments</div></div>
-      <div class="sc"><div class="sc__l">Weeks played</div><div class="sc__v">2</div><div class="sc__sub">of ${SETTINGS.weeks} total</div></div>`;
-    $id('ov-fill').innerHTML=[{l:'3.0 Mixed',f:TT['3.0M'].length,c:SETTINGS.teamsPerDiv},{l:'3.5 Mixed',f:TT['3.5M'].length,c:SETTINGS.teamsPerDiv}].map(f=>{const p=Math.min(100,Math.round(f.f/f.c*100)),co=p>=100?'var(--color-teal)':'var(--color-lime)';return`<div class="fb"><div class="fb__h"><strong>${h(f.l)}</strong><span>${f.f}/${f.c}</span></div><div class="fb__track"><div class="fb__fill" style="width:${p}%;background:${co};"></div></div></div>`;}).join('');
-    $id('ov-activity').innerHTML=[
-      {d:'g',t:'Baseline Bullies confirmed',w:'2h ago'},{d:'y',t:'Casey Hwang signed up (agent)',w:'5h ago'},
-      {d:'b',t:'Week 2 scores finalized (3.0M)',w:'1d ago'},{d:'g',t:'Court Jesters paid $450',w:'2d ago'},
-      {d:'y',t:'Riley Thornton signed up (agent)',w:'3d ago'},{d:'b',t:'Week 2 scores finalized (3.5M)',w:'3d ago'},
-    ].map(a=>`<div class="ai"><div class="ai__dot ai__dot--${a.d}"></div><div><div>${a.t}</div><div class="ai__time">${a.w}</div></div></div>`).join('');
-    const wm=TS['3.0M'].find(w=>w.w===3);
-    $id('ov-week').innerHTML=wm?.mm.length?wm.mm.map(m=>`<div class="mr"><div class="mr__t">${h(m.tA.name)}</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">${h(m.tB.name)}</div><div class="mr__m">${h(m.ct||'')}</div></div>`).join(''):'<div class="empty">No matches.</div>';
+      $$('.wc').forEach(c => c.addEventListener('click', () => selectWeek(parseInt(c.dataset.week), weeks)));
+      selectWeek(weeks[0].week, weeks);
+    } catch (e) {
+      out.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
+    }
   }
 
-  // ─── Registrations ────────────────────────────────────────────
-
-  function renderReg(){
-    let f=[...TR];const sf=$id('rf-st').value,df=$id('rf-dv').value;
-    if(sf!=='all')f=f.filter(r=>r.status===sf);if(df!=='all')f=f.filter(r=>r.division===df);
-    if(!f.length){$id('reg-table').innerHTML='<div class="empty">No registrations match.</div>';return;}
-    $id('reg-table').innerHTML=`<table class="at"><thead><tr><th>Ref</th><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Payment</th><th>Contact</th><th>Date</th><th></th></tr></thead><tbody>${f.map(r=>{
-      const nm=r.path==='team'?`<strong style="font-weight:600">${h(r.team?.name)}</strong> <span style="color:var(--color-text-faint);font-size:10px">(${h(r.team?.captain)})</span>`:h(r.agent?.name);
-      const em=r.path==='team'?r.team?.players?.[0]?.email:r.agent?.email;
-      const pp=r.pay?.st==='paid'?'<span class="p p--paid">Paid</span>':'<span class="p p--unpaid">Unpaid</span>';
-      return`<tr><td><code style="font-size:9px;color:var(--color-text-faint)">${(r.id||'').slice(0,10)}</code></td><td>${nm}</td><td><span class="p p--${r.path}">${r.path==='team'?'Team':'Agent'}</span></td><td>${h(r.divLabel)}</td><td><span class="p p--${r.status}">${r.status}</span></td><td>${pp}</td><td style="font-size:11px;color:var(--color-text-muted)">${h(em)}</td><td style="font-size:10px;color:var(--color-text-faint)">${fd(r.at)}</td><td>${r.status==='pending'?`<button class="ab ab--lime ab--sm" onclick="cfmReg('${r.id}')">Confirm</button>`:''}</td></tr>`;
-    }).join('')}</tbody></table>`;
-  }
-  $id('rf-st').addEventListener('change',renderReg);$id('rf-dv').addEventListener('change',renderReg);
-  window.cfmReg=function(id){const r=TR.find(x=>x.id===id);if(r){r.status='confirmed';renderReg();renderOV();}};
-
-  // ─── Teams ────────────────────────────────────────────────────
-
-  function renderTeams(){
-    const g=$id('teams-grid'),cards=[];
-    for(const[div,teams]of Object.entries(TT)){teams.forEach(t=>{const reg=TR.find(r=>r.path==='team'&&r.team?.name===t.name);const paid=reg?.pay?.st==='paid';
-    cards.push(`<div class="ac"><div class="ac__h"><span class="ac__t">${h(t.name)}</span><span class="p p--div">${DL[div]}</span></div>
-    <div style="font-size:11px;margin-bottom:10px;color:var(--color-text-muted)"><strong style="font-weight:600;color:var(--color-text)">Captain:</strong> ${h(t.cap)} <span style="color:var(--color-text-faint);margin-left:4px">${h(t.capE)}</span></div>
-    <div style="font-size:11px;margin-bottom:10px">${t.p.map(n=>`<span style="display:inline-block;padding:2px 8px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-full);margin:2px 2px;font-size:10px;color:var(--color-text-muted)">${h(n)}</span>`).join('')}</div>
-    <div style="display:flex;gap:8px;align-items:center;font-size:11px">${paid?'<span class="p p--paid">$450 Paid</span>':'<span class="p p--unpaid">Unpaid</span>'}<span style="color:var(--color-text-faint);margin-left:auto;font-size:10px">${h(t.id)}</span></div></div>`);});}
-    g.innerHTML=cards.join('');
+  function selectWeek(n, weeks) {
+    $$('.wc').forEach(c => c.classList.toggle('is-active', parseInt(c.dataset.week) === n));
+    const wk = weeks.find(w => w.week === n);
+    const card = $id('wk-card');
+    if (!wk?.matches?.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
+    card.innerHTML = '<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ' + n + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
+      wk.matches.map(m => {
+        const dt = m.scheduledAt ? fdt(m.scheduledAt) : '—';
+        const fin = m.finalizedAt;
+        return '<div class="mr"><div class="mr__t">' + h(m.teamA.name) + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(m.teamB.name) + '</div><div class="mr__m">' + h(m.court || '') + (fin ? ' · <span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '') + '<br><span style="font-size:9px">' + dt + '</span></div></div>';
+      }).join('') + '</div>';
   }
 
-  // ─── Schedule ─────────────────────────────────────────────────
+  $id('sched-div').addEventListener('change', renderSched);
 
-  function renderSched(){
-    const div=$id('sched-div').value,weeks=TS[div]||[],out=$id('sched-out');
-    if(!weeks.length){out.innerHTML='<div class="empty">No schedule generated.</div>';return;}
-    out.innerHTML=`<div class="wc-grid">${weeks.map(w=>`<div class="wc ${w.w===1?'is-active':''}" data-week="${w.w}" onclick="selW(${w.w})"><div class="wc__n">Week ${w.w}</div><div class="wc__m">${w.mm.length?`${w.mm.filter(m=>m.fin).length}/${w.mm.length} final`:'—'}</div></div>`).join('')}</div><div class="ac" id="wk-card"></div>`;
-    selW(1);
+  // ── Generate schedule ──
+  $id('gen-sched-btn').addEventListener('click', async () => {
+    const div = $id('sched-div').value;
+    if (!div) return;
+    if (!confirm('Generate round-robin schedule for ' + div + '? This will overwrite any existing schedule for this division.')) return;
+
+    const btn = $id('gen-sched-btn');
+    btn.disabled = true; btn.textContent = 'Generating…';
+    try {
+      // Get teams for this division
+      const teamsData = await apiJSON('/.netlify/functions/admin-teams');
+      const divTeams = (teamsData.teams || []).filter(t => t.division === div);
+      if (divTeams.length < 2) throw new Error('Need at least 2 teams in this division');
+      if (divTeams.length % 2 !== 0) throw new Error('Team count must be even for round-robin');
+
+      await apiJSON('/.netlify/functions/admin-generate-schedule', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          circuit: 'I',
+          division: div,
+          teams: divTeams.map(t => ({ id: t.id, name: t.name })),
+          courts: ['Court 1', 'Court 2', 'Court 3'],
+        }),
+      });
+      renderSched();
+    } catch (e) {
+      alert('Schedule generation failed: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = 'Generate round-robin';
+  });
+
+  // ═══════════════════════════════════════════════════════════
+  // SCORE ENTRY — live from admin-matches + admin-scores
+  // ═══════════════════════════════════════════════════════════
+  $id('sc-load-btn').addEventListener('click', loadScoreMatches);
+
+  async function loadScoreMatches() {
+    const division = $id('sc-division').value;
+    const week = $id('sc-week').value;
+    const container = $id('sc-matches');
+    container.innerHTML = '<div class="loading">Loading matches…</div>';
+
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-matches?circuit=I&division=' + encodeURIComponent(division));
+      const weekData = (data.weeks || []).find(w => w.week === parseInt(week));
+
+      if (!weekData?.matches?.length) {
+        container.innerHTML = '<div class="empty">No matches found for Week ' + week + '. Generate the schedule first.</div>';
+        return;
+      }
+      renderScoreMatches(weekData.matches, week);
+    } catch (e) {
+      container.innerHTML = '<div class="empty" style="color:var(--color-red)">' + h(e.message) + '</div>';
+    }
   }
-  window.selW=function(n){$$('.wc').forEach(c=>c.classList.toggle('is-active',parseInt(c.dataset.week)===n));const div=$id('sched-div').value,wk=TS[div]?.find(w=>w.w===n),card=$id('wk-card');
-  if(!wk?.mm.length){card.innerHTML='<div class="empty" style="padding:28px">No matches.</div>';return;}
-  card.innerHTML=`<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ${n}</span><span class="ac__s">${wk.mm.length} matches</span></div>${wk.mm.map(m=>{const dt=m.dt?new Date(m.dt).toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'})+' '+new Date(m.dt).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}):'—';return`<div class="mr"><div class="mr__t">${h(m.tA.name)}</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">${h(m.tB.name)}</div><div class="mr__m">${h(m.ct||'')}${m.fin?' · <span style="color:var(--color-teal);font-weight:700">FINAL</span>':''}<br><span style="font-size:9px">${dt}</span></div></div>`;}).join('')}</div>`;};
-  $id('sched-div').addEventListener('change',renderSched);
 
-  // ─── Score Entry ──────────────────────────────────────────────
+  function renderScoreMatches(matches, week) {
+    const container = $id('sc-matches');
+    container.innerHTML = matches.map(m => {
+      const isFinal = !!m.finalizedAt;
+      return '<div class="ac" data-match="' + h(m.id) + '" style="margin-bottom:12px;">' +
+        '<div class="ac__h" style="margin-bottom:12px;">' +
+          '<h2 class="ac__t">' + h(m.teamA.name) + ' vs ' + h(m.teamB.name) + '</h2>' +
+          '<span class="ac__s">' + h(m.court || '') + (isFinal ? ' · <span style="color:var(--color-lime);font-weight:700;">FINAL</span>' : '') + '</span>' +
+        '</div>' +
+        '<div id="sc-form-' + h(m.id) + '"><div class="loading">Loading scores…</div></div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px;">' +
+          '<button class="ab ab--lime ab--sm" onclick="window._saveScores(\'' + h(m.id) + '\')">' + (isFinal ? 'Update & Re-finalize' : 'Save Scores') + '</button>' +
+          (isFinal
+            ? '<button class="ab ab--sm ab--ghost" onclick="window._reopenMatch(\'' + h(m.id) + '\')">Reopen</button>'
+            : '<button class="ab ab--sm ab--teal" onclick="window._finalizeMatch(\'' + h(m.id) + '\')">Finalize</button>'
+          ) +
+        '</div>' +
+        '<div id="sc-status-' + h(m.id) + '" style="font-size:11px;margin-top:6px;"></div>' +
+      '</div>';
+    }).join('');
 
-  function renderSC(){
-    const wn=parseInt($id('sc-week').value),out=$id('sc-out');let html='';
-    for(const div of['3.0M','3.5M']){const sc=TSC[div]?.[wn],wk=TS[div]?.find(x=>x.w===wn),mm=sc||wk?.mm||[];
-    html+=`<div class="ac"><div class="ac__h"><span class="ac__t">${DL[div]}</span><span class="ac__s">Week ${wn}</span></div>`;
-    if(!mm.length){html+='<div class="empty">No matches.</div>';}else{mm.forEach(m=>{const has=m.gm?.length>0,fin=!!m.fin;
-    html+=`<div style="margin-bottom:14px;padding:14px;background:var(--color-surface-2);border-radius:var(--radius-sm);border:1px solid var(--color-border)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><div style="font-weight:600;font-size:13px">${h(m.tA?.name||'TBD')} <span style="color:var(--color-text-faint);font-size:10px;margin:0 6px">vs</span> ${h(m.tB?.name||'TBD')}</div><div style="font-size:10px">${fin?'<span style="color:var(--color-teal);font-weight:700">FINAL</span>':has?'<span style="color:var(--color-gold)">In progress</span>':'<span style="color:var(--color-text-faint)">Awaiting</span>'}</div></div>`;
-    if(has){html+=`<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;font-size:10px;text-align:center">${m.gm.slice(0,6).map((g,i)=>`<div style="padding:5px;background:var(--color-surface-3);border-radius:4px"><div style="color:var(--color-text-faint);margin-bottom:2px;font-size:9px">G${i+1}</div><div style="font-weight:700">${g.sA}–${g.sB}</div></div>`).join('')}</div>
-    <div style="margin-top:4px;font-size:9px;color:var(--color-text-faint);text-align:center;letter-spacing:0.1em;text-transform:uppercase">Round 1</div>
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:3px;font-size:10px;text-align:center;margin-top:6px">${m.gm.slice(6,12).map((g,i)=>`<div style="padding:5px;background:var(--color-surface-3);border-radius:4px"><div style="color:var(--color-text-faint);margin-bottom:2px;font-size:9px">G${i+7}</div><div style="font-weight:700">${g.sA}–${g.sB}</div></div>`).join('')}</div>
-    <div style="margin-top:4px;font-size:9px;color:var(--color-text-faint);text-align:center;letter-spacing:0.1em;text-transform:uppercase">Round 2</div>`;
-    if(m.rp){html+=`<div style="margin-top:8px;display:flex;gap:16px;justify-content:center;font-size:11px;font-weight:600"><span style="color:var(--color-lime)">${h(m.tA.name)}: ${m.rp[m.tA.id]} pts</span><span style="color:var(--color-teal)">${h(m.tB.name)}: ${m.rp[m.tB.id]} pts</span></div>`;}}
-    else{html+='<div style="text-align:center;padding:12px;color:var(--color-text-faint);font-size:11px">No scores entered</div>';}
-    html+='</div>';});}html+='</div>';}out.innerHTML=html;}
-  $id('sc-week').addEventListener('change',renderSC);
+    matches.forEach(m => loadMatchScores(m.id));
+  }
 
-  // ─── Helpers ──────────────────────────────────────────────────
+  async function loadMatchScores(matchId) {
+    const formEl = $id('sc-form-' + matchId);
+    if (!formEl) return;
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-scores?match=' + matchId);
+      const score = data.score || {};
+      const games = score.games || {};
+      const home = score.home || data.match?.home || {};
+      const away = score.away || data.match?.away || {};
 
-  function h(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-  function fd(iso){if(!iso)return'—';return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric'});}
+      const slots = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
+      const labels = ['R1 G1 · W Doubles','R1 G2 · M Doubles','R1 G3 · Mixed','R1 G4 · Mixed','R1 G5 · Mixed','R1 G6 · Mixed',
+                       'R2 G1 · W Doubles','R2 G2 · M Doubles','R2 G3 · Mixed','R2 G4 · Mixed','R2 G5 · Mixed','R2 G6 · Mixed'];
 
-  // ─── Image Compression ─────────────────────────────────────────
-  // Auto-compresses any image (even 30MB+ raw camera photos) to
-  // high-quality JPEG before uploading. Stays under 6MB Lambda limit.
+      formEl.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px 8px;font-size:12px;align-items:center;">' +
+        '<div style="font-weight:700;padding:4px 0;">Game</div>' +
+        '<div style="font-weight:700;text-align:center;min-width:60px;">' + h(home.name || 'Home') + '</div>' +
+        '<div style="font-weight:700;text-align:center;min-width:60px;">' + h(away.name || 'Away') + '</div>' +
+        slots.map((slot, i) => {
+          const g = games[slot] || {};
+          const hv = g.home ? g.home.entered : '';
+          const av = g.away ? g.away.entered : '';
+          const isR2 = slot.startsWith('r2');
+          return (isR2 && i === 6 ? '<div style="grid-column:1/-1;border-top:1px solid var(--color-border);margin:4px 0;"></div>' : '') +
+            '<div style="color:var(--color-text-muted);">' + labels[i] + '</div>' +
+            '<input type="number" min="0" max="30" value="' + hv + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="home" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">' +
+            '<input type="number" min="0" max="30" value="' + av + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="away" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">';
+        }).join('') +
+        '</div>';
+    } catch (e) {
+      formEl.innerHTML = '<div style="font-size:11px;color:var(--color-red);">Failed to load scores</div>';
+    }
+  }
 
-  var COMPRESS_MAX_DIM = 2500;
-  var COMPRESS_QUALITY = 0.92;
-  var COMPRESS_TARGET  = 5 * 1024 * 1024;
+  window._saveScores = async function(matchId) {
+    const statusEl = $id('sc-status-' + matchId);
+    const inputs = document.querySelectorAll('input[data-match="' + matchId + '"]');
+    const games = {};
+    inputs.forEach(inp => {
+      const slot = inp.dataset.slot, side = inp.dataset.side;
+      if (!games[slot]) games[slot] = {};
+      games[slot][side] = inp.value === '' ? null : parseInt(inp.value);
+    });
+    statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--color-text-faint)';
+    try {
+      await apiJSON('/.netlify/functions/admin-scores?match=' + matchId, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ games }),
+      });
+      statusEl.textContent = 'Saved ✓'; statusEl.style.color = 'var(--color-teal)';
+    } catch (e) {
+      statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)';
+    }
+  };
+
+  window._finalizeMatch = async function(matchId) {
+    if (!confirm('Finalize this match? This will update standings.')) return;
+    const statusEl = $id('sc-status-' + matchId);
+    statusEl.textContent = 'Finalizing…';
+    try {
+      await apiJSON('/.netlify/functions/admin-scores?match=' + matchId + '&action=finalize', { method: 'POST' });
+      statusEl.textContent = 'Finalized! Standings updated.'; statusEl.style.color = 'var(--color-lime)';
+      loadScoreMatches();
+    } catch (e) {
+      statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)';
+    }
+  };
+
+  window._reopenMatch = async function(matchId) {
+    if (!confirm('Reopen this match? Standings will be recalculated.')) return;
+    const statusEl = $id('sc-status-' + matchId);
+    statusEl.textContent = 'Reopening…';
+    try {
+      await apiJSON('/.netlify/functions/admin-scores?match=' + matchId + '&action=reopen', { method: 'POST' });
+      statusEl.textContent = 'Reopened — edit scores and finalize again.'; statusEl.style.color = 'var(--color-gold)';
+      loadScoreMatches();
+    } catch (e) {
+      statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)';
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════
+  // PHOTOS (Moments) — unchanged, live endpoints
+  // ═══════════════════════════════════════════════════════════
+  var COMPRESS_MAX_DIM = 2500, COMPRESS_QUALITY = 0.92, COMPRESS_TARGET = 5 * 1024 * 1024;
 
   async function compressImage(file) {
     if (file.size <= COMPRESS_TARGET && file.type === 'image/jpeg') return file;
@@ -863,406 +1240,139 @@
       i.src = u;
     });
     var w = img.naturalWidth, ht = img.naturalHeight;
-    if (w > COMPRESS_MAX_DIM || ht > COMPRESS_MAX_DIM) {
-      var sc = COMPRESS_MAX_DIM / Math.max(w, ht); w = Math.round(w * sc); ht = Math.round(ht * sc);
-    }
+    if (w > COMPRESS_MAX_DIM || ht > COMPRESS_MAX_DIM) { var sc = COMPRESS_MAX_DIM / Math.max(w, ht); w = Math.round(w * sc); ht = Math.round(ht * sc); }
     var c = document.createElement('canvas'); c.width = w; c.height = ht;
     c.getContext('2d').drawImage(img, 0, 0, w, ht);
     var q = COMPRESS_QUALITY;
     var blob = await new Promise(function(r) { c.toBlob(r, 'image/jpeg', q); });
-    while (blob.size > COMPRESS_TARGET && q > 0.6) {
-      q -= 0.05;
-      blob = await new Promise(function(r) { c.toBlob(r, 'image/jpeg', q); });
-    }
+    while (blob.size > COMPRESS_TARGET && q > 0.6) { q -= 0.05; blob = await new Promise(function(r) { c.toBlob(r, 'image/jpeg', q); }); }
     return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
   }
 
-  // ─── Moments Upload (Photos tab) ─────────────────────────────
   (function() {
     var btn = $id('up-btn');
     if (!btn) return;
     btn.addEventListener('click', async function() {
-      var files = $id('up-files').files;
-      var week  = $id('up-week').value;
-      var cap   = $id('up-cap').value.trim();
-      var status = $id('up-status');
+      var files = $id('up-files').files, week = $id('up-week').value, cap = $id('up-cap').value.trim(), status = $id('up-status');
       if (!files || files.length === 0) { status.className = 'a-status is-err'; status.textContent = 'Pick at least one photo.'; return; }
       btn.disabled = true;
       var uploaded = 0;
       for (var i = 0; i < files.length; i++) {
-        status.className = 'a-status is-info';
-        status.textContent = 'Compressing ' + (i + 1) + ' of ' + files.length + '…';
+        status.className = 'a-status is-info'; status.textContent = 'Compressing ' + (i + 1) + ' of ' + files.length + '…';
         try {
           var compressed = await compressImage(files[i]);
           status.textContent = 'Uploading ' + (i + 1) + ' of ' + files.length + '… (' + (compressed.size / 1024 / 1024).toFixed(1) + 'MB)';
-          var fd = new FormData();
-          fd.append('file', compressed);
-          fd.append('circuit', 'I');
-          fd.append('week', week);
-          fd.append('caption', cap);
+          var fd = new FormData(); fd.append('file', compressed); fd.append('circuit', 'I'); fd.append('week', week); fd.append('caption', cap);
           var r = await fetch('/.netlify/functions/moments-upload', { method: 'POST', body: fd, credentials: 'include' });
           if (!r.ok) { var err = await r.json().catch(function() { return {}; }); throw new Error(err.error || 'Upload failed'); }
           uploaded++;
-        } catch (e) {
-          status.className = 'a-status is-err';
-          status.textContent = 'Failed on file ' + (i + 1) + ': ' + e.message;
-          btn.disabled = false;
-          return;
-        }
+        } catch (e) { status.className = 'a-status is-err'; status.textContent = 'Failed on file ' + (i + 1) + ': ' + e.message; btn.disabled = false; return; }
       }
-      status.className = 'a-status is-ok';
-      status.textContent = 'Uploaded ' + uploaded + ' photo' + (uploaded === 1 ? '' : 's') + '!';
-      $id('up-files').value = '';
-      $id('up-cap').value = '';
-      btn.disabled = false;
+      status.className = 'a-status is-ok'; status.textContent = 'Uploaded ' + uploaded + ' photo' + (uploaded === 1 ? '' : 's') + '!';
+      $id('up-files').value = ''; $id('up-cap').value = ''; btn.disabled = false;
       loadAdminGallery();
     });
   })();
 
-  // ─── Admin Gallery (show recent moments) ──────────────────────
   async function loadAdminGallery() {
-    var el = $id('admin-gallery');
-    if (!el) return;
+    var el = $id('admin-gallery'); if (!el) return;
     try {
       var r = await fetch('/.netlify/functions/moments-list', { credentials: 'include' });
-      var data = await r.json();
-      var moments = data.moments || [];
+      var data = await r.json(); var moments = data.moments || [];
       if (!moments.length) { el.className = 'empty'; el.innerHTML = 'No photos uploaded yet.'; return; }
       moments.sort(function(a, b) { return (b.uploadedAt || '').localeCompare(a.uploadedAt || ''); });
       el.className = 'si-grid';
       el.innerHTML = moments.slice(0, 24).map(function(m) {
-        return '<div class="si-card">' +
-          '<img src="' + m.url + '" alt="' + h(m.caption || '') + '" loading="lazy">' +
-          '<div class="si-card__info">' +
-            '<span class="si-card__label">Wk ' + m.week + (m.caption ? ' · ' + h(m.caption) : '') + '</span>' +
-            '<button class="si-card__del" data-id="' + m.id + '">Delete</button>' +
-          '</div></div>';
+        return '<div class="si-card"><img src="' + m.url + '" alt="' + h(m.caption || '') + '" loading="lazy"><div class="si-card__info"><span class="si-card__label">Wk ' + m.week + (m.caption ? ' · ' + h(m.caption) : '') + '</span><button class="si-card__del" data-id="' + m.id + '">Delete</button></div></div>';
       }).join('');
       el.querySelectorAll('.si-card__del').forEach(function(b) {
         b.addEventListener('click', async function() {
           if (!confirm('Delete this photo?')) return;
-          try {
-            await fetch('/.netlify/functions/moments-delete?id=' + b.dataset.id, { method: 'DELETE', credentials: 'include' });
-            loadAdminGallery();
-          } catch (e) { alert('Delete failed: ' + e.message); }
+          try { await fetch('/.netlify/functions/moments-delete?id=' + b.dataset.id, { method: 'DELETE', credentials: 'include' }); loadAdminGallery(); }
+          catch (e) { alert('Delete failed: ' + e.message); }
         });
       });
     } catch (e) { el.className = 'empty'; el.innerHTML = 'Failed to load gallery.'; }
   }
 
-  checkAuth();
-  </script>
+  // ═══════════════════════════════════════════════════════════
+  // SITE IMAGES — unchanged, live endpoints
+  // ═══════════════════════════════════════════════════════════
+  (function siteImagesAdmin() {
+    var API_LIST = '/.netlify/functions/site-images-list';
+    var API_UPLOAD = '/.netlify/functions/site-images-upload';
+    var SLOTS = ['hero', 'divider-1', 'divider-2', 'cta', 'schedule', 'standings', 'stats', 'teams', 'rules', 'gallery', 'register', 'leaderboard', 'contact'];
+    var allSlots = {};
 
-<script>
-(function siteImagesAdmin() {
-  const API_LIST  = '/.netlify/functions/site-images-list';
-  const API_UPLOAD = '/.netlify/functions/site-images-upload';
-  const SLOTS = ['hero', 'divider-1', 'divider-2', 'cta', 'schedule', 'standings', 'stats', 'teams', 'rules', 'gallery', 'register', 'leaderboard', 'contact'];
-  let allSlots = {};
-
-  async function loadSiteImages() {
-    try {
-      const r = await fetch(API_LIST, { credentials: 'include' });
-      if (!r.ok) throw new Error('Failed to load');
-      allSlots = await r.json();
-    } catch (e) {
-      console.error('site-images load:', e);
-      allSlots = {};
-    }
-    renderAll();
-  }
-
-  function renderAll() {
-    for (const slot of SLOTS) {
-      const grid = document.getElementById('si-grid-' + slot);
-      if (!grid) continue;
-      const images = allSlots[slot] || [];
-      if (images.length === 0) {
-        grid.className = 'si-grid empty';
-        grid.innerHTML = 'No images yet — upload one above.';
-        continue;
-      }
-      grid.className = 'si-grid';
-      grid.innerHTML = images.map(function(img, i) {
-        return '<div class="si-card" data-id="' + img.id + '">' +
-          '<span class="si-card__order">' + (i + 1) + '</span>' +
-          '<img src="' + img.url + '" alt="' + (img.label || 'Site image') + '" loading="lazy">' +
-          '<div class="si-card__info">' +
-            '<span class="si-card__label">' + (img.label || '(no label)') + '</span>' +
-            '<button class="si-card__del" data-id="' + img.id + '" data-slot="' + slot + '">Remove</button>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-      grid.querySelectorAll('.si-card__del').forEach(function(btn) {
-        btn.addEventListener('click', function() { deleteSiteImage(btn.dataset.id, btn.dataset.slot); });
-      });
-    }
-  }
-
-  var uploadBtn = document.getElementById('si-upload-btn');
-  var statusEl  = document.getElementById('si-status');
-
-  if (uploadBtn) {
-    uploadBtn.addEventListener('click', async function() {
-      var fileInput = document.getElementById('si-file');
-      var slot  = document.getElementById('si-slot').value;
-      var label = document.getElementById('si-label').value.trim();
-      var file  = fileInput.files[0];
-      if (!file) { statusEl.textContent = 'Please select an image first.'; statusEl.style.color = 'var(--color-red, #ef4444)'; return; }
-      if (!slot) { statusEl.textContent = 'Please select a section.'; statusEl.style.color = 'var(--color-red, #ef4444)'; return; }
-      uploadBtn.disabled = true;
-      statusEl.textContent = 'Compressing…';
-      statusEl.style.color = 'var(--color-text-faint)';
+    async function loadSiteImages() {
       try {
-        var compressed = await compressImage(file);
-        statusEl.textContent = 'Uploading (' + (compressed.size / 1024 / 1024).toFixed(1) + 'MB)…';
-        var fd = new FormData();
-        fd.append('file', compressed);
-        fd.append('slot', slot);
-        fd.append('label', label);
-        var r = await fetch(API_UPLOAD, { method: 'POST', body: fd, credentials: 'include' });
-        var data = await r.json();
-        if (!r.ok) throw new Error(data.error || 'Upload failed');
-        statusEl.textContent = 'Uploaded to ' + slot;
-        statusEl.style.color = 'var(--color-teal)';
-        fileInput.value = '';
-        document.getElementById('si-label').value = '';
+        var r = await fetch(API_LIST, { credentials: 'include' }); if (!r.ok) throw new Error('Failed to load');
+        allSlots = await r.json();
+      } catch (e) { console.error('site-images load:', e); allSlots = {}; }
+      renderAll();
+    }
+
+    function renderAll() {
+      for (var slot of SLOTS) {
+        var grid = document.getElementById('si-grid-' + slot); if (!grid) continue;
+        var images = allSlots[slot] || [];
+        if (images.length === 0) { grid.className = 'si-grid empty'; grid.innerHTML = 'No images yet — upload one above.'; continue; }
+        grid.className = 'si-grid';
+        grid.innerHTML = images.map(function(img, i) {
+          return '<div class="si-card" data-id="' + img.id + '"><span class="si-card__order">' + (i + 1) + '</span><img src="' + img.url + '" alt="' + (img.label || 'Site image') + '" loading="lazy"><div class="si-card__info"><span class="si-card__label">' + (img.label || '(no label)') + '</span><button class="si-card__del" data-id="' + img.id + '" data-slot="' + slot + '">Remove</button></div></div>';
+        }).join('');
+        grid.querySelectorAll('.si-card__del').forEach(function(btn) {
+          btn.addEventListener('click', function() { deleteSiteImage(btn.dataset.id, btn.dataset.slot); });
+        });
+      }
+    }
+
+    var uploadBtn = document.getElementById('si-upload-btn');
+    var statusEl = document.getElementById('si-status');
+
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', async function() {
+        var fileInput = document.getElementById('si-file'), slot = document.getElementById('si-slot').value, label = document.getElementById('si-label').value.trim(), file = fileInput.files[0];
+        if (!file) { statusEl.textContent = 'Please select an image first.'; statusEl.style.color = 'var(--color-red)'; return; }
+        if (!slot) { statusEl.textContent = 'Please select a section.'; statusEl.style.color = 'var(--color-red)'; return; }
+        uploadBtn.disabled = true; statusEl.textContent = 'Compressing…'; statusEl.style.color = 'var(--color-text-faint)';
+        try {
+          var compressed = await compressImage(file);
+          statusEl.textContent = 'Uploading (' + (compressed.size / 1024 / 1024).toFixed(1) + 'MB)…';
+          var fd = new FormData(); fd.append('file', compressed); fd.append('slot', slot); fd.append('label', label);
+          var r = await fetch(API_UPLOAD, { method: 'POST', body: fd, credentials: 'include' }); var data = await r.json();
+          if (!r.ok) throw new Error(data.error || 'Upload failed');
+          statusEl.textContent = 'Uploaded to ' + slot; statusEl.style.color = 'var(--color-teal)';
+          fileInput.value = ''; document.getElementById('si-label').value = '';
+          await loadSiteImages();
+        } catch (e) { statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)'; }
+        finally { uploadBtn.disabled = false; }
+      });
+    }
+
+    async function deleteSiteImage(id, slot) {
+      if (!confirm('Remove this image from the site?')) return;
+      try {
+        var r = await fetch(API_LIST, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action: 'delete', id: id, slot: slot }) });
+        if (!r.ok) throw new Error('Delete failed');
         await loadSiteImages();
-      } catch (e) {
-        statusEl.textContent = e.message;
-        statusEl.style.color = 'var(--color-red, #ef4444)';
-      } finally {
-        uploadBtn.disabled = false;
-      }
-    });
-  }
-
-  async function deleteSiteImage(id, slot) {
-    if (!confirm('Remove this image from the site?')) return;
-    try {
-      var r = await fetch(API_LIST, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ action: 'delete', id: id, slot: slot }),
-      });
-      if (!r.ok) throw new Error('Delete failed');
-      await loadSiteImages();
-    } catch (e) {
-      alert('Failed to delete: ' + e.message);
+      } catch (e) { alert('Failed to delete: ' + e.message); }
     }
-  }
 
-  // Load when tab becomes active
-  var loaded = false;
-  var observer = new MutationObserver(function() {
+    // Load when tab becomes active
+    var loaded = false;
+    var observer = new MutationObserver(function() {
+      var section = document.querySelector('[data-section="site-images"]');
+      if (section && section.classList.contains('is-active') && !loaded) { loaded = true; loadSiteImages(); }
+    });
+    var main = document.querySelector('.admin-main');
+    if (main) observer.observe(main, { subtree: true, attributes: true, attributeFilter: ['class'] });
     var section = document.querySelector('[data-section="site-images"]');
-    if (section && section.classList.contains('is-active') && !loaded) {
-      loaded = true;
-      loadSiteImages();
-    }
-  });
-  var main = document.querySelector('.admin-main');
-  if (main) observer.observe(main, { subtree: true, attributes: true, attributeFilter: ['class'] });
-  var section = document.querySelector('[data-section="site-images"]');
-  if (section && section.classList.contains('is-active')) { loadSiteImages(); }
-})();
-</script>
+    if (section && section.classList.contains('is-active')) { loadSiteImages(); }
+  })();
 
-<script>
-// ── Seed Teams ──
-(function() {
-  var btn = document.getElementById('seed-teams-btn');
-  var status = document.getElementById('seed-status');
-  if (!btn) return;
-
-  btn.addEventListener('click', async function() {
-    btn.disabled = true;
-    status.textContent = 'Syncing...';
-    status.style.color = 'var(--color-text-faint)';
-    try {
-      var r = await fetch('/.netlify/functions/admin-seed-teams', {
-        method: 'POST', credentials: 'include'
-      });
-      var data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Sync failed');
-      status.textContent = 'Created: ' + (data.created||0) + ', Updated: ' + (data.updated||0) + ', Skipped: ' + (data.skipped||0);
-      status.style.color = 'var(--color-teal)';
-      if (data.errors > 0) {
-        status.textContent += ', Errors: ' + data.errors;
-        status.style.color = 'var(--color-gold)';
-      }
-    } catch(e) {
-      status.textContent = e.message;
-      status.style.color = 'var(--color-red, #ef4444)';
-    } finally {
-      btn.disabled = false;
-    }
-  });
-})();
-
-// ── Score Entry ──
-(function() {
-  var loadBtn = document.getElementById('sc-load-btn');
-  var container = document.getElementById('sc-matches');
-  if (!loadBtn) return;
-
-  loadBtn.addEventListener('click', loadMatches);
-
-  async function loadMatches() {
-    var division = document.getElementById('sc-division').value;
-    var week = document.getElementById('sc-week').value;
-    container.innerHTML = '<div class="empty-state" style="padding:24px 0;font-size:13px;">Loading...</div>';
-
-    try {
-      var r = await fetch('/.netlify/functions/admin-matches?circuit=I&division=' + division, { credentials: 'include' });
-      if (!r.ok) throw new Error('Failed to load');
-      var data = await r.json();
-      var weekData = (data.weeks || []).find(function(w) { return w.week === parseInt(week); });
-
-      if (!weekData || !weekData.matches || weekData.matches.length === 0) {
-        container.innerHTML = '<div class="empty-state" style="padding:24px 0;font-size:13px;">No matches found for Week ' + week + '. Generate the schedule first.</div>';
-        return;
-      }
-
-      renderMatches(weekData.matches, week);
-    } catch(e) {
-      container.innerHTML = '<div class="empty-state" style="padding:24px 0;font-size:13px;color:var(--color-red,#ef4444);">' + e.message + '</div>';
-    }
-  }
-
-  function renderMatches(matches, week) {
-    container.innerHTML = matches.map(function(m) {
-      var isFinal = !!m.finalizedAt;
-      return '<div class="ac" data-match="' + m.id + '" style="margin-bottom:12px;">' +
-        '<div class="ac__h" style="margin-bottom:12px;">' +
-          '<h2 class="ac__t">' + esc(m.teamA.name) + ' vs ' + esc(m.teamB.name) + '</h2>' +
-          '<span class="ac__s">' + (m.court || '') + (isFinal ? ' · <span style="color:var(--color-lime);font-weight:700;">FINAL</span>' : '') + '</span>' +
-        '</div>' +
-        '<div id="sc-form-' + m.id + '">' +
-          '<div style="font-size:11px;color:var(--color-text-faint);margin-bottom:8px;">Loading scores...</div>' +
-        '</div>' +
-        '<div style="display:flex;gap:8px;margin-top:12px;">' +
-          '<button class="ab ab--lime ab--sm" onclick="saveScores('' + m.id + '')">' + (isFinal ? 'Update & Re-finalize' : 'Save Scores') + '</button>' +
-          (isFinal
-            ? '<button class="ab ab--sm" style="background:var(--color-surface-2);color:var(--color-text);" onclick="reopenMatch('' + m.id + '')">Reopen</button>'
-            : '<button class="ab ab--sm" style="background:var(--color-teal-dim);color:var(--color-teal);" onclick="finalizeMatch('' + m.id + '')">Finalize</button>'
-          ) +
-        '</div>' +
-        '<div id="sc-status-' + m.id + '" style="font-size:11px;margin-top:6px;"></div>' +
-      '</div>';
-    }).join('');
-
-    // Load score data for each match
-    matches.forEach(function(m) { loadMatchScores(m.id); });
-  }
-
-  window.loadMatchScores = async function(matchId) {
-    var formEl = document.getElementById('sc-form-' + matchId);
-    if (!formEl) return;
-
-    try {
-      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId, { credentials: 'include' });
-      var data = await r.json();
-      var score = data.score || {};
-      var games = score.games || {};
-      var home = score.home || data.match?.home || {};
-      var away = score.away || data.match?.away || {};
-
-      var slots = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
-      var labels = ["R1 G1 · W Doubles","R1 G2 · M Doubles","R1 G3 · Mixed","R1 G4 · Mixed","R1 G5 · Mixed","R1 G6 · Mixed",
-                    "R2 G1 · W Doubles","R2 G2 · M Doubles","R2 G3 · Mixed","R2 G4 · Mixed","R2 G5 · Mixed","R2 G6 · Mixed"];
-
-      formEl.innerHTML =
-        '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px 8px;font-size:12px;align-items:center;">' +
-        '<div style="font-weight:700;padding:4px 0;">Game</div>' +
-        '<div style="font-weight:700;text-align:center;min-width:60px;">' + esc(home.name || 'Home') + '</div>' +
-        '<div style="font-weight:700;text-align:center;min-width:60px;">' + esc(away.name || 'Away') + '</div>' +
-        slots.map(function(slot, i) {
-          var g = games[slot] || {};
-          var hv = g.home ? g.home.entered : '';
-          var av = g.away ? g.away.entered : '';
-          var isR2 = slot.startsWith('r2');
-          return (isR2 && i === 6 ? '<div style="grid-column:1/-1;border-top:1px solid var(--color-border);margin:4px 0;"></div>' : '') +
-            '<div style="color:var(--color-text-muted);">' + labels[i] + '</div>' +
-            '<input type="number" min="0" max="30" value="' + hv + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="home" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">' +
-            '<input type="number" min="0" max="30" value="' + av + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="away" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">' ;
-        }).join('') +
-        '</div>';
-    } catch(e) {
-      formEl.innerHTML = '<div style="font-size:11px;color:var(--color-red,#ef4444);">Failed to load scores</div>';
-    }
-  };
-
-  window.saveScores = async function(matchId) {
-    var statusEl = document.getElementById('sc-status-' + matchId);
-    var inputs = document.querySelectorAll('input[data-match="' + matchId + '"]');
-    var games = {};
-    inputs.forEach(function(inp) {
-      var slot = inp.dataset.slot;
-      var side = inp.dataset.side;
-      if (!games[slot]) games[slot] = {};
-      games[slot][side] = inp.value === '' ? null : parseInt(inp.value);
-    });
-
-    statusEl.textContent = 'Saving...';
-    statusEl.style.color = 'var(--color-text-faint)';
-    try {
-      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ games: games }),
-      });
-      var data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Save failed');
-      statusEl.textContent = 'Saved';
-      statusEl.style.color = 'var(--color-teal)';
-    } catch(e) {
-      statusEl.textContent = e.message;
-      statusEl.style.color = 'var(--color-red, #ef4444)';
-    }
-  };
-
-  window.finalizeMatch = async function(matchId) {
-    if (!confirm('Finalize this match? This will update standings.')) return;
-    var statusEl = document.getElementById('sc-status-' + matchId);
-    statusEl.textContent = 'Finalizing...';
-    try {
-      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId + '&action=finalize', {
-        method: 'POST', credentials: 'include',
-      });
-      var data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Finalize failed');
-      statusEl.textContent = 'Finalized! Standings updated.';
-      statusEl.style.color = 'var(--color-lime)';
-      loadMatches(); // refresh
-    } catch(e) {
-      statusEl.textContent = e.message;
-      statusEl.style.color = 'var(--color-red, #ef4444)';
-    }
-  };
-
-  window.reopenMatch = async function(matchId) {
-    if (!confirm('Reopen this match for score editing? Current standings will be recalculated.')) return;
-    var statusEl = document.getElementById('sc-status-' + matchId);
-    statusEl.textContent = 'Reopening...';
-    try {
-      var r = await fetch('/.netlify/functions/admin-scores?match=' + matchId + '&action=reopen', {
-        method: 'POST', credentials: 'include',
-      });
-      var data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Reopen failed');
-      statusEl.textContent = 'Reopened. Edit scores and finalize again.';
-      statusEl.style.color = 'var(--color-gold)';
-      loadMatches(); // refresh
-    } catch(e) {
-      statusEl.textContent = e.message;
-      statusEl.style.color = 'var(--color-red, #ef4444)';
-    }
-  };
-
-  function esc(s){return String(s||'').replace(/[&<>"']/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]});}
+  // ─── Init ─────────────────────────────────────────────────
+  checkAuth();
 })();
 </script>
 </body>
