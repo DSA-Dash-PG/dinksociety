@@ -75,15 +75,8 @@
   <main class="sched-shell">
     <div class="sched-hero">
       <div class="eyebrow">Schedule</div>
-      <h1>Circuit I</h1>
-      <p>May – Jun 2026 · Round-robin + Championship</p>
-      <div class="sched-controls">
-        <select id="sched-division">
-          <option value="">All divisions</option>
-          <option value="3-0-mixed">3.0 Mixed</option>
-          <option value="3-5-mixed">3.5 Mixed</option>
-        </select>
-      </div>
+      <h1>Circuit ONE</h1>
+      <p>Starts Thursday, June 11, 2026 · 12 weeks · Matches 7:00–9:00 PM</p>
     </div>
     <nav class="week-tabs" id="week-tabs"></nav>
     <div id="schedule-content"><div class="empty-state">Loading schedule&hellip;</div></div>
@@ -91,15 +84,13 @@
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
   <script>
-    const DIV_LABELS = { '3-0-mixed': '3.0 Mixed', '3-5-mixed': '3.5 Mixed', '3.0M': '3.0 Mixed', '3.5M': '3.5 Mixed' };
+    const DIV_LABELS = { '3-0-mixed': '3.0 Mixed', '3-5-mixed': '3.5+ Mixed', '3.0M': '3.0 Mixed', '3.5M': '3.5+ Mixed' };
     let scheduleData = null, currentWeek = 1;
     const $id = id => document.getElementById(id);
 
     async function loadSchedule() {
       try {
         const p = new URLSearchParams({ season: 'circuit-i' });
-        const d = $id('sched-division').value;
-        if (d) p.set('division', d);
         const r = await fetch(`/.netlify/functions/public-schedule?${p}`);
         if (!r.ok) throw 0;
         scheduleData = await r.json();
@@ -111,7 +102,7 @@
         renderTabs();
         renderWeek(currentWeek);
       } catch {
-        $id('schedule-content').innerHTML = '<div class="empty-state">Schedule not yet published. Check back closer to Circuit I.</div>';
+        $id('schedule-content').innerHTML = '<div class="empty-state">Schedule not yet published. Check back closer to Circuit ONE.</div>';
         $id('week-tabs').innerHTML = '';
       }
     }
@@ -122,7 +113,7 @@
       // Clamp currentWeek
       if (!w.find(x => x.week === currentWeek)) currentWeek = w[0].week;
       $id('week-tabs').innerHTML = w.map(x =>
-        `<button class="week-tab ${x.week === currentWeek ? 'is-active' : ''}" data-week="${x.week}">Week ${x.week}${x.week === 7 ? ' (Finals)' : ''}</button>`
+        `<button class="week-tab ${x.week === currentWeek ? 'is-active' : ''}" data-week="${x.week}">Week ${x.week}${x.week === 11 ? ' (Playoffs)' : x.week === 12 ? ' (Championship)' : ''}</button>`
       ).join('');
       $id('week-tabs').querySelectorAll('.week-tab').forEach(b => {
         b.addEventListener('click', () => {
@@ -169,7 +160,6 @@
     }
 
     function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-    $id('sched-division').addEventListener('change', loadSchedule);
     loadSchedule();
   </script>
 </body>

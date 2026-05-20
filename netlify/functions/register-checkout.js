@@ -52,7 +52,7 @@ export default async (req) => {
     // Look up the season to get the Stripe price ID (if seasonId provided)
     const seasonStore = getStore('seasons');
     let stripePriceId = null;
-    let resolvedPrice = path === 'team' ? 450 : 75; // fallback
+    let resolvedPrice = path === 'team' ? 1000 : 75; // fallback
 
     if (seasonId) {
       const seasonRaw = await seasonStore.get(seasonId);
