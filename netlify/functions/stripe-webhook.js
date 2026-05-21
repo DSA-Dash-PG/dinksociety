@@ -83,7 +83,17 @@ export default async (req) => {
       reg.confirmedAt = new Date().toISOString();
       reg.stripePaymentIntent = session.payment_intent || null;
       reg.stripeCustomer = session.customer || null;
-      reg.amountPaid = session.amount_total ? session.amount_total / 100 : reg.price;
+
+      // Record what was actually collected. For deposit registrations this
+      // is the deposit; the rest stays tracked as an outstanding balance.
+      const paidNow = session.amount_total
+        ? session.amount_total / 100
+        : (reg.depositAmount || reg.price || 0);
+      const totalFee = reg.totalPrice || reg.price || paidNow;
+      reg.amountPaid = paidNow;
+      reg.depositPaid = paidNow;
+      reg.balanceDue = reg.paymentType === 'deposit' ? Math.max(0, totalFee - paidNow) : 0;
+      reg.paymentStatus = reg.balanceDue > 0 ? 'deposit_paid' : 'paid_in_full';
 
       // Write to confirmed/ prefix
       await regStore.set(confirmedKey, JSON.stringify(reg));
@@ -147,6 +157,20 @@ export default async (req) => {
         const siteUrl = process.env.SITE_URL || '';
         const isTeam = reg.path === 'team';
 
+        const hasBalance = reg.paymentType === 'deposit' && (reg.balanceDue || 0) > 0;
+        const dueDateLabel = (() => {
+          if (!reg.balanceDueDate) return '';
+          const d = new Date(reg.balanceDueDate + 'T00:00:00');
+          return isNaN(d.getTime())
+            ? reg.balanceDueDate
+            : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        })();
+        const paymentRows = hasBalance
+          ? `<tr><td style="padding: 6px 0; color: #8a8a8a;">Team fee</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">$${totalFee}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Deposit paid</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #b8ff2c;">$${reg.depositPaid || reg.amountPaid}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Balance due${dueDateLabel ? ' by ' + dueDateLabel : ''}</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">$${reg.balanceDue}</td></tr>`
+          : `<tr><td style="padding: 6px 0; color: #8a8a8a;">Amount paid</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #b8ff2c;">$${reg.amountPaid || reg.price}</td></tr>`;
+
         try {
           await sendEmail({
             to: recipientEmail,
@@ -166,10 +190,18 @@ export default async (req) => {
                     <tr><td style="padding: 6px 0; color: #8a8a8a;">Division</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.divisionLabel || reg.division}</td></tr>
                     ${isTeam ? `<tr><td style="padding: 6px 0; color: #8a8a8a;">Team</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.team?.name || '—'}</td></tr>` : ''}
                     <tr><td style="padding: 6px 0; color: #8a8a8a;">Type</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${isTeam ? 'Team' : 'Free Agent'}</td></tr>
-                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Amount paid</td><td style="padding: 6px 0; text-align: right; font-weight: 600; color: #b8ff2c;">$${reg.amountPaid || reg.price}</td></tr>
+                    ${paymentRows}
                     <tr><td style="padding: 6px 0; color: #8a8a8a;">Reference</td><td style="padding: 6px 0; text-align: right; font-family: monospace; font-size: 12px; color: #8a8a8a;">${regId.toUpperCase()}</td></tr>
                   </table>
                 </div>
+
+                ${hasBalance ? `
+                <div style="background: #1a1a1a; border: 1px solid #2a2a2a; border-left: 3px solid #b8ff2c; padding: 16px 20px; border-radius: 0 12px 12px 0; margin-bottom: 24px;">
+                  <p style="font-size: 14px; margin: 0; line-height: 1.6; color: #8a8a8a;">
+                    <strong style="color: #f5f5f5;">Balance reminder:</strong> Your $${reg.balanceDue} team-fee balance is due${dueDateLabel ? ' by ' + dueDateLabel : ' before the season starts'}. We'll follow up with payment details — your spot is held in the meantime.
+                  </p>
+                </div>
+                ` : ''}
 
                 ${isTeam ? `
                 <div style="background: #1a1a1a; border: 1px solid #2a2a2a; border-left: 3px solid #b8ff2c; padding: 20px; border-radius: 0 12px 12px 0; margin-bottom: 24px;">

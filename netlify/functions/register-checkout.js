@@ -73,6 +73,32 @@ export default async (req) => {
       }
     }
 
+    // ── Deposit model ──────────────────────────────────────────
+    // Teams pay a deposit now; the remaining team fee is tracked as a
+    // balance collected separately before the season. Agents pay in full.
+    const isTeam = path === 'team';
+    let depositAmount = 100;
+    let balanceDueDate = null;
+    try {
+      const configStore = getStore({ name: 'config', consistency: 'strong' });
+      const cfgRaw = await configStore.get('circuit-settings');
+      if (cfgRaw) {
+        const cfg = JSON.parse(cfgRaw);
+        if (cfg.depositAmount != null) depositAmount = Number(cfg.depositAmount);
+        if (cfg.balanceDueDate) balanceDueDate = cfg.balanceDueDate;
+      }
+    } catch (e) {
+      console.warn('Could not load circuit-settings for deposit; using defaults:', e.message);
+    }
+
+    const totalPrice = resolvedPrice;
+    // Agents pay in full; clamp the deposit so it never exceeds the total.
+    if (!isTeam || !(depositAmount > 0) || depositAmount > totalPrice) {
+      depositAmount = totalPrice;
+    }
+    const amountDueNow = depositAmount;
+    const balanceDue = Math.max(0, totalPrice - amountDueNow);
+
     // Generate a registration ID
     const regId = crypto.randomBytes(8).toString('hex');
 
@@ -85,7 +111,12 @@ export default async (req) => {
       divisionLabel: divisionLabel || division,
       path,
       status: 'pending',
-      price: resolvedPrice,
+      price: totalPrice,
+      totalPrice: totalPrice,
+      paymentType: isTeam ? 'deposit' : 'full',
+      depositAmount: amountDueNow,
+      balanceDue: balanceDue,
+      balanceDueDate: balanceDue > 0 ? balanceDueDate : null,
       team: path === 'team' ? team : undefined,
       agent: path === 'agent' ? agent : undefined,
       createdAt: new Date().toISOString(),
@@ -117,27 +148,36 @@ export default async (req) => {
       },
     };
 
-    // Use the Stripe price ID from the season if available,
-    // otherwise fall back to price_data (inline pricing)
-    if (stripePriceId) {
+    // Teams are billed the deposit now via an inline price. The full-price
+    // Stripe price ID is only used when the whole amount is due at checkout
+    // (free agents).
+    if (isTeam) {
+      sessionParams.line_items = [{
+        price_data: {
+          currency: 'usd',
+          product_data: {
+            name: `Dink Society — Team Registration Deposit (${divisionLabel || division})`,
+            description: `${circuit || 'Dink Society'} · ${divisionLabel || division} · $${amountDueNow} deposit toward the $${totalPrice} team fee`,
+          },
+          unit_amount: Math.round(amountDueNow * 100),
+        },
+        quantity: 1,
+      }];
+    } else if (stripePriceId) {
       sessionParams.line_items = [{
         price: stripePriceId,
         quantity: 1,
       }];
     } else {
       // Fallback: create an inline price (works even without admin-created Stripe products)
-      const displayName = path === 'team'
-        ? `Dink Society — Team Registration (${divisionLabel || division})`
-        : `Dink Society — Free Agent Registration (${divisionLabel || division})`;
-
       sessionParams.line_items = [{
         price_data: {
           currency: 'usd',
           product_data: {
-            name: displayName,
+            name: `Dink Society — Free Agent Registration (${divisionLabel || division})`,
             description: `${circuit || 'Dink Society'} · ${divisionLabel || division}`,
           },
-          unit_amount: Math.round(resolvedPrice * 100),
+          unit_amount: Math.round(totalPrice * 100),
         },
         quantity: 1,
       }];

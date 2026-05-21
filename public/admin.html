@@ -483,6 +483,10 @@
             </div>
             <div class="arow">
               <div class="af"><label for="set-teams-per-div">Teams per division</label><input type="number" id="set-teams-per-div" min="2" max="16"></div>
+              <div class="af"><label for="set-deposit">Deposit due at registration ($)</label><input type="number" id="set-deposit" min="0" step="1"></div>
+            </div>
+            <div class="arow">
+              <div class="af"><label for="set-balance-due">Team-fee balance due date</label><input type="date" id="set-balance-due"></div>
               <div class="af"></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
@@ -600,10 +604,10 @@
   async function loadSettings() {
     try {
       const data = await apiJSON('/.netlify/functions/admin-settings');
-      SETTINGS = { circuitName: 'Circuit ONE', startDate: '2026-06-11', teamFee: '$1,000', agentFee: '$75', defaultVenue: '', weeks: 12, teamsPerDiv: 6, ...data };
+      SETTINGS = { circuitName: 'Circuit ONE', startDate: '2026-06-11', teamFee: '$1,000', agentFee: '$75', defaultVenue: '', weeks: 12, teamsPerDiv: 6, depositAmount: 100, balanceDueDate: '2026-06-04', ...data };
     } catch (e) {
       console.warn('Settings load failed, using defaults:', e);
-      SETTINGS = { circuitName: 'Circuit ONE', startDate: '2026-06-11', teamFee: '$1,000', agentFee: '$75', defaultVenue: '', weeks: 12, teamsPerDiv: 6 };
+      SETTINGS = { circuitName: 'Circuit ONE', startDate: '2026-06-11', teamFee: '$1,000', agentFee: '$75', defaultVenue: '', weeks: 12, teamsPerDiv: 6, depositAmount: 100, balanceDueDate: '2026-06-04' };
     }
     applySettings();
   }
@@ -622,6 +626,8 @@
     f('set-venue', SETTINGS.defaultVenue);
     f('set-weeks', SETTINGS.weeks);
     f('set-teams-per-div', SETTINGS.teamsPerDiv);
+    f('set-deposit', SETTINGS.depositAmount);
+    f('set-balance-due', SETTINGS.balanceDueDate);
 
     if (SETTINGS.updatedAt) {
       const d = new Date(SETTINGS.updatedAt);
@@ -641,6 +647,8 @@
       defaultVenue: $id('set-venue').value.trim(),
       weeks: parseInt($id('set-weeks').value) || 12,
       teamsPerDiv: parseInt($id('set-teams-per-div').value) || 6,
+      depositAmount: parseFloat($id('set-deposit').value) || 100,
+      balanceDueDate: $id('set-balance-due').value,
     };
     try {
       const data = await apiJSON('/.netlify/functions/admin-settings', {
@@ -789,8 +797,15 @@
           ? '<strong style="font-weight:600">' + h(r.team?.name) + '</strong> <span style="color:var(--color-text-faint);font-size:10px">(' + h(r.team?.captain) + ')</span>'
           : h(r.agent?.name);
         const em = r.path === 'team' ? r.team?.players?.[0]?.email : r.agent?.email;
-        const paid = r.amountPaid > 0;
-        const pp = paid ? '<span class="p p--paid">$' + r.amountPaid + '</span>' : '<span class="p p--unpaid">Unpaid</span>';
+        let pp;
+        if (r.amountPaid > 0) {
+          const bal = r.balanceDue || 0;
+          pp = bal > 0
+            ? '<span class="p p--paid">$' + r.amountPaid + ' dep</span> <span class="p p--unpaid">$' + bal + ' due</span>'
+            : '<span class="p p--paid">$' + r.amountPaid + ' paid</span>';
+        } else {
+          pp = '<span class="p p--unpaid">Unpaid</span>';
+        }
         return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + (r.status || 'pending') + '">' + (r.status || 'pending') + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td></tr>';
       }).join('') + '</tbody></table>';
   }

@@ -14,6 +14,8 @@ const DEFAULTS = {
   divisions:      ['3.0 Mixed', '3.5 Mixed'],
   teamsPerDiv:    6,
   weeks:          7,
+  depositAmount:  100,          // dollars collected at registration
+  balanceDueDate: '2026-06-04', // when the remaining team-fee balance is due
 };
 
 function json(body, status = 200) {
@@ -61,6 +63,8 @@ export default async (req) => {
         divisions:    body.divisions    ?? prev.divisions,
         teamsPerDiv:  body.teamsPerDiv  ?? prev.teamsPerDiv,
         weeks:        body.weeks        ?? prev.weeks,
+        depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
+        balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
         updatedAt:    new Date().toISOString(),
         updatedBy:    admin.email || 'admin',
       };
