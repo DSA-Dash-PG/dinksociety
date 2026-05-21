@@ -38,6 +38,11 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
+// Normalize a Stripe price ID: trimmed non-empty string, otherwise null.
+function cleanStripeId(val) {
+  return typeof val === 'string' && val.trim() ? val.trim() : null;
+}
+
 async function getAllSeasons() {
   const store = getStore(STORE_NAME);
   const { blobs } = await store.list();
@@ -166,7 +171,7 @@ export default async (req) => {
 
       // Add a division
       case 'add-division': {
-        const { divName, capacity, teamPrice, agentPrice } = payload;
+        const { divName, capacity, teamPrice, agentPrice, stripeTeamPriceId, stripeAgentPriceId } = payload;
         if (!divName) return json({ error: 'Division name is required' }, 400);
 
         const divId = slugify(divName);
@@ -180,8 +185,8 @@ export default async (req) => {
           capacity: parseInt(capacity) || 6,
           teamPrice: parseFloat(teamPrice) || 450,
           agentPrice: parseFloat(agentPrice) || 75,
-          stripeTeamPriceId: null,
-          stripeAgentPriceId: null,
+          stripeTeamPriceId: cleanStripeId(stripeTeamPriceId),
+          stripeAgentPriceId: cleanStripeId(stripeAgentPriceId),
         });
         break;
       }
@@ -196,6 +201,13 @@ export default async (req) => {
         if (payload.capacity) div.capacity = parseInt(payload.capacity);
         if (payload.teamPrice) div.teamPrice = parseFloat(payload.teamPrice);
         if (payload.agentPrice) div.agentPrice = parseFloat(payload.agentPrice);
+        // Stripe price IDs — allow clearing by passing an empty string
+        if (payload.stripeTeamPriceId !== undefined) {
+          div.stripeTeamPriceId = cleanStripeId(payload.stripeTeamPriceId);
+        }
+        if (payload.stripeAgentPriceId !== undefined) {
+          div.stripeAgentPriceId = cleanStripeId(payload.stripeAgentPriceId);
+        }
         break;
       }
 

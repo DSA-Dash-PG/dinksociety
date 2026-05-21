@@ -106,6 +106,12 @@
     .af input:focus, .af select:focus, .af textarea:focus { outline: none; border-color: var(--color-lime); }
     .arow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
+    /* Seasons tab */
+    .se-lbl { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 600; margin-bottom: 4px; }
+    .se-val { font-size: 12px; color: var(--color-text); }
+    .se-sel { padding: 6px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 10px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
+    .se-divbox { background: var(--color-surface-2); border-radius: var(--radius-sm); padding: 14px; margin-top: 8px; }
+
     .a-status { padding: 10px 14px; border-radius: var(--radius-sm); font-size: 11px; margin-top: 10px; display: none; }
     .a-status.is-info { display: block; background: var(--color-teal-dim); color: var(--color-teal); }
     .a-status.is-ok { display: block; background: var(--color-teal-dim); color: var(--color-teal); }
@@ -256,6 +262,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
             Overview
           </button>
+          <button class="sb__link" data-tab="seasons">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+            Seasons
+          </button>
           <button class="sb__link" data-tab="registrations">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
             Registrations <span class="sb__badge" id="sb-reg-ct">—</span>
@@ -303,6 +313,39 @@
             <div class="ac"><div class="ac__h"><h2 class="ac__t">Division fill</h2></div><div id="ov-fill"><div class="loading">Loading…</div></div></div>
             <div class="ac"><div class="ac__h"><h2 class="ac__t">Recent Activity</h2></div><div id="ov-activity"><div class="loading">Loading…</div></div></div>
           </div>
+        </section>
+
+        <!-- SEASONS -->
+        <section class="admin-section" data-section="seasons">
+          <div class="am-head">
+            <h1 class="am-title">Seasons</h1>
+            <div class="am-actions">
+              <button class="ab ab--lime ab--sm" id="season-new-btn">+ New Season</button>
+            </div>
+          </div>
+
+          <div class="ac" id="season-create-card" style="display:none;">
+            <div class="ac__h"><h2 class="ac__t">Create a Season</h2></div>
+            <div class="arow">
+              <div class="af"><label for="sn-name">Season name</label><input type="text" id="sn-name" placeholder="e.g. Circuit TWO" autocomplete="off"></div>
+              <div class="af"><label for="sn-label">Display label (optional)</label><input type="text" id="sn-label" placeholder="e.g. Circuit TWO (Fall 2026)" autocomplete="off"></div>
+            </div>
+            <div class="arow">
+              <div class="af"><label for="sn-start">Start date</label><input type="date" id="sn-start"></div>
+              <div class="af"><label for="sn-end">End date</label><input type="date" id="sn-end"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:4px;">
+              <div class="a-status" id="sn-status" style="margin:0;flex:1;display:none;"></div>
+              <div style="display:flex;gap:8px;flex-shrink:0;margin-left:auto;">
+                <button class="ab ab--outline ab--sm" id="sn-cancel">Cancel</button>
+                <button class="ab ab--lime ab--sm" id="sn-create">Create season</button>
+              </div>
+            </div>
+            <p style="font-size:10px;color:var(--color-text-faint);margin:12px 0 0;line-height:1.5;">New seasons start as a <strong>draft</strong> with registration closed. Add divisions first, then open registration when you're ready.</p>
+          </div>
+
+          <div class="a-status" id="seasons-msg" style="display:none;margin-bottom:14px;"></div>
+          <div id="seasons-list"><div class="loading">Loading seasons…</div></div>
         </section>
 
         <!-- REGISTRATIONS -->
@@ -667,6 +710,376 @@
   }
   $id('save-settings-btn').addEventListener('click', saveSettings);
 
+  // ═══════════════════════════════════════════════════════════
+  // SEASONS — full season & division management
+  // ═══════════════════════════════════════════════════════════
+  const SEASONS_API = '/.netlify/functions/admin-seasons';
+  let SEASONS = [];
+  const seasonUI = { editSeasonId: null, addDivSeasonId: null, editDivKey: null };
+
+  const SEASON_STATUS_STYLE = {
+    draft:    'background:var(--color-surface-3);color:var(--color-text-muted);',
+    open:     'background:var(--color-lime-dim);color:var(--color-lime);',
+    paused:   'background:var(--color-gold-dim);color:var(--color-gold);',
+    closed:   'background:var(--color-surface-3);color:var(--color-text-faint);',
+    archived: 'background:var(--color-red-dim);color:var(--color-red);',
+  };
+  const REG_STATUS_STYLE = {
+    open:   'background:var(--color-teal-dim);color:var(--color-teal);',
+    paused: 'background:var(--color-gold-dim);color:var(--color-gold);',
+    closed: 'background:var(--color-red-dim);color:var(--color-red);',
+  };
+  const cap1 = s => String(s || '').charAt(0).toUpperCase() + String(s || '').slice(1);
+  const money = n => '$' + (Number(n) || 0).toLocaleString();
+
+  function setStatusEl(el, text, kind) {
+    if (!el) return;
+    el.className = 'a-status' + (kind ? ' is-' + kind : '');
+    el.textContent = text || '';
+    el.style.display = text ? 'block' : 'none';
+  }
+  function seasonsMsg(text, kind) {
+    const el = $id('seasons-msg');
+    setStatusEl(el, text, kind);
+    if (text && kind === 'ok') {
+      setTimeout(() => { if (el.textContent === text) setStatusEl(el, '', ''); }, 4000);
+    }
+  }
+
+  async function loadSeasonsData() {
+    const data = await apiJSON(SEASONS_API);
+    SEASONS = data.seasons || [];
+  }
+
+  async function loadAndRenderSeasons() {
+    const list = $id('seasons-list');
+    list.innerHTML = '<div class="loading">Loading seasons…</div>';
+    try {
+      await loadSeasonsData();
+      renderSeasons();
+    } catch (e) {
+      list.innerHTML = '<div class="ac"><div class="empty">Failed to load seasons: ' + h(e.message) + '</div></div>';
+    }
+  }
+
+  function statusBadge(map, st, prefix) {
+    return '<span class="p" style="' + (map[st] || '') + '">' + h((prefix || '') + (st || '—')) + '</span>';
+  }
+
+  function seasonSelect(act, seasonId, options, current) {
+    return '<select class="se-sel" data-act="' + act + '" data-season="' + h(seasonId) + '">' +
+      options.map(o => '<option value="' + o + '"' + (o === current ? ' selected' : '') + '>' + cap1(o) + '</option>').join('') +
+      '</select>';
+  }
+
+  function divFormFields(p, d) {
+    d = d || {};
+    const val = x => (x == null ? '' : x);
+    return '<div class="arow">' +
+        '<div class="af"><label>Division name</label><input type="text" id="' + p + '-name" value="' + h(val(d.name)) + '" placeholder="e.g. 3.0–3.5 Mixed" autocomplete="off"></div>' +
+        '<div class="af"><label>Capacity (teams)</label><input type="number" id="' + p + '-cap" min="2" max="32" value="' + h(d.capacity != null ? d.capacity : 6) + '"></div>' +
+      '</div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Team price ($)</label><input type="number" id="' + p + '-team" min="0" step="1" value="' + h(d.teamPrice != null ? d.teamPrice : 1000) + '"></div>' +
+        '<div class="af"><label>Free-agent price ($)</label><input type="number" id="' + p + '-agent" min="0" step="1" value="' + h(d.agentPrice != null ? d.agentPrice : 75) + '"></div>' +
+      '</div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Stripe team price ID</label><input type="text" id="' + p + '-stripe-team" value="' + h(val(d.stripeTeamPriceId)) + '" placeholder="price_… (optional)" autocomplete="off"></div>' +
+        '<div class="af"><label>Stripe agent price ID</label><input type="text" id="' + p + '-stripe-agent" value="' + h(val(d.stripeAgentPriceId)) + '" placeholder="price_… (optional)" autocomplete="off"></div>' +
+      '</div>';
+  }
+
+  function stripeCell(d) {
+    const t = !!d.stripeTeamPriceId, a = !!d.stripeAgentPriceId;
+    if (t && a) return '<span class="p p--paid">Linked</span>';
+    if (t || a) return '<span class="p p--pending">Partial</span>';
+    return '<span style="color:var(--color-text-faint);font-size:10px;">Not set</span>';
+  }
+
+  function renderDivRow(s, d) {
+    return '<tr style="cursor:default">' +
+      '<td><strong style="font-weight:600">' + h(d.name) + '</strong>' +
+        '<div style="font-size:9px;color:var(--color-text-faint);">id: ' + h(d.id) + '</div></td>' +
+      '<td>' + (d.capacity != null ? d.capacity : '—') + '</td>' +
+      '<td>' + money(d.teamPrice) + '</td>' +
+      '<td>' + money(d.agentPrice) + '</td>' +
+      '<td>' + stripeCell(d) + '</td>' +
+      '<td><div style="display:flex;gap:4px;justify-content:flex-end;">' +
+        '<button class="ab ab--outline ab--sm" data-act="div-edit" data-season="' + h(s.id) + '" data-div="' + h(d.id) + '">Edit</button>' +
+        '<button class="ab ab--danger ab--sm" data-act="div-remove" data-season="' + h(s.id) + '" data-div="' + h(d.id) + '">Remove</button>' +
+      '</div></td>' +
+    '</tr>';
+  }
+
+  function renderDivEditRow(s, d) {
+    return '<tr><td colspan="6" style="padding:0;">' +
+      '<div class="se-divbox" style="margin:0;border-radius:0;">' +
+        '<div class="ac__s" style="margin-bottom:10px;">Edit division</div>' +
+        divFormFields('de', d) +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+          '<button class="ab ab--outline ab--sm" data-act="div-edit-cancel">Cancel</button>' +
+          '<button class="ab ab--lime ab--sm" data-act="div-edit-save" data-season="' + h(s.id) + '" data-div="' + h(d.id) + '">Save division</button>' +
+        '</div>' +
+      '</div>' +
+    '</td></tr>';
+  }
+
+  function renderDivAddForm(s) {
+    return '<div class="se-divbox">' +
+      '<div class="ac__s" style="margin-bottom:10px;">New division</div>' +
+      divFormFields('da', null) +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="ab ab--outline ab--sm" data-act="div-add-cancel">Cancel</button>' +
+        '<button class="ab ab--lime ab--sm" data-act="div-add-save" data-season="' + h(s.id) + '">Add division</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderDivisions(s) {
+    const divs = s.divisions || [];
+    const adding = seasonUI.addDivSeasonId === s.id;
+    let html = '<div style="margin-top:16px;border-top:1px solid var(--color-border);padding-top:14px;">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">' +
+      '<span class="ac__s">Divisions · ' + divs.length + '</span>' +
+      (adding ? '' : '<button class="ab ab--teal ab--sm" data-act="div-add-open" data-season="' + h(s.id) + '">+ Add division</button>') +
+    '</div>';
+
+    if (divs.length) {
+      html += '<table class="at"><thead><tr><th>Division</th><th>Capacity</th><th>Team price</th><th>Agent price</th><th>Stripe</th><th></th></tr></thead><tbody>';
+      for (const d of divs) {
+        html += (seasonUI.editDivKey === s.id + '::' + d.id) ? renderDivEditRow(s, d) : renderDivRow(s, d);
+      }
+      html += '</tbody></table>';
+    } else if (!adding) {
+      html += '<div class="empty" style="padding:18px;">No divisions yet — add one so teams can register.</div>';
+    }
+
+    if (adding) html += renderDivAddForm(s);
+    html += '</div>';
+    return html;
+  }
+
+  function renderSeasonEditForm(s) {
+    return '<div style="margin-top:8px;">' +
+      '<div class="arow">' +
+        '<div class="af"><label>Season name</label><input type="text" id="se-name" value="' + h(s.name) + '" autocomplete="off"></div>' +
+        '<div class="af"><label>Display label</label><input type="text" id="se-label" value="' + h(s.label || '') + '" autocomplete="off"></div>' +
+      '</div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Start date</label><input type="date" id="se-start" value="' + h(s.startDate || '') + '"></div>' +
+        '<div class="af"><label>End date</label><input type="date" id="se-end" value="' + h(s.endDate || '') + '"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+        '<button class="ab ab--outline ab--sm" data-act="season-edit-cancel">Cancel</button>' +
+        '<button class="ab ab--lime ab--sm" data-act="season-edit-save" data-season="' + h(s.id) + '">Save details</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function renderSeasonCard(s) {
+    const archived = s.status === 'archived';
+    let html = '<div class="ac">';
+    html += '<div class="ac__h" style="align-items:flex-start;">' +
+      '<div><h2 class="ac__t">' + h(s.name) + '</h2>' +
+        '<div style="font-size:10px;color:var(--color-text-faint);margin-top:3px;">' +
+          h(s.label || s.name) + ' · id: ' + h(s.id) + '</div></div>' +
+      '<div style="display:flex;gap:6px;flex-shrink:0;">' +
+        statusBadge(SEASON_STATUS_STYLE, s.status, '') +
+        statusBadge(REG_STATUS_STYLE, s.registration, 'reg: ') +
+      '</div>' +
+    '</div>';
+
+    if (seasonUI.editSeasonId === s.id) {
+      html += renderSeasonEditForm(s);
+    } else {
+      html += '<div style="display:flex;flex-wrap:wrap;gap:18px;align-items:flex-end;margin-top:6px;">' +
+        '<div><div class="se-lbl">Start</div><div class="se-val">' + h(s.startDate || '—') + '</div></div>' +
+        '<div><div class="se-lbl">End</div><div class="se-val">' + h(s.endDate || '—') + '</div></div>' +
+        '<div style="flex:1;min-width:10px;"></div>' +
+        '<div><div class="se-lbl">Season status</div>' + seasonSelect('season-status', s.id, ['draft','open','paused','closed','archived'], s.status) + '</div>' +
+        '<div><div class="se-lbl">Registration</div>' + seasonSelect('season-registration', s.id, ['open','paused','closed'], s.registration) + '</div>' +
+      '</div>';
+      html += '<div style="display:flex;gap:8px;margin-top:12px;">' +
+        '<button class="ab ab--outline ab--sm" data-act="season-edit" data-season="' + h(s.id) + '">Edit details</button>' +
+        (archived ? '' : '<button class="ab ab--danger ab--sm" data-act="season-archive" data-season="' + h(s.id) + '">Archive</button>') +
+      '</div>';
+    }
+
+    html += renderDivisions(s);
+    html += '</div>';
+    return html;
+  }
+
+  function renderSeasons() {
+    const list = $id('seasons-list');
+    if (!SEASONS.length) {
+      list.innerHTML = '<div class="ac"><div class="empty">No seasons yet. Click “+ New Season” above to create your first one.</div></div>';
+      return;
+    }
+    list.innerHTML = SEASONS.map(renderSeasonCard).join('');
+  }
+
+  // ─── Seasons: mutations ───
+  function seasonReset() { seasonUI.editSeasonId = null; seasonUI.addDivSeasonId = null; seasonUI.editDivKey = null; }
+
+  function seasonPatch(body) {
+    return apiJSON(SEASONS_API, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+  }
+
+  async function afterSeasonChange(okMsg) {
+    seasonReset();
+    await loadSeasonsData();
+    renderSeasons();
+    try { await loadDivisions(); populateDivisionDropdowns(); } catch (e) {}
+    if (okMsg) seasonsMsg(okMsg, 'ok');
+  }
+
+  function numOrUndef(id) {
+    const el = $id(id);
+    if (!el) return undefined;
+    const v = el.value.trim();
+    return v === '' ? undefined : Number(v);
+  }
+
+  async function handleSeasonAction(act, seasonId, divId) {
+    seasonsMsg('', '');
+    try {
+      if (act === 'season-edit') { seasonReset(); seasonUI.editSeasonId = seasonId; renderSeasons(); return; }
+      if (act === 'season-edit-cancel') { seasonReset(); renderSeasons(); return; }
+      if (act === 'season-edit-save') {
+        const name = $id('se-name').value.trim();
+        if (!name) { seasonsMsg('Season name cannot be empty', 'err'); return; }
+        await seasonPatch({
+          id: seasonId, action: 'update',
+          name: name,
+          label: $id('se-label').value.trim() || name,
+          startDate: $id('se-start').value || null,
+          endDate: $id('se-end').value || null,
+        });
+        await afterSeasonChange('Season details saved ✓');
+        return;
+      }
+      if (act === 'season-archive') {
+        if (!confirm('Archive this season? Registration will be closed and it will no longer appear on the public registration page.')) return;
+        await apiJSON(SEASONS_API + '?id=' + encodeURIComponent(seasonId), { method: 'DELETE' });
+        await afterSeasonChange('Season archived ✓');
+        return;
+      }
+      if (act === 'div-add-open') { seasonReset(); seasonUI.addDivSeasonId = seasonId; renderSeasons(); return; }
+      if (act === 'div-add-cancel') { seasonUI.addDivSeasonId = null; renderSeasons(); return; }
+      if (act === 'div-add-save') {
+        const divName = $id('da-name').value.trim();
+        if (!divName) { seasonsMsg('Division name is required', 'err'); return; }
+        await seasonPatch({
+          id: seasonId, action: 'add-division',
+          divName: divName,
+          capacity: numOrUndef('da-cap'),
+          teamPrice: numOrUndef('da-team'),
+          agentPrice: numOrUndef('da-agent'),
+          stripeTeamPriceId: $id('da-stripe-team').value.trim(),
+          stripeAgentPriceId: $id('da-stripe-agent').value.trim(),
+        });
+        await afterSeasonChange('Division added ✓');
+        return;
+      }
+      if (act === 'div-edit') { seasonReset(); seasonUI.editDivKey = seasonId + '::' + divId; renderSeasons(); return; }
+      if (act === 'div-edit-cancel') { seasonUI.editDivKey = null; renderSeasons(); return; }
+      if (act === 'div-edit-save') {
+        const divName = $id('de-name').value.trim();
+        if (!divName) { seasonsMsg('Division name is required', 'err'); return; }
+        await seasonPatch({
+          id: seasonId, action: 'update-division',
+          divId: divId,
+          divName: divName,
+          capacity: numOrUndef('de-cap'),
+          teamPrice: numOrUndef('de-team'),
+          agentPrice: numOrUndef('de-agent'),
+          stripeTeamPriceId: $id('de-stripe-team').value.trim(),
+          stripeAgentPriceId: $id('de-stripe-agent').value.trim(),
+        });
+        await afterSeasonChange('Division updated ✓');
+        return;
+      }
+      if (act === 'div-remove') {
+        if (!confirm('Remove this division from the season? This does not delete any teams already registered in it.')) return;
+        await seasonPatch({ id: seasonId, action: 'remove-division', divId: divId });
+        await afterSeasonChange('Division removed ✓');
+        return;
+      }
+    } catch (e) {
+      seasonsMsg(e.message || 'Something went wrong', 'err');
+    }
+  }
+
+  async function handleSeasonSelect(act, seasonId, value) {
+    seasonsMsg('', '');
+    try {
+      if (act === 'season-status') {
+        await seasonPatch({ id: seasonId, action: 'set-status', status: value });
+        await afterSeasonChange('Season status updated → ' + value);
+      } else if (act === 'season-registration') {
+        await seasonPatch({ id: seasonId, action: 'set-registration', registration: value });
+        await afterSeasonChange('Registration updated → ' + value);
+      }
+    } catch (e) {
+      seasonsMsg(e.message || 'Update failed', 'err');
+      renderSeasons(); // snap the dropdown back to the actual stored value
+    }
+  }
+
+  // ─── Seasons: wiring ───
+  $id('seasons-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    handleSeasonAction(btn.dataset.act, btn.dataset.season, btn.dataset.div);
+  });
+  $id('seasons-list').addEventListener('change', (e) => {
+    const sel = e.target;
+    if (sel.tagName !== 'SELECT' || !sel.dataset.act) return;
+    handleSeasonSelect(sel.dataset.act, sel.dataset.season, sel.value);
+  });
+
+  function clearCreateForm() {
+    ['sn-name', 'sn-label', 'sn-start', 'sn-end'].forEach(id => { const el = $id(id); if (el) el.value = ''; });
+    setStatusEl($id('sn-status'), '', '');
+  }
+  $id('season-new-btn').addEventListener('click', () => {
+    const card = $id('season-create-card');
+    const show = card.style.display === 'none';
+    card.style.display = show ? 'block' : 'none';
+    if (show) $id('sn-name').focus();
+  });
+  $id('sn-cancel').addEventListener('click', () => {
+    $id('season-create-card').style.display = 'none';
+    clearCreateForm();
+  });
+  $id('sn-create').addEventListener('click', async () => {
+    const name = $id('sn-name').value.trim();
+    if (!name) { setStatusEl($id('sn-status'), 'Season name is required', 'err'); return; }
+    const btn = $id('sn-create');
+    btn.disabled = true; btn.textContent = 'Creating…';
+    setStatusEl($id('sn-status'), '', '');
+    try {
+      await apiJSON(SEASONS_API, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name,
+          label: $id('sn-label').value.trim() || name,
+          startDate: $id('sn-start').value || null,
+          endDate: $id('sn-end').value || null,
+        }),
+      });
+      clearCreateForm();
+      $id('season-create-card').style.display = 'none';
+      await afterSeasonChange('Season "' + name + '" created ✓');
+    } catch (e) {
+      setStatusEl($id('sn-status'), e.message || 'Could not create season', 'err');
+    }
+    btn.disabled = false; btn.textContent = 'Create season';
+  });
+
   // ─── Divisions (from Seasons API) ─────────────────────────
   async function loadDivisions() {
     try {
@@ -719,6 +1132,7 @@
       const t = b.dataset.tab;
       $$('.admin-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === t));
       if (t === 'overview') renderOV();
+      if (t === 'seasons') loadAndRenderSeasons();
       if (t === 'registrations') renderReg();
       if (t === 'teams') renderTeams();
       if (t === 'schedule') renderSched();
