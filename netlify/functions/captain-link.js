@@ -1,13 +1,13 @@
 // netlify/functions/captain-link.js
-// Handles magic-link callback. Consumes the one-time token, creates a
-// session (tied to the captain's email, not a specific team), and
-// redirects to /captain.html with a session cookie.
+// Handles magic-link callback. Consumes the one-time token, loads the
+// captain's team, creates a session, and redirects to /captain.html
+// with a session cookie.
 
 import {
   consumeMagicToken,
   createSession,
   buildCaptainCookie,
-  findTeamsByCaptainEmail,
+  getTeamById,
 } from './lib/captain-auth.js';
 
 export default async (req) => {
@@ -26,14 +26,13 @@ export default async (req) => {
     const consumed = await consumeMagicToken(token);
     if (!consumed) return redirect('/captain.html?error=invalid');
 
-    // Verify the captain still has at least one team
-    const teams = await findTeamsByCaptainEmail(consumed.email);
-    if (!teams.length) {
+    // The magic token carries the captain's team — load it.
+    const team = await getTeamById(consumed.teamId);
+    if (!team) {
       return redirect('/captain.html?error=expired');
     }
 
-    // Session is tied to the email — captain picks their team in the UI
-    const sessionId = await createSession(consumed.email);
+    const sessionId = await createSession(team, consumed.email);
 
     return new Response(null, {
       status: 302,
