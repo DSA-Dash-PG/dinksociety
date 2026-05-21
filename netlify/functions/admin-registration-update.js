@@ -13,6 +13,7 @@
 //   move-division { id, newDivision }  → moves a team/agent to a different division
 //   move-player   { playerId, fromTeamId, toTeamId } → moves a player between teams
 //   remove-player { playerId, teamId } → removes a player from a team
+//   delete     { id } and/or { teamId } → permanently removes a registration + its team
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
@@ -273,6 +274,49 @@ export default async (req) => {
       await teamStore.set(teamId, JSON.stringify(team));
 
       return json({ ok: true, removed, rosterCount: roster.length });
+    }
+
+    // ─── Permanently delete a registration (and its team) ───
+    case 'delete': {
+      const { id, teamId } = body;
+      if (!id && !teamId) return json({ error: 'Registration id or teamId required' }, 400);
+
+      let regId = id || null;
+      let deletedReg = false;
+      let deletedTeam = false;
+
+      // If only a teamId was supplied, resolve its registrationId.
+      if (!regId && teamId) {
+        try {
+          const teamRaw = await teamStore.get(`team/${teamId}.json`);
+          if (teamRaw) regId = JSON.parse(teamRaw).registrationId || null;
+        } catch { /* ok */ }
+      }
+
+      // Delete the registration blob, wherever it lives.
+      if (regId) {
+        const found = await findRegistration(regStore, regId);
+        if (found) {
+          try { await regStore.delete(found.foundKey); deletedReg = true; } catch { /* ok */ }
+        }
+      }
+
+      // Delete the team record. Teams are keyed team/team_<regId>.json,
+      // or use the explicit teamId if one was passed in.
+      const teamKeys = [];
+      if (teamId) teamKeys.push(`team/${teamId}.json`);
+      if (regId) teamKeys.push(`team/team_${regId}.json`);
+      for (const key of teamKeys) {
+        try {
+          const existing = await teamStore.get(key);
+          if (existing) { await teamStore.delete(key); deletedTeam = true; }
+        } catch { /* ok */ }
+      }
+
+      if (!deletedReg && !deletedTeam) {
+        return json({ error: 'Nothing found to delete' }, 404);
+      }
+      return json({ ok: true, deletedReg, deletedTeam });
     }
 
     default:

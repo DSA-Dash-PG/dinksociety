@@ -514,6 +514,7 @@
     </div>
     <div class="tdp-body" id="tdp-body"></div>
     <div class="tdp-foot">
+      <button class="ab ab--danger ab--sm" id="tdp-delete">Delete Team</button>
       <div class="a-status" id="tdp-status" style="margin:0;flex:1;"></div>
       <button class="ab ab--outline ab--sm" id="tdp-cancel">Cancel</button>
       <button class="ab ab--lime ab--sm" id="tdp-save">Save Changes</button>
@@ -791,7 +792,7 @@
 
     if (!f.length) { $id('reg-table').innerHTML = '<div class="empty">No registrations match.</div>'; return; }
 
-    $id('reg-table').innerHTML = '<table class="at"><thead><tr><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Payment</th><th>Contact</th><th>Date</th></tr></thead><tbody>' +
+    $id('reg-table').innerHTML = '<table class="at"><thead><tr><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Payment</th><th>Contact</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
       f.map(r => {
         const nm = r.path === 'team'
           ? '<strong style="font-weight:600">' + h(r.team?.name) + '</strong> <span style="color:var(--color-text-faint);font-size:10px">(' + h(r.team?.captain) + ')</span>'
@@ -806,8 +807,44 @@
         } else {
           pp = '<span class="p p--unpaid">Unpaid</span>';
         }
-        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + (r.status || 'pending') + '">' + (r.status || 'pending') + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td></tr>';
+        const st = r.status || 'pending';
+        const actBtns = [];
+        if (st === 'pending') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="confirm" data-id="' + h(r.id) + '">Confirm</button>');
+        if (st === 'pending' || st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="reject" data-id="' + h(r.id) + '">Reject</button>');
+        if (st === 'rejected') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="reinstate" data-id="' + h(r.id) + '">Reinstate</button>');
+        actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
+        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
+    wireRegActions();
+  }
+
+  async function regAction(act, id) {
+    const payload = { action: act, id };
+    if (act === 'reject') {
+      const reason = prompt('Reject this registration — optional reason (leave blank to skip):');
+      if (reason === null) return; // cancelled
+      payload.reason = reason;
+    } else if (act === 'delete') {
+      if (!confirm('Permanently delete this registration? If a team was already created, it will be removed too. This cannot be undone.')) return;
+    } else if (act === 'confirm') {
+      if (!confirm('Confirm this registration? It will be marked approved and a team record created.')) return;
+    } else if (act === 'reinstate') {
+      if (!confirm('Reinstate this rejected registration back to confirmed?')) return;
+    }
+    try {
+      await apiJSON('/.netlify/functions/admin-registration-update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      renderReg();
+    } catch (e) {
+      alert('Action failed: ' + (e.message || 'unknown error'));
+    }
+  }
+
+  function wireRegActions() {
+    $id('reg-table').querySelectorAll('button.reg-act').forEach(btn => {
+      btn.addEventListener('click', () => regAction(btn.dataset.act, btn.dataset.id));
+    });
   }
 
   $id('rf-st').addEventListener('change', filterAndShowReg);
@@ -895,6 +932,25 @@
   $id('tdp-close').addEventListener('click', closePanel);
   $id('tdp-cancel').addEventListener('click', closePanel);
   $id('tdp-overlay').addEventListener('click', closePanel);
+
+  $id('tdp-delete').addEventListener('click', async () => {
+    if (!currentPanelTeam) return;
+    const t = currentPanelTeam;
+    if (!confirm('Permanently delete the team "' + (t.name || 'this team') + '"? This also removes its registration record. This cannot be undone.')) return;
+    const status = $id('tdp-status'), btn = $id('tdp-delete');
+    btn.disabled = true; status.className = 'a-status';
+    try {
+      await apiJSON('/.netlify/functions/admin-registration-update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', id: t.registrationId || null, teamId: t.id }),
+      });
+      closePanel();
+      renderTeams();
+    } catch (e) {
+      status.className = 'a-status is-err'; status.textContent = e.message || 'Delete failed';
+      btn.disabled = false;
+    }
+  });
 
   function renderPanelBody() {
     const t = currentPanelTeam;
