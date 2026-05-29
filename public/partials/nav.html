@@ -8,7 +8,7 @@
     <a href="/" class="ds-nav-brand">
       <div class="ds-nav-brand-text">
         <strong>The Dink Society</strong>
-        <small data-circuit-label>Circuit ONE</small>
+        <small data-circuit-label>Season 1</small>
       </div>
     </a>
 
@@ -106,21 +106,70 @@
   checkScroll(); // run on load in case page is already scrolled
 
   /* ── Load circuit settings (public GET) ── */
+
+  function _dsDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  }
+  function _dsDay(iso) {
+    if (!iso) return '';
+    var d = new Date(iso + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { weekday: 'long' });
+  }
+  function _dsMonthYear(iso) {
+    if (!iso) return '';
+    var d = new Date(iso + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  }
+
   fetch('/.netlify/functions/admin-settings')
     .then(function (r) { return r.ok ? r.json() : fetch('/api/admin-settings').then(function(r2) { return r2.ok ? r2.json() : null; }); })
     .then(function (s) {
       if (!s) return;
+      window.DS_SETTINGS = s;
+
       document.querySelectorAll('[data-circuit-label]').forEach(function (el) {
-        el.textContent = s.circuitName || 'Circuit ONE';
+        el.textContent = s.circuitName || 'Season 1';
       });
       document.querySelectorAll('[data-circuit-venue]').forEach(function (el) {
         el.textContent = s.defaultVenue || '';
       });
       document.querySelectorAll('[data-team-fee]').forEach(function (el) {
-        el.textContent = s.teamFee || '$1,000';
+        el.textContent = s.teamFee || '$650';
       });
       document.querySelectorAll('[data-agent-fee]').forEach(function (el) {
         el.textContent = s.agentFee || '$75';
+      });
+      document.querySelectorAll('[data-season-weeks]').forEach(function (el) {
+        el.textContent = s.weeks || '8';
+      });
+      if (s.startDate) {
+        var startDate = _dsDate(s.startDate);
+        var startDay  = _dsDay(s.startDate);
+        var startMY   = _dsMonthYear(s.startDate);
+        document.querySelectorAll('[data-start-date]').forEach(function (el) {
+          el.textContent = startDate;
+        });
+        document.querySelectorAll('[data-start-day]').forEach(function (el) {
+          el.textContent = startDay;
+        });
+        document.querySelectorAll('[data-start-day-plural]').forEach(function (el) {
+          el.textContent = startDay + 's';
+        });
+        document.querySelectorAll('[data-start-month-year]').forEach(function (el) {
+          el.textContent = startMY;
+        });
+      }
+      var feeNum   = parseInt(String(s.teamFee || '').replace(/[^0-9]/g, ''), 10) || 0;
+      var deposit  = s.depositAmount || 100;
+      var balance  = feeNum - deposit;
+      var dueDate  = s.balanceDueDate ? _dsDate(s.balanceDueDate) : '';
+      var depositHtml = 'Reserve your team\'s spot with a <strong>$' + deposit + ' deposit</strong> today.'
+        + ' The remaining <strong>$' + balance + '</strong> of the ' + (s.teamFee || '$650')
+        + ' team fee is due by <strong>' + dueDate + '</strong>.';
+      document.querySelectorAll('[data-deposit-note]').forEach(function (el) {
+        el.innerHTML = depositHtml;
       });
     })
     .catch(function () { /* settings not available, defaults stay */ });
