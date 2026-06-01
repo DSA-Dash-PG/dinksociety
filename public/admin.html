@@ -542,6 +542,12 @@
             <table class="at"><thead><tr><th>Email</th><th>Role</th></tr></thead>
             <tbody id="admins-list"><tr><td colspan="2" class="loading">Loading…</td></tr></tbody></table>
           </div>
+          <div class="ac" style="border-color:var(--color-danger,#e53e3e);">
+            <div class="ac__h"><h2 class="ac__t" style="color:var(--color-danger,#e53e3e);">Danger Zone</h2></div>
+            <p style="font-size:13px;color:var(--color-text-muted);margin:0 0 16px;">Clear all season data — teams, matches, standings, registrations, and leaderboard. This cannot be undone.</p>
+            <button class="ab" id="reset-data-btn" style="background:#e53e3e;color:#fff;border-color:#e53e3e;">Clear All Data</button>
+            <span id="reset-status" style="font-size:12px;margin-left:12px;"></span>
+          </div>
         </section>
 
       </main>
@@ -1321,6 +1327,23 @@
       renderTeams();
     } catch (e) {
       status.textContent = e.message; status.style.color = 'var(--color-red, #ef4444)';
+    } finally { btn.disabled = false; }
+  });
+
+  // ── Clear All Data button ──
+  $id('reset-data-btn').addEventListener('click', async () => {
+    if (!confirm('This will permanently delete all teams, matches, standings, registrations, and leaderboard data. Are you sure?')) return;
+    if (!confirm('Last chance — this cannot be undone. Clear everything?')) return;
+    const btn = $id('reset-data-btn'), status = $id('reset-status');
+    btn.disabled = true; status.textContent = 'Clearing…'; status.style.color = 'var(--color-text-faint)';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-reset', { method: 'POST' });
+      const total = Object.values(data.deleted || {}).reduce((a, b) => a + b, 0);
+      status.textContent = `Done — ${total} records deleted.`;
+      status.style.color = 'var(--color-teal)';
+      renderOV();
+    } catch (e) {
+      status.textContent = e.message; status.style.color = '#e53e3e';
     } finally { btn.disabled = false; }
   });
 
