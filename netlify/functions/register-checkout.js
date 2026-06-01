@@ -23,6 +23,7 @@
 import Stripe from 'stripe';
 import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
+import { sendEmail } from './lib/email.js';
 
 export default async (req) => {
   if (req.method !== 'POST') {
@@ -69,6 +70,104 @@ export default async (req) => {
         if (div) {
           stripePriceId = path === 'team' ? div.stripeTeamPriceId : div.stripeAgentPriceId;
           resolvedPrice = path === 'team' ? div.teamPrice : div.agentPrice;
+
+          // ── Pay-later bypass ──────────────────────────────────
+          // If the division has payLater enabled, skip Stripe entirely.
+          // Create a confirmed registration + team record immediately so
+          // the captain can access the portal right away.
+          if (div.payLater && path === 'team') {
+            const regId = crypto.randomBytes(8).toString('hex');
+            const siteUrl = process.env.SITE_URL || `https://${process.env.URL || 'localhost:8888'}`;
+
+            const registration = {
+              id: regId,
+              seasonId: seasonId || null,
+              circuit: circuit || seasonId,
+              division,
+              divisionLabel: divisionLabel || division,
+              path,
+              status: 'confirmed',
+              paymentStatus: 'pay_later',
+              price: resolvedPrice,
+              totalPrice: resolvedPrice,
+              paymentType: 'pay_later',
+              depositAmount: 0,
+              balanceDue: resolvedPrice,
+              balanceDueDate: null,
+              team,
+              createdAt: new Date().toISOString(),
+              confirmedAt: new Date().toISOString(),
+            };
+
+            const regStore = getStore('registrations');
+            await regStore.set(`confirmed/${regId}.json`, JSON.stringify(registration));
+
+            // Create the team record so captain magic-link login works immediately
+            const teamsStore = getStore('teams');
+            const teamId = `team_${regId}`;
+            const captainEmail = (team.players?.[0]?.email || '').toLowerCase().trim();
+            await teamsStore.setJSON(`team/${teamId}.json`, {
+              id: teamId,
+              name: team.name,
+              captainName: team.captain || null,
+              captainEmail: captainEmail || null,
+              division,
+              divisionLabel: divisionLabel || division,
+              circuit: circuit || 'I',
+              roster: (team.players || []).map((p, i) => ({
+                id: `p_${regId}_${i}`,
+                name: p.name || '',
+                gender: '',
+                email: p.email || '',
+                phone: p.phone || '',
+                dupr: '',
+              })),
+              registrationId: regId,
+              createdAt: new Date().toISOString(),
+              status: 'active',
+            });
+
+            // Send a confirmation email (no payment summary since pay-later)
+            if (captainEmail) {
+              try {
+                await sendEmail({
+                  to: captainEmail,
+                  subject: `You're registered — ${circuit || 'Dink Society'} (payment pending)`,
+                  html: `
+                    <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
+                      <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:32px;">THE DINK SOCIETY</div>
+                      <h1 style="font-size:24px;font-weight:800;text-transform:uppercase;color:#f5f5f5;margin:0 0 8px;">You're in${team.captain ? ', ' + team.captain.split(' ')[0] : ''}.</h1>
+                      <p style="font-size:15px;color:#8a8a8a;line-height:1.6;margin:0 0 24px;">
+                        Your team <strong style="color:#f5f5f5;">${team.name}</strong> is registered for <strong style="color:#f5f5f5;">${circuit || 'the league'}</strong> (${divisionLabel || division}).
+                      </p>
+                      <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #ffb400;padding:16px 20px;border-radius:0 12px 12px 0;margin-bottom:24px;">
+                        <p style="font-size:14px;margin:0;line-height:1.6;color:#8a8a8a;">
+                          <strong style="color:#f5f5f5;">Payment pending:</strong> Your team fee of $${resolvedPrice} will be collected separately before the season starts. Your spot is confirmed in the meantime.
+                        </p>
+                      </div>
+                      <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #b8ff2c;padding:20px;border-radius:0 12px 12px 0;margin-bottom:24px;">
+                        <p style="font-size:14px;margin:0 0 12px;line-height:1.6;color:#8a8a8a;">
+                          <strong style="color:#f5f5f5;">Next step:</strong> Complete your roster through the captain portal. Request a magic link at:
+                        </p>
+                        <a href="${siteUrl}/captain.html" style="color:#b8ff2c;font-weight:600;text-decoration:none;">${siteUrl}/captain.html</a>
+                      </div>
+                      <div style="margin-top:40px;padding-top:20px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;">
+                        The Dink Society · Southern California Pickleball League
+                      </div>
+                    </div>
+                  `,
+                });
+              } catch (emailErr) {
+                console.error('Pay-later confirmation email failed:', emailErr);
+              }
+            }
+
+            return new Response(JSON.stringify({ confirmationUrl: `${siteUrl}/register-success.html?id=${regId}` }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            });
+          }
+          // ─────────────────────────────────────────────────────
         }
       }
     }

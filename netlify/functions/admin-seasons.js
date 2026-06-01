@@ -187,6 +187,7 @@ export default async (req) => {
           agentPrice: parseFloat(agentPrice) || 75,
           stripeTeamPriceId: cleanStripeId(stripeTeamPriceId),
           stripeAgentPriceId: cleanStripeId(stripeAgentPriceId),
+          payLater: !!payload.payLater,
         });
         break;
       }
@@ -207,6 +208,9 @@ export default async (req) => {
         }
         if (payload.stripeAgentPriceId !== undefined) {
           div.stripeAgentPriceId = cleanStripeId(payload.stripeAgentPriceId);
+        }
+        if (payload.payLater !== undefined) {
+          div.payLater = !!payload.payLater;
         }
         break;
       }

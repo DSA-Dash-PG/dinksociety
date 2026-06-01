@@ -344,9 +344,16 @@
         });
         if (!res.ok) throw new Error((await res.text()) || 'Checkout session failed');
         const data = await res.json();
-        if (!data.checkoutUrl) throw new Error('No checkout URL returned');
-        status.textContent = 'Redirecting to Stripe…';
-        window.location.href = data.checkoutUrl;
+        if (data.confirmationUrl) {
+          // Pay-later division — skip Stripe, go straight to confirmation
+          status.textContent = 'Registration confirmed! Redirecting…';
+          window.location.href = data.confirmationUrl;
+        } else if (data.checkoutUrl) {
+          status.textContent = 'Redirecting to Stripe…';
+          window.location.href = data.checkoutUrl;
+        } else {
+          throw new Error('No checkout URL returned');
+        }
       } catch (err) {
         status.className = 'reg-status is-error';
         status.textContent = 'Could not start checkout: ' + err.message;

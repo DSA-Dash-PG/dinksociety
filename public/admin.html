@@ -319,7 +319,11 @@
         <section class="admin-section" data-section="seasons">
           <div class="am-head">
             <h1 class="am-title">Seasons</h1>
-            <div class="am-actions">
+            <div class="am-actions" style="display:flex;gap:10px;align-items:center;">
+              <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:12px;color:var(--color-text-faint);white-space:nowrap;">
+                <input type="checkbox" id="hide-archived-toggle" checked>
+                Hide archived
+              </label>
               <button class="ab ab--lime ab--sm" id="season-new-btn">+ New Season</button>
             </div>
           </div>
@@ -792,10 +796,17 @@
       '<div class="arow">' +
         '<div class="af"><label>Stripe team price ID</label><input type="text" id="' + p + '-stripe-team" value="' + h(val(d.stripeTeamPriceId)) + '" placeholder="price_… (optional)" autocomplete="off"></div>' +
         '<div class="af"><label>Stripe agent price ID</label><input type="text" id="' + p + '-stripe-agent" value="' + h(val(d.stripeAgentPriceId)) + '" placeholder="price_… (optional)" autocomplete="off"></div>' +
+      '</div>' +
+      '<div style="margin-top:8px;">' +
+        '<label style="display:flex;gap:8px;align-items:center;cursor:pointer;">' +
+          '<input type="checkbox" id="' + p + '-pay-later"' + (d.payLater ? ' checked' : '') + '>' +
+          '<span style="font-size:12px;color:var(--color-text-faint);">Pay later — teams register without Stripe; captain portal access granted immediately, payment collected separately</span>' +
+        '</label>' +
       '</div>';
   }
 
   function stripeCell(d) {
+    if (d.payLater) return '<span class="p" style="background:rgba(255,180,0,0.15);color:#ffb400;border-color:#ffb400;">Pay later</span>';
     const t = !!d.stripeTeamPriceId, a = !!d.stripeAgentPriceId;
     if (t && a) return '<span class="p p--paid">Linked</span>';
     if (t || a) return '<span class="p p--pending">Partial</span>';
@@ -918,11 +929,19 @@
 
   function renderSeasons() {
     const list = $id('seasons-list');
-    if (!SEASONS.length) {
-      list.innerHTML = '<div class="ac"><div class="empty">No seasons yet. Click “+ New Season” above to create your first one.</div></div>';
+    const hideArchived = $id('hide-archived-toggle')?.checked !== false;
+    const visible = hideArchived ? SEASONS.filter(s => s.status !== 'archived') : SEASONS;
+    if (!visible.length) {
+      const hiddenCount = SEASONS.filter(s => s.status === 'archived').length;
+      const hint = !SEASONS.length
+        ? 'No seasons yet. Click “+ New Season” above to create your first one.'
+        : hiddenCount
+          ? 'No active seasons. ' + hiddenCount + ' archived season' + (hiddenCount > 1 ? 's' : '') + ' hidden — uncheck “Hide archived” to view.'
+          : 'No seasons found.';
+      list.innerHTML = '<div class=”ac”><div class=”empty”>' + h(hint) + '</div></div>';
       return;
     }
-    list.innerHTML = SEASONS.map(renderSeasonCard).join('');
+    list.innerHTML = visible.map(renderSeasonCard).join('');
   }
 
   // ─── Seasons: mutations ───
@@ -986,6 +1005,7 @@
           agentPrice: numOrUndef('da-agent'),
           stripeTeamPriceId: $id('da-stripe-team').value.trim(),
           stripeAgentPriceId: $id('da-stripe-agent').value.trim(),
+          payLater: !!$id('da-pay-later')?.checked,
         });
         await afterSeasonChange('Division added ✓');
         return;
@@ -1004,6 +1024,7 @@
           agentPrice: numOrUndef('de-agent'),
           stripeTeamPriceId: $id('de-stripe-team').value.trim(),
           stripeAgentPriceId: $id('de-stripe-agent').value.trim(),
+          payLater: !!$id('de-pay-later')?.checked,
         });
         await afterSeasonChange('Division updated ✓');
         return;
@@ -1036,6 +1057,8 @@
   }
 
   // ─── Seasons: wiring ───
+  $id('hide-archived-toggle').addEventListener('change', () => renderSeasons());
+
   $id('seasons-list').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
