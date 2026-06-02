@@ -37,7 +37,7 @@ export default async (req) => {
         teams.push({
           id: team.id,
           name: team.name,
-          emoji: team.emoji || '🏓',
+          emoji: team.emoji || '',
           division: team.division,
           divisionLabel: team.divisionLabel || null,
           captain: team.captain || (team.roster?.[0]?.name) || '',
