@@ -198,6 +198,30 @@
     .team-card:hover { border-color: var(--color-lime); transform: translateY(-1px); }
     .team-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--color-border); display: inline-block; vertical-align: middle; }
 
+    /* Transfer panel */
+    .xfer-panel { background: var(--color-surface-1); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 20px; overflow: hidden; }
+    .xfer-panel__head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-2); }
+    .xfer-panel__title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
+    .xfer-panel__body { padding: 14px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+    .xfer-field { display: flex; flex-direction: column; gap: 4px; flex: 1; min-width: 140px; }
+    .xfer-field label { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); }
+    .xfer-field select, .xfer-field input { padding: 7px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 12px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
+    .xfer-arrow { font-size: 18px; color: var(--color-text-faint); align-self: flex-end; padding-bottom: 8px; }
+    .xfer-status { font-size: 11px; padding: 6px 10px; border-radius: var(--radius-sm); display: none; }
+    .xfer-status.ok { background: var(--color-teal-dim); color: var(--color-teal); display: block; }
+    .xfer-status.err { background: var(--color-red-dim, rgba(239,68,68,0.12)); color: var(--color-red, #ef4444); display: block; }
+
+    /* Transfer requests + log */
+    .xreq-row { display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 12px; }
+    .xreq-row:last-child { border-bottom: none; }
+    .xreq-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; }
+    .xreq-badge--pending { background: var(--color-gold-dim, rgba(234,179,8,0.15)); color: var(--color-gold, #ca8a04); }
+    .xreq-badge--approved { background: var(--color-teal-dim); color: var(--color-teal); }
+    .xreq-badge--denied { background: var(--color-red-dim, rgba(239,68,68,0.12)); color: var(--color-red, #ef4444); }
+    .xlog-row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 12px; }
+    .xlog-row:last-child { border-bottom: none; }
+    .xlog-arrow { color: var(--color-text-faint); margin: 0 2px; }
+
     /* ── Site Images grid ──────────────────────────────────────── */
     .si-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; }
     .si-grid.empty { display: block; font-size: 12px; color: var(--color-text-faint); padding: 24px 0; text-align: center; }
@@ -377,10 +401,67 @@
             <div class="am-actions">
               <span id="seed-status" style="font-size:11px;color:var(--color-text-faint);"></span>
               <button class="ab ab--outline ab--sm" id="seed-teams-btn">Sync from Registrations</button>
+              <button class="ab ab--outline ab--sm" id="transfer-toggle-btn" onclick="toggleXferPanel()">⇄ Transfer player</button>
             </div>
           </div>
+
+          <!-- Direct transfer panel (admin only) -->
+          <div class="xfer-panel" id="xfer-panel" style="display:none;">
+            <div class="xfer-panel__head">
+              <span class="xfer-panel__title">Direct transfer</span>
+              <button class="ab ab--ghost ab--sm" onclick="toggleXferPanel()">✕</button>
+            </div>
+            <div class="xfer-panel__body">
+              <div class="xfer-field">
+                <label>From team</label>
+                <select id="xfer-from-team" onchange="xferLoadPlayers()">
+                  <option value="">— select team —</option>
+                </select>
+              </div>
+              <div class="xfer-field">
+                <label>Player</label>
+                <select id="xfer-player" disabled>
+                  <option value="">— pick from team first —</option>
+                </select>
+              </div>
+              <div class="xfer-arrow">→</div>
+              <div class="xfer-field">
+                <label>To team</label>
+                <select id="xfer-to-team">
+                  <option value="">— select team —</option>
+                </select>
+              </div>
+              <div class="xfer-field" style="min-width:180px;">
+                <label>Note (optional)</label>
+                <input type="text" id="xfer-note" placeholder="e.g. Off-season trade">
+              </div>
+              <div style="align-self:flex-end;">
+                <button class="ab ab--primary ab--sm" id="xfer-confirm-btn" onclick="executeDirectTransfer()">Confirm transfer</button>
+              </div>
+            </div>
+            <div style="padding:0 14px 10px;" id="xfer-status-msg"></div>
+          </div>
+
+          <!-- Pending transfer requests from captains -->
+          <div class="ac" style="margin-bottom:16px;">
+            <div class="ac__h">
+              <span class="ac__t">Pending transfer requests</span>
+              <button class="ab ab--ghost ab--sm" onclick="loadTransferRequests()" style="font-size:10px;">Refresh</button>
+            </div>
+            <div id="xreq-list"><div class="loading" style="font-size:12px;">Loading…</div></div>
+          </div>
+
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col" id="teams-grid">
             <div class="loading" style="grid-column:1/-1;">Loading teams…</div>
+          </div>
+
+          <!-- Transfer log -->
+          <div class="ac" style="margin-top:20px;">
+            <div class="ac__h">
+              <span class="ac__t">Transfer log</span>
+              <button class="ab ab--ghost ab--sm" onclick="loadTransferLog()" style="font-size:10px;">Refresh</button>
+            </div>
+            <div id="xlog-list"><div class="loading" style="font-size:12px;">Loading…</div></div>
           </div>
         </section>
 
@@ -1350,8 +1431,144 @@
       const data = await apiJSON('/.netlify/functions/admin-teams');
       allTeams = data.teams || [];
       showTeamCards();
+      populateXferSelects();
     } catch (e) {
       grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">Failed to load teams: ' + h(e.message) + '</div>';
+    }
+    loadTransferRequests();
+    loadTransferLog();
+  }
+
+  // ── Transfer panel helpers ────────────────────────────────────
+  function toggleXferPanel() {
+    const panel = $id('xfer-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function populateXferSelects() {
+    const opts = '<option value="">— select team —</option>' +
+      allTeams.map(t => `<option value="${h(t.id)}">${h(t.name)}</option>`).join('');
+    $id('xfer-from-team').innerHTML = opts;
+    $id('xfer-to-team').innerHTML = opts;
+    $id('xfer-player').innerHTML = '<option value="">— pick from team first —</option>';
+    $id('xfer-player').disabled = true;
+  }
+
+  function xferLoadPlayers() {
+    const teamId = $id('xfer-from-team').value;
+    const sel = $id('xfer-player');
+    if (!teamId) { sel.innerHTML = '<option value="">— pick from team first —</option>'; sel.disabled = true; return; }
+    const team = allTeams.find(t => t.id === teamId);
+    const roster = team?.roster || [];
+    if (!roster.length) { sel.innerHTML = '<option value="">No players on this team</option>'; sel.disabled = true; return; }
+    sel.innerHTML = '<option value="">— select player —</option>' +
+      roster.map(p => {
+        const flags = p.isCaptain ? ' (Captain — cannot transfer)' : '';
+        return `<option value="${h(p.id)}" ${p.isCaptain ? 'disabled' : ''}>${h(p.name)}${flags}</option>`;
+      }).join('');
+    sel.disabled = false;
+  }
+
+  async function executeDirectTransfer() {
+    const fromTeamId = $id('xfer-from-team').value;
+    const playerId   = $id('xfer-player').value;
+    const toTeamId   = $id('xfer-to-team').value;
+    const note       = $id('xfer-note').value.trim();
+    const statusEl   = $id('xfer-status-msg');
+
+    if (!fromTeamId || !playerId || !toTeamId) { statusEl.className = 'xfer-status err'; statusEl.textContent = 'Select a source team, player, and destination.'; return; }
+    if (fromTeamId === toTeamId) { statusEl.className = 'xfer-status err'; statusEl.textContent = 'Source and destination must be different teams.'; return; }
+
+    const player = allTeams.find(t => t.id === fromTeamId)?.roster?.find(p => p.id === playerId);
+    if (!confirm(`Transfer ${player?.name || 'this player'} to ${allTeams.find(t => t.id === toTeamId)?.name}? This cannot be undone.`)) return;
+
+    statusEl.className = 'xfer-status'; statusEl.textContent = '';
+    try {
+      await apiJSON('/.netlify/functions/admin-transfer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'direct', fromTeamId, toTeamId, playerId, note }),
+      });
+      statusEl.className = 'xfer-status ok'; statusEl.textContent = 'Transfer complete ✓';
+      toggleXferPanel();
+      renderTeams();
+    } catch (e) {
+      statusEl.className = 'xfer-status err'; statusEl.textContent = e.message || 'Transfer failed';
+    }
+  }
+
+  // ── Transfer requests list ────────────────────────────────────
+  async function loadTransferRequests() {
+    const el = $id('xreq-list');
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-transfer?status=pending');
+      const requests = data.requests || [];
+      if (!requests.length) {
+        el.innerHTML = '<div style="font-size:12px;color:var(--color-text-faint);padding:8px 0;">No pending requests.</div>';
+        return;
+      }
+      el.innerHTML = requests.map(r => `
+        <div class="xreq-row">
+          <div>
+            <strong style="font-size:12px;">${h(r.playerName)}</strong>
+            <div style="font-size:11px;color:var(--color-text-faint);">${h(r.fromTeamName)} → ${h(r.toTeamName)}</div>
+            ${r.note ? `<div style="font-size:11px;color:var(--color-text-faint);font-style:italic;">"${h(r.note)}"</div>` : ''}
+          </div>
+          <div style="font-size:11px;color:var(--color-text-faint);">
+            Requested by ${h(r.requestedBy)}<br>${new Date(r.requestedAt).toLocaleDateString()}
+          </div>
+          <div>
+            <button class="ab ab--primary ab--sm" onclick="reviewRequest('${h(r.id)}','approve')">Approve</button>
+          </div>
+          <div>
+            <button class="ab ab--outline ab--sm" onclick="reviewRequest('${h(r.id)}','deny')">Deny</button>
+          </div>
+        </div>`).join('');
+    } catch {
+      el.innerHTML = '<div style="font-size:12px;color:var(--color-red,#ef4444);">Failed to load requests.</div>';
+    }
+  }
+
+  async function reviewRequest(requestId, action) {
+    let reviewNote = null;
+    if (action === 'deny') {
+      reviewNote = prompt('Reason for denial (optional):') || null;
+      if (reviewNote === null) return;
+    } else {
+      if (!confirm('Approve this transfer? The player will be moved immediately.')) return;
+    }
+    try {
+      await apiJSON('/.netlify/functions/admin-transfer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, requestId, reviewNote }),
+      });
+      loadTransferRequests();
+      if (action === 'approve') { renderTeams(); }
+    } catch (e) {
+      alert('Failed: ' + (e.message || 'unknown error'));
+    }
+  }
+
+  // ── Transfer log ──────────────────────────────────────────────
+  async function loadTransferLog() {
+    const el = $id('xlog-list');
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-transfer?log=1');
+      const entries = data.entries || [];
+      if (!entries.length) {
+        el.innerHTML = '<div style="font-size:12px;color:var(--color-text-faint);padding:8px 0;">No transfers recorded yet.</div>';
+        return;
+      }
+      el.innerHTML = entries.map(e => `
+        <div class="xlog-row">
+          <div><strong style="font-size:12px;">${h(e.playerName)}</strong></div>
+          <div style="font-size:12px;">${h(e.fromTeamName)} <span class="xlog-arrow">→</span> ${h(e.toTeamName)}</div>
+          <div style="font-size:11px;color:var(--color-text-faint);">
+            ${e.note ? `"${h(e.note)}" · ` : ''}${h(e.transferredBy)}
+          </div>
+          <div style="font-size:11px;color:var(--color-text-faint);">${new Date(e.transferredAt).toLocaleDateString()}</div>
+        </div>`).join('');
+    } catch {
+      el.innerHTML = '<div style="font-size:12px;color:var(--color-red,#ef4444);">Failed to load log.</div>';
     }
   }
 

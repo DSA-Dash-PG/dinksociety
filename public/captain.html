@@ -141,6 +141,30 @@
     .roster-row input:focus, .roster-row select:focus { outline: none; border-color: var(--color-lime); }
     .roster-row__remove { background: none; border: none; color: var(--color-red, #ef4444); cursor: pointer; font-size: 16px; font-weight: 600; font-family: inherit; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
     .roster-row__remove:hover { background: var(--color-red-dim, rgba(239,68,68,0.12)); }
+    .roster-row__transfer { background: none; border: none; color: var(--color-text-faint); cursor: pointer; font-size: 13px; font-family: inherit; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; title: "Request transfer"; }
+    .roster-row__transfer:hover { background: var(--color-surface-3); color: var(--color-text-muted); }
+
+    /* Transfer request modal */
+    .xreq-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
+    .xreq-modal { background: var(--color-surface-1); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; width: 100%; max-width: 420px; }
+    .xreq-modal h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .xreq-modal__sub { font-size: 12px; color: var(--color-text-faint); margin-bottom: 16px; }
+    .xreq-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+    .xreq-field label { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); }
+    .xreq-field select, .xreq-field textarea { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
+    .xreq-field textarea { resize: none; }
+    .xreq-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
+    .xreq-status { font-size: 12px; padding: 7px 10px; border-radius: var(--radius-sm); margin-top: 8px; display: none; }
+    .xreq-status.ok { background: var(--color-teal-dim); color: var(--color-teal); display: block; }
+    .xreq-status.err { background: var(--color-red-dim, rgba(239,68,68,0.12)); color: var(--color-red, #ef4444); display: block; }
+
+    /* Pending requests list */
+    .xreq-item { padding: 10px 0; border-bottom: 1px solid var(--color-border); font-size: 12px; }
+    .xreq-item:last-child { border-bottom: none; }
+    .xreq-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 99px; text-transform: uppercase; display: inline-block; }
+    .xreq-badge--pending { background: rgba(234,179,8,0.15); color: var(--color-gold, #ca8a04); }
+    .xreq-badge--approved { background: var(--color-teal-dim); color: var(--color-teal); }
+    .xreq-badge--denied { background: var(--color-red-dim, rgba(239,68,68,0.12)); color: var(--color-red, #ef4444); }
 
     /* ── Scoresheet ──────────────────────────────────────────── */
     .scoresheet { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; margin-top: 20px; }
@@ -501,7 +525,18 @@
         </div>
         <div class="cap-status" id="roster-status"></div>
       </div>
+
+      <!-- Pending transfer requests -->
+      <div class="cap-card" style="margin-top: 14px;" id="xreq-card">
+        <div class="cap-card__header">
+          <h2 class="cap-card__title">Transfer requests</h2>
+          <span class="cap-card__sub">Requests you've submitted to the league</span>
+        </div>
+        <div id="xreq-captain-list"><div style="font-size:12px;color:var(--color-text-faint);">Loading…</div></div>
+      </div>
     </section>
+
+    <!-- Transfer request modal (appended to body via JS) -->
 
   </div>
 
@@ -686,7 +721,7 @@
         } else {
           switchSection(tab);
           if (tab === 'schedule') loadMatches();
-          if (tab === 'roster') loadRoster();
+          if (tab === 'roster') { loadRoster(); loadCaptainTransferRequests(); }
         }
       });
     });
@@ -1708,7 +1743,7 @@
       // Sort alphabetically so the list is consistent; data-idx aligns with sorted array
       state.roster.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       container.innerHTML = state.roster.map((p, idx) => `
-        <div class="roster-row" data-idx="${idx}">
+        <div class="roster-row" data-idx="${idx}" data-player-id="${escapeAttr(p.id || '')}">
           <input type="text" placeholder="Name" value="${escapeAttr(p.name)}" data-field="name">
           <select data-field="gender">
             <option value="">—</option>
@@ -1718,7 +1753,10 @@
           <input type="email" class="roster-row__email" placeholder="email" value="${escapeAttr(p.email || '')}" data-field="email">
           <input type="tel" class="roster-row__phone" placeholder="phone" value="${escapeAttr(p.phone || '')}" data-field="phone">
           <input type="text" class="roster-row__dupr" placeholder="DUPR" value="${escapeAttr(p.dupr || '')}" data-field="dupr">
-          <button class="roster-row__remove" data-action="remove" aria-label="Remove player">&times;</button>
+          <div style="display:flex;gap:2px;align-items:center;">
+            ${p.isCaptain ? '' : `<button class="roster-row__transfer" data-action="transfer" title="Request transfer" aria-label="Request transfer for ${escapeAttr(p.name)}">⇄</button>`}
+            <button class="roster-row__remove" data-action="remove" aria-label="Remove player">&times;</button>
+          </div>
         </div>
       `).join('');
 
@@ -1730,6 +1768,118 @@
           renderRoster();
         });
       });
+
+      container.querySelectorAll('[data-action="transfer"]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          const row = e.target.closest('.roster-row');
+          const idx = Number(row.dataset.idx);
+          openTransferModal(state.roster[idx]);
+        });
+      });
+    }
+
+    // ── Transfer request modal ──────────────────────────────────
+    let xferModal = null;
+
+    async function openTransferModal(player) {
+      closeTransferModal();
+      // Fetch all teams for destination list
+      let teams = [];
+      try {
+        const res = await fetch('/.netlify/functions/public-teams');
+        const data = await res.json();
+        teams = (data.teams || []).filter(t => t.id !== state.me.team.id);
+      } catch {}
+
+      const teamOpts = teams.length
+        ? teams.map(t => `<option value="${escapeAttr(t.id)}">${escapeAttr(t.name)}</option>`).join('')
+        : '<option value="" disabled>No other teams available</option>';
+
+      xferModal = document.createElement('div');
+      xferModal.className = 'xreq-modal-bg';
+      xferModal.innerHTML = `
+        <div class="xreq-modal">
+          <h3>Request transfer</h3>
+          <div class="xreq-modal__sub">Submitting a request does not move the player — the league admin must approve it first.</div>
+          <div class="xreq-field">
+            <label>Player</label>
+            <div style="font-size:13px;font-weight:600;padding:4px 0;">${escapeHtml(player.name)}</div>
+          </div>
+          <div class="xreq-field">
+            <label>Destination team</label>
+            <select id="xreq-to-team"><option value="">— select team —</option>${teamOpts}</select>
+          </div>
+          <div class="xreq-field">
+            <label>Note (optional)</label>
+            <textarea id="xreq-note" rows="2" placeholder="e.g. Player requested this move"></textarea>
+          </div>
+          <div id="xreq-modal-status" class="xreq-status"></div>
+          <div class="xreq-actions">
+            <button class="cap-btn cap-btn--ghost" onclick="closeTransferModal()">Cancel</button>
+            <button class="cap-btn cap-btn--primary" id="xreq-submit-btn" onclick="submitTransferRequest('${escapeAttr(player.id)}', '${escapeAttr(player.name)}')">Submit request</button>
+          </div>
+        </div>`;
+      document.body.appendChild(xferModal);
+      xferModal.addEventListener('click', (e) => { if (e.target === xferModal) closeTransferModal(); });
+    }
+
+    function closeTransferModal() {
+      if (xferModal) { xferModal.remove(); xferModal = null; }
+    }
+
+    async function submitTransferRequest(playerId, playerName) {
+      const toTeamId = document.getElementById('xreq-to-team')?.value;
+      const note = document.getElementById('xreq-note')?.value.trim();
+      const statusEl = document.getElementById('xreq-modal-status');
+      if (!toTeamId) { statusEl.className = 'xreq-status err'; statusEl.textContent = 'Please select a destination team.'; return; }
+
+      const btn = document.getElementById('xreq-submit-btn');
+      btn.disabled = true; btn.textContent = 'Submitting…';
+      try {
+        const res = await fetch('/.netlify/functions/captain-transfer-request', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId, toTeamId, note: note || null }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Request failed');
+        statusEl.className = 'xreq-status ok';
+        statusEl.textContent = 'Request submitted. The league admin will review it.';
+        btn.style.display = 'none';
+        setTimeout(() => { closeTransferModal(); loadCaptainTransferRequests(); }, 1800);
+      } catch (e) {
+        statusEl.className = 'xreq-status err'; statusEl.textContent = e.message || 'Submission failed.';
+        btn.disabled = false; btn.textContent = 'Submit request';
+      }
+    }
+
+    // ── Load captain's transfer requests ─────────────────────────
+    async function loadCaptainTransferRequests() {
+      const el = document.getElementById('xreq-captain-list');
+      if (!el) return;
+      try {
+        const res = await fetch('/.netlify/functions/captain-transfer-request');
+        const data = await res.json();
+        const requests = data.requests || [];
+        if (!requests.length) {
+          el.innerHTML = '<div style="font-size:12px;color:var(--color-text-faint);">No transfer requests yet. Use the ⇄ button on a player row to submit one.</div>';
+          return;
+        }
+        el.innerHTML = requests.map(r => `
+          <div class="xreq-item">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+              <strong>${escapeHtml(r.playerName)}</strong>
+              <span style="color:var(--color-text-faint);font-size:11px;">→ ${escapeHtml(r.toTeamName)}</span>
+              <span class="xreq-badge xreq-badge--${r.status}">${r.status}</span>
+            </div>
+            <div style="font-size:11px;color:var(--color-text-faint);">
+              Submitted ${new Date(r.requestedAt).toLocaleDateString()}
+              ${r.reviewNote ? ` · Admin note: "${escapeHtml(r.reviewNote)}"` : ''}
+              ${r.note ? ` · "${escapeHtml(r.note)}"` : ''}
+            </div>
+          </div>`).join('');
+      } catch {
+        el.innerHTML = '<div style="font-size:12px;color:var(--color-red,#ef4444);">Could not load requests.</div>';
+      }
     }
 
     $id('add-player-btn').addEventListener('click', () => {
