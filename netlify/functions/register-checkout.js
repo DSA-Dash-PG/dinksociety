@@ -54,12 +54,13 @@ export default async (req) => {
     const seasonStore = getStore('seasons');
     let stripePriceId = null;
     let resolvedPrice = path === 'team' ? 650 : 75; // fallback
+    let season = null;
 
     if (seasonId) {
       const seasonRaw = await seasonStore.get(seasonId);
 
       if (seasonRaw) {
-        const season = JSON.parse(seasonRaw);
+        season = JSON.parse(seasonRaw);
 
         // Check registration is open
         if (season.registration !== 'open') {
@@ -178,16 +179,22 @@ export default async (req) => {
     const isTeam = path === 'team';
     let depositAmount = 100;
     let balanceDueDate = null;
-    try {
-      const configStore = getStore({ name: 'config', consistency: 'strong' });
-      const cfgRaw = await configStore.get('circuit-settings');
-      if (cfgRaw) {
-        const cfg = JSON.parse(cfgRaw);
-        if (cfg.depositAmount != null) depositAmount = Number(cfg.depositAmount);
-        if (cfg.balanceDueDate) balanceDueDate = cfg.balanceDueDate;
+    // Season blob is the authoritative source; fall back to circuit-settings for legacy data.
+    if (season && season.depositAmount != null) {
+      depositAmount = Number(season.depositAmount);
+      balanceDueDate = season.balanceDueDate || null;
+    } else {
+      try {
+        const configStore = getStore({ name: 'config', consistency: 'strong' });
+        const cfgRaw = await configStore.get('circuit-settings');
+        if (cfgRaw) {
+          const cfg = JSON.parse(cfgRaw);
+          if (cfg.depositAmount != null) depositAmount = Number(cfg.depositAmount);
+          if (cfg.balanceDueDate) balanceDueDate = cfg.balanceDueDate;
+        }
+      } catch (e) {
+        console.warn('Could not load circuit-settings for deposit; using defaults:', e.message);
       }
-    } catch (e) {
-      console.warn('Could not load circuit-settings for deposit; using defaults:', e.message);
     }
 
     const totalPrice = resolvedPrice;

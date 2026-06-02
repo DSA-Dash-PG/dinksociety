@@ -134,6 +134,8 @@ export default async (req) => {
         if (payload.label) season.label = payload.label.trim();
         if (payload.startDate !== undefined) season.startDate = payload.startDate;
         if (payload.endDate !== undefined) season.endDate = payload.endDate;
+        if (payload.depositAmount !== undefined) season.depositAmount = payload.depositAmount;
+        if (payload.balanceDueDate !== undefined) season.balanceDueDate = payload.balanceDueDate;
         break;
       }
 

@@ -530,11 +530,19 @@
             </div>
             <div class="arow">
               <div class="af"><label for="set-teams-per-div">Teams per division</label><input type="number" id="set-teams-per-div" min="2" max="16"></div>
-              <div class="af"><label for="set-deposit">Deposit due at registration ($)</label><input type="number" id="set-deposit" min="0" step="1"></div>
+              <div class="af">
+                <label>Deposit model</label>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:4px;">
+                  <label style="display:flex;align-items:center;gap:6px;font-size:12px;text-transform:none;letter-spacing:0;color:var(--color-text-muted);cursor:pointer;">
+                    <input type="checkbox" id="set-deposit-enabled" style="width:auto;margin:0;">
+                    Collect deposit at registration
+                  </label>
+                </div>
+              </div>
             </div>
-            <div class="arow">
-              <div class="af"><label for="set-balance-due">Team-fee balance due date</label><input type="date" id="set-balance-due"></div>
-              <div class="af"></div>
+            <div class="arow" id="deposit-amount-row">
+              <div class="af"><label for="set-deposit">Deposit amount ($)</label><input type="number" id="set-deposit" min="1" step="1"></div>
+              <div class="af"><label for="set-balance-due">Balance due date</label><input type="date" id="set-balance-due"></div>
             </div>
             <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
               <div class="a-status" id="settings-status" style="margin:0;flex:1;margin-right:12px;"></div>
@@ -680,8 +688,14 @@
     f('set-venue', SETTINGS.defaultVenue);
     f('set-weeks', SETTINGS.weeks);
     f('set-teams-per-div', SETTINGS.teamsPerDiv);
-    f('set-deposit', SETTINGS.depositAmount);
+    const depositEnabled = SETTINGS.depositAmount > 0;
+    $id('set-deposit-enabled').checked = depositEnabled;
+    $id('deposit-amount-row').style.display = depositEnabled ? '' : 'none';
+    f('set-deposit', SETTINGS.depositAmount || 100);
     f('set-balance-due', SETTINGS.balanceDueDate);
+    $id('set-deposit-enabled').addEventListener('change', () => {
+      $id('deposit-amount-row').style.display = $id('set-deposit-enabled').checked ? '' : 'none';
+    });
 
     if (SETTINGS.updatedAt) {
       const d = new Date(SETTINGS.updatedAt);
@@ -701,7 +715,7 @@
       defaultVenue: $id('set-venue').value.trim(),
       weeks: parseInt($id('set-weeks').value) || 12,
       teamsPerDiv: parseInt($id('set-teams-per-div').value) || 6,
-      depositAmount: parseFloat($id('set-deposit').value) || 100,
+      depositAmount: $id('set-deposit-enabled').checked ? (parseFloat($id('set-deposit').value) || 100) : 0,
       balanceDueDate: $id('set-balance-due').value,
     };
     try {
@@ -886,6 +900,10 @@
         '<div class="af"><label>Start date</label><input type="date" id="se-start" value="' + h(s.startDate || '') + '"></div>' +
         '<div class="af"><label>End date</label><input type="date" id="se-end" value="' + h(s.endDate || '') + '"></div>' +
       '</div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Deposit amount ($, 0 = pay in full)</label><input type="number" id="se-deposit" min="0" step="1" value="' + h(s.depositAmount != null ? s.depositAmount : 100) + '"></div>' +
+        '<div class="af"><label>Balance due date</label><input type="date" id="se-balance-due" value="' + h(s.balanceDueDate || '') + '"></div>' +
+      '</div>' +
       '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
         '<button class="ab ab--outline ab--sm" data-act="season-edit-cancel">Cancel</button>' +
         '<button class="ab ab--lime ab--sm" data-act="season-edit-save" data-season="' + h(s.id) + '">Save details</button>' +
@@ -982,6 +1000,8 @@
           label: $id('se-label').value.trim() || name,
           startDate: $id('se-start').value || null,
           endDate: $id('se-end').value || null,
+          depositAmount: parseFloat($id('se-deposit').value) || 0,
+          balanceDueDate: $id('se-balance-due').value || null,
         });
         await afterSeasonChange('Season details saved ✓');
         return;
