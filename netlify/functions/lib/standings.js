@@ -353,7 +353,7 @@ function ensurePlayer(map, pid, player, team) {
         mixed: { played: 0, won: 0 },
       },
       matchesPlayed: 0,
-      partners: {}, // { partnerId: gamesPlayedTogether }
+      partners: {}, // { partnerId: { played, won } }
     });
   }
 }
@@ -366,6 +366,8 @@ function bumpPlayer(map, pid, player, team, slotType, won, partners) {
   p.byType[slotType].played++;
   if (won) p.byType[slotType].won++;
   for (const partnerId of partners) {
-    p.partners[partnerId] = (p.partners[partnerId] || 0) + 1;
+    if (!p.partners[partnerId]) p.partners[partnerId] = { played: 0, won: 0 };
+    p.partners[partnerId].played++;
+    if (won) p.partners[partnerId].won++;
   }
 }
