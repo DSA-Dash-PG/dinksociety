@@ -173,20 +173,20 @@ export default async (req) => {
 
       // Add a division
       case 'add-division': {
-        const { divName, capacity, teamPrice, agentPrice, stripeTeamPriceId, stripeAgentPriceId } = payload;
+        const { divName, divId: customDivId, capacity, teamPrice, agentPrice, stripeTeamPriceId, stripeAgentPriceId } = payload;
         if (!divName) return json({ error: 'Division name is required' }, 400);
 
-        const divId = slugify(divName);
+        const divId = customDivId ? customDivId.trim() : slugify(divName);
         if (season.divisions.find((d) => d.id === divId)) {
-          return json({ error: `Division "${divName}" already exists in this season` }, 409);
+          return json({ error: `Division with id "${divId}" already exists in this season` }, 409);
         }
 
         season.divisions.push({
           id: divId,
           name: divName.trim(),
           capacity: parseInt(capacity) || 6,
-          teamPrice: parseFloat(teamPrice) || 450,
-          agentPrice: parseFloat(agentPrice) || 75,
+          teamPrice: parseFloat(teamPrice) || 650,
+          agentPrice: agentPrice != null && !isNaN(parseFloat(agentPrice)) ? parseFloat(agentPrice) : 75,
           stripeTeamPriceId: cleanStripeId(stripeTeamPriceId),
           stripeAgentPriceId: cleanStripeId(stripeAgentPriceId),
           payLater: !!payload.payLater,
@@ -203,7 +203,7 @@ export default async (req) => {
         if (payload.divName) div.name = payload.divName.trim();
         if (payload.capacity) div.capacity = parseInt(payload.capacity);
         if (payload.teamPrice) div.teamPrice = parseFloat(payload.teamPrice);
-        if (payload.agentPrice) div.agentPrice = parseFloat(payload.agentPrice);
+        if (payload.agentPrice != null && !isNaN(parseFloat(payload.agentPrice))) div.agentPrice = parseFloat(payload.agentPrice);
         // Stripe price IDs — allow clearing by passing an empty string
         if (payload.stripeTeamPriceId !== undefined) {
           div.stripeTeamPriceId = cleanStripeId(payload.stripeTeamPriceId);
