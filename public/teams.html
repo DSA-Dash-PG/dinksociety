@@ -74,6 +74,10 @@
     }
     .roster-list li + li { border-top: 1px solid var(--color-divider); }
     .roster-list .name { font-weight: 500; color: var(--color-text); }
+    .team-name-link { color: inherit; text-decoration: none; }
+    .team-name-link:hover { color: var(--color-lime); }
+    .player-link { color: inherit; text-decoration: none; }
+    .player-link:hover { color: var(--color-teal); text-decoration: underline; }
     .roster-list .captain-badge {
       font-size: 9px; font-weight: 700; color: var(--color-lime);
       letter-spacing: 0.08em; text-transform: uppercase;
@@ -173,18 +177,20 @@
       count.textContent = `${filtered.length} team${filtered.length === 1 ? '' : 's'}`;
 
       grid.innerHTML = filtered.map(t => {
+        const teamUrl = `/team?id=${encodeURIComponent(t.id || '')}`;
         const roster = (t.roster || []).map(p => {
+          const playerUrl = `/player?team=${encodeURIComponent(t.id || '')}&name=${encodeURIComponent(p.name || '')}`;
           const badges = [];
           if (p.isCaptain) badges.push('<span class="captain-badge">Captain</span>');
           const dupr = p.dupr ? `<span class="dupr">${p.dupr} DUPR</span>` : '';
-          return `<li><span class="name">${esc(p.name)}</span> <span style="display:flex;gap:6px;align-items:center;">${badges.join('')}${dupr}</span></li>`;
+          return `<li><a href="${playerUrl}" class="name player-link">${esc(p.name)}</a> <span style="display:flex;gap:6px;align-items:center;">${badges.join('')}${dupr}</span></li>`;
         }).join('');
 
         return `<div class="team-card">
           <div class="team-card__header">
             <div class="team-card__emoji">${t.emoji || '🏓'}</div>
             <div class="team-card__info">
-              <div class="team-card__name">${esc(t.name)}</div>
+              <div class="team-card__name"><a href="${teamUrl}" class="team-name-link">${esc(t.name)}</a></div>
               <div class="team-card__captain">Captain: ${esc(t.captain)}</div>
             </div>
           </div>

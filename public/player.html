@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Player &middot; The Dink Society</title>
+  <meta name="description" content="Player profile for The Dink Society pickleball league." />
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .profile-shell { max-width: 640px; margin: 0 auto; padding: 80px var(--gutter) 80px; }
+
+    .back-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: var(--color-text-faint);
+      text-decoration: none; margin-bottom: var(--space-5);
+      transition: color var(--transition);
+    }
+    .back-link:hover { color: var(--color-text); }
+    .back-link::before { content: '←'; }
+
+    .player-hero {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-8) var(--space-6);
+      margin-bottom: var(--space-4);
+    }
+    .player-hero__eyebrow {
+      font-size: var(--text-xs); font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--color-teal); margin-bottom: var(--space-3);
+    }
+    .player-hero__name {
+      font-size: var(--text-3xl); font-weight: 800; text-transform: uppercase;
+      margin: 0 0 var(--space-4); line-height: 1.1;
+    }
+    .player-hero__badges { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+    .badge {
+      font-size: 11px; font-weight: 700; padding: 4px 12px;
+      border-radius: var(--radius-full); border: 1px solid var(--color-border);
+      color: var(--color-text-faint); background: var(--color-surface-2);
+    }
+    .badge--captain { color: var(--color-lime); border-color: var(--color-lime); background: var(--color-lime-ghost); }
+    .badge--dupr { color: var(--color-teal); border-color: var(--color-teal); background: var(--color-teal-dim); }
+
+    .section-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4);
+    }
+    .section-card__title {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.14em; color: var(--color-text-faint); margin: 0 0 var(--space-4);
+    }
+
+    .detail-list { list-style: none; margin: 0; padding: 0; }
+    .detail-list li {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 10px 0; border-bottom: 1px solid var(--color-border);
+      font-size: 13px;
+    }
+    .detail-list li:last-child { border-bottom: none; }
+    .detail-list .label { color: var(--color-text-faint); font-weight: 500; }
+    .detail-list .value { font-weight: 600; color: var(--color-text); }
+    .detail-list .value a {
+      color: var(--color-teal); text-decoration: none;
+      transition: color var(--transition);
+    }
+    .detail-list .value a:hover { text-decoration: underline; }
+
+    .dupr-display {
+      font-size: var(--text-2xl); font-weight: 800;
+      color: var(--color-teal); margin-bottom: 4px;
+    }
+    .dupr-sub { font-size: 11px; color: var(--color-text-faint); }
+
+    .empty-state {
+      text-align: center; padding: 40px 20px; font-size: 14px;
+      color: var(--color-text-faint);
+    }
+
+    @media (max-width: 600px) {
+      .player-hero { padding: var(--space-6) var(--space-4); }
+      .player-hero__name { font-size: clamp(1.5rem, 5vw, 2.5rem); }
+    }
+  </style>
+</head>
+<body data-page="player">
+  <div data-partial="nav"></div>
+
+  <div class="profile-shell">
+    <a id="back-link" href="/teams" class="back-link">All Teams</a>
+
+    <div id="hero-section">
+      <div class="player-hero" style="display:flex;justify-content:center;">
+        <div class="empty-state">Loading player&hellip;</div>
+      </div>
+    </div>
+
+    <div id="details-section" style="display:none;">
+      <div class="section-card">
+        <div class="section-card__title">Profile</div>
+        <ul class="detail-list" id="detail-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const teamId = params.get('team') || '';
+    const playerName = params.get('name') || '';
+
+    async function load() {
+      let team = null;
+      let player = null;
+
+      try {
+        const r = await fetch('/.netlify/functions/public-teams?season=circuit-i');
+        if (r.ok) {
+          const data = await r.json();
+          team = (data.teams || []).find(t => t.id === teamId);
+          if (team) {
+            player = (team.roster || []).find(p => p.name === playerName);
+          }
+        }
+      } catch {}
+
+      if (!player || !team) {
+        document.getElementById('hero-section').innerHTML =
+          '<div class="empty-state">Player not found.</div>';
+        return;
+      }
+
+      // Update page title & back link
+      document.title = `${player.name} · The Dink Society`;
+      const backLink = document.getElementById('back-link');
+      backLink.href = `/team?id=${encodeURIComponent(teamId)}`;
+      backLink.textContent = team.name;
+
+      // Render hero
+      const badges = [];
+      if (player.isCaptain) badges.push('<span class="badge badge--captain">Captain</span>');
+      if (player.dupr) badges.push(`<span class="badge badge--dupr">${esc(player.dupr)} DUPR</span>`);
+      const divLabel = team.divisionLabel || team.division || 'Season 1';
+
+      document.getElementById('hero-section').innerHTML = `
+        <div class="player-hero">
+          <div class="player-hero__eyebrow">Season 1 &mdash; ${esc(divLabel)}</div>
+          <h1 class="player-hero__name">${esc(player.name)}</h1>
+          <div class="player-hero__badges">${badges.join('') || '<span class="badge">Player</span>'}</div>
+        </div>`;
+
+      // Render details
+      const teamUrl = `/team?id=${encodeURIComponent(teamId)}`;
+      const items = [
+        { label: 'Team', value: `<a href="${teamUrl}">${esc(team.name)}</a>` },
+        { label: 'Division', value: esc(divLabel) },
+        { label: 'Role', value: player.isCaptain ? 'Captain' : 'Player' },
+        player.dupr ? { label: 'DUPR Rating', value: esc(player.dupr) } : null,
+        player.gender ? { label: 'Gender', value: esc(player.gender) } : null,
+      ].filter(Boolean);
+
+      document.getElementById('detail-list').innerHTML = items.map(item =>
+        `<li><span class="label">${item.label}</span><span class="value">${item.value}</span></li>`
+      ).join('');
+      document.getElementById('details-section').style.display = '';
+    }
+
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+    load();
+  </script>
+</body>
+</html>
