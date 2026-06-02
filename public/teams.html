@@ -135,12 +135,13 @@
       renderTeams();
     }
 
-    // Normalize a raw division value to its display label (or itself if unknown)
-    function divLabel(d) { return DIVISION_LABELS[d] || d; }
+    // Normalize a team's division to a display label
+    // Prefer the stored divisionLabel, fall back to the DIVISION_LABELS map, then raw value
+    function divLabel(t) { return t.divisionLabel || DIVISION_LABELS[t.division] || t.division || ''; }
 
     function renderTabs() {
       // Group by label so teams with different raw values but same label share a tab
-      const labels = [...new Set(allTeams.map(t => divLabel(t.division)))].sort();
+      const labels = [...new Set(allTeams.map(t => divLabel(t)))].sort();
       if (!labels.length) { document.getElementById('div-tabs').innerHTML = ''; return; }
 
       if (!activeDivision || !labels.includes(activeDivision)) activeDivision = labels[0];
@@ -159,7 +160,7 @@
     }
 
     function renderTeams() {
-      const filtered = allTeams.filter(t => divLabel(t.division) === activeDivision);
+      const filtered = allTeams.filter(t => divLabel(t) === activeDivision);
       const grid = document.getElementById('teams-grid');
       const count = document.getElementById('team-count');
 

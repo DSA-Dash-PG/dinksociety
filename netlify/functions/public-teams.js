@@ -39,6 +39,7 @@ export default async (req) => {
           name: team.name,
           emoji: team.emoji || '🏓',
           division: team.division,
+          divisionLabel: team.divisionLabel || null,
           captain: team.captain || (team.roster?.[0]?.name) || '',
           roster: (team.roster || []).map(p => ({
             name: p.name,
