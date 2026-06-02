@@ -184,10 +184,10 @@
         <p class="reg-lede">Confirm your division, name the team, and enter the captain's info. You'll build your roster (6–12 players) through the Captain Portal after checkout.</p>
         <p class="reg-note" id="deposit-note" data-deposit-note>The full <strong><span data-team-fee>$650</span> team fee</strong> is due at registration to confirm your spot.</p>
 
-        <div class="reg-field">
+        <div class="reg-field" id="division-field">
           <div class="reg-field__label">Division</div>
           <div class="reg-divs" id="divisions">
-            <button type="button" class="reg-div is-selected" data-div="3.5M"><div class="reg-div__name">3.0–3.5 Mixed</div><div class="reg-div__meta">Open</div></button>
+            <div style="font-size:12px;color:var(--color-text-faint);padding:10px 0;">Loading divisions…</div>
           </div>
         </div>
 
@@ -240,25 +240,70 @@
   <script src="/js/partials.js"></script>
 
   <script>
-    let TEAM_PRICE = 650; // overwritten by admin-settings fetch below
-    const DIVISION = { code: '3.5M', label: '3.0–3.5 Mixed' };
-    const state = { division: DIVISION.code, step: 1 };
+    // ── Dynamic state (populated from public-seasons API) ──────
+    let activeSeason = null;
+    let activeDiv = null;
 
-    // Pull live fee from admin settings
-    fetch('/.netlify/functions/admin-settings')
-      .then(r => r.ok ? r.json() : null)
-      .then(s => {
-        if (s && s.teamFee) TEAM_PRICE = parseInt(String(s.teamFee).replace(/[^0-9]/g, ''), 10) || 650;
-        applyFeeCopy();
-      })
-      .catch(() => {});
+    function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+    async function loadSeasons() {
+      try {
+        const res = await fetch('/.netlify/functions/public-seasons');
+        const data = await res.json();
+        const seasons = data.seasons || [];
+        const container = document.getElementById('divisions');
+
+        if (!seasons.length) {
+          container.innerHTML = '<p style="font-size:13px;color:var(--color-text-faint);padding:8px 0;">Registration is currently closed. Check back soon.</p>';
+          document.getElementById('to-step-2').disabled = true;
+          return;
+        }
+
+        activeSeason = seasons[0];
+        renderDivisions(activeSeason.divisions || []);
+      } catch (e) {
+        document.getElementById('divisions').innerHTML = '<p style="font-size:12px;color:var(--color-red);">Could not load divisions. Please refresh and try again.</p>';
+      }
+    }
+
+    function renderDivisions(divs) {
+      const container = document.getElementById('divisions');
+      if (!divs.length) {
+        container.innerHTML = '<p style="font-size:13px;color:var(--color-text-faint);">No divisions available.</p>';
+        return;
+      }
+      container.innerHTML = divs.map((d, i) =>
+        `<button type="button" class="reg-div${i === 0 ? ' is-selected' : ''}" data-div="${esc(d.id)}">` +
+          `<div class="reg-div__name">${esc(d.name)}</div>` +
+          `<div class="reg-div__meta">$${d.teamPrice ? d.teamPrice.toLocaleString() : '—'} · Open</div>` +
+        `</button>`
+      ).join('');
+      selectDivision(divs[0]);
+      container.querySelectorAll('.reg-div').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const div = activeSeason.divisions.find(d => d.id === btn.dataset.div);
+          if (!div) return;
+          container.querySelectorAll('.reg-div').forEach(b => b.classList.remove('is-selected'));
+          btn.classList.add('is-selected');
+          selectDivision(div);
+        });
+      });
+    }
+
+    function selectDivision(div) {
+      activeDiv = div;
+      applyFeeCopy();
+    }
 
     function applyFeeCopy() {
+      const price = activeDiv ? activeDiv.teamPrice : 650;
       const note = document.getElementById('deposit-note');
-      if (note) note.innerHTML = 'The full <strong>$' + TEAM_PRICE.toLocaleString() + ' team fee</strong> is due at registration to confirm your spot.';
+      if (note) note.innerHTML = 'The full <strong>$' + price.toLocaleString() + ' team fee</strong> is due at registration to confirm your spot.';
       const btn = document.getElementById('submit-btn');
-      if (btn) btn.textContent = 'Pay $' + TEAM_PRICE.toLocaleString() + ' & secure spot';
+      if (btn) btn.textContent = 'Pay $' + price.toLocaleString() + ' & secure spot';
     }
+
+    loadSeasons();
 
     function fmtDate(iso) {
       if (!iso) return 'before the season';
@@ -321,13 +366,13 @@
       const rows = [];
       var _s = window.DS_SETTINGS || {};
       rows.push(['Season', (_s.circuitName || 'Season 1') + ' · ' + (_s.startDate ? new Date(_s.startDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'June 2026')]);
-      rows.push(['Division', DIVISION.label]);
+      rows.push(['Division', activeDiv ? activeDiv.name : '—']);
       rows.push(['Registration type', 'Team']);
       rows.push(['Team name', escapeHtml(document.getElementById('team-name').value.trim())]);
       rows.push(['Captain', escapeHtml(val('p1-first') + ' ' + val('p1-last'))]);
       document.getElementById('summary').innerHTML =
         rows.map(([k, v]) => `<div class="reg-summary__row"><span class="reg-summary__label">${k}</span><span class="reg-summary__value">${v}</span></div>`).join('') +
-        `<div class="reg-summary__row reg-summary__row--total"><span class="reg-summary__label">Due today</span><span class="reg-summary__value">$${TEAM_PRICE.toLocaleString()}</span></div>`;
+        `<div class="reg-summary__row reg-summary__row--total"><span class="reg-summary__label">Due today</span><span class="reg-summary__value">$${(activeDiv ? activeDiv.teamPrice : 650).toLocaleString()}</span></div>`;
     }
 
     // Submit → Stripe
@@ -364,9 +409,11 @@
     function buildPayload() {
       const captainName = (val('p1-first') + ' ' + val('p1-last')).trim();
       return {
-        seasonId: 'circuit-1', circuit: 'I',
-        division: DIVISION.code, divisionLabel: DIVISION.label,
-        path: 'team', price: TEAM_PRICE,
+        seasonId: activeSeason ? activeSeason.id : 'circuit-1',
+        circuit: activeSeason ? (activeSeason.name || activeSeason.label) : 'Season 1',
+        division: activeDiv ? activeDiv.id : '',
+        divisionLabel: activeDiv ? activeDiv.name : '',
+        path: 'team', price: activeDiv ? activeDiv.teamPrice : 650,
         agreed: { liability: true, conduct: true },
         team: { name: val('team-name'), captain: captainName, players: [
           { name: captainName, firstName: val('p1-first'), lastName: val('p1-last'), email: val('p1-email'), phone: val('p1-phone'), captain: true },
@@ -375,7 +422,7 @@
     }
 
     function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }
-    function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+    function escapeHtml(s) { return esc(s); }
   </script>
 </body>
 </html>

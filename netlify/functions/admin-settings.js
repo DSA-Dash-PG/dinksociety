@@ -6,16 +6,17 @@ import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 
 const DEFAULTS = {
-  circuitName:    'Circuit I',
-  startDate:      '2026-05-12',
-  teamFee:        '$450',
+  circuitName:    'Season 1',
+  startDate:      '2026-06-08',
+  teamFee:        '$650',
   agentFee:       '$75',
-  defaultVenue:   'South Bay Pickleball Courts',
-  divisions:      ['3.0 Mixed', '3.5 Mixed'],
+  defaultVenue:   '',
+  divisions:      ['3.0–3.5 Mixed'],
   teamsPerDiv:    6,
-  weeks:          7,
-  depositAmount:  100,          // dollars collected at registration
-  balanceDueDate: '2026-06-04', // when the remaining team-fee balance is due
+  weeks:          8,
+  matchTime:      '7:00–9:00 PM',
+  depositAmount:  100,
+  balanceDueDate: '2026-06-01',
 };
 
 function json(body, status = 200) {
@@ -62,7 +63,8 @@ export default async (req) => {
         defaultVenue: body.defaultVenue ?? prev.defaultVenue,
         divisions:    body.divisions    ?? prev.divisions,
         teamsPerDiv:  body.teamsPerDiv  ?? prev.teamsPerDiv,
-        weeks:        body.weeks        ?? prev.weeks,
+        weeks:          body.weeks          ?? prev.weeks,
+        matchTime:      body.matchTime      ?? prev.matchTime      ?? DEFAULTS.matchTime,
         depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
         balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
         updatedAt:    new Date().toISOString(),

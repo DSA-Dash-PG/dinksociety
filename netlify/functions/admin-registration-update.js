@@ -58,6 +58,7 @@ export default async (req) => {
 
   const regStore = getStore('registrations');
   const teamStore = getStore('teams');
+  const seasonStore = getStore('seasons');
 
   switch (action) {
     // ─── Confirm a pending registration ───
@@ -226,8 +227,12 @@ export default async (req) => {
 
       // Check destination capacity
       const toRoster = toTeam.roster || [];
-      if (toRoster.length >= 10) {
-        return json({ error: 'Destination team is at max capacity (10 players)' }, 400);
+      const seasonData = toTeam.seasonId
+        ? await seasonStore.get(toTeam.seasonId, { type: 'json' }).catch(() => null)
+        : null;
+      const maxRoster = seasonData?.maxRosterSize || 10;
+      if (toRoster.length >= maxRoster) {
+        return json({ error: `Destination team is at max capacity (${maxRoster} players)` }, 400);
       }
 
       // Move

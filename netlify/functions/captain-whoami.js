@@ -15,6 +15,7 @@ export default async (req) => {
     division: t.division || null,
     divisionLabel: t.divisionLabel || null,
     circuit: t.circuit || 'I',
+    seasonId: t.seasonId || null,
   } : null;
 
   return new Response(JSON.stringify({

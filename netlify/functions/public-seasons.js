@@ -36,6 +36,11 @@ export default async (req) => {
           status: season.status,
           registration: season.registration,
           startDate: season.startDate,
+          weeks: season.weeks || 8,
+          matchTime: season.matchTime || '7:00–9:00 PM',
+          roundsPerMatch: season.roundsPerMatch || 2,
+          gamesPerRound: season.gamesPerRound || 6,
+          maxRosterSize: season.maxRosterSize || 10,
           divisions: season.divisions.map((d) => ({
             id: d.id,
             name: d.name,

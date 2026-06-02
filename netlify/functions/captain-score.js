@@ -46,8 +46,13 @@ export default async (req) => {
   const scheduleStore = getStore('schedule');
   const scoresStore = getStore('scores');
   const lineupStore = getStore('lineups');
+  const seasonStore = getStore('seasons');
+  const seasonData = ctx.team.seasonId
+    ? await seasonStore.get(ctx.team.seasonId, { type: 'json' }).catch(() => null)
+    : null;
+  const WEEKS = seasonData?.weeks || 8;
 
-  const match = await findMatch(scheduleStore, matchId, ctx.team);
+  const match = await findMatch(scheduleStore, matchId, ctx.team, WEEKS);
   if (!match) return json({ error: 'Match not found or not yours' }, 404);
 
   const myRole = match.teamA.id === ctx.team.id ? 'home' : 'away';
@@ -209,8 +214,8 @@ export default async (req) => {
 
 // ===== Helpers =====
 
-async function findMatch(scheduleStore, matchId, team) {
-  for (let week = 1; week <= 7; week++) {
+async function findMatch(scheduleStore, matchId, team, weeks = 8) {
+  for (let week = 1; week <= weeks; week++) {
     const key = `schedule/${team.circuit}/${team.division}/week-${week}.json`;
     const data = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
     if (!data?.matches) continue;

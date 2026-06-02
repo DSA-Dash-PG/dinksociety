@@ -28,9 +28,16 @@ export default async (req) => {
 
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
+  const seasonStore = getStore('seasons');
+  const seasonData = ctx.team.seasonId
+    ? await seasonStore.get(ctx.team.seasonId, { type: 'json' }).catch(() => null)
+    : null;
+  const WEEKS = seasonData?.weeks || 8;
+  const ROUNDS_PER_MATCH = seasonData?.roundsPerMatch || 2;
+  const GAMES_PER_ROUND = seasonData?.gamesPerRound || 6;
 
   // Verify this captain is actually in this match
-  const match = await findMatch(scheduleStore, matchId, ctx.team);
+  const match = await findMatch(scheduleStore, matchId, ctx.team, WEEKS);
   if (!match) return json({ error: 'Match not found or not yours' }, 404);
 
   const myTeamId = ctx.team.id;
@@ -136,7 +143,7 @@ export default async (req) => {
     // Duplicate-combo check: within a single round, no two games can have the
     // same pair of players. Across rounds is fine.
     if (action === 'lock') {
-      const dupErr = checkDuplicateCombos(normalizedGames);
+      const dupErr = checkDuplicateCombos(normalizedGames, ROUNDS_PER_MATCH, GAMES_PER_ROUND);
       if (dupErr) return json({ error: dupErr }, 400);
     }
 
@@ -182,8 +189,8 @@ export default async (req) => {
   return new Response('Method not allowed', { status: 405 });
 };
 
-async function findMatch(scheduleStore, matchId, team) {
-  for (let week = 1; week <= 7; week++) {
+async function findMatch(scheduleStore, matchId, team, weeks = 8) {
+  for (let week = 1; week <= weeks; week++) {
     const key = `schedule/${team.circuit}/${team.division}/week-${week}.json`;
     const data = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
     if (!data?.matches) continue;
@@ -196,10 +203,10 @@ async function findMatch(scheduleStore, matchId, team) {
 }
 
 /** No two games within the same round can have the same pair of players. */
-function checkDuplicateCombos(games) {
-  for (const round of [1, 2]) {
+function checkDuplicateCombos(games, roundsPerMatch = 2, gamesPerRound = 6) {
+  for (let round = 1; round <= roundsPerMatch; round++) {
     const seen = new Map();
-    for (let g = 1; g <= 6; g++) {
+    for (let g = 1; g <= gamesPerRound; g++) {
       const slot = `r${round}g${g}`;
       const picks = games[slot];
       if (!picks?.p1 || !picks?.p2) continue;

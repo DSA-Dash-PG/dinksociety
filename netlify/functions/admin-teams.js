@@ -36,6 +36,7 @@ export default async (req) => {
 
   const url = new URL(req.url);
   const store = getStore('teams');
+  const seasonStore = getStore('seasons');
   const teamId = url.searchParams.get('id');
 
   // ========== GET — list all or single team ==========
@@ -109,8 +110,12 @@ export default async (req) => {
     switch (action) {
       case 'add-player': {
         const roster = team.roster || [];
-        if (roster.length >= 10) {
-          return json({ error: 'Team is at max capacity (10 players)' }, 400);
+        const seasonData = team.seasonId
+          ? await seasonStore.get(team.seasonId, { type: 'json' }).catch(() => null)
+          : null;
+        const maxRoster = seasonData?.maxRosterSize || 10;
+        if (roster.length >= maxRoster) {
+          return json({ error: `Team is at max capacity (${maxRoster} players)` }, 400);
         }
         const newPlayer = {
           id: generatePlayerId(),

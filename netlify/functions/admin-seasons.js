@@ -136,6 +136,11 @@ export default async (req) => {
         if (payload.endDate !== undefined) season.endDate = payload.endDate;
         if (payload.depositAmount !== undefined) season.depositAmount = payload.depositAmount;
         if (payload.balanceDueDate !== undefined) season.balanceDueDate = payload.balanceDueDate;
+        if (payload.weeks !== undefined) season.weeks = payload.weeks;
+        if (payload.matchTime !== undefined) season.matchTime = payload.matchTime;
+        if (payload.roundsPerMatch !== undefined) season.roundsPerMatch = payload.roundsPerMatch;
+        if (payload.gamesPerRound !== undefined) season.gamesPerRound = payload.gamesPerRound;
+        if (payload.maxRosterSize !== undefined) season.maxRosterSize = payload.maxRosterSize;
         break;
       }
 
