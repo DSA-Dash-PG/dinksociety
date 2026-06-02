@@ -113,7 +113,7 @@ export default async (req) => {
         const seasonData = team.seasonId
           ? await seasonStore.get(team.seasonId, { type: 'json' }).catch(() => null)
           : null;
-        const maxRoster = seasonData?.maxRosterSize || 10;
+        const maxRoster = seasonData?.maxRosterSize || 12;
         if (roster.length >= maxRoster) {
           return json({ error: `Team is at max capacity (${maxRoster} players)` }, 400);
         }
