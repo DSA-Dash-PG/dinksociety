@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Match Night Live &middot; The Dink Society</title>
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/shared.css">
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})();</script>
+  <style>
+    body { font-family: 'Inter', sans-serif; background: var(--color-bg); color: var(--color-text); margin: 0; padding: 0; min-height: 100vh; }
+    .live-header { background: var(--color-surface); border-bottom: 1px solid var(--color-border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .live-header__brand { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-teal); font-weight: 700; margin-bottom: 2px; }
+    .live-header__title { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; margin: 0; }
+    .live-header__controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .live-header select, .live-header input { padding: 6px 10px; border: 1px solid var(--color-border); border-radius: 6px; font-size: 11px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
+    .live-pulse { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--color-text-faint); }
+    .live-pulse__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-teal); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .live-body { padding: 20px 24px; max-width: 1100px; margin: 0 auto; }
+
+    /* Conflict banner */
+    .conflict-banner { background: var(--color-red-dim); border: 1px solid rgba(255,92,71,0.25); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; color: var(--color-red, #ef4444); display: none; }
+    .conflict-banner strong { font-weight: 700; }
+
+    /* Summary bar */
+    .summary-bar { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
+    .summary-chip { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 20px; padding: 5px 14px; font-size: 11px; font-weight: 600; color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; }
+    .summary-chip__dot { width: 7px; height: 7px; border-radius: 50%; }
+
+    /* Match grid */
+    .match-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+
+    /* Match card */
+    .mc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 12px; overflow: hidden; }
+    .mc--conflict { border-color: rgba(255,92,71,0.5); }
+    .mc--final { border-color: rgba(37,201,164,0.3); }
+    .mc__head { padding: 12px 16px; border-bottom: 1px solid var(--color-border); display: flex; justify-content: space-between; align-items: center; }
+    .mc__court { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); }
+    .mc__state-pill { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .mc__state-pill--active   { background: var(--color-teal-dim); color: var(--color-teal); }
+    .mc__state-pill--conflict { background: var(--color-red-dim); color: var(--color-red, #ef4444); }
+    .mc__state-pill--final    { background: var(--color-lime-dim, rgba(184,255,44,0.06)); color: var(--color-lime); }
+    .mc__state-pill--pending  { background: var(--color-surface-3); color: var(--color-text-faint); }
+    .mc__state-pill--ready    { background: var(--color-gold-dim); color: var(--color-gold); }
+
+    .mc__teams { padding: 12px 16px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    .mc__team { }
+    .mc__team--right { text-align: right; }
+    .mc__team-role { font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 600; margin-bottom: 2px; }
+    .mc__team-name { font-size: 13px; font-weight: 700; color: var(--color-text); }
+    .mc__vs { font-size: 9px; color: var(--color-text-faint); font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
+
+    /* Pair dots grid */
+    .mc__pairs { padding: 0 16px 12px; }
+    .mc__pairs-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+    .mc__round-label { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); width: 26px; flex-shrink: 0; }
+    .mc__pair-dots { display: flex; gap: 4px; }
+    .pair-dot { width: 22px; height: 22px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 8px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+    .pair-dot--pending   { background: var(--color-surface-3); color: var(--color-text-faint); }
+    .pair-dot--locked    { background: var(--color-surface-2); color: var(--color-text-faint); border: 1px dashed var(--color-border); }
+    .pair-dot--active    { background: var(--color-gold-dim); color: var(--color-gold); }
+    .pair-dot--confirmed { background: var(--color-teal-dim); color: var(--color-teal); }
+    .pair-dot--mismatch  { background: var(--color-red-dim); color: var(--color-red, #ef4444); }
+
+    /* Conflict alert inside card */
+    .mc__conflict { background: var(--color-red-dim); border-top: 1px solid rgba(255,92,71,0.15); padding: 8px 16px; font-size: 11px; color: var(--color-red, #ef4444); display: flex; align-items: center; gap: 6px; }
+
+    /* Points row */
+    .mc__points { border-top: 1px solid var(--color-border); padding: 10px 16px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    .mc__pts-block { }
+    .mc__pts-block--right { text-align: right; }
+    .mc__pts-label { font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 600; margin-bottom: 2px; }
+    .mc__pts-val { font-size: 20px; font-weight: 800; color: var(--color-lime); }
+    .mc__pts-games { font-size: 10px; color: var(--color-text-faint); margin-top: 1px; }
+    .mc__pts-sep { font-size: 10px; color: var(--color-text-faint); text-align: center; }
+
+    /* Lineup pending note */
+    .mc__lineup-note { padding: 10px 16px; font-size: 11px; color: var(--color-text-faint); text-align: center; }
+
+    /* Last update */
+    .last-update { text-align: center; font-size: 11px; color: var(--color-text-faint); margin-top: 24px; }
+
+    .empty-state { text-align: center; color: var(--color-text-faint); font-size: 13px; padding: 60px 20px; }
+
+    @media (max-width: 600px) {
+      .live-body { padding: 14px 14px; }
+      .live-header { padding: 12px 14px; }
+      .match-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="live-header">
+  <div>
+    <div class="live-header__brand">The Dink Society &middot; Admin</div>
+    <h1 class="live-header__title">Match Night Live</h1>
+  </div>
+  <div class="live-header__controls">
+    <select id="week-select">
+      <option value="1">Week 1</option>
+      <option value="2">Week 2</option>
+      <option value="3">Week 3</option>
+      <option value="4">Week 4</option>
+      <option value="5">Week 5</option>
+      <option value="6">Week 6</option>
+    </select>
+    <select id="div-select">
+      <option value="3.5M">Mixed Doubles</option>
+    </select>
+    <div class="live-pulse"><div class="live-pulse__dot"></div><span id="refresh-label">Refreshing…</span></div>
+    <a href="/admin.html" style="font-size:11px;color:var(--color-text-faint);text-decoration:none;">&larr; Admin</a>
+  </div>
+</header>
+
+<div class="live-body">
+  <div id="conflict-banner" class="conflict-banner"></div>
+  <div id="summary-bar" class="summary-bar" style="display:none;"></div>
+  <div id="match-grid" class="match-grid"><div class="empty-state">Loading…</div></div>
+  <div id="last-update" class="last-update"></div>
+</div>
+
+<script>
+  const CIRCUIT = 'I';
+  let DIVISION = '3.5M';
+  let WEEK = 1;
+  let pollTimer = null;
+  let isPolling = false;
+
+  const STATE_LABELS = {
+    final:               'Final',
+    conflict:            '⚠ Mismatch',
+    ready:               'Ready to submit',
+    active:              'In progress',
+    'scoring-not-started': 'Not started',
+    'lineup-pending':    'Lineup pending',
+    'lineup-not-started':'Lineup needed',
+  };
+  const STATE_PILL = {
+    final:               'final',
+    conflict:            'conflict',
+    ready:               'ready',
+    active:              'active',
+    'scoring-not-started':'pending',
+    'lineup-pending':    'pending',
+    'lineup-not-started':'pending',
+  };
+
+  const DOT_LABELS = { pending:'', locked:'🔒', active:'…', confirmed:'✓', mismatch:'!' };
+
+  async function fetchData() {
+    const url = `/.netlify/functions/admin-score-live?circuit=${CIRCUIT}&division=${encodeURIComponent(DIVISION)}&week=${WEEK}`;
+    const res = await fetch(url, { credentials: 'include' });
+    if (res.status === 401) { window.location.href = '/admin.html'; return null; }
+    if (!res.ok) throw new Error('Server error');
+    return res.json();
+  }
+
+  function pairDot(state) {
+    return `<div class="pair-dot pair-dot--${state}" title="${state}">${DOT_LABELS[state] || ''}</div>`;
+  }
+
+  function renderCard(m) {
+    const statePill = STATE_PILL[m.state] || 'pending';
+    const stateLabel = STATE_LABELS[m.state] || m.state;
+    const courtLabel = m.court ? `Courts ${m.court}` : 'Court TBD';
+
+    const r1Pairs = (m.score.pairStatuses || []).filter(p => p.round === 1);
+    const r2Pairs = (m.score.pairStatuses || []).filter(p => p.round === 2);
+
+    const dotsRow = (pairs, label) => `
+      <div class="mc__pairs-row">
+        <div class="mc__round-label">${label}</div>
+        <div class="mc__pair-dots">
+          ${pairs.map(p => pairDot(p.state)).join('')}
+        </div>
+        <div style="font-size:10px;color:var(--color-text-faint);margin-left:6px;">
+          ${pairs.filter(p=>p.confirmed).length}/${pairs.length} pairs
+        </div>
+      </div>
+    `;
+
+    const conflictHtml = m.score.mismatches?.length
+      ? `<div class="mc__conflict">⚠ Score mismatch: ${m.score.mismatches.map(s => s.toUpperCase().replace('R','R').replace('G',' G')).join(', ')}</div>`
+      : '';
+
+    const lineupNote = !m.lineup.revealed
+      ? `<div class="mc__lineup-note">
+           ${m.lineup.homeLocked ? '✓' : '○'} ${m.home.name}
+           &nbsp;·&nbsp;
+           ${m.lineup.awayLocked ? '✓' : '○'} ${m.away.name}
+           ${!m.lineup.homeLocked || !m.lineup.awayLocked ? '— lineups not yet locked' : ''}
+         </div>`
+      : '';
+
+    const r1 = m.score.round1;
+    const r2 = m.score.round2;
+    const totalH = m.score.matchPoints?.home ?? 0;
+    const totalA = m.score.matchPoints?.away ?? 0;
+
+    const pointsHtml = m.lineup.revealed ? `
+      <div class="mc__points">
+        <div class="mc__pts-block">
+          <div class="mc__pts-label">Home</div>
+          <div class="mc__pts-val">${totalH}</div>
+          <div class="mc__pts-games">
+            ${r1.scoredGames === 6 ? `R1: ${r1.homeGames}–${r1.awayGames}` : 'R1: pending'}
+            &nbsp;·&nbsp;
+            ${r2.scoredGames === 6 ? `R2: ${r2.homeGames}–${r2.awayGames}` : 'R2: pending'}
+          </div>
+        </div>
+        <div class="mc__pts-sep">match<br>pts</div>
+        <div class="mc__pts-block mc__pts-block--right">
+          <div class="mc__pts-label">Away</div>
+          <div class="mc__pts-val">${totalA}</div>
+          <div class="mc__pts-games">
+            ${r1.scoredGames === 6 ? `R1: ${r1.awayGames}–${r1.homeGames}` : 'R1: pending'}
+            &nbsp;·&nbsp;
+            ${r2.scoredGames === 6 ? `R2: ${r2.awayGames}–${r2.homeGames}` : 'R2: pending'}
+          </div>
+        </div>
+      </div>
+    ` : '';
+
+    return `
+      <div class="mc ${m.score.mismatches?.length ? 'mc--conflict' : ''} ${m.state === 'final' ? 'mc--final' : ''}">
+        <div class="mc__head">
+          <div class="mc__court">${courtLabel}</div>
+          <div class="mc__state-pill mc__state-pill--${statePill}">${stateLabel}</div>
+        </div>
+        <div class="mc__teams">
+          <div class="mc__team">
+            <div class="mc__team-role">Home</div>
+            <div class="mc__team-name">${esc(m.home.name)}</div>
+          </div>
+          <div class="mc__vs">vs</div>
+          <div class="mc__team mc__team--right">
+            <div class="mc__team-role">Away</div>
+            <div class="mc__team-name">${esc(m.away.name)}</div>
+          </div>
+        </div>
+        ${m.lineup.revealed ? `
+          <div class="mc__pairs">
+            ${dotsRow(r1Pairs, 'R1')}
+            ${dotsRow(r2Pairs, 'R2')}
+          </div>
+        ` : ''}
+        ${lineupNote}
+        ${conflictHtml}
+        ${pointsHtml}
+      </div>
+    `;
+  }
+
+  function render(data) {
+    const matches = data.matches || [];
+    const conflicts = matches.filter(m => m.score.mismatches?.length > 0);
+    const active    = matches.filter(m => m.state === 'active');
+    const done      = matches.filter(m => m.state === 'final');
+
+    // Conflict banner
+    const banner = document.getElementById('conflict-banner');
+    if (conflicts.length > 0) {
+      banner.style.display = 'block';
+      banner.innerHTML = `<strong>⚠ ${conflicts.length} score mismatch${conflicts.length > 1 ? 'es' : ''} need attention:</strong> ${conflicts.map(m => `${esc(m.home.name)} vs ${esc(m.away.name)}`).join(' · ')}`;
+    } else {
+      banner.style.display = 'none';
+    }
+
+    // Summary bar
+    const bar = document.getElementById('summary-bar');
+    bar.style.display = 'flex';
+    bar.innerHTML = [
+      { dot: '#25c9a4', label: `${done.length} complete` },
+      { dot: 'rgba(255,92,71,0.8)', label: `${conflicts.length} conflict${conflicts.length !== 1 ? 's' : ''}` },
+      { dot: 'rgba(232,181,66,0.8)', label: `${active.length} in progress` },
+      { dot: 'rgba(255,255,255,0.15)', label: `${matches.length} total matches` },
+    ].map(c => `
+      <div class="summary-chip">
+        <div class="summary-chip__dot" style="background:${c.dot};"></div>
+        ${c.label}
+      </div>
+    `).join('');
+
+    // Matches
+    const grid = document.getElementById('match-grid');
+    if (!matches.length) {
+      grid.innerHTML = '<div class="empty-state">No matches found for this week.</div>';
+      return;
+    }
+
+    // Sort: conflicts first, then active, then pending, then final
+    const order = { conflict: 0, ready: 1, active: 2, 'scoring-not-started': 3, 'lineup-pending': 4, 'lineup-not-started': 5, final: 6 };
+    matches.sort((a, b) => (order[a.state] ?? 9) - (order[b.state] ?? 9));
+
+    grid.innerHTML = matches.map(renderCard).join('');
+
+    // Last update
+    document.getElementById('last-update').textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+    document.getElementById('refresh-label').textContent = 'Live — refreshing every 8s';
+  }
+
+  async function refresh() {
+    if (isPolling) return;
+    isPolling = true;
+    try {
+      const data = await fetchData();
+      if (data) render(data);
+    } catch (e) {
+      document.getElementById('refresh-label').textContent = 'Error — retrying…';
+    } finally {
+      isPolling = false;
+    }
+  }
+
+  function startPolling() {
+    if (pollTimer) clearInterval(pollTimer);
+    refresh();
+    pollTimer = setInterval(refresh, 8000);
+  }
+
+  document.getElementById('week-select').addEventListener('change', (e) => {
+    WEEK = parseInt(e.target.value, 10);
+    startPolling();
+  });
+  document.getElementById('div-select').addEventListener('change', (e) => {
+    DIVISION = e.target.value;
+    startPolling();
+  });
+
+  // Detect current week from today's date (rough heuristic: season starts June 8)
+  (function setDefaultWeek() {
+    const start = new Date('2026-06-08');
+    const now = new Date();
+    const diffDays = Math.floor((now - start) / (1000 * 60 * 60 * 24));
+    const week = Math.max(1, Math.min(6, Math.floor(diffDays / 7) + 1));
+    WEEK = week;
+    const sel = document.getElementById('week-select');
+    if (sel) sel.value = String(week);
+  })();
+
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  startPolling();
+</script>
+</body>
+</html>

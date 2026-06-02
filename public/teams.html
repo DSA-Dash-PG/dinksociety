@@ -177,9 +177,10 @@
       count.textContent = `${filtered.length} team${filtered.length === 1 ? '' : 's'}`;
 
       grid.innerHTML = filtered.map(t => {
-        const teamUrl = `/team?id=${encodeURIComponent(t.id || '')}`;
+        const teamSlug = slugify(t.name);
+        const teamUrl = `/team?id=${teamSlug}`;
         const roster = (t.roster || []).map(p => {
-          const playerUrl = `/player?team=${encodeURIComponent(t.id || '')}&name=${encodeURIComponent(p.name || '')}`;
+          const playerUrl = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name || '')}`;
           const badges = [];
           if (p.isCaptain) badges.push('<span class="captain-badge">Captain</span>');
           const dupr = p.dupr ? `<span class="dupr">${p.dupr} DUPR</span>` : '';
@@ -203,6 +204,7 @@
     }
 
     function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function slugify(s) { return String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
     loadTeams();
   </script>
 </body>

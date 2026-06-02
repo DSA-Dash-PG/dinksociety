@@ -35,6 +35,15 @@ const SLOT_RULES = {
 };
 const SLOT_KEYS = Object.keys(SLOT_RULES);
 
+const PAIRS = [
+  { id: 'r1p1', slots: ['r1g1','r1g2'], round: 1, pair: 1, label: 'Pair 1 · G1+G2' },
+  { id: 'r1p2', slots: ['r1g3','r1g4'], round: 1, pair: 2, label: 'Pair 2 · G3+G4' },
+  { id: 'r1p3', slots: ['r1g5','r1g6'], round: 1, pair: 3, label: 'Pair 3 · G5+G6' },
+  { id: 'r2p1', slots: ['r2g1','r2g2'], round: 2, pair: 1, label: 'Pair 1 · G1+G2' },
+  { id: 'r2p2', slots: ['r2g3','r2g4'], round: 2, pair: 2, label: 'Pair 2 · G3+G4' },
+  { id: 'r2p3', slots: ['r2g5','r2g6'], round: 2, pair: 3, label: 'Pair 3 · G5+G6' },
+];
+
 export default async (req) => {
   const ctx = await requireCaptain(req);
   if (!ctx) return unauthResponse();
@@ -100,6 +109,16 @@ export default async (req) => {
     const now = new Date().toISOString();
     let mySideChanged = false;
     let otherSideEffectivelyChanged = false;
+
+    // Pair-sequential lock: cannot enter scores for a pair until the previous pair is confirmed
+    const lockedSet = getLockedPairs(existing.games);
+    const blocked = Object.keys(incoming).filter(s => lockedSet.has(s));
+    if (blocked.length > 0) {
+      return json({
+        error: 'Previous pair must be confirmed by both captains before entering these scores.',
+        lockedSlots: [...lockedSet],
+      }, 409);
+    }
 
     for (const slot of SLOT_KEYS) {
       if (!(slot in incoming)) continue;
@@ -214,6 +233,27 @@ export default async (req) => {
 
 // ===== Helpers =====
 
+function getLockedPairs(games) {
+  // Returns a Set of slot keys that are locked (previous pair not yet fully confirmed).
+  const locked = new Set();
+  for (let i = 1; i < PAIRS.length; i++) {
+    const prevSlots = PAIRS[i - 1].slots;
+    const prevConfirmed = prevSlots.every(slot => {
+      const g = games[slot];
+      return g?.home?.entered !== undefined && g?.away?.entered !== undefined
+        && g.home !== null && g.away !== null
+        && g.home.entered === g.away.entered;
+    });
+    if (!prevConfirmed) {
+      for (let j = i; j < PAIRS.length; j++) {
+        PAIRS[j].slots.forEach(s => locked.add(s));
+      }
+      break;
+    }
+  }
+  return locked;
+}
+
 async function findMatch(scheduleStore, matchId, team, weeks = 8) {
   for (let week = 1; week <= weeks; week++) {
     const key = `schedule/${team.circuit}/${team.division}/week-${week}.json`;
@@ -282,6 +322,31 @@ function decorate(score) {
     : matchAway > matchHome ? 'away' : 'tie';
 
   const allConfirmed = counts.confirmed === 12;
+
+  // Pair-level status
+  const statusBySlot = Object.fromEntries(gameStatuses.map(g => [g.slot, g.status]));
+  const pairStatuses = [];
+  for (let idx = 0; idx < PAIRS.length; idx++) {
+    const pair = PAIRS[idx];
+    const slotSts = pair.slots.map(s => statusBySlot[s] || 'empty');
+    const allConf = slotSts.every(s => s === 'confirmed');
+    const hasMismatch = slotSts.some(s => s === 'mismatch');
+    const hasPartial = slotSts.some(s => s === 'partial');
+    const prevConfirmed = idx === 0 || pairStatuses[idx - 1].confirmed;
+    pairStatuses.push({
+      ...pair,
+      slotStatuses: slotSts,
+      confirmed: allConf,
+      hasMismatch,
+      locked: !prevConfirmed,
+      state: !prevConfirmed ? 'locked'
+           : allConf ? 'confirmed'
+           : hasMismatch ? 'mismatch'
+           : hasPartial ? 'active'
+           : 'pending',
+    });
+  }
+
   const canSubmit = allConfirmed;
 
   return {
@@ -297,6 +362,7 @@ function decorate(score) {
       canSubmit,
       mismatches: gameStatuses.filter(g => g.status === 'mismatch').map(g => g.slot),
       unentered: gameStatuses.filter(g => g.status === 'empty' || g.status === 'partial').map(g => g.slot),
+      pairStatuses,
     },
   };
 }

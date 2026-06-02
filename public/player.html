@@ -111,8 +111,9 @@
   <script src="/js/partials.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
-    const teamId = params.get('team') || '';
+    const teamParam = params.get('team') || '';
     const playerName = params.get('name') || '';
+    function slugify(s) { return String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
     async function load() {
       let team = null;
@@ -122,7 +123,9 @@
         const r = await fetch('/.netlify/functions/public-teams?season=circuit-i');
         if (r.ok) {
           const data = await r.json();
-          team = (data.teams || []).find(t => t.id === teamId);
+          // Match by slug or fall back to raw ID (backward compat)
+          team = (data.teams || []).find(t => slugify(t.name) === teamParam)
+              || (data.teams || []).find(t => t.id === teamParam);
           if (team) {
             player = (team.roster || []).find(p => p.name === playerName);
           }
@@ -137,8 +140,9 @@
 
       // Update page title & back link
       document.title = `${player.name} · The Dink Society`;
+      const teamSlug = slugify(team.name);
       const backLink = document.getElementById('back-link');
-      backLink.href = `/team?id=${encodeURIComponent(teamId)}`;
+      backLink.href = `/team?id=${teamSlug}`;
       backLink.textContent = team.name;
 
       // Render hero
@@ -155,7 +159,7 @@
         </div>`;
 
       // Render details
-      const teamUrl = `/team?id=${encodeURIComponent(teamId)}`;
+      const teamUrl = `/team?id=${teamSlug}`;
       const items = [
         { label: 'Team', value: `<a href="${teamUrl}">${esc(team.name)}</a>` },
         { label: 'Division', value: esc(divLabel) },

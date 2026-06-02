@@ -215,6 +215,11 @@
     .ss-banner--ready strong { color: var(--color-gold); }
     .ss-banner--mine-submitted { background: var(--color-teal-dim); border-color: rgba(37,201,164,0.15); color: var(--color-teal); }
     .ss-banner--mine-submitted strong { color: var(--color-teal); }
+    .ss-pair-group { margin-bottom: 14px; }
+    .ss-pair-group--locked { opacity: 0.55; }
+    .ss-pair-header { display: flex; align-items: center; gap: 10px; padding: 6px 0 5px; border-bottom: 1px solid var(--color-border-strong); margin-bottom: 6px; flex-wrap: wrap; }
+    .ss-pair-header__label { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); }
+    .ss-pair-header__lock { font-size: 10px; color: var(--color-text-faint); margin-left: auto; }
     .ss-banner__detail { display: block; margin-top: 4px; font-size: 11px; opacity: 0.8; }
 
     /* ── Hero cards (JS-rendered state views) ─────────────────── */
@@ -1201,79 +1206,96 @@
           ? 'Home serves first &middot; Away chooses side'
           : 'Home chooses side &middot; Away serves first';
 
-        const rows = [];
-        rows.push(`
-          <tr>
-            <th>Game</th>
-            <th>${escapeHtml(homeName)} pair</th>
-            <th class="ss-th--score">Home</th>
-            <th class="ss-th--score">Away</th>
-            <th>${escapeHtml(awayName)} pair</th>
-            <th class="ss-th--status">Status</th>
-          </tr>
-        `);
+        const pairSts = (c.pairStatuses || []).filter(p => p.round === round);
 
-        for (let g = 1; g <= 6; g++) {
-          const slot = `r${round}g${g}`;
-          const gs = games[slot] || { home: null, away: null };
-          const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
-          const homePair = formatPair(homeLineup[slot]);
-          const awayPair = formatPair(awayLineup[slot]);
+        const renderPair = (pairIdx, gameNums) => {
+          const pst = pairSts[pairIdx] || {};
+          const isLocked = !!pst.locked;
+          const pairState = pst.state || 'pending';
+          const pairNum = pairIdx + 1;
+          const gameTypeLabel = pairNum === 1 ? "Women's + Men's" : 'Mixed + Mixed';
 
-          // Each side's entered value (if any)
-          const hv = gs.home?.entered ?? '';
-          const av = gs.away?.entered ?? '';
+          const pairPill = {
+            confirmed: '<span class="ss-pill ss-pill--confirmed">&check; Confirmed</span>',
+            mismatch:  '<span class="ss-pill ss-pill--mismatch">&times; Mismatch</span>',
+            active:    '<span class="ss-pill ss-pill--partial">In progress</span>',
+            locked:    '<span class="ss-pill ss-pill--empty">🔒 Locked</span>',
+            pending:   '<span class="ss-pill ss-pill--empty">Not started</span>',
+          }[pairState] || '<span class="ss-pill ss-pill--empty">Not started</span>';
 
-          // Cell-level styling per status
-          const homeIsMine = myRole === 'home';
-          const awayIsMine = myRole === 'away';
-
-          const inputClass = (mine, sideStatus) => {
-            const classes = ['ss-score-input'];
-            if (status === 'confirmed') classes.push('ss-score-input--confirmed');
-            else if (status === 'mismatch') classes.push('ss-score-input--mismatch');
-            else if (sideStatus === 'entered' && mine) classes.push('ss-score-input--mine-entered');
-            else if (sideStatus === 'entered') classes.push('ss-score-input--other-entered');
-            else if (sideStatus === 'empty' && !mine) classes.push('ss-score-input--awaiting-other');
-            return classes.join(' ');
-          };
-
-          // For each cell: am I the editor? what's the value?
-          const homeSideStatus = gs.home ? 'entered' : 'empty';
-          const awaySideStatus = gs.away ? 'entered' : 'empty';
-
-          // Status pill
-          const pill = renderStatusPill(status);
-
-          // Row background tint for confirmed/mismatch
-          const rowClass = status === 'confirmed' ? 'ss-row--confirmed'
-                          : status === 'mismatch' ? 'ss-row--mismatch' : '';
-
+          const rows = [];
           rows.push(`
-            <tr class="${rowClass}">
-              <td><span class="ss-type">G${g}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span></td>
-              <td class="ss-pair">${escapeHtml(homePair)}</td>
-              <td>
-                <input type="number" inputmode="numeric" min="0" max="30"
-                  class="${inputClass(homeIsMine, homeSideStatus)}"
-                  value="${hv}"
-                  placeholder="${homeIsMine ? '' : '?'}"
-                  data-slot="${slot}" data-side="home"
-                  ${canEdit && homeIsMine ? '' : 'disabled'}>
-              </td>
-              <td>
-                <input type="number" inputmode="numeric" min="0" max="30"
-                  class="${inputClass(awayIsMine, awaySideStatus)}"
-                  value="${av}"
-                  placeholder="${awayIsMine ? '' : '?'}"
-                  data-slot="${slot}" data-side="away"
-                  ${canEdit && awayIsMine ? '' : 'disabled'}>
-              </td>
-              <td class="ss-pair">${escapeHtml(awayPair)}</td>
-              <td class="ss-status-cell">${pill}</td>
+            <tr>
+              <th>Game</th>
+              <th>${escapeHtml(homeName)} pair</th>
+              <th class="ss-th--score">Home</th>
+              <th class="ss-th--score">Away</th>
+              <th>${escapeHtml(awayName)} pair</th>
+              <th class="ss-th--status">Status</th>
             </tr>
           `);
-        }
+
+          for (const g of gameNums) {
+            const slot = `r${round}g${g}`;
+            const gs = games[slot] || { home: null, away: null };
+            const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
+            const homePair = formatPair(homeLineup[slot]);
+            const awayPair = formatPair(awayLineup[slot]);
+            const hv = gs.home?.entered ?? '';
+            const av = gs.away?.entered ?? '';
+            const homeIsMine = myRole === 'home';
+            const awayIsMine = myRole === 'away';
+
+            const inputClass = (mine, entered) => {
+              const cls = ['ss-score-input'];
+              if (status === 'confirmed') cls.push('ss-score-input--confirmed');
+              else if (status === 'mismatch') cls.push('ss-score-input--mismatch');
+              else if (entered && mine) cls.push('ss-score-input--mine-entered');
+              else if (entered) cls.push('ss-score-input--other-entered');
+              return cls.join(' ');
+            };
+
+            const pill = renderStatusPill(status);
+            const rowClass = status === 'confirmed' ? 'ss-row--confirmed'
+                           : status === 'mismatch'  ? 'ss-row--mismatch' : '';
+
+            rows.push(`
+              <tr class="${rowClass}">
+                <td><span class="ss-type">G${g}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span></td>
+                <td class="ss-pair">${escapeHtml(homePair)}</td>
+                <td>
+                  <input type="number" inputmode="numeric" min="0" max="30"
+                    class="${inputClass(homeIsMine, !!gs.home)}"
+                    value="${hv}"
+                    placeholder="${homeIsMine && !isLocked ? '' : '?'}"
+                    data-slot="${slot}" data-side="home"
+                    ${isLocked || !canEdit || !homeIsMine ? 'disabled' : ''}>
+                </td>
+                <td>
+                  <input type="number" inputmode="numeric" min="0" max="30"
+                    class="${inputClass(awayIsMine, !!gs.away)}"
+                    value="${av}"
+                    placeholder="${awayIsMine && !isLocked ? '' : '?'}"
+                    data-slot="${slot}" data-side="away"
+                    ${isLocked || !canEdit || !awayIsMine ? 'disabled' : ''}>
+                </td>
+                <td class="ss-pair">${escapeHtml(awayPair)}</td>
+                <td class="ss-status-cell">${pill}</td>
+              </tr>
+            `);
+          }
+
+          return `
+            <div class="ss-pair-group ${isLocked ? 'ss-pair-group--locked' : ''}">
+              <div class="ss-pair-header">
+                <span class="ss-pair-header__label">Pair ${pairNum} &middot; ${gameTypeLabel}</span>
+                ${pairPill}
+                ${isLocked ? '<span class="ss-pair-header__lock">Confirm pair ' + pairNum + '–' + (pairNum-1) + ' first</span>' : ''}
+              </div>
+              <table class="ss-table">${rows.join('')}</table>
+            </div>
+          `;
+        };
 
         const rsum = round === 1 ? c.round1 : c.round2;
         const rWin = rsum?.homePoints > rsum?.awayPoints ? 'home'
@@ -1284,7 +1306,9 @@
           <div class="ss-round">
             <h4 class="ss-round__title">Round ${round}</h4>
             <div class="ss-round__sub">${serveNote}</div>
-            <table class="ss-table">${rows.join('')}</table>
+            ${renderPair(0, [1, 2])}
+            ${renderPair(1, [3, 4])}
+            ${renderPair(2, [5, 6])}
             ${rsumComplete ? `
               <div class="ss-round-summary">
                 <div class="ss-round-summary__block">
@@ -1681,6 +1705,8 @@
         container.innerHTML = '<div class="empty-state">Add your first player below.</div>';
         return;
       }
+      // Sort alphabetically so the list is consistent; data-idx aligns with sorted array
+      state.roster.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       container.innerHTML = state.roster.map((p, idx) => `
         <div class="roster-row" data-idx="${idx}">
           <input type="text" placeholder="Name" value="${escapeAttr(p.name)}" data-field="name">

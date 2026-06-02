@@ -149,16 +149,20 @@
   <script src="/js/partials.js"></script>
   <script>
     const params = new URLSearchParams(window.location.search);
-    const teamId = params.get('id') || '';
+    const teamParam = params.get('id') || '';
+    function slugify(s) { return String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
 
     async function load() {
-      // Fetch teams
+      // Fetch teams — match by slug or fall back to raw ID (backward compat)
       let team = null;
+      let teamId = teamParam;
       try {
         const r = await fetch('/.netlify/functions/public-teams?season=circuit-i');
         if (r.ok) {
           const data = await r.json();
-          team = (data.teams || []).find(t => t.id === teamId);
+          team = (data.teams || []).find(t => slugify(t.name) === teamParam)
+              || (data.teams || []).find(t => t.id === teamParam);
+          if (team) teamId = team.id;
         }
       } catch {}
 
@@ -186,11 +190,12 @@
           </div>
         </div>`;
 
-      // Render roster
-      const roster = team.roster || [];
+      // Render roster — alphabetical
+      const teamSlug = slugify(team.name);
+      const roster = (team.roster || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
       if (roster.length) {
         const rows = roster.map(p => {
-          const playerUrl = `/player?team=${encodeURIComponent(teamId)}&name=${encodeURIComponent(p.name || '')}`;
+          const playerUrl = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name || '')}`;
           const captainBadge = p.isCaptain ? '<span class="captain-badge">Captain</span>' : '';
           const dupr = p.dupr ? `<span class="dupr-val">${p.dupr}</span>` : '<span class="dupr-val">—</span>';
           const gender = p.gender ? `<span class="gender-badge">${esc(p.gender)}</span>` : '';
