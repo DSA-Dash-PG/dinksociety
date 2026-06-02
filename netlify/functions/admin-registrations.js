@@ -38,6 +38,7 @@ export default async (req) => {
       balanceDueDate: r.balanceDueDate ?? null,
       paymentType: r.paymentType ?? null,
       paymentStatus: r.paymentStatus ?? null,
+      manualPayment: r.manualPayment ?? null,
       createdAt: r.createdAt,
       confirmedAt: r.confirmedAt || null,
       approvedBy: r.approvedBy || null,

@@ -52,9 +52,10 @@ export default async (req) => {
   let body;
   try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
 
-  const { playerId, toTeamId, note } = body;
+  const { playerId, toTeamId, note, newTeamName } = body;
   if (!playerId || !toTeamId) return json({ error: 'playerId and toTeamId required' }, 400);
   if (toTeamId === team.id) return json({ error: 'Destination must be a different team' }, 400);
+  if (toTeamId === '__new__' && !newTeamName?.trim()) return json({ error: 'newTeamName required when requesting a new team' }, 400);
 
   // Confirm player is on this team
   const player = (team.roster || []).find(p => p.id === playerId);
@@ -73,10 +74,16 @@ export default async (req) => {
   );
   if (duplicate) return json({ error: 'A pending transfer request for this player already exists' }, 409);
 
-  // Fetch destination team name
-  const teamsStore = getStore('teams');
-  const toTeam = await teamsStore.get(`team/${toTeamId}.json`, { type: 'json' }).catch(() => null);
-  if (!toTeam) return json({ error: 'Destination team not found' }, 404);
+  // Resolve destination team name
+  let toTeamName;
+  if (toTeamId === '__new__') {
+    toTeamName = `New team: ${newTeamName.trim()}`;
+  } else {
+    const teamsStore = getStore('teams');
+    const toTeam = await teamsStore.get(`team/${toTeamId}.json`, { type: 'json' }).catch(() => null);
+    if (!toTeam) return json({ error: 'Destination team not found' }, 404);
+    toTeamName = toTeam.name;
+  }
 
   const request = {
     id: generateId('tr_'),
@@ -86,7 +93,8 @@ export default async (req) => {
     fromTeamId: team.id,
     fromTeamName: team.name,
     toTeamId,
-    toTeamName: toTeam.name,
+    toTeamName,
+    newTeamName: toTeamId === '__new__' ? newTeamName.trim() : null,
     seasonId: team.seasonId || null,
     note: note || null,
     requestedBy: user.email,

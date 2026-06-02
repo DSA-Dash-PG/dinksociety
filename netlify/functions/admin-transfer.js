@@ -124,6 +124,16 @@ export default async (req) => {
     if (!request) return json({ error: 'Request not found' }, 404);
     if (request.status !== 'pending') return json({ error: `Request is already ${request.status}` }, 400);
 
+    // New-team requests: admin handles team creation manually, just log and mark approved
+    if (request.toTeamId === '__new__') {
+      request.status = 'approved';
+      request.reviewedBy = admin.email;
+      request.reviewedAt = new Date().toISOString();
+      request.reviewNote = reviewNote || `New team "${request.newTeamName}" — create team manually and complete transfer.`;
+      await requestsStore.setJSON(`request/${request.id}.json`, request);
+      return json({ ok: true, newTeamRequest: true, note: request.reviewNote });
+    }
+
     const fromTeam = await getTeam(teamsStore, request.fromTeamId);
     const toTeam = await getTeam(teamsStore, request.toTeamId);
     if (!fromTeam) return json({ error: 'Source team not found' }, 404);

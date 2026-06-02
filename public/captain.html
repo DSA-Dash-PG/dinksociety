@@ -145,13 +145,14 @@
     .roster-row__transfer:hover { background: var(--color-surface-3); color: var(--color-text-muted); }
 
     /* Transfer request modal */
-    .xreq-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.55); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; }
-    .xreq-modal { background: var(--color-surface-1); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 20px; width: 100%; max-width: 420px; }
-    .xreq-modal h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-    .xreq-modal__sub { font-size: 12px; color: var(--color-text-faint); margin-bottom: 16px; }
+    .xreq-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
+    .xreq-modal { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); padding: 22px; width: 100%; max-width: 420px; box-shadow: 0 0 0 1px rgba(255,255,255,0.06); }
+    .xreq-modal h3 { font-size: 15px; font-weight: 800; margin-bottom: 4px; color: var(--color-text); }
+    .xreq-modal__sub { font-size: 12px; color: var(--color-text-muted); margin-bottom: 18px; line-height: 1.5; padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
     .xreq-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
     .xreq-field label { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); }
-    .xreq-field select, .xreq-field textarea { padding: 8px 10px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
+    .xreq-field select, .xreq-field textarea, .xreq-field input[type="text"] { padding: 9px 11px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); font-size: 13px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); width: 100%; box-sizing: border-box; }
+    .xreq-field select:focus, .xreq-field textarea:focus, .xreq-field input[type="text"]:focus { outline: none; border-color: var(--color-lime); }
     .xreq-field textarea { resize: none; }
     .xreq-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; }
     .xreq-status { font-size: 12px; padding: 7px 10px; border-radius: var(--radius-sm); margin-top: 8px; display: none; }
@@ -279,9 +280,24 @@
       .cap-header__meta { display: none; }
       .cap-section { padding: 16px 14px; }
       .cap-tabs { padding: 0 14px; overflow-x: auto; }
-      .roster-row { grid-template-columns: 1fr 50px 1fr 32px; }
-      .roster-row__email, .roster-row__phone, .roster-row__dupr { display: none; }
-      .roster-head .roster-row__email, .roster-head .roster-row__phone, .roster-head .roster-row__dupr { display: none; }
+      .roster-head { display: none; }
+      .roster-row {
+        display: grid;
+        grid-template-columns: 1fr 60px;
+        gap: 5px;
+        background: var(--color-surface-2);
+        border: 1px solid var(--color-border);
+        border-radius: var(--radius-sm);
+        padding: 10px;
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--color-border);
+      }
+      .roster-row input[data-field="name"]   { grid-column: 1; grid-row: 1; }
+      .roster-row select[data-field="gender"]{ grid-column: 2; grid-row: 1; }
+      .roster-row__email  { display: block !important; grid-column: 1 / -1; grid-row: 2; }
+      .roster-row__phone  { display: block !important; grid-column: 1;      grid-row: 3; }
+      .roster-row__dupr   { display: block !important; grid-column: 2;      grid-row: 3; }
+      .roster-row > div:last-child { grid-column: 1 / -1; grid-row: 4; display: flex; justify-content: flex-end; gap: 4px; }
       .lineup-game { grid-template-columns: 100px 1fr 1fr; gap: 6px; }
       .reveal-matchup { grid-template-columns: 1fr; gap: 4px; text-align: left; }
       .reveal-matchup__right { text-align: left; }
@@ -1791,23 +1807,29 @@
         teams = (data.teams || []).filter(t => t.id !== state.me.team.id);
       } catch {}
 
-      const teamOpts = teams.length
-        ? teams.map(t => `<option value="${escapeAttr(t.id)}">${escapeAttr(t.name)}</option>`).join('')
-        : '<option value="" disabled>No other teams available</option>';
+      const teamOpts = teams.map(t => `<option value="${escapeAttr(t.id)}">${escapeAttr(t.name)}</option>`).join('');
 
       xferModal = document.createElement('div');
       xferModal.className = 'xreq-modal-bg';
       xferModal.innerHTML = `
         <div class="xreq-modal">
           <h3>Request transfer</h3>
-          <div class="xreq-modal__sub">Submitting a request does not move the player — the league admin must approve it first.</div>
+          <div class="xreq-modal__sub">This is a request only — the league admin must approve before any move happens.</div>
           <div class="xreq-field">
             <label>Player</label>
-            <div style="font-size:13px;font-weight:600;padding:4px 0;">${escapeHtml(player.name)}</div>
+            <div style="font-size:14px;font-weight:700;padding:2px 0;color:var(--color-text);">${escapeHtml(player.name)}</div>
           </div>
           <div class="xreq-field">
-            <label>Destination team</label>
-            <select id="xreq-to-team"><option value="">— select team —</option>${teamOpts}</select>
+            <label>Destination</label>
+            <select id="xreq-to-team" onchange="xreqDestChange()">
+              <option value="">— select —</option>
+              ${teamOpts}
+              <option value="__new__">⊕ Start a new team</option>
+            </select>
+          </div>
+          <div class="xreq-field" id="xreq-newteam-field" style="display:none;">
+            <label>New team name</label>
+            <input type="text" id="xreq-newteam-name" placeholder="e.g. The Smashers" maxlength="50">
           </div>
           <div class="xreq-field">
             <label>Note (optional)</label>
@@ -1823,6 +1845,12 @@
       xferModal.addEventListener('click', (e) => { if (e.target === xferModal) closeTransferModal(); });
     }
 
+    function xreqDestChange() {
+      const sel = document.getElementById('xreq-to-team');
+      const newField = document.getElementById('xreq-newteam-field');
+      if (newField) newField.style.display = sel?.value === '__new__' ? 'flex' : 'none';
+    }
+
     function closeTransferModal() {
       if (xferModal) { xferModal.remove(); xferModal = null; }
     }
@@ -1830,15 +1858,20 @@
     async function submitTransferRequest(playerId, playerName) {
       const toTeamId = document.getElementById('xreq-to-team')?.value;
       const note = document.getElementById('xreq-note')?.value.trim();
+      const newTeamName = document.getElementById('xreq-newteam-name')?.value.trim();
       const statusEl = document.getElementById('xreq-modal-status');
-      if (!toTeamId) { statusEl.className = 'xreq-status err'; statusEl.textContent = 'Please select a destination team.'; return; }
+
+      if (!toTeamId) { statusEl.className = 'xreq-status err'; statusEl.textContent = 'Please select a destination.'; return; }
+      if (toTeamId === '__new__' && !newTeamName) { statusEl.className = 'xreq-status err'; statusEl.textContent = 'Please enter the new team name.'; return; }
 
       const btn = document.getElementById('xreq-submit-btn');
       btn.disabled = true; btn.textContent = 'Submitting…';
       try {
+        const payload = { playerId, toTeamId, note: note || null };
+        if (toTeamId === '__new__') payload.newTeamName = newTeamName;
         const res = await fetch('/.netlify/functions/captain-transfer-request', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId, toTeamId, note: note || null }),
+          body: JSON.stringify(payload),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Request failed');

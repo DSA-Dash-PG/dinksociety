@@ -84,6 +84,17 @@
     .p--agent { background: var(--color-teal-dim); color: var(--color-teal); }
     .p--paid { background: var(--color-teal-dim); color: var(--color-teal); }
     .p--unpaid { background: var(--color-red-dim); color: var(--color-red); }
+
+    /* ── Payment modal ────────────────────────────────────────── */
+    .pm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+    .pm-overlay.is-open { opacity: 1; pointer-events: auto; }
+    .pm-modal { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); padding: 24px; width: 320px; max-width: 90vw; }
+    .pm-modal h3 { font-size: 14px; font-weight: 700; margin: 0 0 18px; }
+    .pm-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+    .pm-method { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); cursor: pointer; font-size: 12px; font-weight: 600; transition: all 0.12s; }
+    .pm-method:hover { background: var(--color-surface-2); }
+    .pm-method input[type=radio] { accent-color: var(--color-teal); }
+    .pm-method.is-selected { border-color: var(--color-teal); background: var(--color-teal-dim); color: var(--color-teal); }
     .p--div { background: var(--color-surface-3); color: var(--color-text-muted); }
 
     /* ── Buttons ──────────────────────────────────────────────── */
@@ -662,6 +673,30 @@
       <div class="a-status" id="tdp-status" style="margin:0;flex:1;"></div>
       <button class="ab ab--outline ab--sm" id="tdp-cancel">Cancel</button>
       <button class="ab ab--lime ab--sm" id="tdp-save">Save Changes</button>
+    </div>
+  </div>
+
+  <!-- Manual Payment Modal -->
+  <div class="pm-overlay" id="pm-overlay">
+    <div class="pm-modal">
+      <h3>Record Payment</h3>
+      <div class="af">
+        <label style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--color-text-faint);">Payment Method</label>
+        <div class="pm-methods" id="pm-methods">
+          <label class="pm-method"><input type="radio" name="pm-method" value="zelle"> Zelle</label>
+          <label class="pm-method"><input type="radio" name="pm-method" value="venmo"> Venmo</label>
+          <label class="pm-method"><input type="radio" name="pm-method" value="cash"> Cash</label>
+          <label class="pm-method"><input type="radio" name="pm-method" value="other"> Other</label>
+        </div>
+      </div>
+      <div class="af" style="margin-top:14px;">
+        <label style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--color-text-faint);">Note <span style="text-transform:none;letter-spacing:0;font-weight:400;">(optional)</span></label>
+        <input type="text" id="pm-note" placeholder="e.g. paid in full, ref #1234" style="margin-top:6px;" autocomplete="off">
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px;">
+        <button class="ab ab--outline ab--sm" id="pm-cancel">Cancel</button>
+        <button class="ab ab--teal ab--sm" id="pm-confirm">Mark Paid</button>
+      </div>
     </div>
   </div>
 
@@ -1370,7 +1405,11 @@
           : h(r.agent?.name);
         const em = r.path === 'team' ? r.team?.players?.[0]?.email : r.agent?.email;
         let pp;
-        if (r.amountPaid > 0) {
+        const isFullyPaid = r.paymentStatus === 'paid' || (r.amountPaid > 0 && !r.balanceDue);
+        if (r.manualPayment) {
+          const methodLabel = { zelle: 'Zelle', venmo: 'Venmo', cash: 'Cash', other: 'Other' }[r.manualPayment.method] || r.manualPayment.method;
+          pp = '<span class="p p--paid">$' + (r.amountPaid || r.totalPrice || 0) + ' · ' + methodLabel + '</span>';
+        } else if (r.amountPaid > 0) {
           const bal = r.balanceDue || 0;
           pp = bal > 0
             ? '<span class="p p--paid">$' + r.amountPaid + ' dep</span> <span class="p p--unpaid">$' + bal + ' due</span>'
@@ -1383,6 +1422,7 @@
         if (st === 'pending') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="confirm" data-id="' + h(r.id) + '">Confirm</button>');
         if (st === 'pending' || st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="reject" data-id="' + h(r.id) + '">Reject</button>');
         if (st === 'rejected') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="reinstate" data-id="' + h(r.id) + '">Reinstate</button>');
+        if (st === 'confirmed' && !isFullyPaid) actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="mark-paid" data-id="' + h(r.id) + '">Mark Paid</button>');
         actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
         return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
@@ -1390,6 +1430,7 @@
   }
 
   async function regAction(act, id) {
+    if (act === 'mark-paid') { openPayModal(id); return; }
     const payload = { action: act, id };
     if (act === 'reject') {
       const reason = prompt('Reject this registration — optional reason (leave blank to skip):');
@@ -1417,6 +1458,50 @@
       btn.addEventListener('click', () => regAction(btn.dataset.act, btn.dataset.id));
     });
   }
+
+  // ── Payment modal ──────────────────────────────────────────
+  let _pmRegId = null;
+
+  function openPayModal(id) {
+    _pmRegId = id;
+    // Reset state
+    $id('pm-note').value = '';
+    $id('pm-methods').querySelectorAll('input[type=radio]').forEach(r => { r.checked = false; });
+    $id('pm-methods').querySelectorAll('.pm-method').forEach(l => l.classList.remove('is-selected'));
+    $id('pm-overlay').classList.add('is-open');
+  }
+
+  function closePayModal() {
+    $id('pm-overlay').classList.remove('is-open');
+    _pmRegId = null;
+  }
+
+  $id('pm-methods').addEventListener('change', () => {
+    $id('pm-methods').querySelectorAll('.pm-method').forEach(l => {
+      l.classList.toggle('is-selected', l.querySelector('input').checked);
+    });
+  });
+
+  $id('pm-overlay').addEventListener('click', e => { if (e.target === $id('pm-overlay')) closePayModal(); });
+  $id('pm-cancel').addEventListener('click', closePayModal);
+
+  $id('pm-confirm').addEventListener('click', async () => {
+    const methodEl = $id('pm-methods').querySelector('input[type=radio]:checked');
+    if (!methodEl) { alert('Please select a payment method.'); return; }
+    const method = methodEl.value;
+    const note = $id('pm-note').value.trim();
+    closePayModal();
+    try {
+      await apiJSON('/.netlify/functions/admin-registration-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'mark-paid', id: _pmRegId, method, note }),
+      });
+      renderReg();
+    } catch (e) {
+      alert('Failed to record payment: ' + (e.message || 'unknown error'));
+    }
+  });
 
   $id('rf-st').addEventListener('change', filterAndShowReg);
   $id('rf-dv').addEventListener('change', filterAndShowReg);

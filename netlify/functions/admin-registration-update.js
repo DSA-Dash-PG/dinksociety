@@ -324,6 +324,35 @@ export default async (req) => {
       return json({ ok: true, deletedReg, deletedTeam });
     }
 
+    // ─── Mark balance as paid (Zelle, Venmo, Cash, Other) ───
+    case 'mark-paid': {
+      const { id, method, note } = body;
+      if (!id) return json({ error: 'Registration id required' }, 400);
+
+      const VALID_METHODS = ['zelle', 'venmo', 'cash', 'other'];
+      const payMethod = VALID_METHODS.includes(method) ? method : 'other';
+
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
+
+      const { reg, foundKey } = found;
+
+      // Credit the remaining balance
+      const total = reg.totalPrice ?? reg.price ?? 0;
+      reg.amountPaid = total;
+      reg.balanceDue = 0;
+      reg.paymentStatus = 'paid';
+      reg.manualPayment = {
+        method: payMethod,
+        note: note || '',
+        paidAt: new Date().toISOString(),
+        paidBy: admin.email,
+      };
+
+      await regStore.set(foundKey, JSON.stringify(reg));
+      return json({ ok: true, registration: reg });
+    }
+
     default:
       return json({ error: `Unknown action: ${action}` }, 400);
   }
