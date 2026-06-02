@@ -135,15 +135,18 @@
       renderTeams();
     }
 
+    // Normalize a raw division value to its display label (or itself if unknown)
+    function divLabel(d) { return DIVISION_LABELS[d] || d; }
+
     function renderTabs() {
-      const divs = [...new Set(allTeams.map(t => t.division))].sort();
-      if (!divs.length) { document.getElementById('div-tabs').innerHTML = ''; return; }
+      // Group by label so teams with different raw values but same label share a tab
+      const labels = [...new Set(allTeams.map(t => divLabel(t.division)))].sort();
+      if (!labels.length) { document.getElementById('div-tabs').innerHTML = ''; return; }
 
-      // Default to first division
-      if (!activeDivision || !divs.includes(activeDivision)) activeDivision = divs[0];
+      if (!activeDivision || !labels.includes(activeDivision)) activeDivision = labels[0];
 
-      document.getElementById('div-tabs').innerHTML = divs.map(d =>
-        `<button class="div-tab ${d === activeDivision ? 'is-active' : ''}" data-div="${esc(d)}">${esc(DIVISION_LABELS[d] || d)}</button>`
+      document.getElementById('div-tabs').innerHTML = labels.map(l =>
+        `<button class="div-tab ${l === activeDivision ? 'is-active' : ''}" data-div="${esc(l)}">${esc(l)}</button>`
       ).join('');
 
       document.querySelectorAll('.div-tab').forEach(btn => {
@@ -156,7 +159,7 @@
     }
 
     function renderTeams() {
-      const filtered = allTeams.filter(t => t.division === activeDivision);
+      const filtered = allTeams.filter(t => divLabel(t.division) === activeDivision);
       const grid = document.getElementById('teams-grid');
       const count = document.getElementById('team-count');
 
