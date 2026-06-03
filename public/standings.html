@@ -290,7 +290,9 @@
       totalGamesWon:0, totalGamesLost:0,
       maxPts: SEASON.totalMatches * SEASON.maxPtsPerMatch, status:null, h2h:{},
     }));
-    el.innerHTML = standingsCardHtml(teams, true) + legendCardHtml();
+    // Use divisionLabel from the first team, fall back to DIV_LABELS map, then raw code
+    const divLabel = divTeams[0]?.divisionLabel || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
+    el.innerHTML = standingsCardHtml(teams, true, '', divLabel) + legendCardHtml();
   }
 
   // ── Live season ──────────────────────────────────────────────────
@@ -300,24 +302,25 @@
       el.innerHTML = '<div class="empty-state">No standings for this division yet.</div>';
       return;
     }
-    const emojiMap = {};
-    (teamsData?.teams || []).forEach(t => { emojiMap[t.id] = t.emoji || ''; });
     const teams = divData.teams.map(t => {
       const remaining = SEASON.totalMatches - (t.matchesPlayed || 0);
-      return { ...t, teamEmoji: emojiMap[t.teamId] || t.teamEmoji || '🏓',
-               remaining, maxPts: t.matchPointsFor + remaining * SEASON.maxPtsPerMatch };
+      return { ...t, remaining, maxPts: t.matchPointsFor + remaining * SEASON.maxPtsPerMatch };
     });
     computeStatus(teams);
     const updated = standingsData.lastUpdated
       ? '<span class="stand-card__updated">Updated ' + fmtDate(standingsData.lastUpdated) + '</span>' : '';
-    el.innerHTML = standingsCardHtml(teams, false, updated) + legendCardHtml()
+    // Use divisionLabel from standings blob, then teams fallback, then map
+    const divLabel = divData.divisionLabel
+      || (teamsData?.teams || []).find(t => t.division === activeDivision)?.divisionLabel
+      || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
+    el.innerHTML = standingsCardHtml(teams, false, updated, divLabel) + legendCardHtml()
                  + h2hCardHtml(teams) + trajectoryCardHtml(teams, divData.weeklyData);
   }
 
   // ── Standings card ───────────────────────────────────────────────
-  function standingsCardHtml(teams, preseason, updatedHtml) {
+  function standingsCardHtml(teams, preseason, updatedHtml, divLabel) {
     updatedHtml = updatedHtml || '';
-    const divLabel = DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
+    divLabel = divLabel || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
     const spots = SEASON.playoffSpots;
     let rows = '';
 
@@ -343,7 +346,6 @@
       rows += '<tr class="' + (!preseason && idx===0 ? 'stand-row--leader' : '') + '">'
         + '<td class="col-rank ' + rankCls + '">' + rankSym + '</td>'
         + '<td class="col-team"><div class="team-cell">'
-        + '  <span class="team-emoji">' + esc(t.teamEmoji) + '</span>'
         + '  <span class="team-name">'  + esc(t.teamName)  + '</span>'
         + badge
         + '</div></td>'
