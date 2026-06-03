@@ -215,6 +215,30 @@ export async function rebuildStandings(circuit) {
     divisions,
   };
 
+  // ── Composite score (Aloha formula) ──────────────────────────
+  // Win% (×60) + Avg Diff (×15) + Clutch (×10) + Volume (×10) + Consistency (×5) = max 100
+  const activePlayers = Array.from(playerStats.values()).filter(p => p.gamesPlayed > 0);
+  const maxGames = Math.max(1, ...activePlayers.map(p => p.gamesPlayed));
+
+  for (const p of playerStats.values()) {
+    if (p.gamesPlayed === 0) { p.composite = null; continue; }
+    const winPct    = p.gamesWon / p.gamesPlayed;
+    const avgDiff   = p.diff / p.gamesPlayed;          // ~-11 to +11
+    const volume    = p.gamesPlayed / maxGames;         // 0–1
+    const clutchPct = p.clutchG > 0 ? p.clutchW / p.clutchG : winPct;
+
+    let consistency = 1;
+    if (p.gameDiffs.length >= 2) {
+      const mean = p.gameDiffs.reduce((s, d) => s + d, 0) / p.gameDiffs.length;
+      const variance = p.gameDiffs.reduce((s, d) => s + (d - mean) ** 2, 0) / p.gameDiffs.length;
+      consistency = Math.max(0, 1 - (Math.sqrt(variance) / 8));
+    }
+
+    p.composite   = (winPct * 60) + (clutchPct * 10) + ((avgDiff / 11) * 15) + (consistency * 5) + (volume * 10);
+    p.clutchPct   = clutchPct;
+    p.consistency = consistency;
+  }
+
   const playerStatsOut = {
     circuit,
     lastUpdated: new Date().toISOString(),
@@ -300,12 +324,12 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lin
     for (const pid of homePlayers) {
       const player = rosterA.get(pid);
       if (!player) continue;
-      bumpPlayer(playerStats, pid, player, teamA, slotType, homeWon, homePlayers.filter(p => p !== pid));
+      bumpPlayer(playerStats, pid, player, teamA, slotType, homeWon, homePlayers.filter(p => p !== pid), homeScore, awayScore);
     }
     for (const pid of awayPlayers) {
       const player = rosterB.get(pid);
       if (!player) continue;
-      bumpPlayer(playerStats, pid, player, teamB, slotType, !homeWon, awayPlayers.filter(p => p !== pid));
+      bumpPlayer(playerStats, pid, player, teamB, slotType, !homeWon, awayPlayers.filter(p => p !== pid), awayScore, homeScore);
     }
 
     // Track distinct matches each player appeared in (handled separately below)
@@ -353,18 +377,40 @@ function ensurePlayer(map, pid, player, team) {
         mixed: { played: 0, won: 0 },
       },
       matchesPlayed: 0,
+      // Scoring data (needed for composite score)
+      ps: 0,         // points scored
+      pa: 0,         // points allowed
+      diff: 0,       // cumulative point differential
+      gameDiffs: [], // per-game diffs (for consistency calc)
+      clutchW: 0,    // wins in close games (margin ≤ 3)
+      clutchG: 0,    // close games played
+      composite: null,
       partners: {}, // { partnerId: { played, won } }
     });
   }
 }
 
-function bumpPlayer(map, pid, player, team, slotType, won, partners) {
+function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = null, oppScore = null) {
   ensurePlayer(map, pid, player, team);
   const p = map.get(pid);
   p.gamesPlayed++;
   if (won) p.gamesWon++; else p.gamesLost++;
   p.byType[slotType].played++;
   if (won) p.byType[slotType].won++;
+
+  // Track per-game scoring for composite score
+  if (myScore !== null && oppScore !== null) {
+    const d = myScore - oppScore;
+    p.ps   += myScore;
+    p.pa   += oppScore;
+    p.diff += d;
+    p.gameDiffs.push(d);
+    if (Math.abs(d) <= 3) {
+      p.clutchG++;
+      if (won) p.clutchW++;
+    }
+  }
+
   for (const partnerId of partners) {
     if (!p.partners[partnerId]) p.partners[partnerId] = { played: 0, won: 0 };
     p.partners[partnerId].played++;
