@@ -75,6 +75,15 @@ export default async (req) => {
     // Revenue: amountPaid is already in dollars (webhook converts from cents)
     const revenue = confirmed.reduce((sum, r) => sum + (r?.amountPaid || 0), 0);
 
+    // Total fees owed and balance still outstanding across confirmed registrations
+    const totalFees = confirmed
+      .filter(r => r?.path === 'team')
+      .reduce((sum, r) => sum + (r?.totalPrice || r?.price || 0), 0);
+    const balanceDue = confirmed.reduce((sum, r) => {
+      if (r?.balanceDue != null) return sum + (r.balanceDue || 0);
+      return sum + Math.max(0, (r?.totalPrice || r?.price || 0) - (r?.amountPaid || 0));
+    }, 0);
+
     // Count photos
     const { blobs: photoBlobs } = await momentsStore.list({ prefix: 'meta/' });
     const photos = photoBlobs.length;
@@ -136,6 +145,8 @@ export default async (req) => {
         agents,
         teamCapacity,
         revenue: Math.round(revenue),
+        totalFees: Math.round(totalFees),
+        balanceDue: Math.round(balanceDue),
         photos,
       },
       divisionFill,
