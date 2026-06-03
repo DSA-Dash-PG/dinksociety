@@ -201,6 +201,32 @@
     .roster-item__actions button:hover { background: var(--color-surface-3); color: var(--color-text); }
     .roster-item__actions .act-danger:hover { background: var(--color-red-dim); color: var(--color-red); }
 
+    /* ── Editable roster item ── */
+    .ri { border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 8px; background: var(--color-surface-2); overflow: hidden; }
+    .ri--captain { border-color: var(--color-lime); }
+    .ri--cocaptain { border-color: var(--color-teal); }
+    .ri__head { display: flex; align-items: center; gap: 9px; padding: 10px 12px 8px; }
+    .ri__avatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; color: #fff; flex-shrink: 0; }
+    .ri__name { flex: 1; padding: 5px 8px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 13px; font-family: inherit; font-weight: 600; background: var(--color-surface); color: var(--color-text); min-width: 0; }
+    .ri__name:focus { outline: none; border-color: var(--color-lime); }
+    .ri__remove { background: none; border: none; color: var(--color-text-faint); cursor: pointer; font-size: 16px; padding: 2px 4px; transition: color 0.15s; flex-shrink: 0; }
+    .ri__remove:hover { color: #ef4444; }
+    .ri__body { padding: 0 12px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+    .ri__field { display: flex; flex-direction: column; gap: 3px; }
+    .ri__field--full { grid-column: 1 / -1; }
+    .ri__label { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-faint); }
+    .ri__label em { font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--color-teal); margin-left: 4px; }
+    .ri__input { padding: 5px 8px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 12px; font-family: inherit; background: var(--color-surface); color: var(--color-text); }
+    .ri__input:focus { outline: none; border-color: var(--color-teal); }
+    .ri__input--email { border-color: rgba(23,215,176,0.4); }
+    .ri__input--email:focus { border-color: var(--color-teal); }
+    .ri__roles { grid-column: 1 / -1; display: flex; gap: 4px; margin-top: 2px; }
+    .ri__role { flex: 1; padding: 5px 6px; border: 1px solid var(--color-border); border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; font-family: inherit; background: transparent; color: var(--color-text-faint); transition: all 0.15s; }
+    .ri__role:hover { background: var(--color-surface); color: var(--color-text); }
+    .ri__role--captain.is-active { background: var(--color-lime-ghost); color: var(--color-lime); border-color: var(--color-lime); }
+    .ri__role--cocaptain.is-active { background: var(--color-teal-dim); color: var(--color-teal); border-color: var(--color-teal); }
+    .ri__role--player.is-active { background: var(--color-surface-2); color: var(--color-text-muted); border-color: var(--color-border-strong); }
+
     /* Color swatch input */
     .color-input-row { display: flex; align-items: center; gap: 8px; }
     .color-input-row input[type="color"] { width: 32px; height: 32px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 2px; cursor: pointer; background: transparent; }
@@ -1507,12 +1533,13 @@
     if (!methodEl) { alert('Please select a payment method.'); return; }
     const method = methodEl.value;
     const note = $id('pm-note').value.trim();
+    const regId = _pmRegId; // capture before closePayModal nulls it
     closePayModal();
     try {
       await apiJSON('/.netlify/functions/admin-registration-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark-paid', id: _pmRegId, method, note }),
+        body: JSON.stringify({ action: 'mark-paid', id: regId, method, note }),
       });
       renderReg();
     } catch (e) {
@@ -1844,34 +1871,74 @@
     wireRosterActions();
   }
 
+  // Avatar color helper (matches public pages)
+  const RI_PALETTE = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#84cc16'];
+  function riColor(name) { let n = 0; for (const c of String(name||'')) n = (n*31+c.charCodeAt(0))&0xffff; return RI_PALETTE[n%RI_PALETTE.length]; }
+  function riInit(name) { return (name||'?').charAt(0).toUpperCase(); }
+
+  // Flush current DOM values back into currentPanelTeam.roster (call before re-rendering)
+  function flushRosterFromDOM() {
+    document.querySelectorAll('#tdp-roster .ri[data-idx]').forEach(el => {
+      const idx = parseInt(el.dataset.idx);
+      const p = currentPanelTeam.roster?.[idx];
+      if (!p) return;
+      const g = f => el.querySelector('[data-field="' + f + '"]')?.value?.trim() || '';
+      const nm = g('name'); if (nm) p.name = nm;
+      p.email  = g('email')  || null;
+      p.gender = g('gender') || '';
+      p.dupr   = g('dupr')   || null;
+      p.phone  = g('phone')  || null;
+    });
+  }
+
   function renderRosterItems(roster) {
     if (!roster.length) return '<div class="empty" style="padding:12px;">No players on roster.</div>';
-    // Sort alphabetically; preserve original index so action buttons reference the right slot
-    const sorted = roster.map((p, i) => [p, i]).sort((a, b) => (a[0].name || '').localeCompare(b[0].name || ''));
+    // Sort alphabetically; preserve original index so actions reference the right slot
+    const sorted = roster.map((p, i) => [p, i]).sort((a, b) => (a[0].name||'').localeCompare(b[0].name||''));
     return sorted.map(([p, i]) => {
-      const badges = [];
-      if (p.isCaptain) badges.push('<span class="roster-item__badge roster-item__badge--cap">Captain</span>');
-      if (p.isCoCaptain) badges.push('<span class="roster-item__badge roster-item__badge--cocap">Co-Captain</span>');
-      return '<div class="roster-item" data-idx="' + i + '">' +
-        '<div class="roster-item__info">' +
-          '<div class="roster-item__name">' + h(p.name) + ' ' + badges.join(' ') + '</div>' +
-          '<div class="roster-item__meta">' + [p.email, p.gender, p.dupr ? 'DUPR ' + p.dupr : ''].filter(Boolean).join(' · ') + '</div>' +
+      const roleClass = p.isCaptain ? 'ri--captain' : p.isCoCaptain ? 'ri--cocaptain' : '';
+      const color = riColor(p.name);
+      return '<div class="ri ' + roleClass + '" data-idx="' + i + '">' +
+        '<div class="ri__head">' +
+          '<div class="ri__avatar" style="background:' + color + '">' + riInit(p.name) + '</div>' +
+          '<input type="text" class="ri__name" data-field="name" value="' + h(p.name) + '" placeholder="Player name">' +
+          '<button class="ri__remove" data-action="remove" data-idx="' + i + '" title="Remove">✕</button>' +
         '</div>' +
-        '<div class="roster-item__actions">' +
-          (!p.isCaptain ? '<button data-action="set-captain" data-idx="' + i + '" title="Make Captain">★</button>' : '') +
-          (!p.isCoCaptain && !p.isCaptain ? '<button data-action="set-cocaptain" data-idx="' + i + '" title="Make Co-Captain">☆</button>' : '') +
-          '<button data-action="remove" data-idx="' + i + '" class="act-danger" title="Remove">✕</button>' +
+        '<div class="ri__body">' +
+          '<div class="ri__field ri__field--full">' +
+            '<span class="ri__label">Email <em>— captain portal login</em></span>' +
+            '<input type="email" class="ri__input ri__input--email" data-field="email" value="' + h(p.email||'') + '" placeholder="email@example.com">' +
+          '</div>' +
+          '<div class="ri__field">' +
+            '<span class="ri__label">Gender</span>' +
+            '<select class="ri__input" data-field="gender">' +
+              '<option value=""' + (!p.gender ? ' selected' : '') + '>—</option>' +
+              '<option value="M"' + (p.gender==='M' ? ' selected' : '') + '>Male (M)</option>' +
+              '<option value="F"' + (p.gender==='F' ? ' selected' : '') + '>Female (F)</option>' +
+            '</select>' +
+          '</div>' +
+          '<div class="ri__field">' +
+            '<span class="ri__label">DUPR</span>' +
+            '<input type="text" class="ri__input" data-field="dupr" value="' + h(p.dupr||'') + '" placeholder="e.g. 3.5">' +
+          '</div>' +
+          '<div class="ri__roles">' +
+            '<button class="ri__role ri__role--captain' + (p.isCaptain ? ' is-active' : '') + '" data-action="set-captain" data-idx="' + i + '">👑 Captain</button>' +
+            '<button class="ri__role ri__role--cocaptain' + (p.isCoCaptain ? ' is-active' : '') + '" data-action="set-cocaptain" data-idx="' + i + '">⭐ Co-Captain</button>' +
+            '<button class="ri__role ri__role--player' + (!p.isCaptain && !p.isCoCaptain ? ' is-active' : '') + '" data-action="set-player" data-idx="' + i + '">Player</button>' +
+          '</div>' +
         '</div>' +
       '</div>';
     }).join('');
   }
 
   function wireRosterActions() {
-    $id('tdp-roster').querySelectorAll('button[data-action]').forEach(btn => {
+    $id('tdp-roster').querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
         const idx = parseInt(btn.dataset.idx);
         const action = btn.dataset.action;
+        // Preserve any typed values before re-render
+        flushRosterFromDOM();
         const roster = currentPanelTeam.roster || [];
         if (action === 'set-captain') {
           roster.forEach(p => p.isCaptain = false);
@@ -1879,9 +1946,11 @@
         } else if (action === 'set-cocaptain') {
           roster.forEach(p => p.isCoCaptain = false);
           if (roster[idx]) roster[idx].isCoCaptain = true;
+        } else if (action === 'set-player') {
+          if (roster[idx]) { roster[idx].isCaptain = false; roster[idx].isCoCaptain = false; }
         } else if (action === 'remove') {
           if (roster.length <= 4) { alert('Cannot remove — team needs at least 4 players.'); return; }
-          if (!confirm('Remove ' + roster[idx].name + ' from roster?')) return;
+          if (!confirm('Remove ' + (roster[idx]?.name || 'this player') + ' from roster?')) return;
           roster.splice(idx, 1);
         }
         currentPanelTeam.roster = roster;
@@ -1898,6 +1967,9 @@
     const btn = $id('tdp-save');
     btn.disabled = true; btn.textContent = 'Saving…';
     status.className = 'a-status';
+
+    // Capture any pending edits in the roster form before sending
+    flushRosterFromDOM();
 
     const payload = {
       name: $id('tdp-name').value.trim(),
