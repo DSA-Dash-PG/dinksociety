@@ -326,7 +326,7 @@ export default async (req) => {
 
     // ─── Mark balance as paid (Zelle, Venmo, Cash, Other) ───
     case 'mark-paid': {
-      const { id, method, note } = body;
+      const { id, method, note, amount } = body;
       if (!id) return json({ error: 'Registration id required' }, 400);
 
       const VALID_METHODS = ['zelle', 'venmo', 'cash', 'other'];
@@ -337,9 +337,10 @@ export default async (req) => {
 
       const { reg, foundKey } = found;
 
-      // Credit the remaining balance
-      const total = reg.totalPrice ?? reg.price ?? 0;
+      // Use admin-entered amount if provided, otherwise fall back to stored total
+      const total = (typeof amount === 'number' && amount > 0) ? amount : (reg.totalPrice ?? reg.price ?? 0);
       reg.amountPaid = total;
+      reg.totalPrice = total; // keep in sync so future reads reflect the correct amount
       reg.balanceDue = 0;
       reg.paymentStatus = 'paid';
       reg.manualPayment = {

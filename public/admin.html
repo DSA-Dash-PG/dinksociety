@@ -718,6 +718,10 @@
         </div>
       </div>
       <div class="af" style="margin-top:14px;">
+        <label style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--color-text-faint);">Amount Received ($)</label>
+        <input type="number" id="pm-amount" min="0" step="1" placeholder="650" style="margin-top:6px;" autocomplete="off">
+      </div>
+      <div class="af" style="margin-top:14px;">
         <label style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;font-weight:700;color:var(--color-text-faint);">Note <span style="text-transform:none;letter-spacing:0;font-weight:400;">(optional)</span></label>
         <input type="text" id="pm-note" placeholder="e.g. paid in full, ref #1234" style="margin-top:6px;" autocomplete="off">
       </div>
@@ -1450,7 +1454,7 @@
         if (st === 'pending') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="confirm" data-id="' + h(r.id) + '">Confirm</button>');
         if (st === 'pending' || st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="reject" data-id="' + h(r.id) + '">Reject</button>');
         if (st === 'rejected') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="reinstate" data-id="' + h(r.id) + '">Reinstate</button>');
-        if (st === 'confirmed' && !isFullyPaid) actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="mark-paid" data-id="' + h(r.id) + '">Mark Paid</button>');
+        if (st === 'confirmed' && !isFullyPaid) actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="mark-paid" data-id="' + h(r.id) + '" data-total="' + (r.totalPrice || r.amountPaid || '') + '">Mark Paid</button>');
         if (r.division && DIVISIONS.length > 0 && !DIVISIONS.some(d => d.id === r.division)) actBtns.push('<button class="ab ab--outline ab--sm reg-act" style="color:var(--color-gold,#c9a84c);border-color:var(--color-gold,#c9a84c)" data-act="fix-division" data-id="' + h(r.id) + '" title="Division ID \'' + h(r.division) + '\' is not configured">Fix Division</button>');
         actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
         return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
@@ -1458,8 +1462,8 @@
     wireRegActions();
   }
 
-  async function regAction(act, id) {
-    if (act === 'mark-paid') { openPayModal(id); return; }
+  async function regAction(act, id, total) {
+    if (act === 'mark-paid') { openPayModal(id, total); return; }
     const payload = { action: act, id };
     if (act === 'reject') {
       const reason = prompt('Reject this registration — optional reason (leave blank to skip):');
@@ -1498,20 +1502,22 @@
 
   function wireRegActions() {
     $id('reg-table').querySelectorAll('button.reg-act').forEach(btn => {
-      btn.addEventListener('click', () => regAction(btn.dataset.act, btn.dataset.id));
+      btn.addEventListener('click', () => regAction(btn.dataset.act, btn.dataset.id, btn.dataset.total));
     });
   }
 
   // ── Payment modal ──────────────────────────────────────────
   let _pmRegId = null;
 
-  function openPayModal(id) {
+  function openPayModal(id, total) {
     _pmRegId = id;
     // Reset state
     $id('pm-note').value = '';
+    $id('pm-amount').value = total || '';
     $id('pm-methods').querySelectorAll('input[type=radio]').forEach(r => { r.checked = false; });
     $id('pm-methods').querySelectorAll('.pm-method').forEach(l => l.classList.remove('is-selected'));
     $id('pm-overlay').classList.add('is-open');
+    $id('pm-amount').focus();
   }
 
   function closePayModal() {
@@ -1533,13 +1539,14 @@
     if (!methodEl) { alert('Please select a payment method.'); return; }
     const method = methodEl.value;
     const note = $id('pm-note').value.trim();
+    const amount = parseFloat($id('pm-amount').value) || null;
     const regId = _pmRegId; // capture before closePayModal nulls it
     closePayModal();
     try {
       await apiJSON('/.netlify/functions/admin-registration-update', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'mark-paid', id: regId, method, note }),
+        body: JSON.stringify({ action: 'mark-paid', id: regId, method, note, amount }),
       });
       renderReg();
     } catch (e) {
