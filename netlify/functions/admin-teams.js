@@ -90,11 +90,10 @@ export default async (req) => {
       })).filter(p => p.name);
     }
 
-    // Update captain email if captain changed
+    // Sync captain name + email from isCaptain flag
     const captain = (team.roster || []).find(p => p.isCaptain);
-    if (captain && captain.email) {
-      team.captainEmail = captain.email;
-    }
+    team.captain = captain?.name || '';
+    if (captain?.email) team.captainEmail = captain.email;
 
     team.updatedAt = now;
     team.updatedBy = admin.email;
@@ -158,7 +157,8 @@ export default async (req) => {
         // Clear existing captain flags
         for (const p of roster) p.isCaptain = false;
         target.isCaptain = true;
-        // Update captainEmail
+        // Sync captain name + email
+        team.captain = target.name;
         if (target.email) team.captainEmail = target.email;
         team.roster = roster;
         team.updatedAt = now;

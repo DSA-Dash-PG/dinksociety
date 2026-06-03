@@ -109,6 +109,8 @@
     .ab--sm { padding: 5px 12px; font-size: 10px; }
     .ab--ghost { background: var(--color-surface-2); color: var(--color-text-muted); }
     .ab--teal { background: var(--color-teal-dim); color: var(--color-teal); }
+    .ab--primary { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+    .ab--primary:hover:not(:disabled) { background: var(--color-lime-hover, var(--color-lime)); }
 
     /* ── Forms ────────────────────────────────────────────────── */
     .af { margin-bottom: 12px; }
@@ -210,7 +212,7 @@
     .team-swatch { width: 12px; height: 12px; border-radius: 50%; border: 1px solid var(--color-border); display: inline-block; vertical-align: middle; }
 
     /* Transfer panel */
-    .xfer-panel { background: var(--color-surface-1); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 20px; overflow: hidden; }
+    .xfer-panel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); margin-bottom: 20px; overflow: hidden; }
     .xfer-panel__head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--color-border); background: var(--color-surface-2); }
     .xfer-panel__title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-muted); }
     .xfer-panel__body { padding: 14px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
@@ -1423,6 +1425,7 @@
         if (st === 'pending' || st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="reject" data-id="' + h(r.id) + '">Reject</button>');
         if (st === 'rejected') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="reinstate" data-id="' + h(r.id) + '">Reinstate</button>');
         if (st === 'confirmed' && !isFullyPaid) actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="mark-paid" data-id="' + h(r.id) + '">Mark Paid</button>');
+        if (r.division && DIVISIONS.length > 0 && !DIVISIONS.some(d => d.id === r.division)) actBtns.push('<button class="ab ab--outline ab--sm reg-act" style="color:var(--color-gold,#c9a84c);border-color:var(--color-gold,#c9a84c)" data-act="fix-division" data-id="' + h(r.id) + '" title="Division ID \'' + h(r.division) + '\' is not configured">Fix Division</button>');
         actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
         return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
@@ -1442,6 +1445,20 @@
       if (!confirm('Confirm this registration? It will be marked approved and a team record created.')) return;
     } else if (act === 'reinstate') {
       if (!confirm('Reinstate this rejected registration back to confirmed?')) return;
+    } else if (act === 'fix-division') {
+      let target;
+      if (DIVISIONS.length === 1) {
+        target = DIVISIONS[0];
+        if (!confirm('Reassign this registration to "' + target.name + '"?')) return;
+      } else {
+        const opts = DIVISIONS.map((d, i) => i + ': ' + d.name).join('\n');
+        const choice = parseInt(prompt('Choose division to reassign to:\n' + opts), 10);
+        if (isNaN(choice) || choice < 0 || choice >= DIVISIONS.length) return;
+        target = DIVISIONS[choice];
+        if (!confirm('Reassign to "' + target.name + '"?')) return;
+      }
+      payload.action = 'change-division';
+      payload.newDivision = target.id;
     }
     try {
       await apiJSON('/.netlify/functions/admin-registration-update', {
