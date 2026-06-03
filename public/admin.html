@@ -1545,26 +1545,26 @@
 
     if (!f.length) { $id('reg-table').innerHTML = '<div class="empty">No registrations match.</div>'; return; }
 
-    $id('reg-table').innerHTML = '<table class="at"><thead><tr><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>Payment</th><th>Contact</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
+    $id('reg-table').innerHTML = '<table class="at"><thead><tr><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>League Fee</th><th>Payments</th><th>Balance</th><th>Contact</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
       f.map(r => {
         const nm = r.path === 'team'
           ? '<strong style="font-weight:600">' + h(r.team?.name) + '</strong> <span style="color:var(--color-text-faint);font-size:10px">(' + h(r.team?.captain) + ')</span>'
           : h(r.agent?.name);
         const em = r.path === 'team' ? r.team?.players?.[0]?.email : r.agent?.email;
-        // Payment pill
+        // Payment columns
+        const totalPrice = r.totalPrice || 0;
         const paid = r.amountPaid || 0;
-        const due = r.balanceDue != null ? r.balanceDue : Math.max(0, (r.totalPrice || 0) - paid);
+        const due = r.balanceDue != null ? r.balanceDue : Math.max(0, totalPrice - paid);
         const manualPmts = r.manualPayments || [];
         const lastP = manualPmts.length === 1 ? manualPmts[0] : null;
         const singleLabel = lastP ? (METHOD_LABELS[lastP.method] || lastP.method || '') : null;
-        let pp;
-        if (paid === 0 && !(r.stripeAmountPaid > 0)) {
-          pp = '<span class="p p--unpaid">Unpaid</span>';
-        } else if (due > 0) {
-          pp = '<span class="p p--paid">$' + paid + ' paid</span> <span class="p p--unpaid">$' + due + ' due</span>';
-        } else {
-          pp = '<span class="p p--paid">$' + paid + (singleLabel ? ' · ' + singleLabel : '') + '</span>';
-        }
+        const feeCol = totalPrice ? '$' + totalPrice : '<span style="color:var(--color-text-faint)">—</span>';
+        const paidCol = paid > 0
+          ? '<span class="p p--paid">$' + paid + (singleLabel ? ' · ' + singleLabel : '') + '</span>'
+          : '<span class="p p--unpaid">Unpaid</span>';
+        const balCol = due > 0
+          ? '<span class="p p--unpaid">$' + due + '</span>'
+          : paid > 0 ? '<span class="p p--paid">$0</span>' : '<span style="color:var(--color-text-faint)">—</span>';
         const st = r.status || 'pending';
         const actBtns = [];
         if (st === 'pending') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="confirm" data-id="' + h(r.id) + '">Confirm</button>');
@@ -1573,7 +1573,7 @@
         if (st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="mark-paid" data-id="' + h(r.id) + '">Payments</button>');
         if (r.division && DIVISIONS.length > 0 && !DIVISIONS.some(d => d.id === r.division)) actBtns.push('<button class="ab ab--outline ab--sm reg-act" style="color:var(--color-gold,#c9a84c);border-color:var(--color-gold,#c9a84c)" data-act="fix-division" data-id="' + h(r.id) + '" title="Division ID \'' + h(r.division) + '\' is not configured">Fix Division</button>');
         actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
-        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td>' + pp + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
+        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td style="font-size:12px;">' + feeCol + '</td><td>' + paidCol + '</td><td>' + balCol + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
     wireRegActions();
   }

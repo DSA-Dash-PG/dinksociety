@@ -40,7 +40,7 @@ function migratePayments(reg) {
     if (reg.manualPayment) {
       // Migrate old single-object → array entry
       reg.manualPayments = [{
-        id: 'mp_' + ((reg.manualPayment.paidAt || '').replace(/\D/g, '').slice(0, 13) || Date.now()),
+        id: 'mp_legacy',
         amount: reg.amountPaid || 0,
         method: reg.manualPayment.method || 'other',
         note: reg.manualPayment.note || '',
