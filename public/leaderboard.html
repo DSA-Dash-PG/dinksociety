@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Standings · The Dink Society</title>
+  <title>Leaderboard · The Dink Society</title>
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
@@ -43,6 +43,54 @@
 
     .lb-col-optional {}
 
+    /* ── K'CHN Sponsor ── */
+    .kCHN-logo {
+      display: inline-flex; align-items: center;
+      background: #000; border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 7px; padding: 5px 11px;
+    }
+    .kCHN-logo span {
+      font-size: 16px; font-weight: 900; color: #f0d020;
+      letter-spacing: 0.06em; font-style: italic;
+    }
+    .kCHN-presented {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .kCHN-presented-label {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--color-text-faint);
+    }
+
+    /* ── POTW strip ── */
+    .potw-strip {
+      display: flex; align-items: center; gap: 0; flex-wrap: wrap;
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: 14px 20px;
+      margin-bottom: var(--space-6);
+    }
+    .potw-strip__label {
+      display: flex; align-items: center; gap: 8px;
+      padding-right: 20px; border-right: 1px solid var(--color-border);
+      margin-right: 20px; flex-shrink: 0;
+    }
+    .potw-strip__label-text {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--color-text-faint);
+    }
+    .potw-strip__players { display: flex; gap: 24px; flex-wrap: wrap; }
+    .potw-strip__player { display: flex; align-items: center; gap: 10px; }
+    .potw-strip__avatar {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--color-surface-2);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 900; flex-shrink: 0;
+    }
+    .potw-strip__avatar--male { border: 1.5px solid var(--color-lime); color: var(--color-lime); }
+    .potw-strip__avatar--female { border: 1.5px solid var(--color-teal); color: var(--color-teal); }
+    .potw-strip__name { font-size: 13px; font-weight: 700; }
+    .potw-strip__meta { font-size: 10px; color: var(--color-text-faint); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 1px; }
+    .potw-strip__tba { font-size: 13px; color: var(--color-text-faint); font-style: italic; }
+
     .player-filter { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:var(--space-4); }
     .player-filter__btn { padding:5px 12px; font-size:10px; border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent; color:var(--color-text-faint); cursor:pointer; font-family:inherit; font-weight:600; transition:all var(--transition); }
     .player-filter__btn.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
@@ -70,13 +118,27 @@
     <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="leaderboard"></div>
     <div class="page-hero__gradient"></div>
     <div class="page-hero__content">
-      <div class="page-hero__eyebrow">The Dink Society</div>
-      <h1 class="page-hero__title">Leaderboard</h1>
-      <p class="page-hero__sub">All-time Circuit Points across every division.</p>
+      <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
+      <h1 class="page-hero__title" id="lb-title">Leaderboard</h1>
+      <p class="page-hero__sub" id="lb-sub">Standings, scores, and player stats.</p>
+      <div class="kCHN-presented" style="margin-top:16px;">
+        <span class="kCHN-presented-label">Presented by</span>
+        <div class="kCHN-logo"><span>K'CHN</span></div>
+      </div>
     </div>
   </div>
 
   <main class="lb-shell">
+
+    <!-- K'CHN Player of the Week strip -->
+    <div class="potw-strip" id="potw-strip" style="display:none;">
+      <div class="potw-strip__label">
+        <div class="kCHN-logo" style="padding:3px 8px;"><span style="font-size:11px;">K'CHN</span></div>
+        <span class="potw-strip__label-text">Players of the Week</span>
+      </div>
+      <div class="potw-strip__players" id="potw-players"></div>
+    </div>
+
     <div class="lb-controls">
         <select id="circuit-select"><option value="I">Season 1</option></select>
         <select id="division-select"><option value="">All divisions</option><option value="3-5-mixed">3.0–3.5 Mixed</option></select>
@@ -156,8 +218,28 @@
     function formatTime(iso){if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})+' '+d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});}
     function formatDateShort(iso){if(!iso)return'';const d=new Date(iso);return isNaN(d)?'':d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});}
 
+    // ── Player of the Week strip ──────────────────────────────
+    function initials(name){if(!name)return'?';const p=name.trim().split(' ');return(p[0][0]+(p[p.length-1]?.[0]||'')).toUpperCase();}
+
+    async function loadPotw(){
+      try{
+        const r=await fetch('/.netlify/functions/player-of-week');
+        if(!r.ok)return;
+        const d=await r.json();
+        if(d.empty||(!d.male&&!d.female))return;
+        const strip=$id('potw-strip');
+        const pp=$id('potw-players');
+        let html='';
+        if(d.male){const m=d.male;const wl=m.wins!==undefined?` · ${m.wins}–${m.losses}`:'';html+=`<div class="potw-strip__player"><div class="potw-strip__avatar potw-strip__avatar--male">${escapeHtml(initials(m.name))}</div><div><div class="potw-strip__name">${escapeHtml(m.name)}</div><div class="potw-strip__meta">Male${wl?wl:''}</div></div></div>`;}
+        if(d.female){const f=d.female;const wl=f.wins!==undefined?` · ${f.wins}–${f.losses}`:'';html+=`<div class="potw-strip__player"><div class="potw-strip__avatar potw-strip__avatar--female">${escapeHtml(initials(f.name))}</div><div><div class="potw-strip__name">${escapeHtml(f.name)}</div><div class="potw-strip__meta">Female${wl?wl:''}</div></div></div>`;}
+        pp.innerHTML=html;
+        strip.style.display='flex';
+      }catch(e){console.warn('POTW load failed',e);}
+    }
+
     readUrl();
     loadStandings().then(()=>{renderHero();renderStandings();renderSociety();});
+    loadPotw();
   </script>
   <script src="/js/partials.js"></script>
 </body>

@@ -2,7 +2,8 @@
 // /api/admin-registration-update
 //
 // Manage individual registrations: confirm, reject, reinstate,
-// move to different division, move players between teams.
+// move to different division, move players between teams,
+// and manage payments.
 //
 // POST with { action, ... }
 //
@@ -14,6 +15,10 @@
 //   move-player   { playerId, fromTeamId, toTeamId } → moves a player between teams
 //   remove-player { playerId, teamId } → removes a player from a team
 //   delete     { id } and/or { teamId } → permanently removes a registration + its team
+//   set-price  { id, price }           → override totalPrice, recalculate balance
+//   add-payment / mark-paid { id, amount, method, note } → add manual payment entry
+//   edit-payment { id, paymentId, amount, method, note } → update a payment entry
+//   delete-payment { id, paymentId }   → remove a payment entry
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
@@ -24,6 +29,48 @@ function json(data, status = 200) {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+/**
+ * Ensure reg.manualPayments is an array, migrating the legacy single-object
+ * manualPayment field if present.
+ */
+function migratePayments(reg) {
+  if (!Array.isArray(reg.manualPayments)) {
+    if (reg.manualPayment) {
+      // Migrate old single-object → array entry
+      reg.manualPayments = [{
+        id: 'mp_' + ((reg.manualPayment.paidAt || '').replace(/\D/g, '').slice(0, 13) || Date.now()),
+        amount: reg.amountPaid || 0,
+        method: reg.manualPayment.method || 'other',
+        note: reg.manualPayment.note || '',
+        paidAt: reg.manualPayment.paidAt || new Date().toISOString(),
+        paidBy: reg.manualPayment.paidBy || '',
+      }];
+      delete reg.manualPayment;
+      reg.stripeAmountPaid = reg.stripeAmountPaid ?? 0;
+    } else {
+      reg.manualPayments = [];
+      // First touch — treat any existing amountPaid as a Stripe payment
+      if (reg.stripeAmountPaid === undefined) {
+        reg.stripeAmountPaid = reg.amountPaid || 0;
+      }
+    }
+  }
+  if (reg.stripeAmountPaid === undefined) reg.stripeAmountPaid = 0;
+}
+
+/**
+ * Recalculate amountPaid, balanceDue, and paymentStatus from source data.
+ */
+function recalcPayments(reg) {
+  const stripeAmt = reg.stripeAmountPaid || 0;
+  const manualTotal = (reg.manualPayments || []).reduce((s, p) => s + (p.amount || 0), 0);
+  reg.amountPaid = stripeAmt + manualTotal;
+  reg.balanceDue = Math.max(0, (reg.totalPrice || 0) - reg.amountPaid);
+  const total = reg.totalPrice || 0;
+  reg.paymentStatus = total > 0 && reg.amountPaid >= total ? 'paid'
+    : reg.amountPaid > 0 ? 'partial' : 'unpaid';
 }
 
 /**
@@ -324,32 +371,98 @@ export default async (req) => {
       return json({ ok: true, deletedReg, deletedTeam });
     }
 
-    // ─── Mark balance as paid (Zelle, Venmo, Cash, Other) ───
-    case 'mark-paid': {
-      const { id, method, note, amount } = body;
-      if (!id) return json({ error: 'Registration id required' }, 400);
-
-      const VALID_METHODS = ['zelle', 'venmo', 'cash', 'other'];
-      const payMethod = VALID_METHODS.includes(method) ? method : 'other';
+    // ─── Override total price ───
+    case 'set-price': {
+      const { id, price } = body;
+      if (!id) return json({ error: 'id required' }, 400);
+      const price_ = parseFloat(price);
+      if (isNaN(price_) || price_ < 0) return json({ error: 'Invalid price' }, 400);
 
       const found = await findRegistration(regStore, id);
       if (!found) return json({ error: 'Registration not found' }, 404);
-
       const { reg, foundKey } = found;
 
-      // Use admin-entered amount if provided, otherwise fall back to stored total
-      const total = (typeof amount === 'number' && amount > 0) ? amount : (reg.totalPrice ?? reg.price ?? 0);
-      reg.amountPaid = total;
-      reg.totalPrice = total; // keep in sync so future reads reflect the correct amount
-      reg.balanceDue = 0;
-      reg.paymentStatus = 'paid';
-      reg.manualPayment = {
+      reg.totalPrice = price_;
+      migratePayments(reg);
+      recalcPayments(reg);
+      reg.updatedAt = new Date().toISOString();
+      await regStore.set(foundKey, JSON.stringify(reg));
+      return json({ ok: true, registration: reg });
+    }
+
+    // ─── Add a manual payment entry ───
+    case 'add-payment':
+    case 'mark-paid': {
+      const { id, amount, method, note } = body;
+      if (!id) return json({ error: 'id required' }, 400);
+      const VALID_METHODS = ['zelle', 'venmo', 'cash', 'other'];
+      const payMethod = VALID_METHODS.includes(method) ? method : 'other';
+      const amt = parseFloat(amount);
+      if (isNaN(amt) || amt <= 0) return json({ error: 'Invalid amount' }, 400);
+
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
+      const { reg, foundKey } = found;
+
+      migratePayments(reg);
+      reg.manualPayments.push({
+        id: 'mp_' + Date.now(),
+        amount: amt,
         method: payMethod,
         note: note || '',
         paidAt: new Date().toISOString(),
         paidBy: admin.email,
-      };
+      });
+      recalcPayments(reg);
+      await regStore.set(foundKey, JSON.stringify(reg));
+      return json({ ok: true, registration: reg });
+    }
 
+    // ─── Edit a manual payment entry ───
+    case 'edit-payment': {
+      const { id, paymentId, amount, method, note } = body;
+      if (!id || !paymentId) return json({ error: 'id and paymentId required' }, 400);
+      const VALID_METHODS = ['zelle', 'venmo', 'cash', 'other'];
+      const payMethod = VALID_METHODS.includes(method) ? method : 'other';
+      const amt = parseFloat(amount);
+      if (isNaN(amt) || amt <= 0) return json({ error: 'Invalid amount' }, 400);
+
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
+      const { reg, foundKey } = found;
+
+      migratePayments(reg);
+      const idx = reg.manualPayments.findIndex(p => p.id === paymentId);
+      if (idx === -1) return json({ error: 'Payment not found' }, 404);
+
+      reg.manualPayments[idx] = {
+        ...reg.manualPayments[idx],
+        amount: amt,
+        method: payMethod,
+        note: note || '',
+        updatedAt: new Date().toISOString(),
+        updatedBy: admin.email,
+      };
+      recalcPayments(reg);
+      await regStore.set(foundKey, JSON.stringify(reg));
+      return json({ ok: true, registration: reg });
+    }
+
+    // ─── Delete a manual payment entry ───
+    case 'delete-payment': {
+      const { id, paymentId } = body;
+      if (!id || !paymentId) return json({ error: 'id and paymentId required' }, 400);
+
+      const found = await findRegistration(regStore, id);
+      if (!found) return json({ error: 'Registration not found' }, 404);
+      const { reg, foundKey } = found;
+
+      migratePayments(reg);
+      const before = reg.manualPayments.length;
+      reg.manualPayments = reg.manualPayments.filter(p => p.id !== paymentId);
+      if (reg.manualPayments.length === before) return json({ error: 'Payment not found' }, 404);
+
+      recalcPayments(reg);
       await regStore.set(foundKey, JSON.stringify(reg));
       return json({ ok: true, registration: reg });
     }
