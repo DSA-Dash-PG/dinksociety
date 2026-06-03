@@ -260,8 +260,21 @@
       : [...new Set((teamsData?.teams || []).map(t => t.division).filter(Boolean))].sort();
     if (!divs.length) { el.innerHTML = ''; return; }
     if (!activeDivision || !divs.includes(activeDivision)) activeDivision = divs[0];
+
+    // Build label map from actual data first (divisionLabel field), fall back to hard-coded map
+    const labelMap = {};
+    (teamsData?.teams || []).forEach(t => {
+      if (t.division && t.divisionLabel && !labelMap[t.division]) labelMap[t.division] = t.divisionLabel;
+    });
+    if (standingsData?.divisions) {
+      Object.entries(standingsData.divisions).forEach(([d, data]) => {
+        if (data?.divisionLabel && !labelMap[d]) labelMap[d] = data.divisionLabel;
+      });
+    }
+    const tabLabel = d => labelMap[d] || DIV_LABELS[d] || d;
+
     el.innerHTML = divs.map(d =>
-      '<button class="div-tab' + (d === activeDivision ? ' is-active' : '') + '" data-div="' + esc(d) + '">' + esc(DIV_LABELS[d] || d) + '</button>'
+      '<button class="div-tab' + (d === activeDivision ? ' is-active' : '') + '" data-div="' + esc(d) + '">' + esc(tabLabel(d)) + '</button>'
     ).join('');
     el.querySelectorAll('.div-tab').forEach(btn => btn.addEventListener('click', () => {
       activeDivision = btn.dataset.div;
