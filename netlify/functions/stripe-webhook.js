@@ -90,9 +90,23 @@ export default async (req) => {
         ? session.amount_total / 100
         : (reg.depositAmount || reg.price || 0);
       const totalFee = reg.totalPrice || reg.price || paidNow;
+
+      // Did the team apply a promotion code at checkout? If so, the discounted
+      // amount IS their full obligation — they owe nothing further. Record the
+      // discount so it's visible on the registration.
+      const discountApplied = (session.total_details?.amount_discount || 0) / 100;
+      reg.discountApplied = discountApplied;
+      if (discountApplied > 0 && Array.isArray(session.discounts) && session.discounts[0]?.promotion_code) {
+        reg.promotionCode = session.discounts[0].promotion_code;
+      }
+
       reg.amountPaid = paidNow;
       reg.depositPaid = paidNow;
-      reg.balanceDue = reg.paymentType === 'deposit' ? Math.max(0, totalFee - paidNow) : 0;
+      // A discounted checkout settles the account in full (no phantom balance).
+      // Otherwise, deposit registrations keep the remainder as an open balance.
+      reg.balanceDue = (reg.paymentType === 'deposit' && discountApplied === 0)
+        ? Math.max(0, totalFee - paidNow)
+        : 0;
       reg.paymentStatus = reg.balanceDue > 0 ? 'deposit_paid' : 'paid_in_full';
 
       // Write to confirmed/ prefix

@@ -246,6 +246,11 @@ export default async (req) => {
       success_url: `${siteUrl}/register-success.html?id=${regId}`,
       cancel_url: `${siteUrl}/register.html`,
       customer_email: customerEmail || undefined,
+      // Show an "Add promotion code" box on the Stripe checkout page so teams
+      // can enter a discount code (e.g. sponsor 50% off). Coupons + promotion
+      // codes are created/managed in the Stripe dashboard; Stripe applies the
+      // discount and enforces redemption limits.
+      allow_promotion_codes: true,
       metadata: {
         registrationId: regId,
         seasonId: seasonId || '',
