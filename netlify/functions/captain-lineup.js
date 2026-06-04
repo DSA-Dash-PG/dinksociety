@@ -7,10 +7,12 @@
 //   Round 1 & 2 each have 6 games in this order:
 //     g1 = Women's Doubles  (both players F)
 //     g2 = Men's Doubles    (both players M)
-//     g3-g6 = Mixed Doubles (one M + one F)
+//     g3-g6 = Mixed Doubles (one M + one F — stored woman-first: p1 is always the woman)
+// Also enforces a nightly cap: no player may appear in more than MAX_GAMES_PER_NIGHT games.
 
 import { getStore } from '@netlify/blobs';
 import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { MAX_GAMES_PER_NIGHT, orderMixedWomanFirst, checkGameCap } from './lib/lineup-rules.js';
 
 const SLOT_RULES = {
   r1g1: 'WOMENS', r1g2: 'MENS', r1g3: 'MIXED', r1g4: 'MIXED', r1g5: 'MIXED', r1g6: 'MIXED',
@@ -133,8 +135,14 @@ export default async (req) => {
         return json({ error: `${prettySlot(slot)}: ${gcheck.reason}` }, 400);
       }
 
-      normalizedGames[slot] = { p1: p1Id, p2: p2Id };
+      // Woman-first ordering for mixed: store the woman as p1 every time, for
+      // consistent display on both the lineup builder and the revealed scoresheet.
+      normalizedGames[slot] = orderMixedWomanFirst(slotDef, p1Id, p2Id, (id) => rosterById.get(id)?.gender);
     }
+
+    // Nightly per-player game cap (blocks save and lock — a draft can't exceed it either)
+    const capErr = checkGameCap(normalizedGames, (id) => rosterById.get(id)?.name);
+    if (capErr) return json({ error: capErr }, 400);
 
     // Back-to-back combo check within the same round (blocks save always, not just lock)
     const comboErr = checkBackToBackCombos(normalizedGames, rosterById);

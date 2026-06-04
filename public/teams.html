@@ -214,4 +214,33 @@
         const teamUrl = `/team?id=${teamSlug}${LINK_SUFFIX}`;
         const roster = (t.roster || []).map(p => {
           const playerUrl = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name || '')}${LINK_SUFFIX}`;
-          const gender = `<span class="gender">${p.gender
+          const gender = p.gender ? `<span class="gender">${esc(p.gender)}</span>` : '<span class="gender"></span>';
+          const sc = playerScoreMap[p.name];
+          const scoreEl = sc != null
+            ? `<span class="score">${sc.toFixed(1)}</span>`
+            : `<span class="score--empty">—</span>`;
+          return `<li><a href="${playerUrl}" class="name player-link">${esc(p.name)}</a>${gender}${scoreEl}</li>`;
+        }).join('');
+
+        return `<div class="team-card">
+          <div class="team-card__header">
+            <div class="team-card__emoji">${t.emoji || ''}</div>
+            <div class="team-card__info">
+              <div class="team-card__name"><a href="${teamUrl}" class="team-name-link">${esc(t.name)}</a></div>
+              <div class="team-card__captain">Captain: ${esc(t.captain)}</div>
+            </div>
+          </div>
+          <div class="team-card__roster">
+            <div class="team-card__roster-title">Roster (${t.roster?.length || 0} players)</div>
+            <ul class="roster-list">${roster || '<li class="empty-state" style="padding:8px 0;">Roster pending</li>'}</ul>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+    function slugify(s) { return String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+    loadTeams();
+  </script>
+</body>
+</html>

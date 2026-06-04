@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Captain Portal — Mobile Mockup · The Dink Society</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ── Dink Society tokens (from public/css/shared.css) ── */
+  :root {
+    --color-bg: #0e0e0e; --color-surface: #161616; --color-surface-2: #1e1e1e;
+    --color-surface-3: #262626; --color-surface-4: #2e2e2e;
+    --color-border: rgba(255,255,255,0.08); --color-border-strong: rgba(255,255,255,0.14);
+    --color-text: #f0f0ec; --color-text-muted: #9a9e97; --color-text-faint: #5e625c; --color-text-inverse: #0e0e0e;
+    --color-lime: #b8ff2c; --color-lime-hover: #c8ff58; --color-lime-dim: rgba(184,255,44,0.12); --color-lime-ghost: rgba(184,255,44,0.06);
+    --color-teal: #17d7b0; --color-teal-dim: rgba(23,215,176,0.12);
+    --color-red: #ff5c47; --color-red-dim: rgba(255,92,71,0.12);
+    --color-gold: #f0c040; --color-gold-dim: rgba(240,192,64,0.12);
+    --radius-sm: 10px; --radius-md: 14px; --radius-lg: 20px; --radius-full: 9999px;
+    --transition: 160ms cubic-bezier(0.16, 1, 0.3, 1);
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--font);
+    background: radial-gradient(900px 500px at 15% -5%, rgba(184,255,44,0.06), transparent 60%),
+                radial-gradient(900px 600px at 110% 10%, rgba(23,215,176,0.05), transparent 55%), #050505;
+    color: var(--color-text); min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center; padding: 28px 16px 60px; gap: 22px;
+  }
+  .intro { max-width: 760px; text-align: center; }
+  .intro__eyebrow { font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--color-teal); font-weight: 700; }
+  .intro__title { font-size: 22px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; margin: 8px 0 6px; }
+  .intro__body { font-size: 13px; color: var(--color-text-muted); line-height: 1.6; margin: 0; }
+  .intro__hint { font-size: 12px; color: var(--color-text-faint); margin-top: 10px; }
+  .intro__hint b { color: var(--color-lime); font-weight: 700; }
+
+  /* phone frame */
+  .phone { width: 390px; max-width: 100%; height: 820px; background: var(--color-bg);
+    border-radius: 44px; border: 1px solid var(--color-border-strong);
+    box-shadow: 0 30px 90px rgba(0,0,0,0.7), 0 0 0 11px #161616, 0 0 0 12px #2a2a2a;
+    position: relative; overflow: hidden; display: flex; flex-direction: column; }
+  .phone__notch { position: absolute; top: 0; left: 50%; transform: translateX(-50%);
+    width: 150px; height: 26px; background: #161616; border-radius: 0 0 18px 18px; z-index: 60; }
+  .statusbar { display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 26px 6px; font-size: 12px; font-weight: 600; flex-shrink: 0; }
+  .statusbar__icons { display: flex; gap: 6px; align-items: center; font-size: 11px; }
+
+  .appbar { display: flex; justify-content: space-between; align-items: center;
+    padding: 6px 18px 12px; flex-shrink: 0; border-bottom: 1px solid var(--color-border); }
+  .appbar__brand { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-teal); font-weight: 700; }
+  .appbar__title { font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.01em; margin: 1px 0 0; }
+  .appbar__team { display: flex; align-items: center; gap: 7px; }
+  .appbar__avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--color-lime-dim); border: 1px solid rgba(184,255,44,0.3); display: grid; place-items: center; font-size: 16px; }
+  .appbar__team-name { font-size: 11px; font-weight: 700; }
+  .appbar__team-role { font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 600; }
+
+  .screen { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 16px 16px 24px; scrollbar-width: none; }
+  .screen::-webkit-scrollbar { width: 0; }
+  .view { display: none; animation: fade 0.22s ease; }
+  .view.is-active { display: block; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  .section-label { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin: 4px 2px 10px; display: flex; justify-content: space-between; align-items: center; }
+  .section-label__count { color: var(--color-text-muted); }
+
+  /* tonight banner */
+  .tonight { background: linear-gradient(135deg, rgba(184,255,44,0.16), rgba(23,215,176,0.08));
+    border: 1px solid rgba(184,255,44,0.28); border-radius: var(--radius-md); padding: 16px 16px 14px; margin-bottom: 18px; overflow: hidden; }
+  .tonight__eyebrow { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-lime); font-weight: 800; display: flex; align-items: center; gap: 6px; }
+  .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--color-lime); animation: pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(184,255,44,0.5);} 70%{box-shadow:0 0 0 8px rgba(184,255,44,0);} 100%{box-shadow:0 0 0 0 rgba(184,255,44,0);} }
+  .tonight__matchup { display: flex; align-items: center; gap: 12px; margin: 12px 0 14px; }
+  .tonight__team { flex: 1; text-align: center; }
+  .tonight__emoji { font-size: 30px; }
+  .tonight__name { font-size: 13px; font-weight: 700; margin-top: 3px; }
+  .tonight__vs { font-size: 11px; font-weight: 800; color: var(--color-text-faint); letter-spacing: 0.1em; }
+  .tonight__meta { display: flex; gap: 14px; font-size: 11px; color: var(--color-text-muted); justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .tonight__meta b { color: var(--color-text); }
+  .tonight__cta { width: 100%; padding: 13px; border: none; border-radius: var(--radius-full);
+    background: var(--color-lime); color: var(--color-text-inverse); font-family: var(--font);
+    font-size: 13px; font-weight: 800; letter-spacing: 0.02em; cursor: pointer; transition: background var(--transition);
+    display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .tonight__cta:active { background: var(--color-lime-hover); }
+
+  /* match cards */
+  .gc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+    padding: 13px 14px; margin-bottom: 10px; cursor: pointer; transition: border-color var(--transition), transform var(--transition); }
+  .gc:active { transform: scale(0.985); }
+  .gc--live { border-color: rgba(184,255,44,0.35); background: linear-gradient(180deg, rgba(184,255,44,0.05), transparent); }
+  .gc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; }
+  .gc-week { font-size: 10px; color: var(--color-text-faint); letter-spacing: 0.08em; font-weight: 700; }
+  .gc-pill { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-full); }
+  .gc-pill--live { background: var(--color-lime-dim); color: var(--color-lime); }
+  .gc-pill--final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
+  .gc-pill--wait { background: var(--color-teal-dim); color: var(--color-teal); }
+  .gc-pill--need { background: var(--color-gold-dim); color: var(--color-gold); }
+  .gc-body { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+  .gc-team { text-align: center; }
+  .gc-emoji { font-size: 24px; }
+  .gc-name { font-size: 12px; font-weight: 600; margin-top: 2px; }
+  .gc-role { font-size: 8px; letter-spacing: 0.08em; color: var(--color-text-faint); margin-top: 2px; font-weight: 700; }
+  .gc-team--win .gc-name { color: var(--color-lime); }
+  .gc-won { font-size: 8px; color: var(--color-lime); font-weight: 800; margin-top: 2px; }
+  .gc-vs { font-size: 11px; font-weight: 800; color: var(--color-text-faint); letter-spacing: 0.08em; }
+  .gc-score { font-size: 22px; font-weight: 800; display: flex; gap: 5px; align-items: baseline; }
+  .gc-score .w { color: var(--color-lime); }
+  .gc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--color-border); }
+  .gc-courts { font-size: 10px; color: var(--color-text-faint); }
+  .gc-champ { color: var(--color-gold); font-weight: 700; }
+  .gc-cta { font-size: 11px; font-weight: 700; color: var(--color-lime); }
+  .gc--final .gc-cta { color: var(--color-text-muted); }
+
+  /* ── Lineup view ── */
+  .blind { background: linear-gradient(135deg, rgba(240,192,64,0.14), rgba(184,255,44,0.05));
+    border: 1px solid rgba(240,192,64,0.3); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px; }
+  .blind__top { display: flex; align-items: center; gap: 8px; }
+  .blind__icon { font-size: 16px; }
+  .blind__title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-gold); }
+  .blind__body { font-size: 11px; color: var(--color-text-muted); line-height: 1.55; margin: 8px 0 0; }
+  .blind__body b { color: var(--color-text); }
+  .blind__count { display: flex; align-items: baseline; gap: 6px; margin-top: 11px; padding-top: 11px; border-top: 1px solid rgba(240,192,64,0.18); }
+  .blind__count-num { font-size: 16px; font-weight: 800; color: var(--color-gold); }
+  .blind__count-lbl { font-size: 10px; color: var(--color-text-faint); letter-spacing: 0.04em; }
+  .blind--locked { background: var(--color-teal-dim); border-color: rgba(23,215,176,0.3); }
+  .blind--locked .blind__title { color: var(--color-teal); }
+
+  .lu-game { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 11px 12px; margin-bottom: 9px; }
+  .lu-game--full { border-color: rgba(184,255,44,0.3); }
+  .lu-game__top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .lu-game__court { margin-left: auto; font-size: 9px; font-weight: 700; color: var(--color-teal); background: var(--color-teal-dim); border-radius: 5px; padding: 2px 7px; }
+  .lu-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .lu-slot { display: flex; align-items: center; gap: 9px; padding: 9px 10px; cursor: pointer;
+    background: var(--color-surface-2); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-sm);
+    transition: border-color var(--transition), background var(--transition); min-height: 46px; }
+  .lu-slot:active { background: var(--color-surface-3); }
+  .lu-slot--filled { border-style: solid; border-color: rgba(184,255,44,0.3); background: var(--color-lime-ghost); }
+  .lu-slot__avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--color-surface-4); display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--color-text-muted); flex-shrink: 0; }
+  .lu-slot--filled .lu-slot__avatar { background: var(--color-lime-dim); color: var(--color-lime); }
+  .lu-slot__name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lu-slot__empty { font-size: 11px; color: var(--color-text-faint); }
+  .lu-slot__req { display: block; font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-top: 1px; }
+
+  .lu-rules { font-size: 10px; color: var(--color-text-faint); margin: -4px 2px 10px; line-height: 1.5; }
+  .lu-rules b { color: var(--color-text-muted); }
+  .usage { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 2px 16px; }
+  .usage__chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; padding: 4px 9px; border-radius: var(--radius-full); background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .usage__chip--cap { border-color: rgba(184,255,44,0.45); color: var(--color-lime); background: var(--color-lime-ghost); }
+  .usage__chip--cap .usage__n { color: var(--color-lime); }
+  .usage__dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot-f { background: var(--color-gold); }
+  .dot-m { background: var(--color-teal); }
+  .usage__n { color: var(--color-text-faint); }
+
+  /* bottom sheet */
+  .sheet-scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 90; }
+  .sheet-scrim.is-open { opacity: 1; pointer-events: auto; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 95; background: var(--color-surface);
+    border-top: 1px solid var(--color-border-strong); border-radius: 22px 22px 0 0; padding: 8px 16px 22px;
+    transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); max-height: 70%; overflow-y: auto; }
+  .sheet.is-open { transform: translateY(0); }
+  .sheet__grip { width: 40px; height: 4px; border-radius: 4px; background: var(--color-border-strong); margin: 4px auto 12px; }
+  .sheet__title { font-size: 13px; font-weight: 800; margin: 0 0 2px; }
+  .sheet__sub { font-size: 10px; color: var(--color-text-faint); letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; margin-bottom: 12px; }
+  .pick { display: flex; align-items: center; gap: 11px; padding: 11px 10px; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--transition); }
+  .pick:active { background: var(--color-surface-2); }
+  .pick--disabled { opacity: 0.32; pointer-events: none; }
+  .pick__avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--color-surface-3); display: grid; place-items: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+  .pick__name { font-size: 13px; font-weight: 600; }
+  .pick__meta { font-size: 10px; color: var(--color-text-faint); }
+  .pick__tag { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-full); }
+  .tag-f { background: var(--color-gold-dim); color: var(--color-gold); }
+  .tag-m { background: var(--color-teal-dim); color: var(--color-teal); }
+  .pick__clear { color: var(--color-red); font-weight: 700; }
+
+  /* ── Score view ── */
+  .ss-head { background: var(--color-surface); border: 1px solid rgba(184,255,44,0.2); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px; }
+  .ss-head__top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .ss-head__week { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-lime); font-weight: 800; }
+  .ss-head__title { font-size: 16px; font-weight: 800; margin: 3px 0 0; }
+  .ss-head__sub { font-size: 11px; color: var(--color-text-muted); margin-top: 3px; }
+  .ss-head__live { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 9px; border-radius: var(--radius-full); background: var(--color-lime-dim); color: var(--color-lime); display: flex; align-items: center; gap: 5px; }
+  .ss-progress { margin-top: 13px; }
+  .ss-progress__row { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-text-faint); font-weight: 600; margin-bottom: 5px; letter-spacing: 0.04em; }
+  .ss-progress__bar { height: 6px; background: var(--color-surface-3); border-radius: var(--radius-full); overflow: hidden; }
+  .ss-progress__fill { height: 100%; background: var(--color-lime); border-radius: var(--radius-full); transition: width 0.3s cubic-bezier(0.16,1,0.3,1); }
+
+  .round { margin-bottom: 8px; }
+  .round__head { display: flex; align-items: center; gap: 10px; padding: 12px 4px 10px; cursor: pointer; position: sticky; top: -16px; background: var(--color-bg); z-index: 5; }
+  .round__title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+  .round__tally { margin-left: auto; font-size: 11px; font-weight: 700; color: var(--color-text-muted); }
+  .round__tally b { color: var(--color-lime); }
+  .round__chev { color: var(--color-text-faint); transition: transform var(--transition); font-size: 12px; }
+  .round.is-collapsed .round__chev { transform: rotate(-90deg); }
+  .round.is-collapsed .round__games { display: none; }
+
+  .game { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 13px; margin-bottom: 9px; transition: border-color var(--transition); }
+  .game--entered { border-color: rgba(240,192,64,0.4); }
+  .game__top { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; }
+  .game__badge { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 5px; text-transform: uppercase; }
+  .badge--womens { background: rgba(240,192,64,0.14); color: var(--color-gold); }
+  .badge--mens { background: rgba(23,215,176,0.14); color: var(--color-teal); }
+  .badge--mixed { background: rgba(184,255,44,0.12); color: var(--color-lime); }
+  .game__court { margin-left: auto; font-size: 9px; font-weight: 700; color: var(--color-teal); background: var(--color-teal-dim); border-radius: 5px; padding: 2px 7px; }
+  .game__pair { font-size: 11px; color: var(--color-text-muted); margin-bottom: 12px; line-height: 1.5; }
+  .game__pair b { color: var(--color-text); font-weight: 600; }
+  .game__pair .vs-dot { color: var(--color-text-faint); margin: 0 6px; }
+  .score-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .score-side { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px; text-align: center; }
+  .score-side--us { border-color: rgba(184,255,44,0.25); }
+  .score-side__label { font-size: 8px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-bottom: 6px; }
+  .score-side--us .score-side__label { color: var(--color-lime); }
+  .stepper { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .step-btn { width: 34px; height: 34px; border-radius: 9px; border: 1px solid var(--color-border-strong); background: var(--color-surface-3); color: var(--color-text); font-size: 18px; font-weight: 700; cursor: pointer; display: grid; place-items: center; flex-shrink: 0; user-select: none; transition: background var(--transition), transform 80ms; }
+  .step-btn:active { background: var(--color-surface-4); transform: scale(0.9); }
+  .step-val { font-size: 26px; font-weight: 800; min-width: 34px; font-variant-numeric: tabular-nums; }
+  .score-side--us .step-val { color: var(--color-lime); }
+  .game__status { display: flex; align-items: center; justify-content: space-between; margin-top: 11px; }
+  .game__pill { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-full); }
+  .pill--empty { background: var(--color-surface-3); color: var(--color-text-faint); }
+  .pill--entered { background: var(--color-gold-dim); color: var(--color-gold); }
+  .game__winner { font-size: 10px; font-weight: 700; color: var(--color-text-muted); }
+  .game__winner b { color: var(--color-lime); }
+
+  .approve-block { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; margin: 6px 0 4px; }
+  .approve-block__total { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: center; text-align: center; margin-bottom: 16px; }
+  .approve-block__score { font-size: 30px; font-weight: 800; color: var(--color-lime); line-height: 1; }
+  .approve-block__score--them { color: var(--color-text); }
+  .approve-block__teamlbl { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-top: 5px; }
+  .approve-block__vs { font-size: 9px; letter-spacing: 0.15em; color: var(--color-text-faint); font-weight: 700; }
+  .approve-rows { display: grid; gap: 9px; margin-bottom: 15px; }
+  .approve-card { display: flex; align-items: center; gap: 11px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 11px 13px; }
+  .approve-card--done { border-color: var(--color-teal); background: var(--color-teal-dim); }
+  .approve-card__icon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; flex-shrink: 0; background: var(--color-surface-4); color: var(--color-text-faint); }
+  .approve-card--done .approve-card__icon { background: var(--color-teal); color: var(--color-text-inverse); }
+  .approve-card__name { font-size: 12px; font-weight: 700; }
+  .approve-card__role { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 600; }
+  .approve-card__state { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--color-text-faint); }
+  .approve-card--done .approve-card__state { color: var(--color-teal); }
+  .btn-primary { width: 100%; padding: 14px; border: none; border-radius: var(--radius-full); background: var(--color-lime); color: var(--color-text-inverse); font-family: var(--font); font-size: 13px; font-weight: 800; letter-spacing: 0.02em; cursor: pointer; transition: background var(--transition); }
+  .btn-primary:active { background: var(--color-lime-hover); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .approve-hint { font-size: 10px; color: var(--color-text-faint); text-align: center; margin-top: 10px; line-height: 1.5; }
+  .banner { border-radius: var(--radius-sm); padding: 11px 14px; font-size: 11px; line-height: 1.55; margin-bottom: 14px; }
+  .banner--mine { background: var(--color-teal-dim); border: 1px solid rgba(23,215,176,0.2); color: var(--color-teal); }
+  .banner--final { background: var(--color-lime-ghost); border: 1px solid rgba(184,255,44,0.18); color: var(--color-lime); }
+  .banner b { font-weight: 800; }
+
+  /* bottom tab bar */
+  .tabbar { flex-shrink: 0; display: flex; background: rgba(18,18,18,0.96); backdrop-filter: blur(12px); border-top: 1px solid var(--color-border); padding: 8px 10px 22px; }
+  .tab { flex: 1; background: none; border: none; cursor: pointer; font-family: var(--font); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; color: var(--color-text-faint); transition: color var(--transition); position: relative; }
+  .tab.is-active { color: var(--color-lime); }
+  .tab__icon { width: 24px; height: 24px; }
+  .tab__label { font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
+  .tab__badge { position: absolute; top: 0; right: calc(50% - 26px); background: var(--color-gold); color: var(--color-text-inverse); font-size: 8px; font-weight: 800; border-radius: var(--radius-full); padding: 1px 5px; min-width: 15px; text-align: center; }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 120px; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.25); z-index: 60; }
+
+  .toast { position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--color-surface-3); border: 1px solid var(--color-border-strong); color: var(--color-text); font-size: 12px; font-weight: 600; padding: 11px 18px; border-radius: var(--radius-full); opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 80; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .footer-note { font-size: 11px; color: var(--color-text-faint); text-align: center; max-width: 440px; line-height: 1.6; }
+  .footer-note b { color: var(--color-text-muted); }
+</style>
+</head>
+<body>
+
+  <div class="intro">
+    <div class="intro__eyebrow">The Dink Society · Captain Portal</div>
+    <h1 class="intro__title">Mobile captain view</h1>
+    <p class="intro__body">Three jobs, three taps. <b style="color:var(--color-text)">Schedule</b> shows what's next, <b style="color:var(--color-text)">Lineup</b> lets captains set blind pairs by tapping, and <b style="color:var(--color-text)">Score Night</b> punches in stats game-by-game with big thumb-friendly steppers.</p>
+    <p class="intro__hint">Fully interactive — tap the <b>bottom tabs</b>, assign players in <b>Lineup</b>, use the <b>+ / −</b> steppers in Score, and hit submit/lock to see the flows.</p>
+  </div>
+
+  <div class="phone">
+    <div class="phone__notch"></div>
+    <div class="statusbar"><span id="clock">9:41</span><span class="statusbar__icons">📶 &nbsp;🔋</span></div>
+
+    <div class="appbar">
+      <div><div class="appbar__brand">Dink Society</div><div class="appbar__title">Captain</div></div>
+      <div class="appbar__team">
+        <div style="text-align:right"><div class="appbar__team-name">Dill With It</div><div class="appbar__team-role">Captain · You</div></div>
+        <div class="appbar__avatar">🥒</div>
+      </div>
+    </div>
+
+    <div class="screen" id="screen">
+
+      <!-- ════════ SCHEDULE ════════ -->
+      <section class="view is-active" id="view-schedule">
+        <div class="tonight">
+          <div class="tonight__eyebrow"><span class="pulse"></span> Tonight · Thu 6:30 PM</div>
+          <div class="tonight__matchup">
+            <div class="tonight__team"><div class="tonight__emoji">🥒</div><div class="tonight__name">Dill With It</div></div>
+            <div class="tonight__vs">VS</div>
+            <div class="tonight__team"><div class="tonight__emoji">👑</div><div class="tonight__name">Kingpins</div></div>
+          </div>
+          <div class="tonight__meta"><span>📍 <b>Courts 3 & 4</b></span><span>🏓 <b>Week 5</b></span><span>✅ Lineups revealed</span></div>
+          <button class="tonight__cta" onclick="goScore()">Enter tonight's stats →</button>
+        </div>
+
+        <div class="section-label">Season 1 · Schedule <span class="section-label__count">Week 5 of 8</span></div>
+
+        <div class="gc gc--live" onclick="goScore()">
+          <div class="gc-top"><span class="gc-week">WEEK 5 · TONIGHT</span><span class="gc-pill gc-pill--live">Live</span></div>
+          <div class="gc-body">
+            <div class="gc-team"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-role">HOME</div></div>
+            <div class="gc-vs">VS</div>
+            <div class="gc-team"><div class="gc-emoji">👑</div><div class="gc-name">Kingpins</div><div class="gc-role">AWAY</div></div>
+          </div>
+          <div class="gc-foot"><span class="gc-courts">Courts 3 & 4</span><span class="gc-cta">Open scoresheet ›</span></div>
+        </div>
+
+        <div class="gc" onclick="goLineup()">
+          <div class="gc-top"><span class="gc-week">WEEK 6 · THU JUN 11</span><span class="gc-pill gc-pill--need">Needs lineup</span></div>
+          <div class="gc-body">
+            <div class="gc-team"><div class="gc-emoji">🦅</div><div class="gc-name">Smash Eagles</div><div class="gc-role">HOME</div></div>
+            <div class="gc-vs">VS</div>
+            <div class="gc-team"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-role">AWAY</div></div>
+          </div>
+          <div class="gc-foot"><span class="gc-courts">Courts 1 & 2</span><span class="gc-cta">Set lineup ›</span></div>
+        </div>
+
+        <div class="gc" onclick="goLineup()">
+          <div class="gc-top"><span class="gc-week">WEEK 7 · THU JUN 18</span><span class="gc-pill gc-pill--need">Needs lineup</span></div>
+          <div class="gc-body">
+            <div class="gc-team"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-role">HOME</div></div>
+            <div class="gc-vs">VS</div>
+            <div class="gc-team"><div class="gc-emoji">⚡</div><div class="gc-name">Net Surge</div><div class="gc-role">AWAY</div></div>
+          </div>
+          <div class="gc-foot"><span class="gc-courts">Courts 5 & 6</span><span class="gc-cta">Set lineup ›</span></div>
+        </div>
+
+        <div class="gc">
+          <div class="gc-top"><span class="gc-week">WEEK 8 · THU JUN 25</span><span class="gc-pill gc-pill--final">Championship</span></div>
+          <div class="gc-body">
+            <div class="gc-team"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-role">HOME</div></div>
+            <div class="gc-vs">VS</div>
+            <div class="gc-team"><div class="gc-emoji">❓</div><div class="gc-name">TBD</div><div class="gc-role">AWAY</div></div>
+          </div>
+          <div class="gc-foot"><span class="gc-courts"><span class="gc-champ">Championship · win by 2</span></span><span class="gc-cta">Details ›</span></div>
+        </div>
+
+        <div class="section-label" style="margin-top:18px">Recent results</div>
+
+        <div class="gc gc--final" onclick="toast('Past matches are read-only')">
+          <div class="gc-top"><span class="gc-week">WEEK 4 · THU MAY 28</span><span class="gc-pill gc-pill--final">Final</span></div>
+          <div class="gc-body">
+            <div class="gc-team gc-team--win"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-won">▲ Won</div></div>
+            <div class="gc-score"><span class="w">7</span>–<span>5</span></div>
+            <div class="gc-team"><div class="gc-emoji">🔥</div><div class="gc-name">Dink 182</div><div class="gc-role">AWAY</div></div>
+          </div>
+          <div class="gc-foot"><span class="gc-courts">Courts 3 & 4</span><span class="gc-cta">View ›</span></div>
+        </div>
+
+        <div class="gc gc--final" onclick="toast('Past matches are read-only')">
+          <div class="gc-top"><span class="gc-week">WEEK 3 · THU MAY 21</span><span class="gc-pill gc-pill--final">Final</span></div>
+          <div class="gc-body">
+            <div class="gc-team"><div class="gc-emoji">🐢</div><div class="gc-name">Slow Dinks</div><div class="gc-role">HOME</div></div>
+            <div class="gc-score"><span>4</span>–<span class="w">8</span></div>
+            <div class="gc-team gc-team--win"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-won">▲ Won</div></div>
+          </div>
+          <div class="gc-foot"><span class="gc-courts">Courts 1 & 2</span><span class="gc-cta">View ›</span></div>
+        </div>
+      </section>
+
+      <!-- ════════ LINEUP ════════ -->
+      <section class="view" id="view-lineup">
+        <div class="blind" id="blind-box">
+          <div class="blind__top"><span class="blind__icon">🙈</span><span class="blind__title">Blind lineup · Week 6 vs Smash Eagles 🦅</span></div>
+          <p class="blind__body">Set your pairs for each game. <b>Smash Eagles can't see your picks</b> — lineups lock <b>3 hrs before</b> match and both teams reveal together <b>30 min before</b>. No game-day swaps.</p>
+          <div class="blind__count"><span class="blind__count-num" id="lock-timer">Locks Thu 3:30 PM</span><span class="blind__count-lbl">· set them before then</span></div>
+        </div>
+        <div class="section-label">Tap a slot to assign <span class="section-label__count" id="lu-progress">0 / 12 set</span></div>
+        <div class="lu-rules">Mixed = woman + man (woman listed first) · each player max <b>4 games</b> a night</div>
+        <div class="usage" id="usage-strip"></div>
+        <div id="lineup-rounds"></div>
+        <div style="height:6px"></div>
+        <button class="btn-primary" id="lock-btn" disabled onclick="lockLineup()">Fill all 12 slots to lock</button>
+        <div class="approve-hint" id="lock-hint">Once locked you can't edit until reveal. Save anytime before the deadline.</div>
+      </section>
+
+      <!-- ════════ SCORE ════════ -->
+      <section class="view" id="view-score">
+        <div class="ss-head">
+          <div class="ss-head__top">
+            <div>
+              <div class="ss-head__week">Week 5 · Tonight</div>
+              <div class="ss-head__title">🥒 Dill With It vs Kingpins 👑</div>
+              <div class="ss-head__sub">Courts 3 & 4 · First to 11, win by 1</div>
+            </div>
+            <div class="ss-head__live"><span class="pulse"></span> Live</div>
+          </div>
+          <div class="ss-progress">
+            <div class="ss-progress__row"><span>Games scored</span><span id="prog-text">0 / 12</span></div>
+            <div class="ss-progress__bar"><div class="ss-progress__fill" id="prog-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+
+        <div class="banner banner--mine" id="score-banner">
+          <b>You're keeping score.</b> Punch in each game as it finishes. When all 12 are in, submit for the Kingpins captain to confirm.
+        </div>
+
+        <div id="rounds"></div>
+
+        <div class="approve-block">
+          <div class="approve-block__total">
+            <div><div class="approve-block__score" id="total-us">0</div><div class="approve-block__teamlbl">Dill With It</div></div>
+            <div class="approve-block__vs">GAMES<br>WON</div>
+            <div><div class="approve-block__score approve-block__score--them" id="total-them">0</div><div class="approve-block__teamlbl">Kingpins</div></div>
+          </div>
+          <div class="approve-rows">
+            <div class="approve-card" id="appr-me">
+              <div class="approve-card__icon">○</div>
+              <div><div class="approve-card__name">You · Dill With It</div><div class="approve-card__role">Scorekeeper</div></div>
+              <div class="approve-card__state">Not submitted</div>
+            </div>
+            <div class="approve-card" id="appr-them">
+              <div class="approve-card__icon">○</div>
+              <div><div class="approve-card__name">M. Rivera · Kingpins</div><div class="approve-card__role">Opponent captain</div></div>
+              <div class="approve-card__state">Waiting</div>
+            </div>
+          </div>
+          <button class="btn-primary" id="submit-btn" disabled onclick="submitScores()">Enter all 12 games to submit</button>
+          <div class="approve-hint" id="approve-hint">Both captains confirm before results lock to the standings.</div>
+        </div>
+      </section>
+
+    </div><!-- /screen -->
+
+    <div class="toast" id="toast"></div>
+
+    <div class="sheet-scrim" id="sheet-scrim" onclick="closeSheet()"></div>
+    <div class="sheet" id="sheet">
+      <div class="sheet__grip"></div>
+      <h3 class="sheet__title" id="sheet-title">Pick a player</h3>
+      <div class="sheet__sub" id="sheet-sub">Game</div>
+      <div id="sheet-list"></div>
+    </div>
+
+    <nav class="tabbar">
+      <button class="tab is-active" id="tab-schedule" onclick="switchTab('schedule')">
+        <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span class="tab__label">Schedule</span>
+      </button>
+      <button class="tab" id="tab-lineup" onclick="switchTab('lineup')">
+        <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span class="tab__label">Lineup</span>
+        <span class="tab__badge" id="lineup-badge">0</span>
+      </button>
+      <button class="tab" id="tab-score" onclick="switchTab('score')">
+        <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span class="tab__label">Score Night</span>
+        <span class="tab__badge" id="score-badge">LIVE</span>
+      </button>
+    </nav>
+
+    <div class="home-indicator"></div>
+  </div>
+
+  <p class="footer-note">Mockup matches the live Dink Society palette (charcoal + electric lime + teal, Inter) and the real captain flows — blind lineup with <b>enforced gender slots</b> (mixed = woman first, then man), a <b>4-games-per-player nightly cap</b>, and the scoresheet's <b>2 rounds × 6 games</b> (women's, men's, 4× mixed) with single-entry plus dual-captain confirmation. Nothing here is wired to live data.</p>
+
+<script>
+  // ════════ SCORE NIGHT ════════
+  const GAMES = [
+    { id:'r1g1', round:1, type:'WOMENS', label:"Women's", court:'3', us:'Chen / Park',   them:'Ruiz / Vo' },
+    { id:'r1g2', round:1, type:'MENS',   label:"Men's",   court:'4', us:'Okafor / Bell', them:'Diaz / Cole' },
+    { id:'r1g3', round:1, type:'MIXED',  label:"Mixed",   court:'3', us:'Chen / Okafor', them:'Ruiz / Diaz' },
+    { id:'r1g4', round:1, type:'MIXED',  label:"Mixed",   court:'4', us:'Park / Bell',   them:'Vo / Cole' },
+    { id:'r1g5', round:1, type:'MIXED',  label:"Mixed",   court:'3', us:'Chen / Bell',   them:'Ruiz / Cole' },
+    { id:'r1g6', round:1, type:'MIXED',  label:"Mixed",   court:'4', us:'Park / Okafor', them:'Vo / Diaz' },
+    { id:'r2g1', round:2, type:'WOMENS', label:"Women's", court:'3', us:'Park / Lee',    them:'Vo / Sun' },
+    { id:'r2g2', round:2, type:'MENS',   label:"Men's",   court:'4', us:'Bell / Tran',   them:'Cole / Roy' },
+    { id:'r2g3', round:2, type:'MIXED',  label:"Mixed",   court:'3', us:'Lee / Tran',    them:'Sun / Roy' },
+    { id:'r2g4', round:2, type:'MIXED',  label:"Mixed",   court:'4', us:'Park / Bell',   them:'Vo / Cole' },
+    { id:'r2g5', round:2, type:'MIXED',  label:"Mixed",   court:'3', us:'Lee / Okafor',  them:'Sun / Diaz' },
+    { id:'r2g6', round:2, type:'MIXED',  label:"Mixed",   court:'4', us:'Chen / Tran',   them:'Ruiz / Roy' },
+  ];
+  const sc = {};
+  GAMES.forEach(g => sc[g.id] = { us:0, them:0, entered:false });
+  let submitted = false;
+
+  function renderScoreRounds() {
+    document.getElementById('rounds').innerHTML = [1,2].map(r => {
+      const games = GAMES.filter(g => g.round === r);
+      const done = games.filter(g => sc[g.id].entered).length;
+      return `<div class="round" data-round="${r}">
+        <div class="round__head" onclick="toggleRound(${r})">
+          <span class="round__chev">▾</span><span class="round__title">Round ${r}</span>
+          <span class="round__tally"><b>${done}</b>/6 in</span>
+        </div>
+        <div class="round__games">${games.map(gameHTML).join('')}</div>
+      </div>`;
+    }).join('');
+  }
+  function winnerHTML(s) {
+    if (!s.entered) return '';
+    if (s.us === s.them) return '<span class="game__winner">Tie? check score</span>';
+    return `<span class="game__winner">${s.us>s.them?'<b>Dill With It</b> takes it':'Kingpins take it'}</span>`;
+  }
+  function gameHTML(g) {
+    const s = sc[g.id];
+    const pill = s.entered ? '<span class="game__pill pill--entered">Entered</span>' : '<span class="game__pill pill--empty">Not played</span>';
+    return `<div class="game ${s.entered?'game--entered':''}" id="g-${g.id}">
+      <div class="game__top"><span class="game__badge badge--${g.type.toLowerCase()}">${g.label}</span><span class="game__court">Court ${g.court}</span></div>
+      <div class="game__pair"><b>${g.us}</b><span class="vs-dot">vs</span>${g.them}</div>
+      <div class="score-row">
+        <div class="score-side score-side--us"><div class="score-side__label">Us</div>
+          <div class="stepper"><button class="step-btn" onclick="bump('${g.id}','us',-1)">−</button><span class="step-val" id="${g.id}-us">${s.us}</span><button class="step-btn" onclick="bump('${g.id}','us',1)">+</button></div></div>
+        <div class="score-side"><div class="score-side__label">Them</div>
+          <div class="stepper"><button class="step-btn" onclick="bump('${g.id}','them',-1)">−</button><span class="step-val" id="${g.id}-them">${s.them}</span><button class="step-btn" onclick="bump('${g.id}','them',1)">+</button></div></div>
+      </div>
+      <div class="game__status">${pill}${winnerHTML(s)}</div>
+    </div>`;
+  }
+  function bump(id, side, d) {
+    if (submitted) { toast('Already submitted'); return; }
+    const s = sc[id];
+    s[side] = Math.max(0, Math.min(21, s[side] + d));
+    document.getElementById(id+'-'+side).textContent = s[side];
+    s.entered = (s.us > 0 || s.them > 0);
+    const card = document.getElementById('g-'+id);
+    card.className = 'game ' + (s.entered ? 'game--entered' : '');
+    card.querySelector('.game__status').innerHTML = (s.entered ? '<span class="game__pill pill--entered">Entered</span>' : '<span class="game__pill pill--empty">Not played</span>') + winnerHTML(s);
+    refreshScore();
+  }
+  function refreshScore() {
+    const entered = GAMES.filter(g => sc[g.id].entered).length;
+    document.getElementById('prog-text').textContent = entered + ' / 12';
+    document.getElementById('prog-fill').style.width = (entered/12*100) + '%';
+    let us=0, them=0;
+    GAMES.forEach(g => { const s=sc[g.id]; if(s.entered){ if(s.us>s.them)us++; else if(s.them>s.us)them++; } });
+    document.getElementById('total-us').textContent = us;
+    document.getElementById('total-them').textContent = them;
+    document.querySelectorAll('.round[data-round]').forEach(r => {
+      const rn = +r.dataset.round;
+      const done = GAMES.filter(g=>g.round===rn && sc[g.id].entered).length;
+      r.querySelector('.round__tally').innerHTML = `<b>${done}</b>/6 in`;
+    });
+    if (submitted) return;
+    const btn = document.getElementById('submit-btn');
+    if (entered === 12) { btn.disabled = false; btn.textContent = 'Submit scores for confirmation'; }
+    else { btn.disabled = true; btn.textContent = `Enter all 12 games to submit (${entered}/12)`; }
+  }
+  function toggleRound(r) { document.querySelector(`.round[data-round="${r}"]`).classList.toggle('is-collapsed'); }
+  function submitScores() {
+    submitted = true;
+    document.getElementById('submit-btn').style.display = 'none';
+    const me = document.getElementById('appr-me');
+    me.classList.add('approve-card--done');
+    me.querySelector('.approve-card__icon').textContent = '✓';
+    me.querySelector('.approve-card__state').textContent = 'Submitted';
+    const b = document.getElementById('score-banner');
+    b.className = 'banner banner--mine';
+    b.innerHTML = '<b>Scores submitted.</b> Waiting on the Kingpins captain to confirm. They see the same 12 games and tap to approve.';
+    document.getElementById('approve-hint').textContent = 'Demo: confirming the opponent in 2s…';
+    toast('Submitted — sent to opponent');
+    setTimeout(opponentConfirms, 2200);
+  }
+  function opponentConfirms() {
+    const them = document.getElementById('appr-them');
+    them.classList.add('approve-card--done');
+    them.querySelector('.approve-card__icon').textContent = '✓';
+    them.querySelector('.approve-card__state').textContent = 'Confirmed';
+    const b = document.getElementById('score-banner');
+    b.className = 'banner banner--final';
+    b.innerHTML = '<b>✅ Match finalized.</b> Both captains confirmed — results are locked to the Season 1 standings.';
+    document.getElementById('approve-hint').textContent = 'Done. Head back to Schedule for your next match.';
+    document.getElementById('score-badge').style.display = 'none';
+    toast('Match finalized 🎉');
+  }
+
+  // ════════ LINEUP ════════
+  const ROSTER = [
+    { id:'chen',   name:'A. Chen',   sex:'F' }, { id:'park', name:'J. Park', sex:'F' },
+    { id:'lee',    name:'S. Lee',    sex:'F' }, { id:'sun',  name:'M. Sun',  sex:'F' },
+    { id:'okafor', name:'D. Okafor', sex:'M' }, { id:'bell', name:'T. Bell', sex:'M' },
+    { id:'tran',   name:'K. Tran',   sex:'M' }, { id:'roy',  name:'P. Roy',  sex:'M' },
+  ];
+  const LU_GAMES = [
+    { id:'r1g1', round:1, type:'WOMENS', label:"Women's", court:'1' },
+    { id:'r1g2', round:1, type:'MENS',   label:"Men's",   court:'2' },
+    { id:'r1g3', round:1, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r1g4', round:1, type:'MIXED',  label:"Mixed",   court:'2' },
+    { id:'r1g5', round:1, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r1g6', round:1, type:'MIXED',  label:"Mixed",   court:'2' },
+    { id:'r2g1', round:2, type:'WOMENS', label:"Women's", court:'1' },
+    { id:'r2g2', round:2, type:'MENS',   label:"Men's",   court:'2' },
+    { id:'r2g3', round:2, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r2g4', round:2, type:'MIXED',  label:"Mixed",   court:'2' },
+    { id:'r2g5', round:2, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r2g6', round:2, type:'MIXED',  label:"Mixed",   court:'2' },
+  ];
+  const lu = {};
+  LU_GAMES.forEach(g => lu[g.id] = [null, null]);
+  let lineupLocked = false;
+  const playerById = id => ROSTER.find(p => p.id === id);
+  const initials = n => n.replace(/[^A-Za-z ]/g,'').split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+
+  const MAX_GAMES = 4; // hard cap per player per night
+  // Mixed is always woman first (slot 0), man second (slot 1) — keeps it consistent.
+  function allowedSex(g, i) {
+    if (g.type === 'WOMENS') return 'F';
+    if (g.type === 'MENS') return 'M';
+    return i === 0 ? 'F' : 'M';
+  }
+  function slotReq(g, i) { return allowedSex(g,i)==='F' ? 'Woman' : 'Man'; }
+  function gameCounts() {
+    const c = {}; ROSTER.forEach(p => c[p.id] = 0);
+    LU_GAMES.forEach(g => lu[g.id].forEach(pid => { if(pid) c[pid]++; }));
+    return c;
+  }
+
+  function renderLineup() {
+    document.getElementById('lineup-rounds').innerHTML = [1,2].map(r => {
+      const games = LU_GAMES.filter(g => g.round === r);
+      const done = games.filter(g => lu[g.id][0] && lu[g.id][1]).length;
+      return `<div class="round" data-lround="${r}">
+        <div class="round__head" onclick="toggleLuRound(${r})">
+          <span class="round__chev">▾</span><span class="round__title">Round ${r}</span>
+          <span class="round__tally"><b>${done}</b>/6 set</span>
+        </div>
+        <div class="round__games">${games.map(luGameHTML).join('')}</div>
+      </div>`;
+    }).join('');
+    renderUsage();
+    refreshLineup();
+  }
+  function luGameHTML(g) {
+    const full = lu[g.id][0] && lu[g.id][1];
+    return `<div class="lu-game ${full?'lu-game--full':''}" id="lu-${g.id}">
+      <div class="lu-game__top"><span class="game__badge badge--${g.type.toLowerCase()}">${g.label}</span><span class="lu-game__court">Court ${g.court}</span></div>
+      <div class="lu-slots">${slotHTML(g,0)}${slotHTML(g,1)}</div>
+    </div>`;
+  }
+  function slotHTML(g, i) {
+    const pid = lu[g.id][i];
+    if (lineupLocked && !pid) return `<div class="lu-slot"><div class="lu-slot__avatar">·</div><span class="lu-slot__empty">—</span></div>`;
+    if (pid) {
+      const p = playerById(pid);
+      return `<div class="lu-slot lu-slot--filled" onclick="openSheet('${g.id}',${i})"><div class="lu-slot__avatar">${initials(p.name)}</div><div style="min-width:0"><div class="lu-slot__name">${p.name}</div></div></div>`;
+    }
+    return `<div class="lu-slot" onclick="openSheet('${g.id}',${i})"><div class="lu-slot__avatar">+</div><div><span class="lu-slot__empty">Add player</span><span class="lu-slot__req">${slotReq(g,i)}</span></div></div>`;
+  }
+  function renderUsage() {
+    const counts = gameCounts();
+    document.getElementById('usage-strip').innerHTML = ROSTER.map(p => {
+      const atCap = counts[p.id] >= MAX_GAMES;
+      return `<span class="usage__chip ${atCap?'usage__chip--cap':''}"><span class="usage__dot dot-${p.sex.toLowerCase()}"></span>${p.name}<span class="usage__n">${counts[p.id]}/${MAX_GAMES}</span></span>`;
+    }).join('');
+  }
+  let sheetCtx = null;
+  function openSheet(gameId, slotIdx) {
+    if (lineupLocked) { toast('Lineup locked until reveal'); return; }
+    sheetCtx = { gameId, slotIdx };
+    const g = LU_GAMES.find(x => x.id === gameId);
+    const allow = allowedSex(g, slotIdx);
+    const slotWord = allow==='F' ? 'woman' : 'man';
+    document.getElementById('sheet-title').textContent = `${g.label} · ${allow==='F'?'Woman':'Man'} (player ${slotIdx+1})`;
+    document.getElementById('sheet-sub').textContent = `Needs a ${slotWord} · max ${MAX_GAMES} games per player`;
+    const partner = lu[gameId][slotIdx===0?1:0];
+    const current = lu[gameId][slotIdx];
+    const counts = gameCounts();
+    const rows = ROSTER.filter(p => p.sex === allow).map(p => {
+      const isPartner = p.id===partner;
+      const atCap = counts[p.id] >= MAX_GAMES && p.id !== current;
+      const disabled = isPartner || atCap;
+      const tag = p.sex==='F' ? '<span class="pick__tag tag-f">Woman</span>' : '<span class="pick__tag tag-m">Man</span>';
+      const note = isPartner ? 'Already in this game'
+        : atCap ? `At ${MAX_GAMES}-game limit`
+        : (p.id===current ? 'Currently selected' : `${counts[p.id]}/${MAX_GAMES} games`);
+      return `<div class="pick ${disabled?'pick--disabled':''}" onclick="choose('${p.id}')"><div class="pick__avatar">${initials(p.name)}</div><div><div class="pick__name">${p.name}</div><div class="pick__meta">${note}</div></div>${tag}</div>`;
+    }).join('');
+    const clear = current ? `<div class="pick" onclick="choose(null)"><div class="pick__avatar" style="background:var(--color-red-dim)">✕</div><div class="pick__name pick__clear">Clear this slot</div></div>` : '';
+    document.getElementById('sheet-list').innerHTML = rows + clear;
+    document.getElementById('sheet').classList.add('is-open');
+    document.getElementById('sheet-scrim').classList.add('is-open');
+  }
+  function closeSheet() {
+    document.getElementById('sheet').classList.remove('is-open');
+    document.getElementById('sheet-scrim').classList.remove('is-open');
+    sheetCtx = null;
+  }
+  function choose(pid) {
+    if (!sheetCtx) return;
+    lu[sheetCtx.gameId][sheetCtx.slotIdx] = pid;
+    closeSheet();
+    renderLineup();
+  }
+  function toggleLuRound(r) { document.querySelector(`.round[data-lround="${r}"]`).classList.toggle('is-collapsed'); }
+  function refreshLineup() {
+    const set = LU_GAMES.filter(g => lu[g.id][0] && lu[g.id][1]).length;
+    document.getElementById('lu-progress').textContent = `${set} / 12 set`;
+    document.querySelectorAll('.round[data-lround]').forEach(r => {
+      const rn = +r.dataset.lround;
+      const done = LU_GAMES.filter(g=>g.round===rn && lu[g.id][0] && lu[g.id][1]).length;
+      r.querySelector('.round__tally').innerHTML = `<b>${done}</b>/6 set`;
+    });
+    const badge = document.getElementById('lineup-badge');
+    badge.textContent = lineupLocked ? '🔒' : (set===12 ? 'SET' : `${set}`);
+    if (lineupLocked) return;
+    const btn = document.getElementById('lock-btn');
+    if (set === 12) { btn.disabled = false; btn.textContent = 'Lock lineup'; }
+    else { btn.disabled = true; btn.textContent = `Fill all 12 slots to lock (${set}/12)`; }
+  }
+  function lockLineup() {
+    lineupLocked = true;
+    const box = document.getElementById('blind-box');
+    box.className = 'blind blind--locked';
+    box.innerHTML = `<div class="blind__top"><span class="blind__icon">🔒</span><span class="blind__title">Lineup locked · Week 6</span></div>
+      <p class="blind__body">Your pairs are in. <b>Smash Eagles reveal at the same time</b> — you'll both see each other's lineup 30 min before match. Nothing to do until then.</p>`;
+    document.getElementById('lock-btn').style.display = 'none';
+    document.getElementById('lock-hint').textContent = 'Need a change? The league office can unlock before the deadline.';
+    renderLineup();
+    toast('Lineup locked 🔒');
+  }
+
+  // ════════ NAV / UTIL ════════
+  function goScore() { switchTab('score'); }
+  function goLineup() { switchTab('lineup'); }
+  function switchTab(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('is-active'));
+    document.getElementById('view-'+name).classList.add('is-active');
+    document.getElementById('tab-'+name).classList.add('is-active');
+    document.getElementById('screen').scrollTop = 0;
+  }
+  let toastTimer;
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('is-show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('is-show'), 1900);
+  }
+  function tick(){ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
+
+  tick(); setInterval(tick, 30000);
+  renderScoreRounds(); refreshScore();
+  renderLineup();
+</script>
+</body>
+</html>

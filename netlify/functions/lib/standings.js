@@ -65,6 +65,8 @@ export async function rebuildStandings(circuit) {
 
   // Initialize player stats
   const playerStats = new Map();
+  const weeklyPlayers = {}; // week → Map(pid → weekly game stats) for POW + rank movement
+  const weekMeta = {};      // week → { date } for display
 
   // Process each finalized match
   for (const weekFile of weekFiles) {
@@ -75,6 +77,10 @@ export async function rebuildStandings(circuit) {
 
     for (const match of weekFile.matches) {
       if (!match.finalizedAt) continue;
+
+      if (match.scheduledAt && (!weekMeta[week] || new Date(match.scheduledAt) < new Date(weekMeta[week].date))) {
+        weekMeta[week] = { date: match.scheduledAt };
+      }
 
       const teamA = match.teamA;
       const teamB = match.teamB;
@@ -160,6 +166,8 @@ export async function rebuildStandings(circuit) {
         teamsById,
         lineupStore,
         playerStats,
+        week,
+        weeklyPlayers,
       });
     }
   }
@@ -239,6 +247,14 @@ export async function rebuildStandings(circuit) {
     p.consistency = consistency;
   }
 
+  // ── Weekly Player of the Week (gender-split, by that week's DSR) + rank movement ──
+  const weeklyTopPerformers = buildWeeklyTopPerformers(weeklyPlayers, weekMeta);
+  const rankDeltas = computeRankDeltas(weeklyPlayers);
+  for (const p of playerStats.values()) {
+    p.rankDelta = Object.prototype.hasOwnProperty.call(rankDeltas, p.playerId) ? rankDeltas[p.playerId] : null;
+  }
+  standings.weeklyTopPerformers = weeklyTopPerformers;
+
   const playerStatsOut = {
     circuit,
     lastUpdated: new Date().toISOString(),
@@ -282,7 +298,7 @@ function standingsComparator(a, b) {
 /**
  * Pulls lineup + score for a match, updates the playerStats map in place.
  */
-async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lineupStore, playerStats }) {
+async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lineupStore, playerStats, week, weeklyPlayers }) {
   const scoresStore = getStore('scores');
 
   const [lineupA, lineupB, score] = await Promise.all([
@@ -322,11 +338,13 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lin
       const player = rosterA.get(pid);
       if (!player) continue;
       bumpPlayer(playerStats, pid, player, teamA, slotType, homeWon, homePlayers.filter(p => p !== pid), homeScore, awayScore);
+      if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamA, homeWon, homeScore, awayScore);
     }
     for (const pid of awayPlayers) {
       const player = rosterB.get(pid);
       if (!player) continue;
       bumpPlayer(playerStats, pid, player, teamB, slotType, !homeWon, awayPlayers.filter(p => p !== pid), awayScore, homeScore);
+      if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamB, !homeWon, awayScore, homeScore);
     }
 
     // Track distinct matches each player appeared in (handled separately below)
@@ -413,4 +431,95 @@ function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = n
     p.partners[partnerId].played++;
     if (won) p.partners[partnerId].won++;
   }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Weekly DSR · Player of the Week (gender-split) · rank movement (+/-)
+// ════════════════════════════════════════════════════════════════════
+
+// Same Aloha composite formula, reusable for weekly + cumulative snapshots.
+function compositeScore(p, maxGames) {
+  if (!p.gamesPlayed) return null;
+  const winPct = p.gamesWon / p.gamesPlayed;
+  const avgDiff = p.diff / p.gamesPlayed;
+  const volume = p.gamesPlayed / maxGames;
+  const clutchPct = p.clutchG > 0 ? p.clutchW / p.clutchG : winPct;
+  let consistency = 1;
+  if (p.gameDiffs.length >= 2) {
+    const mean = p.gameDiffs.reduce((s, d) => s + d, 0) / p.gameDiffs.length;
+    const variance = p.gameDiffs.reduce((s, d) => s + (d - mean) ** 2, 0) / p.gameDiffs.length;
+    consistency = Math.max(0, 1 - (Math.sqrt(variance) / 8));
+  }
+  return (winPct * 60) + (clutchPct * 10) + ((avgDiff / 11) * 15) + (consistency * 5) + (volume * 10);
+}
+
+function normGender(g) { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; }
+
+function ensureWeeklyPlayer(weekly, week, pid, player, team) {
+  if (!weekly[week]) weekly[week] = new Map();
+  const m = weekly[week];
+  if (!m.has(pid)) m.set(pid, {
+    playerId: pid, name: player.name, gender: player.gender || null,
+    teamId: team?.id || null, teamName: team?.name || null,
+    gamesPlayed: 0, gamesWon: 0, gamesLost: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0,
+  });
+  return m.get(pid);
+}
+
+function bumpWeeklyPlayer(weekly, week, pid, player, team, won, myScore, oppScore) {
+  if (week == null) return;
+  const p = ensureWeeklyPlayer(weekly, week, pid, player, team);
+  p.gamesPlayed++; if (won) p.gamesWon++; else p.gamesLost++;
+  if (Number.isInteger(myScore) && Number.isInteger(oppScore)) {
+    const d = myScore - oppScore; p.diff += d; p.gameDiffs.push(d);
+    if (Math.abs(d) <= 3) { p.clutchG++; if (won) p.clutchW++; }
+  }
+}
+
+// [{ week, label, date, men:[top3], women:[top3] }], newest week first.
+function buildWeeklyTopPerformers(weekly, weekMeta = {}) {
+  const out = [];
+  const weeks = Object.keys(weekly).map(Number).sort((a, b) => a - b);
+  for (const wk of weeks) {
+    const players = Array.from(weekly[wk].values()).filter(p => p.gamesPlayed > 0);
+    if (!players.length) continue;
+    const maxGames = Math.max(1, ...players.map(p => p.gamesPlayed));
+    players.forEach(p => { p._wdsr = compositeScore(p, maxGames); });
+    const topN = g => players.filter(p => normGender(p.gender) === g)
+      .sort((a, b) => (b._wdsr - a._wdsr) || (b.diff - a.diff))
+      .slice(0, 3)
+      .map(p => ({ playerId: p.playerId, name: p.name, teamName: p.teamName, teamId: p.teamId,
+        gender: p.gender, dsr: Math.round(p._wdsr * 10) / 10, w: p.gamesWon, l: p.gamesLost, diff: p.diff }));
+    out.push({ week: wk, label: `Week ${wk}`, date: weekMeta[wk]?.date || null, men: topN('M'), women: topN('F') });
+  }
+  return out.sort((a, b) => b.week - a.week);
+}
+
+// Rank movement on cumulative season DSR vs the prior week. { pid: delta|null } (+ = moved up).
+function computeRankDeltas(weekly) {
+  const weeks = Object.keys(weekly).map(Number).sort((a, b) => a - b);
+  const cum = new Map();
+  const snaps = [];
+  for (const wk of weeks) {
+    for (const [pid, w] of weekly[wk]) {
+      if (!cum.has(pid)) cum.set(pid, { gamesPlayed: 0, gamesWon: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0 });
+      const c = cum.get(pid);
+      c.gamesPlayed += w.gamesPlayed; c.gamesWon += w.gamesWon; c.diff += w.diff;
+      for (const d of w.gameDiffs) c.gameDiffs.push(d);
+      c.clutchW += w.clutchW; c.clutchG += w.clutchG;
+    }
+    const active = [...cum.entries()].filter(([, c]) => c.gamesPlayed > 0);
+    const maxGames = Math.max(1, ...active.map(([, c]) => c.gamesPlayed));
+    const ranked = active.map(([pid, c]) => ({ pid, s: compositeScore(c, maxGames) })).sort((a, b) => b.s - a.s);
+    const snap = new Map(); ranked.forEach((r, i) => snap.set(r.pid, i + 1));
+    snaps.push(snap);
+  }
+  const cur = snaps[snaps.length - 1] || new Map();
+  const prev = snaps.length >= 2 ? snaps[snaps.length - 2] : new Map();
+  const deltas = {};
+  for (const [pid, rank] of cur) {
+    const pr = prev.get(pid);
+    deltas[pid] = (pr == null) ? null : (pr - rank);
+  }
+  return deltas;
 }
