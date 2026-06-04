@@ -2622,22 +2622,79 @@
   // ═══════════════════════════════════════════════════════════
   // SCHEDULE — live from admin-matches endpoint
   // ═══════════════════════════════════════════════════════════
+  function addMatchFormHTML(teams) {
+    if (!teams.length) {
+      return '<div class="ac" style="margin-top:14px;padding:18px;"><div class="ac__h"><span class="ac__t">Add a match manually</span></div><div class="empty">No teams in this division yet.</div></div>';
+    }
+    const teamOpts = teams.map(t => '<option value="' + h(t.id) + '">' + h(t.name) + '</option>').join('');
+    const weekOpts = Array.from({ length: 8 }, (_, i) => i + 1).map(w => '<option value="' + w + '">Week ' + w + '</option>').join('');
+    const fld = (lbl, inner) => '<div class="af"><label>' + lbl + '</label>' + inner + '</div>';
+    return '<div class="ac" style="margin-top:14px;padding:18px;">'
+      + '<div class="ac__h"><span class="ac__t">Add a match manually</span><span class="ac__s">Build week-by-week (e.g. as new teams join)</span></div>'
+      + '<div class="arow" style="flex-wrap:wrap;gap:10px;align-items:flex-end;margin-top:10px;">'
+      + fld('Week', '<select id="am-week">' + weekOpts + '</select>')
+      + fld('Home team', '<select id="am-home"><option value="">— pick —</option>' + teamOpts + '</select>')
+      + fld('Away team', '<select id="am-away"><option value="">— pick —</option>' + teamOpts + '</select>')
+      + fld('Court A', '<input type="number" id="am-ca" min="1" max="20" style="width:70px;">')
+      + fld('Court B', '<input type="number" id="am-cb" min="1" max="20" style="width:70px;">')
+      + fld('Date/time', '<input type="datetime-local" id="am-dt">')
+      + '<div class="af" style="display:flex;align-items:flex-end;"><button class="ab ab--lime ab--sm" id="am-add-btn">Add match</button></div>'
+      + '</div><div id="am-status" style="font-size:11px;margin-top:8px;"></div></div>';
+  }
+
+  function wireAddMatch(div) {
+    const btn = $id('am-add-btn');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const teams = window.__schedTeams || [];
+      const homeId = $id('am-home').value, awayId = $id('am-away').value;
+      const week = parseInt($id('am-week').value, 10);
+      const stat = $id('am-status');
+      const setErr = (m) => { if (stat) { stat.textContent = m; stat.style.color = 'var(--color-red,#ef4444)'; } };
+      if (!homeId || !awayId) return setErr('Pick both teams.');
+      if (homeId === awayId) return setErr("A team can't play itself.");
+      const home = teams.find(t => t.id === homeId), away = teams.find(t => t.id === awayId);
+      const ca = ($id('am-ca').value || '').trim(), cb = ($id('am-cb').value || '').trim();
+      const dt = $id('am-dt').value ? new Date($id('am-dt').value).toISOString() : null;
+      btn.disabled = true; if (stat) { stat.textContent = 'Adding…'; stat.style.color = 'var(--color-text-faint)'; }
+      try {
+        await apiJSON('/.netlify/functions/admin-matches?circuit=I', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ division: div, week, teamA: { id: home.id, name: home.name }, teamB: { id: away.id, name: away.name }, courtA: ca || null, courtB: cb || null, scheduledAt: dt }),
+        });
+        renderSched();
+      } catch (e) { setErr(e.message); btn.disabled = false; }
+    });
+  }
+
   async function renderSched() {
     const div = $id('sched-div').value;
     const out = $id('sched-out');
     if (!div) { out.innerHTML = '<div class="empty">Select a division.</div>'; return; }
     out.innerHTML = '<div class="loading">Loading schedule…</div>';
     try {
-      const data = await apiJSON('/.netlify/functions/admin-matches?circuit=I&division=' + encodeURIComponent(div));
+      const [data, teamsData] = await Promise.all([
+        apiJSON('/.netlify/functions/admin-matches?circuit=I&division=' + encodeURIComponent(div)),
+        apiJSON('/.netlify/functions/admin-teams'),
+      ]);
       const weeks = data.weeks || [];
-      if (!weeks.length) { out.innerHTML = '<div class="empty">No schedule generated yet for this division. Click "Generate round-robin" to create one.</div>'; return; }
+      const divTeams = (teamsData.teams || []).filter(t => t.division === div).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      window.__schedTeams = divTeams;
+      const addForm = addMatchFormHTML(divTeams);
+
+      if (!weeks.length) {
+        out.innerHTML = '<div class="empty" style="margin-bottom:14px;">No schedule yet. Generate a round-robin above, or add matches one at a time below.</div>' + addForm;
+        wireAddMatch(div);
+        return;
+      }
 
       out.innerHTML = '<div class="wc-grid">' + weeks.map((w, i) =>
         '<div class="wc' + (i === 0 ? ' is-active' : '') + '" data-week="' + w.week + '"><div class="wc__n">Week ' + w.week + '</div><div class="wc__m">' + (w.matches.length ? w.matches.filter(m => m.finalizedAt).length + '/' + w.matches.length + ' final' : '—') + '</div></div>'
-      ).join('') + '</div><div class="ac" id="wk-card"></div>';
+      ).join('') + '</div><div class="ac" id="wk-card"></div>' + addForm;
 
       $$('.wc').forEach(c => c.addEventListener('click', () => selectWeek(parseInt(c.dataset.week), weeks)));
       selectWeek(weeks[0].week, weeks);
+      wireAddMatch(div);
     } catch (e) {
       out.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
     }
@@ -2664,6 +2721,7 @@
             '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="champ-' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
             '<button class="ab ab--outline ab--sm court-save" data-mid="' + h(m.id) + '">Save</button>' +
             '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups (both)</button>' +
+            '<button class="ab ab--outline ab--sm match-del" data-mid="' + h(m.id) + '" style="border-color:rgba(239,68,68,0.5);color:#ef4444;">Delete match</button>' +
             '<span id="cst-' + h(m.id) + '" style="margin-left:4px;"></span>' +
           '</div>';
       }).join('') + '</div>';
@@ -2686,6 +2744,22 @@
         } catch (e) {
           if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
         } finally { btn.disabled = false; }
+      });
+    });
+
+    card.querySelectorAll('.match-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const mid = btn.dataset.mid;
+        if (!confirm('Delete this match? It will be removed from the schedule (any lineups/scores for it are orphaned).')) return;
+        const stat = $id('cst-' + mid);
+        btn.disabled = true; if (stat) { stat.textContent = 'Deleting…'; stat.style.color = 'var(--color-text-faint)'; }
+        try {
+          await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(mid), { method: 'DELETE' });
+          renderSched();
+        } catch (e) {
+          if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
+          btn.disabled = false;
+        }
       });
     });
 

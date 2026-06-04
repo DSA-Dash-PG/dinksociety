@@ -21,7 +21,7 @@ export default async (req) => {
     if (!division) return json({ error: 'division required' }, 400);
 
     const weeks = [];
-    for (let w = 1; w <= 7; w++) {
+    for (let w = 1; w <= 12; w++) {
       const key = `schedule/${circuit}/${division}/week-${w}.json`;
       const data = await store.get(key, { type: 'json' }).catch(() => null);
       if (!data) continue;
@@ -34,6 +34,52 @@ export default async (req) => {
       });
     }
     return json({ circuit, division, weeks });
+  }
+
+  // ========== POST (add one match to a week) ==========
+  if (req.method === 'POST') {
+    const circuit = url.searchParams.get('circuit') || 'I';
+    const body = await req.json();
+    const division = body.division;
+    const week = parseInt(body.week, 10);
+    const teamA = body.teamA, teamB = body.teamB;
+    if (!division || !Number.isInteger(week) || week < 1) {
+      return json({ error: 'division and a valid week are required' }, 400);
+    }
+    if (!teamA?.id || !teamB?.id) return json({ error: 'teamA and teamB are required' }, 400);
+    if (teamA.id === teamB.id) return json({ error: 'A team cannot play itself' }, 400);
+
+    const key = `schedule/${circuit}/${division}/week-${week}.json`;
+    let data = await store.get(key, { type: 'json' }).catch(() => null);
+    if (!data) {
+      data = { circuit, division, week, matches: [], generatedAt: new Date().toISOString(), generatedBy: admin.email };
+    }
+
+    // Guard against duplicating the same pairing within the same week.
+    const dup = (data.matches || []).some(m => {
+      const ids = [m.teamA?.id, m.teamB?.id];
+      return ids.includes(teamA.id) && ids.includes(teamB.id);
+    });
+    if (dup) return json({ error: 'These two teams already play each other that week' }, 409);
+
+    const courtA = (body.courtA != null && body.courtA !== '') ? body.courtA : null;
+    const courtB = (body.courtB != null && body.courtB !== '') ? body.courtB : null;
+    const rnd = Math.random().toString(16).slice(2, 8);
+    const match = {
+      id: `m_${circuit}_${division.toLowerCase()}_w${week}_${rnd}`,
+      teamA: { id: teamA.id, name: teamA.name || '' },
+      teamB: { id: teamB.id, name: teamB.name || '' },
+      courtSet: null,
+      courtA, courtB,
+      court: (courtA && courtB) ? `Courts ${courtA} & ${courtB}` : null,
+      scheduledAt: body.scheduledAt || null,
+      scoreA: null, scoreB: null, playedAt: null,
+    };
+    data.matches = [...(data.matches || []), match];
+    data.updatedAt = new Date().toISOString();
+    data.updatedBy = admin.email;
+    await store.setJSON(key, data);
+    return json({ ok: true, match });
   }
 
   // ========== PATCH (update single match) ==========
@@ -69,8 +115,26 @@ export default async (req) => {
     return json({ error: 'match not found' }, 404);
   }
 
-  // ========== DELETE (wipe week) ==========
+  // ========== DELETE (one match by id, or wipe a week) ==========
   if (req.method === 'DELETE') {
+    const matchId = url.searchParams.get('matchId');
+    if (matchId) {
+      const { blobs } = await store.list({ prefix: 'schedule/' });
+      for (const b of blobs) {
+        const data = await store.get(b.key, { type: 'json' });
+        if (!data?.matches) continue;
+        const before = data.matches.length;
+        data.matches = data.matches.filter(m => m.id !== matchId);
+        if (data.matches.length !== before) {
+          data.updatedAt = new Date().toISOString();
+          data.updatedBy = admin.email;
+          await store.setJSON(b.key, data);
+          return json({ ok: true, deleted: matchId });
+        }
+      }
+      return json({ error: 'match not found' }, 404);
+    }
+
     const circuit = url.searchParams.get('circuit') || 'I';
     const division = url.searchParams.get('division');
     const week = parseInt(url.searchParams.get('week'), 10);
