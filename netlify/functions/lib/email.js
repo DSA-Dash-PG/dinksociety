@@ -46,6 +46,56 @@ export async function sendEmail({ to, subject, html, replyTo }) {
 }
 
 /**
+ * Escape HTML and convert newlines to <br> for plain-text message bodies.
+ */
+function escapeBody(text) {
+  const esc = String(text || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return esc.replace(/\n/g, '<br>');
+}
+
+/**
+ * Render an admin → captain announcement / message email.
+ * @param {{ subject?: string, body: string, teamName: string, portalUrl: string }} opts
+ */
+export function renderAdminMessage({ subject, body, teamName, portalUrl }) {
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
+      ${subject ? `<h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 16px;">${escapeBody(subject)}</h1>` : ''}
+      <div style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 24px;">${escapeBody(body)}</div>
+      <a href="${portalUrl}" style="display: inline-block; padding: 14px 32px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
+        Open captain portal
+      </a>
+      <p style="font-size: 13px; color: #777; margin-top: 24px; line-height: 1.5;">
+        Reply to this message right inside the portal — that's the fastest way to reach the league.
+      </p>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        Sent to ${escapeBody(teamName)} · The Dink Society · Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Render a captain → admin notification email (admin gets pinged when a
+ * captain sends a message in the portal).
+ */
+export function renderCaptainMessageNotify({ teamName, captainName, body, adminUrl }) {
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 24px;">THE DINK SOCIETY · ADMIN</div>
+      <h1 style="font-size: 20px; font-weight: 800; color: #f5f5f5; margin: 0 0 6px;">New message from ${escapeBody(teamName)}</h1>
+      <p style="font-size: 13px; color: #8a8a8a; margin: 0 0 20px;">${escapeBody(captainName || 'Captain')}</p>
+      <div style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 24px; padding: 16px; background: #161616; border-radius: 8px;">${escapeBody(body)}</div>
+      <a href="${adminUrl}" style="display: inline-block; padding: 12px 28px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
+        Reply in admin portal
+      </a>
+    </div>
+  `;
+}
+
+/**
  * Render the captain magic-link sign-in email — Night-Match design system.
  * @param {string} magicUrl - The full magic link URL
  * @param {string} teamName - The captain's team name

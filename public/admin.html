@@ -351,6 +351,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
             Score Entry
           </button>
+          <button class="sb__link" data-tab="messages">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Messages <span class="sb__badge" id="sb-msg-ct" style="display:none;">0</span>
+          </button>
           <div class="sb__sec">Content</div>
           <button class="sb__link" data-tab="moments">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -547,6 +551,70 @@
           </div>
           <div id="sc-matches">
             <div class="empty">Select a division and week, then click Load Matches.</div>
+          </div>
+        </section>
+
+        <!-- MESSAGES -->
+        <section class="admin-section" data-section="messages">
+          <div class="am-head">
+            <h1 class="am-title">Messages</h1>
+            <div class="am-actions">
+              <button class="ab ab--lime ab--sm" id="msg-broadcast-btn">📣 New broadcast</button>
+            </div>
+          </div>
+
+          <!-- Broadcast composer (hidden until opened) -->
+          <div class="ac" id="msg-broadcast-card" style="display:none;">
+            <div class="ac__h"><h2 class="ac__t">Broadcast to captains</h2></div>
+            <div class="arow">
+              <div class="af">
+                <label for="bc-scope">Send to</label>
+                <select id="bc-scope">
+                  <option value="all">All teams</option>
+                  <option value="division">A division</option>
+                  <option value="teams">Specific teams</option>
+                </select>
+              </div>
+              <div class="af" id="bc-division-wrap" style="display:none;">
+                <label for="bc-division">Division</label>
+                <select id="bc-division"></select>
+              </div>
+              <div class="af">
+                <label for="bc-audience">Email recipients</label>
+                <select id="bc-audience">
+                  <option value="captains">Captains only</option>
+                  <option value="cocaptains">Captains + co-captains</option>
+                  <option value="players">All players</option>
+                </select>
+              </div>
+            </div>
+            <div class="af" id="bc-teams-wrap" style="display:none;">
+              <label>Pick teams</label>
+              <div id="bc-teams-list" style="display:flex;flex-wrap:wrap;gap:8px;max-height:160px;overflow:auto;padding:8px;background:var(--color-surface-2);border-radius:var(--radius-sm);"></div>
+            </div>
+            <div class="arow">
+              <div class="af"><label for="bc-subject">Subject (optional)</label><input type="text" id="bc-subject" placeholder="e.g. Tonight's matches delayed 1 hour" autocomplete="off"></div>
+            </div>
+            <div class="af"><label for="bc-body">Message</label><textarea id="bc-body" rows="4" placeholder="Write your announcement…" style="resize:vertical;"></textarea></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;flex-wrap:wrap;">
+              <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:12px;color:var(--color-text-faint);">
+                <input type="checkbox" id="bc-email" checked> Also send email
+              </label>
+              <div style="display:flex;gap:8px;">
+                <button class="ab ab--outline ab--sm" id="bc-cancel">Cancel</button>
+                <button class="ab ab--lime ab--sm" id="bc-send">Send broadcast</button>
+              </div>
+            </div>
+            <div class="a-status" id="bc-status" style="display:none;margin-top:10px;"></div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:320px 1fr;gap:14px;" class="two-col" id="msg-grid">
+            <div class="ac ac--flush">
+              <div id="msg-inbox"><div class="loading">Loading…</div></div>
+            </div>
+            <div class="ac" id="msg-thread-card">
+              <div id="msg-thread"><div class="empty">Select a team to view the conversation.</div></div>
+            </div>
           </div>
         </section>
 
@@ -1475,6 +1543,7 @@
       if (t === 'teams') renderTeams();
       if (t === 'schedule') renderSched();
       if (t === 'scores') {}
+      if (t === 'messages') renderMessages();
       if (t === 'potw') loadPotw();
       if (t === 'settings') applySettings();
       if (t === 'moments') loadAdminGallery();
@@ -1573,6 +1642,7 @@
         if (st === 'rejected') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="reinstate" data-id="' + h(r.id) + '">Reinstate</button>');
         if (st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="mark-paid" data-id="' + h(r.id) + '">Payments</button>');
         if (r.division && DIVISIONS.length > 0 && !DIVISIONS.some(d => d.id === r.division)) actBtns.push('<button class="ab ab--outline ab--sm reg-act" style="color:var(--color-gold,#c9a84c);border-color:var(--color-gold,#c9a84c)" data-act="fix-division" data-id="' + h(r.id) + '" title="Division ID \'' + h(r.division) + '\' is not configured">Fix Division</button>');
+        actBtns.push('<button class="ab ab--ghost ab--sm reg-act" data-act="edit-contact" data-id="' + h(r.id) + '">Edit</button>');
         actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
         return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td style="font-size:12px;">' + feeCol + '</td><td>' + paidCol + '</td><td>' + balCol + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
@@ -1582,6 +1652,25 @@
   async function regAction(act, id) {
     if (act === 'mark-paid') { openPayModal(id); return; }
     const payload = { action: act, id };
+    if (act === 'edit-contact') {
+      const reg = allRegistrations.find(r => r.id === id) || {};
+      const curName = reg.path === 'team' ? (reg.team?.captain || '') : (reg.agent?.name || '');
+      const curEmail = reg.path === 'team' ? (reg.team?.players?.[0]?.email || '') : (reg.agent?.email || '');
+      const name = prompt('Captain / contact name:', curName);
+      if (name === null) return;
+      const email = prompt('Contact email (used for captain portal sign-in):', curEmail);
+      if (email === null) return;
+      if (!email.trim()) { alert('Email is required.'); return; }
+      payload.name = name.trim();
+      payload.email = email.trim();
+      try {
+        await apiJSON('/.netlify/functions/admin-registration-update', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        });
+        renderReg();
+      } catch (e) { alert('Update failed: ' + (e.message || 'unknown error')); }
+      return;
+    }
     if (act === 'reject') {
       const reason = prompt('Reject this registration — optional reason (leave blank to skip):');
       if (reason === null) return; // cancelled

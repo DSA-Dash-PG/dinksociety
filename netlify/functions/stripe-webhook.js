@@ -1,5 +1,5 @@
 // =============================================================
-// POST /api/stripe-webhook
+// POST /api/stripe-webhook  (handles registration + balance payments)
 //
 // Handles Stripe webhook events. Primary event:
 //   checkout.session.completed → marks registration as confirmed
@@ -57,6 +57,38 @@ export default async (req) => {
 
     try {
       const regStore = getStore('registrations');
+
+      // ── Balance payment (initiated from the captain portal) ──────
+      // The registration already exists and is confirmed; just record the
+      // additional payment against it. No pending→confirmed move, and no
+      // duplicate confirmation email.
+      if (session.metadata?.paymentType === 'balance') {
+        const keys = [`confirmed/${regId}.json`, `pending/${regId}.json`, regId];
+        let raw = null;
+        let foundKey = null;
+        for (const k of keys) {
+          raw = await regStore.get(k);
+          if (raw) { foundKey = k; break; }
+        }
+        if (!raw) {
+          console.warn(`Balance payment for unknown registration ${regId}`);
+          return new Response('OK', { status: 200 });
+        }
+        const reg = JSON.parse(raw);
+        const paid = session.amount_total ? session.amount_total / 100 : 0;
+        const discount = (session.total_details?.amount_discount || 0) / 100;
+        reg.amountPaid = Number(reg.amountPaid || 0) + paid;
+        const totalFee = Number(reg.totalPrice || reg.price || reg.amountPaid);
+        // A discount on the balance settles the remainder in full.
+        reg.balanceDue = discount > 0 ? 0 : Math.max(0, totalFee - reg.amountPaid);
+        reg.paymentStatus = reg.balanceDue > 0 ? 'partial' : 'paid_in_full';
+        reg.lastPaymentAt = new Date().toISOString();
+        reg.balancePaidVia = 'stripe_captain_portal';
+        await regStore.set(foundKey, JSON.stringify(reg));
+        console.log(`Balance payment recorded for ${regId}: +$${paid}, balanceDue now $${reg.balanceDue}`);
+        return new Response('OK', { status: 200 });
+      }
+      // ─────────────────────────────────────────────────────────────
 
       // Look for the registration — try prefixed key first, then bare key (legacy)
       const pendingKey = `pending/${regId}.json`;
@@ -248,7 +280,7 @@ export default async (req) => {
     }
   }
 
-  // Always return 200 to acknowledge receipt
+  // Always return 200 to acknowledge receipt of the webhook event
   return new Response(JSON.stringify({ received: true }), {
     status: 200,
     headers: { 'Content-Type': 'application/json' },

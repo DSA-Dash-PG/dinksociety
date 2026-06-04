@@ -435,6 +435,7 @@
           <button class="ds-drawer__link is-active" data-drawer-tab="next">Next match</button>
           <button class="ds-drawer__link" data-drawer-tab="roster">Roster</button>
           <button class="ds-drawer__link" data-drawer-tab="schedule">Schedule</button>
+          <button class="ds-drawer__link" data-drawer-tab="billing">Billing</button>
         </div>
         <div class="ds-drawer__section">
           <div class="ds-drawer__section-label">League</div>
@@ -454,6 +455,7 @@
       <button class="cap-tab is-active" data-tab="next">Next match</button>
       <button class="cap-tab" data-tab="roster">Roster</button>
       <button class="cap-tab" data-tab="schedule">Schedule</button>
+      <button class="cap-tab" data-tab="billing">Billing</button>
     </nav>
 
     <!-- Gender-missing warning (shown only when roster has entries with no gender) -->
@@ -550,6 +552,18 @@
       </div>
     </section>
 
+    <!-- BILLING -->
+    <section class="cap-section" data-section="billing">
+      <div class="cap-card">
+        <div class="cap-card__header">
+          <h2 class="cap-card__title">Team fee &amp; balance</h2>
+          <span class="cap-card__sub">Season 1</span>
+        </div>
+        <div id="billing-area"><div class="empty-state">Loading&hellip;</div></div>
+        <div class="cap-status" id="billing-status"></div>
+      </div>
+    </section>
+
     <!-- Transfer request modal (appended to body via JS) -->
 
   </div>
@@ -616,7 +630,15 @@
       // Load roster + schedule, then dispatch to the right state
       Promise.all([loadRoster(true), loadMatches(true)]).then(() => {
         updateGenderWarning();
-        dispatchToNext();
+        // Returning from a successful balance payment? Land on Billing.
+        if (new URLSearchParams(location.search).get('paid') === '1') {
+          history.replaceState(null, '', location.pathname);
+          document.querySelector('.cap-tab[data-tab="billing"]')?.click();
+          const status = $id('billing-status');
+          if (status) { status.className = 'cap-status is-success'; status.textContent = 'Payment received — thank you! Your balance has been updated.'; }
+        } else {
+          dispatchToNext();
+        }
       });
     }
 
@@ -736,6 +758,7 @@
           switchSection(tab);
           if (tab === 'schedule') loadMatches();
           if (tab === 'roster') { loadRoster(); loadCaptainTransferRequests(); }
+          if (tab === 'billing') loadBalance();
         }
       });
     });
@@ -746,6 +769,84 @@
       });
       stopPolling();
       updateGenderWarning();
+    }
+
+    // ===== Billing / balance =====
+    const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+
+    async function loadBalance() {
+      const area = $id('billing-area');
+      area.innerHTML = '<div class="empty-state">Loading&hellip;</div>';
+      try {
+        const res = await fetch('/.netlify/functions/captain-balance', { credentials: 'include' });
+        if (!res.ok) throw new Error();
+        const b = await res.json();
+        renderBalance(b);
+      } catch {
+        area.innerHTML = '<div class="empty-state">Could not load your balance.</div>';
+      }
+    }
+
+    function renderBalance(b) {
+      const area = $id('billing-area');
+      if (!b.hasRegistration) {
+        area.innerHTML = '<div class="empty-state">No fee on file for this team yet. If you think this is wrong, contact the league.</div>';
+        return;
+      }
+
+      const balance = Number(b.balanceDue || 0);
+      const paid = Number(b.amountPaid || 0);
+      const total = Number(b.totalPrice || 0);
+
+      const rows = `
+        <div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--color-text-faint);font-size:14px;">
+          <span>Team fee</span><span style="color:var(--color-text);font-weight:600;">${money(total)}</span>
+        </div>
+        ${b.discountApplied > 0 ? `<div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--color-text-faint);font-size:14px;">
+          <span>Discount applied</span><span style="color:var(--color-gold);font-weight:600;">−${money(b.discountApplied)}</span>
+        </div>` : ''}
+        <div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--color-text-faint);font-size:14px;">
+          <span>Paid</span><span style="color:#b8ff2c;font-weight:600;">${money(paid)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px 0 0;border-top:1px solid var(--color-line, #2a2a2a);margin-top:6px;font-size:15px;">
+          <span style="font-weight:700;">Balance due</span><span style="font-weight:800;">${money(balance)}</span>
+        </div>`;
+
+      if (balance <= 0) {
+        area.innerHTML = rows + `
+          <div style="margin-top:18px;background:rgba(184,255,44,0.08);border:1px solid rgba(184,255,44,0.3);border-left:3px solid #b8ff2c;padding:14px 16px;border-radius:0 10px 10px 0;font-size:13px;color:var(--color-text-faint);">
+            <strong style="color:var(--color-text);">You're all paid up.</strong> Nothing is owed for your team. Thanks!
+          </div>`;
+        return;
+      }
+
+      area.innerHTML = rows + `
+        <button class="cap-btn cap-btn--gold" id="pay-balance-btn" style="margin-top:18px;width:100%;">Pay ${money(balance)} now</button>
+        <p style="font-size:12px;color:var(--color-text-faint);margin:10px 0 0;text-align:center;">Secure payment via Stripe. Have a discount code? Enter it on the next screen.</p>`;
+
+      $id('pay-balance-btn').addEventListener('click', startBalancePayment);
+    }
+
+    async function startBalancePayment() {
+      const btn = $id('pay-balance-btn');
+      const status = $id('billing-status');
+      btn.disabled = true;
+      status.className = 'cap-status';
+      status.textContent = 'Redirecting to secure checkout…';
+      try {
+        const res = await fetch('/.netlify/functions/captain-pay', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+        });
+        const data = await res.json();
+        if (!res.ok || !data.checkoutUrl) throw new Error(data.error || 'Could not start checkout.');
+        window.location.href = data.checkoutUrl;
+      } catch (err) {
+        btn.disabled = false;
+        status.className = 'cap-status is-err';
+        status.textContent = err.message || 'Something went wrong — try again.';
+      }
     }
 
     // ===== Matches list =====
