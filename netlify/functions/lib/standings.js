@@ -253,6 +253,7 @@ export async function rebuildStandings(circuit) {
   for (const p of playerStats.values()) {
     p.rankDelta = Object.prototype.hasOwnProperty.call(rankDeltas, p.playerId) ? rankDeltas[p.playerId] : null;
   }
+  attachAwards(playerStats, weeklyTopPerformers);
   standings.weeklyTopPerformers = weeklyTopPerformers;
 
   const playerStatsOut = {
@@ -522,4 +523,19 @@ function computeRankDeltas(weekly) {
     deltas[pid] = (pr == null) ? null : (pr - rank);
   }
   return deltas;
+}
+
+// Tag each week's #1 male + #1 female onto their player record as a Chef of the Week award.
+function attachAwards(playerMap, weeklyTopPerformers) {
+  for (const wk of weeklyTopPerformers) {
+    for (const [entry, type] of [[wk.men[0], 'mens'], [wk.women[0], 'womens']]) {
+      if (!entry) continue;
+      const p = playerMap.get(entry.playerId);
+      if (!p) continue;
+      (p.awards = p.awards || []).push({
+        week: wk.week, label: wk.label, date: wk.date, type,
+        dsr: entry.dsr, w: entry.w, l: entry.l, diff: entry.diff,
+      });
+    }
+  }
 }

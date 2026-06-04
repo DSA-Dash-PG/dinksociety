@@ -51,6 +51,20 @@
     .val--teal  { color: var(--color-teal); }
     .val--lime  { color: var(--color-lime); }
 
+    /* ── Awards (Chef of the Week) ── */
+    .awards-list { display: flex; flex-direction: column; }
+    .award-row { display: flex; align-items: center; gap: 12px; padding: 11px 0; border-bottom: 1px solid var(--color-border); }
+    .award-row:last-child { border-bottom: none; }
+    .award-badge { width: 34px; height: 34px; border-radius: 9px; background: var(--color-lime-ghost); display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; }
+    .award-badge--f { background: var(--color-teal-dim); }
+    .award-body { flex: 1; min-width: 0; }
+    .award-title { font-size: 13px; font-weight: 700; }
+    .award-meta { font-size: 11px; color: var(--color-text-faint); margin-top: 1px; }
+    .award-dsr { font-size: 18px; font-weight: 800; color: var(--color-lime); white-space: nowrap; }
+    .award-dsr--f { color: var(--color-teal); }
+    .award-dsr__u { font-size: 9px; color: var(--color-text-faint); font-weight: 600; }
+    .pp-pill--award { color: var(--color-lime); border-color: var(--color-lime); background: var(--color-lime-ghost); }
+
     /* ── By game type ── */
     .game-type-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
     .game-type-card { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px 14px; text-align: center; }
@@ -241,6 +255,30 @@
         </div>
         ${rankTiles}
       </div>`;
+
+      /* ── AWARDS — Chef of the Week wins ── */
+      if (stat?.awards?.length) {
+        const fmtAward = iso => { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch { return ''; } };
+        html += `<div class="pp-card">
+          <div class="pp-card__head" style="justify-content:space-between">
+            <span>🏆 Chef of the Week</span>
+            <span class="pp-pill pp-pill--award">${stat.awards.length}&times; winner</span>
+          </div>
+          <div class="awards-list">
+            ${stat.awards.map(a => {
+              const f = a.type === 'womens';
+              return `<div class="award-row">
+                <div class="award-badge ${f ? 'award-badge--f' : ''}">👑</div>
+                <div class="award-body">
+                  <div class="award-title">Week ${a.week} ${f ? "Women's" : "Men's"} Chef</div>
+                  <div class="award-meta">${fmtAward(a.date)} &middot; ${a.w}W&ndash;${a.l}L &middot; ${a.diff >= 0 ? '+' : ''}${a.diff} pt diff</div>
+                </div>
+                <div class="award-dsr ${f ? 'award-dsr--f' : ''}">${Number(a.dsr).toFixed(1)}<span class="award-dsr__u"> DSR</span></div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
 
       /* ── STATS — only if we have game data ── */
       if (stat && stat.gamesPlayed > 0) {

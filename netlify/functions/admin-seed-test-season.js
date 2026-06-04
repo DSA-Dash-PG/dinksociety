@@ -538,6 +538,7 @@ async function writeAggregates({ teamAgg, playerAgg, weeklyPerTeam, weeklyPlayer
   for (const p of playerAgg.values()) {
     p.rankDelta = Object.prototype.hasOwnProperty.call(rankDeltas, p.playerId) ? rankDeltas[p.playerId] : null;
   }
+  attachAwards(playerAgg, standings.weeklyTopPerformers);
 
   const playerStats = { circuit: CIRCUIT, lastUpdated: now, players: Object.fromEntries(playerAgg) };
 
@@ -636,6 +637,20 @@ function computeRankDeltas(weekly) {
     deltas[pid] = (pr == null) ? null : (pr - rank);
   }
   return deltas;
+}
+
+function attachAwards(playerMap, weeklyTopPerformers) {
+  for (const wk of weeklyTopPerformers) {
+    for (const [entry, type] of [[wk.men[0], 'mens'], [wk.women[0], 'womens']]) {
+      if (!entry) continue;
+      const p = playerMap.get(entry.playerId);
+      if (!p) continue;
+      (p.awards = p.awards || []).push({
+        week: wk.week, label: wk.label, date: wk.date, type,
+        dsr: entry.dsr, w: entry.w, l: entry.l, diff: entry.diff,
+      });
+    }
+  }
 }
 
 export const config = { path: '/.netlify/functions/admin-seed-test-season' };

@@ -109,6 +109,29 @@
     .podium-place { font-size:9px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); }
     .podium-place--1 { color:var(--color-lime); }
 
+    /* Player of the Week — collapsible weekly winners */
+    .chef-week-head { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin-bottom:var(--space-3); }
+    .chef-week-caret { color:var(--color-text-faint); font-size:11px; display:inline-block; transition:transform .15s; }
+    .chef-week-label { color:var(--color-text-faint); font-size:11px; letter-spacing:0.1em; font-weight:700; text-transform:uppercase; }
+    .pow-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .pow-col-label { font-size:10px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:8px; }
+    .pow-winner { border:1px solid var(--color-border); border-radius:var(--radius-md); padding:14px; display:flex; flex-direction:column; gap:8px; }
+    .pow-winner__top { display:flex; align-items:center; gap:10px; }
+    .pow-winner__name { font-size:14px; font-weight:700; }
+    .pow-winner__stats { display:flex; align-items:baseline; justify-content:space-between; }
+    .pow-winner__dsr { font-size:24px; font-weight:900; line-height:1; }
+    .pow-winner__rec { font-size:11px; color:var(--color-text-muted); font-variant-numeric:tabular-nums; }
+    .pow-mentions { margin-top:4px; border-top:1px solid var(--color-divider); }
+    .pow-mention { display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:12px; }
+    .pow-mention__name { font-weight:600; }
+    .pow-mention__team { color:var(--color-text-faint); }
+    .pow-mention__dsr { margin-left:auto; color:var(--color-text-muted); }
+    .pow-collapsed { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:10px 12px; background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-md); }
+    .pow-chip { display:flex; align-items:center; gap:8px; min-width:0; }
+    .pow-chip__name { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pow-chip__dsr { margin-left:auto; font-size:14px; font-weight:800; }
+    @media(max-width:600px){ .pow-cols { grid-template-columns:1fr; } .pow-collapsed { grid-template-columns:1fr; } }
+
     /* Season chefs grid */
     .chefs-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
     @media(max-width:600px){ .chefs-grid { grid-template-columns:1fr; } }
@@ -241,7 +264,7 @@
 
   const state = {
     circuit:'I', division:'', tab:'rankings',
-    filter:'all', search:'',
+    filter:'all', search:'', sort:'dsr', sortDir:'desc',
     playerStats:null, standings:null, potw:null
   };
 
@@ -317,17 +340,38 @@
   function filteredPlayers(filter, searchQ) {
     filter = filter || state.filter;
     searchQ = (searchQ !== undefined ? searchQ : state.search).toLowerCase();
-    return playerList()
+    const rows = playerList()
       .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ) || (p.teamName||'').toLowerCase().includes(searchQ))
       .map(p => {
+        // GP / WON / LOSS respect the active game-type filter
         const s = filter === 'all'
           ? { played: p.gamesPlayed||0, won: p.gamesWon||0 }
           : (p.byType?.[filter] || { played:0, won:0 });
-        return { ...p, _played: s.played, _won: s.won,
-                 _rate: s.played ? s.won/s.played : 0 };
+        // PS / PA / DIFF and per-game averages are always season totals
+        const gp = p.gamesPlayed || 0;
+        const ps = p.ps || 0, pa = p.pa || 0, diff = (p.diff != null ? p.diff : ps - pa);
+        return { ...p,
+          _played: s.played, _won: s.won, _lost: s.played - s.won,
+          _rate: s.played ? s.won/s.played : 0,
+          _dsr: p.composite,
+          _ps: ps, _pa: pa, _diff: diff,
+          _aps: gp ? ps/gp : 0, _apa: gp ? pa/gp : 0, _avgDiff: gp ? diff/gp : 0,
+        };
       })
-      .filter(p => p._played > 0)
-      .sort((a,b) => b._rate !== a._rate ? b._rate - a._rate : b._won - a._won);
+      .filter(p => p._played > 0);
+
+    // Sort by the active column (default: DSR desc). Nulls sink to the bottom.
+    const KEY = { dsr:'_dsr', gp:'_played', won:'_won', loss:'_lost',
+                  ps:'_ps', pa:'_pa', diff:'_diff', aps:'_aps', apa:'_apa', avgdiff:'_avgDiff' };
+    const k = KEY[state.sort] || '_dsr';
+    const dir = state.sortDir === 'asc' ? 1 : -1;
+    const num = v => (v == null || Number.isNaN(v)) ? -Infinity : v;
+    rows.sort((a,b) => {
+      const d = (num(a[k]) - num(b[k])) * dir;
+      if (d) return d;
+      return (num(b._dsr) - num(a._dsr)) || (b._won - a._won);
+    });
+    return rows;
   }
 
   function noData(msg) {
@@ -363,29 +407,53 @@
     }
 
     const players = filteredPlayers();
+
+    // Rank medals only apply to the canonical ordering (DSR, descending)
+    const canonical = state.sort === 'dsr' && state.sortDir === 'desc';
+    const signI = n => (n > 0 ? '+' : '') + n;
+    const sign1 = n => (n > 0 ? '+' : '') + n.toFixed(1);
+    const diffCls = n => n > 0 ? 'val-pos' : n < 0 ? 'val-neg' : 'val-zero';
+    const mvCell = d => {
+      if (d == null) return '<span class="rank-change rank-change--same">—</span>';
+      if (d > 0) return `<span class="rank-change rank-change--up">▲${d}</span>`;
+      if (d < 0) return `<span class="rank-change rank-change--down">▼${Math.abs(d)}</span>`;
+      return '<span class="rank-change rank-change--same">—</span>';
+    };
+
     const rows = players.map((p, i) => {
       const rankCls = i===0 ? 'rank-num--1' : i===1 ? 'rank-num--2' : i===2 ? 'rank-num--3' : '';
-      const pct = Math.round(p._rate * 100);
-      const pctCls = pct >= 65 ? 'win-pct' : 'win-pct--low';
-      const avCls = p.gender === 'female' ? 'player-avatar--f' : '';
-      return `<tr class="${i===0?'rank-row--leader':''}">
-        <td><span class="rank-num ${rankCls}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span></td>
-        <td><span class="rank-change rank-change--same">—</span></td>
+      const rankDisp = canonical && i < 3 ? ['🥇','🥈','🥉'][i] : (i + 1);
+      const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
+      const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
+      return `<tr class="${canonical && i===0 ? 'rank-row--leader' : ''}">
+        <td><span class="rank-num ${rankCls}">${rankDisp}</span></td>
+        <td class="col-opt">${mvCell(p.rankDelta)}</td>
+        <td class="r"><span class="${p._dsr != null ? 'val-dsr' : 'val-zero'}">${dsr}</span></td>
         <td>
           <div class="player-cell">
             <div class="player-avatar ${avCls}">${esc(initials(p.name))}</div>
-            <div>
-              <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
-              <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
-            </div>
+            <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
           </div>
         </td>
+        <td><span class="player-team" style="font-size:11px">${teamLinkHtml(p.teamName, p.teamId)}</span></td>
         <td class="r">${p._played}</td>
-        <td class="r">${p._won}</td>
-        <td class="r">${p._played - p._won}</td>
-        <td class="r"><span class="${pctCls}">${pct}%</span></td>
+        <td class="r"><span class="val-pos">${p._won}</span></td>
+        <td class="r"><span class="val-neg">${p._lost}</span></td>
+        <td class="r col-opt"><span class="val-ps">${p._ps}</span></td>
+        <td class="r col-opt"><span class="val-zero">${p._pa}</span></td>
+        <td class="r"><span class="${diffCls(p._diff)}">${signI(p._diff)}</span></td>
+        <td class="r col-opt"><span class="val-acc">${p._aps.toFixed(1)}</span></td>
+        <td class="r col-opt"><span class="val-zero">${p._apa.toFixed(1)}</span></td>
+        <td class="r"><span class="${diffCls(p._avgDiff)}">${sign1(p._avgDiff)}</span></td>
       </tr>`;
     }).join('');
+
+    // Sortable header cell
+    const th = (key, label, opt) => {
+      const on = state.sort === key;
+      const ar = on ? `<span class="sort-ar">${state.sortDir === 'asc' ? '▲' : '▼'}</span>` : '';
+      return `<th class="r sortable ${on ? 'is-sorted' : ''} ${opt ? 'col-opt' : ''}" data-sort="${key}">${label}${ar}</th>`;
+    };
 
     el.innerHTML = `<div class="lb-card">
       <div class="lb-search-row">
@@ -397,15 +465,22 @@
       <div style="overflow-x:auto">
         <table class="rank-table">
           <thead><tr>
-            <th style="width:36px">#</th>
-            <th style="width:32px">+/−</th>
+            <th style="width:34px">Rank</th>
+            <th class="col-opt" style="width:30px">+/−</th>
+            ${th('dsr','DSR')}
             <th>Player</th>
-            <th class="r">GP</th>
-            <th class="r">W</th>
-            <th class="r">L</th>
-            <th class="r">Win%</th>
+            <th>Team</th>
+            ${th('gp','GP')}
+            ${th('won','Won')}
+            ${th('loss','Loss')}
+            ${th('ps','PS', true)}
+            ${th('pa','PA', true)}
+            ${th('diff','Diff +/−')}
+            ${th('aps','APS', true)}
+            ${th('apa','APA', true)}
+            ${th('avgdiff','Avg Diff')}
           </tr></thead>
-          <tbody>${rows || '<tr><td colspan="7">' + noData('No players match this filter.') + '</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="14">' + noData('No players match this filter.') + '</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -417,8 +492,26 @@
       state.filter = b.dataset.filter;
       renderRankings();
     }));
+    el.querySelectorAll('th[data-sort]').forEach(thEl => thEl.addEventListener('click', () => {
+      const key = thEl.dataset.sort;
+      if (state.sort === key) {
+        state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+      } else {
+        state.sort = key;
+        state.sortDir = 'desc';
+      }
+      renderRankings();
+    }));
     const s = $('rank-search');
-    if (s) s.addEventListener('input', e => { state.search = e.target.value; renderRankings(); });
+    if (s) {
+      s.addEventListener('input', e => {
+        const pos = e.target.selectionStart;
+        state.search = e.target.value;
+        renderRankings();
+        const ns = $('rank-search');
+        if (ns) { ns.focus(); try { ns.setSelectionRange(pos, pos); } catch {} }
+      });
+    }
   }
 
   // ── K'CHN TOP CHEFS ───────────────────────────────────────────────
@@ -436,12 +529,11 @@
         </div>
       </div>`;
 
-    // Weekly top performers — needs backend weekly data
-    if (state.standings?.weeklyTopPerformers?.length) {
-      // Render weekly podiums when data is available
-      state.standings.weeklyTopPerformers.forEach(week => {
-        html += renderWeekPodium(week);
-      });
+    // Weekly Top Chefs — gender-split winners, newest week first, collapsible
+    const wtp = state.standings?.weeklyTopPerformers || [];
+    if (wtp.length) {
+      const openMap = getChefOpen(wtp);
+      wtp.forEach(week => { html += renderWeekPodium(week, !!openMap[week.week]); });
     } else {
       html += `<div style="background:var(--color-surface-2);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-4);">
         <p style="font-size:12px;color:var(--color-text-faint);margin:0;">
@@ -457,8 +549,10 @@
       el.innerHTML = html; return;
     }
 
-    const malePlayers   = filteredPlayers('all').filter(p => p.gender === 'male');
-    const femalePlayers = filteredPlayers('all').filter(p => p.gender === 'female');
+    const byWinRate = (a, b) => (b._rate - a._rate) || (b._won - a._won);
+    const allChefs = filteredPlayers('all');
+    const malePlayers   = allChefs.filter(p => /^m/i.test(p.gender || '')).sort(byWinRate);
+    const femalePlayers = allChefs.filter(p => /^f/i.test(p.gender || '')).sort(byWinRate);
 
     const chefRows = (list, limit) => list.slice(0, limit).map((p, i) => {
       const pct = Math.round(p._rate * 100);
@@ -466,7 +560,7 @@
         <td><span class="rank-num ${i===0?'rank-num--1':i===1?'rank-num--2':i===2?'rank-num--3':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span></td>
         <td>
           <div class="player-cell">
-            <div class="player-avatar ${p.gender==='female'?'player-avatar--f':''}">${esc(initials(p.name))}</div>
+            <div class="player-avatar ${/^f/i.test(p.gender||'')?'player-avatar--f':''}">${esc(initials(p.name))}</div>
             <div>
               <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
               <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
@@ -498,33 +592,92 @@
     </div>`;
 
     el.innerHTML = html;
+    wireChefs(el);
   }
 
-  function renderWeekPodium(week) {
-    // week: { label, date, top3: [{name, teamName, gender, score, wl, diff}] }
-    const [second, first, third] = [week.top3[1], week.top3[0], week.top3[2]];
-    const podiumCard = (p, place) => {
-      if (!p) return `<div class="podium-card"><span style="color:var(--color-text-faint);font-size:12px">—</span></div>`;
-      const avCls = p.gender==='female' ? 'player-avatar--f' : '';
-      return `<div class="podium-card ${place===1?'podium-card--first':''}">
-        <div class="podium-place ${place===1?'podium-place--1':''}">${place===1?'🥇':place===2?'🥈':'🥉'}</div>
-        <div class="podium-avatar ${place===1?'podium-avatar--first':''}" style="${p.gender==='female'?'border-color:var(--color-teal);color:var(--color-teal)':'color:var(--color-lime)'}">
-          ${esc(initials(p.name))}
+  function renderWeekPodium(week, open) {
+    // week: { week, label, date, men:[top3], women:[top3] } — each: {name, teamName, teamId, gender, dsr, w, l, diff}
+    const LIME = 'var(--color-lime)', TEAL = 'var(--color-teal)';
+    const fmtDate = iso => { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); } catch { return esc(iso); } };
+
+    const winnerCard = (p, accent, ghost) => {
+      if (!p) return `<div class="pow-winner"><span style="color:var(--color-text-faint);font-size:12px">—</span></div>`;
+      return `<div class="pow-winner" style="border-color:${accent};background:${ghost}">
+        <div class="pow-winner__top">
+          <div class="player-avatar" style="color:${accent};border-color:${accent}">${esc(initials(p.name))}</div>
+          <div style="min-width:0">
+            <div class="pow-winner__name">👑 ${playerLinkHtml(p.name, p.teamName)}</div>
+            <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
+          </div>
         </div>
-        <div class="podium-name">${playerLinkHtml(p.name, p.teamName)}</div>
-        <div class="podium-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
-        ${p.score ? `<div class="podium-score">${p.score}</div>` : ''}
-        <div class="podium-meta">${esc(p.wl||'')}${p.diff ? ` · ${p.diff>0?'+':''}${p.diff}` : ''}</div>
+        <div class="pow-winner__stats">
+          <span class="pow-winner__dsr" style="color:${accent}">${Number(p.dsr).toFixed(1)}<span style="font-size:9px;color:var(--color-text-faint);font-weight:600"> DSR</span></span>
+          <span class="pow-winner__rec">${p.w}W–${p.l}L · ${p.diff>=0?'+':''}${p.diff}</span>
+        </div>
       </div>`;
     };
-    return `<div class="week-block">
-      <div class="week-label">📅 ${esc(week.label)}${week.date?' · '+esc(week.date):''}</div>
-      <div class="podium">
-        ${podiumCard(second,2)}
-        ${podiumCard(first,1)}
-        ${podiumCard(third,3)}
+    const mention = (p, place) => p ? `<div class="pow-mention">
+      <span>${place===2?'🥈':'🥉'}</span>
+      <span class="pow-mention__name">${playerLinkHtml(p.name, p.teamName)}</span>
+      <span class="pow-mention__team">· ${esc(p.teamName||'')}</span>
+      <span class="pow-mention__dsr">${Number(p.dsr).toFixed(1)} DSR</span>
+    </div>` : '';
+    const column = (list, label, accent, ghost) => {
+      if (!list || !list.length) return '';
+      return `<div>
+        <div class="pow-col-label" style="color:${accent}">${label}</div>
+        ${winnerCard(list[0], accent, ghost)}
+        <div class="pow-mentions">${mention(list[1],2)}${mention(list[2],3)}</div>
+      </div>`;
+    };
+    const chip = (p, accent) => p ? `<div class="pow-chip">
+      <div class="player-avatar" style="width:26px;height:26px;font-size:9px;color:${accent};border-color:${accent}">${esc(initials(p.name))}</div>
+      <div style="min-width:0">
+        <div class="pow-chip__name">👑 ${playerLinkHtml(p.name, p.teamName)}</div>
+        <div class="player-team">${esc(p.teamName||'')}</div>
       </div>
+      <span class="pow-chip__dsr" style="color:${accent}">${Number(p.dsr).toFixed(1)}</span>
+    </div>` : '<div class="pow-chip"><span style="color:var(--color-text-faint);font-size:12px">—</span></div>';
+
+    const body = open
+      ? `<div class="pow-cols">
+           ${column(week.men, "Men's chef", LIME, 'var(--color-lime-ghost)')}
+           ${column(week.women, "Women's chef", TEAL, 'var(--color-teal-dim)')}
+         </div>`
+      : `<div class="pow-collapsed">${chip(week.men && week.men[0], LIME)}${chip(week.women && week.women[0], TEAL)}</div>`;
+
+    return `<div class="week-block">
+      <div class="chef-week-head" data-chef-week="${week.week}">
+        <span class="chef-week-caret" style="transform:rotate(${open ? '90' : '0'}deg)">▶</span>
+        <span class="chef-week-label">📅 ${esc(week.label)}${week.date ? ' · ' + esc(fmtDate(week.date)) : ''}</span>
+      </div>
+      ${body}
     </div>`;
+  }
+
+  // Collapse state for weekly Top Chefs — persisted; newest week open by default.
+  function getChefOpen(weeks) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('ds-chef-open') || '{}'); } catch {}
+    const newest = Math.max(...weeks.map(w => w.week));
+    const out = {};
+    for (const w of weeks) out[w.week] = (String(w.week) in saved) ? !!saved[w.week] : (w.week === newest);
+    return out;
+  }
+  function setChefOpen(week, open) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('ds-chef-open') || '{}'); } catch {}
+    saved[week] = open;
+    try { localStorage.setItem('ds-chef-open', JSON.stringify(saved)); } catch {}
+  }
+  function wireChefs(el) {
+    const weeks = state.standings?.weeklyTopPerformers || [];
+    const openMap = getChefOpen(weeks);
+    el.querySelectorAll('[data-chef-week]').forEach(h => h.addEventListener('click', () => {
+      const wk = Number(h.dataset.chefWeek);
+      setChefOpen(wk, !openMap[wk]);
+      renderTopChefs();
+    }));
   }
 
   // ── TEAM LEADERS ─────────────────────────────────────────────────
