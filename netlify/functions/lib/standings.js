@@ -302,15 +302,12 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lin
   for (const slot of SLOT_KEYS) {
     const slotType = SLOT_TYPE[slot];
     const gs = score.games[slot];
-    if (!gs?.home || !gs?.away) continue;
-    // Only count games where both sides entered AND they match (confirmed)
-    if (gs.home.entered !== gs.away.entered && gs.home.entered && gs.away.entered) continue;
-    // Skip unconfirmed games
-    if (gs.home.entered !== gs.away.entered) continue;
-
-    const homeScore = gs.home.entered;
-    const awayScore = gs.away.entered;
-    if (homeScore === awayScore) continue; // individual game ties impossible in pickleball but guard
+    // Score shape: { home: <homeScore>|null, away: <awayScore>|null }.
+    // Only count complete games (both scores entered, with a winner).
+    const homeScore = gs?.home;
+    const awayScore = gs?.away;
+    if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore)) continue;
+    if (homeScore === awayScore) continue; // a game must have a winner
 
     const homeWon = homeScore > awayScore;
 

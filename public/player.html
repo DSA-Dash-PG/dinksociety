@@ -125,13 +125,17 @@
     const teamParam  = params.get('team')  || '';
     const playerName = params.get('name')  || '';
     const playerIdParam = params.get('id') || '';   // direct player-id lookup (future use)
+    // Optional season override (?season=circuit-test) for staff QA. Default = live season.
+    const SEASON_ID = params.get('season') || 'circuit-i';
+    const CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
+    const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
 
     /* ─── Load ────────────────────────────────────────────── */
     async function load() {
       // Always fetch teams to find the player's roster entry + team info
       const [teamsRes, psRes] = await Promise.allSettled([
-        fetch('/.netlify/functions/public-teams?season=circuit-i').then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-leaderboard?circuit=I&view=players').then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null),
       ]);
 
       const teams = teamsRes.value?.teams || [];
@@ -162,7 +166,7 @@
 
       // Update back link to point at the team page
       const back = document.getElementById('back-link');
-      back.href = `/team?id=${teamSlug}`;
+      back.href = `/team?id=${teamSlug}${LINK_SUFFIX}`;
       back.textContent = team.name;
 
       // Find player stats by name (since we don't have playerId in the URL yet)
@@ -176,7 +180,7 @@
       const resolvedId = pStat?.playerId || rosterPlayer?.id || '';
       if (resolvedId) {
         try {
-          const hr = await fetch(`/.netlify/functions/public-player?id=${encodeURIComponent(resolvedId)}`);
+          const hr = await fetch(`/.netlify/functions/public-player?id=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}`);
           if (hr.ok) {
             const hd = await hr.json();
             history = hd.history || [];
@@ -209,7 +213,7 @@
             <div class="pp-hero__eyebrow">Season 1 &mdash; ${esc(divLabel)}</div>
             <h1 class="pp-hero__name">${esc(rp.name)}</h1>
             <div class="pp-hero__meta">
-              <a href="/team?id=${teamSlug}">${esc(team.name)}</a>
+              <a href="/team?id=${teamSlug}${LINK_SUFFIX}">${esc(team.name)}</a>
               ${team.emoji ? ` ${team.emoji}` : ''}
             </div>
             ${pills.length ? `<div class="pp-hero__pills">${pills.join('')}</div>` : ''}
@@ -284,7 +288,7 @@
               ${pEntries.map(p => {
                 const pcolor = avatarColor(p.name);
                 const partnerTeamSlug = p.teamName ? slug(p.teamName) : teamSlug;
-                const partnerHref = `/player?team=${partnerTeamSlug}&name=${encodeURIComponent(p.name)}`;
+                const partnerHref = `/player?team=${partnerTeamSlug}&name=${encodeURIComponent(p.name)}${LINK_SUFFIX}`;
                 const pp = pct(p.won, p.played);
                 const pctClass = pp >= 60 ? 'val--green' : pp <= 35 ? 'val--red' : '';
                 return `<div class="partner-row">

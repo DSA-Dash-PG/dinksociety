@@ -804,6 +804,29 @@
             <table class="at"><thead><tr><th>Email</th><th>Role</th></tr></thead>
             <tbody id="admins-list"><tr><td colspan="2" class="loading">Loading…</td></tr></tbody></table>
           </div>
+          <div class="ac" style="border-color:rgba(99,102,241,0.45);">
+            <div class="ac__h"><h2 class="ac__t" style="color:#818cf8;">🧪 Test Season (QA)</h2></div>
+            <p style="font-size:13px;color:var(--color-text-muted);margin:0 0 14px;">
+              Spin up a fully isolated test season for vetting the scoring system: 6 teams (6–12 players each), a 5-week round-robin, the first 2 weeks pre-scored and the rest open for live scoring. Completely separate from real seasons — testers sign in at <code>/captain.html</code> with the captain emails below, then enter scores. View it on the real pages:
+              <a href="/teams.html?season=circuit-test" target="_blank" rel="noopener">Teams</a> ·
+              <a href="/standings.html?season=circuit-test" target="_blank" rel="noopener">Standings</a> ·
+              <a href="/leaderboard.html?circuit=TEST" target="_blank" rel="noopener">Leaderboard</a> ·
+              <a href="/leaderboard.html?circuit=TEST&view=players" target="_blank" rel="noopener">Player stats</a>.
+            </p>
+            <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 8px;">Captain emails (one per team — use real tester emails so they can sign in; blanks become <code>test-captain-N@dinksociety.test</code>):</p>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:16px;">
+              <div class="af"><label for="tts-cap-0">Team 1 captain</label><input type="email" id="tts-cap-0" class="tts-cap" autocomplete="off" placeholder="captain1@email.com"></div>
+              <div class="af"><label for="tts-cap-1">Team 2 captain</label><input type="email" id="tts-cap-1" class="tts-cap" autocomplete="off" placeholder="captain2@email.com"></div>
+              <div class="af"><label for="tts-cap-2">Team 3 captain</label><input type="email" id="tts-cap-2" class="tts-cap" autocomplete="off" placeholder="captain3@email.com"></div>
+              <div class="af"><label for="tts-cap-3">Team 4 captain</label><input type="email" id="tts-cap-3" class="tts-cap" autocomplete="off" placeholder="captain4@email.com"></div>
+              <div class="af"><label for="tts-cap-4">Team 5 captain</label><input type="email" id="tts-cap-4" class="tts-cap" autocomplete="off" placeholder="captain5@email.com"></div>
+              <div class="af"><label for="tts-cap-5">Team 6 captain</label><input type="email" id="tts-cap-5" class="tts-cap" autocomplete="off" placeholder="captain6@email.com"></div>
+            </div>
+            <button class="ab" id="seed-test-btn" style="background:#6366f1;color:#fff;border-color:#6366f1;">Seed Test Season</button>
+            <button class="ab ab--danger ab--sm" id="wipe-test-btn" style="margin-left:8px;">Wipe Test Season</button>
+            <span id="test-status" style="font-size:12px;margin-left:12px;"></span>
+            <div id="test-result" style="font-size:12px;color:var(--color-text-muted);margin-top:14px;line-height:1.6;"></div>
+          </div>
           <div class="ac" style="border-color:var(--color-danger,#e53e3e);">
             <div class="ac__h"><h2 class="ac__t" style="color:var(--color-danger,#e53e3e);">Danger Zone</h2></div>
             <p style="font-size:13px;color:var(--color-text-muted);margin:0 0 16px;">Clear all season data — teams, matches, standings, registrations, and leaderboard. This cannot be undone.</p>
@@ -2292,6 +2315,48 @@
       renderOV();
     } catch (e) {
       status.textContent = e.message; status.style.color = '#e53e3e';
+    } finally { btn.disabled = false; }
+  });
+
+  // ── Seed Test Season button ──
+  $id('seed-test-btn').addEventListener('click', async () => {
+    const btn = $id('seed-test-btn'), status = $id('test-status'), result = $id('test-result');
+    const captainEmails = Array.from(document.querySelectorAll('.tts-cap')).map(i => i.value.trim());
+    btn.disabled = true; status.textContent = 'Seeding…'; status.style.color = 'var(--color-text-faint)'; result.innerHTML = '';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-seed-test-season', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ captainEmails }),
+      });
+      const s = data.seeded || {};
+      status.textContent = `Seeded ✓ (${s.teams} teams, ${s.players} players, ${s.finalizedMatches} final + ${s.openMatches} open matches)`;
+      status.style.color = 'var(--color-teal)';
+      const caps = (data.captains || []).map(c => `<tr><td style="padding:2px 12px 2px 0;">${h(c.team)}</td><td style="font-family:monospace;">${h(c.captainEmail)}</td></tr>`).join('');
+      result.innerHTML =
+        '<strong>Captain sign-ins</strong> (go to <code>/captain.html</code>, enter the email, follow the magic link):'
+        + '<table style="margin:8px 0 12px;">' + caps + '</table>'
+        + 'View: '
+        + '<a href="/teams.html?season=circuit-test" target="_blank" rel="noopener">Teams</a> · '
+        + '<a href="/standings.html?season=circuit-test" target="_blank" rel="noopener">Standings</a> · '
+        + '<a href="/leaderboard.html?circuit=TEST" target="_blank" rel="noopener">Leaderboard</a> · '
+        + '<a href="/leaderboard.html?circuit=TEST&view=players" target="_blank" rel="noopener">Player stats</a>';
+    } catch (e) {
+      status.textContent = e.message; status.style.color = 'var(--color-red, #ef4444)';
+    } finally { btn.disabled = false; }
+  });
+
+  // ── Wipe Test Season button ──
+  $id('wipe-test-btn').addEventListener('click', async () => {
+    if (!confirm('Delete ALL test-season data (test teams, schedule, scores, standings)? Real seasons are not affected.')) return;
+    const btn = $id('wipe-test-btn'), status = $id('test-status'), result = $id('test-result');
+    btn.disabled = true; status.textContent = 'Wiping…'; status.style.color = 'var(--color-text-faint)';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-wipe-test-season', { method: 'POST' });
+      status.textContent = `Test season wiped ✓ (${data.total} records removed)`;
+      status.style.color = 'var(--color-teal)';
+      result.innerHTML = '';
+    } catch (e) {
+      status.textContent = e.message; status.style.color = 'var(--color-red, #ef4444)';
     } finally { btn.disabled = false; }
   });
 

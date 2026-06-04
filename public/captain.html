@@ -1462,8 +1462,8 @@
           const gameTypeLabel = pairNum === 1 ? "Women's + Men's" : 'Mixed + Mixed';
 
           const pairPill = {
-            confirmed: '<span class="ss-pill ss-pill--confirmed">&check; Confirmed</span>',
-            mismatch:  '<span class="ss-pill ss-pill--mismatch">&times; Mismatch</span>',
+            confirmed: '<span class="ss-pill ss-pill--confirmed">&check; Recorded</span>',
+            mismatch:  '<span class="ss-pill ss-pill--mismatch">&#9888; Check scores</span>',
             active:    '<span class="ss-pill ss-pill--partial">In progress</span>',
             locked:    '<span class="ss-pill ss-pill--empty">🔒 Locked</span>',
             pending:   '<span class="ss-pill ss-pill--empty">Not started</span>',
@@ -1487,17 +1487,14 @@
             const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
             const homePair = formatPair(homeLineup[slot]);
             const awayPair = formatPair(awayLineup[slot]);
-            const hv = gs.home?.entered ?? '';
-            const av = gs.away?.entered ?? '';
-            const homeIsMine = myRole === 'home';
-            const awayIsMine = myRole === 'away';
+            const hv = Number.isInteger(gs.home) ? gs.home : '';
+            const av = Number.isInteger(gs.away) ? gs.away : '';
 
-            const inputClass = (mine, entered) => {
+            // Single shared sheet: either captain may enter both scores for any game.
+            const inputClass = () => {
               const cls = ['ss-score-input'];
               if (status === 'confirmed') cls.push('ss-score-input--confirmed');
               else if (status === 'mismatch') cls.push('ss-score-input--mismatch');
-              else if (entered && mine) cls.push('ss-score-input--mine-entered');
-              else if (entered) cls.push('ss-score-input--other-entered');
               return cls.join(' ');
             };
 
@@ -1511,19 +1508,17 @@
                 <td class="ss-pair">${escapeHtml(homePair)}</td>
                 <td>
                   <input type="number" inputmode="numeric" min="0" max="30"
-                    class="${inputClass(homeIsMine, !!gs.home)}"
+                    class="${inputClass()}"
                     value="${hv}"
-                    placeholder="${homeIsMine && !isLocked ? '' : '?'}"
                     data-slot="${slot}" data-side="home"
-                    ${isLocked || !canEdit || !homeIsMine ? 'disabled' : ''}>
+                    ${!canEdit ? 'disabled' : ''}>
                 </td>
                 <td>
                   <input type="number" inputmode="numeric" min="0" max="30"
-                    class="${inputClass(awayIsMine, !!gs.away)}"
+                    class="${inputClass()}"
                     value="${av}"
-                    placeholder="${awayIsMine && !isLocked ? '' : '?'}"
                     data-slot="${slot}" data-side="away"
-                    ${isLocked || !canEdit || !awayIsMine ? 'disabled' : ''}>
+                    ${!canEdit ? 'disabled' : ''}>
                 </td>
                 <td class="ss-pair">${escapeHtml(awayPair)}</td>
                 <td class="ss-status-cell">${pill}</td>
@@ -1629,6 +1624,8 @@
       // Action buttons
       const actions = [];
       if (!final) {
+        // Batch save: enter several games (e.g. a whole round), then save together.
+        actions.push(`<button class="cap-btn cap-btn--primary" id="ss-save-btn">Save scores</button>`);
         if (!mySubmitted) {
           const ready = !!c.canSubmit;
           let label;
@@ -1638,7 +1635,7 @@
               : 'Submit final';
           } else {
             const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0) + (c.counts?.mismatch || 0);
-            label = `${remaining} game${remaining === 1 ? '' : 's'} need${remaining === 1 ? 's' : ''} to confirm`;
+            label = `${remaining} game${remaining === 1 ? '' : 's'} need${remaining === 1 ? 's' : ''} a valid score`;
           }
           actions.push(`
             <button class="cap-btn cap-btn--gold" id="ss-submit-btn" ${ready ? '' : 'disabled'}>${label}</button>
@@ -1667,14 +1664,16 @@
         ${final ? renderUpNextStrip() : ''}
       `;
 
-      // Wire input listeners — only the inputs for MY side are enabled
+      // Either captain can edit any game. No per-field autosave — teams often
+      // enter several games at once, so saving is an explicit batch action.
       area.querySelectorAll('.ss-score-input:not([disabled])').forEach(inp => {
-        inp.addEventListener('blur', onScoreInputBlur);
-        // Save on Enter
         inp.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') { e.preventDefault(); inp.blur(); }
+          if (e.key === 'Enter') { e.preventDefault(); saveAllScores(); }
         });
       });
+
+      const saveBtn = $id('ss-save-btn');
+      if (saveBtn) saveBtn.addEventListener('click', saveAllScores);
 
       const submitBtn = $id('ss-submit-btn');
       if (submitBtn) submitBtn.addEventListener('click', submitFinal);
@@ -1748,10 +1747,10 @@
 
     function renderStatusPill(status) {
       const pills = {
-        empty: '<span class="ss-pill ss-pill--empty">Empty</span>',
-        partial: '<span class="ss-pill ss-pill--partial">Awaiting</span>',
-        confirmed: '<span class="ss-pill ss-pill--confirmed">&check; Confirmed</span>',
-        mismatch: '<span class="ss-pill ss-pill--mismatch">&times; Mismatch</span>',
+        empty: '<span class="ss-pill ss-pill--empty">—</span>',
+        partial: '<span class="ss-pill ss-pill--partial">Incomplete</span>',
+        confirmed: '<span class="ss-pill ss-pill--confirmed">&check; Recorded</span>',
+        mismatch: '<span class="ss-pill ss-pill--mismatch">&#9888; Check score</span>',
       };
       return pills[status] || pills.empty;
     }
@@ -1808,15 +1807,22 @@
     }
 
     // ===== Save flow =====
-    async function onScoreInputBlur(e) {
-      const inp = e.target;
-      const slot = inp.dataset.slot;
-      const side = inp.dataset.side;
-      const v = inp.value.trim();
+    // Batch save: gather every game's home + away score from the sheet and
+    // persist them in one request. Supports entering several games at once
+    // (e.g. a whole round after back-to-back matches).
+    async function saveAllScores() {
+      const area = $id('scoresheet-area');
       const games = {};
-      games[slot] = { entered: v === '' ? null : Number(v) };
+      area.querySelectorAll('.ss-score-input').forEach(inp => {
+        const slot = inp.dataset.slot, side = inp.dataset.side;
+        if (!slot || !side) return;
+        if (!games[slot]) games[slot] = {};
+        const v = inp.value.trim();
+        games[slot][side] = v === '' ? null : Number(v);
+      });
 
       const status = $id('ss-status');
+      if (status) { status.className = 'cap-status'; status.textContent = 'Saving…'; }
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, {
           method: 'PUT',
@@ -1826,8 +1832,7 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
-        // Re-render to show updated status pills/colors and live totals
-        await refreshScoresheet();
+        await refreshScoresheet(); // re-render with updated status pills + live totals
       } catch (err) {
         if (status) {
           status.className = 'a-status is-err';

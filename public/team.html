@@ -137,15 +137,20 @@
     const initial = name => (name || '?').charAt(0).toUpperCase();
 
     /* ─── URL ─────────────────────────────────────────────── */
-    const teamParam = new URLSearchParams(location.search).get('id') || '';
+    const _q = new URLSearchParams(location.search);
+    const teamParam = _q.get('id') || '';
+    // Optional season override (?season=circuit-test) for staff QA. Default = live season.
+    const SEASON_ID = _q.get('season') || 'circuit-i';
+    const CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
+    const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
 
     /* ─── Data ────────────────────────────────────────────── */
     async function load() {
       const [td, ld, sd, pd] = await Promise.allSettled([
-        fetch('/.netlify/functions/public-teams?season=circuit-i').then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-leaderboard?circuit=I').then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-schedule?season=circuit-i').then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-leaderboard?circuit=I&view=players').then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT)).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-schedule?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null),
       ]);
 
       const teams  = td.value?.teams  || [];
@@ -230,7 +235,7 @@
           const isPlayed = myScore !== null && oppScore !== null;
           const oppTeam  = teams.find(t => t.name === oppName);
           const oppEmoji = oppTeam?.emoji || '';
-          const oppHref  = oppTeam ? `/team?id=${slug(oppTeam.name)}` : '#';
+          const oppHref  = oppTeam ? `/team?id=${slug(oppTeam.name)}${LINK_SUFFIX}` : '#';
 
           let resultHtml = '', rightHtml = '';
           if (isPlayed) {
@@ -303,13 +308,13 @@
           <div class="snap-item">
             <div class="snap-item__label">Captain</div>
             <div class="snap-item__val">${captain
-              ? `<a href="/player?team=${teamSlug}&name=${encodeURIComponent(captain.name)}">${esc(captain.name)}</a>`
+              ? `<a href="/player?team=${teamSlug}&name=${encodeURIComponent(captain.name)}${LINK_SUFFIX}">${esc(captain.name)}</a>`
               : '—'}</div>
           </div>
           <div class="snap-item">
             <div class="snap-item__label">Co-Captain</div>
             <div class="snap-item__val">${coCaptain
-              ? `<a href="/player?team=${teamSlug}&name=${encodeURIComponent(coCaptain.name)}">${esc(coCaptain.name)}</a>`
+              ? `<a href="/player?team=${teamSlug}&name=${encodeURIComponent(coCaptain.name)}${LINK_SUFFIX}">${esc(coCaptain.name)}</a>`
               : '—'}</div>
           </div>
         </div>
@@ -360,7 +365,7 @@
     function leaderCard(p, teamSlug) {
       const winP = pct(p.gamesWon, p.gamesPlayed);
       const color = avatarColor(p.name);
-      const href  = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name)}`;
+      const href  = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name)}${LINK_SUFFIX}`;
       return `<a class="leader-row" href="${href}">
         <div class="leader-avatar" style="background:${color}">${initial(p.name)}</div>
         <div class="leader-body">
@@ -373,7 +378,7 @@
 
     function rosterCard(p, teamSlug) {
       const color = avatarColor(p.name);
-      const href  = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name)}`;
+      const href  = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name)}${LINK_SUFFIX}`;
       const roleLabel = p.isCaptain ? 'Captain 👑' : p.isCoCaptain ? 'Co-Captain ⭐' : 'Player';
       const roleClass = p.isCaptain ? 'roster-role--captain' : p.isCoCaptain ? 'roster-role--cocaptain' : '';
       const duprLine  = p.dupr ? `<div class="roster-dupr">${esc(p.dupr)} DUPR</div>` : '';

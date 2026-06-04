@@ -124,10 +124,15 @@
     let activeDivision = '';
     let playerScoreMap = {}; // name → composite score
 
+    // Optional season override (?season=circuit-test) for staff QA. Default = live season.
+    const SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
+    const CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
+    const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
+
     async function loadTeams() {
       const [teamsRes, statsRes] = await Promise.allSettled([
-        fetch('/.netlify/functions/public-teams?season=circuit-i').then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-leaderboard?circuit=I&view=players').then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null),
       ]);
       allTeams = teamsRes.value?.teams || [];
 
@@ -182,9 +187,9 @@
 
       grid.innerHTML = filtered.map(t => {
         const teamSlug = slugify(t.name);
-        const teamUrl = `/team?id=${teamSlug}`;
+        const teamUrl = `/team?id=${teamSlug}${LINK_SUFFIX}`;
         const roster = (t.roster || []).map(p => {
-          const playerUrl = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name || '')}`;
+          const playerUrl = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name || '')}${LINK_SUFFIX}`;
           const gender = p.gender ? `<span class="gender">${esc(p.gender)}</span>` : '<span class="gender"></span>';
           const sc = playerScoreMap[p.name];
           const scoreEl = sc != null

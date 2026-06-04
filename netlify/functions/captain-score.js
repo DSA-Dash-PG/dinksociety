@@ -1,25 +1,25 @@
 // netlify/functions/captain-score.js
 //
-// Dual-entry scoring. Both captains enter every game. The system validates
-// match-vs-mismatch. Match finalizes only when:
-//   1. All 12 games have matching scores from both captains (CONFIRMED)
+// Single-entry scoring with final dual-approval. One shared scoresheet:
+// either captain enters each game's home + away score once. The match
+// finalizes only when:
+//   1. All 12 games have a complete, valid score (to 11, win by 2)
 //   2. Both captains have tapped "Submit final" since the last edit
 //
 // GET   ?match=<id>                          → state + computed view
-// PUT   ?match=<id>                          → save my entries (one captain at a time)
-//                                                body: { games: { r1g1: { entered: 11 }, ... } }
-// POST  ?match=<id>&action=submit            → mark this captain's "I'm done" flag
-// POST  ?match=<id>&action=withdraw          → revoke my submit flag (only allowed pre-finalize)
+// PUT   ?match=<id>                          → save game scores (either captain)
+//                                                body: { games: { r1g1: { home: 11, away: 4 }, ... } }
+// POST  ?match=<id>&action=submit            → mark this captain's "I approve" flag
+// POST  ?match=<id>&action=withdraw          → revoke my approval (only allowed pre-finalize)
 //
 // Storage shape:
-//   game = { home: { entered, by, at }, away: { entered, by, at } }
-//   game.home or game.away can be null = "this side hasn't entered"
+//   game = { home: <homeScore>|null, away: <awayScore>|null, by, at }
 //
 // Computed status per game (server-derived, never persisted):
-//   'empty'      both null
-//   'partial'    one side null
-//   'confirmed'  both set, equal
-//   'mismatch'   both set, unequal
+//   'empty'      both scores null
+//   'partial'    one score entered
+//   'confirmed'  both entered AND a valid finished game
+//   'mismatch'   both entered but NOT valid (e.g. not won by 2) — needs fixing
 
 import { getStore } from '@netlify/blobs';
 import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
@@ -107,52 +107,38 @@ export default async (req) => {
     const body = await req.json();
     const incoming = body.games || {};
     const now = new Date().toISOString();
-    let mySideChanged = false;
-    let otherSideEffectivelyChanged = false;
+    let changed = false;
 
-    // Pair-sequential lock: cannot enter scores for a pair until the previous pair is confirmed
-    const lockedSet = getLockedPairs(existing.games);
-    const blocked = Object.keys(incoming).filter(s => lockedSet.has(s));
-    if (blocked.length > 0) {
-      return json({
-        error: 'Previous pair must be confirmed by both captains before entering these scores.',
-        lockedSlots: [...lockedSet],
-      }, 409);
-    }
-
+    // Single shared scoresheet: either captain may enter/edit any game's
+    // home + away scores. Incoming per slot: { home?: N|null, away?: M|null }.
     for (const slot of SLOT_KEYS) {
       if (!(slot in incoming)) continue;
-      const g = incoming[slot];
-
-      // Initialize slot if missing
+      const g = incoming[slot] || {};
       if (!existing.games[slot]) existing.games[slot] = { home: null, away: null };
+      const cur = existing.games[slot];
+      let slotChanged = false;
 
-      // Read what THIS captain wants for this game
-      const newVal = g === null ? null : (g.entered === '' || g.entered === null || g.entered === undefined ? null : toScore(g.entered));
-      if (newVal === 'INVALID') {
-        return json({ error: `${prettySlot(slot)}: scores must be integers 0-30` }, 400);
+      for (const side of ['home', 'away']) {
+        if (!(side in g)) continue;
+        const raw = g[side];
+        const newVal = (raw === '' || raw === null || raw === undefined) ? null : toScore(raw);
+        if (newVal === 'INVALID') {
+          return json({ error: `${prettySlot(slot)}: scores must be integers 0-30` }, 400);
+        }
+        if (cur[side] === newVal) continue; // no change
+        cur[side] = newVal;
+        slotChanged = true;
       }
 
-      const sideKey = myRole; // 'home' or 'away'
-      const currentSide = existing.games[slot][sideKey];
-
-      if (newVal === null && currentSide === null) continue; // no change
-      if (newVal !== null && currentSide && currentSide.entered === newVal) continue; // no change
-
-      mySideChanged = true;
-      if (newVal === null) {
-        existing.games[slot][sideKey] = null;
-      } else {
-        existing.games[slot][sideKey] = {
-          entered: newVal,
-          by: ctx.user.email,
-          at: now,
-        };
+      if (slotChanged) {
+        cur.by = ctx.user.email;
+        cur.at = now;
+        changed = true;
       }
     }
 
-    // Any score change wipes both submit flags — both captains must re-tap.
-    if (mySideChanged && (existing.homeSubmittedAt || existing.awaySubmittedAt)) {
+    // Any score change wipes both submit flags — both captains must re-approve.
+    if (changed && (existing.homeSubmittedAt || existing.awaySubmittedAt)) {
       existing.homeSubmittedAt = null;
       existing.homeSubmittedBy = null;
       existing.awaySubmittedAt = null;
@@ -187,7 +173,7 @@ export default async (req) => {
         const labels = unconfirmed.map(g => prettySlot(g.slot)).slice(0, 3).join(', ');
         const more = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : '';
         return json({
-          error: `Cannot submit yet — ${unconfirmed.length} game(s) still need both captains to agree: ${labels}${more}.`,
+          error: `Cannot submit yet — ${unconfirmed.length} game(s) need a complete, valid score (first to 11): ${labels}${more}.`,
         }, 400);
       }
 
@@ -233,27 +219,6 @@ export default async (req) => {
 
 // ===== Helpers =====
 
-function getLockedPairs(games) {
-  // Returns a Set of slot keys that are locked (previous pair not yet fully confirmed).
-  const locked = new Set();
-  for (let i = 1; i < PAIRS.length; i++) {
-    const prevSlots = PAIRS[i - 1].slots;
-    const prevConfirmed = prevSlots.every(slot => {
-      const g = games[slot];
-      return g?.home?.entered !== undefined && g?.away?.entered !== undefined
-        && g.home !== null && g.away !== null
-        && g.home.entered === g.away.entered;
-    });
-    if (!prevConfirmed) {
-      for (let j = i; j < PAIRS.length; j++) {
-        PAIRS[j].slots.forEach(s => locked.add(s));
-      }
-      break;
-    }
-  }
-  return locked;
-}
-
 async function findMatch(scheduleStore, matchId, team, weeks = 8) {
   for (let week = 1; week <= weeks; week++) {
     const key = `schedule/${team.circuit}/${team.division}/week-${week}.json`;
@@ -293,12 +258,25 @@ function toScore(v) {
 }
 
 function gameStatus(game) {
-  const h = game?.home;
-  const a = game?.away;
-  if (!h && !a) return 'empty';
-  if (!h || !a) return 'partial';
-  if (h.entered === a.entered) return 'confirmed';
-  return 'mismatch';
+  const hHas = Number.isInteger(game?.home);
+  const aHas = Number.isInteger(game?.away);
+  if (!hHas && !aHas) return 'empty';
+  if (!hHas || !aHas) return 'partial';
+  // Both scores entered → 'confirmed' if it's a legal finished game, else 'mismatch'
+  // ('mismatch' = entered but not a valid result, e.g. not won by 2).
+  return isValidGame(game.home, game.away) ? 'confirmed' : 'mismatch';
+}
+
+// Dink Society format: games are first-to-11, win by 1 — the winner's score
+// is exactly 11 and the loser is 0–10. (Championship/gold games to 15 are not
+// special-cased here yet.)
+function isValidGame(h, a) {
+  if (!Number.isInteger(h) || !Number.isInteger(a)) return false;
+  if (h === a) return false;                 // must have a winner
+  const hi = Math.max(h, a), lo = Math.min(h, a);
+  if (hi !== 11) return false;               // winner reaches exactly 11
+  if (lo < 0 || lo > 10) return false;       // loser 0–10
+  return true;
 }
 
 function decorate(score) {
@@ -332,15 +310,13 @@ function decorate(score) {
     const allConf = slotSts.every(s => s === 'confirmed');
     const hasMismatch = slotSts.some(s => s === 'mismatch');
     const hasPartial = slotSts.some(s => s === 'partial');
-    const prevConfirmed = idx === 0 || pairStatuses[idx - 1].confirmed;
     pairStatuses.push({
       ...pair,
       slotStatuses: slotSts,
       confirmed: allConf,
       hasMismatch,
-      locked: !prevConfirmed,
-      state: !prevConfirmed ? 'locked'
-           : allConf ? 'confirmed'
+      locked: false, // single-entry: no pair-sequential locking
+      state: allConf ? 'confirmed'
            : hasMismatch ? 'mismatch'
            : hasPartial ? 'active'
            : 'pending',
@@ -374,8 +350,8 @@ function computeRound(games, roundNum, gameStatuses) {
     const slot = `r${roundNum}g${g}`;
     if (statusBySlot[slot] !== 'confirmed') continue;
     const gs = games[slot];
-    const h = gs.home.entered;
-    const a = gs.away.entered;
+    const h = gs.home;
+    const a = gs.away;
     scored++;
     if (h > a) homeGames++;
     else if (a > h) awayGames++;

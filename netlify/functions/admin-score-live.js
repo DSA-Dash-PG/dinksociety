@@ -150,12 +150,21 @@ export default async (req) => {
 
 function computeGameStatus(game) {
   if (!game) return 'empty';
-  const h = game.home;
-  const a = game.away;
-  if (!h && !a) return 'empty';
-  if (!h || !a) return 'partial';
-  if (h.entered === a.entered) return 'confirmed';
-  return 'mismatch';
+  const hHas = Number.isInteger(game.home);
+  const aHas = Number.isInteger(game.away);
+  if (!hHas && !aHas) return 'empty';
+  if (!hHas || !aHas) return 'partial';
+  return isValidGame(game.home, game.away) ? 'confirmed' : 'mismatch';
+}
+
+function isValidGame(h, a) {
+  // Dink Society: first to 11, win by 1 → winner's score is exactly 11.
+  if (!Number.isInteger(h) || !Number.isInteger(a)) return false;
+  if (h === a) return false;
+  const hi = Math.max(h, a), lo = Math.min(h, a);
+  if (hi !== 11) return false;
+  if (lo < 0 || lo > 10) return false;
+  return true;
 }
 
 function computeRound(games, roundNum, statusBySlot) {
@@ -165,9 +174,9 @@ function computeRound(games, roundNum, statusBySlot) {
     const slot = `r${roundNum}g${g}`;
     if (statusBySlot[slot] !== 'confirmed') continue;
     const gs = games[slot];
-    const h = gs?.home?.entered;
-    const a = gs?.away?.entered;
-    if (h === undefined || a === undefined) continue;
+    const h = gs?.home;
+    const a = gs?.away;
+    if (!Number.isInteger(h) || !Number.isInteger(a)) continue;
     scoredGames++;
     if (h > a) homeGames++;
     else if (a > h) awayGames++;
