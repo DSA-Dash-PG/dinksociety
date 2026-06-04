@@ -68,6 +68,17 @@ export async function rebuildStandings(circuit) {
   const weeklyPlayers = {}; // week → Map(pid → weekly game stats) for POW + rank movement
   const weekMeta = {};      // week → { date } for display
 
+  // Seed every rostered player for this circuit so the leaderboard lists all
+  // players (zeroed) even before they've played a game. Match processing below
+  // simply bumps these existing records once results come in.
+  for (const team of teamsById.values()) {
+    if (team.circuit !== circuit) continue;
+    for (const player of (team.roster || [])) {
+      if (!player?.id) continue;
+      ensurePlayer(playerStats, player.id, player, team);
+    }
+  }
+
   // Process each finalized match
   for (const weekFile of weekFiles) {
     const div = weekFile.division;

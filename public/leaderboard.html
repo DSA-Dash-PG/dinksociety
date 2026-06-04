@@ -357,8 +357,7 @@
           _ps: ps, _pa: pa, _diff: diff,
           _aps: gp ? ps/gp : 0, _apa: gp ? pa/gp : 0, _avgDiff: gp ? diff/gp : 0,
         };
-      })
-      .filter(p => p._played > 0);
+      });
 
     // Sort by the active column (default: DSR desc). Nulls sink to the bottom.
     const KEY = { dsr:'_dsr', gp:'_played', won:'_won', loss:'_lost',
@@ -369,7 +368,10 @@
     rows.sort((a,b) => {
       const d = (num(a[k]) - num(b[k])) * dir;
       if (d) return d;
-      return (num(b._dsr) - num(a._dsr)) || (b._won - a._won);
+      // Tiebreak: DSR, then wins, then alphabetical by name. Keeps zeroed
+      // (yet-to-play) players in clean A→Z order at the bottom of the board.
+      return (num(b._dsr) - num(a._dsr)) || (b._won - a._won)
+        || (a.name||'').localeCompare(b.name||'');
     });
     return rows;
   }
@@ -408,8 +410,6 @@
 
     const players = filteredPlayers();
 
-    // Rank medals only apply to the canonical ordering (DSR, descending)
-    const canonical = state.sort === 'dsr' && state.sortDir === 'desc';
     const signI = n => (n > 0 ? '+' : '') + n;
     const sign1 = n => (n > 0 ? '+' : '') + n.toFixed(1);
     const diffCls = n => n > 0 ? 'val-pos' : n < 0 ? 'val-neg' : 'val-zero';
@@ -421,12 +421,12 @@
     };
 
     const rows = players.map((p, i) => {
-      const rankCls = i===0 ? 'rank-num--1' : i===1 ? 'rank-num--2' : i===2 ? 'rank-num--3' : '';
-      const rankDisp = canonical && i < 3 ? ['🥇','🥈','🥉'][i] : (i + 1);
+      // Plain sequential ranking — no medals or leader highlight.
+      const rankDisp = i + 1;
       const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
       const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
-      return `<tr class="${canonical && i===0 ? 'rank-row--leader' : ''}">
-        <td><span class="rank-num ${rankCls}">${rankDisp}</span></td>
+      return `<tr>
+        <td><span class="rank-num">${rankDisp}</span></td>
         <td class="col-opt">${mvCell(p.rankDelta)}</td>
         <td class="r"><span class="${p._dsr != null ? 'val-dsr' : 'val-zero'}">${dsr}</span></td>
         <td>
