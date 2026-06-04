@@ -150,6 +150,17 @@ export default async (req) => {
       weeks.map(week => week.map(([h, a]) => ({ teamAId: h.id, teamBId: a.id })))
     );
 
+    // Seed every lineup/scoring state so the full flow is testable:
+    //   final    → played + scored (weeks 1..finalizedWeeks)
+    //   revealed → both lineups locked, no scores yet (ready to score)
+    //   waiting  → home locked, away not set (opponent must set; lineups hidden)
+    //   future   → no lineups (both captains set from scratch)
+    const weekState = (week) =>
+      week <= finalizedWeeks ? 'final'
+      : week === finalizedWeeks + 1 ? 'revealed'
+      : week === finalizedWeeks + 2 ? 'waiting'
+      : 'future';
+
     for (let w = 0; w < weeks.length; w++) {
       const week = w + 1;
       const pairings = weeks[w];
@@ -160,12 +171,7 @@ export default async (req) => {
         const matchId = `m_${CIRCUIT}_${DIVISION.toLowerCase()}_w${week}_${idx + 1}`;
         const scheduledAt = new Date(baseDate.getTime() + (w * 7 * 86400000)).toISOString();
 
-        // Locked lineups for BOTH teams → match is immediately scoreable
-        const homeLineup = buildLineup(home, matchId, week * 13 + idx);
-        const awayLineup = buildLineup(away, matchId, week * 13 + idx + 500);
-        await lineupStore.setJSON(`lineup/${matchId}/${home.id}.json`, homeLineup);
-        await lineupStore.setJSON(`lineup/${matchId}/${away.id}.json`, awayLineup);
-
+        const state = weekState(week);
         const cp = courtPlan[w][idx];
         const match = {
           id: matchId,
@@ -178,17 +184,28 @@ export default async (req) => {
           scoreA: null, scoreB: null, finalizedAt: null,
         };
 
-        if (week <= finalizedWeeks) {
+        // Lineups per state
+        let homeLineup = null, awayLineup = null;
+        if (state === 'final' || state === 'revealed') {
+          homeLineup = buildLineup(home, matchId, week * 13 + idx, true);
+          awayLineup = buildLineup(away, matchId, week * 13 + idx + 500, true);
+          await lineupStore.setJSON(`lineup/${matchId}/${home.id}.json`, homeLineup);
+          await lineupStore.setJSON(`lineup/${matchId}/${away.id}.json`, awayLineup);
+        } else if (state === 'waiting') {
+          // Home locked, away not set → opponent must set; reveal blocked
+          homeLineup = buildLineup(home, matchId, week * 13 + idx, true);
+          await lineupStore.setJSON(`lineup/${matchId}/${home.id}.json`, homeLineup);
+        }
+        // 'future' → no lineups written; both captains build from scratch
+
+        if (state === 'final') {
           const sim = simulateMatch(week * 31 + idx * 7 + 3);
-          // 1) write captain-score-shaped score blob (each side = that team's game score)
           await scoresStore.setJSON(`score/${matchId}.json`, buildScoreBlob(match, week, sim, now));
-          // 2) finalized fields on the schedule match
           match.scoreA = sim.round1.homePoints + sim.round2.homePoints;
           match.scoreB = sim.round1.awayPoints + sim.round2.awayPoints;
           match.round1 = sim.round1;
           match.round2 = sim.round2;
           match.finalizedAt = now;
-          // 3) feed aggregators
           accumulateTeams(teamAgg, weeklyPerTeam, week, home, away, sim);
           accumulatePlayers(playerAgg, home, away, homeLineup, awayLineup, sim, teamsById);
           finalizedCount++;
@@ -229,7 +246,7 @@ export default async (req) => {
         leaderboard: `/leaderboard.html?circuit=${CIRCUIT}`,
         stats:       `/leaderboard.html?circuit=${CIRCUIT}&view=players`,
       },
-      note: 'Captains sign in at /captain.html with the email above. Open matches are ready to score now.',
+      note: 'Captains sign in at /captain.html. Week 1–2 are final; the next week is locked & ready to score; the following week is waiting on one team to set a lineup; the last week has no lineups set yet (build from scratch) and is the championship (win by 2).',
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
   } catch (err) {
@@ -274,7 +291,7 @@ function roundRobin(teams) {
 }
 
 /** Valid 12-slot lineup. g1 = women's (2F), g2 = men's (2M), g3-6 = mixed (1M+1F). */
-function buildLineup(team, matchId, seed) {
+function buildLineup(team, matchId, seed, locked = true) {
   const females = shuffle(team.roster.filter(p => p.gender === 'F'), seed);
   const males = shuffle(team.roster.filter(p => p.gender === 'M'), seed + 7);
   const games = {};
@@ -293,7 +310,8 @@ function buildLineup(team, matchId, seed) {
   }
   const now = new Date().toISOString();
   return { matchId, teamId: team.id, teamName: team.name, games, isTest: true,
-           lockedAt: now, lockedBy: team.captainEmail, updatedAt: now, updatedBy: team.captainEmail };
+           lockedAt: locked ? now : null, lockedBy: locked ? team.captainEmail : null,
+           updatedAt: now, updatedBy: team.captainEmail };
 }
 
 // ===== Match simulation =====

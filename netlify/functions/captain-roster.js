@@ -74,6 +74,7 @@ export default async (req) => {
 
       const updated = {
         ...ctx.team,
+        ...(typeof body.emoji === 'string' ? { emoji: body.emoji.trim().slice(0, 8) } : {}),
         roster: cleaned,
         rosterUpdatedAt: new Date().toISOString(),
       };

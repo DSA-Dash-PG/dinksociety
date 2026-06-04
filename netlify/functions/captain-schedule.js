@@ -13,6 +13,8 @@ export default async (req) => {
   const { id: teamId, division, circuit } = ctx.team;
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
+  const teamsStore = getStore('teams');
+  const myEmoji = ctx.team.emoji || '';
 
   try {
     const myMatches = [];
@@ -34,9 +36,10 @@ export default async (req) => {
         // Check lineup lock status
         const myLineupKey = `lineup/${m.id}/${teamId}.json`;
         const oppLineupKey = `lineup/${m.id}/${opponent.id}.json`;
-        const [myLineup, oppLineup] = await Promise.all([
+        const [myLineup, oppLineup, oppTeam] = await Promise.all([
           lineupStore.get(myLineupKey, { type: 'json' }).catch(() => null),
           lineupStore.get(oppLineupKey, { type: 'json' }).catch(() => null),
+          teamsStore.get(`team/${opponent.id}.json`, { type: 'json' }).catch(() => null),
         ]);
 
         const myLocked = !!myLineup?.lockedAt;
@@ -49,12 +52,17 @@ export default async (req) => {
           circuit,
           division,
           court: m.court || null,
+          courtA: m.courtA ?? null,
+          courtB: m.courtB ?? null,
+          championship: !!m.championship,
           venue: m.venue || null,
           scheduledAt: m.scheduledAt || null,
           myRole,
+          myTeam: { id: teamId, name: ctx.team.name, emoji: myEmoji },
           opponent: {
             id: opponent.id,
             name: opponent.name,
+            emoji: oppTeam?.emoji || '',
           },
           status: {
             myLocked,

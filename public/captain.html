@@ -109,6 +109,33 @@
     .match-pill--locked { background: var(--color-teal-dim); color: var(--color-teal); }
     .match-pill--revealed { background: var(--color-lime-dim); color: var(--color-lime); }
 
+    /* ── Game cards (home vs away) ───────────────────────────── */
+    #matches-list { display: flex; flex-direction: column; gap: 12px; }
+    .gc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 14px; padding: 13px 14px; cursor: pointer; transition: border-color var(--transition); }
+    .gc:hover { border-color: rgba(255,255,255,0.22); }
+    .gc--live { border-color: rgba(184,255,44,0.35); }
+    .gc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 8px; }
+    .gc-week { font-size: 11px; color: var(--color-text-faint); letter-spacing: 0.06em; }
+    .gc-pill { font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+    .gc-pill--live { background: var(--color-lime-dim); color: var(--color-lime); }
+    .gc-pill--final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
+    .gc-pill--wait { background: var(--color-teal-dim); color: var(--color-teal); }
+    .gc-pill--need { background: var(--color-gold-dim); color: var(--color-gold); }
+    .gc-body { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+    .gc-team { text-align: center; min-width: 0; }
+    .gc-emoji { font-size: 24px; line-height: 1; }
+    .gc-name { font-size: 13px; font-weight: 500; margin-top: 4px; line-height: 1.2; }
+    .gc-role { font-size: 9px; color: var(--color-text-faint); margin-top: 2px; letter-spacing: 0.06em; }
+    .gc-team--win .gc-name { color: var(--color-lime); }
+    .gc-won { font-size: 9px; color: var(--color-lime); margin-top: 2px; letter-spacing: 0.04em; }
+    .gc-vs { font-size: 13px; font-weight: 500; color: var(--color-text-faint); }
+    .gc-score { font-size: 22px; font-weight: 500; white-space: nowrap; }
+    .gc-score .w { color: var(--color-lime); }
+    .gc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--color-border); gap: 8px; }
+    .gc-courts { font-size: 11px; color: var(--color-teal); }
+    .gc-champ { display: block; font-size: 10px; color: var(--color-gold); margin-top: 2px; }
+    .gc-cta { font-size: 12px; font-weight: 500; color: var(--color-lime); white-space: nowrap; }
+
     /* ── Locked notice ───────────────────────────────────────── */
     .locked-notice { background: var(--color-teal-dim); border: 1px solid rgba(37,201,164,0.15); border-radius: var(--radius-sm); padding: 14px 18px; font-size: 12px; color: var(--color-teal); margin-bottom: 16px; }
 
@@ -308,6 +335,20 @@
       .ss-total { grid-template-columns: 1fr; gap: 10px; }
       .ss-total__team--right { text-align: center; }
     }
+  }
+
+  /* ── Phones: tighten the scoresheet so it fits ─────────────── */
+  @media (max-width: 560px) {
+    .cap-section { padding: 12px 10px; }
+    .cap-card { padding: 14px 12px; }
+    .ss-th--status, .ss-status-cell { display: none; }
+    .ss-table td, .ss-table th { padding: 6px 4px; }
+    .ss-pair { max-width: 64px; font-size: 10px; }
+    .ss-type-label { display: none; }
+    .ss-court { display: inline-block; margin-left: 0; margin-top: 3px; }
+    .ss-score-input { width: 38px; }
+    .gc-name { font-size: 12px; }
+    .gc-emoji { font-size: 22px; }
   }
 
   /* ── Mobile drawer (captain portal) ─────────────────────────── */
@@ -523,6 +564,13 @@
         <div class="cap-card__header">
           <h2 class="cap-card__title">Team roster</h2>
           <span class="cap-card__sub">Players available for lineups</span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:10px;margin:0 0 16px;flex-wrap:wrap;">
+          <span style="font-size:13px;color:var(--color-text-faint);">Team emoji</span>
+          <input id="team-emoji-input" type="text" maxlength="4" placeholder="🏓" style="width:56px;text-align:center;font-size:18px;padding:6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text);">
+          <button class="cap-btn cap-btn--ghost" id="save-emoji-btn" style="padding:8px 14px;">Save emoji</button>
+          <span id="emoji-status" style="font-size:12px;color:var(--color-text-faint);"></span>
         </div>
 
         <p style="font-size: 13px; opacity: 0.75; margin: 0 0 16px;">
@@ -974,23 +1022,53 @@
         else if (m.status.myLocked) pill = '<span class="match-pill match-pill--locked">You\u2019ve locked · waiting on opponent</span>';
         else pill = '<span class="match-pill match-pill--unlocked">Lineup not locked</span>';
 
-        return `
-          <div class="match-tile" data-match-id="${escapeAttr(m.id)}">
-            <div class="match-tile__week">W${m.week}</div>
-            <div class="match-tile__body">
-              <div class="match-tile__opponent">vs ${escapeHtml(m.opponent.name)}</div>
-              <div class="match-tile__meta">
-                ${m.myRole === 'home' ? 'Home' : 'Away'}${m.court ? ' · ' + escapeHtml(m.court) : ''}
-              </div>
-            </div>
-            <div>${pill}</div>
-          </div>
-        `;
+        return matchCard(m);
       }).join('');
 
-      document.querySelectorAll('.match-tile').forEach(el => {
+      document.querySelectorAll('.gc').forEach(el => {
         el.addEventListener('click', () => openMatch(el.dataset.matchId, { viaTab: 'schedule' }));
       });
+    }
+
+    // Home-left / away-right game card with live/upcoming/final/waiting states.
+    function matchCard(m) {
+      const home = m.myRole === 'home' ? m.myTeam : m.opponent;
+      const away = m.myRole === 'home' ? m.opponent : m.myTeam;
+      const final = !!m.finalizedAt;
+      const revealed = !!m.status.revealed;
+      const hasScore = m.scoreA != null && m.scoreB != null;
+      const homeWon = final && m.scoreA > m.scoreB;
+      const awayWon = final && m.scoreB > m.scoreA;
+
+      let pillTxt, pillCls;
+      if (final)                  { pillTxt = 'Final'; pillCls = 'gc-pill--final'; }
+      else if (revealed)          { pillTxt = 'Live'; pillCls = 'gc-pill--live'; }
+      else if (m.status.myLocked) { pillTxt = 'Waiting on opponent'; pillCls = 'gc-pill--wait'; }
+      else                        { pillTxt = 'Needs lineup'; pillCls = 'gc-pill--need'; }
+
+      const courts = (m.courtA && m.courtB)
+        ? `Courts ${escapeHtml(String(m.courtA))} & ${escapeHtml(String(m.courtB))}`
+        : (m.court ? escapeHtml(m.court) : '');
+      const champ = m.championship ? '<span class="gc-champ">Championship · win by 2</span>' : '';
+      const cta = final ? 'View' : revealed ? 'Open scoresheet' : m.status.myLocked ? 'View' : 'Set lineup';
+
+      const center = hasScore
+        ? `<div class="gc-score"><span class="${m.scoreA > m.scoreB ? 'w' : ''}">${m.scoreA}</span>&ndash;<span class="${m.scoreB > m.scoreA ? 'w' : ''}">${m.scoreB}</span></div>`
+        : `<div class="gc-vs">VS</div>`;
+
+      const side = (t, won, role) => `
+        <div class="gc-team ${won ? 'gc-team--win' : ''}">
+          <div class="gc-emoji">${t.emoji ? escapeHtml(t.emoji) : '🏓'}</div>
+          <div class="gc-name">${escapeHtml(t.name)}</div>
+          ${won ? '<div class="gc-won">▲ Won</div>' : `<div class="gc-role">${role}</div>`}
+        </div>`;
+
+      return `
+        <div class="gc ${revealed && !final ? 'gc--live' : ''}" data-match-id="${escapeAttr(m.id)}">
+          <div class="gc-top"><span class="gc-week">WEEK ${m.week}</span><span class="gc-pill ${pillCls}">${pillTxt}</span></div>
+          <div class="gc-body">${side(home, homeWon, 'HOME')}${center}${side(away, awayWon, 'AWAY')}</div>
+          <div class="gc-foot"><span class="gc-courts">${courts}${champ}</span><span class="gc-cta">${cta} &rsaquo;</span></div>
+        </div>`;
     }
 
     // =================================================================
@@ -1079,7 +1157,7 @@
       const live = matches.find(m => m.status?.revealed && !m.finalizedAt)
                 || matches.filter(m => m.finalizedAt)
                           .sort((a, b) => new Date(b.finalizedAt) - new Date(a.finalizedAt))[0];
-      if (live) { openMatch(live.id, { viaTab: 'scoresheet' }); return; }
+      if (live) { openMatch(live.id, { viaTab: 'scoresheet', scoresheetOnly: true }); return; }
 
       // No game is being scored right now — show a friendly placeholder.
       switchSection('match');
@@ -1218,6 +1296,7 @@
       state.currentMatch = state.matches.find(m => m.id === matchId);
       if (!state.currentMatch) return;
       state.scoreDirty = false; // fresh match — no unsaved edits yet
+      state.scoresheetOnly = !!(opts && opts.scoresheetOnly); // Scoresheet tab → scoresheet only
 
       await refreshLineup();
     }
@@ -1310,7 +1389,9 @@
         $id('lineup-actions').style.display = '';
       } else {
         pillEl.innerHTML = '<span class="match-pill match-pill--unlocked">Unlocked</span>';
-        revealEl.innerHTML = '';
+        revealEl.innerHTML = data.myLineup && data.myLineup.unlockedAt
+          ? '<div class="locked-notice" style="border-color:rgba(232,181,66,0.4);background:var(--color-gold-dim);color:var(--color-gold);"><span>An admin reopened lineups for both teams. Edit if needed and re-lock — the opponent stays hidden until you both lock again.</span></div>'
+          : '';
         lockBtn.style.display = '';
         saveBtn.style.display = '';
         $id('lineup-builder').style.display = '';
@@ -1318,6 +1399,18 @@
       }
 
       renderLineupBuilder(data.status.myLocked, data.status.revealed);
+
+      // Scoresheet tab: show ONLY the scoresheet — hide the lineup/matchup blocks.
+      if (state.scoresheetOnly) {
+        revealEl.innerHTML = '';
+        $id('lineup-builder').style.display = 'none';
+        $id('lineup-actions').style.display = 'none';
+        $id('back-to-matches').style.display = 'none';
+        $id('match-sub').innerHTML = `${m.court ? escapeHtml(m.court) : ''}`;
+        if (!data.status.revealed) {
+          $id('scoresheet-area').innerHTML = '<div class="empty-state">This match isn’t ready to score yet — both lineups need to be locked first.</div>';
+        }
+      }
     }
 
     function renderLineupBuilder(locked, revealed) {
@@ -1531,6 +1624,14 @@
             const hv = Number.isInteger(gs.home) ? gs.home : '';
             const av = Number.isInteger(gs.away) ? gs.away : '';
 
+            // Winner highlight (only once the game is a valid recorded result).
+            const confirmed = status === 'confirmed';
+            const homeWin = confirmed && gs.home > gs.away;
+            const awayWin = confirmed && gs.away > gs.home;
+            const winInput = 'border-color:#b8ff2c;color:#b8ff2c;font-weight:500;background:rgba(184,255,44,0.10);';
+            const winPair  = 'color:#b8ff2c;font-weight:500;';
+            const dimPair  = confirmed ? 'color:var(--color-text-faint);' : '';
+
             // Single shared sheet: either captain may enter both scores for any game.
             const inputClass = () => {
               const cls = ['ss-score-input'];
@@ -1546,10 +1647,11 @@
             rows.push(`
               <tr class="${rowClass}">
                 <td><span class="ss-type">G${g}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span> ${courtTag(g)}</td>
-                <td class="ss-pair">${escapeHtml(homePair)}</td>
+                <td class="ss-pair" style="${homeWin ? winPair : dimPair}">${homeWin ? '<span style="color:#b8ff2c">&#9656;</span> ' : ''}${escapeHtml(homePair)}</td>
                 <td>
                   <input type="number" inputmode="numeric" min="0" max="30"
                     class="${inputClass()}"
+                    style="${homeWin ? winInput : ''}"
                     value="${hv}"
                     data-slot="${slot}" data-side="home"
                     ${!canEdit ? 'disabled' : ''}>
@@ -1557,11 +1659,12 @@
                 <td>
                   <input type="number" inputmode="numeric" min="0" max="30"
                     class="${inputClass()}"
+                    style="${awayWin ? winInput : ''}"
                     value="${av}"
                     data-slot="${slot}" data-side="away"
                     ${!canEdit ? 'disabled' : ''}>
                 </td>
-                <td class="ss-pair">${escapeHtml(awayPair)}</td>
+                <td class="ss-pair" style="${awayWin ? winPair : dimPair}">${escapeHtml(awayPair)}${awayWin ? ' <span style="color:#b8ff2c">&#9666;</span>' : ''}</td>
                 <td class="ss-status-cell">${pill}</td>
               </tr>
             `);
@@ -2003,11 +2106,38 @@
         if (!res.ok) throw new Error();
         const data = await res.json();
         state.roster = data.team?.roster || [];
+        const emInput = $id('team-emoji-input');
+        if (emInput) emInput.value = data.team?.emoji || '';
         if (!silent) renderRoster();
       } catch {
         if (!silent) $id('roster-rows').innerHTML = '<div class="empty-state">Could not load roster.</div>';
       }
     }
+
+    async function saveTeamEmoji() {
+      const input = $id('team-emoji-input');
+      const status = $id('emoji-status');
+      if (!input) return;
+      const emoji = (input.value || '').trim();
+      if (status) { status.textContent = 'Saving…'; status.style.color = 'var(--color-text-faint)'; }
+      try {
+        const res = await fetch('/.netlify/functions/captain-team-emoji', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ emoji }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        if (status) { status.textContent = 'Saved ✓'; status.style.color = 'var(--color-teal)'; }
+      } catch (e) {
+        if (status) { status.textContent = e.message; status.style.color = 'var(--color-red, #ef4444)'; }
+      }
+    }
+
+    // Robust wiring (roster buttons are bound elsewhere; delegate the emoji save).
+    document.addEventListener('click', (e) => {
+      if (e.target && e.target.id === 'save-emoji-btn') { e.preventDefault(); saveTeamEmoji(); }
+    });
 
     function renderRoster() {
       const container = $id('roster-rows');

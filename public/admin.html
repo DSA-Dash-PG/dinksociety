@@ -2408,7 +2408,10 @@
     const body = $id('tdp-body');
 
     body.innerHTML =
-      '<div class="af"><label>Team Name</label><input type="text" id="tdp-name" value="' + h(t.name || '') + '"></div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Team Name</label><input type="text" id="tdp-name" value="' + h(t.name || '') + '"></div>' +
+        '<div class="af" style="max-width:90px;"><label>Emoji</label><input type="text" id="tdp-emoji" maxlength="4" value="' + h(t.emoji || '') + '" style="text-align:center;font-size:18px;"></div>' +
+      '</div>' +
       '<div class="arow">' +
         '<div class="af"><label>Division</label><select id="tdp-division">' + DIVISIONS.map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
         '<div class="af"><label>Notes</label><input type="text" id="tdp-notes" value="' + h(t.notes || '') + '"></div>' +
@@ -2570,6 +2573,7 @@
 
     const payload = {
       name: $id('tdp-name').value.trim(),
+      emoji: ($id('tdp-emoji') ? $id('tdp-emoji').value.trim() : (currentPanelTeam.emoji || '')),
       division: $id('tdp-division').value,
       divisionLabel: DIVISIONS.find(d => d.id === $id('tdp-division').value)?.name || $id('tdp-division').value,
       notes: $id('tdp-notes').value.trim(),
@@ -2637,6 +2641,7 @@
             '<input type="number" min="1" max="20" value="' + h(String(cb)) + '" id="ct-B-' + h(m.id) + '" style="' + inStyle + '">' +
             '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="champ-' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
             '<button class="ab ab--outline ab--sm court-save" data-mid="' + h(m.id) + '">Save</button>' +
+            '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups (both)</button>' +
             '<span id="cst-' + h(m.id) + '" style="margin-left:4px;"></span>' +
           '</div>';
       }).join('') + '</div>';
@@ -2656,6 +2661,22 @@
             body: JSON.stringify({ courtA: a, courtB: b, court: 'Courts ' + a + ' & ' + b, championship: champ }),
           });
           if (stat) { stat.textContent = 'Saved ✓'; stat.style.color = 'var(--color-teal)'; }
+        } catch (e) {
+          if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
+        } finally { btn.disabled = false; }
+      });
+    });
+
+    card.querySelectorAll('.lineup-unlock').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const mid = btn.dataset.mid;
+        const stat = $id('cst-' + mid);
+        if (!confirm('Unlock lineups for BOTH teams? This reopens both lineups (hidden from each other again), clears any entered scores, and reopens the match. Both captains must re-lock to reveal.')) return;
+        btn.disabled = true; if (stat) { stat.textContent = 'Unlocking…'; stat.style.color = 'var(--color-text-faint)'; }
+        try {
+          const r = await apiJSON('/.netlify/functions/admin-unlock-lineups?matchId=' + encodeURIComponent(mid), { method: 'POST' });
+          if (stat) { stat.textContent = 'Reopened ✓ (' + (r.lineupsUnlocked || 0) + ' lineups)'; stat.style.color = 'var(--color-gold)'; }
+          renderSched();
         } catch (e) {
           if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
         } finally { btn.disabled = false; }
