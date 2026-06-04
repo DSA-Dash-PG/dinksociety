@@ -21,11 +21,18 @@ export default async (req) => {
   const teamKey = `team/${ctx.team.id}.json`;
 
   if (req.method === 'GET') {
-    return json({ team: ctx.team });
+    const rosterLocked = await isRosterLocked(ctx.team);
+    return json({ team: ctx.team, rosterLocked });
   }
 
   if (req.method === 'PUT') {
     try {
+      // Roster locks once the team's Week 2 match is complete, unless an admin
+      // has set the per-team unlock flag. Server-enforced so it can't be bypassed.
+      if (await isRosterLocked(ctx.team)) {
+        return json({ error: 'Your roster is locked for the season (Week 2 has been played). Ask a league admin to unlock it if you need a change.' }, 423);
+      }
+
       const body = await req.json();
       const roster = Array.isArray(body.roster) ? body.roster : [];
 
@@ -89,6 +96,25 @@ export default async (req) => {
 
   return new Response('Method not allowed', { status: 405 });
 };
+
+/**
+ * Roster locks once the team's Week 2 match has been finalized.
+ * Admin can reopen it per-team by setting team.rosterUnlocked = true.
+ */
+async function isRosterLocked(team) {
+  if (!team) return false;
+  if (team.rosterUnlocked === true) return false; // admin override
+  try {
+    const scheduleStore = getStore('schedule');
+    const key = `schedule/${team.circuit}/${team.division}/week-2.json`;
+    const data = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
+    if (!data?.matches) return false;
+    const m = data.matches.find(x => x.teamA?.id === team.id || x.teamB?.id === team.id);
+    return !!(m && m.finalizedAt);
+  } catch {
+    return false; // never block a save because the lock check itself errored
+  }
+}
 
 function sanitize(val, maxLen) {
   if (!val) return null;
