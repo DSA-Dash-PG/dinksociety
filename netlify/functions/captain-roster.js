@@ -9,6 +9,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
 
 const MAX_ROSTER_SIZE = 20;
 
@@ -48,16 +49,28 @@ export default async (req) => {
         if (ids.has(id)) return json({ error: 'Duplicate player id' }, 400);
         ids.add(id);
 
+        const email = sanitize(p.email, 120);
+        const phone = sanitize(p.phone, 30);
         cleaned.push({
           id,
           name: name.slice(0, 60),
           gender,
-          email: sanitize(p.email, 120),
-          phone: sanitize(p.phone, 30),
+          email,
+          phone,
+          // Normalized contact keys — recomputed on every save so they never
+          // drift from the raw values. Used by the duplicate sweep.
+          normalizedEmail: normalizeEmail(email),
+          normalizedPhone: normalizePhone(phone),
           dupr: sanitize(p.dupr, 10),
           linkedUserId: p.linkedUserId || null,
         });
       }
+
+      // Flag (don't block) likely-duplicate people on this roster — two entries
+      // sharing a normalized email or phone. Shared household contact info is a
+      // legitimate (if rare) case, so we surface it for the captain to confirm
+      // rather than rejecting the save.
+      const duplicateWarnings = findContactCollisions(cleaned);
 
       const updated = {
         ...ctx.team,
@@ -66,7 +79,7 @@ export default async (req) => {
       };
       await store.setJSON(teamKey, updated);
 
-      return json({ team: updated });
+      return json({ team: updated, duplicateWarnings });
     } catch (err) {
       console.error('captain-roster PUT error:', err);
       return json({ error: 'Save failed', detail: err.message }, 500);

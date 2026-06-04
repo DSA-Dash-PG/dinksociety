@@ -16,6 +16,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -121,6 +122,8 @@ export default async (req) => {
           name: (body.name || '').trim(),
           email: body.email || null,
           phone: body.phone || null,
+          normalizedEmail: normalizeEmail(body.email),
+          normalizedPhone: normalizePhone(body.phone),
           gender: body.gender || '',
           dupr: body.dupr || null,
           isCaptain: false,
@@ -132,7 +135,9 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
-        return json({ ok: true, player: newPlayer, rosterCount: roster.length });
+        // Surface (don't block) any contact collision the new player created.
+        const duplicateWarnings = findContactCollisions(roster);
+        return json({ ok: true, player: newPlayer, rosterCount: roster.length, duplicateWarnings });
       }
 
       case 'remove-player': {

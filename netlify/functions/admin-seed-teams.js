@@ -15,6 +15,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { normalizeEmail, normalizePhone } from './lib/identity.js';
 
 const DIVISION_LABELS = {
   '3.0M': '3.0 Mixed',
@@ -239,6 +240,8 @@ function buildRosterFromRegistration(reg) {
     gender: '', // Captain must fill this in — registration doesn't capture it
     email: p.email || null,
     phone: p.phone || null,
+    normalizedEmail: normalizeEmail(p.email),
+    normalizedPhone: normalizePhone(p.phone),
     dupr: null,
     linkedUserId: null,
     isCaptain: idx === 0,

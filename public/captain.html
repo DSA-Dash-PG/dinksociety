@@ -456,6 +456,7 @@
       <button class="cap-tab" data-tab="roster">Roster</button>
       <button class="cap-tab" data-tab="schedule">Schedule</button>
       <button class="cap-tab" data-tab="billing">Billing</button>
+      <button class="cap-tab" data-tab="messages">Messages <span id="cap-msg-badge" style="display:none;background:var(--color-lime);color:#0e0e0e;font-size:9px;font-weight:700;border-radius:9999px;padding:1px 6px;margin-left:4px;">0</span></button>
     </nav>
 
     <!-- Gender-missing warning (shown only when roster has entries with no gender) -->
@@ -564,6 +565,24 @@
       </div>
     </section>
 
+    <!-- MESSAGES -->
+    <section class="cap-section" data-section="messages">
+      <div class="cap-card">
+        <div class="cap-card__header">
+          <h2 class="cap-card__title">Messages with the league</h2>
+          <span class="cap-card__sub">Questions, schedule changes, anything — all in one place</span>
+        </div>
+        <div id="cap-msg-thread" style="display:flex;flex-direction:column;gap:8px;max-height:48vh;overflow:auto;padding:4px 2px 12px;">
+          <div class="empty-state">Loading&hellip;</div>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-end;margin-top:14px;border-top:1px solid var(--color-border);padding-top:14px;">
+          <textarea id="cap-msg-input" rows="2" placeholder="Message the league admin…" style="flex:1;resize:vertical;padding:10px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-2);color:var(--color-text);font-family:inherit;font-size:13px;"></textarea>
+          <button class="cap-btn cap-btn--primary" id="cap-msg-send">Send</button>
+        </div>
+        <div class="cap-status" id="cap-msg-status"></div>
+      </div>
+    </section>
+
     <!-- Transfer request modal (appended to body via JS) -->
 
   </div>
@@ -628,6 +647,7 @@
       $id('cap-team-meta').textContent = `${state.me.team.circuit === 'I' ? 'Season 1' : 'Circuit ' + state.me.team.circuit} · ${state.me.team.divisionLabel || state.me.team.division}`;
       $id('cap-email').textContent = state.me.email;
       // Load roster + schedule, then dispatch to the right state
+      refreshCapMsgBadge();
       Promise.all([loadRoster(true), loadMatches(true)]).then(() => {
         updateGenderWarning();
         // Returning from a successful balance payment? Land on Billing.
@@ -759,6 +779,7 @@
           if (tab === 'schedule') loadMatches();
           if (tab === 'roster') { loadRoster(); loadCaptainTransferRequests(); }
           if (tab === 'billing') loadBalance();
+          if (tab === 'messages') loadMessages();
         }
       });
     });
@@ -770,6 +791,81 @@
       stopPolling();
       updateGenderWarning();
     }
+
+    // ===== Messages =====
+    function fmtMsgTime(iso) {
+      if (!iso) return '';
+      const d = new Date(iso);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+             d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    }
+
+    async function refreshCapMsgBadge() {
+      try {
+        const res = await fetch('/.netlify/functions/captain-messages', { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        const badge = $id('cap-msg-badge');
+        if (!badge) return;
+        if (data.unread > 0) { badge.textContent = data.unread; badge.style.display = 'inline-block'; }
+        else badge.style.display = 'none';
+      } catch {}
+    }
+
+    async function loadMessages() {
+      const pane = $id('cap-msg-thread');
+      pane.innerHTML = '<div class="empty-state">Loading&hellip;</div>';
+      try {
+        const res = await fetch('/.netlify/functions/captain-messages', { credentials: 'include' });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const msgs = data.messages || [];
+        if (!msgs.length) {
+          pane.innerHTML = '<div class="empty-state">No messages yet. Send a note to the league below — questions, issues, anything.</div>';
+        } else {
+          pane.innerHTML = msgs.map(m => {
+            const mine = m.from === 'captain';
+            const align = mine ? 'flex-end' : 'flex-start';
+            const bg = mine ? 'background:var(--color-surface-2);' : 'background:var(--color-lime-dim);border:1px solid rgba(184,255,44,0.35);';
+            const who = mine ? 'You' : 'League Admin';
+            return '<div style="display:flex;justify-content:' + align + ';"><div style="max-width:80%;padding:9px 13px;border-radius:12px;' + bg + 'font-size:13px;line-height:1.5;">' +
+              '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-faint);margin-bottom:3px;">' + who + ' · ' + fmtMsgTime(m.createdAt) + '</div>' +
+              escapeHtml(m.body).replace(/\n/g, '<br>') + '</div></div>';
+          }).join('');
+        }
+        pane.scrollTop = pane.scrollHeight;
+        // Mark read now that the captain is looking at the thread
+        fetch('/.netlify/functions/captain-messages', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'mark-read' }),
+        }).then(() => { const b = $id('cap-msg-badge'); if (b) b.style.display = 'none'; }).catch(() => {});
+      } catch {
+        pane.innerHTML = '<div class="empty-state">Couldn\'t load messages. Try again.</div>';
+      }
+    }
+
+    async function sendCaptainMessage() {
+      const input = $id('cap-msg-input');
+      const text = (input.value || '').trim();
+      const status = $id('cap-msg-status');
+      if (!text) return;
+      const btn = $id('cap-msg-send'); btn.disabled = true;
+      status.className = 'cap-status'; status.textContent = 'Sending…';
+      try {
+        const res = await fetch('/.netlify/functions/captain-messages', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'send', body: text }),
+        });
+        if (!res.ok) throw new Error();
+        input.value = '';
+        status.className = 'cap-status'; status.textContent = '';
+        loadMessages();
+      } catch {
+        status.className = 'cap-status is-err'; status.textContent = 'Send failed — please try again.';
+      } finally { btn.disabled = false; }
+    }
+
+    $id('cap-msg-send')?.addEventListener('click', sendCaptainMessage);
 
     // ===== Billing / balance =====
     const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });

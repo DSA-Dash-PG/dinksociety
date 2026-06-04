@@ -881,6 +881,7 @@
     populateDivisionDropdowns();
     populateWeekDropdowns();
     renderOV();
+    refreshMsgBadge();
   }
 
   $id('login-form').addEventListener('submit', async (e) => {
@@ -1710,6 +1711,166 @@
     $id('reg-table').querySelectorAll('button.reg-act').forEach(btn => {
       btn.addEventListener('click', () => regAction(btn.dataset.act, btn.dataset.id));
     });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // MESSAGES — admin <-> captain message center
+  // ═══════════════════════════════════════════════════════════
+  let _msgInbox = [];
+  let _msgOpenTeam = null;
+  let _msgWired = false;
+
+  async function refreshMsgBadge() {
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-messages');
+      _msgInbox = data.inbox || [];
+      const badge = $id('sb-msg-ct');
+      if (badge) {
+        if (data.totalUnread > 0) { badge.textContent = data.totalUnread; badge.style.display = ''; }
+        else badge.style.display = 'none';
+      }
+    } catch (e) { /* silent */ }
+  }
+
+  async function renderMessages() {
+    setupMsgUI();
+    await loadInbox();
+    if (_msgOpenTeam) openThread(_msgOpenTeam);
+  }
+
+  async function loadInbox() {
+    const box = $id('msg-inbox');
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-messages');
+      _msgInbox = data.inbox || [];
+      const badge = $id('sb-msg-ct');
+      if (badge) {
+        if (data.totalUnread > 0) { badge.textContent = data.totalUnread; badge.style.display = ''; }
+        else badge.style.display = 'none';
+      }
+      if (!_msgInbox.length) { box.innerHTML = '<div class="empty">No teams yet.</div>'; return; }
+      box.innerHTML = _msgInbox.map(t => {
+        const active = t.teamId === _msgOpenTeam ? 'background:var(--color-surface-2);' : '';
+        const unread = t.unread > 0 ? '<span class="sb__badge" style="margin-left:auto;">' + t.unread + '</span>' : '';
+        const preview = t.lastBody ? (t.lastFrom === 'admin' ? 'You: ' : '') + h(t.lastBody) : 'No messages yet';
+        return '<button class="msg-inbox-row" data-team="' + h(t.teamId) + '" style="display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;padding:11px 14px;border:none;border-bottom:1px solid var(--color-border);background:transparent;cursor:pointer;' + active + '">' +
+          '<div style="display:flex;align-items:center;gap:8px;width:100%;"><strong style="font-size:12px;' + (t.unread > 0 ? 'color:var(--color-lime);' : '') + '">' + h(t.teamName) + '</strong>' + unread + '</div>' +
+          '<div style="font-size:10px;color:var(--color-text-faint);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px;">' + preview + '</div>' +
+        '</button>';
+      }).join('');
+      box.querySelectorAll('.msg-inbox-row').forEach(b => b.addEventListener('click', () => openThread(b.dataset.team)));
+    } catch (e) {
+      box.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
+    }
+  }
+
+  async function openThread(teamId) {
+    _msgOpenTeam = teamId;
+    const pane = $id('msg-thread');
+    pane.innerHTML = '<div class="loading">Loading…</div>';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-messages?teamId=' + encodeURIComponent(teamId));
+      const team = data.team || {};
+      const msgs = data.messages || [];
+      const bubbles = msgs.length ? msgs.map(m => {
+        const mine = m.from === 'admin';
+        const align = mine ? 'flex-end' : 'flex-start';
+        const bg = mine ? 'var(--color-lime-dim);border:1px solid var(--color-lime)' : 'var(--color-surface-2)';
+        return '<div style="display:flex;justify-content:' + align + ';"><div style="max-width:78%;padding:9px 13px;border-radius:12px;background:' + bg + ';font-size:13px;line-height:1.5;">' +
+          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-faint);margin-bottom:3px;">' + h(mine ? 'League Admin' : (m.authorName || 'Captain')) + ' · ' + fdt(m.createdAt) + '</div>' +
+          h(m.body).replace(/\n/g, '<br>') + '</div></div>';
+      }).join('') : '<div class="empty">No messages yet. Start the conversation below.</div>';
+
+      pane.innerHTML =
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
+          '<strong style="font-size:14px;">' + h(team.name || teamId) + '</strong>' +
+          '<span style="font-size:10px;color:var(--color-text-faint);">' + h(team.captainEmail || '') + '</span>' +
+        '</div>' +
+        '<div id="msg-bubbles" style="display:flex;flex-direction:column;gap:8px;max-height:46vh;overflow:auto;padding:4px 2px 14px;">' + bubbles + '</div>' +
+        '<div style="display:flex;gap:8px;align-items:flex-end;margin-top:10px;border-top:1px solid var(--color-border);padding-top:12px;">' +
+          '<textarea id="msg-reply-input" rows="2" placeholder="Write a reply…" style="flex:1;resize:vertical;"></textarea>' +
+          '<button class="ab ab--lime ab--sm" id="msg-reply-send">Send</button>' +
+        '</div>' +
+        '<label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:11px;color:var(--color-text-faint);margin-top:8px;"><input type="checkbox" id="msg-reply-email" checked> Also email the captain</label>';
+
+      const bub = $id('msg-bubbles'); if (bub) bub.scrollTop = bub.scrollHeight;
+      $id('msg-reply-send').addEventListener('click', () => sendReply(teamId));
+      // refresh inbox unread state (opening marked it read server-side)
+      loadInbox();
+    } catch (e) {
+      pane.innerHTML = '<div class="empty">Failed to load thread: ' + h(e.message) + '</div>';
+    }
+  }
+
+  async function sendReply(teamId) {
+    const input = $id('msg-reply-input');
+    const text = (input.value || '').trim();
+    if (!text) return;
+    const btn = $id('msg-reply-send'); btn.disabled = true;
+    try {
+      await apiJSON('/.netlify/functions/admin-messages', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reply', teamId, body: text, sendEmail: $id('msg-reply-email').checked }),
+      });
+      openThread(teamId);
+    } catch (e) { alert('Send failed: ' + (e.message || 'unknown')); btn.disabled = false; }
+  }
+
+  function setupMsgUI() {
+    if (_msgWired) return;
+    _msgWired = true;
+
+    const card = $id('msg-broadcast-card');
+    $id('msg-broadcast-btn').addEventListener('click', () => {
+      card.style.display = card.style.display === 'none' ? 'block' : 'none';
+      if (card.style.display === 'block') {
+        // Populate division + team pickers fresh each open
+        const dv = $id('bc-division');
+        dv.innerHTML = DIVISIONS.map(d => '<option value="' + h(d.id) + '">' + h(d.name) + '</option>').join('');
+        const list = $id('bc-teams-list');
+        list.innerHTML = (_msgInbox || []).map(t =>
+          '<label style="display:flex;gap:5px;align-items:center;font-size:11px;cursor:pointer;"><input type="checkbox" class="bc-team-cb" value="' + h(t.teamId) + '"> ' + h(t.teamName) + '</label>'
+        ).join('') || '<span style="font-size:11px;color:var(--color-text-faint);">No teams.</span>';
+      }
+    });
+    $id('bc-cancel').addEventListener('click', () => { card.style.display = 'none'; });
+    $id('bc-scope').addEventListener('change', (e) => {
+      $id('bc-division-wrap').style.display = e.target.value === 'division' ? '' : 'none';
+      $id('bc-teams-wrap').style.display = e.target.value === 'teams' ? '' : 'none';
+    });
+    $id('bc-send').addEventListener('click', sendBroadcast);
+  }
+
+  async function sendBroadcast() {
+    const scope = $id('bc-scope').value;
+    const body = ($id('bc-body').value || '').trim();
+    const subject = ($id('bc-subject').value || '').trim();
+    const status = $id('bc-status');
+    if (!body) { status.style.display = 'block'; status.className = 'a-status is-err'; status.textContent = 'Message body is required.'; return; }
+
+    const payload = {
+      action: 'broadcast', scope, subject, body,
+      audience: $id('bc-audience').value, sendEmail: $id('bc-email').checked,
+    };
+    if (scope === 'division') payload.division = $id('bc-division').value;
+    if (scope === 'teams') {
+      payload.teamIds = [...document.querySelectorAll('.bc-team-cb:checked')].map(c => c.value);
+      if (!payload.teamIds.length) { status.style.display = 'block'; status.className = 'a-status is-err'; status.textContent = 'Pick at least one team.'; return; }
+    }
+
+    const btn = $id('bc-send'); btn.disabled = true;
+    status.style.display = 'block'; status.className = 'a-status is-info'; status.textContent = 'Sending…';
+    try {
+      const r = await apiJSON('/.netlify/functions/admin-messages', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      status.className = 'a-status is-ok';
+      status.textContent = 'Sent to ' + r.teamCount + ' team' + (r.teamCount === 1 ? '' : 's') + (r.emailed ? ' · ' + r.emailed + ' email' + (r.emailed === 1 ? '' : 's') + ' sent' : '');
+      $id('bc-body').value = ''; $id('bc-subject').value = '';
+      loadInbox();
+    } catch (e) {
+      status.className = 'a-status is-err'; status.textContent = 'Failed: ' + (e.message || 'unknown');
+    } finally { btn.disabled = false; }
   }
 
   // ── Payment Manager Modal ─────────────────────────────────
