@@ -2730,11 +2730,35 @@
     function setBnActive(name) {
       document.querySelectorAll('.cap-bn').forEach(b => b.classList.toggle('is-active', b.dataset.bn === name));
     }
+    // Lineup tab is single-purpose: setting lineups. Opens the one editable match,
+    // or shows a picker of matches whose lineup you can still set/change.
     function capLineupJump() {
-      const matches = state.matches || [];
-      const needs = matches.filter(m => !m.status?.revealed && !m.finalizedAt && !m.status?.myLocked).sort((a, b) => a.week - b.week)[0];
-      if (needs) openMatch(needs.id, { viaTab: 'next' });
-      else dispatchToNext();
+      const editable = (state.matches || []).filter(m => !m.status?.revealed && !m.finalizedAt).sort((a, b) => a.week - b.week);
+      if (editable.length === 1) { openMatch(editable[0].id, { viaTab: 'next' }); return; }
+      renderLineupPicker(editable);
+    }
+    function renderLineupPicker(editable) {
+      switchSection('next');
+      setBnActive('lineup');
+      document.querySelectorAll('.cap-tab').forEach(b => b.classList.remove('is-active'));
+      const area = $id('next-landing-area');
+      if (!area) return;
+      if (!editable.length) {
+        area.innerHTML = `<div class="cap-card"><div class="cap-card__header"><h2 class="cap-card__title">Set a lineup</h2></div><div class="empty-state">No matches need a lineup right now. They'll show up here once the next match opens for lineups (locks 3 hours before match time).</div></div>`;
+        return;
+      }
+      const row = (m) => {
+        const needs = !m.status?.myLocked;
+        const pill = needs ? '<span class="match-pill match-pill--unlocked">Needs lineup</span>'
+          : (m.status?.oppLocked ? '<span class="match-pill match-pill--revealed">Both locked</span>' : '<span class="match-pill match-pill--locked">Locked · waiting</span>');
+        return `<div class="match-tile" data-match-id="${escapeAttr(m.id)}">
+          <div class="match-tile__week">W${m.week}</div>
+          <div class="match-tile__body"><div class="match-tile__opponent">vs ${escapeHtml(m.opponent.name)}</div><div class="match-tile__meta">${m.myRole === 'home' ? 'Home' : 'Away'}${m.court ? ' · ' + escapeHtml(m.court) : ''}</div></div>
+          <div>${pill}</div>
+        </div>`;
+      };
+      area.innerHTML = `<div class="cap-card"><div class="cap-card__header"><h2 class="cap-card__title">Set a lineup</h2><span class="cap-card__sub">Pick a match</span></div><div style="margin-top:6px;">${editable.map(row).join('')}</div></div>`;
+      area.querySelectorAll('.match-tile').forEach(el => el.addEventListener('click', () => openMatch(el.dataset.matchId, { viaTab: 'next' })));
     }
     function syncBottomNavTabs() {
       const rosterBtn = $id('cap-bn-roster');
