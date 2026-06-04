@@ -76,8 +76,19 @@
     .player-team  { font-size:10px; color:var(--color-text-faint); margin-top:1px; }
     .win-pct      { font-weight:800; color:var(--color-lime); }
     .win-pct--low { color:var(--color-text-muted); }
+    /* Sortable headers + stat-value coloring (rich rankings table) */
+    .rank-table th.sortable { cursor:pointer; user-select:none; transition:color var(--transition); }
+    .rank-table th.sortable:hover { color:var(--color-text); }
+    .rank-table th.is-sorted { color:var(--color-lime); }
+    .rank-table th .sort-ar { font-size:8px; margin-left:3px; }
+    .val-dsr  { font-weight:800; color:var(--color-lime); }
+    .val-pos  { font-weight:700; color:var(--color-lime); }
+    .val-neg  { font-weight:700; color:var(--color-red); }
+    .val-zero { color:var(--color-text-faint); }
+    .val-acc  { font-weight:600; color:var(--color-teal); }
+    .val-ps   { font-weight:700; color:var(--color-text); }
     .col-opt {}
-    @media(max-width:720px){ .col-opt { display:none; } .rank-table { font-size:11px; } }
+    @media(max-width:720px){ .col-opt { display:none; } .rank-table { font-size:11px; } .rank-table th, .rank-table td { padding:7px 5px; } }
 
     /* ── K'CHN TOP CHEFS ───────────────────────────────────────────── */
     .kchn-logo { display:inline-flex; align-items:center; background:#000; border:1px solid rgba(255,255,255,0.12); border-radius:7px; padding:5px 11px; }
@@ -172,15 +183,14 @@
 </head>
 <body data-page="leaderboard">
   <div data-partial="nav"></div>
-  <div class="page-hero">
+  <div class="page-hero page-hero--sponsor">
     <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="leaderboard"></div>
     <div class="page-hero__gradient"></div>
     <div class="page-hero__content">
       <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
-      <h1 class="page-hero__title" id="lb-title">Season 1</h1>
-      <p class="page-hero__sub" id="lb-sub">Player rankings &amp; season leaders.</p>
-      <div style="display:flex;align-items:center;gap:8px;margin-top:16px;">
-        <span style="font-size:10px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:rgba(255,255,255,0.4);">Presented by</span>
+      <h1 class="page-hero__title" id="lb-title">Leaderboard</h1>
+      <div class="page-hero__presented">
+        <span class="page-hero__presented-label">Presented by</span>
         <div class="kchn-logo"><span>K'CHN</span></div>
       </div>
     </div>
@@ -242,7 +252,7 @@
 
   const state = {
     circuit:'I', division:'', tab:'rankings',
-    filter:'all', search:'',
+    filter:'all', search:'', sort:'dsr', sortDir:'desc',
     playerStats:null, standings:null, potw:null
   };
 
@@ -307,9 +317,7 @@
 
   // ── Hero ─────────────────────────────────────────────────────────
   function renderHero() {
-    $('lb-title').textContent = state.circuit === 'I' ? 'Season 1' : 'Season ' + state.circuit;
-    const u = state.standings?.lastUpdated ? ` · Updated ${fmtDate(state.standings.lastUpdated)}` : '';
-    $('lb-sub').textContent = 'Player rankings & season leaders' + u + '.';
+    /* Title is static ("Leaderboard"); kept for call-site compatibility. */
   }
 
   // ── Helpers ──────────────────────────────────────────────────────
@@ -320,17 +328,39 @@
   function filteredPlayers(filter, searchQ) {
     filter = filter || state.filter;
     searchQ = (searchQ !== undefined ? searchQ : state.search).toLowerCase();
-    return playerList()
+    const rows = playerList()
       .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ) || (p.teamName||'').toLowerCase().includes(searchQ))
       .map(p => {
+        // GP / WON / LOSS respect the active game-type filter
         const s = filter === 'all'
           ? { played: p.gamesPlayed||0, won: p.gamesWon||0 }
           : (p.byType?.[filter] || { played:0, won:0 });
-        return { ...p, _played: s.played, _won: s.won,
-                 _rate: s.played ? s.won/s.played : 0 };
+        // PS / PA / DIFF and per-game averages are always season totals
+        const gp = p.gamesPlayed || 0;
+        const ps = p.ps || 0, pa = p.pa || 0, diff = (p.diff != null ? p.diff : ps - pa);
+        return { ...p,
+          _played: s.played, _won: s.won, _lost: s.played - s.won,
+          _rate: s.played ? s.won/s.played : 0,
+          _dsr: p.composite,
+          _ps: ps, _pa: pa, _diff: diff,
+          _aps: gp ? ps/gp : 0, _apa: gp ? pa/gp : 0, _avgDiff: gp ? diff/gp : 0,
+        };
       })
-      .filter(p => p._played > 0)
-      .sort((a,b) => b._rate !== a._rate ? b._rate - a._rate : b._won - a._won);
+      .filter(p => p._played > 0);
+
+    // Sort by the active column (default: DSR desc). Nulls sink to the bottom.
+    const KEY = { dsr:'_dsr', gp:'_played', won:'_won', loss:'_lost',
+                  ps:'_ps', pa:'_pa', diff:'_diff', aps:'_aps', apa:'_apa', avgdiff:'_avgDiff' };
+    const k = KEY[state.sort] || '_dsr';
+    const dir = state.sortDir === 'asc' ? 1 : -1;
+    const num = v => (v == null || Number.isNaN(v)) ? -Infinity : v;
+    rows.sort((a,b) => {
+      const d = (num(a[k]) - num(b[k])) * dir;
+      if (d) return d;
+      // Tiebreaker: DSR desc, then wins desc
+      return (num(b._dsr) - num(a._dsr)) || (b._won - a._won);
+    });
+    return rows;
   }
 
   function noData(msg) {
@@ -366,29 +396,47 @@
     }
 
     const players = filteredPlayers();
+
+    // Rank medals only apply to the canonical ordering (DSR, descending)
+    const canonical = state.sort === 'dsr' && state.sortDir === 'desc';
+    const signI = n => (n > 0 ? '+' : '') + n;
+    const sign1 = n => (n > 0 ? '+' : '') + n.toFixed(1);
+    const diffCls = n => n > 0 ? 'val-pos' : n < 0 ? 'val-neg' : 'val-zero';
+
     const rows = players.map((p, i) => {
       const rankCls = i===0 ? 'rank-num--1' : i===1 ? 'rank-num--2' : i===2 ? 'rank-num--3' : '';
-      const pct = Math.round(p._rate * 100);
-      const pctCls = pct >= 65 ? 'win-pct' : 'win-pct--low';
-      const avCls = p.gender === 'female' ? 'player-avatar--f' : '';
-      return `<tr class="${i===0?'rank-row--leader':''}">
-        <td><span class="rank-num ${rankCls}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span></td>
-        <td><span class="rank-change rank-change--same">—</span></td>
+      const rankDisp = canonical && i < 3 ? ['🥇','🥈','🥉'][i] : (i + 1);
+      const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
+      const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
+      return `<tr class="${canonical && i===0 ? 'rank-row--leader' : ''}">
+        <td><span class="rank-num ${rankCls}">${rankDisp}</span></td>
+        <td class="col-opt"><span class="rank-change rank-change--same">—</span></td>
+        <td class="r"><span class="${p._dsr != null ? 'val-dsr' : 'val-zero'}">${dsr}</span></td>
         <td>
           <div class="player-cell">
             <div class="player-avatar ${avCls}">${esc(initials(p.name))}</div>
-            <div>
-              <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
-              <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
-            </div>
+            <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
           </div>
         </td>
+        <td><span class="player-team" style="font-size:11px">${teamLinkHtml(p.teamName, p.teamId)}</span></td>
         <td class="r">${p._played}</td>
-        <td class="r">${p._won}</td>
-        <td class="r">${p._played - p._won}</td>
-        <td class="r"><span class="${pctCls}">${pct}%</span></td>
+        <td class="r"><span class="val-pos">${p._won}</span></td>
+        <td class="r"><span class="val-neg">${p._lost}</span></td>
+        <td class="r col-opt"><span class="val-ps">${p._ps}</span></td>
+        <td class="r col-opt"><span class="val-zero">${p._pa}</span></td>
+        <td class="r"><span class="${diffCls(p._diff)}">${signI(p._diff)}</span></td>
+        <td class="r col-opt"><span class="val-acc">${p._aps.toFixed(1)}</span></td>
+        <td class="r col-opt"><span class="val-zero">${p._apa.toFixed(1)}</span></td>
+        <td class="r"><span class="${diffCls(p._avgDiff)}">${sign1(p._avgDiff)}</span></td>
       </tr>`;
     }).join('');
+
+    // Sortable header cell
+    const th = (key, label, opt) => {
+      const on = state.sort === key;
+      const ar = on ? `<span class="sort-ar">${state.sortDir === 'asc' ? '▲' : '▼'}</span>` : '';
+      return `<th class="r sortable ${on ? 'is-sorted' : ''} ${opt ? 'col-opt' : ''}" data-sort="${key}">${label}${ar}</th>`;
+    };
 
     el.innerHTML = `<div class="lb-card">
       <div class="lb-search-row">
@@ -400,15 +448,22 @@
       <div style="overflow-x:auto">
         <table class="rank-table">
           <thead><tr>
-            <th style="width:36px">#</th>
-            <th style="width:32px">+/−</th>
+            <th style="width:34px">Rank</th>
+            <th class="col-opt" style="width:30px">+/−</th>
+            ${th('dsr','DSR')}
             <th>Player</th>
-            <th class="r">GP</th>
-            <th class="r">W</th>
-            <th class="r">L</th>
-            <th class="r">Win%</th>
+            <th>Team</th>
+            ${th('gp','GP')}
+            ${th('won','Won')}
+            ${th('loss','Loss')}
+            ${th('ps','PS', true)}
+            ${th('pa','PA', true)}
+            ${th('diff','Diff +/−')}
+            ${th('aps','APS', true)}
+            ${th('apa','APA', true)}
+            ${th('avgdiff','Avg Diff')}
           </tr></thead>
-          <tbody>${rows || '<tr><td colspan="7">' + noData('No players match this filter.') + '</td></tr>'}</tbody>
+          <tbody>${rows || '<tr><td colspan="14">' + noData('No players match this filter.') + '</td></tr>'}</tbody>
         </table>
       </div>
     </div>`;
@@ -420,8 +475,27 @@
       state.filter = b.dataset.filter;
       renderRankings();
     }));
+    el.querySelectorAll('th[data-sort]').forEach(thEl => thEl.addEventListener('click', () => {
+      const key = thEl.dataset.sort;
+      if (state.sort === key) {
+        state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+      } else {
+        state.sort = key;
+        state.sortDir = 'desc';
+      }
+      renderRankings();
+    }));
     const s = $('rank-search');
-    if (s) s.addEventListener('input', e => { state.search = e.target.value; renderRankings(); });
+    if (s) {
+      // Preserve focus + caret across the re-render the input triggers
+      s.addEventListener('input', e => {
+        const pos = e.target.selectionStart;
+        state.search = e.target.value;
+        renderRankings();
+        const ns = $('rank-search');
+        if (ns) { ns.focus(); try { ns.setSelectionRange(pos, pos); } catch {} }
+      });
+    }
   }
 
   // ── K'CHN TOP CHEFS ───────────────────────────────────────────────
@@ -460,8 +534,11 @@
       el.innerHTML = html; return;
     }
 
-    const malePlayers   = filteredPlayers('all').filter(p => p.gender === 'male');
-    const femalePlayers = filteredPlayers('all').filter(p => p.gender === 'female');
+    // Top Chefs are always ranked by win rate, independent of the Rankings-tab sort
+    const byWinRate = (a, b) => (b._rate - a._rate) || (b._won - a._won);
+    const all = filteredPlayers('all');
+    const malePlayers   = all.filter(p => /^m/i.test(p.gender || '')).sort(byWinRate);
+    const femalePlayers = all.filter(p => /^f/i.test(p.gender || '')).sort(byWinRate);
 
     const chefRows = (list, limit) => list.slice(0, limit).map((p, i) => {
       const pct = Math.round(p._rate * 100);
@@ -697,33 +774,4 @@
 
   // ── Utilities ────────────────────────────────────────────────────
   function esc(s) {
-    return String(s??'').replace(/[&<>"']/g, c =>
-      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  }
-  function fmtDate(iso) {
-    if (!iso) return '';
-    const d = new Date(iso);
-    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})
-           + ' ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-  }
-
-  // ── Boot ─────────────────────────────────────────────────────────
-  document.querySelectorAll('.lb-tab').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
-  $('circuit-select').addEventListener('change', e => {
-    state.circuit = e.target.value;
-    state.playerStats = state.standings = null;
-    writeUrl(); activateTab(state.tab, true); activateTab(state.tab);
-  });
-  $('division-select').addEventListener('change', e => {
-    state.division = e.target.value;
-    writeUrl(); renderAll();
-  });
-
-  readUrl();
-  Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
-    renderHero(); renderAll();
-  });
-  </script>
-  <script src="/js/partials.js"></script>
-</body>
-</html>
+    return String(s??'').replac
