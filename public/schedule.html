@@ -141,6 +141,8 @@
     }
     .match-team-name.is-winner { color: var(--color-lime); }
     .match-team-name.is-tbd { color: var(--color-text-faint); font-weight: 500; }
+    a.team-name-link { text-decoration: none; cursor: pointer; }
+    a.team-name-link:hover { text-decoration: underline; }
     .match-team-record { font-size: 10px; color: var(--color-text-faint); }
 
     .match-center { text-align: center; flex-shrink: 0; padding: 0 6px; }
@@ -311,9 +313,9 @@
 
       return `<div class="matches-grid">${matches.map((m, idx) => {
         const isFinal = m.status === 'final';
-        const teamA   = esc(m.teamA || m.homeTeamName || 'TBD');
-        const teamB   = esc(m.teamB || m.awayTeamName || 'TBD');
-        const isTbd   = teamA === 'TBD' && teamB === 'TBD';
+        const teamAName = m.teamA || m.homeTeamName || 'TBD';
+        const teamBName = m.teamB || m.awayTeamName || 'TBD';
+        const isTbd   = teamAName === 'TBD' && teamBName === 'TBD';
         const court   = esc(m.court || `Court ${idx + 1}`);
         const color   = COURT_COLORS[idx % COURT_COLORS.length];
 
@@ -333,11 +335,11 @@
             </div>
             <div class="match-teams">
               <div class="match-team">
-                <div class="match-team-name${isFinal && m.homeRoundPts > m.awayRoundPts ? ' is-winner' : ''}${isTbd ? ' is-tbd' : ''}">${teamA}</div>
+                ${teamLink(teamAName, m.teamAId, 'match-team-name' + (isFinal && m.homeRoundPts > m.awayRoundPts ? ' is-winner' : '') + (isTbd ? ' is-tbd' : ''))}
               </div>
               ${center}
               <div class="match-team right">
-                <div class="match-team-name${isFinal && m.awayRoundPts > m.homeRoundPts ? ' is-winner' : ''}${isTbd ? ' is-tbd' : ''}">${teamB}</div>
+                ${teamLink(teamBName, m.teamBId, 'match-team-name' + (isFinal && m.awayRoundPts > m.homeRoundPts ? ' is-winner' : '') + (isTbd ? ' is-tbd' : ''))}
               </div>
             </div>
           </div>`;
@@ -359,13 +361,23 @@
       });
     }
 
+    /* ── Season context (carries through to team links) ──────────── */
+    const SEASON_ID   = new URLSearchParams(location.search).get('season') || 'circuit-i';
+    const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
+    function slug(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team';}
+    function teamLink(name, id, cls) {
+      if (!name || name === 'TBD') return `<div class="${cls}">${esc(name || 'TBD')}</div>`;
+      const ref = id || slug(name);
+      return `<a class="${cls} team-name-link" href="/team?id=${encodeURIComponent(ref)}${LINK_SUFFIX}">${esc(name)}</a>`;
+    }
+
     /* ── Load schedule from API ──────────────────────────────────── */
     async function loadSchedule() {
       renderDateStrip(null);
       renderAllWeeks(null);
 
       try {
-        const p = new URLSearchParams({ season: 'circuit-i' });
+        const p = new URLSearchParams({ season: SEASON_ID });
         const r = await fetch(`/.netlify/functions/public-schedule?${p}`);
         if (!r.ok) throw 0;
         scheduleData = await r.json();

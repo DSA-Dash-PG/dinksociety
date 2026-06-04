@@ -20,15 +20,19 @@ export default async (req) => {
   const divisionFilter = url.searchParams.get('division') || '';
 
   try {
+    // Derive the circuit letter for this season (circuit-i → I, circuit-test → TEST)
+    const circuitLetter = seasonId.replace('circuit-', '').toUpperCase();
+
     // Try the schedule store first (admin-generated round-robin)
     const schedStore = getStore('schedule');
-    const { blobs: schedBlobs } = await schedStore.list();
-    
+    const { blobs: schedBlobs } = await schedStore.list({ prefix: `schedule/${circuitLetter}/` });
+
     if (schedBlobs.length > 0) {
       const weekMap = {};
       for (const b of schedBlobs) {
         const data = await schedStore.get(b.key, { type: 'json' }).catch(() => null);
         if (!data?.matches) continue;
+        if (data.circuit && data.circuit !== circuitLetter) continue; // season isolation
         if (divisionFilter && data.division !== divisionFilter) continue;
 
         const w = data.week || 1;
@@ -38,11 +42,19 @@ export default async (req) => {
             id: m.id,
             teamA: m.teamA?.name || 'TBD',
             teamB: m.teamB?.name || 'TBD',
+            teamAId: m.teamA?.id || null,
+            teamBId: m.teamB?.id || null,
             court: m.court || null,
+            courtA: m.courtA ?? null,
+            courtB: m.courtB ?? null,
+            courtSet: m.courtSet ?? null,
             scheduledAt: m.scheduledAt || null,
             scoreA: m.scoreA ?? null,
             scoreB: m.scoreB ?? null,
-            status: m.playedAt ? 'final' : 'scheduled',
+            // schedule.html renders finals from homeRoundPts/awayRoundPts
+            homeRoundPts: m.scoreA ?? null,
+            awayRoundPts: m.scoreB ?? null,
+            status: m.finalizedAt ? 'final' : 'scheduled',
             division: data.division,
           });
         }

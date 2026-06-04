@@ -67,9 +67,10 @@ export default async (req) => {
 
       // Compute per-game and per-pair status from score record
       const games = scoreRec?.games || {};
+      const winBy = m.championship ? 2 : 1;
       const gameStatuses = SLOT_KEYS.map(slot => ({
         slot,
-        status: computeGameStatus(games[slot]),
+        status: computeGameStatus(games[slot], winBy),
       }));
 
       const statusBySlot = Object.fromEntries(gameStatuses.map(g => [g.slot, g.status]));
@@ -123,6 +124,9 @@ export default async (req) => {
         circuit,
         division,
         court: m.court || null,
+        courtA: m.courtA ?? null,
+        courtB: m.courtB ?? null,
+        courtSet: m.courtSet ?? null,
         scheduledAt: m.scheduledAt || null,
         home: { id: homeId, name: m.teamA?.name },
         away: { id: awayId, name: m.teamB?.name },
@@ -148,23 +152,27 @@ export default async (req) => {
   return json({ circuit, division, weeks: weekParam ? [parseInt(weekParam,10)] : null, matches: result, fetchedAt: new Date().toISOString() });
 };
 
-function computeGameStatus(game) {
+function computeGameStatus(game, winBy = 1) {
   if (!game) return 'empty';
   const hHas = Number.isInteger(game.home);
   const aHas = Number.isInteger(game.away);
   if (!hHas && !aHas) return 'empty';
   if (!hHas || !aHas) return 'partial';
-  return isValidGame(game.home, game.away) ? 'confirmed' : 'mismatch';
+  return isValidGame(game.home, game.away, winBy) ? 'confirmed' : 'mismatch';
 }
 
-function isValidGame(h, a) {
-  // Dink Society: first to 11, win by 1 → winner's score is exactly 11.
+function isValidGame(h, a, winBy = 1) {
+  // Regular: first to 11, win by 1. Championship: first to 11, win by 2.
   if (!Number.isInteger(h) || !Number.isInteger(a)) return false;
   if (h === a) return false;
   const hi = Math.max(h, a), lo = Math.min(h, a);
+  if (winBy === 2) {
+    if (hi < 11) return false;
+    if (hi - lo < 2) return false;
+    return hi === 11 ? lo <= 9 : (hi - lo) === 2;
+  }
   if (hi !== 11) return false;
-  if (lo < 0 || lo > 10) return false;
-  return true;
+  return lo >= 0 && lo <= 10;
 }
 
 function computeRound(games, roundNum, statusBySlot) {

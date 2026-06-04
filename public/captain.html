@@ -186,6 +186,7 @@
 
     .ss-type { font-weight: 800; color: var(--color-text-muted); }
     .ss-type-label { color: var(--color-text-faint); font-size: 10px; }
+    .ss-court { display: inline-block; margin-left: 4px; font-size: 9px; font-weight: 700; letter-spacing: .03em; color: var(--color-teal); background: var(--color-teal-dim); border-radius: 4px; padding: 1px 5px; white-space: nowrap; }
     .ss-pair { font-size: 11px; color: var(--color-text-muted); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
     .ss-score-input { width: 55px; padding: 6px 4px; text-align: center; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); color: var(--color-text); font-size: 13px; font-family: inherit; }
@@ -453,6 +454,7 @@
 
     <nav class="cap-tabs">
       <button class="cap-tab is-active" data-tab="next">Next match</button>
+      <button class="cap-tab" data-tab="scoresheet">Scoresheet</button>
       <button class="cap-tab" data-tab="roster">Roster</button>
       <button class="cap-tab" data-tab="schedule">Schedule</button>
       <button class="cap-tab" data-tab="billing">Billing</button>
@@ -617,6 +619,7 @@
       lineupDraft: {},
       oppLineup: null,
       pollTimer: null,
+      scoreDirty: false, // true while the captain has unsaved score entry
     };
 
     const $id = (id) => document.getElementById(id);
@@ -774,6 +777,8 @@
         if (tab === 'next') {
           // Re-dispatch to whatever the current state warrants
           dispatchToNext();
+        } else if (tab === 'scoresheet') {
+          openActiveScoresheet();
         } else {
           switchSection(tab);
           if (tab === 'schedule') loadMatches();
@@ -1067,6 +1072,30 @@
       return null;
     }
 
+    // Scoresheet tab → jump straight to the active game's scoresheet.
+    async function openActiveScoresheet() {
+      if (!state.matches || !state.matches.length) { try { await loadMatches(); } catch {} }
+      const matches = state.matches || [];
+      const live = matches.find(m => m.status?.revealed && !m.finalizedAt)
+                || matches.filter(m => m.finalizedAt)
+                          .sort((a, b) => new Date(b.finalizedAt) - new Date(a.finalizedAt))[0];
+      if (live) { openMatch(live.id, { viaTab: 'scoresheet' }); return; }
+
+      // No game is being scored right now — show a friendly placeholder.
+      switchSection('match');
+      document.querySelectorAll('.cap-tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab === 'scoresheet'));
+      $id('back-to-matches').style.display = 'none';
+      $id('match-title').textContent = 'Scoresheet';
+      $id('match-sub').textContent = 'Your active game';
+      $id('match-status-pill').innerHTML = '';
+      $id('match-reveal-area').innerHTML = '';
+      $id('lineup-builder').innerHTML = '<div class="empty-state">No game is being scored right now. Once both lineups are locked for your current match, the scoresheet appears here.</div>';
+      $id('lineup-actions').style.display = 'none';
+      $id('lineup-status').textContent = '';
+      $id('scoresheet-area').innerHTML = '';
+      stopPolling();
+    }
+
     /**
      * State 0 — Renders the "finish your roster" landing.
      * { empty: true } means no players at all
@@ -1188,6 +1217,7 @@
 
       state.currentMatch = state.matches.find(m => m.id === matchId);
       if (!state.currentMatch) return;
+      state.scoreDirty = false; // fresh match — no unsaved edits yet
 
       await refreshLineup();
     }
@@ -1225,8 +1255,10 @@
       return state.currentScore?.final === true;
     }
 
-    async function refreshScoresheet() {
+    async function refreshScoresheet(force) {
       if (!state.currentMatch) return;
+      // Don't let background polling wipe scores the captain is still typing.
+      if (state.scoreDirty && !force) return;
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, {
           credentials: 'include',
@@ -1431,6 +1463,8 @@
         area.innerHTML = '';
         return;
       }
+      // Rendering fresh server state — clears the unsaved-edit guard.
+      state.scoreDirty = false;
 
       const myRole = data.myRole;
       const homeName = data.match.home.name;
@@ -1446,6 +1480,13 @@
 
       // I can edit my own scores anytime pre-final
       const canEdit = !final;
+
+      // Courts: A hosts games 1,3,5 · B hosts games 2,4,6 (two games run at once).
+      const courtA = data.match.courtA, courtB = data.match.courtB;
+      const courtTag = (g) => {
+        const ct = (g % 2 === 1) ? courtA : courtB;
+        return ct ? `<span class="ss-court">Court ${escapeHtml(String(ct))}</span>` : '';
+      };
 
       const renderRound = (round) => {
         const serveNote = round === 1
@@ -1504,7 +1545,7 @@
 
             rows.push(`
               <tr class="${rowClass}">
-                <td><span class="ss-type">G${g}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span></td>
+                <td><span class="ss-type">G${g}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span> ${courtTag(g)}</td>
                 <td class="ss-pair">${escapeHtml(homePair)}</td>
                 <td>
                   <input type="number" inputmode="numeric" min="0" max="30"
@@ -1650,8 +1691,8 @@
       area.innerHTML = `
         <div class="scoresheet">
           <div class="scoresheet__header">
-            <h3 class="scoresheet__title">Scoresheet</h3>
-            <div class="scoresheet__meta">Week ${data.match.week} &middot; ${escapeHtml(data.match.court || '—')}</div>
+            <h3 class="scoresheet__title">Scoresheet${data.match.championship ? ' &middot; 🏆 Championship' : ''}</h3>
+            <div class="scoresheet__meta">Week ${data.match.week} &middot; ${escapeHtml(data.match.court || '—')}${data.match.championship ? ' &middot; First to 11, win by 2' : ''}</div>
           </div>
           ${banner}
           ${renderRound(1)}
@@ -1667,6 +1708,8 @@
       // Either captain can edit any game. No per-field autosave — teams often
       // enter several games at once, so saving is an explicit batch action.
       area.querySelectorAll('.ss-score-input:not([disabled])').forEach(inp => {
+        inp.dataset.orig = inp.value;                       // baseline for change detection
+        inp.addEventListener('input', () => { state.scoreDirty = true; });
         inp.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); saveAllScores(); }
         });
@@ -1813,15 +1856,28 @@
     async function saveAllScores() {
       const area = $id('scoresheet-area');
       const games = {};
+      let changes = 0;
+      // Only send games the captain actually changed — so two captains editing
+      // the same shared sheet never overwrite each other's saved games.
       area.querySelectorAll('.ss-score-input').forEach(inp => {
         const slot = inp.dataset.slot, side = inp.dataset.side;
         if (!slot || !side) return;
+        const cur  = inp.value.trim();
+        const orig = (inp.dataset.orig || '').trim();
+        if (cur === orig) return;
         if (!games[slot]) games[slot] = {};
-        const v = inp.value.trim();
-        games[slot][side] = v === '' ? null : Number(v);
+        games[slot][side] = cur === '' ? null : Number(cur);
+        changes++;
       });
 
       const status = $id('ss-status');
+      if (changes === 0) {
+        state.scoreDirty = false;
+        if (status) { status.className = 'cap-status'; status.textContent = 'No changes to save.'; }
+        await refreshScoresheet(true);
+        return;
+      }
+
       if (status) { status.className = 'cap-status'; status.textContent = 'Saving…'; }
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, {
@@ -1832,7 +1888,8 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
-        await refreshScoresheet(); // re-render with updated status pills + live totals
+        state.scoreDirty = false;          // saved — safe to re-render
+        await refreshScoresheet(true);     // re-render with updated status pills + live totals
       } catch (err) {
         if (status) {
           status.className = 'a-status is-err';
@@ -1851,7 +1908,8 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Submit failed');
-        await refreshScoresheet();
+        state.scoreDirty = false;
+        await refreshScoresheet(true);
         await loadMatches();
       } catch (err) {
         if (status) {
@@ -1870,7 +1928,8 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed');
-        await refreshScoresheet();
+        state.scoreDirty = false;
+        await refreshScoresheet(true);
       } catch (err) {
         if (status) {
           status.className = 'a-status is-err';

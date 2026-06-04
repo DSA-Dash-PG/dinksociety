@@ -89,7 +89,7 @@ export default async (req) => {
       match: publicMatchInfo(match),
       homeLineup: sanitizeLineup(lineupHome),
       awayLineup: sanitizeLineup(lineupAway),
-      score: decorate(score),
+      score: decorate(score, match.championship),
     });
   }
 
@@ -149,7 +149,7 @@ export default async (req) => {
     existing.updatedBy = ctx.user.email;
 
     await scoresStore.setJSON(scoreKey, existing);
-    return json({ ok: true, score: decorate(existing) });
+    return json({ ok: true, score: decorate(existing, match.championship) });
   }
 
   // ===== POST submit / withdraw =====
@@ -166,14 +166,15 @@ export default async (req) => {
       if (existing.finalizedAt) {
         return json({ error: 'Already finalized' }, 409);
       }
-      // All games must be CONFIRMED (both sides match)
-      const decorated = decorate(existing);
+      // All games must be CONFIRMED (both sides match + valid)
+      const decorated = decorate(existing, match.championship);
       const unconfirmed = decorated.computed.gameStatuses.filter(g => g.status !== 'confirmed');
       if (unconfirmed.length > 0) {
+        const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
         const labels = unconfirmed.map(g => prettySlot(g.slot)).slice(0, 3).join(', ');
         const more = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : '';
         return json({
-          error: `Cannot submit yet — ${unconfirmed.length} game(s) need a complete, valid score (first to 11): ${labels}${more}.`,
+          error: `Cannot submit yet — ${unconfirmed.length} game(s) need a complete, valid score (${rule}): ${labels}${more}.`,
         }, 400);
       }
 
@@ -211,7 +212,7 @@ export default async (req) => {
     }
 
     await scoresStore.setJSON(scoreKey, existing);
-    return json({ ok: true, score: decorate(existing) });
+    return json({ ok: true, score: decorate(existing, match.championship) });
   }
 
   return new Response('Method not allowed', { status: 405 });
@@ -240,6 +241,7 @@ function newScoreRecord(match) {
     circuit: match.circuit,
     division: match.division,
     week: match.week,
+    championship: !!match.championship,
     home: { id: match.teamA.id, name: match.teamA.name },
     away: { id: match.teamB.id, name: match.teamB.name },
     games,
@@ -257,33 +259,39 @@ function toScore(v) {
   return n;
 }
 
-function gameStatus(game) {
+function gameStatus(game, winBy = 1) {
   const hHas = Number.isInteger(game?.home);
   const aHas = Number.isInteger(game?.away);
   if (!hHas && !aHas) return 'empty';
   if (!hHas || !aHas) return 'partial';
-  // Both scores entered → 'confirmed' if it's a legal finished game, else 'mismatch'
-  // ('mismatch' = entered but not a valid result, e.g. not won by 2).
-  return isValidGame(game.home, game.away) ? 'confirmed' : 'mismatch';
+  // Both scores entered → 'confirmed' if it's a legal finished game, else 'mismatch'.
+  return isValidGame(game.home, game.away, winBy) ? 'confirmed' : 'mismatch';
 }
 
-// Dink Society format: games are first-to-11, win by 1 — the winner's score
-// is exactly 11 and the loser is 0–10. (Championship/gold games to 15 are not
-// special-cased here yet.)
-function isValidGame(h, a) {
+// Dink Society game validity. All games are first-to-11.
+//   Regular season: win by 1 → winner's score is exactly 11, loser 0–10.
+//   Championship (week 8 finals): win by 2 → 11–9 (or better), or deuce past
+//   11 ending on a 2-point lead (12–10, 13–11, …).
+function isValidGame(h, a, winBy = 1) {
   if (!Number.isInteger(h) || !Number.isInteger(a)) return false;
   if (h === a) return false;                 // must have a winner
   const hi = Math.max(h, a), lo = Math.min(h, a);
-  if (hi !== 11) return false;               // winner reaches exactly 11
-  if (lo < 0 || lo > 10) return false;       // loser 0–10
-  return true;
+  if (winBy === 2) {
+    if (hi < 11) return false;               // must reach 11
+    if (hi - lo < 2) return false;           // win by 2
+    return hi === 11 ? lo <= 9 : (hi - lo) === 2; // 11–9, or deuce ending +2
+  }
+  // Win by 1: winner reaches exactly 11.
+  if (hi !== 11) return false;
+  return lo >= 0 && lo <= 10;
 }
 
-function decorate(score) {
+function decorate(score, championship = false) {
+  const winBy = championship ? 2 : 1;
   // Status per game
   const gameStatuses = SLOT_KEYS.map(slot => ({
     slot,
-    status: gameStatus(score.games[slot]),
+    status: gameStatus(score.games[slot], winBy),
   }));
 
   const counts = gameStatuses.reduce((acc, g) => {
@@ -373,6 +381,10 @@ function sanitizeLineup(lineup) {
 function publicMatchInfo(match) {
   return {
     id: match.id, week: match.week, court: match.court,
+    courtA: match.courtA ?? null,
+    courtB: match.courtB ?? null,
+    courtSet: match.courtSet ?? null,
+    championship: !!match.championship,
     venue: match.venue || null,
     scheduledAt: match.scheduledAt || null,
     circuit: match.circuit, division: match.division,
@@ -387,7 +399,7 @@ async function writeFinalScoreToSchedule(scheduleStore, match, score) {
   const m = data.matches.find(x => x.id === match.id);
   if (!m) return;
 
-  const decorated = decorate(score);
+  const decorated = decorate(score, match.championship);
   m.scoreA = decorated.computed.matchPoints.home;
   m.scoreB = decorated.computed.matchPoints.away;
   m.finalizedAt = score.finalizedAt;

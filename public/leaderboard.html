@@ -10,6 +10,8 @@
   <link rel="stylesheet" href="/css/shared-nav.css" />
   <style>
     .lb-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+    a.ds-link { color: inherit; text-decoration: none; cursor: pointer; }
+    a.ds-link:hover { color: var(--color-lime); text-decoration: underline; }
 
     /* Controls */
     .lb-controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:var(--space-4); }
@@ -246,6 +248,12 @@
 
   const $ = id => document.getElementById(id);
 
+  // ── Profile links (carry the current season/circuit forward) ─────
+  function _seasonSuffix(){ return state.circuit === 'I' ? '' : '&season=circuit-' + state.circuit.toLowerCase(); }
+  function _slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'x'; }
+  function teamLinkHtml(name, id){ if(!name) return ''; const ref=id||_slug(name); return '<a class="ds-link" href="/team?id='+encodeURIComponent(ref)+_seasonSuffix()+'">'+esc(name)+'</a>'; }
+  function playerLinkHtml(name, teamName){ if(!name) return esc(name||''); return '<a class="ds-link" href="/player?team='+encodeURIComponent(_slug(teamName))+'&name='+encodeURIComponent(name)+_seasonSuffix()+'">'+esc(name)+'</a>'; }
+
   // ── URL ──────────────────────────────────────────────────────────
   function readUrl() {
     const p = new URLSearchParams(window.location.search);
@@ -370,8 +378,8 @@
           <div class="player-cell">
             <div class="player-avatar ${avCls}">${esc(initials(p.name))}</div>
             <div>
-              <div class="player-name">${esc(p.name)}</div>
-              <div class="player-team">${esc(p.teamName||'')}</div>
+              <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
+              <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
             </div>
           </div>
         </td>
@@ -463,8 +471,8 @@
           <div class="player-cell">
             <div class="player-avatar ${p.gender==='female'?'player-avatar--f':''}">${esc(initials(p.name))}</div>
             <div>
-              <div class="player-name">${esc(p.name)}</div>
-              <div class="player-team">${esc(p.teamName||'')}</div>
+              <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
+              <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
             </div>
           </div>
         </td>
@@ -506,8 +514,8 @@
         <div class="podium-avatar ${place===1?'podium-avatar--first':''}" style="${p.gender==='female'?'border-color:var(--color-teal);color:var(--color-teal)':'color:var(--color-lime)'}">
           ${esc(initials(p.name))}
         </div>
-        <div class="podium-name">${esc(p.name)}</div>
-        <div class="podium-team">${esc(p.teamName||'')}</div>
+        <div class="podium-name">${playerLinkHtml(p.name, p.teamName)}</div>
+        <div class="podium-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
         ${p.score ? `<div class="podium-score">${p.score}</div>` : ''}
         <div class="podium-meta">${esc(p.wl||'')}${p.diff ? ` · ${p.diff>0?'+':''}${p.diff}` : ''}</div>
       </div>`;
@@ -556,7 +564,7 @@
             <span class="team-player__rank ${i===0?'team-player__rank--1':''}">${i===0?'🥇':i+1}</span>
             <div class="team-player__av ${avCls}">${esc(initials(p.name))}</div>
             <div style="flex:1">
-              <div class="team-player__name">${esc(p.name)}</div>
+              <div class="team-player__name">${playerLinkHtml(p.name, team.name)}</div>
               <div class="team-player__stats">${p.gamesWon}W–${p.gamesPlayed-p.gamesWon}L · ${p.gamesPlayed} GP</div>
             </div>
             <span class="${pctBadgeCls}">${rate}% Win</span>
@@ -565,7 +573,7 @@
 
         return `<div class="team-card">
           <div class="team-card__hd">
-            <span class="team-card__name">${esc(team.name)}</span>
+            <span class="team-card__name">${teamLinkHtml(team.name, team.id)}</span>
           </div>
           <div class="team-card__body">${playerRows}</div>
         </div>`;
@@ -623,8 +631,8 @@
           <div class="player-cell">
             <div class="player-avatar ${avCls}">${esc(initials(p.name))}</div>
             <div>
-              <div class="player-name">${esc(p.name)} ${badge}</div>
-              <div class="player-team">${esc(p.teamName||'')}</div>
+              <div class="player-name">${playerLinkHtml(p.name, p.teamName)} ${badge}</div>
+              <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
             </div>
           </div>
         </td>

@@ -9,6 +9,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { assignCourtSets } from './lib/courts.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -28,20 +29,32 @@ export default async (req) => {
     const schedule = generateRoundRobin(teams);
     const store = getStore('schedule');
 
+    // Rotate the 2-court sets (A=1&2, B=3&6, C=5&7) across the season so every
+    // team plays each set as evenly as possible.
+    const courtPlan = assignCourtSets(
+      schedule.map(week => week.map(pair => ({ teamAId: pair[0].id, teamBId: pair[1].id })))
+    );
+
     const summary = [];
     for (let i = 0; i < schedule.length; i++) {
       const week = i + 1;
       const pairings = schedule[i];
-      const matches = pairings.map((pair, idx) => ({
-        id: matchId(circuit, division, week, idx),
-        teamA: { id: pair[0].id, name: pair[0].name },
-        teamB: { id: pair[1].id, name: pair[1].name },
-        court: courts[idx] || `Court ${idx + 1}`,
-        scheduledAt: null,
-        scoreA: null,
-        scoreB: null,
-        playedAt: null,
-      }));
+      const matches = pairings.map((pair, idx) => {
+        const plan = courtPlan[i][idx];
+        return {
+          id: matchId(circuit, division, week, idx),
+          teamA: { id: pair[0].id, name: pair[0].name },
+          teamB: { id: pair[1].id, name: pair[1].name },
+          courtSet: plan.courtSet,
+          courtA: plan.courtA,
+          courtB: plan.courtB,
+          court: `Courts ${plan.courtA} & ${plan.courtB}`, // summary label
+          scheduledAt: null,
+          scoreA: null,
+          scoreB: null,
+          playedAt: null,
+        };
+      });
 
       const key = `schedule/${circuit}/${division}/week-${week}.json`;
       await store.setJSON(key, {

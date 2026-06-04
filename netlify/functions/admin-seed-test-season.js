@@ -33,6 +33,7 @@
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 import { wipeTestSeason } from './lib/test-season.js';
+import { assignCourtSets } from './lib/courts.js';
 
 // ---- Test season identity (keep in sync with lib/test-season.js) ----
 const SEASON_ID = 'circuit-test';
@@ -144,6 +145,11 @@ export default async (req) => {
 
     let finalizedCount = 0, openCount = 0;
 
+    // Rotate court sets across the season (A=1&2, B=3&6, C=5&7).
+    const courtPlan = assignCourtSets(
+      weeks.map(week => week.map(([h, a]) => ({ teamAId: h.id, teamBId: a.id })))
+    );
+
     for (let w = 0; w < weeks.length; w++) {
       const week = w + 1;
       const pairings = weeks[w];
@@ -160,11 +166,15 @@ export default async (req) => {
         await lineupStore.setJSON(`lineup/${matchId}/${home.id}.json`, homeLineup);
         await lineupStore.setJSON(`lineup/${matchId}/${away.id}.json`, awayLineup);
 
+        const cp = courtPlan[w][idx];
         const match = {
           id: matchId,
           teamA: { id: home.id, name: home.name },
           teamB: { id: away.id, name: away.name },
-          court: `Court ${idx + 1}`, venue: 'Test Courts', scheduledAt,
+          courtSet: cp.courtSet, courtA: cp.courtA, courtB: cp.courtB,
+          court: `Courts ${cp.courtA} & ${cp.courtB}`,
+          championship: week === weeks.length, // last test week = championship (win by 2) for QA
+          venue: 'Test Courts', scheduledAt,
           scoreA: null, scoreB: null, finalizedAt: null,
         };
 

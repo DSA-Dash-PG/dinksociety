@@ -42,7 +42,7 @@ export default async (req) => {
     if (!matchId) return json({ error: 'matchId required' }, 400);
 
     const body = await req.json();
-    const allowedFields = ['court', 'scheduledAt', 'venue', 'notes'];
+    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'venue', 'notes'];
     const updates = {};
     for (const f of allowedFields) {
       if (f in body) updates[f] = body[f];

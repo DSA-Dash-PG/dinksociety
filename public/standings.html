@@ -95,6 +95,8 @@
     .team-cell  { display: flex; align-items: center; gap: 8px; }
     .team-emoji { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
     .team-name  { font-weight: 700; color: var(--color-text); }
+    a.team-name-link { color: inherit; text-decoration: none; cursor: pointer; }
+    a.team-name-link:hover { color: var(--color-lime); text-decoration: underline; }
     .team-badge {
       display: inline-flex; align-items: center;
       font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
@@ -235,6 +237,11 @@
   // ── State ────────────────────────────────────────────────────────
   let standingsData = null, teamsData = null, activeDivision = '', isPreseason = false;
 
+  // Links carry the current season so navigation stays in context (e.g. test season).
+  const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
+  function slug(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team';}
+  function teamHref(t){const id=t.teamId||slug(t.teamName);return '/team?id='+encodeURIComponent(id)+LINK_SUFFIX;}
+
   // ── Bootstrap ────────────────────────────────────────────────────
   async function load() {
     try {
@@ -359,7 +366,7 @@
       rows += '<tr class="' + (!preseason && idx===0 ? 'stand-row--leader' : '') + '">'
         + '<td class="col-rank ' + rankCls + '">' + rankSym + '</td>'
         + '<td class="col-team"><div class="team-cell">'
-        + '  <span class="team-name">'  + esc(t.teamName)  + '</span>'
+        + '  <a class="team-name team-name-link" href="' + teamHref(t) + '">'  + esc(t.teamName)  + '</a>'
         + badge
         + '</div></td>'
         + '<td class="col-opt col-muted">' + rds + '</td>'
@@ -466,7 +473,7 @@
       const tf = Object.values(rt.h2h||{}).reduce((s,v) => s+(v.for||0), 0);
       const ta = Object.values(rt.h2h||{}).reduce((s,v) => s+(v.against||0), 0);
       const tc = tf>ta ? 'h2h-win' : tf<ta ? 'h2h-loss' : 'h2h-tie';
-      return '<tr><td class="h2h-team">' + esc(rt.teamEmoji) + ' ' + esc(rt.teamName) + '</td>'
+      return '<tr><td class="h2h-team">' + esc(rt.teamEmoji) + ' <a class="team-name-link" href="' + teamHref(rt) + '">' + esc(rt.teamName) + '</a></td>'
            + cells
            + '<td class="h2h-total ' + tc + '">' + tf + '–' + ta + '</td></tr>';
     }).join('');
