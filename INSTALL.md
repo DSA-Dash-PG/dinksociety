@@ -142,6 +142,7 @@ All of these need to be set for the site to work:
 - `EMAIL_FROM` (e.g. `"The Dink Society <noreply@dinksociety.com>"`)
 - `EMAIL_REPLY_TO` (optional)
 - `EMAIL_ADMIN_BCC` (optional)
+- `ADMIN_NOTIFY_EMAIL` (optional) — inbox that receives captain-portal messages. Falls back to `EMAIL_REPLY_TO` → `EMAIL_ADMIN_BCC`, then defaults to `dink@dinksociety.app`.
 
 **Supabase (admin portal auth only — captains use magic links):**
 - `SUPABASE_URL`

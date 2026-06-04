@@ -58,7 +58,11 @@ export default async (req) => {
     await setRead(teamId, 'captain'); // sender has obviously seen the thread
 
     // Notify the league admin by email if a notify address is configured.
-    const notify = process.env.EMAIL_REPLY_TO || process.env.EMAIL_ADMIN_BCC || process.env.EMAIL_FROM;
+    // ADMIN_NOTIFY_EMAIL is the dedicated inbox for captain messages; the rest
+    // are fallbacks so notifications still work if it isn't set yet.
+    const notify = process.env.ADMIN_NOTIFY_EMAIL
+      || process.env.EMAIL_REPLY_TO || process.env.EMAIL_ADMIN_BCC
+      || 'dink@dinksociety.app';
     if (notify) {
       try {
         await sendEmail({
