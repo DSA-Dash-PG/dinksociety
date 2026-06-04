@@ -101,6 +101,15 @@
       color: var(--color-text);
     }
     .hero__headline .lime { color: var(--color-lime); }
+    .hero__headline .teal { color: var(--color-teal, #4fd1c5); }
+
+    /* crossfade for rotating hero tagline */
+    #hero-title, #hero-sub {
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    #hero-title.is-swapping, #hero-sub.is-swapping {
+      opacity: 0; transform: translateY(6px);
+    }
 
     .hero__body {
       font-size: var(--text-base); line-height: 1.7;
@@ -401,10 +410,10 @@
     <div class="hero__gradient"></div>
     <div class="hero__noise"></div>
     <div class="hero__content">
-      <h1 class="hero__headline">
+      <h1 class="hero__headline" id="hero-title">
         COMPETITIVE PLAY HAS ITS <span class="lime">PRIVILEGES.</span><br>LIKE WINNING.
       </h1>
-      <p class="hero__body">
+      <p class="hero__body" id="hero-sub">
         Six teams. <span data-season-weeks>8</span> weeks. One Champion Title. The Dink Society is
         Southern California's <strong>invite-worthy social pickleball league.</strong>
         Bring your A-game — <strong>the Society keeps receipts.</strong>
@@ -782,6 +791,67 @@
       })
       .catch(function (e) { console.warn('POTW load failed:', e); });
   })();
+  </script>
+
+  <!-- ── Hero tagline rotation ──────────────────────────────────
+       Cycles through taglines on each visit using localStorage.
+       Crossfades title + subtitle on page load. Slot 0 is the
+       static HTML default (no swap needed).
+       ────────────────────────────────────────────────────────── -->
+  <script>
+    (function () {
+      var heroes = [
+        { /* slot 0 = HTML default, left in place */ },
+        {
+          title: 'WE MADE A WHOLE <span class="lime">LEAGUE</span><br>SO WE\'D STOP ARGUING<br>AT <span class="teal">OPEN PLAY.</span>',
+          sub: 'Structured. Social. Actually fun. <strong>The Dink Society</strong> is 8 weeks of Monday-night pickleball for people who wanted something better than “next four on.”'
+        },
+        {
+          title: 'WHERE THE DINKS ARE <span class="lime">SOFT</span><br>AND THE COMPETITION <span class="teal">ISN\'T.</span>',
+          sub: 'Southern California’s social pickleball league. <strong>Six teams, 8 weeks, one Champion Title.</strong> Monday nights were made for this.'
+        },
+        {
+          title: 'MONDAY NIGHTS.<br><span class="lime">SAME CREW.</span> REAL STAKES.',
+          sub: 'The Dink Society is Southern California’s invite-worthy pickleball league. <strong>8 weeks. Six teams.</strong> One Champion Title — and a leaderboard that never forgets.'
+        },
+        {
+          title: 'NOT A REC LEAGUE.<br>NOT A TOURNAMENT.<br><span class="lime">SOMETHING BETTER.</span>',
+          sub: 'The Dink Society sits in the sweet spot — real competition, real standings, and a drink afterward. <strong>Season 1 starts June 8.</strong>'
+        },
+        {
+          title: 'SHOW UP. <span class="lime">DINK HARD.</span><br>STAY LATE.',
+          sub: 'Southern California’s social pickleball league. <strong>Six teams. 8 weeks</strong> of Monday-night play. Points that follow you all season.'
+        },
+        {
+          title: 'YOUR THIRD SHOT IS <span class="teal">MID.</span><br>YOUR TEAM STILL <span class="lime">NEEDS YOU.</span>',
+          sub: 'Pickleball for people who care about winning — but not enough to skip the post-match round. <strong>Structured Monday-night league play across SoCal.</strong>'
+        }
+      ];
+
+      var key = 'ds-hero-idx';
+      var last = parseInt(localStorage.getItem(key), 10);
+      var idx = isNaN(last) ? 0 : (last + 1) % heroes.length;
+      localStorage.setItem(key, idx);
+
+      /* slot 0 is the static HTML default — leave it untouched */
+      if (idx === 0) return;
+
+      var h = heroes[idx];
+      var titleEl = document.getElementById('hero-title');
+      var subEl = document.getElementById('hero-sub');
+      if (!titleEl || !subEl || !h.title) return;
+
+      /* Crossfade: hide → swap → reveal */
+      titleEl.classList.add('is-swapping');
+      subEl.classList.add('is-swapping');
+
+      setTimeout(function () {
+        titleEl.innerHTML = h.title;
+        subEl.innerHTML = h.sub;
+        titleEl.classList.remove('is-swapping');
+        subEl.classList.remove('is-swapping');
+      }, 80);
+    })();
   </script>
 </body>
 </html>
