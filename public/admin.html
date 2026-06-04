@@ -502,6 +502,12 @@
             <div id="xreq-list"><div class="loading" style="font-size:12px;">Loading…</div></div>
           </div>
 
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <label style="font-size:12px;color:var(--color-text-faint);">Division</label>
+            <select id="teams-div-filter" style="max-width:260px;"><option value="">All divisions</option></select>
+            <span id="teams-count" style="font-size:11px;color:var(--color-text-faint);"></span>
+          </div>
+
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col" id="teams-grid">
             <div class="loading" style="grid-column:1/-1;">Loading teams…</div>
           </div>
@@ -2260,7 +2266,23 @@
     const grid = $id('teams-grid');
     if (!allTeams.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No teams yet. Sync from registrations to create team records.</div>'; return; }
 
-    grid.innerHTML = allTeams.map(t => {
+    // Division filter (preserve current selection across re-renders)
+    const sel = $id('teams-div-filter');
+    if (sel) {
+      const current = sel.value;
+      const seen = new Set(), divs = [];
+      allTeams.forEach(t => { if (t.division && !seen.has(t.division)) { seen.add(t.division); divs.push({ id: t.division, label: t.divisionLabel || t.division }); } });
+      divs.sort((a, b) => a.label.localeCompare(b.label));
+      sel.innerHTML = '<option value="">All divisions</option>' +
+        divs.map(d => '<option value="' + h(d.id) + '"' + (d.id === current ? ' selected' : '') + '>' + h(d.label) + '</option>').join('');
+      sel.onchange = showTeamCards;
+    }
+    const filterVal = sel ? sel.value : '';
+    const shown = filterVal ? allTeams.filter(t => t.division === filterVal) : allTeams;
+    const cnt = $id('teams-count');
+    if (cnt) cnt.textContent = shown.length + (filterVal ? ' of ' + allTeams.length : '') + ' team' + (shown.length === 1 ? '' : 's');
+
+    grid.innerHTML = shown.map(t => {
       const captain = (t.roster || []).find(p => p.isCaptain);
       const coCaptain = (t.roster || []).find(p => p.isCoCaptain);
       const rosterCt = (t.roster || []).length;

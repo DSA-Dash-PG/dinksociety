@@ -31,6 +31,8 @@ export default async (req) => {
         const team = JSON.parse(raw);
         // Filter by season if present
         if (team.seasonId && team.seasonId !== seasonId) continue;
+        // Don't leak untagged (legacy) teams into non-default seasons like the test season.
+        if (!team.seasonId && seasonId !== 'circuit-i') continue;
         // Filter by division if requested
         if (division && team.division !== division) continue;
 
