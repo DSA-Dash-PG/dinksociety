@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transactions Ledger · The Dink Society</title>
+  <meta name="description" content="League-wide transactions ledger — The Dink Society" />
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .tx-shell { max-width: 1100px; margin: 0 auto; padding: 80px var(--gutter) 100px; }
+
+    .page-head { margin-bottom: var(--space-6); }
+    .page-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-teal); }
+    .page-title { font-size: clamp(1.8rem, 1.2rem + 2vw, 2.6rem); font-weight: 800; margin: 6px 0 8px; line-height: 1.05; }
+    .page-sub { font-size: 13px; color: var(--color-text-muted); max-width: 620px; }
+
+    /* ── Filter bar ── */
+    .filters { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-5); display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+    .field label { font-size: 10px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-text-faint); }
+    .field select, .field input { background: var(--color-surface-2); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13px; font-family: inherit; width: 100%; transition: border-color var(--transition, 0.18s ease); }
+    .field select:focus, .field input:focus { outline: none; border-color: var(--color-lime); }
+    .field input::placeholder { color: var(--color-text-faint); }
+    .filters__clear { background: none; border: 1px solid var(--color-border-strong); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 10px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all var(--transition, 0.18s ease); white-space: nowrap; }
+    .filters__clear:hover { border-color: var(--color-text-faint); color: var(--color-text); }
+
+    .meta-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: var(--space-3); flex-wrap: wrap; }
+    .meta-count { font-size: 12px; color: var(--color-text-muted); }
+    .meta-count b { color: var(--color-text); }
+    .sort-toggle { background: none; border: 1px solid var(--color-border-strong); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 7px 12px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all var(--transition, 0.18s ease); }
+    .sort-toggle:hover { border-color: var(--color-text-faint); color: var(--color-text); }
+
+    /* ── Ledger ── */
+    .ledger { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+    .ledger__head { display: grid; grid-template-columns: 110px 1.4fr 2fr 1fr 110px; gap: 14px; padding: 12px 20px; background: var(--color-surface-2); border-bottom: 1px solid var(--color-border); font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); }
+    .tx { display: grid; grid-template-columns: 110px 1.4fr 2fr 1fr 110px; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--color-border); align-items: center; }
+    .tx:last-child { border-bottom: none; }
+    .tx:hover { background: var(--color-surface-2); }
+
+    .tx-date { font-size: 12px; color: var(--color-text-muted); }
+    .tx-date small { display: block; color: var(--color-text-faint); font-size: 10px; margin-top: 2px; }
+    .tx-player { font-size: 14px; font-weight: 700; color: var(--color-text); text-decoration: none; }
+    .tx-player:hover { color: var(--color-teal); }
+    .tx-route { font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .tx-team { color: var(--color-text); text-decoration: none; }
+    .tx-team:hover { color: var(--color-teal); }
+    .tx-arrow { color: var(--color-lime); font-weight: 700; }
+    .tx-note { font-size: 11px; font-style: italic; color: var(--color-text-muted); margin-top: 4px; }
+    .tx-type { justify-self: start; }
+    .badge { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-full); white-space: nowrap; }
+    .badge--trade { color: var(--color-teal); background: var(--color-teal-dim); }
+    .badge--direct { color: var(--color-lime); background: var(--color-lime-dim); }
+    .tx-season { justify-self: end; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-muted); background: var(--color-surface-3); padding: 4px 9px; border-radius: var(--radius-full); }
+
+    .empty { padding: 60px 20px; text-align: center; color: var(--color-text-faint); font-size: 13px; }
+
+    @media (max-width: 760px) {
+      .ledger__head { display: none; }
+      .tx { grid-template-columns: 1fr; gap: 8px; padding: 16px; position: relative; }
+      .tx-type { position: absolute; top: 16px; right: 16px; }
+      .tx-season { justify-self: start; }
+      .tx-date { order: 5; }
+    }
+  </style>
+</head>
+<body data-page="transactions">
+  <div data-partial="nav"></div>
+
+  <div class="tx-shell">
+    <div class="page-head">
+      <div class="page-eyebrow">League Office</div>
+      <h1 class="page-title">Transactions Ledger</h1>
+      <p class="page-sub">Every player movement across the league — trades and admin transfers — in one running record. Filter by season, team, or player.</p>
+    </div>
+
+    <div class="filters">
+      <div class="field">
+        <label for="f-season">Season</label>
+        <select id="f-season"><option value="">All seasons</option></select>
+      </div>
+      <div class="field">
+        <label for="f-team">Team</label>
+        <select id="f-team"><option value="">All teams</option></select>
+      </div>
+      <div class="field">
+        <label for="f-player">Player</label>
+        <input id="f-player" type="text" placeholder="Search player name…" autocomplete="off" />
+      </div>
+      <button class="filters__clear" id="clear-btn">Clear filters</button>
+    </div>
+
+    <div class="meta-row">
+      <div class="meta-count" id="meta-count"></div>
+      <button class="sort-toggle" id="sort-btn">↓ Newest first</button>
+    </div>
+
+    <div class="ledger" id="ledger">
+      <div class="ledger__head">
+        <span>Date</span><span>Player</span><span>Movement</span><span>Type</span><span>Season</span>
+      </div>
+      <div id="tx-rows"><div class="empty">Loading…</div></div>
+    </div>
+  </div>
+
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+  <script>
+  (() => {
+    /* ─── Helpers ─────────────────────────────────────────── */
+    const esc  = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const slug = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+    const fmtYear = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.getFullYear(); };
+
+    // Map a seasonId → friendly label. Prefers labels from /api/public-seasons,
+    // falls back to converting "circuit-<roman>" → "Season N".
+    const ROMAN = { i:1, ii:2, iii:3, iv:4, v:5, vi:6, vii:7, viii:8, ix:9, x:10 };
+    const seasonLabels = {};
+    function labelFor(id) {
+      if (!id) return '—';
+      if (seasonLabels[id]) return seasonLabels[id];
+      const m = /^circuit-([ivx]+)$/i.exec(id);
+      if (m && ROMAN[m[1].toLowerCase()]) return `Season ${ROMAN[m[1].toLowerCase()]}`;
+      return id;
+    }
+
+    /* ─── State ─────────────────────────────────────────────── */
+    let ALL = [];
+    let sortNewest = true;
+
+    /* ─── Load ──────────────────────────────────────────────── */
+    async function load() {
+      // Season labels (best-effort) + the full ledger, in parallel.
+      const [seasonsRes, txRes] = await Promise.allSettled([
+        fetch('/.netlify/functions/public-seasons').then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-transactions').then(r => r.ok ? r.json() : null),
+      ]);
+
+      (seasonsRes.value?.seasons || []).forEach(s => {
+        if (s.id) seasonLabels[s.id] = s.label || s.name || s.id;
+      });
+
+      ALL = txRes.value?.transactions || [];
+      buildFilters();
+      render();
+    }
+
+    /* ─── Filter options (derived from the data) ────────────── */
+    function buildFilters() {
+      const seasonSel = document.getElementById('f-season');
+      const seasonIds = [...new Set(ALL.map(t => t.seasonId).filter(Boolean))]
+        .sort((a, b) => labelFor(a).localeCompare(labelFor(b)));
+      seasonIds.forEach(id => {
+        const o = document.createElement('option');
+        o.value = id; o.textContent = labelFor(id);
+        seasonSel.appendChild(o);
+      });
+
+      const teamSel = document.getElementById('f-team');
+      const teams = [...new Set(ALL.flatMap(t => [t.fromTeamName, t.toTeamName]).filter(Boolean))].sort();
+      teams.forEach(name => {
+        const o = document.createElement('option');
+        o.value = name; o.textContent = name;
+        teamSel.appendChild(o);
+      });
+    }
+
+    /* ─── Render ────────────────────────────────────────────── */
+    function render() {
+      const fSeason = document.getElementById('f-season').value;
+      const fTeam   = document.getElementById('f-team').value;
+      const fPlayer = document.getElementById('f-player').value.trim().toLowerCase();
+
+      let rows = ALL.filter(t => {
+        if (fSeason && t.seasonId !== fSeason) return false;
+        if (fTeam && t.fromTeamName !== fTeam && t.toTeamName !== fTeam) return false;
+        if (fPlayer && !String(t.playerName).toLowerCase().includes(fPlayer)) return false;
+        return true;
+      });
+
+      rows.sort((a, b) => sortNewest
+        ? String(b.transferredAt).localeCompare(String(a.transferredAt))
+        : String(a.transferredAt).localeCompare(String(b.transferredAt)));
+
+      const container = document.getElementById('tx-rows');
+      const count = document.getElementById('meta-count');
+
+      if (!ALL.length) {
+        container.innerHTML = '<div class="empty">No transactions recorded yet.</div>';
+        count.innerHTML = '<b>0</b> transactions';
+        return;
+      }
+      if (!rows.length) {
+        container.innerHTML = '<div class="empty">No transactions match these filters.</div>';
+        count.innerHTML = '<b>0</b> transactions';
+        return;
+      }
+
+      count.innerHTML = `<b>${rows.length}</b> transaction${rows.length === 1 ? '' : 's'}` +
+        (fTeam ? ` involving <b>${esc(fTeam)}</b>` : '') +
+        (fSeason ? ` · ${esc(labelFor(fSeason))}` : '');
+
+      container.innerHTML = rows.map(t => {
+        const fromSlug = slug(t.fromTeamName), toSlug = slug(t.toTeamName), pSlug = slug(t.toTeamName);
+        const badge = t.type === 'direct'
+          ? '<span class="badge badge--direct">Admin move</span>'
+          : '<span class="badge badge--trade">Trade</span>';
+        return `<div class="tx">
+          <div class="tx-date">${fmtDate(t.transferredAt)}<small>${fmtYear(t.transferredAt)}</small></div>
+          <div>
+            <a class="tx-player" href="/player?team=${pSlug}&name=${encodeURIComponent(t.playerName)}">${esc(t.playerName)}</a>
+          </div>
+          <div>
+            <div class="tx-route">
+              <a class="tx-team" href="/team?id=${fromSlug}">${esc(t.fromTeamName)}</a>
+              <span class="tx-arrow">→</span>
+              <a class="tx-team" href="/team?id=${toSlug}">${esc(t.toTeamName)}</a>
+            </div>
+            ${t.note ? `<div class="tx-note">"${esc(t.note)}"</div>` : ''}
+          </div>
+          <div class="tx-type">${badge}</div>
+          <div class="tx-season">${esc(labelFor(t.seasonId))}</div>
+        </div>`;
+      }).join('');
+    }
+
+    /* ─── Wire up ───────────────────────────────────────────── */
+    document.getElementById('f-season').addEventListener('change', render);
+    document.getElementById('f-team').addEventListener('change', render);
+    document.getElementById('f-player').addEventListener('input', render);
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      document.getElementById('f-season').value = '';
+      document.getElementById('f-team').value = '';
+      document.getElementById('f-player').value = '';
+      render();
+    });
+    document.getElementById('sort-btn').addEventListener('click', (e) => {
+      sortNewest = !sortNewest;
+      e.target.textContent = sortNewest ? '↓ Newest first' : '↑ Oldest first';
+      render();
+    });
+
+    load();
+  })();
+  </script>
+</body>
+</html>
