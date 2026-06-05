@@ -75,10 +75,14 @@ export default async (req) => {
     // Revenue: amountPaid is already in dollars (webhook converts from cents)
     const revenue = confirmed.reduce((sum, r) => sum + (r?.amountPaid || 0), 0);
 
-    // Total fees owed and balance still outstanding across confirmed registrations
+    // Total fees owed and balance still outstanding across confirmed registrations.
+    // Subtract any discount applied (e.g. a Stripe promo code) so the total
+    // reflects the actual obligation, not the pre-discount list price. Without
+    // this, the discount amount shows up as an unexplained gap between the total
+    // and (collected + balance due).
     const totalFees = confirmed
       .filter(r => r?.path === 'team')
-      .reduce((sum, r) => sum + (r?.totalPrice || r?.price || 0), 0);
+      .reduce((sum, r) => sum + Math.max(0, (r?.totalPrice || r?.price || 0) - (r?.discountApplied || 0)), 0);
     const balanceDue = confirmed.reduce((sum, r) => {
       if (r?.balanceDue != null) return sum + (r.balanceDue || 0);
       return sum + Math.max(0, (r?.totalPrice || r?.price || 0) - (r?.amountPaid || 0));

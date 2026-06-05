@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Transactions Ledger (Mockup) · The Dink Society</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <!--
+    ═══════════════════════════════════════════════════════════════════
+    MOCKUP — NOT YET PUBLIC.
+    Standalone preview of a league-wide transactions ledger with filters
+    for Season, Team, and Player. Uses inline design tokens + mock data so
+    it renders on its own (just open it in a browser).
+
+    To productionize later:
+      1. Move to /public/transactions.html
+      2. Replace the inline :root tokens + base styles with:
+           <link rel="stylesheet" href="/css/shared.css" />
+           <link rel="stylesheet" href="/css/shared-nav.css" />
+         and add the standard <script src="/js/partials.js"></script> header.
+      3. Replace MOCK_TX below with a live fetch. The public-transactions
+         endpoint currently requires teamId or playerId; add an
+         "all entries" mode (e.g. no filter → return all) so the ledger
+         can load the full league history, then filter client-side here.
+      4. Add it to the public nav.
+    ═══════════════════════════════════════════════════════════════════
+  -->
+  <style>
+    /* ── Design tokens (mirrored from shared.css) ───────────────── */
+    :root {
+      --color-bg: #0e0e0e;
+      --color-surface: #161616;
+      --color-surface-2: #1e1e1e;
+      --color-surface-3: #262626;
+      --color-border: rgba(255,255,255,0.08);
+      --color-border-strong: rgba(255,255,255,0.14);
+      --color-text: #f0f0ec;
+      --color-text-muted: #9a9e97;
+      --color-text-faint: #5e625c;
+      --color-lime: #b8ff2c;
+      --color-lime-ghost: rgba(184,255,44,0.06);
+      --color-lime-dim: rgba(184,255,44,0.12);
+      --color-teal: #17d7b0;
+      --color-teal-dim: rgba(23,215,176,0.12);
+      --color-gold: #f0c040;
+      --color-gold-dim: rgba(240,192,64,0.12);
+      --max-w: 1100px;
+      --gutter: 20px;
+      --radius-sm: 10px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --space-2: 0.5rem; --space-3: 0.75rem; --space-4: 1rem; --space-5: 1.25rem; --space-6: 1.5rem;
+      --transition: 0.18s ease;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; }
+
+    /* ── Top bar ─────────────────────────────────────────────── */
+    .topbar { border-bottom: 1px solid var(--color-border); background: rgba(14,14,14,0.85); backdrop-filter: blur(8px); position: sticky; top: 0; z-index: 20; }
+    .topbar__inner { max-width: var(--max-w); margin: 0 auto; padding: 14px var(--gutter); display: flex; align-items: center; gap: 12px; }
+    .brand { font-weight: 800; letter-spacing: 0.04em; font-size: 14px; text-transform: uppercase; }
+    .brand b { color: var(--color-lime); }
+    .mock-flag { margin-left: auto; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-gold); background: var(--color-gold-dim); border: 1px solid rgba(240,192,64,0.35); padding: 4px 9px; border-radius: var(--radius-full); }
+
+    /* ── Shell ───────────────────────────────────────────────── */
+    .shell { max-width: var(--max-w); margin: 0 auto; padding: 40px var(--gutter) 90px; }
+
+    .page-head { margin-bottom: var(--space-6); }
+    .page-eyebrow { font-size: 11px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-teal); }
+    .page-title { font-size: clamp(1.8rem, 1.2rem + 2vw, 2.6rem); font-weight: 800; margin: 6px 0 8px; line-height: 1.05; }
+    .page-sub { font-size: 13px; color: var(--color-text-muted); max-width: 620px; }
+
+    /* ── Filter bar ──────────────────────────────────────────── */
+    .filters { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-5); display: flex; flex-wrap: wrap; gap: var(--space-4); align-items: flex-end; }
+    .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 160px; }
+    .field label { font-size: 10px; font-weight: 800; letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-text-faint); }
+    .field select, .field input {
+      background: var(--color-surface-2); color: var(--color-text);
+      border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm);
+      padding: 10px 12px; font-size: 13px; font-family: inherit; width: 100%;
+      transition: border-color var(--transition);
+    }
+    .field select:focus, .field input:focus { outline: none; border-color: var(--color-lime); }
+    .field input::placeholder { color: var(--color-text-faint); }
+    .filters__clear { background: none; border: 1px solid var(--color-border-strong); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 10px 16px; font-size: 12px; font-weight: 700; cursor: pointer; transition: all var(--transition); white-space: nowrap; }
+    .filters__clear:hover { border-color: var(--color-text-faint); color: var(--color-text); }
+
+    /* ── Result meta ─────────────────────────────────────────── */
+    .meta-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: var(--space-3); flex-wrap: wrap; }
+    .meta-count { font-size: 12px; color: var(--color-text-muted); }
+    .meta-count b { color: var(--color-text); }
+    .sort-toggle { background: none; border: 1px solid var(--color-border-strong); color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 7px 12px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all var(--transition); }
+    .sort-toggle:hover { border-color: var(--color-text-faint); color: var(--color-text); }
+
+    /* ── Ledger ──────────────────────────────────────────────── */
+    .ledger { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
+    .ledger__head { display: grid; grid-template-columns: 110px 1.4fr 2fr 1fr 110px; gap: 14px; padding: 12px 20px; background: var(--color-surface-2); border-bottom: 1px solid var(--color-border); font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); }
+    .tx { display: grid; grid-template-columns: 110px 1.4fr 2fr 1fr 110px; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--color-border); align-items: center; }
+    .tx:last-child { border-bottom: none; }
+    .tx:hover { background: var(--color-surface-2); }
+
+    .tx-date { font-size: 12px; color: var(--color-text-muted); }
+    .tx-date small { display: block; color: var(--color-text-faint); font-size: 10px; margin-top: 2px; }
+
+    .tx-player { font-size: 14px; font-weight: 700; color: var(--color-text); text-decoration: none; }
+    .tx-player:hover { color: var(--color-teal); }
+    .tx-gender { font-size: 10px; color: var(--color-text-faint); margin-top: 2px; }
+
+    .tx-route { font-size: 13px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .tx-team { color: var(--color-text); text-decoration: none; }
+    .tx-team:hover { color: var(--color-teal); }
+    .tx-arrow { color: var(--color-lime); font-weight: 700; }
+    .tx-note { font-size: 11px; font-style: italic; color: var(--color-text-muted); margin-top: 4px; }
+
+    .tx-type { justify-self: start; }
+    .badge { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-full); white-space: nowrap; }
+    .badge--trade { color: var(--color-teal); background: var(--color-teal-dim); }
+    .badge--direct { color: var(--color-lime); background: var(--color-lime-dim); }
+
+    .tx-season { justify-self: end; font-size: 10px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--color-text-muted); background: var(--color-surface-3); padding: 4px 9px; border-radius: var(--radius-full); }
+
+    .empty { padding: 60px 20px; text-align: center; color: var(--color-text-faint); font-size: 13px; }
+
+    /* ── Mobile ──────────────────────────────────────────────── */
+    @media (max-width: 760px) {
+      .ledger__head { display: none; }
+      .tx { grid-template-columns: 1fr; gap: 8px; padding: 16px; position: relative; }
+      .tx-type { position: absolute; top: 16px; right: 16px; }
+      .tx-season { justify-self: start; }
+      .tx-date { order: 5; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <div class="topbar__inner">
+      <span class="brand">THE <b>DINK</b> SOCIETY</span>
+      <span class="mock-flag">Mockup · not yet public</span>
+    </div>
+  </div>
+
+  <div class="shell">
+    <div class="page-head">
+      <div class="page-eyebrow">League Office</div>
+      <h1 class="page-title">Transactions Ledger</h1>
+      <p class="page-sub">Every player movement across the league — trades and admin transfers — in one running record. Filter by season, team, or player.</p>
+    </div>
+
+    <div class="filters">
+      <div class="field">
+        <label for="f-season">Season</label>
+        <select id="f-season"><option value="">All seasons</option></select>
+      </div>
+      <div class="field">
+        <label for="f-team">Team</label>
+        <select id="f-team"><option value="">All teams</option></select>
+      </div>
+      <div class="field">
+        <label for="f-player">Player</label>
+        <input id="f-player" type="text" placeholder="Search player name…" autocomplete="off" />
+      </div>
+      <button class="filters__clear" id="clear-btn">Clear filters</button>
+    </div>
+
+    <div class="meta-row">
+      <div class="meta-count" id="meta-count"></div>
+      <button class="sort-toggle" id="sort-btn">↓ Newest first</button>
+    </div>
+
+    <div class="ledger" id="ledger">
+      <div class="ledger__head">
+        <span>Date</span><span>Player</span><span>Movement</span><span>Type</span><span>Season</span>
+      </div>
+      <div id="tx-rows"></div>
+    </div>
+  </div>
+
+  <script>
+    /* ─── Helpers ──────────────────────────────────────────── */
+    const esc  = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const slug = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+    const fmtDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+    const fmtYear = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.getFullYear(); };
+
+    /* ─── Mock data (stand-in for /.netlify/functions/public-transactions) ─── */
+    /* type: 'trade' = captain-requested + admin-approved · 'direct' = admin move */
+    const SEASONS = [
+      { id: 'circuit-i',  label: 'Season 1' },
+      { id: 'circuit-ii', label: 'Season 2' },
+    ];
+
+    const MOCK_TX = [
+      { id:'tx1',  playerName:'Maya Chen',       gender:'F', fromTeamName:'Net Ninjas',     toTeamName:'Dink Dynasty',    seasonId:'circuit-ii', type:'trade',  note:'Two-for-one swap with Volley Llamas', transferredAt:'2026-05-28T18:00:00Z' },
+      { id:'tx2',  playerName:'Derek Olsson',    gender:'M', fromTeamName:'Volley Llamas',  toTeamName:'Net Ninjas',     seasonId:'circuit-ii', type:'trade',  note:'Two-for-one swap with Volley Llamas', transferredAt:'2026-05-28T18:00:00Z' },
+      { id:'tx3',  playerName:'Priya Nair',      gender:'F', fromTeamName:'Smash Bros',     toTeamName:'Paddle Battle',  seasonId:'circuit-ii', type:'direct', note:'Roster rebalance — division parity', transferredAt:'2026-05-21T15:30:00Z' },
+      { id:'tx4',  playerName:'Tom Bauer',       gender:'M', fromTeamName:'Dink Dynasty',   toTeamName:'Smash Bros',     seasonId:'circuit-ii', type:'trade',  note:'', transferredAt:'2026-05-14T19:10:00Z' },
+      { id:'tx5',  playerName:'Alyssa Romero',   gender:'F', fromTeamName:'Paddle Battle',  toTeamName:'Court Jesters',  seasonId:'circuit-ii', type:'trade',  note:'Requested by captain', transferredAt:'2026-05-09T17:45:00Z' },
+      { id:'tx6',  playerName:'Jamal Wright',    gender:'M', fromTeamName:'Court Jesters',  toTeamName:'Volley Llamas',  seasonId:'circuit-ii', type:'direct', note:'Relocation — moved cities', transferredAt:'2026-05-02T14:00:00Z' },
+      { id:'tx7',  playerName:'Hana Suzuki',     gender:'F', fromTeamName:'Net Ninjas',     toTeamName:'Smash Bros',     seasonId:'circuit-i',  type:'trade',  note:'Mid-season trade', transferredAt:'2026-03-18T18:20:00Z' },
+      { id:'tx8',  playerName:'Marcus Lee',      gender:'M', fromTeamName:'Smash Bros',     toTeamName:'Net Ninjas',     seasonId:'circuit-i',  type:'trade',  note:'Mid-season trade', transferredAt:'2026-03-18T18:20:00Z' },
+      { id:'tx9',  playerName:'Sofia Greco',     gender:'F', fromTeamName:'Dink Dynasty',   toTeamName:'Paddle Battle',  seasonId:'circuit-i',  type:'direct', note:'Filled roster gap after injury', transferredAt:'2026-03-04T16:00:00Z' },
+      { id:'tx10', playerName:'Ben Carter',      gender:'M', fromTeamName:'Volley Llamas',  toTeamName:'Court Jesters',  seasonId:'circuit-i',  type:'trade',  note:'', transferredAt:'2026-02-25T19:30:00Z' },
+      { id:'tx11', playerName:'Lena Fischer',    gender:'F', fromTeamName:'Paddle Battle',  toTeamName:'Dink Dynasty',   seasonId:'circuit-i',  type:'direct', note:'Off-season trade', transferredAt:'2026-02-11T15:15:00Z' },
+      { id:'tx12', playerName:'Owen Murphy',     gender:'M', fromTeamName:'Court Jesters',  toTeamName:'Smash Bros',     seasonId:'circuit-i',  type:'trade',  note:'Captain-approved', transferredAt:'2026-01-30T18:00:00Z' },
+      { id:'tx13', playerName:'Zara Khan',       gender:'F', fromTeamName:'Smash Bros',     toTeamName:'Volley Llamas',  seasonId:'circuit-i',  type:'direct', note:'Balancing skill tiers', transferredAt:'2026-01-22T14:40:00Z' },
+      { id:'tx14', playerName:'Diego Santos',    gender:'M', fromTeamName:'Net Ninjas',     toTeamName:'Paddle Battle',  seasonId:'circuit-i',  type:'trade',  note:'', transferredAt:'2026-01-15T17:00:00Z' },
+    ];
+
+    /* ─── State ────────────────────────────────────────────── */
+    let sortNewest = true;
+
+    /* ─── Build filter options ─────────────────────────────── */
+    function buildFilters() {
+      const seasonSel = document.getElementById('f-season');
+      SEASONS.forEach(s => {
+        const o = document.createElement('option');
+        o.value = s.id; o.textContent = s.label;
+        seasonSel.appendChild(o);
+      });
+      const teams = [...new Set(MOCK_TX.flatMap(t => [t.fromTeamName, t.toTeamName]))].sort();
+      const teamSel = document.getElementById('f-team');
+      teams.forEach(name => {
+        const o = document.createElement('option');
+        o.value = name; o.textContent = name;
+        teamSel.appendChild(o);
+      });
+    }
+
+    function seasonLabel(id) { return (SEASONS.find(s => s.id === id) || {}).label || id; }
+
+    /* ─── Render ───────────────────────────────────────────── */
+    function render() {
+      const fSeason = document.getElementById('f-season').value;
+      const fTeam   = document.getElementById('f-team').value;
+      const fPlayer = document.getElementById('f-player').value.trim().toLowerCase();
+
+      let rows = MOCK_TX.filter(t => {
+        if (fSeason && t.seasonId !== fSeason) return false;
+        if (fTeam && t.fromTeamName !== fTeam && t.toTeamName !== fTeam) return false;
+        if (fPlayer && !t.playerName.toLowerCase().includes(fPlayer)) return false;
+        return true;
+      });
+
+      rows.sort((a, b) => sortNewest
+        ? b.transferredAt.localeCompare(a.transferredAt)
+        : a.transferredAt.localeCompare(b.transferredAt));
+
+      const container = document.getElementById('tx-rows');
+      const count = document.getElementById('meta-count');
+
+      if (!rows.length) {
+        container.innerHTML = '<div class="empty">No transactions match these filters.</div>';
+        count.innerHTML = '<b>0</b> transactions';
+        return;
+      }
+
+      count.innerHTML = `<b>${rows.length}</b> transaction${rows.length === 1 ? '' : 's'}` +
+        (fTeam ? ` involving <b>${esc(fTeam)}</b>` : '') +
+        (fSeason ? ` · ${esc(seasonLabel(fSeason))}` : '');
+
+      container.innerHTML = rows.map(t => {
+        const fromSlug = slug(t.fromTeamName), toSlug = slug(t.toTeamName), pSlug = slug(t.toTeamName);
+        const badge = t.type === 'direct'
+          ? '<span class="badge badge--direct">Admin move</span>'
+          : '<span class="badge badge--trade">Trade</span>';
+        return `<div class="tx">
+          <div class="tx-date">${fmtDate(t.transferredAt)}<small>${fmtYear(t.transferredAt)}</small></div>
+          <div>
+            <a class="tx-player" href="/player?team=${pSlug}&name=${encodeURIComponent(t.playerName)}">${esc(t.playerName)}</a>
+            <div class="tx-gender">${t.gender === 'F' ? 'Women' : t.gender === 'M' ? 'Men' : ''}</div>
+          </div>
+          <div>
+            <div class="tx-route">
+              <a class="tx-team" href="/team?id=${fromSlug}">${esc(t.fromTeamName)}</a>
+              <span class="tx-arrow">→</span>
+              <a class="tx-team" href="/team?id=${toSlug}">${esc(t.toTeamName)}</a>
+            </div>
+            ${t.note ? `<div class="tx-note">"${esc(t.note)}"</div>` : ''}
+          </div>
+          <div class="tx-type">${badge}</div>
+          <div class="tx-season">${esc(seasonLabel(t.seasonId))}</div>
+        </div>`;
+      }).join('');
+    }
+
+    /* ─── Wire up ──────────────────────────────────────────── */
+    buildFilters();
+    document.getElementById('f-season').addEventListener('change', render);
+    document.getElementById('f-team').addEventListener('change', render);
+    document.getElementById('f-player').addEventListener('input', render);
+    document.getElementById('clear-btn').addEventListener('click', () => {
+      document.getElementById('f-season').value = '';
+      document.getElementById('f-team').value = '';
+      document.getElementById('f-player').value = '';
+      render();
+    });
+    document.getElementById('sort-btn').addEventListener('click', (e) => {
+      sortNewest = !sortNewest;
+      e.target.textContent = sortNewest ? '↓ Newest first' : '↑ Oldest first';
+      render();
+    });
+
+    render();
+  </script>
+</body>
+</html>

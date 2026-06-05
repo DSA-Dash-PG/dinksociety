@@ -162,6 +162,24 @@
   .hteam { flex:1; min-width:0; } .hteam__n { font-size:12px; font-weight:700; } .hteam__y { font-size:10px; color:var(--color-text-faint); margin-top:2px; }
   .hstat { text-align:right; } .hstat__r { font-size:12px; font-weight:700; } .hstat__p { font-size:10px; color:var(--color-text-faint); margin-top:1px; }
   .hnote { font-size:11px; color:var(--color-text-faint); margin-top:10px; text-align:center; }
+
+  /* standings table */
+  .st-head, .st-row { display:grid; grid-template-columns:24px 1fr 48px 32px 40px; gap:8px; align-items:center; }
+  .st-head { padding:0 13px 8px; font-size:9px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
+  .st-list { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:2px 13px; }
+  .st-row { padding:11px 0; border-bottom:1px solid var(--color-border); font-size:13px; }
+  .st-row:last-child { border-bottom:none; }
+  .st-row--me { background:var(--color-lime-ghost); border-radius:8px; margin:2px -7px; padding-left:7px; padding-right:7px; }
+  .st-rank { text-align:center; font-weight:800; color:var(--color-text-faint); font-variant-numeric:tabular-nums; }
+  .st-row--me .st-rank { color:var(--color-lime); }
+  .st-team { display:flex; align-items:center; gap:8px; min-width:0; }
+  .st-emoji { font-size:16px; flex-shrink:0; }
+  .st-name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .st-wl { text-align:right; font-weight:600; font-size:12px; font-variant-numeric:tabular-nums; }
+  .st-pts { text-align:right; font-weight:800; color:var(--color-lime); font-variant-numeric:tabular-nums; }
+  .st-diff { text-align:right; font-size:11px; font-weight:700; font-variant-numeric:tabular-nums; }
+  .st-diff.up { color:var(--color-lime); } .st-diff.down { color:var(--color-red); } .st-diff.flat { color:var(--color-text-faint); }
+  .st-legend { font-size:10px; color:var(--color-text-faint); margin-top:11px; text-align:center; line-height:1.5; }
 </style>
 </head>
 <body>
@@ -198,6 +216,7 @@
 
     <div class="screen">
       <section class="view is-active" id="v-schedule"></section>
+      <section class="view" id="v-standings"></section>
       <section class="view" id="v-stats"></section>
       <section class="view" id="v-leaderboard"></section>
       <section class="view" id="v-team"></section>
@@ -207,6 +226,10 @@
       <button class="nb is-active" data-tab="schedule">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Schedule</span>
+      </button>
+      <button class="nb" data-tab="standings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/><path d="M4 6h1v4"/><path d="M4 10h2"/><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"/></svg>
+        <span>Standings</span>
       </button>
       <button class="nb" data-tab="stats">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
@@ -239,14 +262,15 @@
       if (res.status === 401) return showLogin(err);
       if (!res.ok) throw new Error('load failed');
       DATA = await res.json();
-      // Cross-season history — same source the public profile uses, for parity.
-      try {
-        const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
-        if (pid) {
-          const hr = await fetch(API + '/public-player?id=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' });
-          if (hr.ok) { const hd = await hr.json(); DATA.history = hd.history || []; }
-        }
-      } catch {}
+      // Cross-season history + division standings — public endpoints, fetched in parallel.
+      const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
+      const season = 'circuit-' + circ.toLowerCase();
+      const [hRes, sRes] = await Promise.allSettled([
+        pid ? fetch(API + '/public-player?id=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' }) : Promise.resolve(null),
+        fetch(API + '/public-standings?season=' + encodeURIComponent(season), { credentials: 'include' }),
+      ]);
+      try { if (hRes.value?.ok) DATA.history = (await hRes.value.json()).history || []; } catch {}
+      try { if (sRes.value?.ok) DATA.standings = await sRes.value.json(); } catch {}
       showApp();
     } catch (e) {
       showLogin(err);
@@ -270,7 +294,7 @@
     $('me-name').textContent = p.name || 'Player';
     $('me-team').textContent = ((p.teamName || '') + (p.divisionLabel ? ' · ' + p.divisionLabel : '')) || '—';
     $('me-av').textContent = initials(p.name);
-    renderSchedule(); renderStats(); renderLeaderboard(); renderTeam();
+    renderSchedule(); renderStandings(); renderStats(); renderLeaderboard(); renderTeam();
   }
 
   // ---- login submit ----
@@ -368,6 +392,40 @@
         ${center}
         <div class="m__team"><div class="m__emoji">${emo({emoji:awayEmoji})}</div><div class="m__tn">${esc(awayName)}</div></div>
       </div>${foot}</div>`;
+  }
+
+  // ---- standings ----
+  function renderStandings() {
+    const st = DATA.standings, me = DATA.profile;
+    if (!st || st.empty || !st.divisions) {
+      $('v-standings').innerHTML = '<div class="muted">' + esc(st?.message || 'Standings populate as matches finalize.') + '</div>';
+      return;
+    }
+    const divs = st.divisions;
+    const myDiv = me.division && divs[me.division] ? me.division : Object.keys(divs)[0];
+    const div = divs[myDiv];
+    const teams = (div && div.teams) || [];
+    if (!teams.length) {
+      $('v-standings').innerHTML = '<div class="muted">Standings populate as matches finalize.</div>';
+      return;
+    }
+    const rows = teams.map(t => {
+      const mine = t.teamId === me.teamId;
+      const diff = t.pointDiff || 0;
+      const diffCls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+      return `<div class="st-row ${mine ? 'st-row--me' : ''}">
+        <div class="st-rank">${t.rank}</div>
+        <div class="st-team"><span class="st-emoji">${emo({ emoji: t.teamEmoji })}</span><span class="st-name">${esc(t.teamName)}${mine ? ' · you' : ''}</span></div>
+        <div class="st-wl">${t.wins}–${t.losses}${t.ties ? '–' + t.ties : ''}</div>
+        <div class="st-pts">${t.matchPointsFor ?? 0}</div>
+        <div class="st-diff ${diffCls}">${diff > 0 ? '+' : ''}${diff}</div>
+      </div>`;
+    }).join('');
+    $('v-standings').innerHTML =
+      `<div class="label">Standings <span class="sub">${esc(div.divisionLabel || myDiv)}</span></div>
+       <div class="st-head"><div class="st-rank">#</div><div class="st-team">Team</div><div class="st-wl">W–L</div><div class="st-pts">PTS</div><div class="st-diff">DIFF</div></div>
+       <div class="st-list">${rows}</div>
+       <div class="st-legend">PTS = match points (win ×2 + tie ×1) · DIFF = point differential</div>`;
   }
 
   // ---- stats ----  (mirrors the public player profile: rankings, awards, season stats, partners, history)

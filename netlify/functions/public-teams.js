@@ -36,18 +36,29 @@ export default async (req) => {
         // Filter by division if requested
         if (division && team.division !== division) continue;
 
+        // Captain is anchored to captainEmail (the login identity), NOT roster
+        // order — registration teams store no isCaptain flag, so falling back to
+        // roster[0] showed whoever sorted first alphabetically as "captain".
+        const capEmail = (team.captainEmail || '').toLowerCase();
+        const capByEmail = capEmail
+          ? (team.roster || []).find(p => (p.email || '').toLowerCase() === capEmail)
+          : null;
+        const captainName = capByEmail?.name || team.captain || team.captainName || '';
+
         teams.push({
           id: team.id,
           name: team.name,
           emoji: team.emoji || '',
           division: team.division,
           divisionLabel: team.divisionLabel || null,
-          captain: team.captain || (team.roster?.[0]?.name) || '',
+          captain: captainName,
           roster: (team.roster || []).map(p => ({
             name: p.name,
             gender: p.gender || '',
             dupr: p.dupr || null,
-            isCaptain: p.role === 'captain' || p.isCaptain || false,
+            isCaptain: capEmail
+              ? (p.email || '').toLowerCase() === capEmail
+              : (p.role === 'captain' || p.isCaptain || false),
           })),
         });
       } catch {}

@@ -84,6 +84,9 @@ export default async (req) => {
         name: (p.name || '').trim(),
         email: p.email || null,
         phone: p.phone || null,
+        // Keep normalized keys in sync so player magic-link login keeps working.
+        normalizedEmail: normalizeEmail(p.email),
+        normalizedPhone: normalizePhone(p.phone),
         gender: p.gender || '',
         dupr: p.dupr || null,
         isCaptain: !!p.isCaptain,
@@ -91,10 +94,25 @@ export default async (req) => {
       })).filter(p => p.name);
     }
 
-    // Sync captain name + email from isCaptain flag
-    const captain = (team.roster || []).find(p => p.isCaptain);
-    team.captain = captain?.name || '';
-    if (captain?.email) team.captainEmail = captain.email;
+    // Captain is anchored to captainEmail (the login identity). Adding or editing
+    // players must NEVER silently reassign it. An explicit isCaptain flag (admin
+    // clicked "Captain") wins; otherwise keep the existing captain and re-sync the
+    // flag + name to them so the roster stays consistent.
+    {
+      const roster = team.roster || [];
+      const flagged = roster.find(p => p.isCaptain && p.email);
+      const capEmail = (team.captainEmail || '').toLowerCase();
+      if (flagged) {
+        team.captainEmail = flagged.email;
+        team.captainName = flagged.name || team.captainName || '';
+        team.captain = team.captainName;
+        roster.forEach(p => { p.isCaptain = (p === flagged); });
+      } else if (capEmail) {
+        const capEntry = roster.find(p => (p.email || '').toLowerCase() === capEmail);
+        roster.forEach(p => { p.isCaptain = !!(capEntry && p === capEntry); });
+        if (capEntry) { team.captainName = capEntry.name; team.captain = capEntry.name; }
+      }
+    }
 
     team.updatedAt = now;
     team.updatedBy = admin.email;
