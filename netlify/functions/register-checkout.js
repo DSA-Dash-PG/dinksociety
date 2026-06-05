@@ -24,6 +24,7 @@ import Stripe from 'stripe';
 import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
 import { sendEmail } from './lib/email.js';
+import { circuitCode } from './lib/circuit.js';
 
 export default async (req) => {
   if (req.method !== 'POST') {
@@ -38,6 +39,12 @@ export default async (req) => {
   try {
     const body = await req.json();
     const { seasonId, circuit, division, divisionLabel, path, team, agent } = body;
+
+    // Storage uses the canonical circuit CODE ("I"); customer-facing text uses
+    // the season's display name ("Season 1"). Keeping these separate is what
+    // prevents the display name from leaking into blob keys.
+    const circuitStored = circuitCode(circuit || seasonId);
+    let seasonName = 'Dink Society';
 
     // Validate required fields (seasonId is optional — falls back to circuit)
     if (!division || !path) {
@@ -61,6 +68,7 @@ export default async (req) => {
 
       if (seasonRaw) {
         season = JSON.parse(seasonRaw);
+        seasonName = season.circuitName || season.name || seasonName;
 
         // Check registration is open
         if (season.registration !== 'open') {
@@ -83,7 +91,7 @@ export default async (req) => {
             const registration = {
               id: regId,
               seasonId: seasonId || null,
-              circuit: circuit || seasonId,
+              circuit: circuitStored,
               division,
               divisionLabel: divisionLabel || division,
               path,
@@ -114,7 +122,7 @@ export default async (req) => {
               captainEmail: captainEmail || null,
               division,
               divisionLabel: divisionLabel || division,
-              circuit: circuit || 'I',
+              circuit: circuitStored,
               roster: (team.players || []).map((p, i) => ({
                 id: `p_${regId}_${i}`,
                 name: p.name || '',
@@ -133,13 +141,13 @@ export default async (req) => {
               try {
                 await sendEmail({
                   to: captainEmail,
-                  subject: `You're registered — ${circuit || 'Dink Society'} (payment pending)`,
+                  subject: `You're registered — ${seasonName} (payment pending)`,
                   html: `
                     <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
                       <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:32px;">THE DINK SOCIETY</div>
                       <h1 style="font-size:24px;font-weight:800;text-transform:uppercase;color:#f5f5f5;margin:0 0 8px;">You're in${team.captain ? ', ' + team.captain.split(' ')[0] : ''}.</h1>
                       <p style="font-size:15px;color:#8a8a8a;line-height:1.6;margin:0 0 24px;">
-                        Your team <strong style="color:#f5f5f5;">${team.name}</strong> is registered for <strong style="color:#f5f5f5;">${circuit || 'the league'}</strong> (${divisionLabel || division}).
+                        Your team <strong style="color:#f5f5f5;">${team.name}</strong> is registered for <strong style="color:#f5f5f5;">${seasonName}</strong> (${divisionLabel || division}).
                       </p>
                       <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #ffb400;padding:16px 20px;border-radius:0 12px 12px 0;margin-bottom:24px;">
                         <p style="font-size:14px;margin:0;line-height:1.6;color:#8a8a8a;">
@@ -212,7 +220,7 @@ export default async (req) => {
     const registration = {
       id: regId,
       seasonId: seasonId || null,
-      circuit: circuit || seasonId,
+      circuit: circuitStored,
       division,
       divisionLabel: divisionLabel || division,
       path,
@@ -268,7 +276,7 @@ export default async (req) => {
           currency: 'usd',
           product_data: {
             name: `Dink Society — Team Registration Deposit (${divisionLabel || division})`,
-            description: `${circuit || 'Dink Society'} · ${divisionLabel || division} · $${amountDueNow} deposit toward the $${totalPrice} team fee`,
+            description: `${seasonName} · ${divisionLabel || division} · $${amountDueNow} deposit toward the $${totalPrice} team fee`,
           },
           unit_amount: Math.round(amountDueNow * 100),
         },
@@ -286,7 +294,7 @@ export default async (req) => {
           currency: 'usd',
           product_data: {
             name: `Dink Society — Free Agent Registration (${divisionLabel || division})`,
-            description: `${circuit || 'Dink Society'} · ${divisionLabel || division}`,
+            description: `${seasonName} · ${divisionLabel || division}`,
           },
           unit_amount: Math.round(totalPrice * 100),
         },

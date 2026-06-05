@@ -4,6 +4,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { requirePlayer, unauthResponse } from './lib/player-auth.js';
+import { circuitCode } from './lib/circuit.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -15,7 +16,7 @@ export default async (req) => {
   if (!ctx) return unauthResponse();
 
   const { playerId, teamId, team, player } = ctx;
-  const circuit = team.circuit || 'I';
+  const circuit = circuitCode(team.circuit);
   const division = team.division || null;
 
   const scheduleStore = getStore('schedule');

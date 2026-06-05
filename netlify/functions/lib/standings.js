@@ -13,6 +13,7 @@
 // cost is cheap (~60 blob reads). Keeps the logic simple and idempotent.
 
 import { getStore } from '@netlify/blobs';
+import { circuitCode } from './circuit.js';
 
 const DIVISIONS = ['3.0M', '3.5M', '3.5W'];
 
@@ -68,11 +69,25 @@ export async function rebuildStandings(circuit) {
   const weeklyPlayers = {}; // week → Map(pid → weekly game stats) for POW + rank movement
   const weekMeta = {};      // week → { date } for display
 
-  // Seed every rostered player for this circuit so the leaderboard lists all
-  // players (zeroed) even before they've played a game. Match processing below
-  // simply bumps these existing records once results come in.
+  // Seed every rostered player AND every team for this circuit so the
+  // leaderboard and standings list everyone (zeroed) even before a single game
+  // is played. Match processing below simply bumps these existing records once
+  // results come in.
+  //
+  // NOTE: team.circuit may hold a display name ("Season 1") or season id
+  // ("circuit-i") rather than the bare code, so normalize before comparing.
   for (const team of teamsById.values()) {
-    if (team.circuit !== circuit) continue;
+    if (circuitCode(team.circuit) !== circuit) continue;
+
+    // Team standing row at 0-0
+    if (team.division) {
+      const div = team.division;
+      if (!divisionBuckets[div]) divisionBuckets[div] = { teams: new Map(), weekly: {} };
+      if (!divisionBuckets[div].teams.has(team.id)) {
+        divisionBuckets[div].teams.set(team.id, newTeamRow(team.id, team.name, div));
+      }
+    }
+
     for (const player of (team.roster || [])) {
       if (!player?.id) continue;
       ensurePlayer(playerStats, player.id, player, team);
@@ -101,18 +116,7 @@ export async function rebuildStandings(circuit) {
       // Ensure team buckets exist
       for (const t of [teamA, teamB]) {
         if (!divisionBuckets[div].teams.has(t.id)) {
-          divisionBuckets[div].teams.set(t.id, {
-            teamId: t.id,
-            teamName: t.name,
-            division: div,
-            matchesPlayed: 0,
-            wins: 0, losses: 0, ties: 0,
-            matchPointsFor: 0, matchPointsAgainst: 0,
-            sweeps: 0,
-            totalGamesWon: 0, totalGamesLost: 0,
-            weeklyBonusPoints: 0,
-            headToHead: {}, // { opponentId: { for, against } }
-          });
+          divisionBuckets[div].teams.set(t.id, newTeamRow(t.id, t.name, div));
         }
       }
 
@@ -385,6 +389,22 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lin
     ensurePlayer(playerStats, pid, player, teamB);
     playerStats.get(pid).matchesPlayed++;
   }
+}
+
+// A fresh standings row for a team (all counters zeroed).
+function newTeamRow(teamId, teamName, division) {
+  return {
+    teamId,
+    teamName,
+    division,
+    matchesPlayed: 0,
+    wins: 0, losses: 0, ties: 0,
+    matchPointsFor: 0, matchPointsAgainst: 0,
+    sweeps: 0,
+    totalGamesWon: 0, totalGamesLost: 0,
+    weeklyBonusPoints: 0,
+    headToHead: {}, // { opponentId: { for, against } }
+  };
 }
 
 function ensurePlayer(map, pid, player, team) {

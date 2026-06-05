@@ -5,12 +5,14 @@
 
 import { getStore } from '@netlify/blobs';
 import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { circuitCode } from './lib/circuit.js';
 
 export default async (req) => {
   const ctx = await requireCaptain(req);
   if (!ctx) return unauthResponse();
 
-  const { id: teamId, division, circuit } = ctx.team;
+  const { id: teamId, division } = ctx.team;
+  const circuit = circuitCode(ctx.team.circuit);
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
   const teamsStore = getStore('teams');

@@ -421,11 +421,23 @@
       }
     });
 
+    // Canonical circuit CODE (e.g. "I", "TEST") used to key schedule/standings
+    // blobs. Derived from the season id ("circuit-i" -> "I"), NOT the display
+    // name ("Season 1") — storing the display name on a team breaks every
+    // team-keyed schedule/standings lookup.
+    function circuitCodeFromSeasonId(seasonId) {
+      const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+      const tail = String(seasonId || '').replace(/^circuit-/i, '').trim();
+      if (/^\d+$/.test(tail)) { const n = parseInt(tail, 10); return (n >= 1 && n <= 10) ? ROMAN[n - 1] : String(n); }
+      return tail ? tail.toUpperCase() : 'I';
+    }
+
     function buildPayload() {
       const captainName = (val('p1-first') + ' ' + val('p1-last')).trim();
+      const seasonId = activeSeason ? activeSeason.id : 'circuit-i';
       return {
-        seasonId: activeSeason ? activeSeason.id : 'circuit-1',
-        circuit: activeSeason ? (activeSeason.name || activeSeason.label) : 'Season 1',
+        seasonId,
+        circuit: circuitCodeFromSeasonId(seasonId),
         division: activeDiv ? activeDiv.id : '',
         divisionLabel: activeDiv ? activeDiv.name : '',
         path: 'team', price: activeDiv ? activeDiv.teamPrice : 650,
