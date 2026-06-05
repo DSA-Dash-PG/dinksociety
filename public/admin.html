@@ -1592,7 +1592,7 @@
       if (t === 'seasons') loadAndRenderSeasons();
       if (t === 'registrations') renderReg();
       if (t === 'teams') renderTeams();
-      if (t === 'schedule') renderSched();
+      if (t === 'schedule') { renderGameday(); renderSched(); }
       if (t === 'scores') {}
       if (t === 'messages') renderMessages();
       if (t === 'potw') loadPotw();
@@ -2656,6 +2656,54 @@
   // ═══════════════════════════════════════════════════════════
   // SCHEDULE — live from admin-matches endpoint
   // ═══════════════════════════════════════════════════════════
+  // ── Game-day command center (league-wide, live) ──
+  async function renderGameday() {
+    const el = $id('gameday');
+    if (!el) return;
+    el.innerHTML = '<div class="loading" style="padding:8px 0;">Loading tonight…</div>';
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-gameday?circuit=I');
+      if (!d || !d.week) { el.innerHTML = ''; return; }
+      const k = d.kpis, ll = d.lineupLocks, al = d.alerts;
+      const alertTxt = [
+        al.notLockedCount ? al.notLockedCount + ' lineup' + (al.notLockedCount === 1 ? '' : 's') + ' not locked' : '',
+        al.liveCount ? al.liveCount + ' live now' : '',
+      ].filter(Boolean).join(' · ');
+      const alert = alertTxt ? '<div class="gd__alert">⚠️ ' + alertTxt + '</div>' : '';
+      const pill = s => s === 'live' ? '<span class="gd__pill live">Live</span>' : s === 'final' ? '<span class="gd__pill final">Final</span>' : '<span class="gd__pill awaiting">To start</span>';
+      const emo = t => t && t.emoji ? t.emoji : '🏓';
+      const rows = (d.matches || []).map(m =>
+        '<div class="gd__m' + (m.status === 'live' ? ' gd__m--live' : '') + '">' +
+          '<span class="gd__div">' + h(m.division) + '</span>' +
+          '<div class="gd__mt">' + emo(m.teamA) + ' ' + h(m.teamA.name) + ' vs ' + emo(m.teamB) + ' ' + h(m.teamB.name) +
+            '<small>' + h(m.court || 'Court TBD') + (m.championship ? ' · 🏆' : '') + '</small></div>' +
+          (m.status !== 'awaiting' ? '<span class="gd__sc">' + m.mpHome + '–' + m.mpAway + '</span>' : '') +
+          pill(m.status) +
+        '</div>').join('');
+      const lockChips = ll.notLocked.length
+        ? ll.notLocked.map(x => '<span class="gd__lockchip">' + h(x.team.name) + ' · ' + h(x.division) + '</span>').join('')
+        : '<span style="color:var(--color-teal);font-weight:700;">All teams locked ✓</span>';
+      el.innerHTML =
+        '<div class="gd">' +
+          '<div class="gd__lbl" style="margin-top:0;display:flex;justify-content:space-between;align-items:center;">Tonight · Week ' + d.week +
+            ' <button class="gd__refresh" onclick="renderGameday()">↻ Refresh</button></div>' +
+          alert +
+          '<div class="gd__kpis">' +
+            '<div class="gd__kpi"><div class="gd__kn">' + k.total + '</div><div class="gd__kl">Matches</div></div>' +
+            '<div class="gd__kpi"><div class="gd__kn live">' + k.live + '</div><div class="gd__kl">Live</div></div>' +
+            '<div class="gd__kpi"><div class="gd__kn done">' + k.final + '</div><div class="gd__kl">Final</div></div>' +
+            '<div class="gd__kpi"><div class="gd__kn warn">' + k.toStart + '</div><div class="gd__kl">To start</div></div>' +
+          '</div>' +
+          '<div class="gd__lbl">Lineup locks · ' + ll.lockedTeams + '/' + ll.totalTeams + ' teams</div>' +
+          '<div class="gd__locks">' + lockChips + '</div>' +
+          '<div class="gd__lbl">Matches</div>' +
+          (rows || '<div class="empty">No matches scheduled this week.</div>') +
+        '</div>';
+    } catch (e) {
+      el.innerHTML = '';
+    }
+  }
+
   function addMatchFormHTML(teams) {
     if (!teams.length) {
       return '<div class="ac" style="margin-top:14px;padding:18px;"><div class="ac__h"><span class="ac__t">Add a match manually</span></div><div class="empty">No teams in this division yet.</div></div>';
@@ -3146,6 +3194,29 @@
     .am-bn svg { width: 22px; height: 22px; }
     .am-bn span { font-size: 10px; font-weight: 700; }
   }
+
+  /* Game-day command center */
+  .gd { margin-bottom: 22px; }
+  .gd__alert { display: flex; gap: 8px; align-items: center; background: var(--color-gold-dim); border: 1px solid rgba(240,192,64,0.3); border-radius: var(--radius-md); padding: 11px 13px; margin-bottom: 12px; font-size: 12px; color: var(--color-gold); font-weight: 600; }
+  .gd__kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-bottom: 6px; }
+  .gd__kpi { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 4px; text-align: center; }
+  .gd__kn { font-size: 19px; font-weight: 800; }
+  .gd__kn.live { color: var(--color-lime); } .gd__kn.done { color: var(--color-teal); } .gd__kn.warn { color: var(--color-gold); }
+  .gd__kl { font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-top: 2px; }
+  .gd__lbl { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin: 16px 2px 8px; }
+  .gd__locks { font-size: 12px; color: var(--color-text-muted); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 11px 13px; line-height: 1.4; }
+  .gd__lockchip { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 9999px; background: var(--color-gold-dim); color: var(--color-gold); margin: 3px 4px 0 0; }
+  .gd__m { display: flex; align-items: center; gap: 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 7px; }
+  .gd__m--live { border-color: rgba(184,255,44,0.35); background: linear-gradient(180deg, rgba(184,255,44,0.04), transparent); }
+  .gd__div { font-size: 9px; font-weight: 700; color: var(--color-teal); background: var(--color-teal-dim); padding: 2px 6px; border-radius: 5px; flex-shrink: 0; }
+  .gd__mt { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; }
+  .gd__mt small { display: block; font-size: 10px; color: var(--color-text-faint); font-weight: 500; margin-top: 2px; }
+  .gd__sc { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .gd__pill { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 9999px; flex-shrink: 0; }
+  .gd__pill.live { background: var(--color-lime-dim); color: var(--color-lime); }
+  .gd__pill.final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
+  .gd__pill.awaiting { background: var(--color-gold-dim); color: var(--color-gold); }
+  .gd__refresh { font-size: 11px; color: var(--color-teal); cursor: pointer; background: none; border: none; font-family: inherit; font-weight: 700; letter-spacing: 0; text-transform: none; }
 </style>
 </body>
 </html>
