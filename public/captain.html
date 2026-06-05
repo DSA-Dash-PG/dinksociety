@@ -74,6 +74,8 @@
     .cap-header__meta a { color: var(--color-text-faint); text-decoration: none; transition: color 0.15s; }
     .cap-header__meta a:hover { color: var(--color-text-muted); }
     .cap-header__meta .team { color: var(--color-teal); font-weight: 600; }
+    .cap-team-switch { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: 8px; padding: 5px 8px; font-size: 11px; font-weight: 600; max-width: 200px; cursor: pointer; }
+    .cap-team-switch--m { width: 100%; max-width: none; padding: 10px; font-size: 14px; margin-top: 6px; }
 
     /* ── Tabs ─────────────────────────────────────────────────── */
     .cap-tabs { display: flex; gap: 2px; padding: 0 24px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
@@ -412,6 +414,7 @@
         <h1 class="cap-header__title" id="cap-team-name">&mdash;</h1>
       </div>
       <div class="cap-header__meta">
+        <select class="cap-team-switch" id="cap-team-switch" style="display:none;" aria-label="Switch team"></select>
         <span class="team" id="cap-team-meta">&mdash;</span>
         <span id="cap-email">&mdash;</span>
         <a href="/">&larr; Site</a>
@@ -431,6 +434,10 @@
         <button class="ds-drawer__close" aria-label="Close menu" data-ds-drawer-close>&times;</button>
       </div>
       <nav class="ds-drawer__body">
+        <div class="ds-drawer__section" id="cap-team-switch-m-wrap" style="display:none;">
+          <div class="ds-drawer__section-label">Your teams</div>
+          <select class="cap-team-switch cap-team-switch--m" id="cap-team-switch-m" aria-label="Switch team"></select>
+        </div>
         <div class="ds-drawer__section">
           <div class="ds-drawer__section-label">Captain portal</div>
           <button class="ds-drawer__link is-active" data-drawer-tab="next">Next match</button>
@@ -806,6 +813,7 @@
       $id('cap-team-name').textContent = state.me.team.name;
       $id('cap-team-meta').textContent = `${state.me.team.circuit === 'I' ? 'Season 1' : 'Circuit ' + state.me.team.circuit} · ${state.me.team.divisionLabel || state.me.team.division}`;
       $id('cap-email').textContent = state.me.email;
+      renderTeamSwitcher();
       // Load roster + schedule, then dispatch to the right state
       refreshCapMsgBadge();
       Promise.all([loadRoster(true), loadMatches(true)]).then(() => {
@@ -820,6 +828,47 @@
           dispatchToNext();
         }
       });
+    }
+
+    // ===== Team switcher (captains who lead more than one team) =====
+    function renderTeamSwitcher() {
+      const teams = state.me.teams || [];
+      const currentId = state.me.currentTeamId || state.me.team?.id;
+      const opts = teams.map(t => {
+        const div = t.divisionLabel || t.division || '';
+        const season = t.circuit === 'I' ? 'Season 1' : 'Circuit ' + t.circuit;
+        const label = `${t.name}${div ? ' · ' + div : ''}${t.role === 'cocaptain' ? ' (co-captain)' : ''}`;
+        return `<option value="${t.id}" ${t.id === currentId ? 'selected' : ''}>${escapeHtml(label)}</option>`;
+      }).join('');
+      const multi = teams.length > 1;
+      [['cap-team-switch', null], ['cap-team-switch-m', 'cap-team-switch-m-wrap']].forEach(([selId, wrapId]) => {
+        const sel = $id(selId);
+        if (!sel) return;
+        sel.innerHTML = opts;
+        sel.value = currentId;
+        if (wrapId) { const w = $id(wrapId); if (w) w.style.display = multi ? '' : 'none'; }
+        else sel.style.display = multi ? '' : 'none';
+        sel.onchange = (e) => switchTeam(e.target.value);
+      });
+    }
+
+    async function switchTeam(teamId) {
+      if (!teamId || teamId === (state.me.currentTeamId || state.me.team?.id)) return;
+      document.querySelectorAll('.cap-team-switch').forEach(s => s.disabled = true);
+      try {
+        const res = await fetch('/.netlify/functions/captain-switch-team', {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ teamId }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Switch failed');
+        // Reload so every team-scoped view (matches, roster, billing) re-fetches.
+        location.reload();
+      } catch (err) {
+        alert(err.message || 'Could not switch teams.');
+        document.querySelectorAll('.cap-team-switch').forEach(s => s.disabled = false);
+        renderTeamSwitcher(); // reset selection to current
+      }
     }
 
     function updateGenderWarning() {

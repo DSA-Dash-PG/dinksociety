@@ -5,6 +5,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { normalizeEmail } from './identity.js';
+import { isTestTeam } from './circuit.js';
 
 const COOKIE_NAME = 'ds_player_session';
 const SESSION_DAYS = 30;
@@ -80,6 +81,28 @@ export async function findPlayerByEmail(rawEmail) {
     if (entry) return { playerId: entry.id, teamId: team.id, name: entry.name, team };
   }
   return null;
+}
+
+// Return EVERY team this email is rostered on: [{ playerId, teamId, name, team }].
+// Powers the player team switcher. Test-season teams are excluded by default.
+export async function findAllPlayerTeamsByEmail(rawEmail, { includeTest = false } = {}) {
+  const norm = normalizeEmail(rawEmail);
+  if (!norm) return [];
+  const store = getStore('teams');
+  const { blobs } = await store.list({ prefix: 'team/' });
+  const out = [];
+  for (const b of blobs) {
+    const team = await store.get(b.key, { type: 'json' }).catch(() => null);
+    if (!team?.roster) continue;
+    if (!includeTest && isTestTeam(team)) continue;
+    const entry = team.roster.find(p =>
+      (p.normalizedEmail && p.normalizedEmail === norm) ||
+      ((p.email || '').toLowerCase() === norm)
+    );
+    if (entry) out.push({ playerId: entry.id, teamId: team.id, name: entry.name, team });
+  }
+  out.sort((a, b) => (a.team.name || '').localeCompare(b.team.name || ''));
+  return out;
 }
 
 // ===== Auth guard =====

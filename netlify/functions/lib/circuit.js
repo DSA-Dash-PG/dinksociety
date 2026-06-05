@@ -55,3 +55,14 @@ export function circuitCode(raw) {
 export function seasonIdForCircuit(code) {
   return 'circuit-' + circuitCode(code).toLowerCase();
 }
+
+// Is this team part of the isolated QA test season? The seeder tags every test
+// team with isTest:true and keys them under the TEST circuit / circuit-test id,
+// so check all three for safety. Used to keep test teams out of the team switcher
+// so they can never shadow a real-season team.
+export function isTestTeam(team) {
+  if (!team) return false;
+  if (team.isTest === true) return true;
+  if (team.seasonId === 'circuit-test') return true;
+  return circuitCode(team.circuit) === 'TEST';
+}

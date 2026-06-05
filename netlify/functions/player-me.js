@@ -3,7 +3,7 @@
 // profile, my stats, leaderboard (with Player of the Week), team, schedule.
 
 import { getStore } from '@netlify/blobs';
-import { requirePlayer, unauthResponse } from './lib/player-auth.js';
+import { requirePlayer, unauthResponse, findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
 
 const SLOT_LABEL = {
@@ -125,6 +125,18 @@ export default async (req) => {
   }
   schedule.sort((a, b) => a.week - b.week);
 
+  // Every team this player is rostered on, for the team switcher.
+  const myTeams = (await findAllPlayerTeamsByEmail(myEmail)).map(({ team }) => ({
+    id: team.id,
+    name: team.name,
+    division: team.division || null,
+    divisionLabel: team.divisionLabel || null,
+  }));
+  // Always include the active team, even if it was filtered (e.g. test season).
+  if (!myTeams.some(x => x.id === teamId)) {
+    myTeams.unshift({ id: teamId, name: team.name, division, divisionLabel: team.divisionLabel || division });
+  }
+
   return json({
     profile: {
       playerId, name: player.name, gender: player.gender || null,
@@ -132,6 +144,8 @@ export default async (req) => {
       division, divisionLabel: team.divisionLabel || division, circuit,
       isCaptain, isCoCaptain,
     },
+    myTeams,
+    currentTeamId: teamId,
     stats: myStats,
     partnerNames: partnerNames(myStats, players),
     leaderboard,

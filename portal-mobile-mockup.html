@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player + Captain Portal — One Login Mockup · The Dink Society</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  /* ── Dink Society tokens (from public/css/shared.css) ── */
+  :root {
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626; --color-surface-4:#2e2e2e;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+    --color-lime:#b8ff2c; --color-lime-hover:#c8ff58; --color-lime-dim:rgba(184,255,44,0.12); --color-lime-ghost:rgba(184,255,44,0.06);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-red:#ff5c47; --color-red-dim:rgba(255,92,71,0.12);
+    --color-gold:#f0c040; --color-gold-dim:rgba(240,192,64,0.12);
+    --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-full:9999px;
+    --transition:160ms cubic-bezier(0.16,1,0.3,1); --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; padding:0; }
+  body { font-family:var(--font);
+    background: radial-gradient(900px 500px at 15% -5%, rgba(184,255,44,0.06), transparent 60%),
+                radial-gradient(900px 600px at 110% 10%, rgba(23,215,176,0.05), transparent 55%), #050505;
+    color:var(--color-text); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:28px 16px 60px; gap:22px; }
+  .intro { max-width:760px; text-align:center; }
+  .intro__eyebrow { font-size:10px; letter-spacing:0.22em; text-transform:uppercase; color:var(--color-teal); font-weight:700; }
+  .intro__title { font-size:22px; font-weight:800; text-transform:uppercase; letter-spacing:0.02em; margin:8px 0 6px; }
+  .intro__body { font-size:13px; color:var(--color-text-muted); line-height:1.6; margin:0; }
+  .intro__hint { font-size:12px; color:var(--color-text-faint); margin-top:10px; }
+  .intro__hint b { color:var(--color-lime); font-weight:700; }
+
+  .phone { width:390px; max-width:100%; height:820px; background:var(--color-bg); border-radius:44px; border:1px solid var(--color-border-strong);
+    box-shadow:0 30px 90px rgba(0,0,0,0.7), 0 0 0 11px #161616, 0 0 0 12px #2a2a2a; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .phone__notch { position:absolute; top:0; left:50%; transform:translateX(-50%); width:150px; height:26px; background:#161616; border-radius:0 0 18px 18px; z-index:60; }
+  .statusbar { display:flex; justify-content:space-between; align-items:center; padding:12px 26px 6px; font-size:12px; font-weight:600; flex-shrink:0; }
+
+  /* login */
+  .login { flex:1; display:flex; flex-direction:column; justify-content:center; padding:0 26px; text-align:center; overflow-y:auto; }
+  .login__logo { font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; }
+  .login__tag { font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--color-teal); font-weight:700; margin-bottom:26px; }
+  .login__h { font-size:22px; font-weight:800; margin:0 0 6px; }
+  .login__p { font-size:12px; color:var(--color-text-muted); line-height:1.55; margin:0 0 22px; }
+  .login__in { width:100%; padding:13px 14px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-2); color:var(--color-text); font-family:inherit; font-size:14px; text-align:center; }
+  .login__in:focus { outline:none; border-color:var(--color-lime); }
+  .login__btn { width:100%; padding:13px; border:none; border-radius:var(--radius-full); background:var(--color-lime); color:var(--color-text-inverse); font-family:inherit; font-size:13px; font-weight:800; cursor:pointer; margin-top:10px; }
+  .login__sent { background:var(--color-teal-dim); border:1px solid rgba(23,215,176,0.3); color:var(--color-teal); border-radius:var(--radius-sm); padding:16px; font-size:12px; line-height:1.55; text-align:left; margin-bottom:14px; }
+  .login__sent b { font-weight:800; }
+  .login__demo { background:none; border:none; color:var(--color-text-faint); font-family:inherit; font-size:11px; cursor:pointer; margin-top:18px; text-decoration:underline; }
+  .login__note { font-size:10px; color:var(--color-text-faint); margin-top:20px; line-height:1.5; }
+  .demo-accts { margin-top:22px; }
+  .demo-accts__lbl { font-size:9px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-bottom:8px; }
+  .demo-acct { display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:9px 11px; margin-bottom:6px; cursor:pointer; font-family:inherit; transition:border-color var(--transition); }
+  .demo-acct:active { border-color:var(--color-lime); }
+  .demo-acct__av { width:30px; height:30px; border-radius:50%; background:var(--color-surface-3); display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--color-text-muted); flex-shrink:0; }
+  .demo-acct__body { flex:1; min-width:0; }
+  .demo-acct__name { font-size:12px; font-weight:700; }
+  .demo-acct__email { font-size:9px; color:var(--color-text-faint); }
+  .demo-acct__role { font-size:8px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; padding:3px 7px; border-radius:var(--radius-full); flex-shrink:0; }
+  .demo-acct__role.cap { background:var(--color-lime-ghost); color:var(--color-lime); border:1px solid rgba(184,255,44,0.4); }
+  .demo-acct__role.co  { background:var(--color-gold-dim); color:var(--color-gold); border:1px solid rgba(240,192,64,0.4); }
+  .demo-acct__role.pl  { background:var(--color-surface-3); color:var(--color-text-faint); }
+
+  /* app header */
+  .appbar { display:flex; justify-content:space-between; align-items:center; padding:6px 18px 12px; flex-shrink:0; border-bottom:1px solid var(--color-border); }
+  .appbar__brand { font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--color-teal); font-weight:700; }
+  .appbar__title { font-size:18px; font-weight:800; margin:1px 0 0; display:flex; align-items:center; gap:8px; }
+  .cap-badge { font-size:8px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-lime); background:var(--color-lime-ghost); border:1px solid rgba(184,255,44,0.4); padding:2px 7px; border-radius:var(--radius-full); }
+  .appbar__me { display:flex; align-items:center; gap:8px; }
+  .appbar__name { font-size:11px; font-weight:700; }
+  .appbar__team { font-size:9px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-faint); font-weight:600; }
+  .appbar__av { width:34px; height:34px; border-radius:50%; background:var(--color-lime-dim); border:1px solid rgba(184,255,44,0.3); display:grid; place-items:center; font-size:13px; font-weight:800; color:var(--color-lime); }
+
+  .screen { flex:1; overflow-y:auto; overflow-x:hidden; padding:16px 16px 24px; scrollbar-width:none; }
+  .screen::-webkit-scrollbar { width:0; }
+  .view { display:none; animation:fade .22s ease; }
+  .view.is-active { display:block; }
+  @keyframes fade { from{opacity:0;transform:translateY(6px);} to{opacity:1;transform:none;} }
+  .pulse { width:7px; height:7px; border-radius:50%; background:var(--color-lime); display:inline-block; animation:pulse 1.6s infinite; }
+  @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(184,255,44,0.5);} 70%{box-shadow:0 0 0 7px rgba(184,255,44,0);} 100%{box-shadow:0 0 0 0 rgba(184,255,44,0);} }
+  .label, .section-label { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:18px 2px 9px; display:flex; justify-content:space-between; align-items:center; }
+  .label:first-child, .section-label:first-child { margin-top:2px; }
+  .section-label__count, .label span.cnt { color:var(--color-text-muted); }
+  .capmark { display:inline-flex; align-items:center; gap:5px; font-size:8px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-lime); }
+  .capmark::before { content:''; width:6px; height:6px; border-radius:50%; background:var(--color-lime); }
+
+  /* next match hero (player) */
+  .next { background:linear-gradient(135deg, rgba(184,255,44,0.16), rgba(23,215,176,0.08)); border:1px solid rgba(184,255,44,0.28); border-radius:var(--radius-md); padding:16px; margin-bottom:16px; }
+  .next__eyebrow { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-lime); font-weight:800; display:flex; align-items:center; gap:6px; }
+  .next__row { display:flex; align-items:center; gap:12px; margin:12px 0; }
+  .next__team { flex:1; text-align:center; }
+  .next__emoji { font-size:30px; } .next__tn { font-size:13px; font-weight:700; margin-top:3px; }
+  .next__vs { font-size:11px; font-weight:800; color:var(--color-text-faint); }
+  .next__meta { font-size:11px; color:var(--color-text-muted); text-align:center; margin-bottom:12px; }
+  .next__you { background:rgba(0,0,0,0.25); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:10px 12px; font-size:11px; }
+  .next__you b { color:var(--color-lime); }
+  .next__games { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
+  .gtag { font-size:9px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:var(--radius-full); }
+  .gtag--w { background:var(--color-gold-dim); color:var(--color-gold); } .gtag--m { background:var(--color-teal-dim); color:var(--color-teal); } .gtag--x { background:var(--color-lime-dim); color:var(--color-lime); }
+
+  /* player match row */
+  .m { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:11px 13px; margin-bottom:8px; }
+  .m__top { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
+  .m__wk { font-size:10px; color:var(--color-text-faint); letter-spacing:0.06em; font-weight:700; }
+  .m__pill { margin-left:auto; font-size:9px; font-weight:800; text-transform:uppercase; padding:3px 8px; border-radius:var(--radius-full); }
+  .pill-final { background:rgba(255,255,255,0.07); color:var(--color-text-faint); }
+  .pill-up { background:var(--color-gold-dim); color:var(--color-gold); }
+  .pill-win { background:var(--color-lime-dim); color:var(--color-lime); }
+  .m__body { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; }
+  .m__team { text-align:center; } .m__emoji { font-size:20px; } .m__tn { font-size:11px; font-weight:600; margin-top:2px; }
+  .m__sc { font-size:18px; font-weight:800; } .m__sc .w { color:var(--color-lime); } .m__vs { font-size:10px; font-weight:800; color:var(--color-text-faint); }
+  .m__foot { font-size:10px; color:var(--color-text-faint); margin-top:9px; padding-top:8px; border-top:1px solid var(--color-border); }
+  .m__foot b { color:var(--color-lime); }
+
+  /* captain schedule cards */
+  .tonight { background: linear-gradient(135deg, rgba(184,255,44,0.16), rgba(23,215,176,0.08)); border: 1px solid rgba(184,255,44,0.28); border-radius: var(--radius-md); padding: 16px 16px 14px; margin-bottom: 18px; overflow: hidden; }
+  .tonight__eyebrow { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-lime); font-weight: 800; display: flex; align-items: center; gap: 6px; }
+  .tonight__matchup { display: flex; align-items: center; gap: 12px; margin: 12px 0 14px; }
+  .tonight__team { flex: 1; text-align: center; }
+  .tonight__emoji { font-size: 30px; }
+  .tonight__name { font-size: 13px; font-weight: 700; margin-top: 3px; }
+  .tonight__vs { font-size: 11px; font-weight: 800; color: var(--color-text-faint); letter-spacing: 0.1em; }
+  .tonight__meta { display: flex; gap: 14px; font-size: 11px; color: var(--color-text-muted); justify-content: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .tonight__meta b { color: var(--color-text); }
+  .tonight__cta { width: 100%; padding: 13px; border: none; border-radius: var(--radius-full); background: var(--color-lime); color: var(--color-text-inverse); font-family: var(--font); font-size: 13px; font-weight: 800; letter-spacing: 0.02em; cursor: pointer; transition: background var(--transition); display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .tonight__cta:active { background: var(--color-lime-hover); }
+  .gc { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 14px; margin-bottom: 10px; cursor: pointer; transition: border-color var(--transition), transform var(--transition); }
+  .gc:active { transform: scale(0.985); }
+  .gc--live { border-color: rgba(184,255,44,0.35); background: linear-gradient(180deg, rgba(184,255,44,0.05), transparent); }
+  .gc-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 11px; }
+  .gc-week { font-size: 10px; color: var(--color-text-faint); letter-spacing: 0.08em; font-weight: 700; }
+  .gc-pill { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-full); }
+  .gc-pill--live { background: var(--color-lime-dim); color: var(--color-lime); }
+  .gc-pill--final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
+  .gc-pill--need { background: var(--color-gold-dim); color: var(--color-gold); }
+  .gc-body { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; }
+  .gc-team { text-align: center; }
+  .gc-emoji { font-size: 24px; }
+  .gc-name { font-size: 12px; font-weight: 600; margin-top: 2px; }
+  .gc-role { font-size: 8px; letter-spacing: 0.08em; color: var(--color-text-faint); margin-top: 2px; font-weight: 700; }
+  .gc-team--win .gc-name { color: var(--color-lime); }
+  .gc-won { font-size: 8px; color: var(--color-lime); font-weight: 800; margin-top: 2px; }
+  .gc-vs { font-size: 11px; font-weight: 800; color: var(--color-text-faint); letter-spacing: 0.08em; }
+  .gc-score { font-size: 22px; font-weight: 800; display: flex; gap: 5px; align-items: baseline; }
+  .gc-score .w { color: var(--color-lime); }
+  .gc-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--color-border); }
+  .gc-courts { font-size: 10px; color: var(--color-text-faint); }
+  .gc-champ { color: var(--color-gold); font-weight: 700; }
+  .gc-cta { font-size: 11px; font-weight: 700; color: var(--color-lime); }
+  .gc--final .gc-cta { color: var(--color-text-muted); }
+
+  /* stats */
+  .dsr { background:var(--color-surface); border:1px solid rgba(184,255,44,0.25); border-radius:var(--radius-lg); padding:20px; text-align:center; margin-bottom:14px; }
+  .dsr__lbl { font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
+  .dsr__n { font-size:52px; font-weight:900; color:var(--color-lime); line-height:1; margin:6px 0 4px; }
+  .dsr__sub { font-size:11px; color:var(--color-text-muted); }
+  .dsr__rank { display:inline-flex; align-items:center; gap:5px; margin-top:10px; font-size:11px; font-weight:700; background:var(--color-lime-dim); color:var(--color-lime); padding:5px 12px; border-radius:var(--radius-full); }
+  .sgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-bottom:6px; }
+  .stat { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:13px 6px; text-align:center; }
+  .stat__n { font-size:22px; font-weight:800; } .stat__n.teal { color:var(--color-teal); }
+  .stat__l { font-size:8px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:3px; }
+  .bytype { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:6px 14px; }
+  .bt__row { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--color-border); font-size:12px; }
+  .bt__row:last-child { border-bottom:none; }
+  .bt__name { font-weight:600; } .bt__rec { color:var(--color-text-muted); font-variant-numeric:tabular-nums; } .bt__rec b { color:var(--color-lime); }
+  .partner { display:flex; align-items:center; gap:10px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:10px 12px; margin-bottom:7px; font-size:12px; }
+  .partner__av { width:28px; height:28px; border-radius:50%; background:var(--color-surface-3); display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--color-text-muted); }
+  .partner__rec { margin-left:auto; font-weight:700; color:var(--color-text-muted); } .partner__rec b { color:var(--color-lime); }
+
+  /* leaderboard / segmented */
+  .seg { display:flex; gap:6px; margin-bottom:14px; }
+  .seg__b { flex:1; text-align:center; font-size:11px; font-weight:700; padding:8px; border-radius:var(--radius-full); background:var(--color-surface-2); border:1px solid var(--color-border); color:var(--color-text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; }
+  .seg__b.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
+  .potw { display:flex; gap:8px; margin-bottom:14px; }
+  .potw__c { flex:1; background:linear-gradient(135deg, rgba(240,192,64,0.14), rgba(184,255,44,0.05)); border:1px solid rgba(240,192,64,0.3); border-radius:var(--radius-md); padding:12px; text-align:center; }
+  .potw__lbl { font-size:8px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-gold); font-weight:800; }
+  .potw__name { font-size:13px; font-weight:800; margin-top:5px; } .potw__team { font-size:10px; color:var(--color-text-faint); margin-top:1px; } .potw__dsr { font-size:11px; color:var(--color-gold); font-weight:700; margin-top:3px; }
+  .lb { display:flex; align-items:center; gap:11px; padding:10px 12px; border-radius:var(--radius-sm); margin-bottom:5px; background:var(--color-surface); border:1px solid var(--color-border); }
+  .lb--me { border-color:rgba(184,255,44,0.5); background:var(--color-lime-ghost); }
+  .lb__rank { font-size:14px; font-weight:800; color:var(--color-text-faint); width:26px; text-align:center; flex-shrink:0; }
+  .lb--me .lb__rank { color:var(--color-lime); }
+  .lb__av { width:30px; height:30px; border-radius:50%; background:var(--color-surface-3); display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--color-text-muted); flex-shrink:0; }
+  .lb__body { flex:1; min-width:0; } .lb__name { font-size:13px; font-weight:700; } .lb__team { font-size:10px; color:var(--color-text-faint); }
+  .lb__dsr { font-size:16px; font-weight:800; color:var(--color-lime); font-variant-numeric:tabular-nums; }
+  .lb__delta { font-size:9px; font-weight:700; } .up{color:var(--color-lime);} .down{color:var(--color-red);} .flat{color:var(--color-text-faint);}
+
+  /* team */
+  .teamhero { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:16px; text-align:center; margin-bottom:14px; }
+  .teamhero__emoji { font-size:38px; } .teamhero__name { font-size:17px; font-weight:800; margin-top:4px; } .teamhero__div { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:2px; }
+  .teamhero__stats { display:flex; justify-content:center; gap:22px; margin-top:14px; }
+  .ths__n { font-size:20px; font-weight:800; } .ths__n.gold{color:var(--color-gold);} .ths__l { font-size:8px; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:2px; }
+  .rost { display:flex; align-items:center; gap:11px; padding:10px 4px; border-bottom:1px solid var(--color-border); }
+  .rost:last-child { border-bottom:none; }
+  .rost__av { width:30px; height:30px; border-radius:50%; background:var(--color-surface-3); display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--color-text-muted); }
+  .rost__name { flex:1; font-size:13px; font-weight:600; } .rost__name .me { font-size:9px; color:var(--color-lime); font-weight:800; margin-left:6px; } .rost__name .cap { font-size:9px; color:var(--color-gold); font-weight:800; margin-left:6px; }
+  .rost__g { font-size:9px; font-weight:700; padding:2px 7px; border-radius:var(--radius-full); }
+  .rost__g.f{background:var(--color-gold-dim);color:var(--color-gold);} .rost__g.m{background:var(--color-teal-dim);color:var(--color-teal);}
+  .rost__dsr { font-size:13px; font-weight:800; color:var(--color-lime); width:42px; text-align:right; }
+
+  /* ── Lineup ── */
+  .blind { background: linear-gradient(135deg, rgba(240,192,64,0.14), rgba(184,255,44,0.05)); border: 1px solid rgba(240,192,64,0.3); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px; }
+  .blind__top { display: flex; align-items: center; gap: 8px; }
+  .blind__icon { font-size: 16px; }
+  .blind__title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; color: var(--color-gold); }
+  .blind__body { font-size: 11px; color: var(--color-text-muted); line-height: 1.55; margin: 8px 0 0; }
+  .blind__body b { color: var(--color-text); }
+  .blind__count { display: flex; align-items: baseline; gap: 6px; margin-top: 11px; padding-top: 11px; border-top: 1px solid rgba(240,192,64,0.18); }
+  .blind__count-num { font-size: 16px; font-weight: 800; color: var(--color-gold); }
+  .blind__count-lbl { font-size: 10px; color: var(--color-text-faint); letter-spacing: 0.04em; }
+  .blind--locked { background: var(--color-teal-dim); border-color: rgba(23,215,176,0.3); }
+  .blind--locked .blind__title { color: var(--color-teal); }
+  .lu-game { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 11px 12px; margin-bottom: 9px; }
+  .lu-game--full { border-color: rgba(184,255,44,0.3); }
+  .lu-game__top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .lu-game__court { margin-left: auto; font-size: 9px; font-weight: 700; color: var(--color-teal); background: var(--color-teal-dim); border-radius: 5px; padding: 2px 7px; }
+  .lu-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .lu-slot { display: flex; align-items: center; gap: 9px; padding: 9px 10px; cursor: pointer; background: var(--color-surface-2); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-sm); transition: border-color var(--transition), background var(--transition); min-height: 46px; }
+  .lu-slot:active { background: var(--color-surface-3); }
+  .lu-slot--filled { border-style: solid; border-color: rgba(184,255,44,0.3); background: var(--color-lime-ghost); }
+  .lu-slot__avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--color-surface-4); display: grid; place-items: center; font-size: 11px; font-weight: 800; color: var(--color-text-muted); flex-shrink: 0; }
+  .lu-slot--filled .lu-slot__avatar { background: var(--color-lime-dim); color: var(--color-lime); }
+  .lu-slot__name { font-size: 12px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lu-slot__empty { font-size: 11px; color: var(--color-text-faint); }
+  .lu-slot__req { display: block; font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-top: 1px; }
+  .lu-rules { font-size: 10px; color: var(--color-text-faint); margin: -4px 2px 10px; line-height: 1.5; }
+  .lu-rules b { color: var(--color-text-muted); }
+  .usage { display: flex; gap: 6px; flex-wrap: wrap; margin: 2px 2px 16px; }
+  .usage__chip { display: inline-flex; align-items: center; gap: 5px; font-size: 10px; font-weight: 600; padding: 4px 9px; border-radius: var(--radius-full); background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+  .usage__chip--cap { border-color: rgba(184,255,44,0.45); color: var(--color-lime); background: var(--color-lime-ghost); }
+  .usage__chip--cap .usage__n { color: var(--color-lime); }
+  .usage__dot { width: 6px; height: 6px; border-radius: 50%; }
+  .dot-f { background: var(--color-gold); }
+  .dot-m { background: var(--color-teal); }
+  .usage__n { color: var(--color-text-faint); }
+
+  /* bottom sheet */
+  .sheet-scrim { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); opacity: 0; pointer-events: none; transition: opacity 0.25s; z-index: 90; }
+  .sheet-scrim.is-open { opacity: 1; pointer-events: auto; }
+  .sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 95; background: var(--color-surface); border-top: 1px solid var(--color-border-strong); border-radius: 22px 22px 0 0; padding: 8px 16px 22px; transform: translateY(100%); transition: transform 0.3s cubic-bezier(0.16,1,0.3,1); max-height: 70%; overflow-y: auto; }
+  .sheet.is-open { transform: translateY(0); }
+  .sheet__grip { width: 40px; height: 4px; border-radius: 4px; background: var(--color-border-strong); margin: 4px auto 12px; }
+  .sheet__title { font-size: 13px; font-weight: 800; margin: 0 0 2px; }
+  .sheet__sub { font-size: 10px; color: var(--color-text-faint); letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; margin-bottom: 12px; }
+  .pick { display: flex; align-items: center; gap: 11px; padding: 11px 10px; cursor: pointer; border-radius: var(--radius-sm); transition: background var(--transition); }
+  .pick:active { background: var(--color-surface-2); }
+  .pick--disabled { opacity: 0.32; pointer-events: none; }
+  .pick__avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--color-surface-3); display: grid; place-items: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+  .pick__name { font-size: 13px; font-weight: 600; }
+  .pick__meta { font-size: 10px; color: var(--color-text-faint); }
+  .pick__tag { margin-left: auto; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-full); }
+  .tag-f { background: var(--color-gold-dim); color: var(--color-gold); }
+  .tag-m { background: var(--color-teal-dim); color: var(--color-teal); }
+  .pick__clear { color: var(--color-red); font-weight: 700; }
+
+  /* ── Score ── */
+  .ss-head { background: var(--color-surface); border: 1px solid rgba(184,255,44,0.2); border-radius: var(--radius-md); padding: 14px; margin-bottom: 14px; }
+  .ss-head__top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .ss-head__week { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-lime); font-weight: 800; }
+  .ss-head__title { font-size: 16px; font-weight: 800; margin: 3px 0 0; }
+  .ss-head__sub { font-size: 11px; color: var(--color-text-muted); margin-top: 3px; }
+  .ss-head__live { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 9px; border-radius: var(--radius-full); background: var(--color-lime-dim); color: var(--color-lime); display: flex; align-items: center; gap: 5px; }
+  .ss-progress { margin-top: 13px; }
+  .ss-progress__row { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-text-faint); font-weight: 600; margin-bottom: 5px; letter-spacing: 0.04em; }
+  .ss-progress__bar { height: 6px; background: var(--color-surface-3); border-radius: var(--radius-full); overflow: hidden; }
+  .ss-progress__fill { height: 100%; background: var(--color-lime); border-radius: var(--radius-full); transition: width 0.3s cubic-bezier(0.16,1,0.3,1); }
+  .banner { border-radius: var(--radius-sm); padding: 11px 14px; font-size: 11px; line-height: 1.55; margin-bottom: 14px; }
+  .banner--mine { background: var(--color-teal-dim); border: 1px solid rgba(23,215,176,0.2); color: var(--color-teal); }
+  .banner--final { background: var(--color-lime-ghost); border: 1px solid rgba(184,255,44,0.18); color: var(--color-lime); }
+  .banner b { font-weight: 800; }
+  .game__badge { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 5px; text-transform: uppercase; }
+  .badge--womens { background: rgba(240,192,64,0.14); color: var(--color-gold); }
+  .badge--mens { background: rgba(23,215,176,0.14); color: var(--color-teal); }
+  .badge--mixed { background: rgba(184,255,44,0.12); color: var(--color-lime); }
+
+  /* match math breakdown */
+  .math { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px; }
+  .math__head { display: grid; grid-template-columns: 1fr 48px 48px; gap: 8px; align-items: center; padding-bottom: 9px; border-bottom: 1px solid var(--color-border-strong); }
+  .math__title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
+  .math__team { text-align: center; font-size: 18px; }
+  .math__round { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: var(--color-text-faint); margin: 14px 0 2px; }
+  .math__row { display: grid; grid-template-columns: 1fr 48px 48px; gap: 8px; align-items: center; padding: 7px 0; font-size: 12px; }
+  .math__row + .math__row { border-top: 1px solid rgba(255,255,255,0.05); }
+  .math__label { color: var(--color-text-muted); }
+  .math__v { text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-text); }
+  .math__v--us { color: var(--color-lime); }
+  .math__row--mp .math__label { color: var(--color-text); font-weight: 600; }
+  .math__row--mp .math__v { color: var(--color-gold); font-weight: 800; }
+  .math__pending { color: var(--color-text-faint); font-weight: 600; }
+  .math__total { display: grid; grid-template-columns: 1fr 48px 48px; gap: 8px; align-items: center; margin-top: 14px; padding-top: 13px; border-top: 2px solid var(--color-border-strong); }
+  .math__total-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; }
+  .math__total-v { text-align: center; font-size: 30px; font-weight: 800; line-height: 1; color: var(--color-text); }
+  .math__total-v--us { color: var(--color-lime); }
+  .math__note { font-size: 10px; color: var(--color-text-faint); margin-top: 10px; line-height: 1.5; }
+
+  /* set-based scoring */
+  .setblock { margin-bottom: 18px; scroll-snap-align: start; }
+  .setblock__head { position: sticky; top: -16px; z-index: 6; display: flex; justify-content: space-between; align-items: center; background: var(--color-bg); padding: 11px 2px 10px; border-bottom: 1px solid var(--color-border-strong); margin-bottom: 11px; }
+  .setblock__r { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+  .setblock__c { font-size: 11px; font-weight: 700; color: var(--color-teal); background: var(--color-teal-dim); padding: 4px 10px; border-radius: var(--radius-full); }
+  .bg { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 14px; margin-bottom: 11px; }
+  .bg--entered { border-color: rgba(240,192,64,0.45); }
+  .bg__top { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+  .bg__court { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--color-text-faint); }
+  .bg__pairs { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 14px; }
+  .bg__pair { font-size: 13px; font-weight: 600; text-align: center; line-height: 1.3; }
+  .bg__pair--us { color: var(--color-lime); }
+  .bg__vs { font-size: 10px; font-weight: 800; color: var(--color-text-faint); letter-spacing: 0.08em; }
+  .bg__scores { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .bg__side { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 11px 6px; text-align: center; }
+  .bg__side--us { border-color: rgba(184,255,44,0.3); }
+  .bg__lbl { font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 800; color: var(--color-text-faint); margin-bottom: 9px; }
+  .bg__side--us .bg__lbl { color: var(--color-lime); }
+  .bg__stepper { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+  .bg__step { width: 42px; height: 42px; border-radius: 11px; border: 1px solid var(--color-border-strong); background: var(--color-surface-3); color: var(--color-text); font-size: 24px; font-weight: 700; display: grid; place-items: center; cursor: pointer; flex-shrink: 0; user-select: none; transition: background var(--transition), transform 80ms; }
+  .bg__step:active { background: var(--color-surface-4); transform: scale(0.9); }
+  .bg__val { font-size: 40px; font-weight: 800; min-width: 42px; font-variant-numeric: tabular-nums; line-height: 1; }
+  .bg__side--us .bg__val { color: var(--color-lime); }
+  .bg__status { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; min-height: 16px; }
+  .bg__pill { font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-full); }
+  .pill--empty { background: var(--color-surface-3); color: var(--color-text-faint); }
+  .pill--entered { background: var(--color-gold-dim); color: var(--color-gold); }
+  .bg__winner { font-size: 11px; font-weight: 700; color: var(--color-text-muted); }
+  .bg__winner b { color: var(--color-lime); }
+  .approve-block { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px; margin: 6px 0 4px; }
+  .approve-rows { display: grid; gap: 9px; margin-bottom: 15px; }
+  .approve-card { display: flex; align-items: center; gap: 11px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 11px 13px; }
+  .approve-card--done { border-color: var(--color-teal); background: var(--color-teal-dim); }
+  .approve-card__icon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; flex-shrink: 0; background: var(--color-surface-4); color: var(--color-text-faint); }
+  .approve-card--done .approve-card__icon { background: var(--color-teal); color: var(--color-text-inverse); }
+  .approve-card__name { font-size: 12px; font-weight: 700; }
+  .approve-card__role { font-size: 9px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 600; }
+  .approve-card__state { margin-left: auto; font-size: 10px; font-weight: 700; color: var(--color-text-faint); }
+  .approve-card--done .approve-card__state { color: var(--color-teal); }
+  .btn-primary { width: 100%; padding: 14px; border: none; border-radius: var(--radius-full); background: var(--color-lime); color: var(--color-text-inverse); font-family: var(--font); font-size: 13px; font-weight: 800; letter-spacing: 0.02em; cursor: pointer; transition: background var(--transition); }
+  .btn-primary:active { background: var(--color-lime-hover); }
+  .btn-primary:disabled { opacity: 0.35; cursor: not-allowed; }
+  .approve-hint { font-size: 10px; color: var(--color-text-faint); text-align: center; margin-top: 10px; line-height: 1.5; }
+
+  /* roster management (captain) */
+  .rm { display:flex; align-items:center; gap:11px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:11px 12px; margin-bottom:7px; }
+  .rm__av { width:30px; height:30px; border-radius:50%; background:var(--color-surface-3); display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--color-text-muted); flex-shrink:0; }
+  .rm__body { flex:1; min-width:0; } .rm__name { font-size:13px; font-weight:700; } .rm__email { font-size:10px; color:var(--color-text-faint); }
+  .rm__state { font-size:9px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:var(--radius-full); flex-shrink:0; }
+  .rm__state.ok { background:var(--color-teal-dim); color:var(--color-teal); }
+  .rm__state.pend { background:var(--color-gold-dim); color:var(--color-gold); }
+  .rm-add { display:flex; gap:8px; margin:4px 0 6px; }
+  .rm-add input { flex:1; padding:11px 13px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-2); color:var(--color-text); font-family:inherit; font-size:13px; }
+  .rm-add input:focus { outline:none; border-color:var(--color-lime); }
+  .rm-add button { border:none; border-radius:var(--radius-sm); background:var(--color-lime); color:var(--color-text-inverse); font-family:inherit; font-weight:800; font-size:13px; padding:0 16px; cursor:pointer; }
+
+  /* bottom tab bar */
+  .tabbar { flex-shrink: 0; display: flex; background: rgba(18,18,18,0.96); backdrop-filter: blur(12px); border-top: 1px solid var(--color-border); padding: 8px 6px 22px; }
+  .tab { flex: 1; background: none; border: none; cursor: pointer; font-family: var(--font); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 0; color: var(--color-text-faint); transition: color var(--transition); position: relative; }
+  .tab.is-active { color: var(--color-lime); }
+  .tab__icon { width: 23px; height: 23px; }
+  .tab__label { font-size: 9.5px; font-weight: 700; letter-spacing: 0.01em; }
+  .tab__badge { position: absolute; top: 0; right: calc(50% - 24px); background: var(--color-gold); color: var(--color-text-inverse); font-size: 8px; font-weight: 800; border-radius: var(--radius-full); padding: 1px 5px; min-width: 15px; text-align: center; }
+  .home-indicator { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); width: 120px; height: 4px; border-radius: 4px; background: rgba(255,255,255,0.25); z-index: 60; }
+
+  .toast { position: absolute; bottom: 92px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--color-surface-3); border: 1px solid var(--color-border-strong); color: var(--color-text); font-size: 12px; font-weight: 600; padding: 11px 18px; border-radius: var(--radius-full); opacity: 0; pointer-events: none; transition: all 0.3s; z-index: 80; white-space: nowrap; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .toast.is-show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .footer-note { font-size: 11px; color: var(--color-text-faint); text-align: center; max-width: 480px; line-height: 1.6; }
+  .footer-note b { color: var(--color-text-muted); }
+  .hidden { display:none !important; }
+</style>
+</head>
+<body>
+
+  <div class="intro">
+    <div class="intro__eyebrow">The Dink Society · One Login</div>
+    <h1 class="intro__title">One sign-in for players & captains</h1>
+    <p class="intro__body">Everyone uses the <b style="color:var(--color-text)">same magic-link login</b>. The portal checks the roster: if your email is flagged as a team's <b style="color:var(--color-text)">captain</b> or <b style="color:var(--color-text)">co-captain</b>, the captain-only <b style="color:var(--color-text)">Captain</b> tab (Lineup, Score Night, Roster) just appears. Regular players sign in the same way and simply don't see it. No second account.</p>
+    <p class="intro__hint">Tap a <b>demo login</b> on the phone to sign in as a captain, a co-captain, or a plain player — then explore the <b>bottom tabs</b>. Tap your name (top-right) to switch accounts.</p>
+  </div>
+
+  <div class="phone">
+    <div class="phone__notch"></div>
+    <div class="statusbar"><span id="clock">9:41</span><span>📶 &nbsp;🔋</span></div>
+
+    <!-- LOGIN -->
+    <div class="login" id="login">
+      <div class="login__logo">The Dink Society</div>
+      <div class="login__tag">Season 1 · Player Sign-in</div>
+      <div id="login-step1">
+        <h1 class="login__h">Sign in</h1>
+        <p class="login__p">Enter the email you're rostered with. One sign-in for everyone — if you captain a team, your captain tools just appear.</p>
+        <input class="login__in" id="login-email" type="email" placeholder="you@email.com" value="pete.park@email.com">
+        <button class="login__btn" onclick="sendLink()">Send my magic link</button>
+        <div class="demo-accts">
+          <div class="demo-accts__lbl">Demo logins — tap to sign in</div>
+          <div id="demo-list"></div>
+        </div>
+      </div>
+      <div id="login-step2" style="display:none;">
+        <div class="login__sent"><b>✉️ Link on the way.</b><br>Check <span id="sent-to">your inbox</span> for a one-tap sign-in link. It expires in 15 minutes.</div>
+        <button class="login__btn" onclick="enterApp()">Demo: open the portal →</button>
+        <button class="login__demo" onclick="resetLogin()">Use a different email</button>
+      </div>
+      <p class="login__note">Only emails on a team roster can sign in. Captains & co-captains are flagged on the roster — there's no separate captain account.</p>
+    </div>
+
+    <!-- APP -->
+    <div id="app" style="display:none; flex:1; min-height:0; flex-direction:column;">
+      <div class="appbar">
+        <div>
+          <div class="appbar__brand">Dink Society · Season 1</div>
+          <div class="appbar__title"><span id="ab-name">Pete Park</span> <span class="cap-badge" id="cap-badge">Captain</span></div>
+        </div>
+        <div class="appbar__me" id="ab-me" onclick="signOut()" style="cursor:pointer" title="Switch account">
+          <div style="text-align:right"><div class="appbar__name">Dill With It</div><div class="appbar__team" id="ab-switch">Tap to switch ⇄</div></div>
+          <div class="appbar__av" id="ab-av">PP</div>
+        </div>
+      </div>
+
+      <div class="screen" id="screen">
+
+        <!-- ════════ SCHEDULE ════════ -->
+        <section class="view is-active" id="view-schedule">
+
+          <!-- captain schedule -->
+          <div id="sched-captain">
+            <div class="tonight">
+              <div class="tonight__eyebrow"><span class="pulse"></span> Tonight · Mon 7:00 PM</div>
+              <div class="tonight__matchup">
+                <div class="tonight__team"><div class="tonight__emoji">🥒</div><div class="tonight__name">Dill With It</div></div>
+                <div class="tonight__vs">VS</div>
+                <div class="tonight__team"><div class="tonight__emoji">👑</div><div class="tonight__name">Kingpins</div></div>
+              </div>
+              <div class="tonight__meta"><span>📍 <b>Courts 3 & 4</b></span><span>🕖 <b>7:00 PM</b></span><span>🏓 <b>Week 5</b></span><span>✅ Lineups revealed</span></div>
+              <button class="tonight__cta" onclick="goScore()">Enter tonight's stats →</button>
+            </div>
+
+            <div class="section-label">Captain duties <span class="capmark">Captain only</span></div>
+            <div class="gc gc--live" onclick="goScore()">
+              <div class="gc-top"><span class="gc-week">WEEK 5 · TONIGHT</span><span class="gc-pill gc-pill--live">Live</span></div>
+              <div class="gc-body">
+                <div class="gc-team"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-role">HOME</div></div>
+                <div class="gc-vs">VS</div>
+                <div class="gc-team"><div class="gc-emoji">👑</div><div class="gc-name">Kingpins</div><div class="gc-role">AWAY</div></div>
+              </div>
+              <div class="gc-foot"><span class="gc-courts">Courts 3 & 4</span><span class="gc-cta">Open scoresheet ›</span></div>
+            </div>
+            <div class="gc" onclick="goLineup()">
+              <div class="gc-top"><span class="gc-week">WEEK 6 · THU JUN 11</span><span class="gc-pill gc-pill--need">Needs lineup</span></div>
+              <div class="gc-body">
+                <div class="gc-team"><div class="gc-emoji">🦅</div><div class="gc-name">Smash Eagles</div><div class="gc-role">HOME</div></div>
+                <div class="gc-vs">VS</div>
+                <div class="gc-team"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-role">AWAY</div></div>
+              </div>
+              <div class="gc-foot"><span class="gc-courts">Courts 1 & 2</span><span class="gc-cta">Set lineup ›</span></div>
+            </div>
+
+            <div class="section-label" style="margin-top:18px">Recent results</div>
+            <div class="gc gc--final" onclick="toast('Past matches are read-only')">
+              <div class="gc-top"><span class="gc-week">WEEK 4 · THU MAY 28</span><span class="gc-pill gc-pill--final">Final</span></div>
+              <div class="gc-body">
+                <div class="gc-team gc-team--win"><div class="gc-emoji">🥒</div><div class="gc-name">Dill With It</div><div class="gc-won">▲ Won</div></div>
+                <div class="gc-score"><span class="w">7</span>–<span>5</span></div>
+                <div class="gc-team"><div class="gc-emoji">🔥</div><div class="gc-name">Dink 182</div><div class="gc-role">AWAY</div></div>
+              </div>
+              <div class="gc-foot"><span class="gc-courts">Courts 3 & 4</span><span class="gc-cta">View ›</span></div>
+            </div>
+          </div>
+
+          <!-- player schedule -->
+          <div id="sched-player" class="hidden">
+            <div class="next">
+              <div class="next__eyebrow"><span class="pulse"></span> Next match · Mon 7:00 PM</div>
+              <div class="next__row">
+                <div class="next__team"><div class="next__emoji">🥒</div><div class="next__tn">Dill With It</div></div>
+                <div class="next__vs">VS</div>
+                <div class="next__team"><div class="next__emoji">👑</div><div class="next__tn">Kingpins</div></div>
+              </div>
+              <div class="next__meta">📍 Courts 3 & 4 · Week 5</div>
+              <div class="next__you">You're in the lineup — <b>3 games</b> tonight:
+                <div class="next__games"><span class="gtag gtag--m">R1 · Men's</span><span class="gtag gtag--x">R1 · Mixed</span><span class="gtag gtag--x">R2 · Mixed</span></div>
+              </div>
+            </div>
+            <div class="label">Upcoming</div>
+            <div class="m">
+              <div class="m__top"><span class="m__wk">WEEK 6 · THU JUN 11</span><span class="m__pill pill-up">Lineup pending</span></div>
+              <div class="m__body">
+                <div class="m__team"><div class="m__emoji">🦅</div><div class="m__tn">Smash Eagles</div></div>
+                <div class="m__vs">VS</div>
+                <div class="m__team"><div class="m__emoji">🥒</div><div class="m__tn">Dill With It</div></div>
+              </div>
+              <div class="m__foot">Courts 1 & 2 · lineup reveals 30 min before</div>
+            </div>
+            <div class="label">Results</div>
+            <div class="m">
+              <div class="m__top"><span class="m__wk">WEEK 4 · MAY 28</span><span class="m__pill pill-win">Won</span></div>
+              <div class="m__body">
+                <div class="m__team"><div class="m__emoji">🥒</div><div class="m__tn">Dill With It</div></div>
+                <div class="m__sc"><span class="w">4</span>–<span>0</span></div>
+                <div class="m__team"><div class="m__emoji">🔥</div><div class="m__tn">Dink 182</div></div>
+              </div>
+              <div class="m__foot">You went <b>3–1</b> · clutch win in R2 mixed (11–9)</div>
+            </div>
+            <div class="m">
+              <div class="m__top"><span class="m__wk">WEEK 3 · MAY 21</span><span class="m__pill pill-final">Final</span></div>
+              <div class="m__body">
+                <div class="m__team"><div class="m__emoji">🐢</div><div class="m__tn">Slow Dinks</div></div>
+                <div class="m__sc"><span>1</span>–<span class="w">3</span></div>
+                <div class="m__team"><div class="m__emoji">🥒</div><div class="m__tn">Dill With It</div></div>
+              </div>
+              <div class="m__foot">You went <b>2–0</b></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ════════ STATS ════════ -->
+        <section class="view" id="view-stats">
+          <div class="dsr">
+            <div class="dsr__lbl">Your DSR · Dink Society Rating</div>
+            <div class="dsr__n" id="dsr-num">78.4</div>
+            <div class="dsr__sub">Top 12% of all players</div>
+            <div class="dsr__rank">▲ #4 in 3.5M · up 2 this week</div>
+          </div>
+          <div class="sgrid">
+            <div class="stat"><div class="stat__n">14</div><div class="stat__l">Games</div></div>
+            <div class="stat"><div class="stat__n teal">10–4</div><div class="stat__l">W–L</div></div>
+            <div class="stat"><div class="stat__n">71%</div><div class="stat__l">Win rate</div></div>
+          </div>
+          <div class="sgrid">
+            <div class="stat"><div class="stat__n">+38</div><div class="stat__l">Pt diff</div></div>
+            <div class="stat"><div class="stat__n">5–1</div><div class="stat__l">Clutch</div></div>
+            <div class="stat"><div class="stat__n">2</div><div class="stat__l">POW</div></div>
+          </div>
+          <div class="label">By game type</div>
+          <div class="bytype">
+            <div class="bt__row"><span class="bt__name">Men's doubles</span><span class="bt__rec"><b>3</b>–1</span></div>
+            <div class="bt__row"><span class="bt__name">Mixed doubles</span><span class="bt__rec"><b>7</b>–3</span></div>
+          </div>
+          <div class="label">Best partners</div>
+          <div class="partner"><div class="partner__av">AC</div><div><div style="font-weight:600;">Ana Chen</div><div style="font-size:10px;color:var(--color-text-faint);">Mixed</div></div><span class="partner__rec"><b>5</b>–1</span></div>
+          <div class="partner"><div class="partner__av">TB</div><div><div style="font-weight:600;">Tom Bell</div><div style="font-size:10px;color:var(--color-text-faint);">Men's</div></div><span class="partner__rec"><b>3</b>–1</span></div>
+        </section>
+
+        <!-- ════════ LEADERBOARD ════════ -->
+        <section class="view" id="view-leaders">
+          <div class="label">Player of the Week</div>
+          <div class="potw">
+            <div class="potw__c"><div class="potw__lbl">♀ Woman</div><div class="potw__name">Ana Chen</div><div class="potw__team">Dill With It</div><div class="potw__dsr">DSR 84.1</div></div>
+            <div class="potw__c"><div class="potw__lbl">♂ Man</div><div class="potw__name">Cole Diaz</div><div class="potw__team">Kingpins</div><div class="potw__dsr">DSR 82.7</div></div>
+          </div>
+          <div class="label">Leaderboard <span class="cnt" style="text-transform:none;letter-spacing:0;font-weight:600;">Season 1 · 3.5M</span></div>
+          <div class="seg" id="seg">
+            <div class="seg__b is-active" data-f="all" onclick="setFilter('all')">All</div>
+            <div class="seg__b" data-f="F" onclick="setFilter('F')">Women</div>
+            <div class="seg__b" data-f="M" onclick="setFilter('M')">Men</div>
+          </div>
+          <div id="lblist"></div>
+        </section>
+
+        <!-- ════════ TEAM ════════ -->
+        <section class="view" id="view-team">
+          <div class="teamhero">
+            <div class="teamhero__emoji">🥒</div>
+            <div class="teamhero__name">Dill With It</div>
+            <div class="teamhero__div">3.5 Mixed · Season 1</div>
+            <div class="teamhero__stats">
+              <div><div class="ths__n gold">1st</div><div class="ths__l">Division</div></div>
+              <div><div class="ths__n">3–1</div><div class="ths__l">Record</div></div>
+              <div><div class="ths__n">11</div><div class="ths__l">Match pts</div></div>
+            </div>
+          </div>
+          <div class="label">Roster <span class="cnt" style="text-transform:none;letter-spacing:0;font-weight:600;">8 players</span></div>
+          <div id="rosterlist"></div>
+        </section>
+
+        <!-- ════════ CAPTAIN HUB ════════ -->
+        <section class="view" id="view-captain">
+          <div class="seg" id="capseg">
+            <div class="seg__b is-active" data-cap="lineup" onclick="setCapSection('lineup')">Lineup</div>
+            <div class="seg__b" data-cap="score" onclick="setCapSection('score')">Score</div>
+            <div class="seg__b" data-cap="roster" onclick="setCapSection('roster')">Roster</div>
+          </div>
+
+          <!-- Lineup -->
+          <div id="cap-lineup">
+            <div class="blind" id="blind-box">
+              <div class="blind__top"><span class="blind__icon">🙈</span><span class="blind__title">Blind lineup · Week 6 vs Smash Eagles 🦅</span></div>
+              <p class="blind__body">Set your pairs for each game. <b>Smash Eagles can't see your picks</b> — lineups lock <b>3 hrs before</b> match and both teams reveal together <b>30 min before</b>. No game-day swaps.</p>
+              <div class="blind__count"><span class="blind__count-num" id="lock-timer">Locks Thu 3:30 PM</span><span class="blind__count-lbl">· set them before then</span></div>
+            </div>
+            <div class="section-label">Tap a slot to assign <span class="section-label__count" id="lu-progress">0 / 12 set</span></div>
+            <div class="lu-rules">Mixed = woman + man (woman listed first) · each player max <b>4 games</b> a night</div>
+            <div class="usage" id="usage-strip"></div>
+            <div id="lineup-rounds"></div>
+            <div style="height:6px"></div>
+            <button class="btn-primary" id="lock-btn" disabled onclick="lockLineup()">Fill all 12 slots to lock</button>
+            <div class="approve-hint" id="lock-hint">Once locked you can't edit until reveal. Save anytime before the deadline.</div>
+          </div>
+
+          <!-- Score -->
+          <div id="cap-score" class="hidden">
+            <div class="ss-head">
+              <div class="ss-head__top">
+                <div>
+                  <div class="ss-head__week">Week 5 · Tonight</div>
+                  <div class="ss-head__title">🥒 Dill With It vs Kingpins 👑</div>
+                  <div class="ss-head__sub">Courts 3 & 4 · first to 11 · scored by set</div>
+                </div>
+                <div class="ss-head__live"><span class="pulse"></span> Live</div>
+              </div>
+              <div class="ss-progress">
+                <div class="ss-progress__row"><span>Games scored</span><span id="prog-text">0 / 12</span></div>
+                <div class="ss-progress__bar"><div class="ss-progress__fill" id="prog-fill" style="width:0%"></div></div>
+              </div>
+            </div>
+            <div class="banner banner--mine" id="score-banner">
+              <b>You're keeping score.</b> Scroll set by set — both courts show together. Enter each game as it finishes; when all 12 are in, submit for the Kingpins captain to confirm.
+            </div>
+            <div id="rounds"></div>
+            <div class="math" id="math-block"></div>
+            <div class="approve-block">
+              <div class="approve-rows">
+                <div class="approve-card" id="appr-me">
+                  <div class="approve-card__icon">○</div>
+                  <div><div class="approve-card__name">You · Dill With It</div><div class="approve-card__role">Scorekeeper</div></div>
+                  <div class="approve-card__state">Not submitted</div>
+                </div>
+                <div class="approve-card" id="appr-them">
+                  <div class="approve-card__icon">○</div>
+                  <div><div class="approve-card__name">M. Rivera · Kingpins</div><div class="approve-card__role">Opponent captain</div></div>
+                  <div class="approve-card__state">Waiting</div>
+                </div>
+              </div>
+              <button class="btn-primary" id="submit-btn" disabled onclick="submitScores()">Enter all 12 games to submit</button>
+              <div class="approve-hint" id="approve-hint">Both captains confirm before results lock to the standings.</div>
+            </div>
+          </div>
+
+          <!-- Roster management -->
+          <div id="cap-roster" class="hidden">
+            <div class="section-label">Manage roster <span class="capmark">Captain only</span></div>
+            <div class="lu-rules">Players sign in with the email you add here — a magic link, no password. Add a teammate and they can log in tonight.</div>
+            <div class="rm-add">
+              <input id="rm-email" type="email" placeholder="newplayer@email.com">
+              <button onclick="addPlayer()">Add</button>
+            </div>
+            <div id="rmlist"></div>
+          </div>
+        </section>
+
+      </div><!-- /screen -->
+
+      <div class="toast" id="toast"></div>
+
+      <div class="sheet-scrim" id="sheet-scrim" onclick="closeSheet()"></div>
+      <div class="sheet" id="sheet">
+        <div class="sheet__grip"></div>
+        <h3 class="sheet__title" id="sheet-title">Pick a player</h3>
+        <div class="sheet__sub" id="sheet-sub">Game</div>
+        <div id="sheet-list"></div>
+      </div>
+
+      <nav class="tabbar" id="tabbar">
+        <button class="tab is-active" id="tab-schedule" onclick="switchTab('schedule')">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          <span class="tab__label">Schedule</span>
+        </button>
+        <button class="tab" id="tab-stats" onclick="switchTab('stats')">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          <span class="tab__label">My Stats</span>
+        </button>
+        <button class="tab" id="tab-leaders" onclick="switchTab('leaders')">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+          <span class="tab__label">Leaders</span>
+        </button>
+        <button class="tab" id="tab-team" onclick="switchTab('team')">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span class="tab__label">Team</span>
+        </button>
+        <button class="tab" id="tab-captain" onclick="switchTab('captain')">
+          <svg class="tab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9H21l-5.4 4 2.1 6.9L12 15.8 6.3 19.8l2.1-6.9L3 8.9h6.6z"/></svg>
+          <span class="tab__label">Captain</span>
+          <span class="tab__badge" id="captain-badge">LIVE</span>
+        </button>
+      </nav>
+    </div><!-- /#app -->
+
+    <div class="home-indicator"></div>
+  </div>
+
+  <p class="footer-note">One merged portal on the live Dink Society palette (charcoal + electric lime + teal, Inter). Everyone signs in with the same magic link; the roster's captain / co-captain flag decides whether the <b>Captain</b> tab (Lineup with enforced gender slots and a 4-game nightly cap · Score Night's 2 rounds × 6 games with dual-captain confirmation · Roster + magic-link invites) appears. Tap a demo login to try each role. Not wired to live data.</p>
+
+<script>
+  /* ════════ SHARED DATA ════════ */
+  // role: 'captain' | 'cocaptain' | undefined (regular player). Captain tab shows for captain OR cocaptain.
+  const ROSTER = [
+    { id:'chen',   name:'Ana Chen',    sex:'F', dsr:84.1, email:'ana.chen@email.com',   status:'ok', role:'cocaptain' },
+    { id:'lee',    name:'Maya Lee',    sex:'F', dsr:74.0, email:'maya.lee@email.com',   status:'ok' },
+    { id:'jpark',  name:'Jenna Park',  sex:'F', dsr:69.5, email:'jenna.p@email.com',    status:'ok' },
+    { id:'vo',     name:'Sara Vo',     sex:'F', dsr:66.2, email:'sara.vo@email.com',    status:'pend' },
+    { id:'ppark',  name:'Pete Park',   sex:'M', dsr:78.4, email:'pete.park@email.com',  status:'ok', role:'captain' },
+    { id:'bell',   name:'Tom Bell',    sex:'M', dsr:76.9, email:'tom.bell@email.com',   status:'ok' },
+    { id:'okafor', name:'Dan Okafor',  sex:'M', dsr:71.3, email:'dan.ok@email.com',     status:'ok' },
+    { id:'tran',   name:'Kyle Tran',   sex:'M', dsr:64.8, email:'kyle.tran@email.com',  status:'ok' },
+  ];
+  let CURRENT = ROSTER.find(p => p.id === 'ppark');
+  const initials = n => n.replace(/[^A-Za-z ]/g,'').split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const playerById = id => ROSTER.find(p => p.id === id);
+  const roleLabel = r => r==='captain' ? 'Captain' : r==='cocaptain' ? 'Co-Captain' : 'Player';
+
+  /* ════════ LOGIN / ACCOUNTS ════════ */
+  const DEMOS = ['ppark','chen','bell']; // captain, co-captain, plain player
+  function renderDemos(){
+    document.getElementById('demo-list').innerHTML = DEMOS.map(id=>{
+      const p = playerById(id);
+      const cls = p.role==='captain' ? 'cap' : p.role==='cocaptain' ? 'co' : 'pl';
+      return `<button class="demo-acct" onclick="pickDemo('${p.email}')">
+        <div class="demo-acct__av">${initials(p.name)}</div>
+        <div class="demo-acct__body"><div class="demo-acct__name">${p.name}</div><div class="demo-acct__email">${p.email}</div></div>
+        <span class="demo-acct__role ${cls}">${roleLabel(p.role)}</span></button>`;
+    }).join('');
+  }
+  function sendLink(){
+    document.getElementById('sent-to').textContent = document.getElementById('login-email').value || 'your inbox';
+    document.getElementById('login-step1').style.display='none';
+    document.getElementById('login-step2').style.display='block';
+  }
+  function pickDemo(email){ document.getElementById('login-email').value = email; sendLink(); }
+  function resetLogin(){
+    document.getElementById('login-step1').style.display='block';
+    document.getElementById('login-step2').style.display='none';
+  }
+  function enterApp(){
+    const email = (document.getElementById('login-email').value||'').trim().toLowerCase();
+    let u = ROSTER.find(p => p.email.toLowerCase() === email);
+    if(!u){ u = { id:'guest', name:'Guest Player', sex:'M', dsr:70.0, email, status:'ok' }; }
+    CURRENT = u;
+    configureForUser(u);
+    document.getElementById('login').style.display='none';
+    document.getElementById('app').style.display='flex';
+    switchTab('schedule');
+    toast(`Signed in · ${roleLabel(u.role)}`);
+  }
+  function signOut(){
+    document.getElementById('app').style.display='none';
+    resetLogin();
+    document.getElementById('login').style.display='flex';
+  }
+  function configureForUser(u){
+    const isCap = u.role==='captain' || u.role==='cocaptain';
+    document.getElementById('ab-name').textContent = u.name;
+    document.getElementById('ab-av').textContent = initials(u.name);
+    const badge = document.getElementById('cap-badge');
+    if(isCap){ badge.style.display='inline-block'; badge.textContent = roleLabel(u.role); }
+    else badge.style.display='none';
+    document.getElementById('tab-captain').classList.toggle('hidden', !isCap);
+    document.getElementById('sched-captain').classList.toggle('hidden', !isCap);
+    document.getElementById('sched-player').classList.toggle('hidden', isCap);
+    document.getElementById('dsr-num').textContent = u.dsr ? u.dsr.toFixed(1) : '—';
+    renderLB(); renderRoster();
+    setCapSection('lineup');
+  }
+
+  /* ════════ LEADERBOARD ════════ */
+  const LB = [
+    { rank:1, name:'Ana Chen', team:'Dill With It', dsr:84.1, sex:'F', d:1 },
+    { rank:2, name:'Cole Diaz', team:'Kingpins', dsr:82.7, sex:'M', d:0 },
+    { rank:3, name:'Maya Sun', team:'Net Surge', dsr:80.2, sex:'F', d:2 },
+    { rank:4, name:'Pete Park', team:'Dill With It', dsr:78.4, sex:'M', d:2 },
+    { rank:5, name:'Tom Bell', team:'Dill With It', dsr:76.9, sex:'M', d:-1 },
+    { rank:6, name:'Lena Young', team:'Kingpins', dsr:75.3, sex:'F', d:0 },
+    { rank:7, name:'Ravi Okafor', team:'Smash Eagles', dsr:73.8, sex:'M', d:-2 },
+    { rank:8, name:'Jess Park', team:'Net Surge', dsr:72.1, sex:'F', d:1 },
+  ];
+  let filter='all';
+  function renderLB(){
+    const rows = LB.filter(p=>filter==='all'||p.sex===filter);
+    document.getElementById('lblist').innerHTML = rows.map((p,i)=>{
+      const me = CURRENT && p.name === CURRENT.name;
+      const delta = p.d>0?`<span class="lb__delta up">▲${p.d}</span>`:p.d<0?`<span class="lb__delta down">▼${-p.d}</span>`:`<span class="lb__delta flat">—</span>`;
+      const rk = filter==='all'?p.rank:(i+1);
+      return `<div class="lb ${me?'lb--me':''}"><div class="lb__rank">${rk}</div><div class="lb__av">${initials(p.name)}</div><div class="lb__body"><div class="lb__name">${p.name}${me?' · you':''}</div><div class="lb__team">${p.team}</div></div><div style="text-align:right;"><div class="lb__dsr">${p.dsr.toFixed(1)}</div>${delta}</div></div>`;
+    }).join('');
+  }
+  function setFilter(f){ filter=f; document.querySelectorAll('#seg .seg__b').forEach(b=>b.classList.toggle('is-active', b.dataset.f===f)); renderLB(); }
+
+  /* ════════ TEAM ROSTER ════════ */
+  function renderRoster(){
+    document.getElementById('rosterlist').innerHTML = ROSTER.map(p=>{
+      const me = CURRENT && p.id === CURRENT.id;
+      const roleTag = p.role==='captain' ? '<span class="cap">CAPTAIN</span>'
+                    : p.role==='cocaptain' ? '<span class="cap">CO-CAPTAIN</span>' : '';
+      return `<div class="rost"><div class="rost__av">${initials(p.name)}</div>
+        <div class="rost__name">${p.name}${me?'<span class="me">YOU</span>':''}${roleTag}</div>
+        <span class="rost__g ${p.sex==='F'?'f':'m'}">${p.sex==='F'?'W':'M'}</span>
+        <span class="rost__dsr">${p.dsr.toFixed(1)}</span></div>`;
+    }).join('');
+  }
+
+  /* ════════ ROSTER MANAGEMENT (captain) ════════ */
+  function renderRM(){
+    document.getElementById('rmlist').innerHTML = ROSTER.map(p=>{
+      const st = p.status==='ok' ? '<span class="rm__state ok">Active</span>' : '<span class="rm__state pend">Invite sent</span>';
+      const crown = p.role==='captain' ? ' 👑' : p.role==='cocaptain' ? ' 🤝' : '';
+      return `<div class="rm"><div class="rm__av">${initials(p.name)}</div>
+        <div class="rm__body"><div class="rm__name">${p.name}${crown}</div><div class="rm__email">${p.email}</div></div>${st}</div>`;
+    }).join('');
+  }
+  function addPlayer(){
+    const inp = document.getElementById('rm-email');
+    const email = (inp.value||'').trim();
+    if(!email || !email.includes('@')){ toast('Enter a valid email'); return; }
+    const name = email.split('@')[0].replace(/[._]/g,' ').replace(/\b\w/g, c=>c.toUpperCase());
+    ROSTER.push({ id:'new'+Date.now(), name, sex:'M', dsr:0, email, status:'pend' });
+    inp.value='';
+    renderRM(); renderRoster();
+    toast('Magic-link invite sent ✉️');
+  }
+
+  /* ════════ SCORE NIGHT ════════ */
+  const GAMES = [
+    { id:'r1g1', round:1, type:'WOMENS', label:"Women's", court:'3', us:'Chen / J.Park', them:'Ruiz / Vo' },
+    { id:'r1g2', round:1, type:'MENS',   label:"Men's",   court:'4', us:'Okafor / Bell', them:'Diaz / Cole' },
+    { id:'r1g3', round:1, type:'MIXED',  label:"Mixed",   court:'3', us:'Chen / Okafor', them:'Ruiz / Diaz' },
+    { id:'r1g4', round:1, type:'MIXED',  label:"Mixed",   court:'4', us:'J.Park / Bell', them:'Vo / Cole' },
+    { id:'r1g5', round:1, type:'MIXED',  label:"Mixed",   court:'3', us:'Chen / P.Park', them:'Ruiz / Cole' },
+    { id:'r1g6', round:1, type:'MIXED',  label:"Mixed",   court:'4', us:'Lee / Okafor',  them:'Vo / Diaz' },
+    { id:'r2g1', round:2, type:'WOMENS', label:"Women's", court:'3', us:'J.Park / Lee',  them:'Vo / Sun' },
+    { id:'r2g2', round:2, type:'MENS',   label:"Men's",   court:'4', us:'Bell / Tran',   them:'Cole / Roy' },
+    { id:'r2g3', round:2, type:'MIXED',  label:"Mixed",   court:'3', us:'Lee / Tran',    them:'Sun / Roy' },
+    { id:'r2g4', round:2, type:'MIXED',  label:"Mixed",   court:'4', us:'J.Park / P.Park',them:'Vo / Cole' },
+    { id:'r2g5', round:2, type:'MIXED',  label:"Mixed",   court:'3', us:'Lee / Okafor',  them:'Sun / Diaz' },
+    { id:'r2g6', round:2, type:'MIXED',  label:"Mixed",   court:'4', us:'Chen / Tran',   them:'Ruiz / Roy' },
+  ];
+  const sc = {};
+  GAMES.forEach(g => sc[g.id] = { us:0, them:0, entered:false });
+  let submitted = false;
+  const SETS = [
+    { round:1, set:1, games:['r1g1','r1g2'] },
+    { round:1, set:2, games:['r1g3','r1g4'] },
+    { round:1, set:3, games:['r1g5','r1g6'] },
+    { round:2, set:1, games:['r2g1','r2g2'] },
+    { round:2, set:2, games:['r2g3','r2g4'] },
+    { round:2, set:3, games:['r2g5','r2g6'] },
+  ];
+  function renderScoreSets() {
+    document.getElementById('rounds').innerHTML = SETS.map(st => {
+      const a = GAMES.find(g => g.id === st.games[0]);
+      const b = GAMES.find(g => g.id === st.games[1]);
+      return `<div class="setblock">
+        <div class="setblock__head"><span class="setblock__r">Round ${st.round} · Set ${st.set}</span><span class="setblock__c">Courts ${a.court} & ${b.court}</span></div>
+        ${bigGameHTML(a)}${bigGameHTML(b)}
+      </div>`;
+    }).join('');
+  }
+  function statusHTML(id) {
+    const s = sc[id];
+    const pill = s.entered ? '<span class="bg__pill pill--entered">Entered</span>' : '<span class="bg__pill pill--empty">Not played</span>';
+    let win = '';
+    if (s.entered) win = s.us === s.them
+      ? '<span class="bg__winner">Tie? check score</span>'
+      : `<span class="bg__winner">${s.us>s.them?'<b>Dill With It</b> ✓':'Kingpins ✓'}</span>`;
+    return pill + win;
+  }
+  function bigGameHTML(g) {
+    const s = sc[g.id];
+    return `<div class="bg ${s.entered?'bg--entered':''}" id="g-${g.id}">
+      <div class="bg__top"><span class="game__badge badge--${g.type.toLowerCase()}">${g.label}</span><span class="bg__court">Court ${g.court}</span></div>
+      <div class="bg__pairs"><div class="bg__pair bg__pair--us">${g.us}</div><div class="bg__vs">VS</div><div class="bg__pair">${g.them}</div></div>
+      <div class="bg__scores">
+        <div class="bg__side bg__side--us"><div class="bg__lbl">Us</div>
+          <div class="bg__stepper"><button class="bg__step" onclick="bump('${g.id}','us',-1)">−</button><span class="bg__val" id="${g.id}-us">${s.us}</span><button class="bg__step" onclick="bump('${g.id}','us',1)">+</button></div></div>
+        <div class="bg__side"><div class="bg__lbl">Them</div>
+          <div class="bg__stepper"><button class="bg__step" onclick="bump('${g.id}','them',-1)">−</button><span class="bg__val" id="${g.id}-them">${s.them}</span><button class="bg__step" onclick="bump('${g.id}','them',1)">+</button></div></div>
+      </div>
+      <div class="bg__status" id="st-${g.id}">${statusHTML(g.id)}</div>
+    </div>`;
+  }
+  function bump(id, side, d) {
+    if (submitted) { toast('Already submitted'); return; }
+    const s = sc[id];
+    s[side] = Math.max(0, Math.min(21, s[side] + d));
+    document.getElementById(id+'-'+side).textContent = s[side];
+    s.entered = (s.us > 0 || s.them > 0);
+    document.getElementById('g-'+id).classList.toggle('bg--entered', s.entered);
+    document.getElementById('st-'+id).innerHTML = statusHTML(id);
+    refreshScore();
+  }
+  function roundMath(r) {
+    const games = GAMES.filter(g => g.round === r);
+    let gwU = 0, gwT = 0, psU = 0, psT = 0;
+    games.forEach(g => {
+      const s = sc[g.id];
+      if (!s.entered) return;
+      psU += s.us; psT += s.them;
+      if (s.us > s.them) gwU++; else if (s.them > s.us) gwT++;
+    });
+    const complete = games.every(g => sc[g.id].entered && sc[g.id].us !== sc[g.id].them);
+    let mpU = null, mpT = null;
+    if (complete) {
+      if (gwU > gwT) { mpU = 2; mpT = 0; }
+      else if (gwT > gwU) { mpU = 0; mpT = 2; }
+      else { mpU = 1; mpT = 1; }
+    }
+    return { gwU, gwT, psU, psT, mpU, mpT, complete };
+  }
+  function renderMath() {
+    const r1 = roundMath(1), r2 = roundMath(2);
+    const mp = (v) => v === null ? '<span class="math__pending">—</span>' : v;
+    const totU = (r1.mpU || 0) + (r2.mpU || 0);
+    const totT = (r1.mpT || 0) + (r2.mpT || 0);
+    const bothDone = r1.complete && r2.complete;
+    const block = (label, r) => `
+      <div class="math__round">${label}</div>
+      <div class="math__row"><span class="math__label">Games won</span><span class="math__v math__v--us">${r.gwU}</span><span class="math__v">${r.gwT}</span></div>
+      <div class="math__row"><span class="math__label">Points scored</span><span class="math__v math__v--us">${r.psU}</span><span class="math__v">${r.psT}</span></div>
+      <div class="math__row math__row--mp"><span class="math__label">Match points</span><span class="math__v">${mp(r.mpU)}</span><span class="math__v">${mp(r.mpT)}</span></div>`;
+    document.getElementById('math-block').innerHTML = `
+      <div class="math__head"><span class="math__title">Match math</span><span class="math__team">🥒</span><span class="math__team">👑</span></div>
+      ${block('Round 1', r1)}
+      ${block('Round 2', r2)}
+      <div class="math__total"><span class="math__total-label">Total match points</span><span class="math__total-v math__total-v--us">${totU}</span><span class="math__total-v">${totT}</span></div>
+      <div class="math__note">${bothDone ? 'Final — this is what posts to the standings (max 4).' : 'Match points lock in once all 6 games of each round have a winner.'}</div>`;
+  }
+  function refreshScore() {
+    const entered = GAMES.filter(g => sc[g.id].entered).length;
+    document.getElementById('prog-text').textContent = entered + ' / 12';
+    document.getElementById('prog-fill').style.width = (entered/12*100) + '%';
+    renderMath();
+    if (submitted) return;
+    const btn = document.getElementById('submit-btn');
+    if (entered === 12) { btn.disabled = false; btn.textContent = 'Submit scores for confirmation'; }
+    else { btn.disabled = true; btn.textContent = `Enter all 12 games to submit (${entered}/12)`; }
+  }
+  function submitScores() {
+    submitted = true;
+    document.getElementById('submit-btn').style.display = 'none';
+    const me = document.getElementById('appr-me');
+    me.classList.add('approve-card--done');
+    me.querySelector('.approve-card__icon').textContent = '✓';
+    me.querySelector('.approve-card__state').textContent = 'Submitted';
+    const b = document.getElementById('score-banner');
+    b.className = 'banner banner--mine';
+    b.innerHTML = '<b>Scores submitted.</b> Waiting on the Kingpins captain to confirm. They see the same 12 games and tap to approve.';
+    document.getElementById('approve-hint').textContent = 'Demo: confirming the opponent in 2s…';
+    toast('Submitted — sent to opponent');
+    setTimeout(opponentConfirms, 2200);
+  }
+  function opponentConfirms() {
+    const them = document.getElementById('appr-them');
+    them.classList.add('approve-card--done');
+    them.querySelector('.approve-card__icon').textContent = '✓';
+    them.querySelector('.approve-card__state').textContent = 'Confirmed';
+    const b = document.getElementById('score-banner');
+    b.className = 'banner banner--final';
+    b.innerHTML = '<b>✅ Match finalized.</b> Both captains confirmed — results are locked to the Season 1 standings.';
+    document.getElementById('approve-hint').textContent = 'Done. Head back to Schedule for your next match.';
+    document.getElementById('captain-badge').style.display = 'none';
+    toast('Match finalized 🎉');
+  }
+
+  /* ════════ LINEUP ════════ */
+  const LU_GAMES = [
+    { id:'r1g1', round:1, type:'WOMENS', label:"Women's", court:'1' },
+    { id:'r1g2', round:1, type:'MENS',   label:"Men's",   court:'2' },
+    { id:'r1g3', round:1, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r1g4', round:1, type:'MIXED',  label:"Mixed",   court:'2' },
+    { id:'r1g5', round:1, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r1g6', round:1, type:'MIXED',  label:"Mixed",   court:'2' },
+    { id:'r2g1', round:2, type:'WOMENS', label:"Women's", court:'1' },
+    { id:'r2g2', round:2, type:'MENS',   label:"Men's",   court:'2' },
+    { id:'r2g3', round:2, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r2g4', round:2, type:'MIXED',  label:"Mixed",   court:'2' },
+    { id:'r2g5', round:2, type:'MIXED',  label:"Mixed",   court:'1' },
+    { id:'r2g6', round:2, type:'MIXED',  label:"Mixed",   court:'2' },
+  ];
+  const lu = {};
+  LU_GAMES.forEach(g => lu[g.id] = [null, null]);
+  let lineupLocked = false;
+  const MAX_GAMES = 4;
+  function allowedSex(g, i) {
+    if (g.type === 'WOMENS') return 'F';
+    if (g.type === 'MENS') return 'M';
+    return i === 0 ? 'F' : 'M';
+  }
+  function slotReq(g, i) { return allowedSex(g,i)==='F' ? 'Woman' : 'Man'; }
+  function gameCounts() {
+    const c = {}; ROSTER.forEach(p => c[p.id] = 0);
+    LU_GAMES.forEach(g => lu[g.id].forEach(pid => { if(pid) c[pid]++; }));
+    return c;
+  }
+  function renderLineup() {
+    document.getElementById('lineup-rounds').innerHTML = [1,2].map(r => {
+      const games = LU_GAMES.filter(g => g.round === r);
+      const done = games.filter(g => lu[g.id][0] && lu[g.id][1]).length;
+      return `<div class="round" data-lround="${r}">
+        <div class="section-label" style="margin-top:14px"><span>Round ${r}</span><span class="section-label__count"><b style="color:var(--color-lime)">${done}</b>/6 set</span></div>
+        <div>${games.map(luGameHTML).join('')}</div>
+      </div>`;
+    }).join('');
+    renderUsage();
+    refreshLineup();
+  }
+  function luGameHTML(g) {
+    const full = lu[g.id][0] && lu[g.id][1];
+    return `<div class="lu-game ${full?'lu-game--full':''}" id="lu-${g.id}">
+      <div class="lu-game__top"><span class="game__badge badge--${g.type.toLowerCase()}">${g.label}</span><span class="lu-game__court">Court ${g.court}</span></div>
+      <div class="lu-slots">${slotHTML(g,0)}${slotHTML(g,1)}</div>
+    </div>`;
+  }
+  function slotHTML(g, i) {
+    const pid = lu[g.id][i];
+    if (lineupLocked && !pid) return `<div class="lu-slot"><div class="lu-slot__avatar">·</div><span class="lu-slot__empty">—</span></div>`;
+    if (pid) {
+      const p = playerById(pid);
+      return `<div class="lu-slot lu-slot--filled" onclick="openSheet('${g.id}',${i})"><div class="lu-slot__avatar">${initials(p.name)}</div><div style="min-width:0"><div class="lu-slot__name">${p.name}</div></div></div>`;
+    }
+    return `<div class="lu-slot" onclick="openSheet('${g.id}',${i})"><div class="lu-slot__avatar">+</div><div><span class="lu-slot__empty">Add player</span><span class="lu-slot__req">${slotReq(g,i)}</span></div></div>`;
+  }
+  function renderUsage() {
+    const counts = gameCounts();
+    document.getElementById('usage-strip').innerHTML = ROSTER.filter(p=>p.dsr>0).map(p => {
+      const atCap = counts[p.id] >= MAX_GAMES;
+      return `<span class="usage__chip ${atCap?'usage__chip--cap':''}"><span class="usage__dot dot-${p.sex.toLowerCase()}"></span>${p.name.split(' ')[0]}<span class="usage__n">${counts[p.id]}/${MAX_GAMES}</span></span>`;
+    }).join('');
+  }
+  let sheetCtx = null;
+  function openSheet(gameId, slotIdx) {
+    if (lineupLocked) { toast('Lineup locked until reveal'); return; }
+    sheetCtx = { gameId, slotIdx };
+    const g = LU_GAMES.find(x => x.id === gameId);
+    const allow = allowedSex(g, slotIdx);
+    const slotWord = allow==='F' ? 'woman' : 'man';
+    document.getElementById('sheet-title').textContent = `${g.label} · ${allow==='F'?'Woman':'Man'} (player ${slotIdx+1})`;
+    document.getElementById('sheet-sub').textContent = `Needs a ${slotWord} · max ${MAX_GAMES} games per player`;
+    const partner = lu[gameId][slotIdx===0?1:0];
+    const current = lu[gameId][slotIdx];
+    const counts = gameCounts();
+    const rows = ROSTER.filter(p => p.sex === allow && p.dsr>0).map(p => {
+      const isPartner = p.id===partner;
+      const atCap = counts[p.id] >= MAX_GAMES && p.id !== current;
+      const disabled = isPartner || atCap;
+      const tag = p.sex==='F' ? '<span class="pick__tag tag-f">Woman</span>' : '<span class="pick__tag tag-m">Man</span>';
+      const note = isPartner ? 'Already in this game'
+        : atCap ? `At ${MAX_GAMES}-game limit`
+        : (p.id===current ? 'Currently selected' : `${counts[p.id]}/${MAX_GAMES} games`);
+      return `<div class="pick ${disabled?'pick--disabled':''}" onclick="choose('${p.id}')"><div class="pick__avatar">${initials(p.name)}</div><div><div class="pick__name">${p.name}</div><div class="pick__meta">${note}</div></div>${tag}</div>`;
+    }).join('');
+    const clear = current ? `<div class="pick" onclick="choose(null)"><div class="pick__avatar" style="background:var(--color-red-dim)">✕</div><div class="pick__name pick__clear">Clear this slot</div></div>` : '';
+    document.getElementById('sheet-list').innerHTML = rows + clear;
+    document.getElementById('sheet').classList.add('is-open');
+    document.getElementById('sheet-scrim').classList.add('is-open');
+  }
+  function closeSheet() {
+    document.getElementById('sheet').classList.remove('is-open');
+    document.getElementById('sheet-scrim').classList.remove('is-open');
+    sheetCtx = null;
+  }
+  function choose(pid) {
+    if (!sheetCtx) return;
+    lu[sheetCtx.gameId][sheetCtx.slotIdx] = pid;
+    closeSheet();
+    renderLineup();
+  }
+  function refreshLineup() {
+    const set = LU_GAMES.filter(g => lu[g.id][0] && lu[g.id][1]).length;
+    document.getElementById('lu-progress').textContent = `${set} / 12 set`;
+    if (lineupLocked) return;
+    const btn = document.getElementById('lock-btn');
+    if (set === 12) { btn.disabled = false; btn.textContent = 'Lock lineup'; }
+    else { btn.disabled = true; btn.textContent = `Fill all 12 slots to lock (${set}/12)`; }
+  }
+  function lockLineup() {
+    lineupLocked = true;
+    const box = document.getElementById('blind-box');
+    box.className = 'blind blind--locked';
+    box.innerHTML = `<div class="blind__top"><span class="blind__icon">🔒</span><span class="blind__title">Lineup locked · Week 6</span></div>
+      <p class="blind__body">Your pairs are in. <b>Smash Eagles reveal at the same time</b> — you'll both see each other's lineup 30 min before match. Nothing to do until then.</p>`;
+    document.getElementById('lock-btn').style.display = 'none';
+    document.getElementById('lock-hint').textContent = 'Need a change? The league office can unlock before the deadline.';
+    renderLineup();
+    toast('Lineup locked 🔒');
+  }
+
+  /* ════════ CAPTAIN HUB SUB-NAV ════════ */
+  function setCapSection(s) {
+    document.querySelectorAll('#capseg .seg__b').forEach(b=>b.classList.toggle('is-active', b.dataset.cap===s));
+    ['lineup','score','roster'].forEach(name=>{
+      document.getElementById('cap-'+name).classList.toggle('hidden', name!==s);
+    });
+    const screen = document.getElementById('screen');
+    screen.style.scrollSnapType = s === 'score' ? 'y proximity' : '';
+    screen.scrollTop = 0;
+  }
+
+  /* ════════ NAV / UTIL ════════ */
+  function goScore() { switchTab('captain'); setCapSection('score'); }
+  function goLineup() { switchTab('captain'); setCapSection('lineup'); }
+  function switchTab(name) {
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('is-active'));
+    document.getElementById('view-'+name).classList.add('is-active');
+    document.getElementById('tab-'+name).classList.add('is-active');
+    const screen = document.getElementById('screen');
+    screen.style.scrollSnapType = (name==='captain' && !document.getElementById('cap-score').classList.contains('hidden')) ? 'y proximity' : '';
+    screen.scrollTop = 0;
+  }
+  let toastTimer;
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('is-show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(()=>t.classList.remove('is-show'), 1900);
+  }
+  function tick(){ document.getElementById('clock').textContent = new Date().toLocaleTimeString([], {hour:'numeric', minute:'2-digit'}); }
+
+  /* init */
+  tick(); setInterval(tick, 30000);
+  renderDemos();
+  renderLB(); renderRoster(); renderRM();
+  renderScoreSets(); refreshScore();
+  renderLineup();
+  setCapSection('lineup');
+</script>
+</body>
+</html>

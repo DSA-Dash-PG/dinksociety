@@ -3,6 +3,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { normalizeEmail } from './identity.js';
+import { isTestTeam } from './circuit.js';
 
 const COOKIE_NAME = 'ds_captain_session';
 const SESSION_DAYS = 30;
@@ -134,6 +135,29 @@ export async function findTeamByLeaderEmail(email) {
     if (role === 'cocaptain' && !coMatch) coMatch = { team, role };
   }
   return coMatch;
+}
+
+// Scan all teams; return an array of { team, role } for EVERY team this email
+// leads as captain or co-captain. Powers the captain team switcher. Test-season
+// teams are excluded by default so they can't shadow a real team.
+export async function findAllLeaderTeamsByEmail(email, { includeTest = false } = {}) {
+  const norm = normalizeEmail(email) || (email || '').toLowerCase();
+  if (!norm) return [];
+  const store = getStore('teams');
+  const { blobs } = await store.list({ prefix: 'team/' });
+  const out = [];
+  for (const b of blobs) {
+    const team = await store.get(b.key, { type: 'json' }).catch(() => null);
+    if (!team) continue;
+    if (!includeTest && isTestTeam(team)) continue;
+    const role = leaderRole(team, norm);
+    if (role) out.push({ team, role });
+  }
+  // Stable, friendly ordering: captains first, then alphabetical by name.
+  out.sort((a, b) =>
+    (a.role === b.role ? 0 : a.role === 'captain' ? -1 : 1) ||
+    (a.team.name || '').localeCompare(b.team.name || ''));
+  return out;
 }
 
 // ===== Team lookups =====

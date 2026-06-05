@@ -226,7 +226,7 @@
   const TEAM_COLORS = ['#b8ff2c','#17d7b0','#f0c040','#ff7b54','#a78bfa','#f472b6','#60a5fa','#34d399'];
 
   // ── State ────────────────────────────────────────────────────────
-  let standingsData = null, teamsData = null, activeDivision = '', isPreseason = false;
+  let standingsData = null, teamsData = null, activeDivision = '', isPreseason = false, divCount = 0;
 
   // Links carry the current season so navigation stays in context (e.g. test season).
   const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
@@ -255,8 +255,12 @@
     let divs  = standingsData?.divisions
       ? Object.keys(standingsData.divisions).sort()
       : [...new Set((teamsData?.teams || []).map(t => t.division).filter(Boolean))].sort();
+    divCount = divs.length;
     if (!divs.length) { el.innerHTML = ''; return; }
     if (!activeDivision || !divs.includes(activeDivision)) activeDivision = divs[0];
+
+    // Only one active division — it's known, so hide the selector pill entirely
+    if (divs.length < 2) { el.innerHTML = ''; return; }
 
     // Build label map from actual data first (divisionLabel field), fall back to hard-coded map
     const labelMap = {};
@@ -393,12 +397,13 @@
         + (teams.length > spots ? '<span>Top ' + spots + ' advance to playoffs · Bottom ' + (teams.length - spots) + ' play consolation bracket</span>' : '')
         + '</div>';
 
+    // With a single known division, the title is redundant — show only the updated stamp
+    const headerInner = (divCount < 2)
+      ? updatedHtml
+      : '  <h2 class="stand-card__title">' + esc(divLabel) + '</h2>' + updatedHtml;
+
     return '<div class="stand-card">'
-      + '<div class="stand-card__hd">'
-      + '  <h2 class="stand-card__title">' + esc(divLabel) + '</h2>'
-      + (!seasonStarted ? '  <span class="stand-card__sub">Pre-Season</span>' : '')
-      + updatedHtml
-      + '</div>'
+      + (headerInner ? '<div class="stand-card__hd">' + headerInner + '</div>' : '')
       + '<div class="stand-table-wrap">'
       + '<table class="stand-table">'
       + '<thead><tr>'

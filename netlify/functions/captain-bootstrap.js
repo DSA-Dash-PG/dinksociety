@@ -8,7 +8,7 @@ import { requirePlayer, unauthResponse } from './lib/player-auth.js';
 import {
   createSession,
   buildCaptainCookie,
-  findTeamByLeaderEmail,
+  leaderRole,
 } from './lib/captain-auth.js';
 
 export default async (req) => {
@@ -20,20 +20,29 @@ export default async (req) => {
   const ctx = await requirePlayer(req);
   if (!ctx) return unauthResponse();
 
+  // Bind the captain session to the EXACT team this player is on — the same team
+  // the player portal already shows them. We must NOT scan all teams by email and
+  // grab the first captain match: a user who leads more than one team (e.g. a real
+  // season team plus a seeded test-season team) could otherwise be dropped into the
+  // wrong team's captain portal. Their saved lineups would then look "missing"
+  // because drafts are keyed by team id (lineup/<matchId>/<teamId>.json), and the
+  // wrong team has no draft. Resolution order across seasons isn't even stable, so
+  // the same account could land on a different team from one tap to the next.
+  const team = ctx.team;
   const email = ctx.session.email;
-  const found = await findTeamByLeaderEmail(email);
-  if (!found) {
-    // Authenticated, but not a captain or co-captain of any team.
-    return json({ error: 'Not a captain or co-captain' }, 403);
+  const role = leaderRole(team, email);
+  if (!role) {
+    // Authenticated as a player, but not a leader of their own team.
+    return json({ error: 'Not a captain or co-captain of your team' }, 403);
   }
 
-  const sessionId = await createSession(found.team, email);
+  const sessionId = await createSession(team, email);
 
   return new Response(JSON.stringify({
     ok: true,
-    role: found.role,            // 'captain' | 'cocaptain'
-    teamId: found.team.id,
-    teamName: found.team.name,
+    role,                        // 'captain' | 'cocaptain'
+    teamId: team.id,
+    teamName: team.name,
   }), {
     status: 200,
     headers: {

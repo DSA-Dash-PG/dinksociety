@@ -48,6 +48,9 @@
   .appbar__me { display:flex; align-items:center; gap:8px; }
   .appbar__name { font-size:11px; font-weight:700; }
   .appbar__team { font-size:9px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-faint); font-weight:600; }
+  .me-team-switch { background:transparent; border:none; color:var(--color-teal); font-size:9px; letter-spacing:0.06em; text-transform:uppercase; font-weight:700; font-family:inherit; text-align:right; padding:0; margin:0; cursor:pointer; max-width:160px; direction:rtl; }
+  .me-team-switch:focus { outline:none; text-decoration:underline; }
+  .me-team-switch option { direction:ltr; color:var(--color-text); background:var(--color-bg); }
   .appbar__av { width:34px; height:34px; border-radius:50%; background:var(--color-lime-dim); border:1px solid rgba(184,255,44,0.3); display:grid; place-items:center; font-size:13px; font-weight:800; color:var(--color-lime); cursor:pointer; }
 
   .screen { padding:16px 16px calc(86px + env(safe-area-inset-bottom)); }
@@ -329,7 +332,7 @@
     $('app').classList.remove('hidden');
     const p = DATA.profile || {};
     $('me-name').textContent = p.name || 'Player';
-    $('me-team').textContent = ((p.teamName || '') + (p.divisionLabel ? ' · ' + p.divisionLabel : '')) || '—';
+    renderTeamSwitcher();
     $('me-av').textContent = initials(p.name);
     // Captain tab + role label show only for team leaders.
     const isLeader = !!(p.isCaptain || p.isCoCaptain);
@@ -339,6 +342,45 @@
     if (titleEl) titleEl.textContent = p.isCaptain ? 'Captain' : p.isCoCaptain ? 'Co-Captain' : 'Player';
     renderSchedule(); renderStandings(); renderStats(); renderLeaderboard(); renderTeam();
     refreshChatBadge();
+  }
+
+  // ---- team switcher (players rostered on more than one team) ----
+  function renderTeamSwitcher() {
+    const p = DATA.profile || {};
+    const teams = DATA.myTeams || [];
+    const currentId = DATA.currentTeamId || p.teamId;
+    const el = $('me-team');
+    if (teams.length > 1) {
+      const opts = teams.map(t => {
+        const label = (t.name || '') + (t.divisionLabel ? ' · ' + t.divisionLabel : '');
+        return `<option value="${t.id}" ${t.id === currentId ? 'selected' : ''}>${esc(label)}</option>`;
+      }).join('');
+      el.innerHTML = `<select id="me-team-switch" class="me-team-switch" aria-label="Switch team">${opts}</select>`;
+      const sel = $('me-team-switch');
+      sel.value = currentId;
+      sel.addEventListener('change', e => switchPlayerTeam(e.target.value));
+    } else {
+      el.textContent = ((p.teamName || '') + (p.divisionLabel ? ' · ' + p.divisionLabel : '')) || '—';
+    }
+  }
+
+  async function switchPlayerTeam(teamId) {
+    const currentId = DATA.currentTeamId || DATA.profile?.teamId;
+    if (!teamId || teamId === currentId) return;
+    const sel = $('me-team-switch');
+    if (sel) sel.disabled = true;
+    try {
+      const res = await fetch(API + '/player-switch-team', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId }),
+      });
+      if (!res.ok) throw new Error('switch failed');
+      location.reload();
+    } catch (e) {
+      if (sel) sel.disabled = false;
+      renderTeamSwitcher();
+    }
   }
 
   // ---- login submit ----
