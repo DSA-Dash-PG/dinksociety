@@ -51,6 +51,7 @@ export default async (req) => {
   try {
     const regStore = getStore('registrations');
     const momentsStore = getStore('moments');
+    const teamsStore = getStore('teams');
 
     // List all confirmed + pending registrations
     const { blobs: confirmedBlobs } = await regStore.list({ prefix: 'confirmed/' });
@@ -127,6 +128,27 @@ export default async (req) => {
     const labelById = {};
     for (const d of divisionFill) labelById[d.division] = d.label;
 
+    // Current captain lookup, keyed by the registration the team was created from.
+    // Teams are the source of truth for captaincy — the registration blob only
+    // holds the roster as it was at sign-up and is never updated when an admin
+    // reassigns the captain on the Teams page. Without this, Recent Activity
+    // shows whoever registered the team, not the current captain.
+    const captainByRegId = {};
+    try {
+      const { blobs: teamBlobs } = await teamsStore.list({ prefix: 'team/' });
+      const teamRecords = (await Promise.all(
+        teamBlobs.map(b => teamsStore.get(b.key, { type: 'json' }).catch(() => null))
+      )).filter(Boolean);
+      for (const t of teamRecords) {
+        if (!t.registrationId) continue;
+        const flagged = (t.roster || []).find(p => p.isCaptain);
+        const captainName = flagged?.name || t.captainName || t.captain || null;
+        if (captainName) captainByRegId[t.registrationId] = captainName;
+      }
+    } catch (err) {
+      console.error('admin-overview: failed to load teams for captain lookup:', err);
+    }
+
     // Recent 10 registrations sorted desc
     const recent = allRegs
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
@@ -139,7 +161,7 @@ export default async (req) => {
         status: r.status || 'pending',
         createdAt: r.createdAt,
         displayName: r.path === 'team'
-          ? `${r.team?.name || 'Team'} (${r.team?.players?.[0]?.name || '—'})`
+          ? `${r.team?.name || 'Team'} (${captainByRegId[r.id] || r.team?.players?.[0]?.name || '—'})`
           : (r.agent?.name || '—'),
       }));
 
