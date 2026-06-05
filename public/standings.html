@@ -332,28 +332,41 @@
     updatedHtml = updatedHtml || '';
     divLabel = divLabel || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
     const spots = SEASON.playoffSpots;
+
+    // How many weeks of matches have been completed (max across teams).
+    const weeksPlayed = teams.length ? Math.max(0, ...teams.map(t => t.matchesPlayed || 0)) : 0;
+    // The season has "started" once at least one week has been played.
+    const seasonStarted = !preseason && weeksPlayed > 0;
+    // Playoff line only appears at the start of Week 5 (i.e. 4 weeks completed).
+    const showPlayoffLine = !preseason && weeksPlayed >= 4;
+
+    // Before the season starts there is no meaningful ranking — list alphabetically.
+    if (!seasonStarted) {
+      teams = [...teams].sort((a, b) => String(a.teamName).localeCompare(String(b.teamName)));
+    }
+
     let rows = '';
 
     teams.forEach((t, idx) => {
       // Playoff cutline row
-      if (!preseason && idx === spots) {
+      if (showPlayoffLine && idx === spots) {
         rows += '<tr class="cutline-row"><td colspan="12" style="padding:0 8px">'
               + '<div class="cutline-inner">CURRENT PLAYOFF LINE</div></td></tr>';
       }
 
-      const rankCls = idx===0 ? 'col-rank--1' : idx===1 ? 'col-rank--2' : idx===2 ? 'col-rank--3' : '';
-      const rankSym = preseason ? (idx+1) : (idx===0 ? '🥇' : idx===1 ? '🥈' : idx===2 ? '🥉' : idx+1);
+      const rankCls = !seasonStarted ? '' : idx===0 ? 'col-rank--1' : idx===1 ? 'col-rank--2' : idx===2 ? 'col-rank--3' : '';
+      const rankSym = !seasonStarted ? (idx+1) : (idx===0 ? '🥇' : idx===1 ? '🥈' : idx===2 ? '🥉' : idx+1);
 
       const pts      = t.matchPointsFor;
-      const pb       = (preseason || idx===0) ? '—' : (teams[0].matchPointsFor - pts);
+      const pb       = (!seasonStarted || idx===0) ? '—' : (teams[0].matchPointsFor - pts);
       const diff     = t.pointDiff || 0;
-      const diffStr  = preseason ? '—' : (diff===0 ? '0' : diff>0 ? '+'+diff : String(diff));
-      const diffCls  = preseason ? 'col-muted' : diff>0 ? 'col-diff-pos' : diff<0 ? 'col-diff-neg' : '';
+      const diffStr  = !seasonStarted ? '—' : (diff===0 ? '0' : diff>0 ? '+'+diff : String(diff));
+      const diffCls  = !seasonStarted ? 'col-muted' : diff>0 ? 'col-diff-pos' : diff<0 ? 'col-diff-neg' : '';
       const ptsCls   = pts===0 ? 'col-pts col-pts--zero' : 'col-pts';
-      const rds      = preseason ? '—' : (t.matchesPlayed || 0) * 2;
+      const rds      = !seasonStarted ? '—' : (t.matchesPlayed || 0) * 2;
       const badge    = badgeHtml(t.status);
 
-      rows += '<tr class="' + (!preseason && idx===0 ? 'stand-row--leader' : '') + '">'
+      rows += '<tr class="' + (seasonStarted && idx===0 ? 'stand-row--leader' : '') + '">'
         + '<td class="col-rank ' + rankCls + '">' + rankSym + '</td>'
         + '<td class="col-team"><div class="team-cell">'
         + '  <a class="team-name team-name-link" href="' + teamHref(t) + '">'  + esc(t.teamName)  + '</a>'
@@ -372,8 +385,8 @@
         + '</tr>';
     });
 
-    const note = preseason
-      ? '<div class="pts-note">Teams listed in registration order. Stats will populate after Week 1.</div>'
+    const note = !seasonStarted
+      ? '<div class="pts-note">Teams listed alphabetically. Stats will populate after Week 1.</div>'
       : '<div class="pts-note">'
         + '<span><strong>Point System:</strong> Win = 2 pts · Tie = 1 pt · Loss = 0 pts · Max 4 pts per match (2 rounds)</span>'
         + '<span><strong>Tiebreaker:</strong> PTS → GW → Head-to-Head → DIFF</span>'
@@ -383,7 +396,7 @@
     return '<div class="stand-card">'
       + '<div class="stand-card__hd">'
       + '  <h2 class="stand-card__title">' + esc(divLabel) + '</h2>'
-      + (preseason ? '  <span class="stand-card__sub">Pre-Season</span>' : '')
+      + (!seasonStarted ? '  <span class="stand-card__sub">Pre-Season</span>' : '')
       + updatedHtml
       + '</div>'
       + '<div class="stand-table-wrap">'
@@ -430,7 +443,7 @@
       + '  <div class="legend-badge-item"><span class="team-badge team-badge--eliminated">Eliminated</span>Mathematically can’t reach top 4</div>'
       + '</div>'
       + '<div class="legend-tiebreak">'
-      + '  <strong>Playoff visualization</strong> appears once standings reflect at least 2 completed weeks. '
+      + '  <strong>Playoff visualization</strong> appears at the start of Week 5 (after 4 completed weeks). '
       + '  Top 4 seeds advance to the Week 7 playoff bracket; the bottom 2 play a consolation match.'
       + '</div>'
       + '</div>'
