@@ -46,6 +46,7 @@
     /* ── Hero ── */
     .tp-hero { display: flex; align-items: center; gap: var(--space-5); }
     .tp-hero__emoji { font-size: 52px; width: 80px; height: 80px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--color-surface-2); border-radius: var(--radius-md); }
+    .tp-hero__emoji--text { font-size: 28px; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; }
     .tp-hero__body { flex: 1; min-width: 0; }
     .tp-hero__eyebrow { font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--color-teal); margin-bottom: var(--space-2); }
     .tp-hero__name { font-size: clamp(1.7rem, 4vw, 2.6rem); font-weight: 800; text-transform: uppercase; margin: 0 0 var(--space-3); line-height: 1.05; }
@@ -121,6 +122,7 @@
       .tp-card { padding: var(--space-4); }
       .tp-hero { flex-direction: column; align-items: flex-start; gap: var(--space-3); }
       .tp-hero__emoji { width: 64px; height: 64px; font-size: 38px; }
+      .tp-hero__emoji--text { font-size: 22px; }
       .leaders-cols { grid-template-columns: 1fr; }
       .roster-grid { grid-template-columns: 1fr; }
       .snap-grid { grid-template-columns: 1fr 1fr; }
@@ -150,6 +152,7 @@
     const PALETTE = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#84cc16'];
     const avatarColor = name => { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) & 0xffff; return PALETTE[h % PALETTE.length]; };
     const initial = name => (name || '?').charAt(0).toUpperCase();
+    const isTextLogo = v => /[a-z0-9]/i.test(String(v || ''));
 
     /* ─── URL ─────────────────────────────────────────────── */
     const _q = new URLSearchParams(location.search);
@@ -222,7 +225,7 @@
       html += `
         <div class="tp-card">
           <div class="tp-hero">
-            <div class="tp-hero__emoji">${team.emoji || ''}</div>
+            <div class="tp-hero__emoji${isTextLogo(team.emoji) ? ' tp-hero__emoji--text' : ''}"${isTextLogo(team.emoji) && team.color ? ` style="color:${team.color}"` : ''}>${team.emoji || ''}</div>
             <div class="tp-hero__body">
               <div class="tp-hero__eyebrow">Season 1 &mdash; ${esc(divLabel)}</div>
               <h1 class="tp-hero__name">${esc(team.name)}</h1>
@@ -315,31 +318,6 @@
           </div>
         </div>`;
       }
-
-      /* TEAM SNAPSHOT */
-      html += `<div class="tp-card">
-        <div class="tp-card__head"><span class="tp-card__head-icon">📋</span> Team Snapshot</div>
-        <div class="snap-grid">
-          <div class="snap-item">
-            <div class="snap-item__label">Captain</div>
-            <div class="snap-item__val">${captain
-              ? `<a href="/player?team=${teamSlug}&name=${encodeURIComponent(captain.name)}${LINK_SUFFIX}">${esc(captain.name)}</a>`
-              : '—'}</div>
-          </div>
-          <div class="snap-item">
-            <div class="snap-item__label">Co-Captain</div>
-            <div class="snap-item__val">${coCaptain
-              ? `<a href="/player?team=${teamSlug}&name=${encodeURIComponent(coCaptain.name)}${LINK_SUFFIX}">${esc(coCaptain.name)}</a>`
-              : '—'}</div>
-          </div>
-        </div>
-        <hr class="snap-divider" />
-        <div class="snap-meta">
-          <span>👥 ${roster.length} players</span>
-          ${maleCount   ? `<span>♂ ${maleCount}M</span>` : ''}
-          ${femaleCount ? `<span>♀ ${femaleCount}F</span>` : ''}
-        </div>
-      </div>`;
 
       /* TEAM LEADERS */
       if (myP.length) {
