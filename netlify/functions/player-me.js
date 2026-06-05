@@ -1,0 +1,157 @@
+// netlify/functions/player-me.js
+// Authed. Returns everything the player portal needs in one call:
+// profile, my stats, leaderboard (with Player of the Week), team, schedule.
+
+import { getStore } from '@netlify/blobs';
+import { requirePlayer, unauthResponse } from './lib/player-auth.js';
+
+const SLOT_LABEL = {
+  r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
+  r2g1: "R2 · Women's", r2g2: "R2 · Men's", r2g3: 'R2 · Mixed', r2g4: 'R2 · Mixed', r2g5: 'R2 · Mixed', r2g6: 'R2 · Mixed',
+};
+
+export default async (req) => {
+  const ctx = await requirePlayer(req);
+  if (!ctx) return unauthResponse();
+
+  const { playerId, teamId, team, player } = ctx;
+  const circuit = team.circuit || 'I';
+  const division = team.division || null;
+
+  const scheduleStore = getStore('schedule');
+  const lineupStore = getStore('lineups');
+  const statsStore = getStore('player-stats');
+  const standingsStore = getStore('standings');
+  const teamsStore = getStore('teams');
+
+  const [psData, standings] = await Promise.all([
+    statsStore.get(`player-stats/${circuit}.json`, { type: 'json' }).catch(() => null),
+    standingsStore.get(`standings/${circuit}.json`, { type: 'json' }).catch(() => null),
+  ]);
+  const players = psData?.players || {};
+  const myStats = players[playerId] || null;
+
+  // teamId -> division (for tagging leaderboard rows)
+  const teamDiv = new Map();
+  const teamEmoji = new Map();
+  try {
+    const { blobs } = await teamsStore.list({ prefix: 'team/' });
+    for (const b of blobs) {
+      const t = await teamsStore.get(b.key, { type: 'json' }).catch(() => null);
+      if (t?.id) { teamDiv.set(t.id, t.division || null); teamEmoji.set(t.id, t.emoji || null); }
+    }
+  } catch { /* non-fatal */ }
+
+  // ── Leaderboard (ranked by composite) ──
+  const leaderboard = Object.values(players)
+    .filter(p => p.composite != null && p.gamesPlayed > 0)
+    .map(p => ({
+      playerId: p.playerId, name: p.name, teamName: p.teamName || null,
+      division: teamDiv.get(p.teamId) || null, gender: p.gender || null,
+      dsr: Math.round((p.composite || 0) * 10) / 10,
+      w: p.gamesWon || 0, l: p.gamesLost || 0, rankDelta: p.rankDelta ?? null,
+    }))
+    .sort((a, b) => b.dsr - a.dsr)
+    .map((p, i) => ({ ...p, rank: i + 1, me: p.playerId === playerId }));
+
+  // Player of the Week (latest week, gender split)
+  const pow = (standings?.weeklyTopPerformers || [])[0] || null;
+  const powOut = pow ? {
+    week: pow.week,
+    woman: pow.women?.[0] || null,
+    man: pow.men?.[0] || null,
+  } : null;
+
+  // ── Team standing + roster (with DSR) ──
+  let teamStanding = null;
+  if (standings?.divisions?.[division]?.teams) {
+    teamStanding = standings.divisions[division].teams.find(t => t.teamId === teamId) || null;
+  }
+  const roster = (team.roster || []).map(p => ({
+    id: p.id, name: p.name, gender: p.gender || null,
+    dsr: players[p.id]?.composite != null ? Math.round(players[p.id].composite * 10) / 10 : null,
+    me: p.id === playerId,
+  })).sort((a, b) => (b.dsr ?? -1) - (a.dsr ?? -1));
+
+  // ── Schedule (my team's matches) ──
+  const schedule = [];
+  if (division) {
+    for (let w = 1; w <= 12; w++) {
+      const data = await scheduleStore.get(`schedule/${circuit}/${division}/week-${w}.json`, { type: 'json' }).catch(() => null);
+      if (!data?.matches) continue;
+      const mt = data.matches.find(m => m.teamA?.id === teamId || m.teamB?.id === teamId);
+      if (!mt) continue;
+      const home = mt.teamA?.id === teamId;
+      const opp = home ? mt.teamB : mt.teamA;
+      const final = !!mt.finalizedAt;
+      const myMp = home ? (mt.scoreA ?? null) : (mt.scoreB ?? null);
+      const oppMp = home ? (mt.scoreB ?? null) : (mt.scoreA ?? null);
+      let result = null;
+      if (final && myMp != null && oppMp != null) result = myMp > oppMp ? 'W' : myMp < oppMp ? 'L' : 'T';
+
+      // My lineup membership (which games I'm slotted in), if my lineup is locked
+      let myGames = [];
+      let myLocked = false, revealed = false;
+      if (!final) {
+        const [mine, oppLu] = await Promise.all([
+          lineupStore.get(`lineup/${mt.id}/${teamId}.json`, { type: 'json' }).catch(() => null),
+          opp?.id ? lineupStore.get(`lineup/${mt.id}/${opp.id}.json`, { type: 'json' }).catch(() => null) : null,
+        ]);
+        myLocked = !!mine?.lockedAt;
+        revealed = myLocked && !!oppLu?.lockedAt;
+        if (mine?.games) {
+          for (const [slot, g] of Object.entries(mine.games)) {
+            if (g && (g.p1 === playerId || g.p2 === playerId)) myGames.push(SLOT_LABEL[slot] || slot);
+          }
+        }
+      }
+
+      schedule.push({
+        matchId: mt.id, week: w,
+        opponent: { id: opp?.id || null, name: opp?.name || 'TBD', emoji: teamEmoji.get(opp?.id) || null },
+        home, court: mt.court || null, scheduledAt: mt.scheduledAt || null,
+        championship: !!mt.championship,
+        final, myMp, oppMp, result,
+        myLocked, revealed, myGames,
+        status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
+      });
+    }
+  }
+  schedule.sort((a, b) => a.week - b.week);
+
+  return json({
+    profile: {
+      playerId, name: player.name, gender: player.gender || null,
+      teamId, teamName: team.name, teamEmoji: team.emoji || null,
+      division, divisionLabel: team.divisionLabel || division, circuit,
+    },
+    stats: myStats,
+    partnerNames: partnerNames(myStats, players),
+    leaderboard,
+    pow: powOut,
+    team: {
+      standing: teamStanding,
+      roster,
+    },
+    schedule,
+  });
+};
+
+function partnerNames(myStats, players) {
+  const out = {};
+  if (myStats?.partners) {
+    for (const pid of Object.keys(myStats.partners)) {
+      const p = players[pid];
+      if (p) out[pid] = { name: p.name, teamName: p.teamName || null };
+    }
+  }
+  return out;
+}
+
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
+  });
+}
+
+export const config = { path: '/.netlify/functions/player-me' };
