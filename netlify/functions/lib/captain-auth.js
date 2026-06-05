@@ -2,6 +2,7 @@
 // Magic-link auth for captains. No Supabase dependency.
 
 import { getStore } from '@netlify/blobs';
+import { normalizeEmail } from './identity.js';
 
 const COOKIE_NAME = 'ds_captain_session';
 const SESSION_DAYS = 30;
@@ -86,13 +87,53 @@ export async function requireCaptain(req) {
 
   const team = await getTeamById(session.teamId);
   if (!team) return null;
-  if ((team.captainEmail || '').toLowerCase() !== session.email) return null;
+  // A "team leader" is the captain (team.captainEmail) OR a roster member flagged
+  // isCaptain / isCoCaptain. Co-captains reach the captain portal via the player
+  // login + captain-bootstrap SSO bridge, so they must pass this guard too.
+  const role = leaderRole(team, session.email);
+  if (!role) return null;
 
   return {
     session: { id: sessionId, email: session.email },
     team,
-    user: { email: session.email },
+    user: { email: session.email, role },
   };
+}
+
+// ===== Team leadership =====
+// Returns 'captain' | 'cocaptain' | null for the given email on a team.
+export function leaderRole(team, email) {
+  const norm = normalizeEmail(email) || (email || '').toLowerCase();
+  if (!team || !norm) return null;
+  if ((team.captainEmail || '').toLowerCase() === norm) return 'captain';
+  const entry = (team.roster || []).find(p =>
+    (p.normalizedEmail && p.normalizedEmail === norm) ||
+    ((p.email || '').toLowerCase() === norm)
+  );
+  if (entry) {
+    if (entry.isCaptain) return 'captain';
+    if (entry.isCoCaptain) return 'cocaptain';
+  }
+  return null;
+}
+
+// Scan all teams; return { team, role } for the team this email leads.
+// Prefers a 'captain' match over a 'cocaptain' match if the email leads more
+// than one team in different capacities.
+export async function findTeamByLeaderEmail(email) {
+  const norm = normalizeEmail(email) || (email || '').toLowerCase();
+  if (!norm) return null;
+  const store = getStore('teams');
+  const { blobs } = await store.list({ prefix: 'team/' });
+  let coMatch = null;
+  for (const b of blobs) {
+    const team = await store.get(b.key, { type: 'json' }).catch(() => null);
+    if (!team) continue;
+    const role = leaderRole(team, norm);
+    if (role === 'captain') return { team, role };
+    if (role === 'cocaptain' && !coMatch) coMatch = { team, role };
+  }
+  return coMatch;
 }
 
 // ===== Team lookups =====

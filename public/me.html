@@ -276,6 +276,10 @@
         <span>Chat</span>
         <span class="nb__badge" id="chat-badge">0</span>
       </button>
+      <button class="nb" data-tab="captain" id="nb-captain" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9H21l-5.4 4 2.1 6.9L12 15.8 6.3 19.8l2.1-6.9L3 8.9h6.6z"/></svg>
+        <span>Captain</span>
+      </button>
     </nav>
   </div>
 
@@ -327,6 +331,12 @@
     $('me-name').textContent = p.name || 'Player';
     $('me-team').textContent = ((p.teamName || '') + (p.divisionLabel ? ' · ' + p.divisionLabel : '')) || '—';
     $('me-av').textContent = initials(p.name);
+    // Captain tab + role label show only for team leaders.
+    const isLeader = !!(p.isCaptain || p.isCoCaptain);
+    const capBtn = $('nb-captain');
+    if (capBtn) capBtn.style.display = isLeader ? '' : 'none';
+    const titleEl = document.querySelector('.appbar__title');
+    if (titleEl) titleEl.textContent = p.isCaptain ? 'Captain' : p.isCoCaptain ? 'Co-Captain' : 'Player';
     renderSchedule(); renderStandings(); renderStats(); renderLeaderboard(); renderTeam();
     refreshChatBadge();
   }
@@ -357,12 +367,36 @@
   // ---- tabs ----
   document.querySelectorAll('.nb').forEach(b => b.addEventListener('click', () => {
     const t = b.dataset.tab;
+    if (t === 'captain') { openCaptainTools(b); return; }  // SSO bridge — navigates away
     document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
     document.querySelectorAll('.nb').forEach(x => x.classList.toggle('is-active', x === b));
     $('v-' + t).classList.add('is-active');
     window.scrollTo(0, 0);
     if (t === 'chat') loadChat();
   }));
+
+  // ---- captain SSO bridge ----
+  // Mint a captain session from the current player session, then open the
+  // captain portal. Works for captains AND co-captains — no second login.
+  let capOpening = false;
+  async function openCaptainTools(btn) {
+    if (capOpening) return;
+    capOpening = true;
+    const lbl = btn.querySelector('span:not(.nb__badge)');
+    const orig = lbl ? lbl.textContent : '';
+    if (lbl) lbl.textContent = 'Opening…';
+    try {
+      const res = await fetch(API + '/captain-bootstrap', { method: 'POST', credentials: 'include' });
+      if (res.ok) { location.href = '/captain.html'; return; }
+      if (res.status === 401) { location.href = '/me.html'; return; }
+      alert('Captain access not found for your account. If this looks wrong, ask the league office.');
+    } catch (e) {
+      alert('Could not open captain tools — please try again.');
+    } finally {
+      if (lbl) lbl.textContent = orig;
+      capOpening = false;
+    }
+  }
 
   // ---- schedule ----
   const MATCH_START_TIME = '7:00 PM';   // single start time for all matches

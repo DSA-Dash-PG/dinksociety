@@ -19,6 +19,11 @@ export default async (req) => {
   const circuit = circuitCode(team.circuit);
   const division = team.division || null;
 
+  // Is this player a team leader? Drives the Captain tab in the portal.
+  const myEmail = player.normalizedEmail || (player.email || '').toLowerCase() || null;
+  const isCaptain = !!player.isCaptain || (!!myEmail && (team.captainEmail || '').toLowerCase() === myEmail);
+  const isCoCaptain = !!player.isCoCaptain && !isCaptain;
+
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
   const statsStore = getStore('player-stats');
@@ -125,6 +130,7 @@ export default async (req) => {
       playerId, name: player.name, gender: player.gender || null,
       teamId, teamName: team.name, teamEmoji: team.emoji || null,
       division, divisionLabel: team.divisionLabel || division, circuit,
+      isCaptain, isCoCaptain,
     },
     stats: myStats,
     partnerNames: partnerNames(myStats, players),
