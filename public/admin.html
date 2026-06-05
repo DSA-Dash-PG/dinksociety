@@ -322,6 +322,26 @@
     <div class="mob-bar"><span class="mob-bar__brand">Admin</span><button class="mob-bar__ham" id="mob-ham" aria-label="Menu">☰</button></div>
     <div class="mob-overlay" id="mob-overlay"></div>
 
+    <!-- Mobile quick-access bottom nav (phones only; full menu via the ☰ top bar) -->
+    <nav class="am-bottomnav" id="am-bottomnav">
+      <button class="am-bn is-active" data-bn="schedule">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>Schedule</span>
+      </button>
+      <button class="am-bn" data-bn="teams">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+        <span>Trades</span>
+      </button>
+      <button class="am-bn" data-bn="scores">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        <span>Score</span>
+      </button>
+      <button class="am-bn" data-bn="messages">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>Messages</span>
+      </button>
+    </nav>
+
     <div class="admin-shell">
       <aside class="sb" id="sb">
         <div class="sb__brand"><div class="sb__logo">The Dink Society</div><div class="sb__tag">Admin Portal</div></div>
@@ -1584,6 +1604,19 @@
 
   $id('mob-ham')?.addEventListener('click', () => { $id('sb').classList.toggle('is-open'); $id('mob-overlay').classList.toggle('is-open'); });
   $id('mob-overlay')?.addEventListener('click', () => { $id('sb').classList.remove('is-open'); $id('mob-overlay').classList.remove('is-open'); });
+
+  // Mobile bottom nav → drive the existing sidebar tabs
+  (function wireAdminBottomNav() {
+    const nav = $id('am-bottomnav');
+    if (!nav) return;
+    nav.querySelectorAll('.am-bn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        nav.querySelectorAll('.am-bn').forEach(b => b.classList.toggle('is-active', b === btn));
+        const link = document.querySelector('.sb__link[data-tab="' + btn.dataset.bn + '"]');
+        if (link) link.click();
+      });
+    });
+  })();
   $id('sign-out-btn')?.addEventListener('click', async () => {
     try { await api('/.netlify/functions/admin-logout', { method: 'POST' }); } catch (e) {}
     window.location.reload();
@@ -3094,5 +3127,24 @@
   checkAuth();
 })();
 </script>
+
+<style>
+  /* Admin mobile bottom nav — phones only */
+  .am-bottomnav { display: none; }
+  @media (max-width: 860px) {
+    #admin-shell { padding-bottom: 78px; }
+    .am-bottomnav {
+      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
+      background: rgba(18,18,18,0.97); backdrop-filter: blur(12px);
+      border-top: 1px solid var(--color-border);
+      padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
+    }
+    .am-bn { flex: 1; background: none; border: none; cursor: pointer; font-family: inherit; position: relative;
+      display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0; color: var(--color-text-faint); }
+    .am-bn.is-active { color: var(--color-lime); }
+    .am-bn svg { width: 22px; height: 22px; }
+    .am-bn span { font-size: 10px; font-weight: 700; }
+  }
+</style>
 </body>
 </html>
