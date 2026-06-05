@@ -1271,7 +1271,7 @@
           ${upcoming.map(m => `
             <div class="cap-hero__sched-row">
               <div class="cap-hero__week-num">W${m.week}</div>
-              <div>vs ${escapeHtml(m.opponent.name)} <span class="cap-hero__sched-detail">${m.court ? '· ' + escapeHtml(m.court) : ''} ${m.scheduledAt ? '· ' + formatDateShort(m.scheduledAt) : ''}</span></div>
+              <div>vs ${escapeHtml(m.opponent.name)} <span class="cap-hero__sched-detail">${m.court ? '· ' + escapeHtml(m.court) : ''} ${m.scheduledAt ? '· ' + formatDateShort(m.scheduledAt) : ''} · ${m.startTime || MATCH_START_TIME}</span></div>
               <div class="cap-hero__sched-status">Locked when ready</div>
             </div>
           `).join('')}
@@ -1359,6 +1359,7 @@
       if (isNaN(d)) return '';
       return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     }
+    const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
 
     // ===== Match detail / lineup builder =====
     async function openMatch(matchId, opts) {
@@ -1523,11 +1524,11 @@
 
       container.innerHTML = `
         <div class="lineup-round">
-          <h3 class="lineup-round__title">Round 1 &mdash; Home serves first · Away chooses side</h3>
+          <h3 class="lineup-round__title">Round 1 &mdash; Home team serves first · Away team chooses side</h3>
           ${['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6'].map(renderGame).join('')}
         </div>
         <div class="lineup-round">
-          <h3 class="lineup-round__title">Round 2 &mdash; Home chooses side · Away serves first</h3>
+          <h3 class="lineup-round__title">Round 2 &mdash; Home team chooses side · Away team serves first</h3>
           ${['r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'].map(renderGame).join('')}
         </div>
       `;
@@ -1654,8 +1655,8 @@
 
       const renderRound = (round) => {
         const serveNote = round === 1
-          ? 'Home serves first &middot; Away chooses side'
-          : 'Home chooses side &middot; Away serves first';
+          ? 'Home team serves first &middot; Away team chooses side'
+          : 'Home team chooses side &middot; Away team serves first';
 
         const pairSts = (c.pairStatuses || []).filter(p => p.round === round);
 
@@ -1934,6 +1935,7 @@
 
       const meta = [
         next.scheduledAt ? formatDateShort(next.scheduledAt) : null,
+        next.startTime || MATCH_START_TIME,
         next.court,
       ].filter(Boolean).join(' · ');
 

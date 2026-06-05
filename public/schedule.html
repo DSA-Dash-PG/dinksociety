@@ -133,6 +133,18 @@
       display: flex; align-items: center; gap: 6px;
     }
     .court-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+    .match-time { margin-left: auto; font-weight: 700; color: var(--color-text); letter-spacing: 0.02em; text-transform: none; }
+
+    .match-serve {
+      font-size: 10px; line-height: 1.35; color: var(--color-text-faint);
+      padding: 8px 12px; border-top: 1px dashed var(--color-divider);
+    }
+    .match-serve b { color: var(--color-text); font-weight: 700; }
+    .match-serve .serve-tag {
+      display: inline-block; font-size: 9px; font-weight: 800; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--color-lime);
+      background: rgba(198,255,58,0.12); padding: 1px 5px; border-radius: 4px; margin-right: 5px;
+    }
 
     .match-teams {
       padding: 12px; display: flex; align-items: center;
@@ -209,6 +221,7 @@
     /* ── Constants ───────────────────────────────────────────────── */
     const SEASON_START = new Date('2026-06-08T00:00:00');
     const TOTAL_WEEKS  = 8;
+    const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
     const COURT_COLORS = ['#4a7c9e', '#7c4a9e', '#9e7c4a'];
     const DIV_LABELS   = { '3-0-mixed': '3.0 Mixed', '3-5-mixed': '3.0–3.5 Mixed', '3.0M': '3.0 Mixed', '3.5M': '3.0–3.5 Mixed' };
 
@@ -299,7 +312,7 @@
               <div class="week-left">
                 <span class="week-num">Week ${n}</span>
                 <span class="week-date-text">${formatWeekDate(n, weeksData)}</span>
-                <span class="week-time-text">7:00–9:00 PM</span>
+                <span class="week-time-text">Matches start ${MATCH_START_TIME}</span>
               </div>
               <div class="week-right">
                 <span class="${badgeCls}">${badgeTxt}</span>
@@ -337,10 +350,16 @@
           </div>`;
         }
 
+        // Round 1 serving rule (teamA = home, teamB = away). Hidden once final or teams TBD.
+        const serveRow = (!isFinal && !isTbd)
+          ? `<div class="match-serve"><span class="serve-tag">R1 Serve</span><b>${esc(teamAName)}</b> serves first · <b>${esc(teamBName)}</b> chooses side</div>`
+          : '';
+
         return `
           <div class="match-entry${isFinal ? ' is-final' : ''}">
             <div class="match-court">
               <span class="court-dot" style="background:${color}"></span>${court}
+              <span class="match-time">${m.startTime || MATCH_START_TIME}</span>
             </div>
             <div class="match-teams">
               <div class="match-team">
@@ -351,6 +370,7 @@
                 ${teamLink(teamBName, m.teamBId, 'match-team-name' + (isFinal && m.awayRoundPts > m.homeRoundPts ? ' is-winner' : '') + (isTbd ? ' is-tbd' : ''))}
               </div>
             </div>
+            ${serveRow}
           </div>`;
       }).join('')}</div>`;
     }

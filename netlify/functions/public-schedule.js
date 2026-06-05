@@ -49,6 +49,7 @@ export default async (req) => {
             courtB: m.courtB ?? null,
             courtSet: m.courtSet ?? null,
             scheduledAt: m.scheduledAt || null,
+            startTime: m.startTime || null,
             scoreA: m.scoreA ?? null,
             scoreB: m.scoreB ?? null,
             // schedule.html renders finals from homeRoundPts/awayRoundPts
@@ -88,6 +89,7 @@ export default async (req) => {
           court: m.court || null,
           date: m.date || null,
           scheduledAt: m.scheduledAt || null,
+          startTime: m.startTime || null,
           status: m.status || 'scheduled',
           division: m.division,
           divisionLabel: m.divisionLabel || '',

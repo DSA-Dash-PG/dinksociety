@@ -128,6 +128,7 @@ export default async (req) => {
         courtB: m.courtB ?? null,
         courtSet: m.courtSet ?? null,
         scheduledAt: m.scheduledAt || null,
+        startTime: m.startTime || null,
         home: { id: homeId, name: m.teamA?.name },
         away: { id: awayId, name: m.teamB?.name },
         lineup: { homeLocked, awayLocked, revealed },

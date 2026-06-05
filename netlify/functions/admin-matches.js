@@ -73,6 +73,7 @@ export default async (req) => {
       courtA, courtB,
       court: (courtA && courtB) ? `Courts ${courtA} & ${courtB}` : null,
       scheduledAt: body.scheduledAt || null,
+      startTime: body.startTime || null,   // optional per-match override; blank = season default
       scoreA: null, scoreB: null, playedAt: null,
     };
     data.matches = [...(data.matches || []), match];
@@ -88,7 +89,7 @@ export default async (req) => {
     if (!matchId) return json({ error: 'matchId required' }, 400);
 
     const body = await req.json();
-    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'venue', 'notes'];
+    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'venue', 'notes'];
     const updates = {};
     for (const f of allowedFields) {
       if (f in body) updates[f] = body[f];

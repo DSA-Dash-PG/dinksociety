@@ -59,6 +59,7 @@ export default async (req) => {
           championship: !!m.championship,
           venue: m.venue || null,
           scheduledAt: m.scheduledAt || null,
+          startTime: m.startTime || null,
           myRole,
           myTeam: { id: teamId, name: ctx.team.name, emoji: myEmoji },
           opponent: {

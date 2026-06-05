@@ -1295,7 +1295,7 @@
       '</div>' +
       '<div class="arow">' +
         '<div class="af"><label>Total weeks</label><input type="number" id="se-weeks" min="1" max="52" value="' + h(s.weeks != null ? s.weeks : 8) + '"></div>' +
-        '<div class="af"><label>Match time</label><input type="text" id="se-match-time" value="' + h(s.matchTime || '7:00–9:00 PM') + '" placeholder="e.g. 7:00–9:00 PM" autocomplete="off"></div>' +
+        '<div class="af"><label>Match start time</label><input type="text" id="se-match-time" value="' + h(s.matchTime || '7:00 PM') + '" placeholder="e.g. 7:00 PM" autocomplete="off"></div>' +
       '</div>' +
       '<div class="arow">' +
         '<div class="af"><label>Rounds per match</label><input type="number" id="se-rounds" min="1" max="4" value="' + h(s.roundsPerMatch != null ? s.roundsPerMatch : 2) + '"></div>' +
@@ -1406,7 +1406,7 @@
           depositAmount: parseFloat($id('se-deposit').value) || 0,
           balanceDueDate: $id('se-balance-due').value || null,
           weeks: parseInt($id('se-weeks').value) || 8,
-          matchTime: $id('se-match-time').value.trim() || '7:00–9:00 PM',
+          matchTime: $id('se-match-time').value.trim() || '7:00 PM',
           roundsPerMatch: parseInt($id('se-rounds').value) || 2,
           gamesPerRound: parseInt($id('se-games').value) || 6,
           maxRosterSize: parseInt($id('se-max-roster').value) || 10,
@@ -2810,12 +2810,14 @@
         const fin = m.finalizedAt;
         const ca = m.courtA != null ? m.courtA : '';
         const cb = m.courtB != null ? m.courtB : '';
-        return '<div class="mr"><div class="mr__t">' + h(m.teamA.name) + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(m.teamB.name) + '</div><div class="mr__m">' + h(m.court || '') + (fin ? ' · <span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '') + '<br><span style="font-size:9px">' + dt + '</span></div></div>' +
+        const effTime = m.startTime || '7:00 PM';
+        return '<div class="mr"><div class="mr__t">' + h(m.teamA.name) + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(m.teamB.name) + '</div><div class="mr__m">' + h(m.court || '') + ' · ' + h(effTime) + (m.startTime ? '' : ' <span style="opacity:0.5">(default)</span>') + (fin ? ' · <span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '') + '<br><span style="font-size:9px">' + dt + '</span></div></div>' +
           '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);flex-wrap:wrap;">' +
             '<span>Courts (A: games 1·3·5, B: games 2·4·6):</span>' +
             '<input type="number" min="1" max="20" value="' + h(String(ca)) + '" id="ct-A-' + h(m.id) + '" style="' + inStyle + '">' +
             '<span>&amp;</span>' +
             '<input type="number" min="1" max="20" value="' + h(String(cb)) + '" id="ct-B-' + h(m.id) + '" style="' + inStyle + '">' +
+            '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;">Start time <input type="text" id="st-' + h(m.id) + '" value="' + h(m.startTime || '') + '" placeholder="7:00 PM" style="width:84px;padding:3px 6px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-family:inherit;font-size:12px;"></label>' +
             '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="champ-' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
             '<button class="ab ab--outline ab--sm court-save" data-mid="' + h(m.id) + '">Save</button>' +
             '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups (both)</button>' +
@@ -2834,9 +2836,11 @@
         btn.disabled = true; if (stat) { stat.textContent = 'Saving…'; stat.style.color = 'var(--color-text-faint)'; }
         try {
           const champ = !!($id('champ-' + mid) && $id('champ-' + mid).checked);
+          const stEl = $id('st-' + mid);
+          const st = stEl ? (stEl.value || '').trim() : '';
           await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(mid), {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ courtA: a, courtB: b, court: 'Courts ' + a + ' & ' + b, championship: champ }),
+            body: JSON.stringify({ courtA: a, courtB: b, court: 'Courts ' + a + ' & ' + b, championship: champ, startTime: st || null }),
           });
           if (stat) { stat.textContent = 'Saved ✓'; stat.style.color = 'var(--color-teal)'; }
         } catch (e) {

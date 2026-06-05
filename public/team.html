@@ -65,6 +65,7 @@
     .sched-opp__emoji { margin-right: 5px; }
     .sched-score { font-size: 12px; font-weight: 700; color: var(--color-text-muted); font-variant-numeric: tabular-nums; flex-shrink: 0; }
     .sched-date { font-size: 11px; color: var(--color-text-faint); flex-shrink: 0; }
+    .sched-serve { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; color: #ffb02e; background: rgba(255,176,46,0.12); padding: 2px 6px; border-radius: 4px; flex-shrink: 0; }
     .sched-result { font-size: 11px; font-weight: 800; padding: 3px 9px; border-radius: 4px; flex-shrink: 0; }
     .sched-result--w { color: #22c55e; background: rgba(34,197,94,.14); }
     .sched-result--l { color: #ef4444; background: rgba(239,68,68,.14); }
@@ -163,6 +164,7 @@
     const pct  = (won, played) => played ? Math.round(won / played * 100) : 0;
     const sign = n => n > 0 ? `+${n}` : String(n);
     const fmtDate = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); };
+    const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
 
     const PALETTE = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#84cc16'];
     const avatarColor = name => { let h = 0; for (const c of String(name)) h = (h * 31 + c.charCodeAt(0)) & 0xffff; return PALETTE[h % PALETTE.length]; };
@@ -283,13 +285,18 @@
             resultHtml = `<span class="sched-result sched-result--${r}">${r.toUpperCase()}</span>`;
             rightHtml  = `<span class="sched-score">${myScore}–${oppScore}</span>`;
           } else {
-            rightHtml = `<span class="sched-date">${fmtDate(m.scheduledAt) || 'TBD'}</span>`;
+            const dstr = fmtDate(m.scheduledAt);
+            rightHtml = `<span class="sched-date">${dstr ? dstr + ' · ' : ''}${m.startTime || MATCH_START_TIME}</span>`;
           }
+
+          // Round 1 serve indicator (home serves first); shown on upcoming rows only
+          const serveHtml = isPlayed ? '' :
+            `<span class="sched-serve" title="${isHome ? 'Round 1: you serve first, opponent chooses side' : 'Round 1: opponent serves first, you choose side'}">${isHome ? 'Serve R1' : 'Receive R1'}</span>`;
 
           html += `<div class="sched-row ${isPlayed ? '' : 'sched-row--upcoming'}">
             <span class="sched-wk">WK ${m.week}</span>
             <a href="${oppHref}" class="sched-opp"><span class="sched-opp__emoji">${oppEmoji}</span>vs ${esc(oppName)}</a>
-            ${rightHtml}${resultHtml}
+            ${serveHtml}${rightHtml}${resultHtml}
           </div>`;
         });
         html += `</div>`;

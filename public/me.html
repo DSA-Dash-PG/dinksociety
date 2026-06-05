@@ -65,6 +65,10 @@
   .next__team { flex:1; text-align:center; } .next__emoji { font-size:30px; } .next__tn { font-size:13px; font-weight:700; margin-top:3px; }
   .next__vs { font-size:11px; font-weight:800; color:var(--color-text-faint); }
   .next__meta { font-size:11px; color:var(--color-text-muted); text-align:center; margin-bottom:12px; }
+  .next__serve { background:rgba(255,176,46,0.10); border:1px solid rgba(255,176,46,0.28); border-radius:var(--radius-sm); padding:9px 12px; font-size:11px; color:var(--color-text-muted); margin-bottom:12px; text-align:center; }
+  .next__serve b { color:#ffb02e; }
+  .m__serve { font-size:10px; color:var(--color-text-faint); margin-top:6px; }
+  .m__serve b { color:var(--color-text); }
   .next__you { background:rgba(0,0,0,0.25); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:10px 12px; font-size:11px; }
   .next__you b { color:var(--color-lime); }
   .next__games { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
@@ -330,6 +334,7 @@
   }));
 
   // ---- schedule ----
+  const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
   function renderSchedule() {
     const sch = DATA.schedule || [], me = DATA.profile;
     const upcoming = sch.filter(m => !m.final);
@@ -341,7 +346,13 @@
       const homeEmoji = next.home ? me.teamEmoji : next.opponent.emoji;
       const awayName = next.home ? next.opponent.name : me.teamName;
       const awayEmoji = next.home ? next.opponent.emoji : me.teamEmoji;
-      const when = next.scheduledAt ? new Date(next.scheduledAt).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : 'Time TBD';
+      const whenDate = next.scheduledAt ? new Date(next.scheduledAt).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }) : null;
+      const startT = next.startTime || MATCH_START_TIME;
+      const when = whenDate ? `${whenDate} · ${startT}` : `${startT} · date TBD`;
+      // Round 1 serving rule, personalized (home serves first, away chooses side)
+      const serveBlock = next.home
+        ? `<div class="next__serve"><b>Round 1:</b> You serve first · opponent chooses side</div>`
+        : `<div class="next__serve"><b>Round 1:</b> Opponent serves first · you choose side</div>`;
       const youBlock = next.revealed && next.myGames.length
         ? `<div class="next__you">You're in the lineup — <b>${next.myGames.length} game${next.myGames.length===1?'':'s'}</b>:<div class="next__games">${next.myGames.map(g=>'<span class="gtag">'+esc(g)+'</span>').join('')}</div></div>`
         : next.myLocked
@@ -355,6 +366,7 @@
           <div class="next__team"><div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div></div>
         </div>
         <div class="next__meta">${esc(next.court||'Court TBD')} · ${esc(when)}${next.championship?' · 🏆':''}</div>
+        ${serveBlock}
         ${youBlock}
       </div>`;
     }
@@ -384,7 +396,10 @@
     } else {
       pill = m.status === 'live' ? '<span class="m__pill pill-live">Live</span>' : m.myLocked ? '<span class="m__pill pill-final">Lineup set</span>' : '<span class="m__pill pill-up">Upcoming</span>';
       center = '<div class="m__vs">VS</div>';
-      if (m.court || dt) foot = `<div class="m__foot">${esc([m.court, dt].filter(Boolean).join(' · '))}</div>`;
+      const serveLine = m.home
+        ? `<div class="m__serve"><b>R1:</b> you serve · opponent picks side</div>`
+        : `<div class="m__serve"><b>R1:</b> opponent serves · you pick side</div>`;
+      foot = `<div class="m__foot">${esc([m.court, dt, (m.startTime || MATCH_START_TIME)].filter(Boolean).join(' · '))}${serveLine}</div>`;
     }
     return `<div class="m"><div class="m__top"><span class="m__wk">WEEK ${m.week}</span>${pill}</div>
       <div class="m__body">
