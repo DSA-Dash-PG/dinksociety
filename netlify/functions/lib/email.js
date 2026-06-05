@@ -96,6 +96,31 @@ export function renderCaptainMessageNotify({ teamName, captainName, body, adminU
 }
 
 /**
+ * Render a team-chat notification email. Sent to a teammate when another
+ * player posts in their team's group chat.
+ * @param {{ teamName:string, authorName:string, body:string, portalUrl:string }} opts
+ */
+export function renderTeamChatNotify({ teamName, authorName, body, portalUrl }) {
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 24px;">THE DINK SOCIETY</div>
+      <h1 style="font-size: 20px; font-weight: 800; color: #f5f5f5; margin: 0 0 6px;">New message in ${escapeBody(teamName)} chat</h1>
+      <p style="font-size: 13px; color: #8a8a8a; margin: 0 0 20px;">${escapeBody(authorName || 'A teammate')}</p>
+      <div style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 24px; padding: 16px; background: #161616; border-radius: 8px;">${escapeBody(body)}</div>
+      <a href="${portalUrl}" style="display: inline-block; padding: 12px 28px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
+        Open team chat
+      </a>
+      <p style="font-size: 13px; color: #777; margin-top: 24px; line-height: 1.5;">
+        Only your teammates can see this conversation. Reply in your player portal.
+      </p>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        Sent to ${escapeBody(teamName)} · The Dink Society · Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Render the PLAYER magic-link sign-in email.
  * @param {string} magicUrl - The full magic link URL
  * @param {string} playerName - The player's name
