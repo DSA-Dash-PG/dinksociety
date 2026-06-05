@@ -217,7 +217,15 @@ export async function rebuildStandings(circuit) {
     const teams = Array.from(divisionBuckets[div].teams.values());
     if (teams.length === 0) continue;
 
-    teams.sort(standingsComparator);
+    // Before any matches are played there is no meaningful ranking, so order
+    // teams alphabetically. Every consumer (public standings page + player/
+    // captain portal) reads this same sorted array, so the order stays in sync.
+    const anyPlayed = teams.some(t => (t.matchesPlayed || 0) > 0);
+    if (anyPlayed) {
+      teams.sort(standingsComparator);
+    } else {
+      teams.sort((a, b) => String(a.teamName).localeCompare(String(b.teamName)));
+    }
 
     // Apply placement bonus based on sorted position (projected until Circuit done)
     teams.forEach((t, idx) => {

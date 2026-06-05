@@ -51,11 +51,19 @@
       border-radius: var(--radius-full); padding: 5px 12px; font-size: 11px;
       font-weight: 600; color: var(--color-text-muted); white-space: nowrap;
       display: flex; align-items: center; gap: 5px; flex-shrink: 0;
+      cursor: pointer; transition: all var(--transition);
     }
+    .date-pill:hover { border-color: var(--color-border-strong); color: var(--color-text); }
     .date-pill .wk { font-size: 9px; color: var(--color-text-faint); font-weight: 700; letter-spacing: 0.08em; }
     .date-pill.is-next { border-color: var(--color-lime); color: var(--color-lime); background: var(--color-lime-ghost); }
     .date-pill.is-next .wk { color: var(--color-lime-active); }
     .date-pill.is-past { opacity: 0.4; }
+    .date-pill.is-past:hover { opacity: 0.7; }
+    .date-pill.is-selected {
+      border-color: var(--color-lime); color: var(--color-bg);
+      background: var(--color-lime); opacity: 1;
+    }
+    .date-pill.is-selected .wk { color: var(--color-bg); opacity: 0.7; }
 
     /* ── Toolbar ─────────────────────────────────────────────────── */
     .sched-toolbar { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
@@ -206,6 +214,7 @@
 
     let scheduleData  = null;
     let pastCollapsed = false;
+    let selectedWeek  = null;
 
     const $id = id => document.getElementById(id);
 
@@ -258,22 +267,24 @@
         const n = i + 1;
         const past = isWeekPast(n, weeksData);
         const next = n === nextWk;
-        const cls  = next ? 'date-pill is-next' : past ? 'date-pill is-past' : 'date-pill';
-        return `<div class="${cls}"><span class="wk">WK ${n}</span>${formatPillDate(n, weeksData)}</div>`;
+        const sel  = n === selectedWeek;
+        const cls  = (sel ? 'date-pill is-selected' : next ? 'date-pill is-next' : past ? 'date-pill is-past' : 'date-pill');
+        return `<div class="${cls}" data-week="${n}"><span class="wk">WK ${n}</span>${formatPillDate(n, weeksData)}</div>`;
       }).join('');
     }
 
     /* ── Render all weeks ────────────────────────────────────────── */
     function renderAllWeeks(weeksData) {
       const nextWk = nextWeekNum(weeksData);
-      $id('weeks-list').innerHTML = Array.from({ length: TOTAL_WEEKS }, (_, i) => {
-        const n    = i + 1;
+      const weekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1)
+        .filter(n => selectedWeek == null || n === selectedWeek);
+      $id('weeks-list').innerHTML = weekNums.map(n => {
         const past = isWeekPast(n, weeksData);
         const next = n === nextWk;
 
         const badgeCls  = next ? 'week-badge is-next' : past ? 'week-badge is-complete' : 'week-badge';
         const badgeTxt  = next ? 'Up next' : past ? 'Complete' : 'TBD';
-        const collapsed = past && pastCollapsed;
+        const collapsed = past && pastCollapsed && n !== selectedWeek;
         const cardCls   = ['week-card', past ? 'is-past' : '', collapsed ? 'is-collapsed' : ''].filter(Boolean).join(' ');
 
         const wData  = weeksData?.find(w => w.week === n);
@@ -394,6 +405,20 @@
 
     /* ── Wire up collapse button ─────────────────────────────────── */
     $id('collapse-btn').addEventListener('click', togglePast);
+
+    /* ── Filter weeks by clicking a game-night pill ──────────────── */
+    function selectWeek(n) {
+      selectedWeek = (selectedWeek === n) ? null : n;
+      const weeksData = scheduleData?.empty ? null : scheduleData?.weeks;
+      renderDateStrip(weeksData);
+      renderAllWeeks(weeksData);
+    }
+    $id('date-pills').addEventListener('click', e => {
+      const pill = e.target.closest('.date-pill');
+      if (!pill) return;
+      const n = Number(pill.dataset.week);
+      if (n) selectWeek(n);
+    });
 
     loadSchedule();
   </script>
