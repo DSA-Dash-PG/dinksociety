@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Match Details — Game Time + Serving Rule | Mockup & Checklist</title>
+<style>
+  :root{
+    --bg:#0e1216; --panel:#161c22; --panel2:#1d242c; --line:#2a333d;
+    --ink:#eef3f7; --muted:#9aa7b2; --dim:#6b7783;
+    --accent:#c6ff3a;       /* dink lime */
+    --accent2:#36c6ff;      /* court blue */
+    --serve:#ffb02e;        /* serving highlight */
+    --good:#36d399; --warn:#ffb02e;
+    --radius:14px;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);line-height:1.5;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}
+  h1{font-size:26px;margin:0 0 4px;letter-spacing:-.4px}
+  .sub{color:var(--muted);margin:0 0 28px;font-size:15px}
+  .legend{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 30px;font-size:13px;color:var(--muted)}
+  .legend b{color:var(--accent)}
+  h2{font-size:13px;text-transform:uppercase;letter-spacing:1.4px;color:var(--dim);
+     margin:38px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  .tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.5px;
+     text-transform:uppercase;padding:2px 7px;border-radius:5px;vertical-align:middle}
+  .tag.new{background:rgba(198,255,58,.15);color:var(--accent)}
+  .tag.exists{background:rgba(54,198,255,.13);color:var(--accent2)}
+
+  /* ── Mockup cards ───────────────────────────────────────── */
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+  @media(max-width:760px){.grid{grid-template-columns:1fr}}
+  .frame{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+  .frame__cap{font-size:12px;color:var(--muted);padding:9px 14px;background:var(--panel2);
+     border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}
+  .frame__body{padding:16px}
+
+  /* public week card */
+  .week-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .week-num{font-weight:800;font-size:16px}
+  .week-date{color:var(--muted);font-size:14px}
+  .week-time{margin-left:auto;font-size:12px;font-weight:700;color:var(--accent);
+     background:rgba(198,255,58,.10);padding:3px 9px;border-radius:999px}
+
+  .match{background:var(--panel2);border:1px solid var(--line);border-radius:11px;
+     padding:13px 14px;margin-bottom:11px}
+  .match__top{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .court-dot{width:9px;height:9px;border-radius:50%;background:var(--accent2)}
+  .match__court{font-size:12px;font-weight:700;color:var(--muted);letter-spacing:.3px}
+  .match__time{margin-left:auto;font-size:12px;font-weight:700;color:var(--ink);
+     display:flex;align-items:center;gap:5px}
+  .match__time svg{width:13px;height:13px;opacity:.85}
+  .teams{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px}
+  .tname{font-weight:700;font-size:15px}
+  .tname.right{text-align:right}
+  .vs{font-size:11px;font-weight:800;color:var(--dim);letter-spacing:1px}
+  .serve-row{margin-top:11px;padding-top:11px;border-top:1px dashed var(--line);
+     display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+  .serve-badge{font-size:10px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;
+     background:rgba(255,176,46,.14);color:var(--serve);padding:2px 7px;border-radius:5px}
+  .serve-row b{color:var(--ink)}
+
+  /* captain lineup round */
+  .round{border:1px solid var(--line);border-radius:11px;overflow:hidden;margin-bottom:12px}
+  .round__head{padding:11px 14px;background:var(--panel2);border-bottom:1px solid var(--line)}
+  .round__title{font-weight:800;font-size:14px;margin:0 0 3px}
+  .round__rule{font-size:12px;color:var(--serve);font-weight:600}
+  .round__rule .pipe{color:var(--dim);margin:0 6px}
+  .gslot{display:flex;align-items:center;gap:10px;padding:9px 14px;font-size:13px;border-bottom:1px solid var(--line)}
+  .gslot:last-child{border-bottom:0}
+  .gslot .g{font-weight:700;color:var(--muted);width:34px}
+  .gslot .pair{color:var(--dim);font-size:11px;margin-left:auto}
+
+  /* mobile tonight card */
+  .phone{max-width:300px;margin:0 auto;background:#0b0f13;border:1px solid var(--line);
+     border-radius:22px;padding:14px}
+  .phone__label{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin-bottom:6px}
+  .phone__time{font-size:13px;font-weight:700;color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+  .phone__match{text-align:center;padding:14px 0}
+  .phone__match .you{font-size:18px;font-weight:800}
+  .phone__match .vs{display:block;margin:6px 0;color:var(--dim)}
+  .phone__match .opp{font-size:18px;font-weight:800;color:var(--muted)}
+  .phone__serve{margin-top:12px;background:rgba(255,176,46,.10);border:1px solid rgba(255,176,46,.25);
+     border-radius:10px;padding:10px 12px;font-size:12px;color:var(--muted)}
+  .phone__serve b{color:var(--serve)}
+
+  /* ── Checklist ───────────────────────────────────────────── */
+  .ck-intro{color:var(--muted);font-size:14px;margin:0 0 6px}
+  .ck-reset{font-size:12px;color:var(--accent2);background:none;border:1px solid var(--line);
+     border-radius:7px;padding:5px 11px;cursor:pointer}
+  .ck-reset:hover{border-color:var(--accent2)}
+  .ck-group{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}
+  .ck-group__h{padding:12px 16px;background:var(--panel2);font-weight:800;font-size:14px;
+     display:flex;align-items:center;gap:10px}
+  .ck-group__h .file{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;
+     color:var(--accent2);font-weight:600}
+  .ck-item{display:flex;gap:12px;padding:12px 16px;border-top:1px solid var(--line);cursor:pointer;align-items:flex-start}
+  .ck-item:hover{background:rgba(255,255,255,.02)}
+  .ck-item input{margin-top:3px;width:17px;height:17px;accent-color:var(--accent);flex:0 0 auto;cursor:pointer}
+  .ck-item .txt{flex:1}
+  .ck-item .what{font-size:14px}
+  .ck-item .where{font-size:12px;color:var(--dim);margin-top:2px;
+     font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .ck-item.done .what{text-decoration:line-through;color:var(--dim)}
+  .pill{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;
+     padding:2px 7px;border-radius:5px;margin-left:8px}
+  .pill.time{background:rgba(198,255,58,.15);color:var(--accent)}
+  .pill.serve{background:rgba(255,176,46,.14);color:var(--serve)}
+  .pill.both{background:rgba(54,198,255,.13);color:var(--accent2)}
+  .progress{position:sticky;top:0;background:var(--bg);padding:14px 0 10px;z-index:5;margin-bottom:6px}
+  .bar{height:8px;background:var(--panel2);border-radius:999px;overflow:hidden;border:1px solid var(--line)}
+  .bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--accent2),var(--accent));transition:width .25s}
+  .pcount{font-size:12px;color:var(--muted);margin-top:6px}
+  .note{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--accent);
+     border-radius:10px;padding:13px 16px;font-size:13px;color:var(--muted);margin:0 0 22px}
+  .note b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>Match Details — Game Time + Serving Rule</h1>
+  <p class="sub">Mockup of the two changes, plus a verification checklist of every place match details live on the site.</p>
+
+  <div class="legend">
+    <span><b>① Game time</b> — show a real per-match start time (not the hardcoded week string)</span>
+    <span><b>② Serving rule</b> — “Round 1: Home Team Serves · Away Team Chooses Side”</span>
+  </div>
+
+  <div class="note">
+    <b>Good news from the audit:</b> the match data already carries a <code>scheduledAt</code> datetime, and
+    <code>public-schedule.js</code> already passes it to the front end — it's just not displayed. Today
+    <code>schedule.html</code> prints a hardcoded <code>7:00–9:00&nbsp;PM</code> at the week level (line 302).
+    The serving rule already exists inside the captain lineup &amp; scoring tabs (<code>captain.html</code> lines 774 / 778 / 893)
+    but appears <b>nowhere public-facing</b>. So most of this is surfacing data that's already there.
+  </div>
+
+  <!-- ════════════ MOCKUPS ════════════ -->
+  <h2>What it should look like</h2>
+
+  <div class="grid">
+
+    <!-- Public schedule card -->
+    <div class="frame">
+      <div class="frame__cap"><span>Public schedule — week card</span><span class="tag new">proposed</span></div>
+      <div class="frame__body">
+        <div class="week-head">
+          <span class="week-num">Week 3</span>
+          <span class="week-date">Monday, June 22</span>
+          <span class="week-time">7:00 PM</span>
+        </div>
+
+        <div class="match">
+          <div class="match__top">
+            <span class="court-dot"></span>
+            <span class="match__court">Courts 1 &amp; 2</span>
+            <span class="match__time">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              7:00 PM
+            </span>
+          </div>
+          <div class="teams">
+            <span class="tname">Net Gains</span>
+            <span class="vs">VS</span>
+            <span class="tname right">Dink 182</span>
+          </div>
+          <div class="serve-row">
+            <span class="serve-badge">R1 Serve</span>
+            <span><b>Net Gains</b> (home) serves first · <b>Dink 182</b> (away) chooses side</span>
+          </div>
+        </div>
+
+        <div class="match">
+          <div class="match__top">
+            <span class="court-dot" style="background:var(--accent)"></span>
+            <span class="match__court">Courts 3 &amp; 6</span>
+            <span class="match__time">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+              8:00 PM
+            </span>
+          </div>
+          <div class="teams">
+            <span class="tname">Smash Bros</span>
+            <span class="vs">VS</span>
+            <span class="tname right">Kitchen Sync</span>
+          </div>
+          <div class="serve-row">
+            <span class="serve-badge">R1 Serve</span>
+            <span><b>Smash Bros</b> (home) serves first · <b>Kitchen Sync</b> (away) chooses side</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Captain lineup -->
+    <div class="frame">
+      <div class="frame__cap"><span>Captain — lineup / scoring tab</span><span class="tag exists">rule already here</span></div>
+      <div class="frame__body">
+        <div class="round">
+          <div class="round__head">
+            <p class="round__title">Round 1</p>
+            <p class="round__rule">Home Team Serves<span class="pipe">·</span>Away Team Chooses Side</p>
+          </div>
+          <div class="gslot"><span class="g">G1</span> Court 1 <span class="pair">Pair 1</span></div>
+          <div class="gslot"><span class="g">G2</span> Court 2 <span class="pair">Pair 1</span></div>
+          <div class="gslot"><span class="g">G3</span> Court 1 <span class="pair">Pair 2</span></div>
+        </div>
+        <div class="round">
+          <div class="round__head">
+            <p class="round__title">Round 2</p>
+            <p class="round__rule">Home Team Chooses Side<span class="pipe">·</span>Away Team Serves First</p>
+          </div>
+          <div class="gslot"><span class="g">G1</span> Court 1 <span class="pair">Pair 1</span></div>
+          <div class="gslot"><span class="g">G2</span> Court 2 <span class="pair">Pair 1</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Player portal -->
+    <div class="frame">
+      <div class="frame__cap"><span>Player portal — Schedule tab (me.html)</span><span class="tag new">add time + rule</span></div>
+      <div class="frame__body">
+        <div class="phone">
+          <div class="phone__label"><span style="color:var(--good)">●</span> Next match · Week 3</div>
+          <div class="phone__match">
+            <span class="you">Net Gains</span>
+            <span class="vs">vs</span>
+            <span class="opp">Dink 182</span>
+          </div>
+          <div class="phone__time" style="justify-content:center;margin:10px 0 0">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            Mon Jun 22 · 7:00 PM · Courts 1 &amp; 2
+          </div>
+          <div class="phone__serve">
+            <b>Round 1:</b> You serve first (home) · opponent chooses side.
+          </div>
+          <div style="margin-top:12px">
+            <div class="phone__label">Upcoming</div>
+            <div class="match" style="margin:0;padding:10px 12px">
+              <div class="match__top">
+                <span class="court-dot"></span><span class="match__court">Week 4 · vs Smash Bros</span>
+                <span class="match__time">Mon Jun 29 · 8:00 PM</span>
+              </div>
+              <div style="font-size:11px;color:var(--dim);margin-top:6px">+ time now shown on upcoming cards (was date-only)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile tonight -->
+    <div class="frame">
+      <div class="frame__cap"><span>Mobile — tonight's match</span><span class="tag new">proposed</span></div>
+      <div class="frame__body">
+        <div class="phone">
+          <div class="phone__label">Tonight · Week 3</div>
+          <div class="phone__time">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+            7:00 PM · Courts 1 &amp; 2
+          </div>
+          <div class="phone__match">
+            <span class="you">Net Gains</span>
+            <span class="vs">vs</span>
+            <span class="opp">Dink 182</span>
+          </div>
+          <div class="phone__serve">
+            <b>Round 1:</b> You serve first (home). Opponent chooses side.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Admin edit -->
+    <div class="frame">
+      <div class="frame__cap"><span>Admin — match edit row</span><span class="tag new">add time input</span></div>
+      <div class="frame__body">
+        <div class="match" style="margin-bottom:0">
+          <div class="match__top">
+            <span class="court-dot"></span>
+            <span class="match__court">Week 3 · Courts 1 &amp; 2</span>
+          </div>
+          <div class="teams">
+            <span class="tname">Net Gains</span>
+            <span class="vs">VS</span>
+            <span class="tname right">Dink 182</span>
+          </div>
+          <div class="serve-row" style="border-top-style:solid">
+            <span class="serve-badge">Time</span>
+            <span>Start: <b>7:00 PM</b> &nbsp;·&nbsp; <span style="color:var(--dim)">editable per match → saves to <code>scheduledAt</code></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ════════════ CHECKLIST ════════════ -->
+  <h2>Verification checklist — everywhere match details appear</h2>
+  <p class="ck-intro">Check items off as you verify each location. Progress saves in your browser.
+    <span class="pill time">Time</span> = game-time change ·
+    <span class="pill serve">Serve</span> = serving-rule change ·
+    <span class="pill both">Both</span> = touches both.</p>
+
+  <div class="progress">
+    <div class="bar"><i id="bar"></i></div>
+    <div class="pcount"><span id="done">0</span> / <span id="total">0</span> verified
+      &nbsp;·&nbsp; <button class="ck-reset" onclick="resetCk()">Reset</button></div>
+  </div>
+
+  <div id="checklist"></div>
+
+</div>
+
+<script>
+  const DATA = [
+    {
+      group:'Public schedule', file:'public/schedule.html',
+      items:[
+        {t:'Replace hardcoded "7:00–9:00 PM" week string with real time from data', w:'line 302 · .week-time-text', k:'time'},
+        {t:'Add per-match start time to each match card (renderMatches)', w:'renderMatches() ~line 323-355', k:'time'},
+        {t:'Add Round 1 serving-rule line under each matchup', w:'renderMatches() ~line 340-354', k:'serve'},
+        {t:'Confirm scheduledAt is read & formatted to local time', w:'formatWeekDate / new render helper', k:'time'},
+      ]
+    },
+    {
+      group:'Public schedule API', file:'netlify/functions/public-schedule.js',
+      items:[
+        {t:'Confirm scheduledAt is included in match payload (it already is)', w:'line 51', k:'time'},
+        {t:'Confirm fallback "matches store" path also returns scheduledAt', w:'~line 69-90 fallback block', k:'time'},
+        {t:'Decide if serving rule is derived client-side (home=teamA) — no API change needed', w:'teamA = home', k:'serve'},
+      ]
+    },
+    {
+      group:'Captain portal', file:'captain.html  (+ root duplicate)',
+      items:[
+        {t:'Schedule tab: show start time next to each match', w:'schedule section ~500-700', k:'time'},
+        {t:'Lineup tab: serving rule already present — confirm wording matches "Home Team Serves · Away Team Chooses Side"', w:'line 774 / 778', k:'serve'},
+        {t:'Scoring tab: serving note already present — confirm wording', w:'line 893', k:'serve'},
+        {t:'Verify both /captain.html and /public/captain.html (duplicate) are updated', w:'root + public copy', k:'both'},
+      ]
+    },
+    {
+      group:'Team profile', file:'public/team.html',
+      items:[
+        {t:'Match list: add start time to each row', w:'team match list render', k:'time'},
+        {t:'Optional: show home/away serve indicator per match', w:'match row', k:'serve'},
+      ]
+    },
+    {
+      group:'Player portal — Schedule tab', file:'public/me.html',
+      items:[
+        {t:'Next-match card already shows full date+time — confirm it stays correct', w:'renderSchedule() line 344 (toLocaleString)', k:'time'},
+        {t:'Upcoming cards show DATE ONLY — add start time', w:'matchCard() line 377 + foot line 387', k:'time'},
+        {t:'Add Round 1 serving rule to next-match card (home/away aware from m.home)', w:'next__meta / next__you ~line 348-357', k:'serve'},
+        {t:'Optional: add serve indicator to upcoming match cards too', w:'matchCard() ~line 372-389', k:'serve'},
+        {t:'Confirm DATA.schedule feed carries scheduledAt (player schedule API)', w:'me.html data source', k:'time'},
+      ]
+    },
+    {
+      group:'Mobile captain', file:'captain-mobile-mockup.html',
+      items:[
+        {t:'Tonight’s matchup: add start time', w:'tonight card', k:'time'},
+        {t:'Add Round 1 serving rule for the captain’s team (home vs away aware)', w:'matchup / pre-game state', k:'serve'},
+      ]
+    },
+    {
+      group:'Admin — matches', file:'public/admin.html + netlify/functions/admin-matches.js',
+      items:[
+        {t:'Add editable start-time input to match edit UI', w:'admin.html matches tab', k:'time'},
+        {t:'Confirm PATCH endpoint writes scheduledAt (already supported)', w:'admin-matches.js PATCH', k:'time'},
+        {t:'Verify time renders in the admin matches table', w:'admin.html match table', k:'time'},
+      ]
+    },
+    {
+      group:'Admin — live dashboard', file:'public/admin-matches-live.html',
+      items:[
+        {t:'Show scheduled start time per match in live grid', w:'live grid rows', k:'time'},
+      ]
+    },
+    {
+      group:'Seed / data generation', file:'admin-seed-test-season.js · seed-demo-data.js',
+      items:[
+        {t:'admin-seed-test-season.js already sets scheduledAt per week — confirm a real clock time (not just date) is set', w:'per-week scheduledAt', k:'time'},
+        {t:'seed-demo-data.js currently leaves scheduledAt = null — decide whether to populate', w:'demo match build', k:'time'},
+        {t:'Decide default time policy: one season default vs staggered per-court (7:00 / 8:00)', w:'admin-settings matchTime', k:'time'},
+      ]
+    },
+    {
+      group:'Rules page', file:'public/rules.html',
+      items:[
+        {t:'Confirm/add the serving rule to written rules: R1 home serves, away chooses side; R2 reversed', w:'serving section', k:'serve'},
+        {t:'Confirm stated game time matches what schedule now shows', w:'schedule/format section', k:'time'},
+      ]
+    },
+    {
+      group:'Player profile (public)', file:'public/player.html',
+      items:[
+        {t:'Aggregate stats only (Matches Played) — confirm no per-match time/rule needed here', w:'stats block', k:'time'},
+        {t:'If a per-match history list exists here, add start time to it', w:'match history (if present)', k:'time'},
+      ]
+    },
+  ];
+
+  const KEY='ds-matchdetails-checklist-v1';
+  let state = {};
+  try{ state = JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){ state={}; }
+
+  const pillCls = {time:'time', serve:'serve', both:'both'};
+  const pillTxt = {time:'Time', serve:'Serve', both:'Both'};
+  let total=0;
+
+  function render(){
+    const root=document.getElementById('checklist');
+    root.innerHTML=''; total=0;
+    DATA.forEach((g,gi)=>{
+      const box=document.createElement('div'); box.className='ck-group';
+      box.innerHTML=`<div class="ck-group__h">${g.group}<span class="file">${g.file}</span></div>`;
+      g.items.forEach((it,ii)=>{
+        const id=`${gi}-${ii}`; total++;
+        const done=!!state[id];
+        const row=document.createElement('label');
+        row.className='ck-item'+(done?' done':'');
+        row.innerHTML=`<input type="checkbox" ${done?'checked':''} data-id="${id}">
+          <span class="txt"><span class="what">${it.t}<span class="pill ${pillCls[it.k]}">${pillTxt[it.k]}</span></span>
+          <span class="where">${it.w}</span></span>`;
+        row.querySelector('input').addEventListener('change',e=>{
+          state[id]=e.target.checked;
+          localStorage.setItem(KEY,JSON.stringify(state));
+          row.classList.toggle('done',e.target.checked);
+          updateBar();
+        });
+        box.appendChild(row);
+      });
+      root.appendChild(box);
+    });
+    document.getElementById('total').textContent=total;
+    updateBar();
+  }
+  function updateBar(){
+    const done=Object.values(state).filter(Boolean).length;
+    document.getElementById('done').textContent=done;
+    document.getElementById('bar').style.width=(total?Math.round(done/total*100):0)+'%';
+  }
+  function resetCk(){ state={}; localStorage.removeItem(KEY); render(); }
+  render();
+</script>
+</body>
+</html>
