@@ -10,6 +10,8 @@
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 import { assignCourtSets } from './lib/courts.js';
+import { rebuildStandings } from './lib/standings.js';
+import { circuitCode } from './lib/circuit.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -66,7 +68,17 @@ export default async (req) => {
       summary.push({ week, matchCount: matches.length });
     }
 
-    return json({ ok: true, weeksGenerated: schedule.length, summary });
+    // Rebuild standings so the division table goes live immediately (all teams
+    // seeded at 0-0), rather than staying blank until the first score finalizes.
+    let standingsRebuilt = false;
+    try {
+      await rebuildStandings(circuitCode(circuit));
+      standingsRebuilt = true;
+    } catch (e) {
+      console.error('post-generate standings rebuild failed:', e);
+    }
+
+    return json({ ok: true, weeksGenerated: schedule.length, summary, standingsRebuilt });
   } catch (err) {
     console.error('admin-generate-schedule error:', err);
     return json({ error: 'Generation failed', detail: err.message }, 500);

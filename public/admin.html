@@ -550,6 +550,7 @@
             <div class="am-actions">
               <select id="sched-div" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);"></select>
               <button class="ab ab--lime ab--sm" id="gen-sched-btn">Generate round-robin</button>
+              <button class="ab ab--outline ab--sm" id="rebuild-standings-btn" title="Recompute standings + leaderboard from current schedule and scores">Rebuild standings</button>
             </div>
           </div>
           <div id="gameday"></div>
@@ -2911,6 +2912,20 @@
       alert('Schedule generation failed: ' + e.message);
     }
     btn.disabled = false; btn.textContent = 'Generate round-robin';
+  });
+
+  // Manually recompute standings + leaderboard (also runs automatically after
+  // generating a schedule and after each score is finalized).
+  $id('rebuild-standings-btn').addEventListener('click', async () => {
+    const btn = $id('rebuild-standings-btn');
+    btn.disabled = true; btn.textContent = 'Rebuilding…';
+    try {
+      const res = await apiJSON('/.netlify/functions/admin-rebuild-standings?circuit=I', { method: 'POST' });
+      alert('Standings rebuilt: ' + (res.teamCount ?? 0) + ' teams across ' + ((res.divisions || []).length) + ' division(s).');
+    } catch (e) {
+      alert('Rebuild failed: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = 'Rebuild standings';
   });
 
   // ═══════════════════════════════════════════════════════════
