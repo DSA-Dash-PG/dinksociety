@@ -180,6 +180,32 @@
     })
     .catch(function () { /* settings not available, defaults stay */ });
 
+  /* ── Register CTA visibility ──
+     Hide every "Register" / "Reserve my spot" CTA when no season is
+     accepting signups. public-seasons only returns seasons whose
+     registration is not "closed", so an empty list = nothing to join.
+     The buttons reappear automatically once a season opens again.
+     Fails open: if the request errors, CTAs stay visible. */
+  (function () {
+    var REG_CTA_SEL = '.ds-nav-cta, .ds-nav-drawer-cta, [data-register-cta]';
+    function setRegisterCTAs(show) {
+      document.querySelectorAll(REG_CTA_SEL).forEach(function (el) {
+        el.style.display = show ? '' : 'none';
+      });
+    }
+    fetch('/.netlify/functions/public-seasons')
+      .then(function (r) {
+        if (r.ok) return r.json();
+        return fetch('/api/public-seasons').then(function (r2) { return r2.ok ? r2.json() : null; });
+      })
+      .then(function (data) {
+        if (!data) return; // request failed → leave CTAs visible
+        var hasOpen = Array.isArray(data.seasons) && data.seasons.length > 0;
+        if (!hasOpen) setRegisterCTAs(false);
+      })
+      .catch(function () { /* leave CTAs visible on error */ });
+  })();
+
   /* ── Page hero background images ── */
   // Sub-pages use <div class="page-hero__bg" data-hero-slot="schedule">
   // This fetches from the site-images API and sets the background-image.
