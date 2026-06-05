@@ -136,6 +136,32 @@
   .nb.is-active { color:var(--color-lime); }
   .nb svg { width:23px; height:23px; } .nb span { font-size:10px; font-weight:700; }
   .center { min-height:100vh; display:flex; align-items:center; justify-content:center; color:var(--color-text-faint); font-size:13px; }
+
+  /* stats parity — awards, pending, partner total, season history */
+  .pending { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:34px 20px; text-align:center; margin-bottom:14px; }
+  .pending__i { font-size:30px; margin-bottom:8px; }
+  .pending__t { font-size:14px; font-weight:800; margin-bottom:4px; }
+  .pending__s { font-size:12px; color:var(--color-text-faint); line-height:1.5; }
+  .awardlist { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:4px 13px; }
+  .award { display:flex; align-items:center; gap:11px; padding:11px 0; border-bottom:1px solid var(--color-border); }
+  .award:last-child { border-bottom:none; }
+  .award__badge { width:32px; height:32px; border-radius:9px; background:var(--color-lime-dim); display:grid; place-items:center; font-size:15px; flex-shrink:0; }
+  .award__badge.f { background:var(--color-teal-dim); }
+  .award__body { flex:1; min-width:0; }
+  .award__t { font-size:12px; font-weight:700; }
+  .award__m { font-size:10px; color:var(--color-text-faint); margin-top:1px; }
+  .award__dsr { font-size:16px; font-weight:800; color:var(--color-lime); white-space:nowrap; }
+  .award__dsr span { font-size:8px; color:var(--color-text-faint); font-weight:600; }
+  .partner__pct { margin-left:10px; font-weight:800; min-width:38px; text-align:right; font-variant-numeric:tabular-nums; }
+  .ptot { display:flex; justify-content:space-between; align-items:center; padding:11px 2px 2px; font-size:12px; font-weight:700; color:var(--color-text-faint); }
+  .ptot b { color:var(--color-lime); }
+  .hlist { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:4px 13px; }
+  .hrow { display:flex; align-items:center; gap:12px; padding:12px 0; border-bottom:1px solid var(--color-border); }
+  .hrow:last-child { border-bottom:none; }
+  .hseason { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:0.06em; color:var(--color-lime); background:var(--color-lime-ghost); padding:3px 8px; border-radius:5px; flex-shrink:0; min-width:64px; text-align:center; }
+  .hteam { flex:1; min-width:0; } .hteam__n { font-size:12px; font-weight:700; } .hteam__y { font-size:10px; color:var(--color-text-faint); margin-top:2px; }
+  .hstat { text-align:right; } .hstat__r { font-size:12px; font-weight:700; } .hstat__p { font-size:10px; color:var(--color-text-faint); margin-top:1px; }
+  .hnote { font-size:11px; color:var(--color-text-faint); margin-top:10px; text-align:center; }
 </style>
 </head>
 <body>
@@ -213,6 +239,14 @@
       if (res.status === 401) return showLogin(err);
       if (!res.ok) throw new Error('load failed');
       DATA = await res.json();
+      // Cross-season history — same source the public profile uses, for parity.
+      try {
+        const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
+        if (pid) {
+          const hr = await fetch(API + '/public-player?id=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' });
+          if (hr.ok) { const hd = await hr.json(); DATA.history = hd.history || []; }
+        }
+      } catch {}
       showApp();
     } catch (e) {
       showLogin(err);
@@ -336,33 +370,121 @@
       </div>${foot}</div>`;
   }
 
-  // ---- stats ----
+  // ---- stats ----  (mirrors the public player profile: rankings, awards, season stats, partners, history)
+  const norm = g => { const x = String(g || '').trim().toLowerCase(); return x[0] === 'f' ? 'F' : x[0] === 'm' ? 'M' : ''; };
+  const fmtRank = r => r != null ? '#' + r : '—';
+  const fmtDsr = d => d != null ? (Math.round(d * 10) / 10).toFixed(1) : '—';
+  const wpct = (w, p) => p ? Math.round(w / p * 100) : 0;
+
+  function rankTiles() {
+    const me = DATA.profile, lb = DATA.leaderboard || [];
+    const myRow = lb.find(p => p.me);
+    let overall = null, gender = null;
+    if (myRow) {
+      overall = myRow.rank;
+      const myG = norm(me.gender);
+      const idx = lb.filter(p => norm(p.gender) === myG).findIndex(p => p.me);
+      gender = idx >= 0 ? idx + 1 : null;
+    }
+    const gLabel = norm(me.gender) === 'F' ? "Women's Rank" : norm(me.gender) === 'M' ? "Men's Rank" : 'Division Rank';
+    return `<div class="sgrid">
+      <div class="stat"><div class="stat__n">${fmtRank(overall)}</div><div class="stat__l">Overall Rank</div></div>
+      <div class="stat"><div class="stat__n">${fmtRank(gender)}</div><div class="stat__l">${gLabel}</div></div>
+      <div class="stat"><div class="stat__n" style="color:var(--color-lime)">${fmtDsr(DATA.stats?.composite)}</div><div class="stat__l">DSR</div></div>
+    </div>`;
+  }
+
+  function seasonHistory() {
+    const hist = DATA.history || [], me = DATA.profile, s = DATA.stats;
+    let rows;
+    if (hist.length) {
+      rows = hist.map(h => `<div class="hrow">
+        <span class="hseason">${esc(h.seasonLabel || h.circuit)}</span>
+        <div class="hteam"><div class="hteam__n">${esc(h.teamName || '—')}</div><div class="hteam__y">${esc(h.year || '')}</div></div>
+        <div class="hstat"><div class="hstat__r">${h.stats?.gamesWon ?? '—'}–${h.stats?.gamesLost ?? '—'}</div>
+          <div class="hstat__p">${wpct(h.stats?.gamesWon || 0, h.stats?.gamesPlayed || 0)}% · ${h.stats?.matchesPlayed ?? 0} matches</div></div>
+      </div>`).join('');
+      return `<div class="label">🗂 Season History</div><div class="hlist">${rows}</div>`;
+    }
+    const live = s && s.gamesPlayed > 0;
+    rows = `<div class="hrow">
+      <span class="hseason">Season 1</span>
+      <div class="hteam"><div class="hteam__n">${esc(me.teamName)}</div><div class="hteam__y">2026 — In progress</div></div>
+      <div class="hstat">${live
+        ? `<div class="hstat__r">${s.gamesWon}–${s.gamesLost}</div><div class="hstat__p">${wpct(s.gamesWon, s.gamesPlayed)}%</div>`
+        : `<div class="hstat__r" style="color:var(--color-text-faint)">—</div>`}</div>
+    </div>`;
+    return `<div class="label">🗂 Season History</div><div class="hlist">${rows}</div>
+      <div class="hnote">Past seasons will be archived here at the end of each circuit.</div>`;
+  }
+
   function renderStats() {
     const s = DATA.stats, pn = DATA.partnerNames || {};
+
+    // No games yet → rankings (all "—"), pending card, history. Mirrors the public profile.
     if (!s || !s.gamesPlayed) {
-      $('v-stats').innerHTML = '<div class="muted">No games played yet. Your stats show up once your matches are scored.</div>';
+      $('v-stats').innerHTML = rankTiles() +
+        `<div class="pending"><div class="pending__i">📊</div>
+          <div class="pending__t">Stats pending</div>
+          <div class="pending__s">Game stats will appear here once Season 1 begins on June 8.</div></div>` +
+        seasonHistory();
       return;
     }
-    const dsr = s.composite != null ? (Math.round(s.composite * 10) / 10).toFixed(1) : '—';
-    const winPct = s.gamesPlayed ? Math.round((s.gamesWon / s.gamesPlayed) * 100) : 0;
+
+    const dsr = fmtDsr(s.composite);
+    const winPct = wpct(s.gamesWon, s.gamesPlayed);
     const diff = (s.diff > 0 ? '+' : '') + (s.diff ?? 0);
     const delta = s.rankDelta;
     const deltaTxt = delta == null ? '' : delta > 0 ? ' · ▲ up ' + delta + ' this week' : delta < 0 ? ' · ▼ down ' + (-delta) : ' · holding';
+
     const bt = s.byType || {};
     const btRow = (name, o) => o && (o.played) ? `<div class="bt__row"><span>${name}</span><span class="bt__rec"><b>${o.won}</b>–${o.played - o.won}</span></div>` : '';
+
+    // Chef of the Week awards
+    const awards = s.awards || [];
+    const awardsHtml = awards.length ? `<div class="label">🏆 Chef of the Week <span class="sub">${awards.length}× winner</span></div>
+      <div class="awardlist">${awards.map(a => {
+        const f = a.type === 'womens';
+        const dt = a.date ? new Date(a.date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+        return `<div class="award"><div class="award__badge ${f ? 'f' : ''}">👑</div>
+          <div class="award__body"><div class="award__t">Week ${a.week} ${f ? "Women's" : "Men's"} Chef</div>
+            <div class="award__m">${dt ? esc(dt) + ' · ' : ''}${a.w}W–${a.l}L · ${a.diff >= 0 ? '+' : ''}${a.diff} pt diff</div></div>
+          <div class="award__dsr">${Number(a.dsr).toFixed(1)}<span> DSR</span></div></div>`;
+      }).join('')}</div>` : '';
+
+    // All partners + total
     const partners = Object.entries(s.partners || {}).map(([pid, o]) => ({ pid, name: pn[pid]?.name || 'Partner', ...o }))
-      .sort((a, b) => b.won - a.won).slice(0, 4);
+      .filter(p => p.played > 0).sort((a, b) => b.played - a.played || b.won - a.won);
+    const totP = partners.reduce((x, p) => x + p.played, 0), totW = partners.reduce((x, p) => x + p.won, 0);
+    const partnersHtml = partners.length ? '<div class="label">All partners</div>' + partners.map(p => {
+      const pp = wpct(p.won, p.played);
+      const col = pp >= 60 ? '#22c55e' : pp <= 35 ? 'var(--color-red)' : 'var(--color-text-muted)';
+      return `<div class="partner"><div class="partner__av">${initials(p.name)}</div>
+        <div style="font-weight:600;flex:1;min-width:0;">${esc(p.name)}</div>
+        <span class="partner__rec"><b>${p.won}</b>–${p.played - p.won}</span>
+        <span class="partner__pct" style="color:${col}">${pp}%</span></div>`;
+    }).join('') + `<div class="ptot"><span>Total</span><span>${totW}–${totP - totW} <b>${wpct(totW, totP)}%</b></span></div>` : '';
+
     $('v-stats').innerHTML =
+      rankTiles() +
       `<div class="dsr"><div class="dsr__lbl">Your DSR · Dink Society Rating</div><div class="dsr__n">${dsr}</div>
         <div class="dsr__sub">${s.gamesWon}–${s.gamesLost} across ${s.gamesPlayed} games</div>
         <div class="dsr__rank">${winPct}% win rate${esc(deltaTxt)}</div></div>
+      <div class="label">Season Stats</div>
+      <div class="sgrid">
+        <div class="stat"><div class="stat__n" style="color:#22c55e">${s.gamesWon}</div><div class="stat__l">Wins</div></div>
+        <div class="stat"><div class="stat__n" style="color:var(--color-red)">${s.gamesLost}</div><div class="stat__l">Losses</div></div>
+        <div class="stat"><div class="stat__n teal">${winPct}%</div><div class="stat__l">Win%</div></div>
+      </div>
       <div class="sgrid">
         <div class="stat"><div class="stat__n">${s.gamesPlayed}</div><div class="stat__l">Games</div></div>
-        <div class="stat"><div class="stat__n teal">${s.gamesWon}–${s.gamesLost}</div><div class="stat__l">W–L</div></div>
+        <div class="stat"><div class="stat__n">${s.matchesPlayed ?? 0}</div><div class="stat__l">Matches</div></div>
         <div class="stat"><div class="stat__n">${diff}</div><div class="stat__l">Pt diff</div></div>
-      </div>
-      ${(btRow("Women's", bt.womens) + btRow("Men's", bt.mens) + btRow('Mixed', bt.mixed)) ? '<div class="label">By game type</div><div class="bytype">' + btRow("Women's", bt.womens) + btRow("Men's", bt.mens) + btRow('Mixed', bt.mixed) + '</div>' : ''}
-      ${partners.length ? '<div class="label">Best partners</div>' + partners.map(p => `<div class="partner"><div class="partner__av">${initials(p.name)}</div><div style="font-weight:600;">${esc(p.name)}</div><span class="partner__rec"><b>${p.won}</b>–${p.played - p.won}</span></div>`).join('') : ''}`;
+      </div>` +
+      awardsHtml +
+      ((btRow("Women's", bt.womens) + btRow("Men's", bt.mens) + btRow('Mixed', bt.mixed)) ? '<div class="label">By game type</div><div class="bytype">' + btRow("Women's", bt.womens) + btRow("Men's", bt.mens) + btRow('Mixed', bt.mixed) + '</div>' : '') +
+      partnersHtml +
+      seasonHistory();
   }
 
   // ---- leaderboard ----
