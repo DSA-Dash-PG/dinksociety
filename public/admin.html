@@ -2297,6 +2297,18 @@
     }
   }
 
+  // Expose transfer/gameday handlers to global scope so inline onclick/onchange
+  // attributes can reach them (this whole script runs inside an IIFE, so bare
+  // function declarations are NOT on window otherwise — clicks would silently
+  // do nothing). Mirrors the window._saveScores pattern used in gameday.
+  window.toggleXferPanel = toggleXferPanel;
+  window.xferLoadPlayers = xferLoadPlayers;
+  window.executeDirectTransfer = executeDirectTransfer;
+  window.loadTransferRequests = loadTransferRequests;
+  window.loadTransferLog = loadTransferLog;
+  window.reviewRequest = reviewRequest;
+  window.renderGameday = renderGameday;
+
   function showTeamCards() {
     const grid = $id('teams-grid');
     if (!allTeams.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No teams yet. Sync from registrations to create team records.</div>'; return; }
@@ -2318,7 +2330,10 @@
     if (cnt) cnt.textContent = shown.length + (filterVal ? ' of ' + allTeams.length : '') + ' team' + (shown.length === 1 ? '' : 's');
 
     grid.innerHTML = shown.map(t => {
-      const captain = (t.roster || []).find(p => p.isCaptain);
+      const capEmail = (t.captainEmail || '').toLowerCase();
+      const captain = (t.roster || []).find(p => p.isCaptain)
+        || (capEmail ? (t.roster || []).find(p => (p.email || '').toLowerCase() === capEmail) : null)
+        || (t.captainName ? { name: t.captainName } : null);
       const coCaptain = (t.roster || []).find(p => p.isCoCaptain);
       const rosterCt = (t.roster || []).length;
       const colorSwatch = t.color ? '<span class="team-swatch" style="background:' + h(t.color) + ';"></span> ' : '';
