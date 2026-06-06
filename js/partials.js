@@ -42,6 +42,22 @@
   // If the current page is viewing a non-default season (e.g. the test season
   // via ?season=circuit-test or ?circuit=TEST), carry that context onto the
   // nav/footer links so navigating the site stays in that season.
+  //
+  // TODO: make this mapping data-driven instead of string manipulation.
+  // The admin-settings response (window.DS_SETTINGS) currently has NO
+  // season↔circuit mapping — only display fields (circuitName, startDate,
+  // fees, etc.). To do this properly, admin-settings would need to return
+  // something like:
+  //   seasons: [
+  //     { id: 'circuit-i',    circuit: 'I',    default: true  },
+  //     { id: 'circuit-test', circuit: 'TEST', default: false },
+  //   ]
+  // i.e. one entry per season with its blob-store season id, its circuit
+  // code (the standings/player-stats storage key), and a default flag so
+  // the "nothing to carry" check stops hardcoding 'circuit-i' / 'I'.
+  // Until that field exists, the string-derivation below
+  // ('circuit-<x>' ↔ uppercase code) is the safe fallback — it matches
+  // the same convention used server-side in netlify/functions/lib/circuit.js.
   function seasonContext() {
     const q = new URLSearchParams(location.search);
     let season = q.get('season');
