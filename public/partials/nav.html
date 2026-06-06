@@ -125,10 +125,12 @@
     return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   }
 
-  fetch('/.netlify/functions/admin-settings')
-    .then(function (r) { return r.ok ? r.json() : fetch('/api/admin-settings').then(function(r2) { return r2.ok ? r2.json() : null; }); })
-    .then(function (s) {
+  (async function () {
+      // Shared settings promise created in js/partials.js — no second fetch.
+      var s = await window.DS_SETTINGS;
       if (!s) return;
+      // Replace the promise with the resolved object so synchronous readers
+      // (window.DS_SETTINGS.circuitName etc.) keep working as before.
       window.DS_SETTINGS = s;
 
       document.querySelectorAll('[data-circuit-label]').forEach(function (el) {
@@ -171,8 +173,7 @@
       document.querySelectorAll('[data-deposit-note]').forEach(function (el) {
         el.innerHTML = feeHtml;
       });
-    })
-    .catch(function () { /* settings not available, defaults stay */ });
+  })().catch(function () { /* settings not available, defaults stay */ });
 
   /* ── Register CTA visibility ──
      Hide every "Register" / "Reserve my spot" CTA when no season is

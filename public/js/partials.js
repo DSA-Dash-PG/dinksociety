@@ -4,6 +4,12 @@
 // Example: <div data-partial="nav"></div> fetches /partials/nav.html
 // ═══════════════════════════════════════════════════════════════
 
+// Central admin-settings fetch — ONE request shared site-wide.
+// Starts as a promise; nav.html awaits it and then replaces it with the
+// resolved object so existing synchronous readers (captain.html,
+// register.html) keep working once it has loaded.
+window.DS_SETTINGS = fetch('/.netlify/functions/admin-settings').then(r => r.json()).catch(() => ({}));
+
 (async function loadPartials() {
   const slots = document.querySelectorAll('[data-partial]');
   if (!slots.length) return;
