@@ -228,9 +228,11 @@
       ).filter(m => m.teamA === team.name || m.teamB === team.name)
        .sort((a,b) => a.week - b.week);
 
-      /* player stats for this team */
+      /* player stats for this team — only players who have actually played;
+         the aggregate seeds every rostered player at zero, and those shouldn't
+         populate Team Leaders */
       const allP = pstats && !pstats.empty ? Object.values(pstats.players || {}) : [];
-      const myP  = allP.filter(p => p.teamName === team.name || p.teamId === team.id);
+      const myP  = allP.filter(p => (p.teamName === team.name || p.teamId === team.id) && p.gamesPlayed > 0);
 
       /* roster helpers */
       const roster = (team.roster || []).slice().sort((a,b) => (a.name||'').localeCompare(b.name||''));
@@ -250,7 +252,9 @@
       let html = '';
 
       /* HERO */
-      const recPill = rec ? `<span class="tp-pill">${rec.wins}–${rec.losses}${rec.ties ? `–${rec.ties}` : ''}</span>` : '';
+      // Standings seed every team at 0–0, so "has stats" means at least one match played.
+      const hasPlayed = !!rec && (rec.wins + rec.losses + (rec.ties || 0)) > 0;
+      const recPill = hasPlayed ? `<span class="tp-pill">${rec.wins}–${rec.losses}${rec.ties ? `–${rec.ties}` : ''}</span>` : '';
       html += `
         <div class="tp-card">
           <div class="tp-hero">
@@ -262,7 +266,7 @@
                 <span class="tp-pill">${roster.length} players</span>
                 ${captain ? `<span class="tp-pill tp-pill--teal">Captain: ${esc(captain.name)}</span>` : ''}
                 ${recPill}
-                ${rec?.rank ? `<span class="tp-pill tp-pill--lime">#${rec.rank} of ${divTeamCount}</span>` : ''}
+                ${hasPlayed && rec?.rank ? `<span class="tp-pill tp-pill--lime">#${rec.rank} of ${divTeamCount}</span>` : ''}
               </div>
             </div>
           </div>
@@ -311,8 +315,8 @@
       }
       html += `</div>`;
 
-      /* MATCH RECORD */
-      if (rec) {
+      /* MATCH RECORD — hidden until the team has actually played */
+      if (hasPlayed) {
         const total = rec.wins + rec.losses + (rec.ties || 0);
         const winP  = pct(rec.wins, total);
         html += `<div class="tp-card">
