@@ -3,6 +3,7 @@
 
 import { findPlayerByEmail, createPlayerToken } from './lib/player-auth.js';
 import { sendEmail, renderPlayerMagicLink } from './lib/email.js';
+import { allowRequest } from './lib/rate-limit.js';
 
 const GENERIC = {
   ok: true,
@@ -16,6 +17,19 @@ export default async (req) => {
     const normalized = (email || '').toString().trim().toLowerCase();
     if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
       return json({ error: 'Valid email required' }, 400);
+    }
+
+    // Rate limit: max 3 links per email + 10 per IP per 15 minutes. Over the
+    // limit we still return the GENERIC 200 (no enumeration, nothing for an
+    // attacker to observe) — we just quietly don't send another email.
+    const ip = req.headers.get('x-nf-client-connection-ip') || 'unknown';
+    const [emailOk, ipOk] = await Promise.all([
+      allowRequest(`player-login:email:${normalized}`, { max: 3, windowMin: 15 }),
+      allowRequest(`player-login:ip:${ip}`, { max: 10, windowMin: 15 }),
+    ]);
+    if (!emailOk || !ipOk) {
+      await new Promise(r => setTimeout(r, 300)); // uniform timing
+      return json(GENERIC);
     }
 
     const found = await findPlayerByEmail(normalized);

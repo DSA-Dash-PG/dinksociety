@@ -474,7 +474,16 @@
 
   // ---- schedule ----
   const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
+  // Error boundary: a single malformed match must never blank the whole view.
   function renderSchedule() {
+    try {
+      renderScheduleInner();
+    } catch (err) {
+      console.error('schedule render failed:', err);
+      $('v-schedule').innerHTML = '<div class="muted">Couldn’t display your schedule. Pull down to refresh, or try again shortly.</div>';
+    }
+  }
+  function renderScheduleInner() {
     const sch = DATA.schedule || [], me = DATA.profile;
     const upcoming = sch.filter(m => !m.final);
     const results = sch.filter(m => m.final).reverse();
@@ -511,11 +520,17 @@
     }
     if (upcoming.length > (next?1:0)) {
       html += '<div class="label">Upcoming</div>';
-      upcoming.slice(next?1:0).forEach(m => { html += matchCard(m, me, false); });
+      upcoming.slice(next?1:0).forEach(m => {
+        try { html += matchCard(m, me, false); }
+        catch (e) { console.warn('skipping malformed match', m && m.id, e); }
+      });
     }
     if (results.length) {
       html += '<div class="label">Results</div>';
-      results.forEach(m => { html += matchCard(m, me, true); });
+      results.forEach(m => {
+        try { html += matchCard(m, me, true); }
+        catch (e) { console.warn('skipping malformed match', m && m.id, e); }
+      });
     }
     if (!sch.length) html = '<div class="muted">No matches scheduled yet. Your season schedule will show up here.</div>';
     $('v-schedule').innerHTML = html;
