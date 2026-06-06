@@ -38,6 +38,9 @@ export default async (req) => {
   const WEEKS = seasonData?.weeks || 8;
   const ROUNDS_PER_MATCH = seasonData?.roundsPerMatch || 2;
   const GAMES_PER_ROUND = seasonData?.gamesPerRound || 6;
+  // Lineups hard-lock this many minutes before match start. Season-configurable
+  // (default 3 hours) — keep in sync with the reveal offset rules in [[lineup-system]].
+  const LINEUP_LOCK_OFFSET_MIN = Number(seasonData?.lineupLockOffsetMin) || 180;
 
   // Verify this captain is actually in this match
   const match = await findMatch(scheduleStore, matchId, ctx.team, WEEKS);
@@ -59,6 +62,11 @@ export default async (req) => {
     const oppLocked = !!opp?.lockedAt;
     const revealed = myLocked && oppLocked;
 
+    // A locked lineup can be reopened by the captain only while it's still before
+    // the hard-lock window AND the opponent hasn't locked (i.e. nothing revealed).
+    const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
+    const unlockable = myLocked && !revealed && (cutoff === null || Date.now() < cutoff);
+
     return json({
       matchId,
       myRole: match.teamA.id === myTeamId ? 'home' : 'away',
@@ -71,18 +79,49 @@ export default async (req) => {
       scheduledAt: match.scheduledAt || null,
       myLineup: mine || null,
       oppLineup: revealed ? sanitizeRevealedLineup(opp) : null,
-      status: { myLocked, oppLocked, revealed },
+      status: { myLocked, oppLocked, revealed, unlockable, hardLockAt: cutoff ? new Date(cutoff).toISOString() : null },
     });
   }
 
   // ========== PUT ==========
   if (req.method === 'PUT') {
     const body = await req.json();
-    const action = body.action === 'lock' ? 'lock' : 'save';
+    const action = ['lock', 'unlock'].includes(body.action) ? body.action : 'save';
     const games = body.games || {};
 
     // Load current to check lock state
     const existing = await lineupStore.get(myKey, { type: 'json' }).catch(() => null);
+
+    // ========== UNLOCK ==========
+    // Reopen a locked lineup for editing — but only while it's safe to do so:
+    //   1. it must actually be locked,
+    //   2. the opponent must NOT be locked (once both lock, the matchup is
+    //      revealed and changing yours would defeat the blind-lineup anti-cheat),
+    //   3. we must still be before the hard-lock window (match start − offset).
+    // Anything past those points needs an admin override (logged), not self-serve.
+    if (action === 'unlock') {
+      if (!existing?.lockedAt) {
+        return json({ error: 'Lineup is not locked.' }, 409);
+      }
+      const opp = await lineupStore.get(oppKey, { type: 'json' }).catch(() => null);
+      if (opp?.lockedAt) {
+        return json({ error: 'Both lineups are locked and the matchup is revealed — it can no longer be unlocked. Ask a league admin if you need a change.' }, 409);
+      }
+      const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
+      if (cutoff !== null && Date.now() >= cutoff) {
+        return json({ error: `Too close to match time — lineups hard-lock ${formatOffset(LINEUP_LOCK_OFFSET_MIN)} before the match and can no longer be unlocked. Ask a league admin if you need a change.` }, 403);
+      }
+      const reopened = {
+        ...existing,
+        lockedAt: null,
+        lockedBy: null,
+        updatedAt: new Date().toISOString(),
+        updatedBy: ctx.user.email,
+      };
+      await lineupStore.setJSON(myKey, reopened);
+      return json({ ok: true, locked: false, revealed: false, myLineup: reopened, oppLineup: null });
+    }
+
     if (existing?.lockedAt) {
       return json({ error: 'Lineup is already locked and cannot be changed' }, 409);
     }
@@ -309,6 +348,27 @@ function checkRosterDepth(roster) {
     gaps.push(`${n} more ${n > 1 ? 'men' : 'man'}`);
   }
   return `Not enough players to fill a lineup. With a ${MAX_GAMES_PER_NIGHT}-game-per-player cap you need at least ${minWomen} women and ${minMen} men (with a gender set) — you have ${women} ${women === 1 ? 'woman' : 'women'} and ${men} ${men === 1 ? 'man' : 'men'}. Add ${gaps.join(' and ')} to your roster, then lock.`;
+}
+
+/**
+ * The instant a lineup hard-locks: match start − offset (in minutes).
+ * Returns a ms timestamp, or null when the match has no scheduled time (in which
+ * case there's no time-based lock to enforce). scheduledAt is an ISO timestamp.
+ */
+function hardLockTime(scheduledAt, offsetMin) {
+  if (!scheduledAt) return null;
+  const t = Date.parse(scheduledAt);
+  if (Number.isNaN(t)) return null;
+  return t - offsetMin * 60000;
+}
+
+/** Human-friendly offset, e.g. 180 → "3 hours", 30 → "30 minutes". */
+function formatOffset(min) {
+  if (min % 60 === 0) {
+    const h = min / 60;
+    return `${h} hour${h === 1 ? '' : 's'}`;
+  }
+  return `${min} minutes`;
 }
 
 function prettySlot(slot) {

@@ -92,6 +92,37 @@
   .m__foot { font-size:10px; color:var(--color-text-faint); margin-top:9px; padding-top:8px; border-top:1px solid var(--color-border); }
   .m__foot b { color:var(--color-lime); }
 
+  /* ── Lineup card (player view) ───────────────────── */
+  .lu { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; margin-bottom:8px; }
+  .lu__head { display:flex; align-items:center; gap:8px; padding:13px 14px; border-bottom:1px solid var(--color-border); }
+  .lu__head h3 { margin:0; font-size:13px; font-weight:800; }
+  .lu__status { margin-left:auto; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:3px 9px; border-radius:var(--radius-full); }
+  .lu__status.is-locked { background:var(--color-teal-dim); color:var(--color-teal); }
+  .lu__status.is-revealed { background:var(--color-lime-dim); color:var(--color-lime); }
+  .lu__round { padding:0 14px 12px; }
+  .lu__rtitle { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:14px 0 4px; }
+  .lu__rserve { font-size:10px; color:var(--color-text-muted); margin-bottom:8px; }
+  .lu__rserve b { color:var(--color-text); }
+  .lu__colhead { display:grid; grid-template-columns:38px 1fr 16px 1fr; gap:6px; align-items:center; padding:0 2px 6px; }
+  .lu__colhead span { font-size:8px; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
+  .lu__colhead .right { text-align:right; }
+  .g { display:grid; grid-template-columns:38px 1fr 16px 1fr; gap:6px; align-items:center; padding:8px 8px; margin:0 -6px; border-radius:var(--radius-sm); border-bottom:1px solid var(--color-border); }
+  .g:last-child { border-bottom:none; }
+  .g.is-mine { background:var(--color-lime-ghost); box-shadow:inset 2px 0 0 var(--color-lime); }
+  .g__no { font-size:9px; font-weight:800; color:var(--color-text-faint); }
+  .g__no small { display:block; font-size:7px; letter-spacing:0.04em; font-weight:700; margin-top:1px; }
+  .g__no .type-w { color:#e57bb0; } .g__no .type-m { color:#5aa9ff; } .g__no .type-x { color:var(--color-teal); }
+  .g__pair { font-size:11px; line-height:1.45; min-width:0; }
+  .g__pair .pl { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .g__pair .you { color:var(--color-lime); font-weight:800; }
+  .g__pair--right { text-align:right; }
+  .g__vs { font-size:8px; font-weight:800; color:var(--color-text-faint); text-align:center; }
+  .g__hidden { color:var(--color-text-faint); font-style:italic; font-size:10px; }
+  .g__mine-tag { display:inline-block; font-size:7px; font-weight:800; letter-spacing:0.06em; background:var(--color-lime); color:var(--color-text-inverse); border-radius:var(--radius-full); padding:1px 5px; margin-left:5px; vertical-align:1px; }
+  .lu__reveal-note { background:rgba(0,0,0,0.25); border:1px dashed var(--color-border-strong); border-radius:var(--radius-sm); padding:10px 12px; font-size:11px; color:var(--color-text-muted); margin:12px 14px 2px; text-align:center; }
+  .lu__foot { padding:11px 14px; border-top:1px solid var(--color-border); font-size:10px; color:var(--color-text-faint); line-height:1.5; display:flex; gap:7px; align-items:flex-start; }
+  .lu__foot b { color:var(--color-text-muted); }
+
   .dsr { background:var(--color-surface); border:1px solid rgba(184,255,44,0.25); border-radius:var(--radius-lg); padding:20px; text-align:center; margin-bottom:14px; }
   .dsr__lbl { font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
   .dsr__n { font-size:52px; font-weight:900; color:var(--color-lime); line-height:1; margin:6px 0 4px; }
@@ -460,11 +491,10 @@
       const serveBlock = next.home
         ? `<div class="next__serve"><b>Round 1:</b> You serve first · opponent chooses side</div>`
         : `<div class="next__serve"><b>Round 1:</b> Opponent serves first · you choose side</div>`;
-      const youBlock = next.revealed && next.myGames.length
-        ? `<div class="next__you">You're in the lineup — <b>${next.myGames.length} game${next.myGames.length===1?'':'s'}</b>:<div class="next__games">${next.myGames.map(g=>'<span class="gtag">'+esc(g)+'</span>').join('')}</div></div>`
-        : next.myLocked
-          ? `<div class="next__you">Lineup locked — it reveals 30 min before match.</div>`
-          : `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>`;
+      // Detail lives in the lineup card below once locked; here just nudge if not set.
+      const youBlock = next.myLocked
+        ? ''
+        : `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>`;
       html += `<div class="next">
         <div class="next__eyebrow"><span class="pulse"></span> ${next.status==='live'?'Live now':'Next match'} · Week ${next.week}</div>
         <div class="next__row">
@@ -476,6 +506,7 @@
         ${serveBlock}
         ${youBlock}
       </div>`;
+      if (next.lineup) html += renderLineupCard(next, me);
     }
     if (upcoming.length > (next?1:0)) {
       html += '<div class="label">Upcoming</div>';
@@ -514,6 +545,62 @@
         ${center}
         <div class="m__team"><div class="m__emoji">${emo({emoji:awayEmoji})}</div><div class="m__tn">${esc(awayName)}</div></div>
       </div>${foot}</div>`;
+  }
+
+  // Full lineup card for the next/current match. Shows our team once locked;
+  // the opponent only once revealed (mirrors the blind-lineup rules).
+  function lineupGameType(slot) {
+    const g = slot.slice(-1);
+    if (g === '1') return { label: 'Women', cls: 'type-w' };
+    if (g === '2') return { label: 'Men', cls: 'type-m' };
+    return { label: 'Mixed', cls: 'type-x' };
+  }
+  function renderLineupCard(next, me) {
+    const lu = next.lineup;
+    if (!lu) return '';
+    const revealed = !!lu.opp;
+    const myName = me.teamName, oppName = next.opponent.name;
+    const nameEl = (side, pos, isMe) =>
+      `<div class="pl${isMe ? ' you' : ''}">${side && side[pos] ? esc(side[pos]) : '—'}${isMe ? '<span class="g__mine-tag">YOU</span>' : ''}</div>`;
+    const round = (r) => {
+      const serve = next.home
+        ? (r === 1 ? '<b>You serve first</b> · opponent chooses side' : '<b>You choose side</b> · opponent serves first')
+        : (r === 1 ? '<b>Opponent serves first</b> · you choose side' : '<b>Opponent chooses side</b> · you serve first');
+      const rows = [1,2,3,4,5,6].map(gi => {
+        const s = `r${r}g${gi}`;
+        const t = lineupGameType(s);
+        const mineSide = lu.mine ? lu.mine[s] : null;
+        const mePos = lu.mySlots ? lu.mySlots[s] : null;
+        const oppCol = revealed
+          ? `<div class="g__pair g__pair--right">${nameEl(lu.opp[s], 'p1', false)}${nameEl(lu.opp[s], 'p2', false)}</div>`
+          : `<div class="g__pair g__pair--right g__hidden">Hidden</div>`;
+        return `<div class="g${mePos ? ' is-mine' : ''}">
+          <div class="g__no">G${gi}<small class="${t.cls}">${t.label}</small></div>
+          <div class="g__pair">${nameEl(mineSide, 'p1', mePos === 'p1')}${nameEl(mineSide, 'p2', mePos === 'p2')}</div>
+          <div class="g__vs">vs</div>
+          ${oppCol}
+        </div>`;
+      }).join('');
+      return `<div class="lu__round">
+        <div class="lu__rtitle">Round ${r}</div>
+        <div class="lu__rserve">${serve}</div>
+        <div class="lu__colhead"><span></span><span>${esc(myName)}</span><span></span><span class="right">${esc(oppName)}</span></div>
+        ${rows}
+      </div>`;
+    };
+    const n = lu.mySlots ? Object.keys(lu.mySlots).length : 0;
+    const pill = revealed
+      ? '<span class="lu__status is-revealed">Revealed</span>'
+      : '<span class="lu__status is-locked">Locked</span>';
+    const note = revealed ? '' : `<div class="lu__reveal-note">🔒 Opponent's lineup reveals 30 min before match — here's your team's.</div>`;
+    return `<div class="label">Lineup <span class="sub">${revealed ? 'Full matchup' : 'Your team'}</span></div>
+      <div class="lu">
+        <div class="lu__head"><h3>Match lineup</h3>${pill}</div>
+        ${note}
+        ${round(1)}
+        ${round(2)}
+        <div class="lu__foot"><span>🏓</span><span>You're in <b>${n} of 12 game${n === 1 ? '' : 's'}</b>.</span></div>
+      </div>`;
   }
 
   // ---- standings ----

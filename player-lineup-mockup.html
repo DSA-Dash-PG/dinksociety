@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player Lineup View — Mockup</title>
+<style>
+  :root {
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12); --color-lime-ghost:rgba(184,255,44,0.06);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-red:#ff5c47; --color-red-dim:rgba(255,92,71,0.12);
+    --color-gold:#f0c040; --color-gold-dim:rgba(240,192,64,0.12);
+    --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-full:999px;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:#070707; color:var(--color-text); font-family:var(--font); }
+  .stage { display:flex; flex-wrap:wrap; gap:28px; justify-content:center; padding:28px 16px 60px; }
+  .caption { width:100%; max-width:900px; margin:0 auto 4px; color:var(--color-text-muted); font-size:13px; line-height:1.6; }
+  .caption h1 { color:var(--color-text); font-size:20px; font-weight:800; margin:0 0 6px; }
+  .phone { width:390px; max-width:100%; background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:26px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.5); }
+  .phone__label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-teal); font-weight:700; text-align:center; padding:10px 0 0; }
+
+  .appbar { display:flex; justify-content:space-between; align-items:center; padding:12px 16px 10px; border-bottom:1px solid var(--color-border); }
+  .appbar__brand { font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--color-teal); font-weight:700; }
+  .appbar__team { font-size:9px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-faint); font-weight:600; margin-top:2px; }
+  .appbar__av { width:32px; height:32px; border-radius:50%; background:var(--color-lime-dim); border:1px solid rgba(184,255,44,0.3); display:grid; place-items:center; font-size:12px; font-weight:800; color:var(--color-lime); }
+
+  .body { padding:14px 14px 18px; }
+  .label { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:18px 2px 9px; display:flex; justify-content:space-between; align-items:center; }
+  .label:first-child { margin-top:4px; }
+  .label .sub { color:var(--color-text-muted); text-transform:none; letter-spacing:0; font-weight:600; }
+
+  /* Next-match hero (existing component, shown for context) */
+  .next { background:linear-gradient(135deg, rgba(184,255,44,0.16), rgba(23,215,176,0.08)); border:1px solid rgba(184,255,44,0.28); border-radius:var(--radius-md); padding:14px; margin-bottom:8px; }
+  .next__eyebrow { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-lime); font-weight:800; display:flex; align-items:center; gap:6px; }
+  .pulse { width:7px; height:7px; border-radius:50%; background:var(--color-lime); display:inline-block; }
+  .next__row { display:flex; align-items:center; gap:12px; margin:12px 0 8px; }
+  .next__team { flex:1; text-align:center; } .next__emoji { font-size:28px; } .next__tn { font-size:13px; font-weight:700; margin-top:3px; }
+  .next__vs { font-size:11px; font-weight:800; color:var(--color-text-faint); }
+  .next__meta { font-size:11px; color:var(--color-text-muted); text-align:center; }
+
+  /* ── NEW: Lineup card ────────────────────────────── */
+  .lu { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; }
+  .lu__head { display:flex; align-items:center; gap:8px; padding:13px 14px; border-bottom:1px solid var(--color-border); }
+  .lu__head h3 { margin:0; font-size:13px; font-weight:800; }
+  .lu__status { margin-left:auto; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:3px 9px; border-radius:var(--radius-full); }
+  .lu__status.is-locked { background:var(--color-teal-dim); color:var(--color-teal); }
+  .lu__status.is-revealed { background:var(--color-lime-dim); color:var(--color-lime); }
+  .lu__status.is-pending { background:var(--color-gold-dim); color:var(--color-gold); }
+
+  .lu__round { padding:4px 14px 12px; }
+  .lu__rtitle { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:14px 0 4px; }
+  .lu__rserve { font-size:10px; color:var(--color-text-muted); margin-bottom:8px; }
+  .lu__rserve b { color:var(--color-text); }
+
+  .lu__colhead { display:grid; grid-template-columns:38px 1fr 16px 1fr; gap:6px; align-items:center; padding:0 2px 6px; }
+  .lu__colhead span { font-size:8px; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
+  .lu__colhead .right { text-align:right; }
+
+  .g { display:grid; grid-template-columns:38px 1fr 16px 1fr; gap:6px; align-items:center; padding:8px 8px; margin:0 -6px; border-radius:var(--radius-sm); border-bottom:1px solid var(--color-border); }
+  .g:last-child { border-bottom:none; }
+  .g.is-mine { background:var(--color-lime-ghost); box-shadow:inset 2px 0 0 var(--color-lime); }
+  .g__no { font-size:9px; font-weight:800; color:var(--color-text-faint); }
+  .g__no small { display:block; font-size:7px; letter-spacing:0.04em; color:var(--color-text-faint); font-weight:700; margin-top:1px; }
+  .g__no .type-w { color:#e57bb0; } .g__no .type-m { color:#5aa9ff; } .g__no .type-x { color:var(--color-teal); }
+  .g__pair { font-size:11px; line-height:1.45; min-width:0; }
+  .g__pair .pl { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .g__pair .you { color:var(--color-lime); font-weight:800; }
+  .g__pair--right { text-align:right; }
+  .g__vs { font-size:8px; font-weight:800; color:var(--color-text-faint); text-align:center; }
+  .g__hidden { color:var(--color-text-faint); font-style:italic; font-size:10px; }
+  .g__mine-tag { display:inline-block; font-size:7px; font-weight:800; letter-spacing:0.06em; background:var(--color-lime); color:var(--color-text-inverse); border-radius:var(--radius-full); padding:1px 5px; margin-left:5px; vertical-align:1px; }
+
+  .lu__foot { padding:11px 14px; border-top:1px solid var(--color-border); font-size:10px; color:var(--color-text-faint); line-height:1.5; display:flex; gap:7px; align-items:flex-start; }
+  .lu__foot b { color:var(--color-text-muted); }
+  .lu__reveal-note { background:rgba(0,0,0,0.25); border:1px dashed var(--color-border-strong); border-radius:var(--radius-sm); padding:10px 12px; font-size:11px; color:var(--color-text-muted); margin:2px 0 0; text-align:center; }
+  .lu__empty { padding:26px 16px; text-align:center; color:var(--color-text-faint); font-size:12px; line-height:1.6; }
+  .lu__legend { display:flex; gap:14px; flex-wrap:wrap; padding:10px 14px; border-top:1px solid var(--color-border); font-size:9px; color:var(--color-text-faint); }
+  .lu__legend span { display:inline-flex; align-items:center; gap:5px; }
+  .dot { width:8px; height:8px; border-radius:2px; display:inline-block; }
+
+  /* faux bottom nav for context */
+  .nav { display:flex; border-top:1px solid var(--color-border); background:rgba(18,18,18,0.97); padding:8px 6px 12px; }
+  .nb { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; font-size:8px; letter-spacing:0.04em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
+  .nb.is-active { color:var(--color-lime); }
+  .nb svg { width:18px; height:18px; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption">
+      <h1>Player lineup view — concept</h1>
+      Lives inside the existing <b>Schedule</b> tab, under the “Next match” hero (no new nav tab). Two states shown: <b>A</b> — your lineup is locked but the opponent's is still hidden (blind-lineup window); <b>B</b> — both locked, matchup revealed. Your games are highlighted in lime with a “YOU” tag. Mixed games list the woman first to match the scoresheet.
+    </div>
+
+    <!-- ============ STATE A: locked, opponent hidden ============ -->
+    <div class="phone">
+      <div class="phone__label">A · Locked · opponent hidden</div>
+      <div class="appbar">
+        <div><div class="appbar__brand">The Dink Society</div><div class="appbar__team">South End Smash · Division B</div></div>
+        <div class="appbar__av">RH</div>
+      </div>
+      <div class="body">
+        <div class="next">
+          <div class="next__eyebrow"><span class="pulse"></span> Next match · Week 3</div>
+          <div class="next__row">
+            <div class="next__team"><div class="next__emoji">🏓</div><div class="next__tn">South End Smash</div></div>
+            <div class="next__vs">VS</div>
+            <div class="next__team"><div class="next__emoji">🔥</div><div class="next__tn">North Park Net</div></div>
+          </div>
+          <div class="next__meta">Courts 3 &amp; 4 · Mon Jun 22 · 7:00 PM</div>
+        </div>
+
+        <div class="label">Lineup <span class="sub">Set by your captain</span></div>
+        <div class="lu">
+          <div class="lu__head">
+            <h3>Match lineup</h3>
+            <span class="lu__status is-locked">Locked</span>
+          </div>
+
+          <div class="lu__reveal-note">🔒 Opponent's lineup reveals 30 min before match. Here's your team's lineup now.</div>
+
+          <div class="lu__round">
+            <div class="lu__rtitle">Round 1</div>
+            <div class="lu__rserve"><b>Home serves first</b> · away chooses side</div>
+            <div class="lu__colhead"><span></span><span>South End Smash</span><span></span><span class="right">North Park Net</span></div>
+
+            <div class="g"><div class="g__no">G1<small class="type-w">Women</small></div>
+              <div class="g__pair"><div class="pl">Dana K.</div><div class="pl">Priya S.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+
+            <div class="g is-mine"><div class="g__no">G2<small class="type-m">Men</small></div>
+              <div class="g__pair"><div class="pl you">Richard H.<span class="g__mine-tag">YOU</span></div><div class="pl">Marcus T.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+
+            <div class="g"><div class="g__no">G3<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Dana K.</div><div class="pl">Marcus T.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+
+            <div class="g is-mine"><div class="g__no">G4<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Priya S.</div><div class="pl you">Richard H.<span class="g__mine-tag">YOU</span></div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+
+            <div class="g"><div class="g__no">G5<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Lena M.</div><div class="pl">Marcus T.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+
+            <div class="g"><div class="g__no">G6<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Dana K.</div><div class="pl">Sam W.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+          </div>
+
+          <div class="lu__round">
+            <div class="lu__rtitle">Round 2</div>
+            <div class="lu__rserve"><b>Home chooses side</b> · away serves first</div>
+            <div class="g is-mine"><div class="g__no">G1<small class="type-w">Women</small></div>
+              <div class="g__pair"><div class="pl">Priya S.</div><div class="pl">Lena M.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+            <div class="g"><div class="g__no">G2<small class="type-m">Men</small></div>
+              <div class="g__pair"><div class="pl">Marcus T.</div><div class="pl">Sam W.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+            <div class="g"><div class="g__no">G3<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Lena M.</div><div class="pl">Sam W.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right g__hidden">Hidden</div></div>
+            <div class="g" style="opacity:.6"><div class="g__no">…</div><div class="g__pair" style="color:var(--color-text-faint)">G4–G6 below</div><div></div><div></div></div>
+          </div>
+
+          <div class="lu__foot"><span>🏓</span><span>You're in <b>3 of 12 games</b> (cap is 4). Lineups lock 3 hours before match — talk to your captain before then for changes.</span></div>
+        </div>
+      </div>
+
+      <div class="nav">
+        <div class="nb is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Schedule</span></div>
+        <div class="nb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/></svg><span>Standings</span></div>
+        <div class="nb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Stats</span></div>
+        <div class="nb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Team</span></div>
+      </div>
+    </div>
+
+    <!-- ============ STATE B: revealed ============ -->
+    <div class="phone">
+      <div class="phone__label">B · Revealed · both locked</div>
+      <div class="appbar">
+        <div><div class="appbar__brand">The Dink Society</div><div class="appbar__team">South End Smash · Division B</div></div>
+        <div class="appbar__av">RH</div>
+      </div>
+      <div class="body">
+        <div class="next">
+          <div class="next__eyebrow"><span class="pulse"></span> Live now · Week 3</div>
+          <div class="next__row">
+            <div class="next__team"><div class="next__emoji">🏓</div><div class="next__tn">South End Smash</div></div>
+            <div class="next__vs">VS</div>
+            <div class="next__team"><div class="next__emoji">🔥</div><div class="next__tn">North Park Net</div></div>
+          </div>
+          <div class="next__meta">Courts 3 &amp; 4 · Mon Jun 22 · 7:00 PM</div>
+        </div>
+
+        <div class="label">Lineup <span class="sub">Full matchup</span></div>
+        <div class="lu">
+          <div class="lu__head">
+            <h3>Match lineup</h3>
+            <span class="lu__status is-revealed">Revealed</span>
+          </div>
+
+          <div class="lu__round">
+            <div class="lu__rtitle">Round 1</div>
+            <div class="lu__rserve"><b>Home serves first</b> · away chooses side</div>
+            <div class="lu__colhead"><span></span><span>South End Smash</span><span></span><span class="right">North Park Net</span></div>
+
+            <div class="g"><div class="g__no">G1<small class="type-w">Women</small></div>
+              <div class="g__pair"><div class="pl">Dana K.</div><div class="pl">Priya S.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Bea L.</div><div class="pl">Quinn R.</div></div></div>
+
+            <div class="g is-mine"><div class="g__no">G2<small class="type-m">Men</small></div>
+              <div class="g__pair"><div class="pl you">Richard H.<span class="g__mine-tag">YOU</span></div><div class="pl">Marcus T.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Tom V.</div><div class="pl">Will A.</div></div></div>
+
+            <div class="g"><div class="g__no">G3<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Dana K.</div><div class="pl">Marcus T.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Bea L.</div><div class="pl">Tom V.</div></div></div>
+
+            <div class="g is-mine"><div class="g__no">G4<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Priya S.</div><div class="pl you">Richard H.<span class="g__mine-tag">YOU</span></div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Quinn R.</div><div class="pl">Will A.</div></div></div>
+
+            <div class="g"><div class="g__no">G5<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Lena M.</div><div class="pl">Marcus T.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Bea L.</div><div class="pl">Will A.</div></div></div>
+
+            <div class="g"><div class="g__no">G6<small class="type-x">Mixed</small></div>
+              <div class="g__pair"><div class="pl">Dana K.</div><div class="pl">Sam W.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Quinn R.</div><div class="pl">Tom V.</div></div></div>
+          </div>
+
+          <div class="lu__round">
+            <div class="lu__rtitle">Round 2</div>
+            <div class="lu__rserve"><b>Home chooses side</b> · away serves first</div>
+            <div class="g is-mine"><div class="g__no">G1<small class="type-w">Women</small></div>
+              <div class="g__pair"><div class="pl">Priya S.</div><div class="pl">Lena M.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Bea L.</div><div class="pl">Quinn R.</div></div></div>
+            <div class="g"><div class="g__no">G2<small class="type-m">Men</small></div>
+              <div class="g__pair"><div class="pl">Marcus T.</div><div class="pl">Sam W.</div></div>
+              <div class="g__vs">vs</div>
+              <div class="g__pair g__pair--right"><div class="pl">Tom V.</div><div class="pl">Will A.</div></div></div>
+            <div class="g" style="opacity:.6"><div class="g__no">…</div><div class="g__pair" style="color:var(--color-text-faint)">G3–G6 below</div><div></div><div></div></div>
+          </div>
+
+          <div class="lu__legend">
+            <span><i class="dot" style="background:var(--color-lime)"></i> Your games</span>
+            <span><i class="dot" style="background:#e57bb0"></i> Women's</span>
+            <span><i class="dot" style="background:#5aa9ff"></i> Men's</span>
+            <span><i class="dot" style="background:var(--color-teal)"></i> Mixed</span>
+          </div>
+          <div class="lu__foot"><span>🏓</span><span>You're in <b>3 of 12 games</b>. Tap a game on the scoresheet during play to enter scores.</span></div>
+        </div>
+      </div>
+
+      <div class="nav">
+        <div class="nb is-active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span>Schedule</span></div>
+        <div class="nb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="10" y1="6" x2="21" y2="6"/><line x1="10" y1="12" x2="21" y2="12"/><line x1="10" y1="18" x2="21" y2="18"/></svg><span>Standings</span></div>
+        <div class="nb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg><span>Stats</span></div>
+        <div class="nb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg><span>Team</span></div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

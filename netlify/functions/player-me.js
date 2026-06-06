@@ -10,6 +10,7 @@ const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
   r2g1: "R2 · Women's", r2g2: "R2 · Men's", r2g3: 'R2 · Mixed', r2g4: 'R2 · Mixed', r2g5: 'R2 · Mixed', r2g6: 'R2 · Mixed',
 };
+const LINEUP_SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
 
 export default async (req) => {
   const ctx = await requirePlayer(req);
@@ -98,6 +99,9 @@ export default async (req) => {
       // My lineup membership (which games I'm slotted in), if my lineup is locked
       let myGames = [];
       let myLocked = false, revealed = false;
+      // Full lineup for the player view: our team's pairings once locked, the
+      // opponent's only once revealed (preserves the blind-lineup anti-cheat).
+      let lineup = null;
       if (!final) {
         const [mine, oppLu] = await Promise.all([
           lineupStore.get(`lineup/${mt.id}/${teamId}.json`, { type: 'json' }).catch(() => null),
@@ -110,6 +114,25 @@ export default async (req) => {
             if (g && (g.p1 === playerId || g.p2 === playerId)) myGames.push(SLOT_LABEL[slot] || slot);
           }
         }
+        if (myLocked && mine?.games) {
+          // Names only — no PII. Mixed slots are already stored woman-first.
+          const side = (lu) => {
+            if (!lu?.games) return null;
+            const o = {};
+            for (const s of LINEUP_SLOTS) {
+              const g = lu.games[s];
+              o[s] = { p1: g?.p1Name || null, p2: g?.p2Name || null };
+            }
+            return o;
+          };
+          const mySlots = {};
+          for (const s of LINEUP_SLOTS) {
+            const g = mine.games[s];
+            if (g?.p1 === playerId) mySlots[s] = 'p1';
+            else if (g?.p2 === playerId) mySlots[s] = 'p2';
+          }
+          lineup = { mine: side(mine), opp: revealed ? side(oppLu) : null, mySlots };
+        }
       }
 
       schedule.push({
@@ -118,7 +141,7 @@ export default async (req) => {
         home, court: mt.court || null, scheduledAt: mt.scheduledAt || null, startTime: mt.startTime || null,
         championship: !!mt.championship,
         final, myMp, oppMp, result,
-        myLocked, revealed, myGames,
+        myLocked, revealed, myGames, lineup,
         status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
       });
     }

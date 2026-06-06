@@ -1598,15 +1598,25 @@
         $id('lineup-actions').style.display = 'none';
       } else if (data.status.myLocked) {
         pillEl.innerHTML = '<span class="match-pill match-pill--locked">Locked</span>';
+        const canUnlock = !!data.status.unlockable;
+        const cutoffNote = data.status.hardLockAt
+          ? `You can still unlock and make changes until <strong>${formatLockCutoff(data.status.hardLockAt)}</strong>, when the lineup hard-locks.`
+          : 'You can still unlock and make changes until the lineup hard-locks before match time.';
         revealEl.innerHTML = `
           <div class="locked-notice">
             <span>Your lineup is locked. Waiting on ${escapeHtml(m.opponent.name)}. You'll see the full matchup as soon as they lock theirs.</span>
+            ${canUnlock ? `<div style="margin-top:12px; opacity:0.85;">${cutoffNote}</div>
+            <button class="cap-btn cap-btn--ghost" id="unlock-lineup-btn" style="margin-top:10px;">Unlock to edit</button>` : ''}
           </div>
         `;
         lockBtn.style.display = 'none';
         saveBtn.style.display = 'none';
         $id('lineup-builder').style.display = '';
         $id('lineup-actions').style.display = '';
+        if (canUnlock) {
+          const ub = $id('unlock-lineup-btn');
+          if (ub) ub.addEventListener('click', unlockLineup);
+        }
       } else {
         pillEl.innerHTML = '<span class="match-pill match-pill--unlocked">Unlocked</span>';
         revealEl.innerHTML = '';
@@ -2342,6 +2352,43 @@
         saveBtn.disabled = false;
         lockBtn.disabled = false;
       }
+    }
+
+    // ===== Unlock (reopen a locked lineup before the hard-lock window) =====
+    async function unlockLineup() {
+      if (!confirm('Unlock this lineup so you can edit it? It won’t count as locked again until you re-lock it.')) return;
+      const status = $id('lineup-status');
+      const ub = $id('unlock-lineup-btn');
+      if (ub) ub.disabled = true;
+      status.className = 'a-status is-info';
+      status.textContent = 'Unlocking…';
+      try {
+        const res = await fetch(`/.netlify/functions/captain-lineup?match=${encodeURIComponent(state.currentMatch.id)}`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'unlock' }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Unlock failed');
+        status.className = 'cap-status is-success';
+        status.textContent = 'Unlocked. Make your changes, then lock again.';
+        await refreshLineup();
+        await loadMatches(); // refresh tile pills
+      } catch (err) {
+        if (ub) ub.disabled = false;
+        status.className = 'a-status is-err';
+        status.textContent = err.message;
+      }
+    }
+
+    // Friendly date+time for the hard-lock cutoff, e.g. "Mon, Jun 8, 4:00 PM".
+    function formatLockCutoff(iso) {
+      try {
+        return new Date(iso).toLocaleString([], {
+          weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+        });
+      } catch { return 'match time'; }
     }
 
     // Poll for opponent lock while we're locked but not revealed
