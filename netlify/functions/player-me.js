@@ -52,15 +52,17 @@ export default async (req) => {
   } catch { /* non-fatal */ }
 
   // ── Leaderboard (ranked by composite) ──
+  // Pre-season players (0 games) are included with dsr:null so the portal
+  // matches the public leaderboard, which lists every rostered player.
   const leaderboard = Object.values(players)
-    .filter(p => p.composite != null && p.gamesPlayed > 0)
     .map(p => ({
       playerId: p.playerId, name: p.name, teamName: p.teamName || null,
       division: teamDiv.get(p.teamId) || null, gender: p.gender || null,
-      dsr: Math.round((p.composite || 0) * 10) / 10,
+      dsr: (p.composite != null && (p.gamesPlayed || 0) > 0) ? Math.round(p.composite * 10) / 10 : null,
+      gp: p.gamesPlayed || 0,
       w: p.gamesWon || 0, l: p.gamesLost || 0, rankDelta: p.rankDelta ?? null,
     }))
-    .sort((a, b) => b.dsr - a.dsr)
+    .sort((a, b) => ((b.dsr ?? -1) - (a.dsr ?? -1)) || String(a.name || '').localeCompare(String(b.name || '')))
     .map((p, i) => ({ ...p, rank: i + 1, me: p.playerId === playerId }));
 
   // Player of the Week (latest week, gender split)
@@ -70,6 +72,13 @@ export default async (req) => {
     woman: pow.women?.[0] || null,
     man: pow.men?.[0] || null,
   } : null;
+
+  // K'CHN Top Chefs — weekly winners feed for the portal Leaders tab
+  const chefWeeks = (standings?.weeklyTopPerformers || []).map(w => ({
+    week: w.week,
+    women: (w.women || []).slice(0, 3),
+    men: (w.men || []).slice(0, 3),
+  }));
 
   // ── Team standing + roster (with DSR) ──
   let teamStanding = null;
@@ -175,6 +184,7 @@ export default async (req) => {
     partnerNames: partnerNames(myStats, players),
     leaderboard,
     pow: powOut,
+    chefWeeks,
     team: {
       standing: teamStanding,
       roster,

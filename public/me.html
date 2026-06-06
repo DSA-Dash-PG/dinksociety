@@ -760,7 +760,7 @@
     const me = DATA.profile, pow = DATA.pow;
     const powHtml = pow ? `<div class="label">Player of the Week${pow.week ? ' <span class="sub">Week ' + pow.week + '</span>' : ''}</div><div class="potw">
       ${powCard('♀ Woman', pow.woman)}${powCard('♂ Man', pow.man)}</div>` : '';
-    $('v-leaderboard').innerHTML = powHtml +
+    $('v-leaderboard').innerHTML = powHtml + chefsHtml() +
       `<div class="label">Leaderboard <span class="sub">${esc(me.divisionLabel || me.division || '')}</span></div>
       <div class="seg">
         <div class="seg__b ${lbFilter==='all'?'is-active':''}" data-f="all">All</div>
@@ -770,6 +770,29 @@
     $('v-leaderboard').querySelectorAll('.seg__b').forEach(b => b.addEventListener('click', () => { lbFilter = b.dataset.f; renderLeaderboard(); }));
     renderLbList();
   }
+  // ---- K'CHN Top Chefs (season win-rate leaders, division-scoped) ----
+  function chefsHtml() {
+    const me = DATA.profile;
+    const kchn = '<span style="display:inline-flex;align-items:center;background:#000;border:1px solid rgba(255,255,255,0.12);border-radius:5px;padding:1px 7px;margin-right:6px;"><span style="font-size:11px;font-weight:900;color:#f0d020;letter-spacing:0.06em;font-style:italic;">K\'CHN</span></span>';
+    let html = `<div class="label"><span style="display:flex;align-items:center;">${kchn} Top Chefs</span></div>`;
+    const pool = (DATA.leaderboard || [])
+      .filter(p => !me.division || p.division === me.division)
+      .filter(p => (p.w + p.l) > 0);
+    if (!pool.length) {
+      return html + '<div class="muted" style="padding:14px 16px;">⏳ Top Chefs appear after the first match night.</div>';
+    }
+    const rate = p => p.w / (p.w + p.l);
+    const top = g => pool.filter(p => (p.gender || '').toUpperCase().startsWith(g))
+      .sort((a, b) => (rate(b) - rate(a)) || (b.w - a.w)).slice(0, 3);
+    const row = (p, i) => `<div class="lb ${p.me?'lb--me':''}"><div class="lb__rank">${['🥇','🥈','🥉'][i] || i + 1}</div><div class="lb__av">${initials(p.name)}</div>
+      <div class="lb__body"><div class="lb__name">${esc(p.name)}${p.me?' · you':''}</div><div class="lb__team">${esc(p.teamName || '')}</div></div>
+      <div style="text-align:right;"><div class="lb__dsr">${p.w}–${p.l}</div><span class="lb__delta flat">${Math.round(rate(p) * 100)}%</span></div></div>`;
+    const f = top('F'), m = top('M');
+    if (f.length) html += '<div class="label">♀ Women</div>' + f.map(row).join('');
+    if (m.length) html += '<div class="label">♂ Men</div>' + m.map(row).join('');
+    return html;
+  }
+
   function powCard(lbl, p) {
     if (!p) return `<div class="potw__c"><div class="potw__lbl">${lbl}</div><div class="potw__name" style="color:var(--color-text-faint)">—</div></div>`;
     return `<div class="potw__c"><div class="potw__lbl">${lbl}</div><div class="potw__name">${esc(p.name)}</div><div class="potw__team">${esc(p.teamName||'')}</div>${p.dsr!=null?'<div class="potw__dsr">DSR '+esc(p.dsr)+'</div>':''}</div>`;
@@ -784,7 +807,7 @@
       const delta = d == null ? '<span class="lb__delta flat">—</span>' : d > 0 ? '<span class="lb__delta up">▲' + d + '</span>' : d < 0 ? '<span class="lb__delta down">▼' + (-d) + '</span>' : '<span class="lb__delta flat">—</span>';
       return `<div class="lb ${p.me?'lb--me':''}"><div class="lb__rank">${i + 1}</div><div class="lb__av">${initials(p.name)}</div>
         <div class="lb__body"><div class="lb__name">${esc(p.name)}${p.me?' · you':''}</div><div class="lb__team">${esc(p.teamName||'')}</div></div>
-        <div style="text-align:right;"><div class="lb__dsr">${esc(p.dsr)}</div>${delta}</div></div>`;
+        <div style="text-align:right;"><div class="lb__dsr">${p.dsr != null ? esc(p.dsr) : '—'}</div>${delta}</div></div>`;
     }).join('');
   }
 
