@@ -17,6 +17,8 @@
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
 import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
+import { circuitCode } from './lib/circuit.js';
+import { rebuildStandings } from './lib/standings.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -69,6 +71,7 @@ export default async (req) => {
   // ========== PUT — update team fields ==========
   if (req.method === 'PUT') {
     const body = await req.json();
+    const oldName = team.name;
     const allowed = ['name', 'emoji', 'color', 'secondaryColor', 'notes', 'division', 'divisionLabel'];
 
     for (const field of allowed) {
@@ -117,6 +120,25 @@ export default async (req) => {
     team.updatedAt = now;
     team.updatedBy = admin.email;
     await store.setJSON(teamKey, team);
+
+    // The team blob is the source of truth for the name, but the name is also
+    // SNAPSHOTTED into schedule matches, score records, and lineup records when
+    // those are created. On rename, push the new name into every copy so the
+    // whole site updates — otherwise public schedule/standings keep the old name.
+    if ('name' in body && team.name !== oldName) {
+      try {
+        await propagateTeamRename(team);
+      } catch (err) {
+        console.error('Team rename propagation failed:', err);
+        return json({ ok: true, team, warning: 'Team saved, but updating the name on existing schedule/score records failed — regenerate or retry.' });
+      }
+    } else if (body.roster && Array.isArray(body.roster)) {
+      // Roster replaced → refresh the pre-computed standings/player-stats
+      // aggregates so removed players don't linger on public pages (team page
+      // "Team Leaders", leaderboard, etc.). Rename path above already rebuilds.
+      rebuildStandings(circuitCode(team.circuit)).catch(err =>
+        console.error('rebuildStandings after roster update failed:', err));
+    }
     return json({ ok: true, team });
   }
 
@@ -153,6 +175,9 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
+        // Refresh aggregates so the new player appears on public pages.
+        rebuildStandings(circuitCode(team.circuit)).catch(err =>
+          console.error('rebuildStandings after add-player failed:', err));
         // Surface (don't block) any contact collision the new player created.
         const duplicateWarnings = findContactCollisions(roster);
         return json({ ok: true, player: newPlayer, rosterCount: roster.length, duplicateWarnings });
@@ -170,6 +195,9 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
+        // Refresh aggregates so the removed player stops showing on public pages.
+        rebuildStandings(circuitCode(team.circuit)).catch(err =>
+          console.error('rebuildStandings after remove-player failed:', err));
         return json({ ok: true, removed, rosterCount: roster.length });
       }
 
@@ -221,5 +249,59 @@ export default async (req) => {
 
   return new Response('Method not allowed', { status: 405 });
 };
+
+/**
+ * Pushes a renamed team's new name into every blob that snapshotted it:
+ *   1. schedule/<circuit>/<div>/week-N.json  — match.teamA/teamB.name
+ *   2. score/<matchId>.json                  — home/away.name
+ *   3. lineup/<matchId>/<teamId>.json        — teamName
+ *   4. standings + player-stats aggregates   — via rebuildStandings (reads team blobs)
+ * Scans the whole circuit prefix (all divisions) so a simultaneous division
+ * change can't strand a stale name under the old division.
+ */
+async function propagateTeamRename(team) {
+  const circuit = circuitCode(team.circuit);
+  const scheduleStore = getStore('schedule');
+  const scoresStore = getStore('scores');
+  const lineupStore = getStore('lineups');
+
+  // 1. Schedule blobs — also collect this team's matchIds for steps 2 & 3.
+  const myMatchIds = [];
+  const { blobs } = await scheduleStore.list({ prefix: `schedule/${circuit}/` });
+  for (const b of blobs) {
+    const data = await scheduleStore.get(b.key, { type: 'json' }).catch(() => null);
+    if (!data?.matches) continue;
+    let dirty = false;
+    for (const m of data.matches) {
+      const mine = m.teamA?.id === team.id ? m.teamA : m.teamB?.id === team.id ? m.teamB : null;
+      if (!mine) continue;
+      myMatchIds.push(m.id);
+      if (mine.name !== team.name) { mine.name = team.name; dirty = true; }
+    }
+    if (dirty) await scheduleStore.setJSON(b.key, data);
+  }
+
+  // 2. Score records + 3. lineup records for those matches.
+  for (const matchId of myMatchIds) {
+    const scoreKey = `score/${matchId}.json`;
+    const score = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null);
+    if (score) {
+      let dirty = false;
+      if (score.home?.id === team.id && score.home.name !== team.name) { score.home.name = team.name; dirty = true; }
+      if (score.away?.id === team.id && score.away.name !== team.name) { score.away.name = team.name; dirty = true; }
+      if (dirty) await scoresStore.setJSON(scoreKey, score);
+    }
+
+    const lineupKey = `lineup/${matchId}/${team.id}.json`;
+    const lineup = await lineupStore.get(lineupKey, { type: 'json' }).catch(() => null);
+    if (lineup && lineup.teamName !== team.name) {
+      lineup.teamName = team.name;
+      await lineupStore.setJSON(lineupKey, lineup);
+    }
+  }
+
+  // 4. Standings + player-stats aggregates re-read team blobs on rebuild.
+  await rebuildStandings(circuit);
+}
 
 export const config = { path: '/.netlify/functions/admin-teams' };
