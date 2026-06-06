@@ -901,6 +901,8 @@
   const h = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const fd = iso => { if (!iso) return '—'; return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); };
   const fdt = iso => { if (!iso) return '—'; const d = new Date(iso); return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+  // ISO → value for <input type="datetime-local"> (local time, no seconds/zone).
+  const toLocalInput = iso => { if (!iso) return ''; const d = new Date(iso); if (isNaN(d)) return ''; return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16); };
   const api = (url, opts = {}) => fetch(url, { credentials: 'include', ...opts });
   const apiJSON = async (url, opts = {}) => {
     const r = await api(url, opts);
@@ -2856,6 +2858,7 @@
             '<input type="number" min="1" max="20" value="' + h(String(ca)) + '" id="ct-A-' + h(m.id) + '" style="' + inStyle + '">' +
             '<span>&amp;</span>' +
             '<input type="number" min="1" max="20" value="' + h(String(cb)) + '" id="ct-B-' + h(m.id) + '" style="' + inStyle + '">' +
+            '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;">Date/time <input type="datetime-local" id="dt-' + h(m.id) + '" value="' + h(toLocalInput(m.scheduledAt)) + '" style="padding:3px 6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-family:inherit;font-size:12px;"></label>' +
             '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;">Start time <input type="text" id="st-' + h(m.id) + '" value="' + h(m.startTime || '') + '" placeholder="7:00 PM" style="width:84px;padding:3px 6px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-family:inherit;font-size:12px;"></label>' +
             '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="champ-' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
             '<button class="ab ab--outline ab--sm court-save" data-mid="' + h(m.id) + '">Save</button>' +
@@ -2871,15 +2874,21 @@
         const a = ($id('ct-A-' + mid).value || '').trim();
         const b = ($id('ct-B-' + mid).value || '').trim();
         const stat = $id('cst-' + mid);
-        if (!a || !b) { if (stat) { stat.textContent = 'Enter both courts'; stat.style.color = 'var(--color-red,#ef4444)'; } return; }
+        // Courts are optional (so you can set just a date), but if you fill one you must fill both.
+        if ((a && !b) || (!a && b)) { if (stat) { stat.textContent = 'Enter both courts, or leave both blank'; stat.style.color = 'var(--color-red,#ef4444)'; } return; }
         btn.disabled = true; if (stat) { stat.textContent = 'Saving…'; stat.style.color = 'var(--color-text-faint)'; }
         try {
           const champ = !!($id('champ-' + mid) && $id('champ-' + mid).checked);
           const stEl = $id('st-' + mid);
           const st = stEl ? (stEl.value || '').trim() : '';
+          const dtEl = $id('dt-' + mid);
+          const dtVal = dtEl ? (dtEl.value || '').trim() : '';
+          const scheduledAt = dtVal ? new Date(dtVal).toISOString() : null;
+          const payload = { championship: champ, startTime: st || null, scheduledAt: scheduledAt };
+          if (a && b) { payload.courtA = a; payload.courtB = b; payload.court = 'Courts ' + a + ' & ' + b; }
           await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(mid), {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ courtA: a, courtB: b, court: 'Courts ' + a + ' & ' + b, championship: champ, startTime: st || null }),
+            body: JSON.stringify(payload),
           });
           if (stat) { stat.textContent = 'Saved ✓'; stat.style.color = 'var(--color-teal)'; }
         } catch (e) {
