@@ -72,3 +72,12 @@ function highlightNav() {
     }
   });
 }
+
+// ═══════════════════════════════════════════════════════════════
+// Keep-warm ping — fires every 4 minutes while the tab is visible,
+// so Netlify functions stay warm during active browsing.
+// ═══════════════════════════════════════════════════════════════
+setInterval(() => {
+  if (document.visibilityState !== 'visible') return;
+  fetch('/.netlify/functions/ping').catch(() => {});
+}, 4 * 60 * 1000);
