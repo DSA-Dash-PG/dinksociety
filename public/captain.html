@@ -2797,4 +2797,136 @@
       const mathBlock = `<div class="mth">
         <div class="mth__head"><span class="mth__title">Match math</span><span class="mth__team">${escapeHtml(myName)}</span><span class="mth__team">${escapeHtml(oppName)}</span></div>
         ${roundBlock('Round 1', 1)}${roundBlock('Round 2', 2)}
-        <div class="mth__total"><span class="mth__total-label">Total match points</span><span class="mth__total-v 
+        <div class="mth__total"><span class="mth__total-label">Total match points</span><span class="mth__total-v mth__total-v--us">${usTot}</span><span class="mth__total-v">${themTot}</span></div>
+        <div class="mth__note">${bothDone ? 'Final — this is what posts to the standings (max 4).' : 'Match points lock once all 6 games of each round have a winner.'}</div>
+      </div>`;
+
+      // submissions + actions (reuse existing save/submit/withdraw handlers)
+      const mySubmitted = mySide === 'home' ? !!score.homeSubmittedAt : !!score.awaySubmittedAt;
+      const otherSubmitted = mySide === 'home' ? !!score.awaySubmittedAt : !!score.homeSubmittedAt;
+      const submissions = `<div class="ss-approvals" style="margin-top:14px;">
+        <div class="ss-approval ${mySubmitted ? 'ss-approval--done' : 'ss-approval--mine'}"><div class="ss-approval__label">${escapeHtml(myName)} (you)</div><div class="ss-approval__value">${mySubmitted ? '✓ Submitted' : 'Not submitted'}</div></div>
+        <div class="ss-approval ${otherSubmitted ? 'ss-approval--done' : ''}"><div class="ss-approval__label">${escapeHtml(oppName)}</div><div class="ss-approval__value">${otherSubmitted ? '✓ Submitted' : 'Waiting'}</div></div>
+      </div>`;
+      const actions = [];
+      if (!final) {
+        actions.push('<button class="cap-btn cap-btn--primary" id="ss-save-btn" style="flex:1;">Save scores</button>');
+        if (!mySubmitted) {
+          const ready = !!c.canSubmit;
+          const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0) + (c.counts?.mismatch || 0);
+          const label = ready ? 'Submit final' : `${remaining} game${remaining === 1 ? '' : 's'} left`;
+          actions.push(`<button class="cap-btn cap-btn--gold" id="ss-submit-btn" style="flex:1;" ${ready ? '' : 'disabled'}>${label}</button>`);
+        } else {
+          actions.push('<button class="cap-btn cap-btn--ghost" id="ss-withdraw-btn" style="flex:1;">Withdraw</button>');
+        }
+      }
+
+      area.innerHTML = `
+        <div class="scoresheet" style="padding:0;border:none;background:none;">
+          ${renderScoresheetBanner(data)}
+          ${setBlock(1, 1, 1, 2)}${setBlock(1, 2, 3, 4)}${setBlock(1, 3, 5, 6)}
+          ${setBlock(2, 1, 1, 2)}${setBlock(2, 2, 3, 4)}${setBlock(2, 3, 5, 6)}
+          ${mathBlock}
+          ${submissions}
+          ${actions.length ? `<div style="display:flex;gap:10px;margin-top:14px;">${actions.join('')}</div>` : ''}
+          <div class="cap-status" id="ss-status"></div>
+        </div>
+        ${final ? renderUpNextStrip() : ''}`;
+
+      $id('ss-save-btn')?.addEventListener('click', saveAllScores);
+      $id('ss-submit-btn')?.addEventListener('click', submitFinal);
+      $id('ss-withdraw-btn')?.addEventListener('click', withdrawSubmit);
+      const upNextBtn = $id('up-next-btn');
+      if (upNextBtn) upNextBtn.addEventListener('click', (e) => { e.preventDefault(); const id = upNextBtn.dataset.matchId; if (id) openMatch(id, { hideBackLink: true, viaTab: 'next' }); });
+    }
+    function capStep(slot, side, d) {
+      const inp = $id('inp-' + slot + '-' + side);
+      if (!inp || inp.disabled) return;
+      let v = parseInt(inp.value, 10); if (isNaN(v)) v = 0;
+      v = Math.max(0, Math.min(30, v + d));
+      inp.value = v;
+      const span = $id('val-' + slot + '-' + side); if (span) span.textContent = v;
+      state.scoreDirty = true;
+    }
+
+    // ---------- tonight banner (schedule) ----------
+    function renderTonightBanner() {
+      const matches = state.matches || [];
+      const m = matches.find(x => x.status?.revealed && !x.finalizedAt)
+        || matches.filter(x => !x.finalizedAt).sort((a, b) => a.week - b.week)[0];
+      if (!m) return '';
+      const live = m.status?.revealed && !m.finalizedAt;
+      const meta = [m.myRole === 'home' ? 'Home' : 'Away', m.court].filter(Boolean).join(' · ');
+      return `<div class="mtonight">
+        <div class="mtonight__eyebrow">${live ? 'Live now' : 'Up next'} · Week ${m.week}</div>
+        <div class="mtonight__row"><span class="mtonight__team">${escapeHtml(state.me?.team?.name || 'You')}</span><span class="mtonight__vs">VS</span><span class="mtonight__team">${escapeHtml(m.opponent.name)}</span></div>
+        <div class="mtonight__meta">${escapeHtml(meta)}</div>
+        <button class="mtonight__cta" onclick="capTonightOpen('${escapeAttr(m.id)}')">${live ? 'Enter scores →' : (m.status?.myLocked ? 'View match →' : 'Set lineup →')}</button>
+      </div>`;
+    }
+    function capTonightOpen(id) { openMatch(id, { viaTab: 'next' }); }
+
+    // ---------- bottom nav ----------
+    function setBnActive(name) {
+      document.querySelectorAll('.cap-bn').forEach(b => b.classList.toggle('is-active', b.dataset.bn === name));
+    }
+    // Lineup tab is single-purpose: setting lineups. Opens the one editable match,
+    // or shows a picker of matches whose lineup you can still set/change.
+    function capLineupJump() {
+      const editable = (state.matches || []).filter(m => !m.status?.revealed && !m.finalizedAt).sort((a, b) => a.week - b.week);
+      if (editable.length === 1) { openMatch(editable[0].id, { viaTab: 'next' }); return; }
+      renderLineupPicker(editable);
+    }
+    function renderLineupPicker(editable) {
+      switchSection('next');
+      setBnActive('lineup');
+      document.querySelectorAll('.cap-tab').forEach(b => b.classList.remove('is-active'));
+      const area = $id('next-landing-area');
+      if (!area) return;
+      if (!editable.length) {
+        area.innerHTML = `<div class="cap-card"><div class="cap-card__header"><h2 class="cap-card__title">Set a lineup</h2></div><div class="empty-state">No matches need a lineup right now. They'll show up here once the next match opens for lineups (locks 3 hours before match time).</div></div>`;
+        return;
+      }
+      const row = (m) => {
+        const needs = !m.status?.myLocked;
+        const pill = needs ? '<span class="match-pill match-pill--unlocked">Needs lineup</span>'
+          : (m.status?.oppLocked ? '<span class="match-pill match-pill--revealed">Both locked</span>' : '<span class="match-pill match-pill--locked">Locked · waiting</span>');
+        return `<div class="match-tile" data-match-id="${escapeAttr(m.id)}">
+          <div class="match-tile__week">W${m.week}</div>
+          <div class="match-tile__body"><div class="match-tile__opponent">vs ${escapeHtml(m.opponent.name)}</div><div class="match-tile__meta">${m.myRole === 'home' ? 'Home' : 'Away'}${m.court ? ' · ' + escapeHtml(m.court) : ''}</div></div>
+          <div>${pill}</div>
+        </div>`;
+      };
+      area.innerHTML = `<div class="cap-card"><div class="cap-card__header"><h2 class="cap-card__title">Set a lineup</h2><span class="cap-card__sub">Pick a match</span></div><div style="margin-top:6px;">${editable.map(row).join('')}</div></div>`;
+      area.querySelectorAll('.match-tile').forEach(el => el.addEventListener('click', () => openMatch(el.dataset.matchId, { viaTab: 'next' })));
+    }
+    function syncBottomNavTabs() {
+      const rosterBtn = $id('cap-bn-roster');
+      if (rosterBtn) rosterBtn.hidden = !!state.rosterLocked;
+      const src = $id('cap-msg-badge'), dst = $id('cap-bn-msg-badge');
+      if (src && dst) { dst.style.display = src.style.display; dst.textContent = src.textContent; }
+    }
+    (function wireBottomNav() {
+      const nav = $id('cap-bottomnav');
+      if (!nav) return;
+      nav.querySelectorAll('.cap-bn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const bn = btn.dataset.bn;
+          setBnActive(bn);
+          if (bn === 'schedule') document.querySelector('.cap-tab[data-tab="schedule"]')?.click();
+          else if (bn === 'lineup') capLineupJump();
+          else if (bn === 'score') document.querySelector('.cap-tab[data-tab="scoresheet"]')?.click();
+          else if (bn === 'roster') document.querySelector('.cap-tab[data-tab="roster"]')?.click();
+          else if (bn === 'messages') document.querySelector('.cap-tab[data-tab="messages"]')?.click();
+        });
+      });
+      // mirror unread badge onto the bottom nav
+      const src = $id('cap-msg-badge');
+      if (src) new MutationObserver(syncBottomNavTabs).observe(src, { childList: true, characterData: true, attributes: true, subtree: true });
+    })();
+
+    // ===== Init =====
+    checkAuth();
+  </script>
+</body>
+</html>

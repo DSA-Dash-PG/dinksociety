@@ -10,15 +10,15 @@
   <meta property="og:description" content="Player profile — The Dink Society" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="The Dink Society" />
-  <meta property="og:url" content="https://dinksociety.app/player" />
-  <meta property="og:image" content="https://dinksociety.app/img/og-image.png" />
+  <meta property="og:url" content="https://dinksociety.netlify.app/player" />
+  <meta property="og:image" content="https://dinksociety.netlify.app/img/og-image.png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="Player · The Dink Society" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Player · The Dink Society" />
   <meta name="twitter:description" content="Player profile — The Dink Society" />
-  <meta name="twitter:image" content="https://dinksociety.app/img/og-image.png" />
+  <meta name="twitter:image" content="https://dinksociety.netlify.app/img/og-image.png" />
 
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -421,3 +421,88 @@
         }
 
       } else {
+        /* No game data yet — show a pending card */
+        html += `<div class="pp-card" style="text-align:center;padding:var(--space-8);">
+          <div style="font-size:32px;margin-bottom:var(--space-3)">📊</div>
+          <div style="font-size:14px;font-weight:700;margin-bottom:var(--space-2)">Stats pending</div>
+          <div style="font-size:12px;color:var(--color-text-faint)">Game stats will appear here once Season 1 begins on June 8.</div>
+        </div>`;
+      }
+
+      /* ── SEASON HISTORY ── */
+      html += `<div class="pp-card">
+        <div class="pp-card__head">🗂 Season History</div>`;
+
+      if (history.length) {
+        html += `<div class="history-list">
+          ${history.map(s => {
+            const sp = pct(s.stats?.gamesWon || 0, s.stats?.gamesPlayed || 0);
+            const tSlug = s.teamName ? slug(s.teamName) : '';
+            return `<div class="history-row">
+              <span class="history-season">${esc(s.seasonLabel || s.circuit)}</span>
+              <div class="history-team">
+                ${tSlug ? `<a href="/team?id=${tSlug}" class="history-team__name">${esc(s.teamName)}</a>` : `<span class="history-team__name">${esc(s.teamName || '—')}</span>`}
+                <div class="history-team__div">${s.year || ''}</div>
+              </div>
+              <div class="history-stat">
+                <div class="history-stat__record">${s.stats?.gamesWon ?? '—'}–${s.stats?.gamesLost ?? '—'}</div>
+                <div class="history-stat__pct">${sp}% · ${s.stats?.matchesPlayed ?? 0} matches</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+      } else {
+        /* Current season as a live preview row */
+        const liveStat = stat && stat.gamesPlayed > 0;
+        html += `<div class="history-list">
+          <div class="history-row">
+            <span class="history-season">Season 1</span>
+            <div class="history-team">
+              <a href="/team?id=${teamSlug}" class="history-team__name">${esc(team.name)}</a>
+              <div class="history-team__div">2026 — In progress</div>
+            </div>
+            <div class="history-stat">
+              ${liveStat
+                ? `<div class="history-stat__record">${stat.gamesWon}–${stat.gamesLost}</div>
+                   <div class="history-stat__pct">${pct(stat.gamesWon, stat.gamesPlayed)}%</div>`
+                : `<div class="history-stat__record" style="color:var(--color-text-faint)">—</div>`}
+            </div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--color-text-faint);margin-top:var(--space-3);text-align:center;">
+          Past seasons will be archived here at the end of each circuit.
+        </div>`;
+      }
+
+      html += `</div>`;
+
+      /* ── TRANSACTIONS ── */
+      if (transactions.length) {
+        html += `<div class="pp-card">
+          <div class="pp-card__head">🔄 Transactions</div>
+          <div class="tx-list">
+            ${transactions.map(tx => {
+              const toSlug = tx.toTeamName ? slug(tx.toTeamName) : '';
+              const fromSlug = tx.fromTeamName ? slug(tx.fromTeamName) : '';
+              const toName = toSlug ? `<a href="/team?id=${toSlug}${LINK_SUFFIX}" class="tx-team">${esc(tx.toTeamName)}</a>` : `<span class="tx-team">${esc(tx.toTeamName || '—')}</span>`;
+              const fromName = fromSlug ? `<a href="/team?id=${fromSlug}${LINK_SUFFIX}" class="tx-team">${esc(tx.fromTeamName)}</a>` : `<span class="tx-team">${esc(tx.fromTeamName || '—')}</span>`;
+              return `<div class="tx-row">
+                <div class="tx-body">
+                  <div class="tx-route">${fromName} <span class="tx-arrow">→</span> ${toName}</div>
+                  ${tx.note ? `<div class="tx-note">"${esc(tx.note)}"</div>` : ''}
+                </div>
+                <div class="tx-date">${fmtDate(tx.transferredAt)}</div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>`;
+      }
+
+      document.getElementById('page-root').innerHTML = html;
+    }
+
+    load();
+  })();
+  </script>
+</body>
+</html>
