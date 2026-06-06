@@ -97,6 +97,44 @@
   .home-team { display:flex; align-items:center; gap:12px; }
   .home-team__chev { color:var(--color-text-faint); font-size:18px; font-weight:800; }
 
+  /* ── Home: "Your night" personalized game list ───── */
+  .yn { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:12px 13px; margin-bottom:8px; }
+  .yn__head { display:flex; justify-content:space-between; align-items:baseline; }
+  .yn__head h3 { margin:0; font-size:13px; font-weight:800; }
+  .yn__head .sub2 { font-size:10px; color:var(--color-text-faint); font-weight:600; }
+  .yn__row { display:flex; align-items:center; gap:10px; padding:8px 9px; border-radius:var(--radius-sm); background:var(--color-surface-2); margin-top:6px; }
+  .yn__row.is-live { background:var(--color-lime-ghost); border:1px solid rgba(184,255,44,0.35); }
+  .yn__slot { font-size:9px; font-weight:800; color:var(--color-text-faint); width:58px; line-height:1.45; flex-shrink:0; }
+  .yn__slot .type-w { color:#e57bb0; } .yn__slot .type-m { color:#5aa9ff; } .yn__slot .type-x { color:var(--color-teal); }
+  .yn__body { flex:1; min-width:0; font-size:12px; font-weight:600; }
+  .yn__sub { font-size:10px; color:var(--color-text-faint); font-weight:600; margin-top:1px; }
+  .yn__state { font-size:11px; font-weight:800; white-space:nowrap; }
+  .yn__state.w { color:var(--color-lime); } .yn__state.l { color:var(--color-red); }
+  .yn__state.now { background:var(--color-lime); color:var(--color-text-inverse); padding:3px 9px; border-radius:var(--radius-full); font-size:9px; text-transform:uppercase; letter-spacing:0.04em; }
+  .yn__state.eta { color:var(--color-text-muted); font-weight:700; }
+  .yn__none { font-size:11px; color:var(--color-text-faint); padding:6px 2px 0; }
+
+  /* ── Home: compact live match strip ───── */
+  .livestrip { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--color-surface); border:1px solid rgba(184,255,44,0.3); border-radius:var(--radius-md); padding:10px 13px; margin-bottom:8px; font-size:11px; }
+  .livestrip__live { display:flex; align-items:center; gap:6px; font-weight:800; color:var(--color-lime); }
+  .livestrip__tally { font-size:14px; font-weight:800; }
+  .livestrip__note { color:var(--color-text-faint); font-weight:600; }
+
+  /* ── Home: collapsible full-lineup accordion ───── */
+  .acc { margin-bottom:8px; }
+  .acc__head { display:flex; justify-content:space-between; align-items:center; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:12px 13px; cursor:pointer; font-size:12px; font-weight:800; }
+  .acc__head .sub2 { font-size:10px; color:var(--color-text-faint); font-weight:600; display:flex; align-items:center; gap:5px; }
+  .acc__head .chev { display:inline-block; transition:transform .15s ease; font-size:10px; }
+  .acc__body { display:none; margin-top:8px; }
+  .acc.is-open .acc__body { display:block; }
+  .acc.is-open .acc__head { border-bottom-left-radius:0; border-bottom-right-radius:0; }
+  .acc.is-open .chev { transform:rotate(180deg); }
+
+  /* ── Appbar chat button (chat moved out of the nav) ───── */
+  .appbar__chat { position:relative; background:none; border:none; color:var(--color-text-muted); cursor:pointer; padding:4px 2px; }
+  .appbar__chat svg { width:22px; height:22px; display:block; }
+  .appbar__chat .nb__badge { top:-3px; left:auto; right:-6px; transform:none; }
+
   /* ── Lineup card (player view) ───────────────────── */
   .lu { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; margin-bottom:8px; }
   .lu__head { display:flex; align-items:center; gap:8px; padding:13px 14px; border-bottom:1px solid var(--color-border); }
@@ -276,6 +314,10 @@
       <div><div class="appbar__brand">Dink Society</div><div class="appbar__title">Player</div></div>
       <div class="appbar__me">
         <div style="text-align:right"><div class="appbar__name" id="me-name">—</div><div class="appbar__team" id="me-team">—</div></div>
+        <button class="appbar__chat" id="appbar-chat" aria-label="Team chat">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="nb__badge" id="chat-badge">0</span>
+        </button>
         <div class="appbar__av" id="me-av" title="Sign out">—</div>
       </div>
     </div>
@@ -298,22 +340,17 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Games</span>
       </button>
-      <button class="nb" data-tab="standings">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
-        <span>Standings</span>
+      <button class="nb" data-tab="captain" id="nb-captain" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Team</span>
       </button>
       <button class="nb" data-tab="stats">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         <span>Stats</span>
       </button>
-      <button class="nb" data-tab="chat">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span>Chat</span>
-        <span class="nb__badge" id="chat-badge">0</span>
-      </button>
-      <button class="nb" data-tab="captain" id="nb-captain" style="display:none">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.4 6.9H21l-5.4 4 2.1 6.9L12 15.8 6.3 19.8l2.1-6.9L3 8.9h6.6z"/></svg>
-        <span>Captain</span>
+      <button class="nb" data-tab="standings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
+        <span>Standings</span>
       </button>
     </nav>
   </div>
@@ -453,6 +490,7 @@
     if (t === 'chat') loadChat();
   }
   document.querySelectorAll('.nb').forEach(b => b.addEventListener('click', () => goTab(b.dataset.tab)));
+  $('appbar-chat').addEventListener('click', () => goTab('chat'));
 
   // ---- captain SSO bridge ----
   // Mint a captain session from the current player session, then open the
@@ -481,6 +519,8 @@
   // Card stack that reorders by context: on match day the next-match hero
   // leads; other days the last result + season tiles lead. Built entirely
   // from the player-me payload — no extra fetches.
+  const HOME_SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
+  const GAME_MIN = 13;   // rough minutes per game, for "you're up around..." estimates
   function fmtCountdown(iso) {
     if (!iso) return null;
     const ms = new Date(iso).getTime() - Date.now();
@@ -516,16 +556,10 @@
       const cd = fmtCountdown(next.scheduledAt);
       const eyebrow = next.status === 'live' ? 'Live now' : isMatchDay ? 'Match night' : 'Next match';
       const cdTxt = next.status === 'live' ? '' : cd ? ' · starts in ' + cd : '';
-      let state;
-      if (next.revealed) {
-        const chips = (next.myGames || []).map(g => `<span class="gtag">${esc(g)}</span>`).join('');
-        state = `<div class="next__you">Lineups revealed — ${chips ? `you're in <b>${next.myGames.length} game${next.myGames.length === 1 ? '' : 's'}</b>` : `you're not in tonight's lineup`} · <b class="hcard-tap" data-go="schedule">see matchup →</b>${chips ? `<div class="next__games">${chips}</div>` : ''}</div>`;
-      } else if (next.myLocked) {
-        const chips = (next.myGames || []).map(g => `<span class="gtag">${esc(g)}</span>`).join('');
-        state = `<div class="next__you">🔒 Lineup locked — opponent's reveals 30 min before start.${chips ? `<div class="next__games">${chips}</div>` : ''}</div>`;
-      } else {
-        state = `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>`;
-      }
+      // Pending nudge only — once locked, "Your night" below owns the detail.
+      const state = next.myLocked
+        ? (next.revealed ? '' : `<div class="next__you">🔒 Lineup locked — opponent's reveals 30 min before start.</div>`)
+        : `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>`;
       hero = `<div class="next hcard-tap" data-go="schedule">
         <div class="next__eyebrow"><span class="pulse"></span> ${eyebrow} · Week ${next.week}${esc(cdTxt)}</div>
         <div class="next__row">
@@ -535,6 +569,90 @@
         </div>
         <div class="next__meta">${esc(next.court || 'Court TBD')} · ${esc(whenDate ? whenDate + ' · ' + startT : startT + ' · date TBD')}${next.championship ? ' · 🏆' : ''}</div>
         ${state}
+      </div>`;
+    }
+
+    // -- per-game states for the live match (done / live / upcoming) --
+    const sc = (next && next.scores) || {};
+    const underway = !!(next && next.revealed && (Object.keys(sc).length > 0 || (next.scheduledAt && Date.now() > new Date(next.scheduledAt).getTime())));
+    let liveSlot = null;
+    const slotState = {};
+    for (const s of HOME_SLOTS) {
+      const g = sc[s];
+      if (g && g.home != null && g.away != null) slotState[s] = 'done';
+      else if (underway && !liveSlot) { liveSlot = s; slotState[s] = 'live'; }
+      else slotState[s] = 'upcoming';
+    }
+
+    // -- "Your night": my games, personalized --
+    let night = '';
+    if (next && next.lineup && next.lineup.mySlots) {
+      const lu = next.lineup, mySlotKeys = HOME_SLOTS.filter(s => lu.mySlots[s]);
+      if (mySlotKeys.length) {
+        const rows = mySlotKeys.map(s => {
+          const t = lineupGameType(s);
+          const r = s[1], gNo = s.slice(-1);
+          const mine = lu.mine && lu.mine[s];
+          const partner = mine ? (lu.mySlots[s] === 'p1' ? mine.p2 : mine.p1) : null;
+          const oppPair = lu.opp && lu.opp[s] ? [lu.opp[s].p1, lu.opp[s].p2].filter(Boolean).join(' / ') : null;
+          const st = slotState[s];
+          let stateEl, liveCls = '';
+          if (st === 'done') {
+            const myPts = next.home ? sc[s].home : sc[s].away;
+            const oppPts = next.home ? sc[s].away : sc[s].home;
+            stateEl = myPts > oppPts ? `<span class="yn__state w">W ${myPts}–${oppPts}</span>` : `<span class="yn__state l">L ${myPts}–${oppPts}</span>`;
+          } else if (st === 'live') {
+            stateEl = '<span class="yn__state now">Up now</span>'; liveCls = ' is-live';
+          } else {
+            const idx = HOME_SLOTS.indexOf(s);
+            const eta = next.scheduledAt ? new Date(new Date(next.scheduledAt).getTime() + idx * GAME_MIN * 60000) : null;
+            const etaPast = eta && eta.getTime() < Date.now();
+            stateEl = eta ? `<span class="yn__state eta">${underway && etaPast ? 'soon' : '~' + eta.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}</span>` : '';
+          }
+          return `<div class="yn__row${liveCls}">
+            <div class="yn__slot">R${r} · G${gNo}<br><span class="${t.cls}">${t.label}</span></div>
+            <div class="yn__body">${partner ? 'with ' + esc(partner) : '—'}${oppPair ? `<div class="yn__sub">vs ${esc(oppPair)}</div>` : ''}</div>
+            ${stateEl}
+          </div>`;
+        }).join('');
+        night = `<div class="yn">
+          <div class="yn__head"><h3>Your night</h3><span class="sub2">${mySlotKeys.length} game${mySlotKeys.length === 1 ? '' : 's'}</span></div>
+          ${rows}
+        </div>`;
+      } else if (next.myLocked && isMatchDay) {
+        night = `<div class="yn"><div class="yn__head"><h3>Your night</h3></div><div class="yn__none">You're not in this match's lineup — cheer loud. 📣</div></div>`;
+      }
+    }
+
+    // -- compact live strip: whole-match tally --
+    let live = '';
+    if (next && underway) {
+      let myW = 0, oppW = 0;
+      for (const s of HOME_SLOTS) {
+        const g = sc[s];
+        if (!g || g.home == null || g.away == null) continue;
+        const myPts = next.home ? g.home : g.away, oppPts = next.home ? g.away : g.home;
+        if (myPts > oppPts) myW++; else if (oppPts > myPts) oppW++;
+      }
+      const done = myW + oppW;
+      const nowLbl = liveSlot ? `R${liveSlot[1]} G${liveSlot.slice(-1)}` : null;
+      live = `<div class="livestrip hcard-tap" data-go="schedule">
+        <span class="livestrip__live"><span class="pulse"></span> Live${nowLbl ? ' · ' + nowLbl : ''}</span>
+        <span class="livestrip__tally">${myW} – ${oppW}</span>
+        <span class="livestrip__note">games · ${done} of 12 done</span>
+      </div>`;
+    }
+
+    // -- full lineup, collapsed by default --
+    let lulist = '';
+    if (next && next.lineup) {
+      const open = localStorage.getItem('ds-lineup-open') === '1';
+      lulist = `<div class="acc${open ? ' is-open' : ''}" id="home-lu-acc">
+        <div class="acc__head" id="home-lu-toggle">
+          <span>Full lineup</span>
+          <span class="sub2">all 12 games <span class="chev">▼</span></span>
+        </div>
+        <div class="acc__body">${renderLineupCard(next, me)}</div>
       </div>`;
     }
 
@@ -584,16 +702,22 @@
         <div class="home-team__chev">›</div>
       </div>`;
 
-    const blocks = { hero, recap, tiles, potw, movers, coming, team };
+    const blocks = { hero, night, live, lulist, recap, tiles, potw, movers, coming, team };
     const order = isMatchDay
-      ? ['hero', 'recap', 'tiles', 'potw', 'movers', 'coming', 'team']
-      : ['recap', 'tiles', 'hero', 'potw', 'movers', 'coming', 'team'];
+      ? ['hero', 'night', 'live', 'lulist', 'recap', 'tiles', 'potw', 'movers', 'coming', 'team']
+      : ['recap', 'tiles', 'hero', 'night', 'lulist', 'potw', 'movers', 'coming', 'team'];
     const html = order.map(k => blocks[k] || '').join('');
     $('v-home').innerHTML = html || '<div class="muted">No matches scheduled yet. Your season will show up here.</div>';
     $('v-home').querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => {
       e.stopPropagation();
       goTab(el.dataset.go);
     }));
+    const luToggle = $('home-lu-toggle');
+    if (luToggle) luToggle.addEventListener('click', () => {
+      const acc = $('home-lu-acc');
+      acc.classList.toggle('is-open');
+      try { localStorage.setItem('ds-lineup-open', acc.classList.contains('is-open') ? '1' : '0'); } catch {}
+    });
   }
 
   // ---- schedule ----

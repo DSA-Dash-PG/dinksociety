@@ -29,6 +29,7 @@ export default async (req) => {
 
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
+  const scoresStore = getStore('scores');
   const statsStore = getStore('player-stats');
   const standingsStore = getStore('standings');
   const teamsStore = getStore('teams');
@@ -146,13 +147,29 @@ export default async (req) => {
         }
       }
 
+      // Live game scores, sanitized (numbers only — no submitter PII).
+      // Only once lineups are revealed: before that there's nothing to score,
+      // and it keeps the blind-lineup window airtight. home = teamA.
+      let scores = null;
+      if (!final && revealed) {
+        const sc = await scoresStore.get(`score/${mt.id}.json`, { type: 'json' }).catch(() => null);
+        if (sc?.games) {
+          scores = {};
+          for (const s of LINEUP_SLOTS) {
+            const g = sc.games[s];
+            if (g && (g.home != null || g.away != null)) scores[s] = { home: g.home ?? null, away: g.away ?? null };
+          }
+          if (!Object.keys(scores).length) scores = null;
+        }
+      }
+
       schedule.push({
         matchId: mt.id, week: w,
         opponent: { id: opp?.id || null, name: opp?.name || 'TBD', emoji: teamEmoji.get(opp?.id) || null },
         home, court: mt.court || null, scheduledAt: mt.scheduledAt || null, startTime: mt.startTime || null,
         championship: !!mt.championship,
         final, myMp, oppMp, result,
-        myLocked, revealed, myGames, lineup,
+        myLocked, revealed, myGames, lineup, scores,
         status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
       });
     }
