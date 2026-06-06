@@ -17,6 +17,10 @@
        Uses shared.css tokens exclusively
        ═══════════════════════════════════════════════════════════ */
 
+    /* Busy-button spinner (slow connections / double-tap guard) */
+    .btn-spin { display: inline-block; width: 12px; height: 12px; margin-right: 7px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; vertical-align: -2px; animation: btnspin 0.7s linear infinite; }
+    @keyframes btnspin { to { transform: rotate(360deg); } }
+
     .admin-shell { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
 
     /* ── Sidebar ──────────────────────────────────────────────── */
@@ -921,6 +925,27 @@
     return r.json();
   };
 
+  // ─── Busy-button helper (slow connections / double-tap guard) ──
+  // btnBusy returns false if the button is already in-flight, so callers can
+  // bail out: `if (!btnBusy(btn)) return;`. btnDone restores it. Re-enable
+  // only on error paths; successful flows usually re-render the button anyway.
+  function btnBusy(btn, label) {
+    if (!btn) return true;            // no button to guard — proceed
+    if (btn.dataset.busy) return false;
+    btn.dataset.busy = '1';
+    btn.dataset.busyHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spin"></span>' + h(label || btn.textContent);
+    return true;
+  }
+  function btnDone(btn) {
+    if (!btn || !btn.dataset.busy) return;
+    btn.disabled = false;
+    btn.innerHTML = btn.dataset.busyHtml;
+    delete btn.dataset.busy;
+    delete btn.dataset.busyHtml;
+  }
+
   // ─── State ─────────────────────────────────────────────────
   let SETTINGS = {};
   let DIVISIONS = []; // { id, name } from seasons
@@ -1124,7 +1149,11 @@
 
   async function clearPotw() {
     if (!confirm('Clear the current Player of the Week?')) return;
-    await fetch('/.netlify/functions/player-of-week', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ male: null, female: null, week: null }) });
+    const btn = $id('potw-clear-btn');
+    if (!btnBusy(btn, 'Clearing…')) return;
+    try {
+      await fetch('/.netlify/functions/player-of-week', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ male: null, female: null, week: null }) });
+    } finally { btnDone(btn); }
     ['potw-m-name','potw-m-team','potw-m-rank','potw-m-wins','potw-m-losses','potw-f-name','potw-f-team','potw-f-rank','potw-f-wins','potw-f-losses','potw-week'].forEach(id => { if ($id(id)) $id(id).value = ''; });
     if ($id('potw-saved-at')) $id('potw-saved-at').textContent = 'Cleared';
   }
@@ -1502,15 +1531,21 @@
   // ─── Seasons: wiring ───
   $id('hide-archived-toggle').addEventListener('change', () => renderSeasons());
 
-  $id('seasons-list').addEventListener('click', (e) => {
+  $id('seasons-list').addEventListener('click', async (e) => {
     const btn = e.target.closest('button[data-act]');
     if (!btn) return;
-    handleSeasonAction(btn.dataset.act, btn.dataset.season, btn.dataset.div);
+    if (!btnBusy(btn)) return; // in-flight — ignore repeat taps
+    try {
+      await handleSeasonAction(btn.dataset.act, btn.dataset.season, btn.dataset.div);
+    } finally { btnDone(btn); } // no-op if renderSeasons already replaced the button
   });
-  $id('seasons-list').addEventListener('change', (e) => {
+  $id('seasons-list').addEventListener('change', async (e) => {
     const sel = e.target;
     if (sel.tagName !== 'SELECT' || !sel.dataset.act) return;
-    handleSeasonSelect(sel.dataset.act, sel.dataset.season, sel.value);
+    sel.disabled = true;
+    try {
+      await handleSeasonSelect(sel.dataset.act, sel.dataset.season, sel.value);
+    } finally { sel.disabled = false; }
   });
 
   function clearCreateForm() {
@@ -1874,8 +1909,15 @@
     wireRegActions();
   }
 
-  async function regAction(act, id) {
+  async function regAction(act, id, srcBtn) {
     if (act === 'mark-paid') { openPayModal(id); return; }
+    if (srcBtn && !btnBusy(srcBtn)) return; // in-flight — ignore repeat taps
+    try {
+      await regActionInner(act, id);
+    } finally { btnDone(srcBtn); } // no-op if renderReg already replaced the button
+  }
+
+  async function regActionInner(act, id) {
     const payload = { action: act, id };
     if (act === 'edit-contact') {
       const reg = allRegistrations.find(r => r.id === id) || {};
@@ -1933,7 +1975,7 @@
 
   function wireRegActions() {
     $id('reg-table').querySelectorAll('button.reg-act').forEach(btn => {
-      btn.addEventListener('click', () => regAction(btn.dataset.act, btn.dataset.id));
+      btn.addEventListener('click', () => regAction(btn.dataset.act, btn.dataset.id, btn));
     });
   }
 
@@ -2250,7 +2292,10 @@
     modal.querySelectorAll('.pm-del-p').forEach(btn => {
       btn.addEventListener('click', async () => {
         if (!confirm('Delete this payment?')) return;
-        await pmApiCall({ action: 'delete-payment', id: _pmRegId, paymentId: btn.dataset.pid });
+        if (!btnBusy(btn)) return;
+        try {
+          await pmApiCall({ action: 'delete-payment', id: _pmRegId, paymentId: btn.dataset.pid });
+        } finally { btnDone(btn); }
       });
     });
 
@@ -2274,11 +2319,15 @@
       if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
       const note = modal.querySelector('#pm-note').value.trim();
       const method = methodEl.value;
-      if (_pmEditId) {
-        await pmApiCall({ action: 'edit-payment', id: _pmRegId, paymentId: _pmEditId, amount, method, note });
-      } else {
-        await pmApiCall({ action: 'add-payment', id: _pmRegId, amount, method, note });
-      }
+      const btn = modal.querySelector('#pm-submit');
+      if (!btnBusy(btn, 'Saving…')) return;
+      try {
+        if (_pmEditId) {
+          await pmApiCall({ action: 'edit-payment', id: _pmRegId, paymentId: _pmEditId, amount, method, note });
+        } else {
+          await pmApiCall({ action: 'add-payment', id: _pmRegId, amount, method, note });
+        }
+      } finally { btnDone(btn); } // no-op if renderPayModal replaced the modal contents
     });
   }
 
@@ -2368,6 +2417,8 @@
     if (!confirm(`Transfer ${player?.name || 'this player'} to ${allTeams.find(t => t.id === toTeamId)?.name}? This cannot be undone.`)) return;
 
     statusEl.className = 'xfer-status'; statusEl.textContent = '';
+    const btn = $id('xfer-confirm-btn');
+    if (!btnBusy(btn, 'Transferring…')) return;
     try {
       await apiJSON('/.netlify/functions/admin-transfer', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2378,7 +2429,7 @@
       renderTeams();
     } catch (e) {
       statusEl.className = 'xfer-status err'; statusEl.textContent = e.message || 'Transfer failed';
-    }
+    } finally { btnDone(btn); }
   }
 
   // ── Transfer requests list ────────────────────────────────────
@@ -2402,10 +2453,10 @@
             Requested by ${h(r.requestedBy)}<br>${new Date(r.requestedAt).toLocaleDateString()}
           </div>
           <div>
-            <button class="ab ab--primary ab--sm" onclick="reviewRequest('${h(r.id)}','approve')">Approve</button>
+            <button class="ab ab--primary ab--sm" onclick="reviewRequest('${h(r.id)}','approve',this)">Approve</button>
           </div>
           <div>
-            <button class="ab ab--outline ab--sm" onclick="reviewRequest('${h(r.id)}','deny')">Deny</button>
+            <button class="ab ab--outline ab--sm" onclick="reviewRequest('${h(r.id)}','deny',this)">Deny</button>
           </div>
         </div>`).join('');
     } catch {
@@ -2413,7 +2464,7 @@
     }
   }
 
-  async function reviewRequest(requestId, action) {
+  async function reviewRequest(requestId, action, srcBtn) {
     let reviewNote = null;
     if (action === 'deny') {
       reviewNote = prompt('Reason for denial (optional):') || null;
@@ -2421,6 +2472,7 @@
     } else {
       if (!confirm('Approve this transfer? The player will be moved immediately.')) return;
     }
+    if (srcBtn && !btnBusy(srcBtn)) return;
     try {
       await apiJSON('/.netlify/functions/admin-transfer', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -2430,7 +2482,7 @@
       if (action === 'approve') { renderTeams(); }
     } catch (e) {
       alert('Failed: ' + (e.message || 'unknown error'));
-    }
+    } finally { btnDone(srcBtn); } // no-op if the request list re-rendered
   }
 
   // ── Transfer log ──────────────────────────────────────────────
@@ -2723,8 +2775,9 @@
       '</div>';
 
     // Wire up "View as" impersonation
-    const viewAsGo = async (payload) => {
+    const viewAsGo = async (payload, srcBtn) => {
       const st = $id('tdp-viewas-status');
+      if (srcBtn && !btnBusy(srcBtn)) return;
       st.textContent = 'Creating session…';
       try {
         const data = await apiJSON('/.netlify/functions/admin-impersonate', {
@@ -2734,15 +2787,16 @@
         st.textContent = '';
         window.open(data.redirect, '_blank');
       } catch (e) { st.textContent = e.message || 'Failed'; }
+      finally { btnDone(srcBtn); }
     };
-    $id('tdp-viewas-captain').addEventListener('click', () =>
-      viewAsGo({ mode: 'captain' }));
-    if (viewAsCo) $id('tdp-viewas-cocaptain')?.addEventListener('click', () =>
-      viewAsGo({ mode: 'captain', email: viewAsCo.email || '' }));
-    $id('tdp-viewas-player-btn').addEventListener('click', () => {
+    $id('tdp-viewas-captain').addEventListener('click', (e) =>
+      viewAsGo({ mode: 'captain' }, e.currentTarget));
+    if (viewAsCo) $id('tdp-viewas-cocaptain')?.addEventListener('click', (e) =>
+      viewAsGo({ mode: 'captain', email: viewAsCo.email || '' }, e.currentTarget));
+    $id('tdp-viewas-player-btn').addEventListener('click', (e) => {
       const pid = $id('tdp-viewas-player').value;
       if (!pid) { $id('tdp-viewas-status').textContent = 'Pick a player first.'; return; }
-      viewAsGo({ mode: 'player', playerId: pid });
+      viewAsGo({ mode: 'player', playerId: pid }, e.currentTarget);
     });
 
     // Wire up team photo upload (admin can set any team's photo)
@@ -3232,10 +3286,10 @@
         '</div>' +
         '<div id="sc-form-' + h(m.id) + '"><div class="loading">Loading scores…</div></div>' +
         '<div style="display:flex;gap:8px;margin-top:12px;">' +
-          '<button class="ab ab--lime ab--sm" onclick="window._saveScores(\'' + h(m.id) + '\')">' + (isFinal ? 'Update & Re-finalize' : 'Save Scores') + '</button>' +
+          '<button class="ab ab--lime ab--sm" onclick="window._saveScores(\'' + h(m.id) + '\', this)">' + (isFinal ? 'Update & Re-finalize' : 'Save Scores') + '</button>' +
           (isFinal
-            ? '<button class="ab ab--sm ab--ghost" onclick="window._reopenMatch(\'' + h(m.id) + '\')">Reopen</button>'
-            : '<button class="ab ab--sm ab--teal" onclick="window._finalizeMatch(\'' + h(m.id) + '\')">Finalize</button>'
+            ? '<button class="ab ab--sm ab--ghost" onclick="window._reopenMatch(\'' + h(m.id) + '\', this)">Reopen</button>'
+            : '<button class="ab ab--sm ab--teal" onclick="window._finalizeMatch(\'' + h(m.id) + '\', this)">Finalize</button>'
           ) +
         '</div>' +
         '<div id="sc-status-' + h(m.id) + '" style="font-size:11px;margin-top:6px;"></div>' +
@@ -3280,7 +3334,7 @@
     }
   }
 
-  window._saveScores = async function(matchId) {
+  window._saveScores = async function(matchId, srcBtn) {
     const statusEl = $id('sc-status-' + matchId);
     const inputs = document.querySelectorAll('input[data-match="' + matchId + '"]');
     const games = {};
@@ -3289,6 +3343,7 @@
       if (!games[slot]) games[slot] = {};
       games[slot][side] = inp.value === '' ? null : parseInt(inp.value);
     });
+    if (srcBtn && !btnBusy(srcBtn, 'Saving…')) return;
     statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--color-text-faint)';
     try {
       await apiJSON('/.netlify/functions/admin-scores?match=' + matchId, {
@@ -3297,12 +3352,13 @@
       statusEl.textContent = 'Saved ✓'; statusEl.style.color = 'var(--color-teal)';
     } catch (e) {
       statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)';
-    }
+    } finally { btnDone(srcBtn); }
   };
 
-  window._finalizeMatch = async function(matchId) {
+  window._finalizeMatch = async function(matchId, srcBtn) {
     if (!confirm('Finalize this match? This will update standings.')) return;
     const statusEl = $id('sc-status-' + matchId);
+    if (srcBtn && !btnBusy(srcBtn, 'Finalizing…')) return;
     statusEl.textContent = 'Finalizing…';
     try {
       await apiJSON('/.netlify/functions/admin-scores?match=' + matchId + '&action=finalize', { method: 'POST' });
@@ -3310,12 +3366,13 @@
       loadScoreMatches();
     } catch (e) {
       statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)';
-    }
+    } finally { btnDone(srcBtn); } // no-op if loadScoreMatches re-rendered the card
   };
 
-  window._reopenMatch = async function(matchId) {
+  window._reopenMatch = async function(matchId, srcBtn) {
     if (!confirm('Reopen this match? Standings will be recalculated.')) return;
     const statusEl = $id('sc-status-' + matchId);
+    if (srcBtn && !btnBusy(srcBtn, 'Reopening…')) return;
     statusEl.textContent = 'Reopening…';
     try {
       await apiJSON('/.netlify/functions/admin-scores?match=' + matchId + '&action=reopen', { method: 'POST' });
@@ -3323,7 +3380,7 @@
       loadScoreMatches();
     } catch (e) {
       statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)';
-    }
+    } finally { btnDone(srcBtn); } // no-op if loadScoreMatches re-rendered the card
   };
 
   // ═══════════════════════════════════════════════════════════

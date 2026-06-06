@@ -18,6 +18,10 @@
        Uses shared.css tokens exclusively (matches admin portal)
        ═══════════════════════════════════════════════════════════ */
 
+    /* Busy-button spinner (slow connections / double-tap guard) */
+    .btn-spin { display: inline-block; width: 12px; height: 12px; margin-right: 7px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; vertical-align: -2px; animation: btnspin 0.7s linear infinite; }
+    @keyframes btnspin { to { transform: rotate(360deg); } }
+
     /* ── Login (matches admin) ───────────────────────────────── */
     .login-wrap { max-width: 380px; margin: 100px auto; padding: 0 20px; }
     .login-card { background: var(--color-surface); border: 1px solid var(--color-border); padding: 36px 28px; border-radius: var(--radius-lg); text-align: center; }
@@ -819,6 +823,28 @@
     const $id = (id) => document.getElementById(id);
     const show = (el) => el.classList.add('is-visible');
     const hide = (el) => el.classList.remove('is-visible');
+
+    // ===== Busy-button helper (slow connections / double-tap guard) =====
+    // btnBusy returns false if the button is already in-flight so callers can
+    // bail: `if (!btnBusy(btn)) return;`. btnDone restores it (no-op if the
+    // button was re-rendered in the meantime).
+    function btnBusy(btn, label) {
+      if (!btn) return true;          // nothing to guard — proceed
+      if (btn.dataset.busy) return false;
+      btn.dataset.busy = '1';
+      btn.dataset.busyHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="btn-spin"></span>';
+      btn.appendChild(document.createTextNode(label || 'Working…'));
+      return true;
+    }
+    function btnDone(btn) {
+      if (!btn || !btn.dataset.busy) return;
+      btn.disabled = false;
+      btn.innerHTML = btn.dataset.busyHtml;
+      delete btn.dataset.busy;
+      delete btn.dataset.busyHtml;
+    }
 
     // ===== Auth =====
     async function checkAuth() {
@@ -2229,6 +2255,14 @@
     // persist them in one request. Supports entering several games at once
     // (e.g. a whole round after back-to-back matches).
     async function saveAllScores() {
+      const saveBtn = $id('ss-save-btn');
+      if (!btnBusy(saveBtn, 'Saving…')) return; // already saving — ignore repeat taps / Enter
+      try {
+        await saveAllScoresInner();
+      } finally { btnDone(saveBtn); } // no-op if refreshScoresheet re-rendered the button
+    }
+
+    async function saveAllScoresInner() {
       const area = $id('scoresheet-area');
       const games = {};
       let changes = 0;
@@ -2277,6 +2311,8 @@
       if (!confirm('Submit this scoresheet as final from your side?\n\nIf the other captain also submits, the match becomes FINAL and scores are written to the leaderboard. You can withdraw your submission until the other captain submits.')) return;
 
       const status = $id('ss-status');
+      const btn = $id('ss-submit-btn');
+      if (!btnBusy(btn, 'Submitting…')) return;
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}&action=submit`, {
           method: 'POST', credentials: 'include',
@@ -2291,12 +2327,14 @@
           status.className = 'a-status is-err';
           status.textContent = err.message;
         }
-      }
+      } finally { btnDone(btn); } // no-op if refreshScoresheet re-rendered the button
     }
 
     async function withdrawSubmit() {
       if (!confirm('Withdraw your submission? You can re-submit later.')) return;
       const status = $id('ss-status');
+      const btn = $id('ss-withdraw-btn');
+      if (!btnBusy(btn, 'Withdrawing…')) return;
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}&action=withdraw`, {
           method: 'POST', credentials: 'include',
@@ -2310,7 +2348,7 @@
           status.className = 'a-status is-err';
           status.textContent = err.message;
         }
-      }
+      } finally { btnDone(btn); } // no-op if refreshScoresheet re-rendered the button
     }
 
     // ===== Save / Lock =====
