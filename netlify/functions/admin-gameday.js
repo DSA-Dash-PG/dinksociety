@@ -23,6 +23,11 @@ export default async (req) => {
   const lineupStore = getStore('lineups');
   const scoresStore = getStore('scores');
   const teamsStore = getStore('teams');
+  const standingsStore = getStore('standings');
+
+  // When the standings/leaderboard aggregate was last rebuilt (Overview health card).
+  const standingsBlob = await standingsStore.get(`standings/${circuit}.json`, { type: 'json' }).catch(() => null);
+  const standingsUpdatedAt = standingsBlob?.lastUpdated || null;
 
   // Discover every division/week file for this circuit.
   const { blobs } = await scheduleStore.list({ prefix: `schedule/${circuit}/` });
@@ -38,7 +43,7 @@ export default async (req) => {
 
   const allWeeks = Object.keys(weekFiles).map(Number).sort((a, b) => a - b);
   if (!allWeeks.length) {
-    return json({ circuit, week: null, matches: [], kpis: emptyKpis(), lineupLocks: { lockedTeams: 0, totalTeams: 0, notLocked: [] }, alerts: { notLockedCount: 0, liveCount: 0 } });
+    return json({ circuit, week: null, matches: [], kpis: emptyKpis(), lineupLocks: { lockedTeams: 0, totalTeams: 0, notLocked: [] }, alerts: { notLockedCount: 0, liveCount: 0, pendingApprovalCount: 0, priorIncompleteCount: 0 }, pendingApproval: [], priorIncomplete: [], standingsUpdatedAt });
   }
 
   // Pick the week.
@@ -60,6 +65,23 @@ export default async (req) => {
   const notLocked = [];
   const lockedTeamIds = new Set();
   const allTeamIds = new Set();
+  const pendingApproval = [];
+
+  // Matches in EARLIER weeks that never got finalized — stale scoresheets that
+  // silently corrupt standings. Derived from the schedule blobs already loaded.
+  const priorIncomplete = [];
+  for (const w of allWeeks) {
+    if (w >= week) continue;
+    for (const { division, data } of weekFiles[w]) {
+      for (const mt of data.matches || []) {
+        if (mt.finalizedAt) continue;
+        priorIncomplete.push({
+          week: w, division, matchId: mt.id,
+          name: `${mt.teamA?.name || '?'} vs ${mt.teamB?.name || '?'}`,
+        });
+      }
+    }
+  }
 
   for (const { division, data } of weekFiles[week]) {
     for (const mt of data.matches || []) {
@@ -79,6 +101,20 @@ export default async (req) => {
       else { const lp = liveMatchPoints(sc?.games); mpHome = lp.home; mpAway = lp.away; }
 
       const status = final ? 'final' : revealed ? 'live' : 'awaiting';
+
+      // One captain has signed off but the other hasn't → sheet is stuck
+      // waiting on dual approval.
+      if (!final && sc && (sc.homeSubmittedAt || sc.awaySubmittedAt)) {
+        const waitingOn = !sc.homeSubmittedAt ? (mt.teamA?.name || 'home')
+          : !sc.awaySubmittedAt ? (mt.teamB?.name || 'away') : null;
+        if (waitingOn) {
+          pendingApproval.push({
+            matchId: mt.id, division,
+            name: `${mt.teamA?.name || '?'} vs ${mt.teamB?.name || '?'}`,
+            waitingOn,
+          });
+        }
+      }
 
       if (aId) { allTeamIds.add(aId); (aLocked ? lockedTeamIds : null)?.add(aId); }
       if (bId) { allTeamIds.add(bId); (bLocked ? lockedTeamIds : null)?.add(bId); }
@@ -116,7 +152,15 @@ export default async (req) => {
     matches,
     kpis,
     lineupLocks: { lockedTeams: lockedTeamIds.size, totalTeams: allTeamIds.size, notLocked },
-    alerts: { notLockedCount: notLocked.length, liveCount: kpis.live },
+    alerts: {
+      notLockedCount: notLocked.length,
+      liveCount: kpis.live,
+      pendingApprovalCount: pendingApproval.length,
+      priorIncompleteCount: priorIncomplete.length,
+    },
+    pendingApproval,
+    priorIncomplete,
+    standingsUpdatedAt,
   });
 };
 

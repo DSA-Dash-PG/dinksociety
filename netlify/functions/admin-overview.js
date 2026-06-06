@@ -89,6 +89,20 @@ export default async (req) => {
       return sum + Math.max(0, (r?.totalPrice || r?.price || 0) - (r?.amountPaid || 0));
     }, 0);
 
+    // Per-registration outstanding balances, so the Overview can show WHO owes
+    // (not just the total). Sorted largest-first.
+    const balanceTeams = confirmed
+      .map(r => {
+        const due = r?.balanceDue != null
+          ? (r.balanceDue || 0)
+          : Math.max(0, (r?.totalPrice || r?.price || 0) - (r?.amountPaid || 0));
+        if (due <= 0) return null;
+        const name = r?.path === 'team' ? (r.team?.name || 'Team') : (r.agent?.name || 'Free agent');
+        return { id: r.id, name, due: Math.round(due) };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.due - a.due);
+
     // Count photos
     const { blobs: photoBlobs } = await momentsStore.list({ prefix: 'meta/' });
     const photos = photoBlobs.length;
@@ -174,7 +188,9 @@ export default async (req) => {
         totalFees: Math.round(totalFees),
         balanceDue: Math.round(balanceDue),
         photos,
+        pendingRegs: pending.length,
       },
+      balanceTeams,
       divisionFill,
       recent,
     }), {

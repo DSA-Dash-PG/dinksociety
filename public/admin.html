@@ -406,7 +406,18 @@
         <!-- OVERVIEW -->
         <section class="admin-section is-active" data-section="overview">
           <div class="am-head"><h1 class="am-title">Overview</h1><span class="ov-circuit-label" style="font-size:10px;color:var(--color-text-faint);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;" id="ov-circuit-label"></span></div>
+          <div id="ov-actions"><div class="loading">Loading…</div></div>
+          <div id="ov-tonight"></div>
           <div class="stats-row" id="ov-stats"><div class="loading">Loading overview…</div></div>
+          <div class="gd__lbl" style="margin:0 0 8px;">Quick actions</div>
+          <div class="ov-qa" id="ov-qa">
+            <button class="ab ab--outline ab--sm" data-qa="rebuild">↻ Rebuild standings</button>
+            <button class="ab ab--outline ab--sm" data-qa="tab:schedule">Generate round-robin</button>
+            <button class="ab ab--outline ab--sm" data-qa="tab:scores">Enter scores</button>
+            <button class="ab ab--outline ab--sm" data-qa="tab:messages">Message league</button>
+            <button class="ab ab--outline ab--sm" data-qa="tab:teams">View as captain</button>
+            <span id="ov-qa-status" style="font-size:11px;color:var(--color-text-faint);align-self:center;"></span>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col">
             <div class="ac"><div class="ac__h"><h2 class="ac__t">Division fill</h2></div><div id="ov-fill"><div class="loading">Loading…</div></div></div>
             <div class="ac"><div class="ac__h"><h2 class="ac__t">Recent Activity</h2></div><div id="ov-activity"><div class="loading">Loading…</div></div></div>
@@ -1628,14 +1639,160 @@
   });
 
   // ═══════════════════════════════════════════════════════════
-  // OVERVIEW — live from admin-overview endpoint
+  // OVERVIEW — live from admin-overview + admin-gameday endpoints
   // ═══════════════════════════════════════════════════════════
-  async function renderOV() {
+  function gotoTab(t) {
+    const link = document.querySelector('.sb__link[data-tab="' + t + '"]');
+    if (link) link.click();
+  }
+
+  function renderOVActions(data, gd) {
+    const el = $id('ov-actions');
+    if (!el) return;
+    const s = data.stats || {};
+    const items = [];
+    const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+
+    if (gd && gd.week) {
+      const nl = (gd.lineupLocks && gd.lineupLocks.notLocked) || [];
+      if (nl.length) {
+        const seen = new Set(), teams = [];
+        for (const x of nl) { if (x.team && !seen.has(x.team.id)) { seen.add(x.team.id); teams.push(h(x.team.name) + ' · ' + h(x.division)); } }
+        items.push({ cls: 'warn', ico: '🔓', tab: 'schedule', btn: 'Open schedule',
+          act: 'lineups', actBtn: 'Nudge captains',
+          confirm: 'Email + portal-message the ' + teams.length + ' captain' + (teams.length === 1 ? '' : 's') + ' who haven’t locked their Week ' + gd.week + ' lineup?',
+          t: plural(teams.length, 'lineup') + ' not locked · Week ' + gd.week,
+          s: teams.join(' &nbsp;·&nbsp; ') });
+      }
+      const pa = gd.pendingApproval || [];
+      if (pa.length) {
+        items.push({ cls: 'warn', ico: '📝', tab: 'scores', btn: 'Score entry',
+          t: plural(pa.length, 'scoresheet') + ' awaiting captain approval',
+          s: pa.slice(0, 4).map(x => h(x.name) + ' — waiting on ' + h(x.waitingOn)).join(' &nbsp;·&nbsp; ') + (pa.length > 4 ? ' &nbsp;·&nbsp; +' + (pa.length - 4) + ' more' : '') });
+      }
+      const pi = gd.priorIncomplete || [];
+      if (pi.length) {
+        items.push({ cls: 'danger', ico: '⚠️', tab: 'scores', btn: 'Score entry',
+          t: pi.length + ' match' + (pi.length === 1 ? '' : 'es') + ' from earlier weeks missing final scores',
+          s: pi.slice(0, 4).map(x => 'Wk ' + x.week + ': ' + h(x.name)).join(' &nbsp;·&nbsp; ') + (pi.length > 4 ? ' &nbsp;·&nbsp; +' + (pi.length - 4) + ' more' : '') });
+      }
+    }
+    if (s.pendingRegs) {
+      items.push({ ico: '👤', tab: 'registrations', btn: 'Review',
+        t: plural(s.pendingRegs, 'registration') + ' pending review',
+        s: 'Confirm or reject to free up division slots' });
+    }
+    if ((s.balanceDue || 0) > 0) {
+      const bt = data.balanceTeams || [];
+      items.push({ cls: 'danger', ico: '💳', tab: 'registrations', btn: 'Payments',
+        act: 'balance', actBtn: 'Email reminders',
+        confirm: 'Send a balance reminder (email + portal message) to every team still owing? Total outstanding: $' + s.balanceDue.toLocaleString() + '.',
+        t: '$' + s.balanceDue.toLocaleString() + ' balance outstanding',
+        s: bt.slice(0, 4).map(x => h(x.name) + ' ($' + x.due.toLocaleString() + ')').join(' &nbsp;·&nbsp; ') + (bt.length > 4 ? ' &nbsp;·&nbsp; +' + (bt.length - 4) + ' more' : '') });
+    }
+
+    if (!items.length) {
+      el.innerHTML = '<div class="ova__clear">✓ All clear — nothing needs your attention right now.</div>';
+      return;
+    }
+    el.innerHTML =
+      '<div class="gd__lbl" style="margin-top:0;">Action required · ' + items.length + '</div>' +
+      '<div class="ova">' + items.map((it, i) =>
+        '<div class="ova__item' + (it.cls ? ' ova__item--' + it.cls : '') + '">' +
+          '<span class="ova__ico">' + it.ico + '</span>' +
+          '<div class="ova__body"><div class="ova__t">' + it.t + '</div><div class="ova__s">' + it.s + '</div></div>' +
+          (it.act ? '<button class="ab ab--lime ab--sm" data-ova-act="' + it.act + '" data-ova-confirm="' + h(it.confirm || '') + '">' + it.actBtn + '</button>' : '') +
+          '<button class="ab ab--outline ab--sm" data-ova-tab="' + it.tab + '">' + it.btn + '</button>' +
+        '</div>').join('') + '</div>';
+    el.querySelectorAll('[data-ova-tab]').forEach(b => b.addEventListener('click', () => gotoTab(b.dataset.ovaTab)));
+    el.querySelectorAll('[data-ova-act]').forEach(b => b.addEventListener('click', () => sendNudge(b)));
+  }
+
+  // Fire a one-click reminder (lineups / balance) via admin-nudge.
+  async function sendNudge(btn) {
+    const type = btn.dataset.ovaAct;
+    if (btn.dataset.ovaConfirm && !window.confirm(btn.dataset.ovaConfirm)) return;
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Sending…';
     try {
-      const data = await apiJSON('/.netlify/functions/admin-overview');
+      const r = await apiJSON('/.netlify/functions/admin-nudge', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, circuit: 'I' }),
+      });
+      const emailed = (r.sent || []).reduce((n, x) => n + (x.emailed || 0), 0);
+      const skipped = (r.skipped || []).length;
+      btn.textContent = '✓ ' + (r.sent || []).length + ' sent' + (emailed ? ' · ' + emailed + ' emailed' : '') + (skipped ? ' · ' + skipped + ' skipped' : '');
+      if (skipped) console.warn('nudge skipped:', r.skipped);
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 6000);
+    } catch (e) {
+      btn.textContent = 'Failed: ' + e.message;
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 6000);
+    }
+  }
+
+  function renderOVTonight(gd) {
+    const el = $id('ov-tonight');
+    if (!el) return;
+    if (!gd || !gd.week) { el.innerHTML = ''; return; }
+    const k = gd.kpis || {}, ll = gd.lineupLocks || {};
+    const locksCls = (ll.totalTeams && ll.lockedTeams === ll.totalTeams) ? 'done' : 'warn';
+    el.innerHTML =
+      '<div class="gd" style="margin-bottom:18px;">' +
+        '<div class="gd__lbl" style="margin-top:0;display:flex;justify-content:space-between;align-items:center;">Tonight · Week ' + gd.week +
+          ' <button class="gd__refresh" id="ov-refresh-btn">↻ Refresh</button></div>' +
+        '<div class="gd__kpis" style="grid-template-columns:repeat(5,1fr);">' +
+          '<div class="gd__kpi"><div class="gd__kn">' + (k.total || 0) + '</div><div class="gd__kl">Matches</div></div>' +
+          '<div class="gd__kpi"><div class="gd__kn live">' + (k.live || 0) + '</div><div class="gd__kl">Live</div></div>' +
+          '<div class="gd__kpi"><div class="gd__kn done">' + (k.final || 0) + '</div><div class="gd__kl">Final</div></div>' +
+          '<div class="gd__kpi"><div class="gd__kn warn">' + (k.toStart || 0) + '</div><div class="gd__kl">To start</div></div>' +
+          '<div class="gd__kpi"><div class="gd__kn ' + locksCls + '">' + (ll.lockedTeams || 0) + '/' + (ll.totalTeams || 0) + '</div><div class="gd__kl">Locked</div></div>' +
+        '</div>' +
+        (gd.standingsUpdatedAt ? '<div class="ov-health" style="margin:6px 2px 0;">Standings last rebuilt ' + h(fdt(gd.standingsUpdatedAt)) + '</div>' : '') +
+      '</div>';
+    $id('ov-refresh-btn')?.addEventListener('click', renderOV);
+  }
+
+  // Quick actions (static buttons, wired once)
+  $id('ov-qa')?.querySelectorAll('[data-qa]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const qa = b.dataset.qa;
+      if (qa.startsWith('tab:')) { gotoTab(qa.slice(4)); return; }
+      if (qa === 'rebuild') {
+        const status = $id('ov-qa-status');
+        b.disabled = true; if (status) status.textContent = 'Rebuilding standings…';
+        try {
+          await apiJSON('/.netlify/functions/admin-rebuild-standings?circuit=I', { method: 'POST' });
+          if (status) status.textContent = 'Standings rebuilt ✓';
+          renderOV();
+        } catch (e) {
+          if (status) status.textContent = 'Rebuild failed: ' + e.message;
+        }
+        b.disabled = false;
+        setTimeout(() => { const st = $id('ov-qa-status'); if (st) st.textContent = ''; }, 5000);
+      }
+    });
+  });
+
+  async function renderOV() {
+    const [ovRes, gdRes] = await Promise.allSettled([
+      apiJSON('/.netlify/functions/admin-overview'),
+      apiJSON('/.netlify/functions/admin-gameday?circuit=I'),
+    ]);
+    if (ovRes.status === 'rejected') {
+      $id('ov-stats').innerHTML = '<div class="empty">Failed to load overview: ' + h(ovRes.reason && ovRes.reason.message) + '</div>';
+      $id('ov-actions').innerHTML = '';
+      $id('ov-tonight').innerHTML = '';
+      return;
+    }
+    try {
+      const data = ovRes.value;
+      const gd = gdRes.status === 'fulfilled' ? gdRes.value : null;
       const s = data.stats || {};
       const fill = data.divisionFill || [];
       const recent = data.recent || [];
+
+      renderOVActions(data, gd);
+      renderOVTonight(gd);
 
       $id('sb-reg-ct').textContent = (s.teams || 0) + (s.agents || 0);
       $id('ov-stats').innerHTML =
@@ -3359,6 +3516,23 @@
   .gd__pill.final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
   .gd__pill.awaiting { background: var(--color-gold-dim); color: var(--color-gold); }
   .gd__refresh { font-size: 11px; color: var(--color-teal); cursor: pointer; background: none; border: none; font-family: inherit; font-weight: 700; letter-spacing: 0; text-transform: none; }
+
+  /* Overview — action required panel */
+  .ova { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .ova__item { display: flex; align-items: center; gap: 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; }
+  .ova__item--warn { border-color: rgba(240,192,64,0.35); }
+  .ova__item--danger { border-color: rgba(229,62,62,0.4); }
+  .ova__ico { font-size: 16px; flex-shrink: 0; width: 24px; text-align: center; }
+  .ova__body { flex: 1; min-width: 0; }
+  .ova__t { font-size: 13px; font-weight: 700; }
+  .ova__s { font-size: 11px; color: var(--color-text-faint); margin-top: 2px; line-height: 1.45; }
+  .ova__clear { display: flex; align-items: center; gap: 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; font-size: 12px; font-weight: 600; color: var(--color-teal); margin-bottom: 20px; }
+  .ov-qa { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+  .ov-health { font-size: 11px; color: var(--color-text-faint); margin: -12px 0 18px; }
+  @media (max-width: 700px) {
+    .ova__item { flex-wrap: wrap; }
+    .ova__body { flex-basis: calc(100% - 80px); }
+  }
 </style>
 </body>
 </html>
