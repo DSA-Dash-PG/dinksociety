@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Captain Roster — Mockup · The Dink Society</title>
+<style>
+  :root {
+    --bg: #0e0e0e; --surface: #161616; --surface2: #1e1e1e; --surface3: #262626;
+    --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.14);
+    --text: #f0f0ec; --muted: #9a9e97; --faint: #5e625c;
+    --lime: #b8ff2c; --lime-dim: rgba(184,255,44,0.12);
+    --teal: #17d7b0; --teal-dim: rgba(23,215,176,0.12);
+    --red: #ff5c47; --gold: #f0c040; --gold-dim: rgba(240,192,64,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; padding: 24px 14px 90px; }
+  .wrap { max-width: 520px; margin: 0 auto; }
+  h1 { font-size: 20px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .sub { color: var(--muted); font-size: 13px; margin: 6px 0 20px; line-height: 1.5; }
+
+  .label { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin: 18px 2px 9px; display: flex; justify-content: space-between; align-items: baseline; }
+  .label .count { letter-spacing: 0; text-transform: none; font-weight: 600; }
+
+  /* Roster rows — read-only, tap to edit */
+  .roster { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 13px 14px; border: none; border-bottom: 1px solid var(--border); background: none; color: var(--text); font: inherit; cursor: pointer; text-align: left; }
+  .row:last-child { border-bottom: none; }
+  .row:active { background: var(--surface2); }
+  .av { width: 36px; height: 36px; border-radius: 50%; background: var(--surface3); border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; flex-shrink: 0; }
+  .row.is-lead .av { background: var(--lime-dim); border-color: rgba(184,255,44,0.4); color: var(--lime); }
+  .row__body { flex: 1; min-width: 0; }
+  .row__name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+  .row__phone { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .row__phone.none { color: var(--faint); font-style: italic; }
+  .badge { font-size: 8px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+  .badge.cap { background: var(--lime-dim); color: var(--lime); }
+  .badge.co { background: var(--teal-dim); color: var(--teal); }
+  .gtag { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; }
+  .gtag.f { background: rgba(255,126,182,0.15); color: #ff7eb6; }
+  .gtag.m { background: rgba(110,168,255,0.15); color: #6ea8ff; }
+  .gtag.none { background: var(--gold-dim); color: var(--gold); }
+  .callbtn { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border-strong); background: var(--surface2); color: var(--teal); flex-shrink: 0; text-decoration: none; font-size: 15px; }
+  .callbtn.off { color: var(--faint); pointer-events: none; opacity: 0.45; }
+  .chev { color: var(--faint); flex-shrink: 0; font-size: 14px; }
+
+  .addbtn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; margin-top: 12px; padding: 12px; border-radius: 12px; border: 1px dashed var(--border-strong); background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; }
+  .addbtn:active { background: var(--surface2); }
+
+  /* Bottom-sheet editor — only way to edit, keeps the list clean */
+  .sheet-scrim { display: none; }
+  .sheet-scrim.is-open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); z-index: 130; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 135; background: var(--surface); border-top: 1px solid var(--border-strong); border-radius: 22px 22px 0 0; padding: 8px 18px calc(24px + env(safe-area-inset-bottom)); transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.16,1,0.3,1); max-height: 85vh; overflow-y: auto; }
+  .sheet.is-open { transform: translateY(0); }
+  .sheet__grip { width: 40px; height: 4px; border-radius: 4px; background: var(--border-strong); margin: 4px auto 14px; }
+  .sheet__title { font-size: 15px; font-weight: 800; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+  .f { margin-bottom: 12px; }
+  .f label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 5px; }
+  .f input, .f select { width: 100%; padding: 11px 12px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface3); color: var(--text); font: inherit; font-size: 14px; }
+  .f input:focus, .f select:focus { outline: none; border-color: var(--lime); }
+  .f.is-bad input, .f.is-bad select { border-color: var(--red); }
+  .f .req { color: var(--red); margin-left: 2px; }
+  .sheet__err { display: none; font-size: 12px; font-weight: 600; color: var(--red); background: rgba(255,92,71,0.1); border: 1px solid rgba(255,92,71,0.3); border-radius: 9px; padding: 9px 12px; margin-top: 12px; }
+  .sheet__err.show { display: block; }
+  .sheet__btns { display: flex; gap: 9px; margin-top: 16px; }
+  .btn { flex: 1; padding: 12px; border-radius: 999px; border: none; font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+  .btn.save { background: var(--lime); color: #0e0e0e; }
+  .btn.cancel { background: none; border: 1px solid var(--border-strong); color: var(--text); }
+  .btn.remove { background: none; border: none; color: var(--red); font-weight: 700; font-size: 12px; width: 100%; margin-top: 12px; cursor: pointer; }
+  .rolebox { display: flex; gap: 8px; }
+  .rolebox button { flex: 1; padding: 9px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface3); color: var(--muted); font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .rolebox button.on { border-color: rgba(184,255,44,0.5); color: var(--lime); background: var(--lime-dim); }
+
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom)); background: var(--surface3); border: 1px solid var(--border-strong); color: var(--lime); font-size: 12px; font-weight: 700; padding: 9px 18px; border-radius: 999px; opacity: 0; transition: opacity 0.25s; pointer-events: none; z-index: 140; }
+  .toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Roster — Captain View Mockup</h1>
+  <p class="sub">No team-photo section on mobile, no wall of input fields. Captain first, then co-captains, then everyone else A→Z — each with their phone (tap 📞 to call). Tap a player to edit their info in the sheet.</p>
+
+  <div class="label"><span>Team Roster</span><span class="count" id="count"></span></div>
+  <div class="roster" id="roster"></div>
+  <button class="addbtn" id="add-btn">+ Add player</button>
+</div>
+
+<div class="sheet-scrim" id="scrim"></div>
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="sheet__grip"></div>
+  <div class="sheet__title" id="sheet-title">Edit player</div>
+  <div class="f" id="f-name"><label>Name<span class="req">*</span></label><input id="ed-name" type="text" placeholder="Player name"></div>
+  <div class="f" id="f-gender"><label>Gender<span class="req">*</span> <span style="text-transform:none;letter-spacing:0;font-weight:500;">(needed for lineup slots)</span></label>
+    <select id="ed-gender"><option value="">— select —</option><option value="F">Female</option><option value="M">Male</option></select>
+  </div>
+  <div class="f" id="f-email"><label>Email<span class="req">*</span> <span style="text-transform:none;letter-spacing:0;font-weight:500;">(used for player sign-in)</span></label><input id="ed-email" type="email" placeholder="player@email.com"></div>
+  <div class="f" id="f-phone"><label>Phone</label><input id="ed-phone" type="tel" placeholder="(555) 123-4567"></div>
+  <div class="f"><label>Role</label>
+    <div class="rolebox">
+      <button type="button" data-role="">Player</button>
+      <button type="button" data-role="co">Co-captain</button>
+    </div>
+  </div>
+  <div class="sheet__err" id="sheet-err"></div>
+  <div class="sheet__btns">
+    <button class="btn cancel" id="ed-cancel">Cancel</button>
+    <button class="btn save" id="ed-save">Save player</button>
+  </div>
+  <button class="btn remove" id="ed-remove">Remove from roster</button>
+</div>
+
+<div class="toast" id="toast">Saved ✓</div>
+
+<script>
+(function () {
+  // Deliberately unsorted sample data — the list below must come out ordered.
+  let roster = [
+    { id: 'p1', name: 'Marco V.',   gender: 'M', phone: '(619) 555-0188', email: 'marco@mail.com',  role: '' },
+    { id: 'p2', name: 'Annie K.',   gender: 'F', phone: '(619) 555-0142', email: 'annie@mail.com',  role: 'co' },
+    { id: 'p3', name: 'Richard H.', gender: 'M', phone: '(619) 555-0101', email: 'rich@mail.com',   role: 'cap' },
+    { id: 'p4', name: 'Bella R.',   gender: 'F', phone: '',               email: 'bella@mail.com',  role: '' },
+    { id: 'p5', name: 'Devon S.',   gender: 'M', phone: '(619) 555-0173', email: 'devon@mail.com',  role: '' },
+    { id: 'p6', name: 'Amita P.',   gender: 'F', phone: '(619) 555-0119', email: 'amita@mail.com',  role: '' },
+    { id: 'p7', name: 'Ant B.',     gender: '',  phone: '(619) 555-0166', email: 'ant@mail.com',    role: '' },
+    { id: 'p8', name: 'Cara M.',    gender: 'F', phone: '(619) 555-0151', email: 'cara@mail.com',   role: 'co' },
+  ];
+
+  // ── Sort: captain → co-captains → everyone else A→Z ─────────
+  function sorted() {
+    const rank = (p) => p.role === 'cap' ? 0 : p.role === 'co' ? 1 : 2;
+    return [...roster].sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+  }
+
+  const initials = (n) => n.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  function render() {
+    const el = document.getElementById('roster');
+    el.innerHTML = sorted().map(p => {
+      const lead = p.role === 'cap' || p.role === 'co';
+      const badge = p.role === 'cap' ? '<span class="badge cap">Captain</span>' : p.role === 'co' ? '<span class="badge co">Co-captain</span>' : '';
+      const gtag = p.gender === 'F' ? '<span class="gtag f">W</span>' : p.gender === 'M' ? '<span class="gtag m">M</span>' : '<span class="gtag none">no gender</span>';
+      const phone = p.phone
+        ? '<div class="row__phone">' + esc(p.phone) + '</div>'
+        : '<div class="row__phone none">no phone on file</div>';
+      const call = p.phone
+        ? '<a class="callbtn" href="tel:' + esc(p.phone.replace(/[^\d+]/g, '')) + '" onclick="event.stopPropagation()" aria-label="Call ' + esc(p.name) + '">&#9742;</a>'
+        : '<span class="callbtn off">&#9742;</span>';
+      return '<button type="button" class="row ' + (lead ? 'is-lead' : '') + '" data-id="' + p.id + '">' +
+        '<span class="av">' + esc(initials(p.name)) + '</span>' +
+        '<span class="row__body"><span class="row__name">' + esc(p.name) + ' ' + badge + ' ' + gtag + '</span>' + phone + '</span>' +
+        call + '<span class="chev">›</span></button>';
+    }).join('');
+    document.getElementById('count').textContent = roster.length + ' players';
+    el.querySelectorAll('.row').forEach(r => r.addEventListener('click', () => openEditor(r.dataset.id)));
+  }
+
+  // ── Bottom-sheet editor ──────────────────────────────────────
+  let editing = null; // player id, or null = adding new
+
+  function openEditor(id) {
+    const p = roster.find(x => x.id === id);
+    editing = id || null;
+    document.getElementById('sheet-title').textContent = p ? 'Edit · ' + p.name : 'Add player';
+    document.getElementById('ed-name').value = p?.name || '';
+    document.getElementById('ed-gender').value = p?.gender || '';
+    document.getElementById('ed-phone').value = p?.phone || '';
+    document.getElementById('ed-email').value = p?.email || '';
+    setRole(p?.role === 'cap' ? '' : (p?.role || '')); // captain role isn't editable here
+    document.querySelector('.rolebox').style.display = p?.role === 'cap' ? 'none' : 'flex';
+    document.getElementById('ed-remove').style.display = (p && p.role !== 'cap') ? 'block' : 'none';
+    document.getElementById('sheet').classList.add('is-open');
+    document.getElementById('scrim').classList.add('is-open');
+  }
+  function closeEditor() {
+    document.getElementById('sheet').classList.remove('is-open');
+    document.getElementById('scrim').classList.remove('is-open');
+    editing = null;
+  }
+
+  let pickedRole = '';
+  function setRole(r) {
+    pickedRole = r;
+    document.querySelectorAll('.rolebox button').forEach(b => b.classList.toggle('on', b.dataset.role === r));
+  }
+  document.querySelectorAll('.rolebox button').forEach(b => b.addEventListener('click', () => setRole(b.dataset.role)));
+
+  document.getElementById('ed-save').addEventListener('click', () => {
+    const name = document.getElementById('ed-name').value.trim();
+    const gender = document.getElementById('ed-gender').value;
+    const email = document.getElementById('ed-email').value.trim();
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+    // Gender + email are REQUIRED — gender drives lineup slots, email is the
+    // player's sign-in. Flag everything missing at once.
+    const problems = [];
+    document.getElementById('f-name').classList.toggle('is-bad', !name);
+    document.getElementById('f-gender').classList.toggle('is-bad', !gender);
+    document.getElementById('f-email').classList.toggle('is-bad', !emailOk);
+    if (!name) problems.push('name');
+    if (!gender) problems.push('gender');
+    if (!emailOk) problems.push(email ? 'a valid email' : 'email');
+    const errEl = document.getElementById('sheet-err');
+    if (problems.length) {
+      errEl.textContent = 'Required: ' + problems.join(', ') + '.';
+      errEl.classList.add('show');
+      return;
+    }
+    errEl.classList.remove('show');
+
+    const data = {
+      name,
+      gender,
+      email,
+      phone: document.getElementById('ed-phone').value.trim(),
+    };
+    if (editing) {
+      const p = roster.find(x => x.id === editing);
+      Object.assign(p, data);
+      if (p.role !== 'cap') p.role = pickedRole;
+    } else {
+      roster.push({ id: 'p' + Date.now(), role: pickedRole, ...data });
+    }
+    closeEditor(); render(); toast('Saved ✓');
+  });
+
+  document.getElementById('ed-remove').addEventListener('click', () => {
+    if (!editing) return;
+    const p = roster.find(x => x.id === editing);
+    if (!confirm('Remove ' + p.name + ' from the roster?')) return;
+    roster = roster.filter(x => x.id !== editing);
+    closeEditor(); render(); toast('Removed');
+  });
+
+  document.getElementById('ed-cancel').addEventListener('click', closeEditor);
+  document.getElementById('scrim').addEventListener('click', closeEditor);
+  document.getElementById('add-btn').addEventListener('click', () => openEditor(null));
+
+  let toastTimer;
+  function toast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 1600);
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lineup Builder — Set Conflict Mockup · The Dink Society</title>
+<style>
+  :root {
+    --bg: #0e0e0e; --surface: #161616; --surface2: #1e1e1e; --surface3: #262626;
+    --border: rgba(255,255,255,0.08); --border-strong: rgba(255,255,255,0.14);
+    --text: #f0f0ec; --muted: #9a9e97; --faint: #5e625c;
+    --lime: #b8ff2c; --lime-dim: rgba(184,255,44,0.12);
+    --teal: #17d7b0; --teal-dim: rgba(23,215,176,0.12);
+    --red: #ff5c47; --red-dim: rgba(255,92,71,0.12);
+    --gold: #f0c040; --gold-dim: rgba(240,192,64,0.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; padding: 24px 14px 110px; }
+  .wrap { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 20px; text-transform: uppercase; letter-spacing: 0.02em; }
+  .sub { color: var(--muted); font-size: 13px; margin: 6px 0 18px; line-height: 1.5; }
+  .note { background: var(--teal-dim); border: 1px solid rgba(23,215,176,0.3); border-radius: 10px; padding: 10px 13px; font-size: 12px; color: var(--teal); margin-bottom: 18px; line-height: 1.5; }
+
+  .round-label { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--faint); font-weight: 700; margin: 26px 2px 16px; }
+
+  /* A "set" = two games on court simultaneously — ringed so the pairing is unmissable */
+  .set { position: relative; background: var(--surface); border: 2px solid rgba(23,215,176,0.5); border-radius: 16px; padding: 18px 12px 12px; margin: 24px 0 20px; }
+  .set--bad { border-color: rgba(255,92,71,0.75); }
+  .set__title { position: absolute; top: -11px; left: 14px; background: var(--bg); color: var(--teal); border: 1px solid rgba(23,215,176,0.5); padding: 2px 10px; border-radius: 999px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; }
+  .set--bad .set__title { color: var(--red); border-color: rgba(255,92,71,0.75); }
+  .set__hint { position: absolute; top: -9px; right: 14px; background: var(--bg); padding: 1px 8px; font-size: 10px; color: var(--faint); }
+  .set__games { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 560px) { .set__games { grid-template-columns: 1fr; } }
+
+  .game { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 11px; }
+  .game__head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .game__no { font-size: 12px; font-weight: 800; }
+  .game__no small { font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin-left: 5px; }
+  .game__no small.w { color: #ff7eb6; } .game__no small.m { color: #6ea8ff; } .game__no small.x { color: var(--gold); }
+  .court { font-size: 9px; font-weight: 700; color: var(--faint); background: var(--surface3); padding: 2px 7px; border-radius: 999px; }
+  .game.has-conflict { border-color: rgba(255,92,71,0.5); }
+  .why { font-size: 10px; color: var(--red); margin-top: 6px; display: none; line-height: 1.4; }
+  .game.has-conflict .why { display: block; }
+
+  /* Slot buttons — tap to open the bottom-sheet picker (matches captain portal) */
+  .slot { display: flex; align-items: center; gap: 9px; width: 100%; margin-top: 7px; padding: 9px 10px; border-radius: 9px; border: 1px dashed var(--border-strong); background: var(--surface3); color: var(--faint); font: inherit; font-size: 13px; cursor: pointer; text-align: left; }
+  .slot.is-filled { border-style: solid; color: var(--text); }
+  .slot:active { background: #2e2e2e; }
+  .av { width: 26px; height: 26px; border-radius: 50%; background: var(--surface2); border: 1px solid var(--border-strong); display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; flex-shrink: 0; }
+  .slot.is-filled .av { background: var(--lime-dim); border-color: rgba(184,255,44,0.35); color: var(--lime); }
+
+  /* Bottom sheet picker (mirrors .cap-sheet in captain.html) */
+  .sheet-scrim { display: none; }
+  .sheet-scrim.is-open { display: block; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(3px); z-index: 130; }
+  .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 135; background: var(--surface); border-top: 1px solid var(--border-strong); border-radius: 22px 22px 0 0; padding: 8px 16px calc(22px + env(safe-area-inset-bottom)); transform: translateY(110%); transition: transform 0.28s cubic-bezier(0.16,1,0.3,1); max-height: 72vh; overflow-y: auto; }
+  .sheet.is-open { transform: translateY(0); }
+  .sheet__grip { width: 40px; height: 4px; border-radius: 4px; background: var(--border-strong); margin: 4px auto 12px; }
+  .sheet__title { font-size: 14px; font-weight: 800; margin: 0 0 2px; }
+  .sheet__sub { font-size: 10px; color: var(--faint); letter-spacing: 0.04em; text-transform: uppercase; font-weight: 600; margin-bottom: 10px; }
+  .pick { display: flex; align-items: center; gap: 11px; width: 100%; padding: 11px 8px; border: none; border-bottom: 1px solid var(--border); background: none; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; text-align: left; }
+  .pick:last-child { border-bottom: none; }
+  .pick__nm { flex: 1; min-width: 0; font-weight: 600; }
+  .pick__note { display: block; font-size: 10px; font-weight: 500; color: var(--faint); margin-top: 1px; }
+  .pick.is-disabled { opacity: 0.38; pointer-events: none; }
+  .pick.is-disabled .pick__note { color: var(--red); opacity: 1; }
+  .tag { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: 999px; flex-shrink: 0; }
+  .tag.f { background: rgba(255,126,182,0.15); color: #ff7eb6; }
+  .tag.m { background: rgba(110,168,255,0.15); color: #6ea8ff; }
+
+  /* Status bar */
+  .status { position: fixed; left: 0; right: 0; bottom: 0; z-index: 120; background: rgba(18,18,18,0.97); backdrop-filter: blur(10px); border-top: 1px solid var(--border); padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .status__msg { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .status__msg.ok { color: var(--lime); } .status__msg.bad { color: var(--red); }
+  .status__btns { display: flex; gap: 8px; flex-shrink: 0; }
+  .lockbtn { background: var(--lime); color: #0e0e0e; border: none; font: inherit; font-weight: 800; font-size: 13px; padding: 10px 20px; border-radius: 999px; cursor: pointer; }
+  .lockbtn:disabled { background: var(--surface3); color: var(--faint); cursor: not-allowed; }
+  .draftbtn { background: none; color: var(--text); border: 1px solid var(--border-strong); font: inherit; font-weight: 700; font-size: 13px; padding: 10px 16px; border-radius: 999px; cursor: pointer; }
+  .draftbtn:disabled { color: var(--faint); border-color: var(--border); cursor: not-allowed; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Lineup Builder — Set Pairing Mockup</h1>
+  <p class="sub">Two games run at the same time (Court 1 + Court 2), so each pair is a <b>set</b>:
+  G1+G2 · G3+G4 · G5+G6, then G7+G8 · G9+G10 · G11+G12.
+  Tap a slot to open the player picker — anyone already in the <b>other game of the same set</b> shows grayed out with the reason, same for the 4-game nightly cap.</p>
+  <div class="note">Try it: put Annie K. in G3, then open a slot in G4 — she's grayed out: "Playing G3 (other court)".</div>
+  <div id="builder"></div>
+</div>
+
+<div class="sheet-scrim" id="sheet-scrim"></div>
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="sheet__grip"></div>
+  <h3 class="sheet__title" id="sheet-title">Pick a player</h3>
+  <div class="sheet__sub" id="sheet-sub"></div>
+  <div id="sheet-list"></div>
+</div>
+
+<div class="status">
+  <div class="status__msg" id="status-msg">Pick players for all 12 games.</div>
+  <div class="status__btns">
+    <button class="draftbtn" id="draft-btn" disabled>Save draft</button>
+    <button class="lockbtn" id="lock-btn" disabled>Lock lineup</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  const MAX_GAMES = 4;
+  const ROSTER = [
+    { id: 'f1', name: 'Amita P.',  g: 'F' },
+    { id: 'f2', name: 'Annie K.',  g: 'F' },
+    { id: 'f3', name: 'Aurora T.', g: 'F' },
+    { id: 'f4', name: 'Bella R.',  g: 'F' },
+    { id: 'f5', name: 'Cara M.',   g: 'F' },
+    { id: 'm1', name: 'Richard H.',g: 'M' },
+    { id: 'm2', name: 'Angel M.',  g: 'M' },
+    { id: 'm3', name: 'Ant B.',    g: 'M' },
+    { id: 'm4', name: 'Devon S.',  g: 'M' },
+    { id: 'm5', name: 'Marco V.',  g: 'M' },
+  ];
+
+  const SLOTS = [];
+  for (let r = 1; r <= 2; r++) {
+    SLOTS.push(
+      { key: `r${r}g1`, n: (r-1)*6 + 1, type: 'W', round: r },
+      { key: `r${r}g2`, n: (r-1)*6 + 2, type: 'M', round: r },
+      { key: `r${r}g3`, n: (r-1)*6 + 3, type: 'X', round: r },
+      { key: `r${r}g4`, n: (r-1)*6 + 4, type: 'X', round: r },
+      { key: `r${r}g5`, n: (r-1)*6 + 5, type: 'X', round: r },
+      { key: `r${r}g6`, n: (r-1)*6 + 6, type: 'X', round: r },
+    );
+  }
+  const TYPE_LABEL = { W: "Women's", M: "Men's", X: 'Mixed' };
+  const TYPE_CLS = { W: 'w', M: 'm', X: 'x' };
+  const bySlot = {}; SLOTS.forEach(s => bySlot[s.key] = s);
+
+  // THE CORE RULE: 1↔2, 3↔4, 5↔6 within each round play simultaneously.
+  function pairedSlot(key) {
+    const m = key.match(/^r(\d)g(\d)$/);
+    const g = Number(m[2]);
+    return `r${m[1]}g${g % 2 === 1 ? g + 1 : g - 1}`;
+  }
+
+  const DRAFT_KEY = 'ds-lineup-sets-mockup-draft';
+  const picks = {};
+  SLOTS.forEach(s => { picks[s.key] = { p1: null, p2: null }; });
+  try { // restore a saved draft (partial lineups welcome — same as the real builder)
+    const saved = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+    if (saved) SLOTS.forEach(s => { if (saved[s.key]) picks[s.key] = { p1: saved[s.key].p1 || null, p2: saved[s.key].p2 || null }; });
+  } catch {}
+  let dirty = false, justSaved = !!localStorage.getItem(DRAFT_KEY);
+
+  function genderFor(type, pos) { return type === 'W' ? 'F' : type === 'M' ? 'M' : (pos === 'p1' ? 'F' : 'M'); }
+  function playersInSlot(key) { return [picks[key].p1, picks[key].p2].filter(Boolean); }
+  function nameOf(id) { const p = ROSTER.find(x => x.id === id); return p ? p.name : '—'; }
+  function initials(n) { return n.split(/\s+/).map(w => w[0]).join('').slice(0, 2).toUpperCase(); }
+  function gameCount(id) { return SLOTS.reduce((n, s) => n + (playersInSlot(s.key).includes(id) ? 1 : 0), 0); }
+
+  function slotConflict(key) {
+    const dupe = playersInSlot(key).find(id => playersInSlot(pairedSlot(key)).includes(id));
+    if (!dupe) return null;
+    return `${nameOf(dupe)} is also in G${bySlot[pairedSlot(key)].n} — both games are on court at the same time.`;
+  }
+
+  // ── Render builder ───────────────────────────────────────────
+  const builder = document.getElementById('builder');
+
+  function render() {
+    let html = '';
+    for (let r = 1; r <= 2; r++) {
+      html += `<div class="round-label">Round ${r}</div>`;
+      for (let g = 1; g <= 6; g += 2) {
+        const a = bySlot[`r${r}g${g}`], b = bySlot[`r${r}g${g+1}`];
+        const bad = slotConflict(a.key) || slotConflict(b.key);
+        html += `<div class="set ${bad ? 'set--bad' : ''}">
+          <div class="set__title">Set ${Math.ceil(g/2) + (r-1)*3} · G${a.n} + G${b.n}</div>
+          <div class="set__hint">same time, two courts</div>
+          <div class="set__games">${gameCard(a, 1)}${gameCard(b, 2)}</div>
+        </div>`;
+      }
+    }
+    builder.innerHTML = html;
+    updateStatus();
+  }
+
+  function gameCard(slot, court) {
+    const conflict = slotConflict(slot.key);
+    return `<div class="game ${conflict ? 'has-conflict' : ''}">
+      <div class="game__head">
+        <div class="game__no">G${slot.n}<small class="${TYPE_CLS[slot.type]}">${TYPE_LABEL[slot.type]}</small></div>
+        <span class="court">Court ${court}</span>
+      </div>
+      ${slotBtn(slot, 'p1')}${slotBtn(slot, 'p2')}
+      <div class="why">⚠ ${conflict || ''}</div>
+    </div>`;
+  }
+
+  function slotBtn(slot, pos) {
+    const pid = picks[slot.key][pos];
+    const need = genderFor(slot.type, pos);
+    if (pid) {
+      const nm = nameOf(pid);
+      return `<button type="button" class="slot is-filled" data-slot="${slot.key}" data-pos="${pos}"><span class="av">${initials(nm)}</span>${nm}</button>`;
+    }
+    return `<button type="button" class="slot" data-slot="${slot.key}" data-pos="${pos}"><span class="av">+</span>Add ${need === 'F' ? 'woman' : 'man'}</button>`;
+  }
+
+  builder.addEventListener('click', (e) => {
+    const btn = e.target.closest('.slot');
+    if (btn) openSheet(btn.dataset.slot, btn.dataset.pos);
+  });
+
+  // ── Bottom sheet picker ──────────────────────────────────────
+  let ctx = null;
+
+  function openSheet(slotKey, pos) {
+    const slot = bySlot[slotKey];
+    const need = genderFor(slot.type, pos);
+    const partner = picks[slotKey][pos === 'p1' ? 'p2' : 'p1'];
+    const current = picks[slotKey][pos];
+    const busyAcrossSet = playersInSlot(pairedSlot(slotKey)); // ← the new set rule
+    ctx = { slotKey, pos };
+
+    document.getElementById('sheet-title').textContent = `${TYPE_LABEL[slot.type]} · ${need === 'F' ? 'Woman' : 'Man'}`;
+    document.getElementById('sheet-sub').textContent = `Game ${slot.n} · paired with G${bySlot[pairedSlot(slotKey)].n} (other court) · max ${MAX_GAMES} games/night`;
+
+    let rows = ROSTER.filter(p => p.g === need).map(p => {
+      const isPartner = p.id === partner;
+      const onOtherCourt = busyAcrossSet.includes(p.id) && p.id !== current;
+      const atCap = gameCount(p.id) >= MAX_GAMES && p.id !== current && !playersInSlot(slotKey).includes(p.id);
+      const disabled = isPartner || onOtherCourt || atCap;
+      const note = isPartner ? 'Already in this game'
+        : onOtherCourt ? `Playing G${bySlot[pairedSlot(slotKey)].n} (other court)`
+        : atCap ? `At ${MAX_GAMES}-game limit`
+        : p.id === current ? 'Currently selected'
+        : `${gameCount(p.id)}/${MAX_GAMES} games`;
+      const tag = p.g === 'F' ? '<span class="tag f">Woman</span>' : '<span class="tag m">Man</span>';
+      return `<button type="button" class="pick ${disabled ? 'is-disabled' : ''}" data-pick="${p.id}">
+        <span class="av">${initials(p.name)}</span>
+        <span class="pick__nm">${p.name}<span class="pick__note">${note}</span></span>${tag}
+      </button>`;
+    }).join('');
+
+    if (current) rows += `<button type="button" class="pick" data-pick=""><span class="av" style="color:var(--red)">&times;</span><span class="pick__nm" style="color:var(--red)">Clear this slot</span></button>`;
+
+    document.getElementById('sheet-list').innerHTML = rows;
+    document.getElementById('sheet').classList.add('is-open');
+    document.getElementById('sheet-scrim').classList.add('is-open');
+  }
+
+  function closeSheet() {
+    document.getElementById('sheet').classList.remove('is-open');
+    document.getElementById('sheet-scrim').classList.remove('is-open');
+    ctx = null;
+  }
+
+  document.getElementById('sheet-list').addEventListener('click', (e) => {
+    const btn = e.target.closest('.pick');
+    if (!btn || btn.classList.contains('is-disabled') || !ctx) return;
+    picks[ctx.slotKey][ctx.pos] = btn.dataset.pick || null;
+    dirty = true; justSaved = false;
+    closeSheet();
+    render();
+  });
+  document.getElementById('sheet-scrim').addEventListener('click', closeSheet);
+
+  // ── Status bar ───────────────────────────────────────────────
+  function updateStatus() {
+    const msg = document.getElementById('status-msg');
+    const lockBtn = document.getElementById('lock-btn');
+    const draftBtn = document.getElementById('draft-btn');
+    const conflicts = SLOTS.map(s => slotConflict(s.key)).filter(Boolean);
+    const anyPicks = SLOTS.some(s => picks[s.key].p1 || picks[s.key].p2);
+    const filled = SLOTS.every(s => picks[s.key].p1 && picks[s.key].p2);
+
+    // Draft: allowed any time there's something to save and no conflicts —
+    // partial lineups are fine (same as the real builder's Save draft).
+    draftBtn.disabled = !anyPicks || !dirty || conflicts.length > 0;
+    draftBtn.textContent = justSaved && !dirty ? 'Draft saved ✓' : 'Save draft';
+
+    if (conflicts.length) {
+      msg.className = 'status__msg bad';
+      msg.textContent = '⚠ ' + conflicts[0];
+      lockBtn.disabled = true;
+    } else if (!filled) {
+      const remaining = SLOTS.filter(s => !picks[s.key].p1 || !picks[s.key].p2).length;
+      msg.className = 'status__msg';
+      msg.textContent = remaining + ' game' + (remaining === 1 ? '' : 's') + ' still need players · no set conflicts ✓';
+      lockBtn.disabled = true;
+    } else {
+      msg.className = 'status__msg ok';
+      msg.textContent = 'All 12 games filled, no set conflicts ✓ Ready to lock.';
+      lockBtn.disabled = false;
+    }
+  }
+
+  document.getElementById('draft-btn').addEventListener('click', () => {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(picks));
+    dirty = false; justSaved = true;
+    updateStatus();
+  });
+
+  document.getElementById('lock-btn').addEventListener('click', () => {
+    localStorage.removeItem(DRAFT_KEY);
+    alert('Locked! (mockup — draft cleared, no real data saved)');
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
