@@ -42,9 +42,11 @@ export default async (req) => {
         return json({ error: `Roster cannot exceed ${MAX_ROSTER_SIZE} players` }, 400);
       }
 
-      // Validate each entry
+      // Validate each entry. Name, gender AND email are required: gender
+      // drives lineup slot enforcement, email is the player's portal sign-in.
       const cleaned = [];
       const ids = new Set();
+      const existingById = new Map((ctx.team.roster || []).map(x => [x.id, x]));
       for (const p of roster) {
         if (!p || typeof p !== 'object') continue;
         const name = (p.name || '').toString().trim();
@@ -53,13 +55,20 @@ export default async (req) => {
         if (!['M', 'F'].includes(gender)) {
           return json({ error: `Player "${name}" needs a gender (M or F)` }, 400);
         }
+        const email = sanitize(p.email, 120);
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return json({ error: `Player "${name}" needs a valid email (it's their sign-in)` }, 400);
+        }
 
         const id = p.id || generateId();
         if (ids.has(id)) return json({ error: 'Duplicate player id' }, 400);
         ids.add(id);
 
-        const email = sanitize(p.email, 120);
         const phone = sanitize(p.phone, 30);
+        // Leadership flags are preserved from the stored roster — the client
+        // can't grant or strip captain/co-captain through this endpoint.
+        // (Previously a roster save silently wiped these flags.)
+        const prev = existingById.get(p.id) || null;
         cleaned.push({
           id,
           name: name.slice(0, 60),
@@ -71,7 +80,9 @@ export default async (req) => {
           normalizedEmail: normalizeEmail(email),
           normalizedPhone: normalizePhone(phone),
           dupr: sanitize(p.dupr, 10),
-          linkedUserId: p.linkedUserId || null,
+          linkedUserId: p.linkedUserId || (prev ? prev.linkedUserId : null) || null,
+          ...(prev?.isCaptain ? { isCaptain: true } : {}),
+          ...(prev?.isCoCaptain ? { isCoCaptain: true } : {}),
         });
       }
 

@@ -144,15 +144,37 @@
     .reveal-matchup__vs { font-size: 9px; letter-spacing: 0.12em; color: var(--color-text-faint); font-weight: 700; text-align: center; white-space: nowrap; }
 
     /* ── Roster ───────────────────────────────────────────────── */
-    .roster-row { display: grid; grid-template-columns: 1fr 60px 1fr 100px 32px; gap: 6px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--color-border); font-size: 12px; }
-    .roster-row:last-child { border-bottom: none; }
-    .roster-head { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); border-bottom: 1px solid var(--color-border-strong); padding-bottom: 8px; }
-    .roster-row input, .roster-row select { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 12px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); width: 100%; box-sizing: border-box; }
-    .roster-row input:focus, .roster-row select:focus { outline: none; border-color: var(--color-lime); }
-    .roster-row__remove { background: none; border: none; color: var(--color-red, #ef4444); cursor: pointer; font-size: 16px; font-weight: 600; font-family: inherit; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
-    .roster-row__remove:hover { background: var(--color-red-dim, rgba(239,68,68,0.12)); }
-    .roster-row__transfer { background: none; border: none; color: var(--color-text-faint); cursor: pointer; font-size: 13px; font-family: inherit; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; title: "Request transfer"; }
-    .roster-row__transfer:hover { background: var(--color-surface-3); color: var(--color-text-muted); }
+    /* Roster list — read-only rows, tap to edit in the sheet */
+    .ros-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 4px; border: none; border-bottom: 1px solid var(--color-border); background: none; color: var(--color-text); font-family: inherit; cursor: pointer; text-align: left; }
+    .ros-row:last-child { border-bottom: none; }
+    .ros-row:hover { background: var(--color-surface-2); }
+    div.ros-row { cursor: default; }
+    div.ros-row:hover { background: none; }
+    .ros-av { width: 36px; height: 36px; border-radius: 50%; background: var(--color-surface-3); border: 1px solid var(--color-border-strong); display: grid; place-items: center; font-size: 12px; font-weight: 800; flex-shrink: 0; color: var(--color-text-muted); }
+    .ros-row.is-lead .ros-av { background: var(--color-lime-dim); border-color: rgba(184,255,44,0.4); color: var(--color-lime); }
+    .ros-body { flex: 1; min-width: 0; }
+    .ros-name { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+    .ros-phone { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; }
+    .ros-phone.none { color: var(--color-text-faint); font-style: italic; }
+    .ros-badge { font-size: 8px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 7px; border-radius: var(--radius-full); }
+    .ros-badge.cap { background: var(--color-lime-dim); color: var(--color-lime); }
+    .ros-badge.co { background: var(--color-teal-dim); color: var(--color-teal); }
+    .ros-gtag { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full); flex-shrink: 0; }
+    .ros-gtag.f { background: var(--color-gold-dim); color: var(--color-gold); }
+    .ros-gtag.m { background: var(--color-teal-dim); color: var(--color-teal); }
+    .ros-gtag.none { background: var(--color-red-dim); color: var(--color-red); }
+    .ros-call { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--color-border-strong); background: var(--color-surface-2); color: var(--color-teal); flex-shrink: 0; text-decoration: none; font-size: 15px; }
+    .ros-call.off { color: var(--color-text-faint); pointer-events: none; opacity: 0.45; }
+    .ros-chev { color: var(--color-text-faint); flex-shrink: 0; }
+    /* Roster editor sheet fields */
+    .ros-f { margin-bottom: 12px; }
+    .ros-f label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 5px; }
+    .ros-f input, .ros-f select { width: 100%; padding: 11px 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text); font-family: inherit; font-size: 14px; box-sizing: border-box; }
+    .ros-f input:focus, .ros-f select:focus { outline: none; border-color: var(--color-lime); }
+    .ros-f.is-bad input, .ros-f.is-bad select { border-color: var(--color-red); }
+    .ros-req { color: var(--color-red); margin-left: 2px; }
+    .ros-err { display: none; font-size: 12px; font-weight: 600; color: var(--color-red); background: var(--color-red-dim); border: 1px solid rgba(255,92,71,0.3); border-radius: var(--radius-sm); padding: 9px 12px; margin: 4px 0 10px; }
+    .ros-err.show { display: block; }
 
     /* Transfer request modal */
     .xreq-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 16px; }
@@ -291,23 +313,6 @@
       .cap-header__meta { display: none; }
       .cap-section { padding: 16px 14px; }
       .cap-tabs { padding: 0 14px; overflow-x: auto; }
-      .roster-head { display: none; }
-      .roster-row {
-        display: grid;
-        grid-template-columns: 1fr 60px;
-        gap: 5px;
-        background: var(--color-surface-2);
-        border: 1px solid var(--color-border);
-        border-radius: var(--radius-sm);
-        padding: 10px;
-        margin-bottom: 6px;
-        border-bottom: 1px solid var(--color-border);
-      }
-      .roster-row input[data-field="name"]   { grid-column: 1; grid-row: 1; }
-      .roster-row select[data-field="gender"]{ grid-column: 2; grid-row: 1; }
-      .roster-row__email  { display: block !important; grid-column: 1 / -1; grid-row: 2; }
-      .roster-row__phone  { display: block !important; grid-column: 1 / -1; grid-row: 3; }
-      .roster-row > div:last-child { grid-column: 1 / -1; grid-row: 4; display: flex; justify-content: flex-end; gap: 4px; }
       .lineup-game { grid-template-columns: 100px 1fr 1fr; gap: 6px; }
       .reveal-matchup { grid-template-columns: 1fr; gap: 4px; text-align: left; }
       .reveal-matchup__right { text-align: left; }
@@ -542,7 +547,7 @@
 
     <!-- ROSTER -->
     <section class="cap-section" data-section="roster">
-      <div class="cap-card" style="margin-bottom: 14px;">
+      <div class="cap-card" style="margin-bottom: 14px;" id="team-photo-card">
         <div class="cap-card__header">
           <h2 class="cap-card__title">Team photo</h2>
           <span class="cap-card__sub">Shown on the public Teams page</span>
@@ -566,22 +571,14 @@
           <span class="cap-card__sub">Players available for lineups</span>
         </div>
 
-        <p style="font-size: 13px; opacity: 0.75; margin: 0 0 16px;">
-          Every player needs a name and gender. Gender determines which game slots they can fill (women's doubles, men's doubles, mixed). Email and phone are optional but useful for match-night contact.
+        <p style="font-size: 13px; opacity: 0.75; margin: 0 0 10px;">
+          Captain and co-captains first, then players A–Z. Tap a player to edit their info — name, gender, and email are required (gender drives lineup slots, email is their sign-in).
         </p>
 
-        <div class="roster-row roster-head">
-          <div>Name</div>
-          <div>Gender</div>
-          <div class="roster-row__email">Email</div>
-          <div class="roster-row__phone">Phone</div>
-          <div></div>
-        </div>
         <div id="roster-rows"></div>
 
-        <div style="display: flex; gap: 10px; margin-top: 16px; justify-content: space-between; flex-wrap: wrap;">
-          <button class="cap-btn cap-btn--ghost" id="add-player-btn">+ Add player</button>
-          <button class="cap-btn cap-btn--primary" id="save-roster-btn">Save roster</button>
+        <div style="display: flex; gap: 10px; margin-top: 16px;">
+          <button class="cap-btn cap-btn--ghost" id="add-player-btn" style="width: 100%;">+ Add player</button>
         </div>
         <div class="cap-status" id="roster-status"></div>
       </div>
@@ -634,6 +631,11 @@
   <style>
     .cap-bottomnav { display: none; }
     .cap-sheet-scrim { display: none; }
+
+    /* Roster: hide the team-photo card on phones — captains manage it from desktop */
+    @media (max-width: 860px) {
+      #team-photo-card { display: none; }
+    }
 
     /* mobile lineup builder */
     .lmob-rules { font-size: 11px; color: var(--color-text-faint); line-height: 1.5; margin: 0 0 8px; }
@@ -761,6 +763,29 @@
     <h3 class="cap-sheet__title" id="cap-sheet-title">Pick a player</h3>
     <div class="cap-sheet__sub" id="cap-sheet-sub"></div>
     <div id="cap-sheet-list"></div>
+  </div>
+
+  <!-- Roster player editor sheet (tap a roster row to open) -->
+  <div class="cap-sheet-scrim" id="rp-scrim"></div>
+  <div class="cap-sheet" id="rp-sheet" aria-hidden="true">
+    <div class="cap-sheet__grip"></div>
+    <h3 class="cap-sheet__title" id="rp-title">Edit player</h3>
+    <div class="cap-sheet__sub" id="rp-sub"></div>
+    <div class="ros-f" id="rp-name-w"><label>Name<span class="ros-req">*</span></label><input id="rp-name" type="text" placeholder="Player name"></div>
+    <div class="ros-f" id="rp-gender-w"><label>Gender<span class="ros-req">*</span> <span style="text-transform:none;letter-spacing:0;font-weight:500;">(needed for lineup slots)</span></label>
+      <select id="rp-gender"><option value="">— select —</option><option value="F">Female</option><option value="M">Male</option></select>
+    </div>
+    <div class="ros-f" id="rp-email-w"><label>Email<span class="ros-req">*</span> <span style="text-transform:none;letter-spacing:0;font-weight:500;">(used for player sign-in)</span></label><input id="rp-email" type="email" placeholder="player@email.com"></div>
+    <div class="ros-f"><label>Phone</label><input id="rp-phone" type="tel" placeholder="(555) 123-4567"></div>
+    <div class="ros-err" id="rp-err"></div>
+    <div style="display: flex; gap: 9px; margin-top: 4px;">
+      <button class="cap-btn cap-btn--ghost" id="rp-cancel" style="flex: 1;">Cancel</button>
+      <button class="cap-btn cap-btn--primary" id="rp-save" style="flex: 1;">Save player</button>
+    </div>
+    <div style="display: flex; gap: 18px; justify-content: center; margin-top: 14px;">
+      <button id="rp-transfer" style="background:none;border:none;color:var(--color-text-faint);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">⇄ Request transfer</button>
+      <button id="rp-remove" style="background:none;border:none;color:var(--color-red);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Remove from roster</button>
+    </div>
   </div>
 
   <nav class="cap-bottomnav" id="cap-bottomnav">
@@ -2487,66 +2512,164 @@
       }
     }
 
+    // Captain first, then co-captains, then everyone else A→Z.
+    function isCap(p) {
+      const capEmail = (state.me?.team?.captainEmail || '').toLowerCase();
+      return !!p.isCaptain || (!!capEmail && (p.email || '').toLowerCase() === capEmail);
+    }
+    function rosterSorted() {
+      const rank = (p) => isCap(p) ? 0 : p.isCoCaptain ? 1 : 2;
+      return (state.roster || []).slice().sort((a, b) =>
+        rank(a) - rank(b) || (a.name || '').localeCompare(b.name || ''));
+    }
+
+    function rosterRowHtml(p, readOnly) {
+      const lead = isCap(p) || p.isCoCaptain;
+      const badge = isCap(p) ? '<span class="ros-badge cap">Captain</span>'
+        : p.isCoCaptain ? '<span class="ros-badge co">Co-captain</span>' : '';
+      const gtag = p.gender === 'F' ? '<span class="ros-gtag f">W</span>'
+        : p.gender === 'M' ? '<span class="ros-gtag m">M</span>'
+        : '<span class="ros-gtag none">no gender</span>';
+      const phone = p.phone
+        ? `<div class="ros-phone">${escapeHtml(p.phone)}</div>`
+        : '<div class="ros-phone none">no phone on file</div>';
+      const call = p.phone
+        ? `<a class="ros-call" href="tel:${escapeAttr((p.phone || '').replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()" aria-label="Call ${escapeAttr(p.name)}">&#9742;</a>`
+        : '<span class="ros-call off">&#9742;</span>';
+      const inner = `<span class="ros-av">${escapeHtml(initialsOf(p.name || '?'))}</span>
+        <span class="ros-body"><span class="ros-name">${escapeHtml(p.name)} ${badge} ${gtag}</span>${phone}</span>
+        ${call}`;
+      if (readOnly) return `<div class="ros-row ${lead ? 'is-lead' : ''}">${inner}</div>`;
+      return `<button type="button" class="ros-row ${lead ? 'is-lead' : ''}" data-rid="${state.roster.indexOf(p)}">${inner}<span class="ros-chev">›</span></button>`;
+    }
+
     function renderRoster() {
       const container = $id('roster-rows');
+      const addBtn = $id('add-player-btn');
 
-      // Locked for the season (Week 2 played) — show read-only, hide editing controls.
+      // Locked for the season (Week 2 played) — read-only list, no editing.
       if (state.rosterLocked) {
-        const addBtn = $id('add-player-btn'), saveBtn = $id('save-roster-btn');
         if (addBtn) addBtn.style.display = 'none';
-        if (saveBtn) saveBtn.style.display = 'none';
-        const list = (state.roster || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
         container.innerHTML = `
           <div class="cap-status is-info" style="margin-bottom:12px;">🔒 Roster is locked for the season (Week 2 has been played). Contact a league admin if you need a change.</div>
-          ${list.length ? list.map(p => `
-            <div class="roster-row" style="grid-template-columns:1fr 60px;">
-              <div style="font-weight:600;">${escapeHtml(p.name)}</div>
-              <div style="color:var(--color-text-faint);">${p.gender === 'F' ? 'Woman' : p.gender === 'M' ? 'Man' : '—'}</div>
-            </div>`).join('') : '<div class="empty-state">No players on the roster.</div>'}
+          ${state.roster.length ? rosterSorted().map(p => rosterRowHtml(p, true)).join('') : '<div class="empty-state">No players on the roster.</div>'}
         `;
         return;
       }
 
+      if (addBtn) addBtn.style.display = '';
       if (!state.roster.length) {
         container.innerHTML = '<div class="empty-state">Add your first player below.</div>';
         return;
       }
-      // Sort alphabetically so the list is consistent; data-idx aligns with sorted array
-      state.roster.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
-      container.innerHTML = state.roster.map((p, idx) => `
-        <div class="roster-row" data-idx="${idx}" data-player-id="${escapeAttr(p.id || '')}">
-          <input type="text" placeholder="Name" value="${escapeAttr(p.name)}" data-field="name">
-          <select data-field="gender">
-            <option value="">—</option>
-            <option value="M" ${p.gender === 'M' ? 'selected' : ''}>M</option>
-            <option value="F" ${p.gender === 'F' ? 'selected' : ''}>F</option>
-          </select>
-          <input type="email" class="roster-row__email" placeholder="email" value="${escapeAttr(p.email || '')}" data-field="email">
-          <input type="tel" class="roster-row__phone" placeholder="phone" value="${escapeAttr(p.phone || '')}" data-field="phone">
-          <div style="display:flex;gap:2px;align-items:center;">
-            ${p.isCaptain ? '' : `<button class="roster-row__transfer" data-action="transfer" title="Request transfer" aria-label="Request transfer for ${escapeAttr(p.name)}">⇄</button>`}
-            <button class="roster-row__remove" data-action="remove" aria-label="Remove player">&times;</button>
-          </div>
-        </div>
-      `).join('');
-
-      container.querySelectorAll('[data-action="remove"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const row = e.target.closest('.roster-row');
-          const idx = Number(row.dataset.idx);
-          state.roster.splice(idx, 1);
-          renderRoster();
-        });
-      });
-
-      container.querySelectorAll('[data-action="transfer"]').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-          const row = e.target.closest('.roster-row');
-          const idx = Number(row.dataset.idx);
-          openTransferModal(state.roster[idx]);
-        });
+      container.innerHTML = rosterSorted().map(p => rosterRowHtml(p, false)).join('');
+      container.querySelectorAll('.ros-row[data-rid]').forEach(row => {
+        row.addEventListener('click', () => openRosterEditor(Number(row.dataset.rid)));
       });
     }
+
+    // ── Roster editor sheet (the only place player info is edited) ──
+    let rpIdx = null; // index into state.roster, or null = adding a new player
+
+    function openRosterEditor(idx) {
+      const p = (idx != null && idx >= 0) ? state.roster[idx] : null;
+      rpIdx = p ? idx : null;
+      $id('rp-title').textContent = p ? `Edit · ${p.name}` : 'Add player';
+      $id('rp-sub').textContent = p && isCap(p) ? 'Team captain' : p?.isCoCaptain ? 'Co-captain' : 'Name, gender & email required';
+      $id('rp-name').value = p?.name || '';
+      $id('rp-gender').value = p?.gender || '';
+      $id('rp-email').value = p?.email || '';
+      $id('rp-phone').value = p?.phone || '';
+      $id('rp-err').classList.remove('show');
+      ['rp-name-w', 'rp-gender-w', 'rp-email-w'].forEach(id => $id(id).classList.remove('is-bad'));
+      // Captains can't be removed or transferred from their own roster.
+      $id('rp-remove').style.display = (p && !isCap(p)) ? '' : 'none';
+      $id('rp-transfer').style.display = (p && !isCap(p) && p.id) ? '' : 'none';
+      $id('rp-sheet').classList.add('is-open');
+      $id('rp-scrim').classList.add('is-open');
+    }
+    function closeRosterEditor() {
+      $id('rp-sheet').classList.remove('is-open');
+      $id('rp-scrim').classList.remove('is-open');
+      rpIdx = null;
+    }
+
+    async function saveRosterArray(updated, successMsg) {
+      const btn = $id('rp-save');
+      if (!btnBusy(btn, 'Saving…')) return;
+      const errEl = $id('rp-err');
+      try {
+        const res = await fetch('/.netlify/functions/captain-roster', {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ roster: updated }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Save failed');
+        state.roster = data.team?.roster || updated;
+        closeRosterEditor();
+        renderRoster();
+        updateGenderWarning();
+        maybeShowGenderWarning();
+        const status = $id('roster-status');
+        status.className = 'cap-status is-success';
+        status.textContent = successMsg;
+        setTimeout(() => { if (status.textContent === successMsg) status.textContent = ''; }, 4000);
+      } catch (err) {
+        errEl.textContent = err.message;
+        errEl.classList.add('show');
+      } finally {
+        btnDone(btn);
+      }
+    }
+
+    $id('rp-save').addEventListener('click', () => {
+      const name = $id('rp-name').value.trim();
+      const gender = $id('rp-gender').value;
+      const email = $id('rp-email').value.trim();
+      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+      // Gender + email are required: gender drives lineup slots, email is the
+      // player's sign-in. Flag everything that's missing at once.
+      const problems = [];
+      $id('rp-name-w').classList.toggle('is-bad', !name);
+      $id('rp-gender-w').classList.toggle('is-bad', !gender);
+      $id('rp-email-w').classList.toggle('is-bad', !emailOk);
+      if (!name) problems.push('name');
+      if (!gender) problems.push('gender');
+      if (!emailOk) problems.push(email ? 'a valid email' : 'email');
+      const errEl = $id('rp-err');
+      if (problems.length) {
+        errEl.textContent = 'Required: ' + problems.join(', ') + '.';
+        errEl.classList.add('show');
+        return;
+      }
+      errEl.classList.remove('show');
+
+      const fields = { name, gender, email, phone: $id('rp-phone').value.trim() };
+      const updated = state.roster.slice();
+      if (rpIdx != null) updated[rpIdx] = { ...updated[rpIdx], ...fields };
+      else updated.push({ id: null, ...fields });
+      saveRosterArray(updated, 'Roster saved.');
+    });
+
+    $id('rp-remove').addEventListener('click', () => {
+      if (rpIdx == null) return;
+      const p = state.roster[rpIdx];
+      if (!confirm(`Remove ${p.name} from the roster?`)) return;
+      saveRosterArray(state.roster.filter((_, i) => i !== rpIdx), 'Player removed.');
+    });
+
+    $id('rp-transfer').addEventListener('click', () => {
+      if (rpIdx == null) return;
+      const p = state.roster[rpIdx];
+      closeRosterEditor();
+      openTransferModal(p);
+    });
+
+    $id('rp-cancel').addEventListener('click', closeRosterEditor);
+    $id('rp-scrim').addEventListener('click', closeRosterEditor);
 
     // ── Transfer request modal ──────────────────────────────────
     let xferModal = null;
@@ -2669,53 +2792,7 @@
       }
     }
 
-    $id('add-player-btn').addEventListener('click', () => {
-      state.roster.push({ id: null, name: '', gender: '', email: '', phone: '' });
-      renderRoster();
-    });
-
-    $id('save-roster-btn').addEventListener('click', async () => {
-      // Read back inputs
-      const updated = [];
-      document.querySelectorAll('.roster-row[data-idx]').forEach(row => {
-        const get = (f) => row.querySelector(`[data-field="${f}"]`)?.value?.trim() || '';
-        updated.push({
-          id: state.roster[Number(row.dataset.idx)]?.id || null,
-          name: get('name'),
-          gender: get('gender'),
-          email: get('email'),
-          phone: get('phone'),
-        });
-      });
-
-      const status = $id('roster-status');
-      const btn = $id('save-roster-btn');
-      btn.disabled = true;
-      status.className = 'a-status is-info';
-      status.textContent = 'Saving roster…';
-
-      try {
-        const res = await fetch('/.netlify/functions/captain-roster', {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ roster: updated }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Save failed');
-        state.roster = data.team?.roster || [];
-        status.className = 'cap-status is-success';
-        status.textContent = 'Roster saved.';
-        renderRoster();
-        updateGenderWarning();
-        maybeShowGenderWarning();
-      } catch (err) {
-        status.className = 'a-status is-err';
-        status.textContent = err.message;
-      } finally {
-        btn.disabled = false;
-      }
-    });
+    $id('add-player-btn').addEventListener('click', () => openRosterEditor(null));
 
     // ===== Utils =====
     function escapeHtml(s) {
