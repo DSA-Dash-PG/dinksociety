@@ -534,6 +534,24 @@
 
     <!-- ROSTER -->
     <section class="cap-section" data-section="roster">
+      <div class="cap-card" style="margin-bottom: 14px;">
+        <div class="cap-card__header">
+          <h2 class="cap-card__title">Team photo</h2>
+          <span class="cap-card__sub">Shown on the public Teams page</span>
+        </div>
+        <div style="display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap;">
+          <div id="cap-photo-prev" style="width: 132px; height: 84px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface-2) center/cover no-repeat; display: flex; align-items: center; justify-content: center; font-size: 32px; flex-shrink: 0;">🏓</div>
+          <div style="flex: 1; min-width: 200px;">
+            <input type="file" id="cap-photo-file" accept="image/jpeg,image/png,image/webp" style="font-size: 12px; width: 100%;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; flex-wrap: wrap;">
+              <span class="cap-status" id="cap-photo-status" style="margin: 0;"></span>
+              <button class="cap-btn cap-btn--primary" id="cap-photo-btn">Upload photo</button>
+            </div>
+            <p style="font-size: 11px; color: var(--color-text-faint); margin: 6px 0 0;">JPG, PNG, or WebP. A wide group shot works best — it's auto-compressed before upload.</p>
+          </div>
+        </div>
+      </div>
+
       <div class="cap-card">
         <div class="cap-card__header">
           <h2 class="cap-card__title">Team roster</h2>
@@ -822,6 +840,7 @@
       $id('cap-team-meta').textContent = `${state.me.team.circuit === 'I' ? 'Season 1' : 'Circuit ' + state.me.team.circuit} · ${state.me.team.divisionLabel || state.me.team.division}`;
       $id('cap-email').textContent = state.me.email;
       renderTeamSwitcher();
+      initTeamPhoto();
       // Load roster + schedule, then dispatch to the right state
       refreshCapMsgBadge();
       Promise.all([loadRoster(true), loadMatches(true)]).then(() => {
@@ -835,6 +854,64 @@
         } else {
           dispatchToNext();
         }
+      });
+    }
+
+    // ===== Team photo =====
+    async function compressTeamPhoto(file) {
+      const TARGET = 5 * 1024 * 1024, MAX_DIM = 2500;
+      if (file.size <= TARGET && file.type === 'image/jpeg') return file;
+      const img = await new Promise((resolve, reject) => {
+        const i = new Image(), u = URL.createObjectURL(file);
+        i.onload = () => { URL.revokeObjectURL(u); resolve(i); };
+        i.onerror = () => { URL.revokeObjectURL(u); reject(new Error('Could not load image')); };
+        i.src = u;
+      });
+      let w = img.naturalWidth, ht = img.naturalHeight;
+      if (w > MAX_DIM || ht > MAX_DIM) { const sc = MAX_DIM / Math.max(w, ht); w = Math.round(w * sc); ht = Math.round(ht * sc); }
+      const c = document.createElement('canvas'); c.width = w; c.height = ht;
+      c.getContext('2d').drawImage(img, 0, 0, w, ht);
+      let q = 0.92, blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
+      while (blob.size > TARGET && q > 0.6) { q -= 0.05; blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q)); }
+      return new File([blob], 'team-photo.jpg', { type: 'image/jpeg' });
+    }
+
+    function setTeamPhotoPreview() {
+      const prev = $id('cap-photo-prev'); if (!prev) return;
+      const team = state.me?.team;
+      if (team?.photo?.updatedAt) {
+        prev.textContent = '';
+        prev.style.backgroundImage = `url('/.netlify/functions/team-photo-serve?id=${encodeURIComponent(team.id)}&v=${encodeURIComponent(team.photo.updatedAt)}')`;
+      } else {
+        prev.style.backgroundImage = '';
+        prev.textContent = team?.emoji || '🏓';
+      }
+    }
+
+    function initTeamPhoto() {
+      setTeamPhotoPreview();
+      const btn = $id('cap-photo-btn');
+      if (!btn || btn.dataset.wired) return;
+      btn.dataset.wired = '1';
+      btn.addEventListener('click', async () => {
+        const fi = $id('cap-photo-file'), st = $id('cap-photo-status');
+        const f = fi.files && fi.files[0];
+        if (!f) { st.className = 'cap-status is-err'; st.style.margin = '0'; st.textContent = 'Pick an image first.'; return; }
+        btn.disabled = true;
+        try {
+          st.className = 'cap-status'; st.style.margin = '0'; st.textContent = 'Compressing…';
+          const compressed = await compressTeamPhoto(f);
+          st.textContent = `Uploading… (${(compressed.size / 1024 / 1024).toFixed(1)}MB)`;
+          const fd = new FormData(); fd.append('file', compressed); fd.append('teamId', state.me.team.id);
+          const r = await fetch('/.netlify/functions/team-photo-upload', { method: 'POST', body: fd, credentials: 'include' });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || 'Upload failed');
+          state.me.team.photo = { updatedAt: data.updatedAt };
+          setTeamPhotoPreview();
+          st.className = 'cap-status is-success'; st.textContent = 'Photo updated!';
+          fi.value = '';
+        } catch (e) { st.className = 'cap-status is-err'; st.textContent = e.message; }
+        btn.disabled = false;
       });
     }
 

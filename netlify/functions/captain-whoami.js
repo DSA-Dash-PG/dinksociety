@@ -16,6 +16,8 @@ export default async (req) => {
     divisionLabel: t.divisionLabel || null,
     circuit: t.circuit || 'I',
     seasonId: t.seasonId || null,
+    emoji: t.emoji || '',
+    photo: t.photo || null,
     role: ctx.user.role,
   } : null;
 
@@ -28,6 +30,8 @@ export default async (req) => {
     divisionLabel: team.divisionLabel || null,
     circuit: team.circuit || 'I',
     seasonId: team.seasonId || null,
+    emoji: team.emoji || '',
+    photo: team.photo || null,
     role,
   }));
 

@@ -49,9 +49,15 @@ export default async (req) => {
           id: team.id,
           name: team.name,
           emoji: team.emoji || '',
+          color: team.color || null,
           division: team.division,
           divisionLabel: team.divisionLabel || null,
           captain: captainName,
+          // Team photo (optional). `team.photo.updatedAt` is stamped by
+          // team-photo-upload; the ?v= cache-busts when the photo changes.
+          photoUrl: team.photo?.updatedAt
+            ? `/.netlify/functions/team-photo-serve?id=${encodeURIComponent(team.id)}&v=${encodeURIComponent(team.photo.updatedAt)}`
+            : null,
           roster: (team.roster || []).map(p => ({
             name: p.name,
             gender: p.gender || '',

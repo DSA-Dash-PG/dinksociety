@@ -2486,6 +2486,21 @@
         '<div class="af" style="max-width:120px;"><label>Logo</label><input type="text" id="tdp-emoji" maxlength="4" placeholder="🏓 or DSD" value="' + h(t.emoji || '') + '" style="text-align:center;font-size:18px;"><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Emoji or 2-3 letters</span></div>' +
       '</div>' +
       '<div class="arow">' +
+        '<div class="af"><label>Team Photo</label>' +
+          '<div style="display:flex;gap:12px;align-items:flex-start;">' +
+            '<div id="tdp-photo-prev" style="width:120px;height:76px;border-radius:var(--radius-sm);border:1px solid var(--color-border);background:var(--color-surface-2) center/cover no-repeat;display:flex;align-items:center;justify-content:center;font-size:30px;flex-shrink:0;' + (t.photo && t.photo.updatedAt ? "background-image:url('/.netlify/functions/team-photo-serve?id=" + encodeURIComponent(t.id) + "&v=" + encodeURIComponent(t.photo.updatedAt) + "');" : '') + '">' + (t.photo && t.photo.updatedAt ? '' : h(t.emoji || '🏓')) + '</div>' +
+            '<div style="flex:1;min-width:0;">' +
+              '<input type="file" id="tdp-photo-file" accept="image/jpeg,image/png,image/webp" style="font-size:11px;width:100%;">' +
+              '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">' +
+                '<span id="tdp-photo-status" style="font-size:10px;color:var(--color-text-faint);"></span>' +
+                '<button class="ab ab--teal ab--sm" id="tdp-photo-btn">Upload photo</button>' +
+              '</div>' +
+              '<span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:2px;">JPG / PNG / WebP — auto-compressed</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="arow">' +
         '<div class="af"><label>Division</label><select id="tdp-division">' + DIVISIONS.map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
         '<div class="af"><label>Notes</label><input type="text" id="tdp-notes" value="' + h(t.notes || '') + '"></div>' +
       '</div>' +
@@ -2510,6 +2525,30 @@
         '</div>' +
         '<div style="text-align:right;"><button class="ab ab--teal ab--sm" id="tdp-add-btn">Add to roster</button></div>' +
       '</div>';
+
+    // Wire up team photo upload (admin can set any team's photo)
+    $id('tdp-photo-btn').addEventListener('click', async () => {
+      const fi = $id('tdp-photo-file'), st = $id('tdp-photo-status'), btn = $id('tdp-photo-btn');
+      const f = fi.files && fi.files[0];
+      if (!f) { st.style.color = 'var(--color-red)'; st.textContent = 'Pick an image first.'; return; }
+      btn.disabled = true;
+      try {
+        st.style.color = 'var(--color-text-faint)'; st.textContent = 'Compressing…';
+        const compressed = await compressImage(f);
+        st.textContent = 'Uploading… (' + (compressed.size / 1024 / 1024).toFixed(1) + 'MB)';
+        const fd = new FormData(); fd.append('file', compressed); fd.append('teamId', currentPanelTeam.id);
+        const r = await fetch('/.netlify/functions/team-photo-upload', { method: 'POST', body: fd, credentials: 'include' });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(data.error || 'Upload failed');
+        currentPanelTeam.photo = { updatedAt: data.updatedAt };
+        const prev = $id('tdp-photo-prev');
+        prev.textContent = '';
+        prev.style.backgroundImage = "url('/.netlify/functions/team-photo-serve?id=" + encodeURIComponent(currentPanelTeam.id) + "&v=" + encodeURIComponent(data.updatedAt) + "')";
+        st.style.color = 'var(--color-teal)'; st.textContent = 'Photo updated!';
+        fi.value = '';
+      } catch (e) { st.style.color = 'var(--color-red)'; st.textContent = e.message; }
+      btn.disabled = false;
+    });
 
     // Wire up color sync
     $id('tdp-color').addEventListener('input', () => { $id('tdp-color-hex').value = $id('tdp-color').value; });

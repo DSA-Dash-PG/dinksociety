@@ -30,7 +30,6 @@
   <style>
     .teams-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
 
-
     .div-tabs { display: flex; gap: 3px; margin-bottom: var(--space-4); flex-wrap: wrap; }
     .div-tab {
       padding: 8px 16px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700;
@@ -40,68 +39,78 @@
     .div-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
     .div-tab.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
 
-    .teams-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-      gap: 12px;
-    }
-
-    .team-card {
-      background: var(--color-surface); border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg); padding: 20px;
-      transition: border-color var(--transition);
-    }
-    .team-card:hover { border-color: var(--color-border-strong); }
-
-    .team-card__header { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-    .team-card__emoji { font-size: 24px; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: var(--color-surface-2); border-radius: var(--radius-sm); flex-shrink: 0; }
-    .team-card__emoji--text { font-size: 14px; font-weight: 900; letter-spacing: 0.02em; text-transform: uppercase; }
-    .team-card__info { flex: 1; min-width: 0; }
-    .team-card__name { font-size: 15px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em; }
-    .team-card__captain { font-size: 11px; color: var(--color-teal); font-weight: 600; margin-top: 2px; }
-
-    .team-card__roster { border-top: 1px solid var(--color-border); padding-top: 12px; }
-    .team-card__roster-title {
-      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em;
-      color: var(--color-text-faint); margin-bottom: 8px;
-    }
-    /* Shared column grid for the header row + each roster row */
-    .roster-head, .roster-list li {
-      display: grid;
-      grid-template-columns: 1fr 58px 18px 46px;
-      align-items: center; gap: 6px;
-    }
-    .roster-head {
-      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
-      color: var(--color-text-faint); padding: 0 0 6px; border-bottom: 1px solid var(--color-border);
-    }
-    .roster-head .h-rank { text-align: center; }
-    .roster-head .h-dsr  { text-align: right; }
-    .roster-list { list-style: none; margin: 6px 0 0; padding: 0; }
-    .roster-list li {
-      padding: 5px 0; font-size: 13px; color: var(--color-text-muted);
-    }
-    .roster-list li + li { border-top: 1px solid var(--color-divider); }
-    .roster-list .name { font-weight: 500; color: var(--color-text); min-width: 0; }
-    .team-name-link { color: inherit; text-decoration: none; }
-    .team-name-link:hover { color: var(--color-lime); }
-    .player-link { color: inherit; text-decoration: none; }
-    .player-link:hover { color: var(--color-teal); text-decoration: underline; }
-    .roster-list .rank { font-size: 12px; font-weight: 700; color: var(--color-text-muted); text-align: center; font-variant-numeric: tabular-nums; }
-    .roster-list .rank--empty { color: var(--color-text-faint); font-weight: 600; }
-    .roster-list .gender { font-size: 11px; color: var(--color-text-faint); text-align: center; }
-    .roster-list .score { font-size: 12px; font-weight: 700; color: var(--color-teal); font-variant-numeric: tabular-nums; text-align: right; }
-    .roster-list .score--empty { font-size: 11px; color: var(--color-text-faint); text-align: right; }
-
-    .empty-state {
-      text-align: center; padding: 60px 20px; font-size: 14px;
-      color: var(--color-text-faint);
-    }
-
     .team-count {
       font-size: 11px; color: var(--color-text-faint); margin-bottom: var(--space-3);
       font-variant-numeric: tabular-nums;
     }
+
+    .teams-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+      gap: 18px;
+    }
+
+    .team-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); overflow: hidden;
+      display: flex; flex-direction: column;
+      transition: border-color var(--transition), transform var(--transition);
+    }
+    .team-card:hover { border-color: var(--color-border-strong); transform: translateY(-2px); }
+
+    /* ── Banner: team photo OR emoji fallback ── */
+    .team-banner { position: relative; height: 172px; display: flex; align-items: flex-end; }
+    .team-banner__img { position: absolute; inset: 0; background-size: cover; background-position: center; }
+    .team-banner__emoji { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 72px; }
+    /* Resting dark overlay; lifts on hover to reveal full-colour photo/emoji */
+    .team-banner__overlay { position: absolute; inset: 0; z-index: 1; background: rgba(14,14,14,0.55); transition: background var(--transition); }
+    .team-card:hover .team-banner__overlay { background: rgba(14,14,14,0); }
+    .team-banner__scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.6) 100%); }
+    .team-banner__rank {
+      position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: 6px;
+      background: rgba(14,14,14,0.72); border: 1px solid var(--color-border-strong);
+      padding: 5px 11px; border-radius: var(--radius-full); font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
+    }
+    .rank-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-text-muted); }
+    .rank-dot--1 { background: var(--color-gold); }
+    .rank-dot--2 { background: #c8d0d8; }
+    .rank-dot--3 { background: #d08a4a; }
+    .team-banner__name { position: relative; z-index: 2; padding: 14px 16px; }
+    .team-banner__title {
+      font-size: 18px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.02em;
+      color: #fff; line-height: 1.1; text-shadow: 0 1px 5px rgba(0,0,0,0.8);
+    }
+    .team-name-link { color: inherit; text-decoration: none; }
+
+    .team-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+    .stat-group__label {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
+      color: var(--color-text-faint); margin-bottom: 7px;
+    }
+    .stat-row { display: grid; gap: 7px; }
+    .stat-row--match { grid-template-columns: repeat(4, 1fr); }
+    .stat-row--game { grid-template-columns: repeat(3, 1fr); }
+    .stat-cell { background: var(--color-surface-2); border-radius: var(--radius-sm); padding: 9px 4px; text-align: center; }
+    .stat-cell__num { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+    .stat-cell__lbl { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); margin-top: 5px; }
+    .n-win { color: var(--color-teal); }
+    .n-loss { color: var(--color-red); }
+    .n-tie { color: var(--color-text-muted); }
+    .n-pts { color: var(--color-lime); }
+    .n-pos { color: var(--color-teal); }
+    .n-neg { color: var(--color-red); }
+    .n-mute { color: var(--color-text-faint); }
+
+    .roster-btn {
+      display: block; width: 100%; text-align: center; padding: 11px; border-radius: var(--radius);
+      background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text);
+      font-size: 12px; font-weight: 700; letter-spacing: 0.03em; cursor: pointer; text-decoration: none;
+      transition: border-color var(--transition), color var(--transition);
+    }
+    .roster-btn:hover { border-color: var(--color-lime); color: var(--color-lime); }
+
+    .empty-state { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--color-text-faint); }
 
     @media (max-width: 600px) {
       .teams-grid { grid-template-columns: 1fr; }
@@ -135,120 +144,141 @@
     const DIVISION_LABELS = { '3-0-mixed': '3.0–3.5 Mixed', '3-5-mixed': '3.0–3.5 Mixed', '3.5M': '3.0–3.5 Mixed', '3.0M': '3.0 Mixed' };
     let allTeams = [];
     let activeDivision = '';
-    let playerScoreMap = {}; // name → composite score (DSR)
-    let playerRankMap = {};  // name → league rank within their gender (by DSR)
-
-    // M / F / male / female / Male → 'M' | 'F' | ''
-    function normGender(g) { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; }
+    let statsById = {};       // teamId → { rank, wins, losses, ties, matchPointsFor, totalGamesWon, totalGamesLost, pointDiff }
+    let seasonStarted = false; // rankings + diff only show once Week 1 is in the books
 
     // Optional season override (?season=circuit-test) for staff QA. Default = live season.
     const SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
-    const CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
     const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
 
     async function loadTeams() {
-      const [teamsRes, statsRes] = await Promise.allSettled([
+      const [teamsRes, standRes] = await Promise.allSettled([
         fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-standings?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
       ]);
       allTeams = teamsRes.value?.teams || [];
 
-      // Build name → composite score map
-      const statsData = statsRes.value;
-      if (statsData && !statsData.empty && statsData.players) {
-        for (const p of Object.values(statsData.players)) {
-          if (p.name && p.composite != null) playerScoreMap[p.name] = p.composite;
+      // Flatten standings (all divisions) into a teamId → stats map.
+      const stand = standRes.value;
+      if (stand && !stand.empty && stand.divisions) {
+        for (const div of Object.values(stand.divisions)) {
+          for (const t of (div.teams || [])) {
+            if (!t.teamId) continue;
+            statsById[t.teamId] = t;
+            if ((t.matchesPlayed || 0) > 0) seasonStarted = true;
+          }
         }
       }
 
-      computeGenderRanks();
       renderTabs();
       renderTeams();
     }
 
-    // League-wide ranking within each gender, ordered by DSR (composite) desc.
-    // Players without a DSR yet are left unranked.
-    function computeGenderRanks() {
-      playerRankMap = {};
-      const seen = new Set();
-      const pool = [];
-      for (const t of allTeams) {
-        for (const p of (t.roster || [])) {
-          if (!p.name || seen.has(p.name)) continue;
-          seen.add(p.name);
-          const dsr = playerScoreMap[p.name];
-          if (dsr == null) continue;
-          pool.push({ name: p.name, g: normGender(p.gender), dsr });
-        }
-      }
-      for (const g of ['M', 'F']) {
-        pool.filter(p => p.g === g)
-            .sort((a, b) => b.dsr - a.dsr)
-            .forEach((p, i) => { playerRankMap[p.name] = i + 1; });
-      }
-    }
-
-    // Normalize a team's division to a display label
-    // Prefer the stored divisionLabel, fall back to the DIVISION_LABELS map, then raw value
+    // Normalize a team's division to a display label.
     function divLabel(t) { return t.divisionLabel || DIVISION_LABELS[t.division] || t.division || ''; }
 
     function renderTabs() {
-      // Group by label so teams with different raw values but same label share a tab
+      // Group by label so teams with different raw values but same label share a tab.
       const labels = [...new Set(allTeams.map(t => divLabel(t)))].sort();
-      if (!labels.length) { document.getElementById('div-tabs').innerHTML = ''; return; }
+      const nav = document.getElementById('div-tabs');
+
+      // One division (single active season) → no tabs / no green pills.
+      if (labels.length <= 1) { nav.innerHTML = ''; activeDivision = labels[0] || ''; return; }
 
       if (!activeDivision || !labels.includes(activeDivision)) activeDivision = labels[0];
 
-      document.getElementById('div-tabs').innerHTML = labels.map(l =>
+      nav.innerHTML = labels.map(l =>
         `<button class="div-tab ${l === activeDivision ? 'is-active' : ''}" data-div="${esc(l)}">${esc(l)}</button>`
       ).join('');
 
-      document.querySelectorAll('.div-tab').forEach(btn => {
+      nav.querySelectorAll('.div-tab').forEach(btn => {
         btn.addEventListener('click', () => {
           activeDivision = btn.dataset.div;
-          document.querySelectorAll('.div-tab').forEach(b => b.classList.toggle('is-active', b.dataset.div === activeDivision));
+          nav.querySelectorAll('.div-tab').forEach(b => b.classList.toggle('is-active', b.dataset.div === activeDivision));
           renderTeams();
         });
       });
     }
 
+    // Resting/hover banner: real photo if present, otherwise the team emoji on a colour-tinted field.
+    function bannerInner(t) {
+      const color = t.color || '#b8ff2c';
+      if (t.photoUrl) {
+        return `<div class="team-banner__img" style="background-image:url('${esc(t.photoUrl)}')"></div>`;
+      }
+      return `<div class="team-banner__img" style="background:radial-gradient(120% 120% at 50% 25%, ${esc(color)}22 0%, var(--color-surface) 70%)"></div>
+        <div class="team-banner__emoji">${esc(t.emoji || '🏓')}</div>`;
+    }
+
+    function statCell(num, lbl, cls) {
+      return `<div class="stat-cell"><div class="stat-cell__num ${cls || ''}">${num}</div><div class="stat-cell__lbl">${lbl}</div></div>`;
+    }
+
     function renderTeams() {
-      const filtered = allTeams.filter(t => divLabel(t) === activeDivision);
+      const filtered = activeDivision ? allTeams.filter(t => divLabel(t) === activeDivision) : allTeams;
       const grid = document.getElementById('teams-grid');
       const count = document.getElementById('team-count');
 
       if (!filtered.length) {
-        grid.innerHTML = '<div class="empty-state">No teams registered yet for this division.</div>';
+        grid.innerHTML = '<div class="empty-state">No teams registered yet.</div>';
         count.textContent = '';
         return;
       }
 
-      count.textContent = `${filtered.length} team${filtered.length === 1 ? '' : 's'}`;
+      // Order by rank once the season has started; alphabetical before that.
+      const ordered = filtered.slice().sort((a, b) => {
+        if (seasonStarted) {
+          const ra = statsById[a.id]?.rank ?? 999, rb = statsById[b.id]?.rank ?? 999;
+          if (ra !== rb) return ra - rb;
+        }
+        return String(a.name).localeCompare(String(b.name));
+      });
 
-      grid.innerHTML = filtered.map(t => {
+      count.textContent = `${ordered.length} team${ordered.length === 1 ? '' : 's'}`;
+
+      grid.innerHTML = ordered.map(t => {
         const teamSlug = slugify(t.name);
         const teamUrl = `/team?id=${teamSlug}${LINK_SUFFIX}`;
-        const roster = (t.roster || []).map(p => {
-          const playerUrl = `/player?team=${teamSlug}&name=${encodeURIComponent(p.name || '')}${LINK_SUFFIX}`;
-          const gender = p.gender ? `<span class="gender">${esc(p.gender)}</span>` : '<span class="gender"></span>';
-          const sc = playerScoreMap[p.name];
-          const scoreEl = sc != null
-            ? `<span class="score">${sc.toFixed(1)}</span>`
-            : `<span class="score--empty">—</span>`;
-          return `<li><a href="${playerUrl}" class="name player-link">${esc(p.name)}</a>${gender}${scoreEl}</li>`;
-        }).join('');
+        const s = statsById[t.id] || {};
+        const wins = s.wins || 0, losses = s.losses || 0, ties = s.ties || 0;
+        const pts = s.matchPointsFor || 0, gw = s.totalGamesWon || 0, gl = s.totalGamesLost || 0;
+        const diff = s.pointDiff || 0;
+
+        // Rank badge only after Week 1.
+        const rankBadge = (seasonStarted && s.rank)
+          ? `<div class="team-banner__rank"><span class="rank-dot rank-dot--${s.rank <= 3 ? s.rank : 'x'}"></span>Rank ${s.rank}</div>`
+          : '';
+
+        const diffStr = !seasonStarted ? '—' : (diff > 0 ? '+' + diff : String(diff));
+        const diffCls = !seasonStarted ? 'n-mute' : (diff > 0 ? 'n-pos' : diff < 0 ? 'n-neg' : 'n-tie');
 
         return `<div class="team-card">
-          <div class="team-card__header">
-            <div class="team-card__emoji${/[a-z0-9]/i.test(t.emoji||'') ? ' team-card__emoji--text' : ''}"${/[a-z0-9]/i.test(t.emoji||'') && t.color ? ` style="color:${t.color}"` : ''}>${t.emoji || ''}</div>
-            <div class="team-card__info">
-              <div class="team-card__name"><a href="${teamUrl}" class="team-name-link">${esc(t.name)}</a></div>
-              <div class="team-card__captain">Captain: ${esc(t.captain)}</div>
+          <a class="team-banner" href="${teamUrl}" aria-label="View ${esc(t.name)}">
+            ${bannerInner(t)}
+            <div class="team-banner__overlay"></div>
+            <div class="team-banner__scrim"></div>
+            ${rankBadge}
+            <div class="team-banner__name"><span class="team-banner__title">${esc(t.name)}</span></div>
+          </a>
+          <div class="team-body">
+            <div class="stat-group">
+              <div class="stat-group__label">Match Stats</div>
+              <div class="stat-row stat-row--match">
+                ${statCell(wins, 'Win', 'n-win')}
+                ${statCell(losses, 'Loss', 'n-loss')}
+                ${statCell(ties, 'Tie', 'n-tie')}
+                ${statCell(pts, 'Pts', 'n-pts')}
+              </div>
             </div>
-          </div>
-          <div class="team-card__roster">
-            <div class="team-card__roster-title">Roster (${t.roster?.length || 0} players)</div>
-            <ul class="roster-list">${roster || '<li class="empty-state" style="padding:8px 0;">Roster pending</li>'}</ul>
+            <div class="stat-group">
+              <div class="stat-group__label">Game Stats</div>
+              <div class="stat-row stat-row--game">
+                ${statCell(gw, 'Won', 'n-pts')}
+                ${statCell(gl, 'Lost', 'n-mute')}
+                ${statCell(diffStr, 'Diff', diffCls)}
+              </div>
+            </div>
+            <a class="roster-btn" href="${teamUrl}">View Roster &rarr;</a>
           </div>
         </div>`;
       }).join('');
