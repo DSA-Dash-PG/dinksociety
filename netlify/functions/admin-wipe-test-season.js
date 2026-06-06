@@ -9,13 +9,13 @@
 // Admin-only.
 // =============================================================
 
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { wipeTestSeason } from './lib/test-season.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const result = await verifyAdminSession(req);
+  if (!result.valid) return unauthResponse(result.error);
 
   try {
     const deleted = await wipeTestSeason();

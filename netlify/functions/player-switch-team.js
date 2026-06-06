@@ -3,9 +3,8 @@
 // signed-in player is rostered on. Re-mints the player session cookie for that
 // team. Used by the team switcher in me.html when a player is on >1 team.
 
+import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import {
-  requirePlayer,
-  unauthResponse,
   createPlayerSession,
   buildPlayerCookie,
   findAllPlayerTeamsByEmail,
@@ -14,8 +13,9 @@ import {
 export default async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  const ctx = await requirePlayer(req);
-  if (!ctx) return unauthResponse();
+  const result = await verifyPlayerSession(req);
+  if (!result.valid) return unauthResponse(result.error);
+  const ctx = result.payload;
 
   const body = await req.json().catch(() => ({}));
   const teamId = body.teamId;

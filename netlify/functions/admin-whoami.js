@@ -5,20 +5,20 @@
 // admin session cookie. Returns 401 otherwise.
 // =============================================================
 
-import { requireAdmin } from './lib/admin-auth.js';
+import { verifyAdminSession } from './lib/auth.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  try {
-    const admin = await requireAdmin(req);
-    return new Response(JSON.stringify({ admin: true, email: admin.email }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
-  } catch {
+  const result = await verifyAdminSession(req);
+  if (!result.valid) {
     return new Response('Unauthorized', { status: 401 });
   }
+
+  return new Response(JSON.stringify({ admin: true, email: result.payload.email }), {
+    status: 200,
+    headers: { 'Content-Type': 'application/json' },
+  });
 };

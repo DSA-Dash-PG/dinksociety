@@ -2,11 +2,13 @@
 // Returns the captain's email and ALL teams they manage.
 // The frontend uses this to populate the team switcher.
 
-import { requireCaptain, unauthResponse, findAllLeaderTeamsByEmail } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
+import { findAllLeaderTeamsByEmail } from './lib/captain-auth.js';
 
 export default async (req) => {
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const result = await verifyCaptainSession(req);
+  if (!result.valid) return unauthResponse(result.error);
+  const ctx = result.payload;
 
   const t = ctx.team;
   const teamEntry = t ? {

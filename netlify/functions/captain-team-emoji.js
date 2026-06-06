@@ -3,12 +3,13 @@
 // validation) so a captain can set their emoji even if the roster is mid-edit.
 
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const result = await verifyCaptainSession(req);
+  if (!result.valid) return unauthResponse(result.error);
+  const ctx = result.payload;
 
   try {
     const body = await req.json();
