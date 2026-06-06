@@ -12,6 +12,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
+import { getRaw } from './retry.js';
 
 /**
  * Parse a specific cookie value from the Cookie header.
@@ -42,7 +43,7 @@ export async function requireAdmin(req) {
   }
 
   const store = getStore('admin-sessions');
-  const raw = await store.get(token);
+  const raw = await getRaw(store, token); // retries transient store hiccups
   if (!raw) {
     throw new Error('Invalid session');
   }

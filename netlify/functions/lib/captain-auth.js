@@ -4,6 +4,7 @@
 import { getStore } from '@netlify/blobs';
 import { normalizeEmail } from './identity.js';
 import { isTestTeam } from './circuit.js';
+import { getJSON } from './retry.js';
 
 const COOKIE_NAME = 'ds_captain_session';
 const SESSION_DAYS = 30;
@@ -78,7 +79,8 @@ export async function requireCaptain(req) {
   if (!sessionId) return null;
 
   const sessionStore = getStore('captain-sessions');
-  const session = await sessionStore.get(`session/${sessionId}.json`, { type: 'json' })
+  // Retries transient store hiccups so a blip doesn't bounce the captain to login
+  const session = await getJSON(sessionStore, `session/${sessionId}.json`)
     .catch(() => null);
   if (!session) return null;
   if (new Date(session.expiresAt).getTime() < Date.now()) {
@@ -178,7 +180,7 @@ export async function findTeamByCaptainEmail(email) {
 export async function getTeamById(teamId) {
   if (!teamId) return null;
   const store = getStore('teams');
-  return await store.get(`team/${teamId}.json`, { type: 'json' }).catch(() => null);
+  return await getJSON(store, `team/${teamId}.json`).catch(() => null);
 }
 
 // ===== Utilities =====

@@ -6,6 +6,7 @@
 import { getStore } from '@netlify/blobs';
 import { normalizeEmail } from './identity.js';
 import { isTestTeam } from './circuit.js';
+import { getJSON } from './retry.js';
 
 const COOKIE_NAME = 'ds_player_session';
 const SESSION_DAYS = 30;
@@ -57,10 +58,18 @@ export async function createPlayerToken({ email, playerId, teamId }) {
 export async function consumePlayerToken(token) {
   if (!token || !/^[a-f0-9]{48}$/.test(token)) return null;
   const store = getStore('player-tokens');
-  const record = await store.get(`token/${token}.json`, { type: 'json' }).catch(() => null);
+  const key = `token/${token}.json`;
+  const record = await store.get(key, { type: 'json' }).catch(() => null);
   if (!record) return null;
+  if (record.used) return null; // single-use: already consumed → caller redirects ?error=invalid
   if (new Date(record.expiresAt).getTime() < Date.now()) return null;
-  await store.delete(`token/${token}.json`).catch(() => null);
+  // Mark used BEFORE the caller creates a session/cookie. If this write
+  // fails, refuse the sign-in rather than leave a replayable token.
+  try {
+    await store.setJSON(key, { ...record, used: true, usedAt: new Date().toISOString() });
+  } catch {
+    return null;
+  }
   return { email: record.email, playerId: record.playerId, teamId: record.teamId };
 }
 
@@ -110,13 +119,14 @@ export async function requirePlayer(req) {
   const sessionId = getPlayerToken(req);
   if (!sessionId) return null;
   const sessionStore = getStore('player-sessions');
-  const session = await sessionStore.get(`session/${sessionId}.json`, { type: 'json' }).catch(() => null);
+  // getJSON retries transient store hiccups so a blip doesn't sign the player out
+  const session = await getJSON(sessionStore, `session/${sessionId}.json`).catch(() => null);
   if (!session) return null;
   if (new Date(session.expiresAt).getTime() < Date.now()) {
     await sessionStore.delete(`session/${sessionId}.json`).catch(() => null);
     return null;
   }
-  const team = await getStore('teams').get(`team/${session.teamId}.json`, { type: 'json' }).catch(() => null);
+  const team = await getJSON(getStore('teams'), `team/${session.teamId}.json`).catch(() => null);
   if (!team?.roster) return null;
   // Confirm the player is still on this roster (by id, with matching email).
   const player = team.roster.find(p => p.id === session.playerId);
