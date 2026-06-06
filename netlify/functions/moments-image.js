@@ -1,1 +1,6 @@
-{"type":"error","error":{"type":"not_found_error","message":"File not found in container: /mnt/user-data/outputs/moments-image.js","details":{"error_visibility":"user_facing"}},"request_id":"req_011CaYnnnqfv7vzD1U2c29yy"}
+export default async (req) => {
+  return new Response(
+    JSON.stringify({ error: 'Not implemented', message: 'This feature is coming soon' }),
+    { status: 501, headers: { 'Content-Type': 'application/json' } }
+  );
+};
