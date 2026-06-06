@@ -107,6 +107,10 @@
 
     /* ── Roster grid ── */
     .roster-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .roster-split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5); }
+    .roster-col__title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--color-text-faint); margin-bottom: var(--space-3); display: flex; align-items: center; gap: 6px; }
+    .roster-col__count { font-weight: 800; color: var(--color-text-muted); }
+    .roster-col__cards { display: flex; flex-direction: column; gap: 8px; }
     .roster-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); text-decoration: none; transition: border-color var(--transition); }
     .roster-card:hover { border-color: var(--color-border-strong); }
     .roster-avatar { width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 800; color: #fff; flex-shrink: 0; }
@@ -141,6 +145,7 @@
       .tp-hero__emoji--text { font-size: 22px; }
       .leaders-cols { grid-template-columns: 1fr; }
       .roster-grid { grid-template-columns: 1fr; }
+      .roster-split { grid-template-columns: 1fr; gap: var(--space-4); }
       .snap-grid { grid-template-columns: 1fr 1fr; }
       .stat-tile__val { font-size: 1.5rem; }
     }
@@ -372,12 +377,28 @@
         </div>`;
       }
 
-      /* ROSTER */
+      /* ROSTER — split by gender */
+      const rosterMen   = roster.filter(p => p.gender === 'M');
+      const rosterWomen = roster.filter(p => p.gender === 'F');
+      const rosterOther = roster.filter(p => p.gender !== 'M' && p.gender !== 'F');
+      const rosterCol = (title, list) => list.length ? `
+        <div class="roster-col">
+          <div class="roster-col__title">${title} <span class="roster-col__count">${list.length}</span></div>
+          <div class="roster-col__cards">
+            ${list.map(p => rosterCard(p, teamSlug)).join('')}
+          </div>
+        </div>` : '';
       html += `<div class="tp-card">
         <div class="tp-card__head"><span class="tp-card__head-icon">👥</span> Roster</div>
-        <div class="roster-grid">
-          ${roster.map(p => rosterCard(p, teamSlug)).join('')}
+        <div class="roster-split">
+          ${rosterCol('♂ Men', rosterMen)}
+          ${rosterCol('♀ Women', rosterWomen)}
         </div>
+        ${rosterOther.length ? `
+        <div class="roster-col" style="margin-top:var(--space-4);">
+          <div class="roster-col__title">Unspecified <span class="roster-col__count">${rosterOther.length}</span></div>
+          <div class="roster-grid">${rosterOther.map(p => rosterCard(p, teamSlug)).join('')}</div>
+        </div>` : ''}
       </div>`;
 
       /* TRANSACTIONS */

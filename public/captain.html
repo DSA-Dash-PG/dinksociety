@@ -1530,6 +1530,8 @@
         state.currentLineup = data.myLineup;
         state.oppLineup = data.oppLineup;
         state.lineupDraft = (data.myLineup?.games) || {};
+        // Roster must be loaded before we can judge lineup eligibility (the gate).
+        if (!(state.roster || []).length) { await loadRoster(true); }
         renderMatchDetail(data);
 
         // If revealed, also fetch and render scoresheet
@@ -1608,6 +1610,19 @@
       } else {
         pillEl.innerHTML = '<span class="match-pill match-pill--unlocked">Unlocked</span>';
         revealEl.innerHTML = '';
+
+        // Gate: a captain can't even START a lineup until the roster can fill one.
+        const shortfall = lineupRosterShortfall();
+        if (shortfall) {
+          $id('lineup-actions').style.display = 'none';
+          const builder = $id('lineup-builder');
+          builder.style.display = '';
+          builder.innerHTML = renderLineupGate(shortfall);
+          const goBtn = document.getElementById('gate-go-roster');
+          if (goBtn) goBtn.addEventListener('click', () => document.querySelector('.cap-tab[data-tab="roster"]')?.click());
+          return;
+        }
+
         lockBtn.style.display = '';
         saveBtn.style.display = '';
         $id('lineup-builder').style.display = '';
@@ -1615,6 +1630,52 @@
       }
 
       renderLineupBuilder(data.status.myLocked, data.status.revealed);
+    }
+
+    /**
+     * Can the roster physically fill a legal lineup? Mirrors the server guard in
+     * captain-lineup.js. Demand is derived from the slot mix + the nightly
+     * per-player game cap. Only gender-set players count. Returns a shortfall
+     * object { minWomen, minMen, women, men, noGender } or null if OK.
+     */
+    function lineupRosterShortfall() {
+      const roster = state.roster || [];
+      let womenDemand = 0, menDemand = 0;
+      for (const key in SLOT_RULES) {
+        const t = SLOT_RULES[key].type;
+        if (t === 'WOMENS') womenDemand += 2;
+        else if (t === 'MENS') menDemand += 2;
+        else { womenDemand += 1; menDemand += 1; } // MIXED: one of each
+      }
+      const minWomen = Math.ceil(womenDemand / LINEUP_MAX_GAMES);
+      const minMen = Math.ceil(menDemand / LINEUP_MAX_GAMES);
+      const women = roster.filter(p => p.gender === 'F').length;
+      const men = roster.filter(p => p.gender === 'M').length;
+      const noGender = roster.filter(p => !p.gender || !['M', 'F'].includes(p.gender)).length;
+      if (women >= minWomen && men >= minMen) return null;
+      return { minWomen, minMen, women, men, noGender };
+    }
+
+    function renderLineupGate(s) {
+      const need = [];
+      if (s.women < s.minWomen) { const n = s.minWomen - s.women; need.push(`${n} more ${n > 1 ? 'women' : 'woman'}`); }
+      if (s.men < s.minMen) { const n = s.minMen - s.men; need.push(`${n} more ${n > 1 ? 'men' : 'man'}`); }
+      const genderNote = s.noGender > 0
+        ? `<p style="margin:12px 0 0; font-size:13px; opacity:0.85;">${s.noGender} player(s) on your roster don't have a gender set yet — they won't count toward a lineup until you fix that.</p>`
+        : '';
+      return `
+        <div class="empty-state" style="text-align:left; padding:24px; max-width:520px;">
+          <h3 style="margin:0 0 8px; font-size:18px;">Add a few more players first</h3>
+          <p style="margin:0; font-size:14px; line-height:1.6;">
+            A full lineup is 12 games with a ${LINEUP_MAX_GAMES}-game-per-player cap, so you need at least
+            <strong>${s.minWomen} women</strong> and <strong>${s.minMen} men</strong> on your roster before you can build one.
+            Right now you have <strong>${s.women} ${s.women === 1 ? 'woman' : 'women'}</strong> and
+            <strong>${s.men} ${s.men === 1 ? 'man' : 'men'}</strong>. Add ${need.join(' and ')} to get started.
+          </p>
+          ${genderNote}
+          <a id="gate-go-roster" style="display:inline-block; margin-top:16px; font-weight:600; color:var(--color-lime); cursor:pointer;">Go to roster &rarr;</a>
+        </div>
+      `;
     }
 
     function renderLineupBuilder(locked, revealed) {

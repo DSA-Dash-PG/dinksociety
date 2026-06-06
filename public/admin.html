@@ -2346,12 +2346,31 @@
           '<strong style="font-weight:600;color:var(--color-text)">Captain:</strong> ' + h(captain?.name || '—') +
           (coCaptain ? ' · <strong style="font-weight:600;color:var(--color-text)">Co-Captain:</strong> ' + h(coCaptain.name) : '') +
         '</div>' +
-        '<div style="font-size:11px;margin-bottom:8px">' +
-          (t.roster || []).map(p => {
+        (function () {
+          const roster = t.roster || [];
+          const chip = p => {
             const badge = p.isCaptain ? ' ★' : p.isCoCaptain ? ' ☆' : '';
             return '<span style="display:inline-block;padding:2px 8px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-full);margin:2px;font-size:10px;color:var(--color-text-muted)">' + h(p.name) + badge + '</span>';
-          }).join('') +
-        '</div>' +
+          };
+          const men = roster.filter(p => p.gender === 'M');
+          const women = roster.filter(p => p.gender === 'F');
+          const other = roster.filter(p => p.gender !== 'M' && p.gender !== 'F');
+          const col = (label, list, color) =>
+            '<div style="flex:1;min-width:0">' +
+              '<div style="font-size:9px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:' + color + ';margin:0 0 5px 2px">' + label + ' · ' + list.length + '</div>' +
+              (list.length ? list.map(chip).join('') : '<span style="font-size:10px;color:var(--color-text-faint);margin-left:2px">—</span>') +
+            '</div>';
+          return '<div style="display:flex;gap:10px;margin-bottom:8px">' +
+              col('Men', men, '#5b8bd0') +
+              col('Women', women, '#d06ba0') +
+            '</div>' +
+            (other.length
+              ? '<div style="font-size:11px;margin-bottom:8px">' +
+                  '<div style="font-size:9px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 5px 2px">Unspecified · ' + other.length + '</div>' +
+                  other.map(chip).join('') +
+                '</div>'
+              : '');
+        })() +
         '<div style="font-size:10px;color:var(--color-text-faint)">' + rosterCt + ' players</div>' +
       '</div>';
     }).join('');

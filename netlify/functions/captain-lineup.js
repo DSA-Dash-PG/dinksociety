@@ -91,6 +91,13 @@ export default async (req) => {
     const roster = ctx.team.roster || [];
     const rosterById = new Map(roster.map(p => [p.id, p]));
 
+    // Before a lock, make sure the roster can physically fill a legal lineup —
+    // a clear up-front message beats twelve per-slot "missing players" errors.
+    if (action === 'lock') {
+      const shortfall = checkRosterDepth(roster);
+      if (shortfall) return json({ error: shortfall }, 400);
+    }
+
     // Validate all 12 slots if locking, allow partial if drafting
     const normalizedGames = {};
     for (const slot of SLOT_KEYS) {
@@ -269,6 +276,39 @@ function checkSlotGender(slotType, g1, g2) {
     return { ok: false, reason: 'mixed doubles needs one woman and one man' };
   }
   return { ok: false, reason: 'unknown slot' };
+}
+
+/**
+ * Checks the roster can physically fill a legal lineup before a lock.
+ * Demand is derived from the slot mix + the nightly per-player game cap, so it
+ * stays correct if either the slot rules or MAX_GAMES_PER_NIGHT change.
+ * Only players with a gender set ('M'/'F') count — gender-less players can't be
+ * placed in a slot. Returns a player-facing error string, or null if OK.
+ */
+function checkRosterDepth(roster) {
+  let womenDemand = 0, menDemand = 0;
+  for (const type of Object.values(SLOT_RULES)) {
+    if (type === 'WOMENS') womenDemand += 2;
+    else if (type === 'MENS') menDemand += 2;
+    else { womenDemand += 1; menDemand += 1; } // MIXED: one of each
+  }
+  const minWomen = Math.ceil(womenDemand / MAX_GAMES_PER_NIGHT);
+  const minMen = Math.ceil(menDemand / MAX_GAMES_PER_NIGHT);
+
+  const women = (roster || []).filter(p => p.gender === 'F').length;
+  const men = (roster || []).filter(p => p.gender === 'M').length;
+  if (women >= minWomen && men >= minMen) return null;
+
+  const gaps = [];
+  if (women < minWomen) {
+    const n = minWomen - women;
+    gaps.push(`${n} more ${n > 1 ? 'women' : 'woman'}`);
+  }
+  if (men < minMen) {
+    const n = minMen - men;
+    gaps.push(`${n} more ${n > 1 ? 'men' : 'man'}`);
+  }
+  return `Not enough players to fill a lineup. With a ${MAX_GAMES_PER_NIGHT}-game-per-player cap you need at least ${minWomen} women and ${minMen} men (with a gender set) — you have ${women} ${women === 1 ? 'woman' : 'women'} and ${men} ${men === 1 ? 'man' : 'men'}. Add ${gaps.join(' and ')} to your roster, then lock.`;
 }
 
 function prettySlot(slot) {
