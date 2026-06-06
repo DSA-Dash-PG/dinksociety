@@ -10,7 +10,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -26,8 +26,9 @@ function generateId(prefix) {
 }
 
 export default async (req) => {
-  const auth = await requireCaptain(req);
-  if (!auth) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const auth = verified.payload;
 
   const { team, user } = auth;
   const requestsStore = getStore('transfer-requests');

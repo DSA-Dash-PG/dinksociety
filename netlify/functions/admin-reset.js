@@ -10,7 +10,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 async function clearStore(name) {
   const store = getStore(name);
@@ -21,7 +21,8 @@ async function clearStore(name) {
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  try { await requireAdmin(req); } catch { return unauthResponse(); }
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
 
   const stores = ['seasons', 'teams', 'matches', 'standings', 'registrations', 'leaderboard'];
   const counts = {};

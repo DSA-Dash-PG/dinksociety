@@ -6,7 +6,7 @@
 // team.registrationId), so we resolve and project the relevant fields here.
 
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 
 async function findRegistration(regStore, id) {
   const keys = [`confirmed/${id}.json`, `pending/${id}.json`, id];
@@ -20,8 +20,9 @@ async function findRegistration(regStore, id) {
 }
 
 export default async (req) => {
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' };
   const regId = ctx.team.registrationId;

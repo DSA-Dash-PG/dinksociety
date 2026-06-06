@@ -4,12 +4,13 @@
 // is public) but NOT opponent lineup details.
 
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 
 export default async (req) => {
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const { id: teamId, division } = ctx.team;
   const circuit = circuitCode(ctx.team.circuit);

@@ -2,10 +2,10 @@
 // Returns all registrations (confirmed + pending + rejected) with full details.
 // Admin-only — returns more than the public registration-lookup endpoint.
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 export default async (req) => {
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
   try {
     const store = getStore('registrations');
     const { blobs: confirmedBlobs } = await store.list({ prefix: 'confirmed/' });

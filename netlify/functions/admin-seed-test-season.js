@@ -31,7 +31,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { wipeTestSeason } from './lib/test-season.js';
 import { assignCourtSets } from './lib/courts.js';
 
@@ -71,8 +71,9 @@ function shuffle(arr, seed) { const a = [...arr]; const rnd = mkRng(seed); for (
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   let body = {};
   try { body = await req.json(); } catch { /* empty body ok */ }

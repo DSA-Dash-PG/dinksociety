@@ -13,7 +13,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -68,12 +68,9 @@ async function executeTransfer({ teamsStore, logStore, fromTeam, toTeam, player,
 }
 
 export default async (req) => {
-  let admin;
-  try {
-    admin = await requireAdmin(req);
-  } catch {
-    return unauthResponse();
-  }
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   const url = new URL(req.url);
   const teamsStore = getStore('teams');

@@ -6,7 +6,7 @@
 //   → Designed for polling every 8–10 seconds from the admin dashboard.
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 const PAIRS = [
   { id: 'r1p1', slots: ['r1g1','r1g2'], round: 1, pair: 1, label: 'R1 P1' },
@@ -23,8 +23,9 @@ const SLOT_KEYS = [
 ];
 
 export default async (req) => {
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
 

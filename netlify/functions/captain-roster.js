@@ -8,15 +8,16 @@
 // gender is REQUIRED because it's used for slot enforcement in lineups.
 
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
 import { circuitCode } from './lib/circuit.js';
 
 const MAX_ROSTER_SIZE = 20;
 
 export default async (req) => {
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const store = getStore('teams');
   const teamKey = `team/${ctx.team.id}.json`;

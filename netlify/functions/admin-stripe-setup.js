@@ -16,7 +16,7 @@
 
 import Stripe from 'stripe';
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -30,11 +30,8 @@ export default async (req) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  try {
-    await requireAdmin(req);
-  } catch {
-    return unauthResponse();
-  }
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeKey) {

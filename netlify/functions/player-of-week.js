@@ -3,7 +3,7 @@
 // POST → save Player of the Week data (admin-only)
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -35,8 +35,8 @@ export default async (req) => {
 
   // POST — admin only
   if (req.method === 'POST') {
-    const authed = await requireAdmin(req);
-    if (!authed) return unauthResponse();
+    const verified = await verifyAdminSession(req);
+    if (!verified.valid) return unauthResponse(verified.error);
 
     try {
       const body = await req.json();

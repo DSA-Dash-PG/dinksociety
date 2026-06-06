@@ -3,7 +3,7 @@
 // POST → save circuit settings (admin-only)
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 const DEFAULTS = {
   circuitName:    'Season 1',
@@ -42,12 +42,9 @@ export default async (req) => {
 
   // POST — admin only
   if (req.method === 'POST') {
-    let admin;
-    try {
-      admin = await requireAdmin(req);
-    } catch {
-      return unauthResponse();
-    }
+    const verified = await verifyAdminSession(req);
+    if (!verified.valid) return unauthResponse(verified.error);
+    const admin = verified.payload;
 
     try {
       const body = await req.json();

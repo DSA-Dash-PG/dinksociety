@@ -12,13 +12,14 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { rebuildStandings } from './lib/standings.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   const url = new URL(req.url);
   const matchId = url.searchParams.get('matchId');

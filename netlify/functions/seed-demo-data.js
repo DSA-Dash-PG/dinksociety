@@ -14,7 +14,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import crypto from 'crypto';
 
 function rid() { return crypto.randomBytes(6).toString('hex'); }
@@ -143,7 +143,8 @@ function simulateMatch(homeTeam, awayTeam) {
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  try { await requireAdmin(req); } catch { return unauthResponse(); }
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
 
   const seasonStore = getStore('seasons');
   const teamStore = getStore('teams');

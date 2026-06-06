@@ -9,8 +9,7 @@
 // public page knows a photo exists and can cache-bust on change.
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin } from './lib/admin-auth.js';
-import { requireCaptain } from './lib/captain-auth.js';
+import { verifyAdminSession, verifyCaptainSession } from './lib/auth.js';
 
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB — Lambda payload ceiling (client compresses first)
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -33,11 +32,11 @@ export default async (req) => {
     }
 
     // ── Authorize: admin (any team) OR captain of THIS team ──
-    const admin = await requireAdmin(req);
-    let authorized = !!admin;
+    const admin = await verifyAdminSession(req);
+    let authorized = admin.valid;
     if (!authorized) {
-      const cap = await requireCaptain(req);
-      if (cap && cap.team && cap.team.id === teamId) authorized = true;
+      const cap = await verifyCaptainSession(req);
+      if (cap.valid && cap.payload.team && cap.payload.team.id === teamId) authorized = true;
     }
     if (!authorized) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });

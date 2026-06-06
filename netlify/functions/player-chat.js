@@ -9,7 +9,7 @@
 // POST action=send     body: { body }   → post a message to the team
 // POST action=mark-read                 → clear this player's unread count
 
-import { requirePlayer, unauthResponse } from './lib/player-auth.js';
+import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { sendEmail, renderTeamChatNotify } from './lib/email.js';
 import { normalizeEmail } from './lib/identity.js';
 import {
@@ -31,8 +31,9 @@ function siteUrl() {
 }
 
 export default async (req) => {
-  const ctx = await requirePlayer(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyPlayerSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
   const { playerId, teamId, team, player } = ctx;
 
   // ── GET — load thread ──────────────────────────────────────

@@ -23,7 +23,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 const STORE_NAME = 'seasons';
 
@@ -67,11 +67,8 @@ async function getAllSeasons() {
 }
 
 export default async (req) => {
-  try {
-    await requireAdmin(req);
-  } catch {
-    return unauthResponse();
-  }
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
 
   const store = getStore(STORE_NAME);
 

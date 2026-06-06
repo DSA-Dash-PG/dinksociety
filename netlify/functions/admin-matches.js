@@ -5,11 +5,12 @@
 // DELETE ?circuit=I&division=3.5M&week=N        → wipe a week's schedule (admin override)
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 export default async (req) => {
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   const url = new URL(req.url);
   const store = getStore('schedule');

@@ -4,7 +4,7 @@
 // second magic-link login. The player portal (me.html) calls this when the user
 // taps the Captain tab, then navigates to /captain.html.
 
-import { requirePlayer, unauthResponse } from './lib/player-auth.js';
+import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import {
   createSession,
   buildCaptainCookie,
@@ -17,8 +17,9 @@ export default async (req) => {
   }
 
   // Must already be signed in as a player.
-  const ctx = await requirePlayer(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyPlayerSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   // Bind the captain session to the EXACT team this player is on — the same team
   // the player portal already shows them. We must NOT scan all teams by email and

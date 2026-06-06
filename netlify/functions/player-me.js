@@ -3,7 +3,8 @@
 // profile, my stats, leaderboard (with Player of the Week), team, schedule.
 
 import { getStore } from '@netlify/blobs';
-import { requirePlayer, unauthResponse, findAllPlayerTeamsByEmail } from './lib/player-auth.js';
+import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
+import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
 
 const SLOT_LABEL = {
@@ -13,8 +14,9 @@ const SLOT_LABEL = {
 const LINEUP_SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
 
 export default async (req) => {
-  const ctx = await requirePlayer(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyPlayerSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const { playerId, teamId, team, player } = ctx;
   const circuit = circuitCode(team.circuit);

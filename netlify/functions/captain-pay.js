@@ -7,7 +7,7 @@
 
 import Stripe from 'stripe';
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 
 async function findRegistration(regStore, id) {
   const keys = [`confirmed/${id}.json`, `pending/${id}.json`, id];
@@ -25,8 +25,9 @@ export default async (req) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const headers = { 'Content-Type': 'application/json' };
   const stripeKey = process.env.STRIPE_SECRET_KEY;

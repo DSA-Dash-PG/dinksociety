@@ -22,7 +22,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { rebuildStandings } from './lib/standings.js';
 import { circuitCode } from './lib/circuit.js';
 
@@ -95,12 +95,9 @@ export default async (req) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  let admin;
-  try {
-    admin = await requireAdmin(req);
-  } catch {
-    return unauthResponse();
-  }
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   const body = await req.json();
   const { action } = body;

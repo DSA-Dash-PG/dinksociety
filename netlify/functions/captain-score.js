@@ -22,7 +22,7 @@
 //   'mismatch'   both entered but NOT valid (e.g. not won by 2) — needs fixing
 
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { rebuildStandings } from './lib/standings.js';
 import { circuitCode } from './lib/circuit.js';
 
@@ -46,8 +46,9 @@ const PAIRS = [
 ];
 
 export default async (req) => {
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const url = new URL(req.url);
   const matchId = url.searchParams.get('match');

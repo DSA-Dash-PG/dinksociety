@@ -57,9 +57,9 @@ export default async (req, context) => {
   // ── POST: admin actions (delete, reorder) ──
   if (req.method === 'POST') {
     // Lazy-import admin auth only when needed (avoids auth side-effects on public GET)
-    const { requireAdmin, unauthResponse } = await import('./lib/admin-auth.js');
-    const admin = await requireAdmin(req);
-    if (!admin) return unauthResponse();
+    const { verifyAdminSession, unauthResponse } = await import('./lib/auth.js');
+    const verified = await verifyAdminSession(req);
+    if (!verified.valid) return unauthResponse(verified.error);
 
     try {
       const store = getStore('site-images');

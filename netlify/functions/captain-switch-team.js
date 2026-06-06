@@ -3,9 +3,8 @@
 // signed-in captain leads. Re-mints the captain session cookie for that team.
 // Used by the team switcher in captain.html when a captain leads >1 team.
 
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import {
-  requireCaptain,
-  unauthResponse,
   leaderRole,
   createSession,
   buildCaptainCookie,
@@ -15,8 +14,9 @@ import {
 export default async (req) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const body = await req.json().catch(() => ({}));
   const teamId = body.teamId;

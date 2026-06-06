@@ -6,7 +6,7 @@
 // POST action=send       body: { body }       → captain posts to admin
 // POST action=mark-read                        → clears captain unread
 
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { sendEmail, renderCaptainMessageNotify } from './lib/email.js';
 import { listThread, appendMessage, getReads, setRead, unreadCount } from './lib/messages.js';
 
@@ -23,8 +23,9 @@ function siteUrl() {
 }
 
 export default async (req) => {
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
   const teamId = ctx.team.id;
 
   // ── GET — load thread ──────────────────────────────────────

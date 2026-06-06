@@ -10,7 +10,7 @@
 // POST action=mark-read       body: { teamId }
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { sendEmail, renderAdminMessage } from './lib/email.js';
 import {
   listThread, appendMessage, getReads, setRead, unreadCount, generateId,
@@ -60,9 +60,9 @@ function recipientEmails(team, audience) {
 }
 
 export default async (req) => {
-  let admin;
-  try { admin = await requireAdmin(req); } catch { return unauthResponse(); }
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   const url = new URL(req.url);
 

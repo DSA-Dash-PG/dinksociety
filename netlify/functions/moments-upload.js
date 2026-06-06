@@ -7,7 +7,7 @@
 // The 6MB limit here matches the real Lambda/Netlify payload ceiling.
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB — real Lambda payload ceiling
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -23,8 +23,8 @@ export default async (req, context) => {
   }
 
   // Admin-only
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
 
   try {
     const formData = await req.formData();

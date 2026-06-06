@@ -31,7 +31,7 @@
 // SAME person returning next season, which is expected and not a defect.
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail, normalizePhone } from './lib/identity.js';
 
 function json(data, status = 200) {
@@ -42,8 +42,8 @@ function json(data, status = 200) {
 }
 
 export default async (req) => {
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
 
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
 

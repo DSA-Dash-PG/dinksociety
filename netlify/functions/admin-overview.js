@@ -7,7 +7,7 @@
 // shown (flagged `unconfigured`) so data drift is visible rather than hidden.
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 
 // Live division list from the seasons store: [{ id, label, capacity }]
 // De-duplicated by id, across all non-archived seasons.
@@ -45,8 +45,8 @@ async function getSeasonDivisions() {
 }
 
 export default async (req) => {
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
 
   try {
     const regStore = getStore('registrations');

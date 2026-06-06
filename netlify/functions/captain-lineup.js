@@ -11,7 +11,7 @@
 // Also enforces a nightly cap: no player may appear in more than MAX_GAMES_PER_NIGHT games.
 
 import { getStore } from '@netlify/blobs';
-import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
+import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { MAX_GAMES_PER_NIGHT, orderMixedWomanFirst, checkGameCap } from './lib/lineup-rules.js';
 import { circuitCode } from './lib/circuit.js';
 
@@ -22,8 +22,9 @@ const SLOT_RULES = {
 const SLOT_KEYS = Object.keys(SLOT_RULES);
 
 export default async (req) => {
-  const ctx = await requireCaptain(req);
-  if (!ctx) return unauthResponse();
+  const verified = await verifyCaptainSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const ctx = verified.payload;
 
   const url = new URL(req.url);
   const matchId = url.searchParams.get('match');

@@ -8,7 +8,7 @@
 // Writes one file per week to the 'schedule' Blobs store and returns a summary.
 
 import { getStore } from '@netlify/blobs';
-import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { assignCourtSets } from './lib/courts.js';
 import { rebuildStandings } from './lib/standings.js';
 import { circuitCode } from './lib/circuit.js';
@@ -16,8 +16,9 @@ import { circuitCode } from './lib/circuit.js';
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
 
-  const admin = await requireAdmin(req);
-  if (!admin) return unauthResponse();
+  const verified = await verifyAdminSession(req);
+  if (!verified.valid) return unauthResponse(verified.error);
+  const admin = verified.payload;
 
   try {
     const { circuit, division, teams, courts = [] } = await req.json();
