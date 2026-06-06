@@ -23,6 +23,8 @@
 
 import { getStore } from '@netlify/blobs';
 import { requireAdmin, unauthResponse } from './lib/admin-auth.js';
+import { rebuildStandings } from './lib/standings.js';
+import { circuitCode } from './lib/circuit.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -294,6 +296,14 @@ export default async (req) => {
       await teamStore.set(fromTeamId, JSON.stringify(fromTeam));
       await teamStore.set(toTeamId, JSON.stringify(toTeam));
 
+      // Refresh aggregates so the moved player shows under the right team
+      // on public pages (team page leaders, leaderboard, etc.).
+      const circuits = new Set([circuitCode(fromTeam.circuit), circuitCode(toTeam.circuit)]);
+      for (const c of circuits) {
+        if (c) rebuildStandings(c).catch(err =>
+          console.error('rebuildStandings after move-player failed:', err));
+      }
+
       return json({
         ok: true,
         player,
@@ -324,6 +334,11 @@ export default async (req) => {
       team.roster = roster;
       team.updatedAt = new Date().toISOString();
       await teamStore.set(teamId, JSON.stringify(team));
+
+      // Refresh aggregates so the removed player stops showing on public pages.
+      const circuit = circuitCode(team.circuit);
+      if (circuit) rebuildStandings(circuit).catch(err =>
+        console.error('rebuildStandings after remove-player failed:', err));
 
       return json({ ok: true, removed, rosterCount: roster.length });
     }
