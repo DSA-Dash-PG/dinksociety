@@ -2501,7 +2501,25 @@
     if (!t) return;
     const body = $id('tdp-body');
 
+    // ── View as (impersonation) ──
+    const viewAsCo = (t.roster || []).find(p => p.isCoCaptain && p.email);
+    const viewAsBlock =
+      '<div style="margin-bottom:14px;padding:12px 14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.35);border-radius:var(--radius-sm);">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#f59e0b;margin-bottom:8px;">👁 View as — see exactly what they see</div>' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' +
+          '<button class="ab ab--outline ab--sm" id="tdp-viewas-captain">View as Captain</button>' +
+          (viewAsCo ? '<button class="ab ab--outline ab--sm" id="tdp-viewas-cocaptain">View as Co-Captain (' + h(viewAsCo.name) + ')</button>' : '') +
+          '<select id="tdp-viewas-player" style="font-size:11px;max-width:180px;">' +
+            '<option value="">— view as player —</option>' +
+            (t.roster || []).map(p => '<option value="' + h(p.id) + '">' + h(p.name) + (p.gender ? ' (' + h(p.gender) + ')' : '') + '</option>').join('') +
+          '</select>' +
+          '<button class="ab ab--outline ab--sm" id="tdp-viewas-player-btn">Go</button>' +
+          '<span id="tdp-viewas-status" style="font-size:11px;color:var(--color-text-faint);"></span>' +
+        '</div>' +
+      '</div>';
+
     body.innerHTML =
+      viewAsBlock +
       '<div class="arow">' +
         '<div class="af"><label>Team Name</label><input type="text" id="tdp-name" value="' + h(t.name || '') + '"></div>' +
         '<div class="af" style="max-width:120px;"><label>Logo</label><input type="text" id="tdp-emoji" maxlength="4" placeholder="🏓 or DSD" value="' + h(t.emoji || '') + '" style="text-align:center;font-size:18px;"><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Emoji or 2-3 letters</span></div>' +
@@ -2546,6 +2564,29 @@
         '</div>' +
         '<div style="text-align:right;"><button class="ab ab--teal ab--sm" id="tdp-add-btn">Add to roster</button></div>' +
       '</div>';
+
+    // Wire up "View as" impersonation
+    const viewAsGo = async (payload) => {
+      const st = $id('tdp-viewas-status');
+      st.textContent = 'Creating session…';
+      try {
+        const data = await apiJSON('/.netlify/functions/admin-impersonate', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.assign({ teamId: t.id }, payload)),
+        });
+        st.textContent = '';
+        window.open(data.redirect, '_blank');
+      } catch (e) { st.textContent = e.message || 'Failed'; }
+    };
+    $id('tdp-viewas-captain').addEventListener('click', () =>
+      viewAsGo({ mode: 'captain' }));
+    if (viewAsCo) $id('tdp-viewas-cocaptain')?.addEventListener('click', () =>
+      viewAsGo({ mode: 'captain', email: viewAsCo.email || '' }));
+    $id('tdp-viewas-player-btn').addEventListener('click', () => {
+      const pid = $id('tdp-viewas-player').value;
+      if (!pid) { $id('tdp-viewas-status').textContent = 'Pick a player first.'; return; }
+      viewAsGo({ mode: 'player', playerId: pid });
+    });
 
     // Wire up team photo upload (admin can set any team's photo)
     $id('tdp-photo-btn').addEventListener('click', async () => {
