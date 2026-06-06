@@ -1545,7 +1545,12 @@
       await refreshLineup();
     }
 
-    async function refreshLineup() {
+    // `fresh` (optional) = the response body from a just-completed save/lock/unlock
+    // PUT. The blob store is eventually consistent, so an immediate re-read can
+    // return the STALE pre-save record — which made saves look like they didn't
+    // take until you switched tabs and back. If the re-read is older than what
+    // the save returned, trust the save.
+    async function refreshLineup(fresh) {
       if (!state.currentMatch) return;
       try {
         const res = await fetch(`/.netlify/functions/captain-lineup?match=${encodeURIComponent(state.currentMatch.id)}`, {
@@ -1553,6 +1558,16 @@
         });
         if (!res.ok) throw new Error();
         const data = await res.json();
+        if (fresh && fresh.myLineup) {
+          const fetchedAt = data.myLineup?.updatedAt || '';
+          const savedAt = fresh.myLineup.updatedAt || '';
+          if (savedAt > fetchedAt) {
+            data.myLineup = fresh.myLineup;
+            if (typeof fresh.locked === 'boolean') data.status.myLocked = fresh.locked;
+            if (typeof fresh.revealed === 'boolean') data.status.revealed = fresh.revealed;
+            if (fresh.oppLineup) data.oppLineup = fresh.oppLineup;
+          }
+        }
         state.currentLineup = data.myLineup;
         state.oppLineup = data.oppLineup;
         state.lineupDraft = (data.myLineup?.games) || {};
@@ -2392,7 +2407,7 @@
         status.textContent = action === 'lock'
           ? (data.revealed ? 'Locked. Both sides in — matchup revealed below.' : 'Locked. Waiting on your opponent.')
           : 'Draft saved.';
-        await refreshLineup();
+        await refreshLineup(data); // pass the save response — guards against stale re-read
         await loadMatches(); // refresh tile pills
       } catch (err) {
         status.className = 'a-status is-err';
@@ -2422,7 +2437,7 @@
         if (!res.ok) throw new Error(data.error || 'Unlock failed');
         status.className = 'cap-status is-success';
         status.textContent = 'Unlocked. Make your changes, then lock again.';
-        await refreshLineup();
+        await refreshLineup(data); // pass the unlock response — guards against stale re-read
         await loadMatches(); // refresh tile pills
       } catch (err) {
         if (ub) ub.disabled = false;
