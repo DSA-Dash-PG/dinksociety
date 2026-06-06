@@ -10,6 +10,7 @@
 import { getStore } from '@netlify/blobs';
 import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
 import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
+import { circuitCode } from './lib/circuit.js';
 
 const MAX_ROSTER_SIZE = 20;
 
@@ -106,7 +107,7 @@ async function isRosterLocked(team) {
   if (team.rosterUnlocked === true) return false; // admin override
   try {
     const scheduleStore = getStore('schedule');
-    const key = `schedule/${team.circuit}/${team.division}/week-2.json`;
+    const key = `schedule/${circuitCode(team.circuit)}/${team.division}/week-2.json`;
     const data = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
     if (!data?.matches) return false;
     const m = data.matches.find(x => x.teamA?.id === team.id || x.teamB?.id === team.id);

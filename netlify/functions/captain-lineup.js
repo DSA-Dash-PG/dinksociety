@@ -13,6 +13,7 @@
 import { getStore } from '@netlify/blobs';
 import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
 import { MAX_GAMES_PER_NIGHT, orderMixedWomanFirst, checkGameCap } from './lib/lineup-rules.js';
+import { circuitCode } from './lib/circuit.js';
 
 const SLOT_RULES = {
   r1g1: 'WOMENS', r1g2: 'MENS', r1g3: 'MIXED', r1g4: 'MIXED', r1g5: 'MIXED', r1g6: 'MIXED',
@@ -198,8 +199,9 @@ export default async (req) => {
 };
 
 async function findMatch(scheduleStore, matchId, team, weeks = 8) {
+  const circuit = circuitCode(team.circuit);
   for (let week = 1; week <= weeks; week++) {
-    const key = `schedule/${team.circuit}/${team.division}/week-${week}.json`;
+    const key = `schedule/${circuit}/${team.division}/week-${week}.json`;
     const data = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
     if (!data?.matches) continue;
     const m = data.matches.find(x => x.id === matchId);

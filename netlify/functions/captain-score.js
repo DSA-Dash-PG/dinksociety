@@ -24,6 +24,7 @@
 import { getStore } from '@netlify/blobs';
 import { requireCaptain, unauthResponse } from './lib/captain-auth.js';
 import { rebuildStandings } from './lib/standings.js';
+import { circuitCode } from './lib/circuit.js';
 
 const SLOT_RULES = {
   r1g1: { round: 1, game: 1 }, r1g2: { round: 1, game: 2 },
@@ -221,13 +222,14 @@ export default async (req) => {
 // ===== Helpers =====
 
 async function findMatch(scheduleStore, matchId, team, weeks = 8) {
+  const circuit = circuitCode(team.circuit);
   for (let week = 1; week <= weeks; week++) {
-    const key = `schedule/${team.circuit}/${team.division}/week-${week}.json`;
+    const key = `schedule/${circuit}/${team.division}/week-${week}.json`;
     const data = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
     if (!data?.matches) continue;
     const m = data.matches.find(x => x.id === matchId);
     if (m && (m.teamA?.id === team.id || m.teamB?.id === team.id)) {
-      return { ...m, week, circuit: team.circuit, division: team.division, scheduleKey: key };
+      return { ...m, week, circuit, division: team.division, scheduleKey: key };
     }
   }
   return null;
