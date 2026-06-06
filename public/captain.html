@@ -2334,9 +2334,20 @@
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, games: state.lineupDraft }),
+          body: JSON.stringify({
+            action,
+            games: state.lineupDraft,
+            // Echo back the version we loaded — server returns 409 if someone
+            // else (e.g. the co-captain) saved since, instead of overwriting.
+            updatedAt: state.currentLineup?.updatedAt ?? null,
+          }),
         });
         const data = await res.json();
+        if (res.status === 409 && data.error === 'conflict') {
+          status.className = 'a-status is-err';
+          status.textContent = data.message || 'Lineup was updated by someone else — please refresh.';
+          return;
+        }
         if (!res.ok) throw new Error(data.error || 'Save failed');
 
         status.className = 'cap-status is-success';

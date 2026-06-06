@@ -126,6 +126,18 @@ export default async (req) => {
       return json({ error: 'Lineup is already locked and cannot be changed' }, 409);
     }
 
+    // Optimistic concurrency: the client echoes back the updatedAt it loaded.
+    // If it no longer matches what's stored (co-captain saved in the meantime),
+    // reject instead of silently overwriting their changes. Only enforced when
+    // the client actually sends the field, so older cached frontends keep working.
+    if ('updatedAt' in body) {
+      const clientStamp = body.updatedAt ?? null;
+      const serverStamp = existing?.updatedAt ?? null;
+      if (clientStamp !== serverStamp) {
+        return json({ error: 'conflict', message: 'Lineup was updated by someone else — please refresh.' }, 409);
+      }
+    }
+
     // Resolve roster for validation
     const roster = ctx.team.roster || [];
     const rosterById = new Map(roster.map(p => [p.id, p]));
