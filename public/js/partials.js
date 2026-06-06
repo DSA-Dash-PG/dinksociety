@@ -28,9 +28,41 @@
           newScript.textContent = oldScript.textContent;
           oldScript.parentNode.replaceChild(newScript, oldScript);
         });
+
+        // Single source of truth for the active nav link.
+        if (name === 'nav') highlightNav();
       } catch (err) {
         console.warn(`[partials] Could not load "${name}":`, err);
       }
     })
   );
 })();
+
+// ═══════════════════════════════════════════════════════════════
+// highlightNav — marks the current page's nav link with .is-active.
+// Reads location.pathname (NOT body[data-page]; the inline data-page
+// script that used to live in partials/nav.html has been removed).
+// ═══════════════════════════════════════════════════════════════
+function highlightNav() {
+  const path = location.pathname;
+  let key = null;
+
+  if (path.includes('schedule'))         key = 'schedule';
+  else if (path.includes('standing'))    key = 'standings';
+  else if (path.includes('leaderboard')) key = 'leaderboard';
+  else if (path.includes('stats'))       key = 'stats';
+  else if (path.includes('team'))        key = 'teams';
+  else if (path.includes('gallery') || path.includes('moments')) key = 'gallery';
+  else if (path.includes('rules'))       key = 'rules';
+  else if (path.includes('contact'))     key = 'contact';
+  else if (path.includes('register'))    key = 'register';
+  else if (path.includes('me.') || path.includes('player')) key = 'player';
+  else if (path === '/' || path.includes('index')) key = 'home';
+
+  if (!key) return;
+  document.querySelectorAll('[data-nav]').forEach((link) => {
+    if (link.getAttribute('data-nav') === key) {
+      link.classList.add('is-active');
+    }
+  });
+}
