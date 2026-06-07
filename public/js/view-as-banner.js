@@ -49,6 +49,25 @@
   bar.appendChild(text);
   bar.appendChild(btn);
   document.body.appendChild(bar);
-  // Keep the bar from covering page content.
-  document.body.style.paddingBottom = '52px';
+
+  // Sit ABOVE the portal's fixed bottom nav (player portal `.nav`,
+  // captain mobile `.cap-bottomnav`) instead of covering it. Re-measure on
+  // resize (the captain nav only exists ≤860px) and once after load in case
+  // the nav renders after this script runs.
+  function reposition() {
+    let navH = 0;
+    for (const sel of ['.nav', '.cap-bottomnav']) {
+      const nav = document.querySelector(sel);
+      if (nav && getComputedStyle(nav).display !== 'none') {
+        navH = Math.max(navH, nav.getBoundingClientRect().height);
+      }
+    }
+    bar.style.bottom = navH + 'px';
+    // Page CSS already clears its own nav — body just needs the banner's height.
+    document.body.style.paddingBottom = bar.getBoundingClientRect().height + 'px';
+  }
+  reposition();
+  window.addEventListener('resize', reposition);
+  if (document.readyState !== 'complete') window.addEventListener('load', reposition);
+  setTimeout(reposition, 500); // late-rendered navs
 })();
