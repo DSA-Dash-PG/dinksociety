@@ -431,6 +431,7 @@
           <div class="gd__lbl" style="margin:0 0 8px;">Quick actions</div>
           <div class="ov-qa" id="ov-qa">
             <button class="ab ab--outline ab--sm" data-qa="rebuild">↻ Rebuild standings</button>
+            <button class="ab ab--outline ab--sm" data-qa="settimes">🕖 Set match times</button>
             <button class="ab ab--outline ab--sm" data-qa="tab:schedule">Generate round-robin</button>
             <button class="ab ab--outline ab--sm" data-qa="tab:scores">Enter scores</button>
             <button class="ab ab--outline ab--sm" data-qa="tab:messages">Message league</button>
@@ -2006,6 +2007,36 @@
         }
         b.disabled = false;
         setTimeout(() => { const st = $id('ov-qa-status'); if (st) st.textContent = ''; }, 5000);
+      }
+      if (qa === 'settimes') {
+        // Backfill scheduledAt on every match: week date + 7:00 PM, computed in
+        // THIS browser's timezone (server is UTC). The blind-lineup reveal gate
+        // reads scheduledAt and now fails closed when it's missing.
+        const status = $id('ov-qa-status');
+        try {
+          const cfg = await apiJSON('/.netlify/functions/admin-settings');
+          const startDate = cfg.startDate || '2026-06-08';
+          const weeks = Number(cfg.weeks) || 8;
+          const times = {};
+          for (let w = 1; w <= weeks; w++) {
+            const d = new Date(startDate + 'T19:00:00'); // 7:00 PM local
+            d.setDate(d.getDate() + (w - 1) * 7);
+            times[w] = d.toISOString();
+          }
+          const sample = new Date(times[1]).toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+          if (!confirm(`Set every match's start time to 7:00 PM on its week night (Week 1 = ${sample})?\n\nLineups reveal 15 min before this time. Existing per-match times are kept.`)) return;
+          b.disabled = true; if (status) status.textContent = 'Setting match times…';
+          const r = await apiJSON('/.netlify/functions/admin-backfill-times', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ circuit: 'I', times, overwrite: false }),
+          });
+          if (status) status.textContent = `Match times set ✓ (${r.matchesUpdated} updated, ${r.matchesSkipped} already had times)`;
+        } catch (e) {
+          if (status) status.textContent = 'Set times failed: ' + e.message;
+        }
+        b.disabled = false;
+        setTimeout(() => { const st = $id('ov-qa-status'); if (st) st.textContent = ''; }, 8000);
       }
     });
   });

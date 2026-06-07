@@ -156,13 +156,16 @@ export function revealTime(scheduledAt, offsetMin = DEFAULT_REVEAL_OFFSET_MIN) {
 
 /**
  * Time gate for the simultaneous reveal: true once we're within `offsetMin`
- * minutes of match start. A match with no scheduled time has no gate (reveals
- * as soon as both lineups lock). Both-locked is checked by callers — this is
- * ONLY the clock half of `revealed = bothLocked && isRevealTime(...)`.
+ * minutes of match start. FAILS CLOSED: a match with no scheduled time never
+ * reveals (admin must set scheduledAt — see admin "Set match times" backfill).
+ * Failing open here leaked opponent lineups days early the moment both
+ * captains locked (June 2026 Season 1 bug). Both-locked is checked by
+ * callers — this is ONLY the clock half of
+ * `revealed = bothLocked && isRevealTime(...)`.
  */
 export function isRevealTime(scheduledAt, offsetMin = DEFAULT_REVEAL_OFFSET_MIN) {
   const t = revealTime(scheduledAt, offsetMin);
-  return t === null || Date.now() >= t;
+  return t !== null && Date.now() >= t;
 }
 
 /** Human-friendly offset, e.g. 180 → "3 hours", 30 → "30 minutes". */

@@ -15,6 +15,7 @@
 import { getStore } from '@netlify/blobs';
 import { normalizeScore } from './lib/score-helpers.js';
 import { etagJson } from './lib/http-cache.js';
+import { isRevealTime } from './lib/lineup-helpers.js';
 
 // Slot → discipline label. Matches lib ordering: g1 women's, g2 men's, rest mixed.
 const SLOT_TYPE = {
@@ -65,11 +66,19 @@ export default async (req) => {
     // home/away values (only set once both teams' entries match).
     if (score) normalizeScore(score, !!found.championship);
 
+    // Blind-lineup gate: this endpoint is public, so never expose player
+    // pairings before the simultaneous reveal. Names are visible only once
+    // the match is finalized, or both lineups are locked AND we're inside
+    // the reveal window. Draft/early-locked lineups stay hidden.
+    const final = !!(found.finalizedAt || score?.finalizedAt);
+    const lineupsVisible = final
+      || (!!lineupA?.lockedAt && !!lineupB?.lockedAt && isRevealTime(found.scheduledAt));
+
     const games = [];
     let totalHome = 0, totalAway = 0;
     const sg = score?.games || {};
-    const lgA = lineupA?.games || {};
-    const lgB = lineupB?.games || {};
+    const lgA = lineupsVisible ? (lineupA?.games || {}) : {};
+    const lgB = lineupsVisible ? (lineupB?.games || {}) : {};
 
     for (const slot of SLOT_KEYS) {
       const g = sg[slot];
