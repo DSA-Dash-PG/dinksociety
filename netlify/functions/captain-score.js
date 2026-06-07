@@ -19,7 +19,7 @@
 //   'empty'      both scores null
 //   'partial'    one score entered
 //   'confirmed'  both entered AND a valid finished game
-//   'mismatch'   both entered but NOT valid (e.g. not won by 2) — needs fixing
+//   'mismatch'   both entered but NOT a valid finished game — blocks save + submit
 
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
@@ -123,6 +123,27 @@ export default async (req) => {
       }
     }
 
+    // Reject save if any fully-entered game pair is invalid (mismatch).
+    // Partial entries (one side only) are allowed mid-entry.
+    const winBy = match.championship ? 2 : 1;
+    const mismatchedSlots = SLOT_KEYS.filter(slot => {
+      const g = existing.games[slot];
+      if (!g) return false;
+      const hHas = Number.isInteger(g.home);
+      const aHas = Number.isInteger(g.away);
+      if (!hHas || !aHas) return false; // partial — ok
+      return !isValidGame(g.home, g.away, winBy);
+    });
+
+    if (mismatchedSlots.length > 0) {
+      const labels = mismatchedSlots.map(prettySlot).join(', ');
+      const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
+      return json({
+        error: `${mismatchedSlots.length} game(s) have invalid scores (${rule}): ${labels}. Fix before saving.`,
+        mismatchedSlots,
+      }, 400);
+    }
+
     // Any score change wipes both submit flags — both captains must re-approve.
     if (changed && (existing.homeSubmittedAt || existing.awaySubmittedAt)) {
       existing.homeSubmittedAt = null;
@@ -152,8 +173,24 @@ export default async (req) => {
       if (existing.finalizedAt) {
         return json({ error: 'Already finalized' }, 409);
       }
-      // All games must be CONFIRMED (both sides match + valid)
+
       const decorated = decorate(existing, match.championship);
+
+      // Check for mismatched slots first (invalid score pairs)
+      const mismatchedSlots = decorated.computed.gameStatuses
+        .filter(g => g.status === 'mismatch')
+        .map(g => g.slot);
+      if (mismatchedSlots.length > 0) {
+        const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
+        const labels = mismatchedSlots.map(prettySlot).slice(0, 3).join(', ');
+        const more = mismatchedSlots.length > 3 ? ` and ${mismatchedSlots.length - 3} more` : '';
+        return json({
+          error: `Cannot submit — ${mismatchedSlots.length} game(s) have invalid scores (${rule}): ${labels}${more}. Both home and away scores must form a valid finished game.`,
+          mismatchedSlots,
+        }, 400);
+      }
+
+      // All games must be CONFIRMED (both sides entered + valid)
       const unconfirmed = decorated.computed.gameStatuses.filter(g => g.status !== 'confirmed');
       if (unconfirmed.length > 0) {
         const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
@@ -176,11 +213,16 @@ export default async (req) => {
       // Both submitted → finalize and write to schedule
       if (existing.homeSubmittedAt && existing.awaySubmittedAt) {
         existing.finalizedAt = now;
-        await writeFinalScoreToSchedule(scheduleStore, match, existing);
+        try {
+          await writeFinalScoreToSchedule(scheduleStore, match, existing);
+        } catch (err) {
+          console.error('writeFinalScoreToSchedule failed for match', matchId, ':', err);
+          // Don't block finalize — score record is already marked final
+        }
         // Rebuild standings + player-stats aggregates for this Circuit.
         // Wrapped so a standings error doesn't block the finalize itself.
         rebuildStandings(match.circuit).catch(err =>
-          console.error('rebuildStandings failed post-finalize:', err)
+          console.error('rebuildStandings failed post-finalize for match', matchId, 'circuit', match.circuit, ':', err)
         );
       }
     } else {
@@ -240,11 +282,28 @@ function publicMatchInfo(match) {
   };
 }
 
+function isValidGame(h, a, winBy = 1) {
+  if (!Number.isInteger(h) || !Number.isInteger(a)) return false;
+  if (h === a) return false;
+  const hi = Math.max(h, a), lo = Math.min(h, a);
+  if (winBy === 2) {
+    if (hi < 11) return false;
+    if (hi - lo < 2) return false;
+    return hi === 11 ? lo <= 9 : (hi - lo) === 2;
+  }
+  if (hi !== 11) return false;
+  return lo >= 0 && lo <= 10;
+}
+
 async function writeFinalScoreToSchedule(scheduleStore, match, score) {
   const data = await scheduleStore.get(match.scheduleKey, { type: 'json' });
-  if (!data?.matches) return;
+  if (!data?.matches) {
+    throw new Error(`scheduleKey ${match.scheduleKey} returned no matches array`);
+  }
   const m = data.matches.find(x => x.id === match.id);
-  if (!m) return;
+  if (!m) {
+    throw new Error(`match ${match.id} not found in scheduleKey ${match.scheduleKey}`);
+  }
 
   const decorated = decorate(score, match.championship);
   m.scoreA = decorated.computed.matchPoints.home;
