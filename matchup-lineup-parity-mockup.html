@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Matchup Lineup parity — captain vs player mockup</title>
+<style>
+  :root {
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626; --color-surface-4:#2e2e2e;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12); --color-lime-ghost:rgba(184,255,44,0.06);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-red:#ff5c47; --color-red-dim:rgba(255,92,71,0.12);
+    --color-gold:#f0c040; --color-gold-dim:rgba(240,192,64,0.12);
+    --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-full:9999px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#080808; color:var(--color-text); font-family:var(--font); padding:24px 16px 60px; }
+  h1 { font-size:18px; font-weight:800; margin:0 0 4px; }
+  .pagehint { font-size:12px; color:var(--color-text-muted); margin-bottom:18px; max-width:760px; line-height:1.5; }
+  .toggle { display:inline-flex; gap:6px; margin-bottom:22px; }
+  .toggle button { font-family:var(--font); font-size:11px; font-weight:700; padding:8px 16px; border-radius:var(--radius-full); border:1px solid var(--color-border); background:var(--color-surface-2); color:var(--color-text-muted); cursor:pointer; }
+  .toggle button.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
+  .cols { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; }
+  .phone { width:360px; background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:26px; padding:16px 14px 20px; flex-shrink:0; }
+  .phone__tag { font-size:10px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; text-align:center; margin-bottom:4px; }
+  .phone__tag.ref { color:var(--color-teal); } .phone__tag.cur { color:var(--color-red); } .phone__tag.pro { color:var(--color-lime); }
+  .phone__sub { font-size:10px; color:var(--color-text-faint); text-align:center; margin-bottom:14px; line-height:1.4; }
+
+  /* ===================== CURRENT player lineup card (verbatim from me.html) ===================== */
+  .label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:0 0 8px; }
+  .label .sub { font-weight:600; letter-spacing:0.04em; text-transform:none; }
+  .lu { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); overflow:hidden; margin-bottom:8px; }
+  .lu__head { display:flex; align-items:center; gap:8px; padding:13px 14px; border-bottom:1px solid var(--color-border); }
+  .lu__head h3 { margin:0; font-size:13px; font-weight:800; }
+  .lu__status { margin-left:auto; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; padding:3px 9px; border-radius:var(--radius-full); }
+  .lu__status.is-locked { background:var(--color-teal-dim); color:var(--color-teal); }
+  .lu__status.is-revealed { background:var(--color-lime-dim); color:var(--color-lime); }
+  .lu__round { padding:0 14px 12px; }
+  .lu__rtitle { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:14px 0 4px; }
+  .lu__rserve { font-size:10px; color:var(--color-text-muted); margin-bottom:8px; }
+  .lu__rserve b { color:var(--color-text); }
+  .lu__colhead { display:grid; grid-template-columns:38px 1fr 16px 1fr; gap:6px; align-items:center; padding:0 2px 6px; }
+  .lu__colhead span { font-size:8px; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
+  .lu__colhead .right { text-align:right; }
+  .g { display:grid; grid-template-columns:38px 1fr 16px 1fr; gap:6px; align-items:center; padding:8px 8px; margin:0 -6px; border-radius:var(--radius-sm); border-bottom:1px solid var(--color-border); }
+  .g:last-child { border-bottom:none; }
+  .g.is-mine { background:var(--color-lime-ghost); box-shadow:inset 2px 0 0 var(--color-lime); }
+  .g__no { font-size:9px; font-weight:800; color:var(--color-text-faint); }
+  .g__no small { display:block; font-size:7px; letter-spacing:0.04em; font-weight:700; margin-top:1px; }
+  .g__no .type-w { color:#e57bb0; } .g__no .type-m { color:#5aa9ff; } .g__no .type-x { color:var(--color-teal); }
+  .g__pair { font-size:11px; line-height:1.45; min-width:0; }
+  .g__pair .pl { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .g__pair .you { color:var(--color-lime); font-weight:800; }
+  .g__pair--right { text-align:right; }
+  .g__vs { font-size:8px; font-weight:800; color:var(--color-text-faint); text-align:center; }
+  .g__hidden { color:var(--color-text-faint); font-style:italic; font-size:10px; }
+  .g__mine-tag { display:inline-block; font-size:7px; font-weight:800; letter-spacing:0.06em; background:var(--color-lime); color:var(--color-text-inverse); border-radius:var(--radius-full); padding:1px 5px; margin-left:5px; vertical-align:1px; }
+  .lu__reveal-note { background:rgba(0,0,0,0.25); border:1px dashed var(--color-border-strong); border-radius:var(--radius-sm); padding:10px 12px; font-size:11px; color:var(--color-text-muted); margin:12px 14px 2px; text-align:center; }
+  .lu__foot { padding:11px 14px; border-top:1px solid var(--color-border); font-size:10px; color:var(--color-text-faint); line-height:1.5; display:flex; gap:7px; align-items:flex-start; }
+  .lu__foot b { color:var(--color-text-muted); }
+
+  /* ===================== CAPTAIN reference styles (verbatim from captain.html) ===================== */
+  .setblk { margin-bottom:16px; }
+  .setblk__head { display:flex; justify-content:space-between; align-items:center; padding:10px 2px 9px; border-bottom:1px solid var(--color-border-strong); margin-bottom:10px; }
+  .setblk__r { font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:0.05em; }
+  .setblk__c { font-size:11px; font-weight:700; color:var(--color-teal); background:var(--color-teal-dim); padding:3px 9px; border-radius:var(--radius-full); }
+  .bgm { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:14px; margin-bottom:10px; }
+  .bgm__top { display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+  .bgm__court { margin-left:auto; font-size:10px; font-weight:700; color:var(--color-text-faint); }
+  .bgm__pairs { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; }
+  .bgm__pair { font-size:12px; font-weight:600; text-align:center; line-height:1.3; }
+  .bgm__pair--us { color:var(--color-lime); }
+  .bgm__vs { font-size:10px; font-weight:800; color:var(--color-text-faint); }
+  .bgm__hidden { color:var(--color-text-faint); font-style:italic; font-weight:500; font-size:11px; }
+  .lmob-badge { font-size:9px; font-weight:800; letter-spacing:0.04em; padding:3px 7px; border-radius:5px; text-transform:uppercase; }
+  .lmob-badge.is-w { background:var(--color-gold-dim); color:var(--color-gold); }
+  .lmob-badge.is-m { background:var(--color-teal-dim); color:var(--color-teal); }
+  .lmob-badge.is-x { background:var(--color-lime-dim); color:var(--color-lime); }
+  .bgm__scores { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:14px; }
+  .bgm__side { background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:11px 6px; text-align:center; }
+  .bgm__side--us { border-color:rgba(184,255,44,0.3); }
+  .bgm__lbl { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; font-weight:800; color:var(--color-text-faint); margin-bottom:9px; }
+  .bgm__side--us .bgm__lbl { color:var(--color-lime); }
+  .bgm__stepper { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+  .bgm__step { width:42px; height:42px; border-radius:11px; border:1px solid var(--color-border-strong); background:var(--color-surface-3); color:var(--color-text); font-size:24px; font-weight:700; display:grid; place-items:center; user-select:none; opacity:0.45; }
+  .bgm__val { font-size:20px; font-weight:800; }
+
+  /* ===================== PROPOSED player view: captain look, read-only ===================== */
+  /* Same setblk / bgm / lmob-badge skeleton as captain, plus the player-only bits: */
+  .pgm__you-tag { display:inline-block; font-size:7px; font-weight:800; letter-spacing:0.06em; background:var(--color-lime); color:var(--color-text-inverse); border-radius:var(--radius-full); padding:1px 5px; margin-left:5px; vertical-align:1px; }
+  .pgm.is-mine { border-color:rgba(184,255,44,0.35); background:var(--color-lime-ghost); }
+  .pgm__g { margin-left:auto; font-size:10px; font-weight:700; color:var(--color-text-faint); }
+  .pgm__g .crt { margin-left:6px; }
+  .pser { font-size:10px; color:var(--color-text-muted); margin:-4px 0 10px; }
+  .pser b { color:var(--color-text); }
+</style>
+</head>
+<body>
+<h1>Games &rsaquo; Matchup Lineup — parity mockup</h1>
+<div class="pagehint">
+  Left: the captain's lineup view (the reference). Middle: what players see today. Right: the proposed player view —
+  same set-grouped game cards as the captain, minus score entry, keeping the player-only touches (YOU highlight,
+  lock/reveal pill, "in N of 12" footer). Toggle to see the pre-reveal (opponent hidden) state.
+</div>
+<div class="toggle">
+  <button id="t-rev" class="is-active" onclick="setState(true)">Revealed</button>
+  <button id="t-lock" onclick="setState(false)">Locked · pre-reveal</button>
+</div>
+
+<div class="cols">
+
+  <!-- ============ CAPTAIN REFERENCE ============ -->
+  <div class="phone">
+    <div class="phone__tag ref">Captain — reference</div>
+    <div class="phone__sub">captain.html lineup/scoresheet (mobile)<br>set blocks · badge pills · Us VS Them</div>
+    <div id="cap-view"></div>
+  </div>
+
+  <!-- ============ PLAYER TODAY ============ -->
+  <div class="phone">
+    <div class="phone__tag cur">Player — current</div>
+    <div class="phone__sub">me.html renderLineupCard<br>table-style grid · different type colors · no sets/courts</div>
+    <div id="cur-view"></div>
+  </div>
+
+  <!-- ============ PLAYER PROPOSED ============ -->
+  <div class="phone">
+    <div class="phone__tag pro">Player — proposed</div>
+    <div class="phone__sub">captain card style, read-only<br>+ YOU tag · lock pill · "in N of 12" footer kept</div>
+    <div id="pro-view"></div>
+  </div>
+
+</div>
+
+<script>
+// ---- demo data (Richard plays r1g2 men's + r1g4 mixed + r2g3 mixed) ----
+const MY = 'South End Smashers', OPP = 'Dink Dynasty';
+const SLOTS = [
+  { k:'r1g1', r:1, g:1, t:'w', label:"Women's", us:['Sarah M.','Emily K.'],   them:['Jess T.','Amy R.'] },
+  { k:'r1g2', r:1, g:2, t:'m', label:"Men's",   us:['Richard H.','Dave P.'],  them:['Mike B.','Tom W.'], me:0 },
+  { k:'r1g3', r:1, g:3, t:'x', label:'Mixed',   us:['Sarah M.','Dave P.'],    them:['Jess T.','Tom W.'] },
+  { k:'r1g4', r:1, g:4, t:'x', label:'Mixed',   us:['Emily K.','Richard H.'], them:['Amy R.','Mike B.'], me:1 },
+  { k:'r1g5', r:1, g:5, t:'x', label:'Mixed',   us:['Nina S.','Carlos V.'],   them:['Beth L.','Raj P.'] },
+  { k:'r1g6', r:1, g:6, t:'x', label:'Mixed',   us:['Lena O.','Marcus D.'],   them:['Kim H.','Joe F.'] },
+  { k:'r2g1', r:2, g:1, t:'w', label:"Women's", us:['Nina S.','Lena O.'],     them:['Beth L.','Kim H.'] },
+  { k:'r2g2', r:2, g:2, t:'m', label:"Men's",   us:['Carlos V.','Marcus D.'], them:['Raj P.','Joe F.'] },
+  { k:'r2g3', r:2, g:3, t:'x', label:'Mixed',   us:['Sarah M.','Richard H.'], them:['Jess T.','Mike B.'], me:1 },
+  { k:'r2g4', r:2, g:4, t:'x', label:'Mixed',   us:['Emily K.','Dave P.'],    them:['Amy R.','Tom W.'] },
+  { k:'r2g5', r:2, g:5, t:'x', label:'Mixed',   us:['Nina S.','Marcus D.'],   them:['Beth L.','Joe F.'] },
+  { k:'r2g6', r:2, g:6, t:'x', label:'Mixed',   us:['Lena O.','Carlos V.'],   them:['Kim H.','Raj P.'] },
+];
+const COURT_A = '3', COURT_B = '4';
+const courtOf = g => (g % 2 === 1) ? COURT_A : COURT_B;
+const serveTxt = r => r === 1
+  ? '<b>You serve first</b> · opponent chooses side'
+  : '<b>You choose side</b> · opponent serves first';
+
+// ---------- CAPTAIN reference (set blocks + bgm cards + disabled steppers) ----------
+function capView(revealed) {
+  const card = s => `
+    <div class="bgm">
+      <div class="bgm__top"><span class="lmob-badge is-${s.t}">${s.label}</span><span class="bgm__court">Court ${courtOf(s.g)}</span></div>
+      <div class="bgm__pairs">
+        <div class="bgm__pair bgm__pair--us">${s.us.join(' & ')}</div>
+        <div class="bgm__vs">VS</div>
+        <div class="bgm__pair">${revealed ? s.them.join(' & ') : '<span class="bgm__hidden">Reveals 30 min before match</span>'}</div>
+      </div>
+      <div class="bgm__scores">
+        <div class="bgm__side bgm__side--us"><div class="bgm__lbl">Us</div><div class="bgm__stepper"><span class="bgm__step">&minus;</span><span class="bgm__val">0</span><span class="bgm__step">+</span></div></div>
+        <div class="bgm__side"><div class="bgm__lbl">Them</div><div class="bgm__stepper"><span class="bgm__step">&minus;</span><span class="bgm__val">0</span><span class="bgm__step">+</span></div></div>
+      </div>
+    </div>`;
+  const set = (r, n) => {
+    const games = SLOTS.filter(s => s.r === r && Math.ceil(s.g / 2) === n);
+    return `<div class="setblk">
+      <div class="setblk__head"><span class="setblk__r">Round ${r} · Set ${n}</span><span class="setblk__c">Courts ${COURT_A} & ${COURT_B}</span></div>
+      ${games.map(card).join('')}
+    </div>`;
+  };
+  // sets 1–3 of round 1 + set 1 of round 2 (enough to show the pattern)
+  return set(1,1) + set(1,2) + set(2,1);
+}
+
+// ---------- PLAYER current (verbatim structure from me.html) ----------
+function curView(revealed) {
+  const row = s => {
+    const tcls = s.t === 'w' ? 'type-w' : s.t === 'm' ? 'type-m' : 'type-x';
+    const tlbl = s.t === 'w' ? 'Women' : s.t === 'm' ? 'Men' : 'Mixed';
+    const mine = s.me !== undefined;
+    const us = s.us.map((n,i) =>
+      `<div class="pl${mine && s.me === i ? ' you' : ''}">${n}${mine && s.me === i ? '<span class="g__mine-tag">YOU</span>' : ''}</div>`).join('');
+    const opp = revealed
+      ? `<div class="g__pair g__pair--right">${s.them.map(n => `<div class="pl">${n}</div>`).join('')}</div>`
+      : `<div class="g__pair g__pair--right g__hidden">Hidden</div>`;
+    return `<div class="g${mine ? ' is-mine' : ''}">
+      <div class="g__no">G${s.g}<small class="${tcls}">${tlbl}</small></div>
+      <div class="g__pair">${us}</div>
+      <div class="g__vs">vs</div>
+      ${opp}
+    </div>`;
+  };
+  const round = r => `<div class="lu__round">
+    <div class="lu__rtitle">Round ${r}</div>
+    <div class="lu__rserve">${serveTxt(r)}</div>
+    <div class="lu__colhead"><span></span><span>${MY}</span><span></span><span class="right">${OPP}</span></div>
+    ${SLOTS.filter(s => s.r === r).map(row).join('')}
+  </div>`;
+  const pill = revealed ? '<span class="lu__status is-revealed">Revealed</span>' : '<span class="lu__status is-locked">Locked</span>';
+  const note = revealed ? '' : `<div class="lu__reveal-note">🔒 Opponent's lineup reveals 30 min before match — here's your team's.</div>`;
+  return `<div class="label">Lineup <span class="sub">${revealed ? 'Full matchup' : 'Your team'}</span></div>
+    <div class="lu">
+      <div class="lu__head"><h3>Match lineup</h3>${pill}</div>
+      ${note}${round(1)}${round(2)}
+      <div class="lu__foot"><span>🏓</span><span>You're in <b>3 of 12 games</b>.</span></div>
+    </div>`;
+}
+
+// ---------- PLAYER proposed (captain skeleton, read-only, player touches kept) ----------
+function proView(revealed) {
+  const card = s => {
+    const mine = s.me !== undefined;
+    const us = s.us.map((n,i) => mine && s.me === i ? `${n}<span class="pgm__you-tag">YOU</span>` : n).join(' & ');
+    return `
+    <div class="bgm pgm${mine ? ' is-mine' : ''}">
+      <div class="bgm__top"><span class="lmob-badge is-${s.t}">${s.label}</span><span class="pgm__g">G${s.g}<span class="crt">· Court ${courtOf(s.g)}</span></span></div>
+      <div class="bgm__pairs">
+        <div class="bgm__pair bgm__pair--us">${us}</div>
+        <div class="bgm__vs">VS</div>
+        <div class="bgm__pair">${revealed ? s.them.join(' & ') : '<span class="bgm__hidden">Reveals 30 min before match</span>'}</div>
+      </div>
+    </div>`;
+  };
+  const set = (r, n) => {
+    const games = SLOTS.filter(s => s.r === r && Math.ceil(s.g / 2) === n);
+    return `<div class="setblk">
+      <div class="setblk__head"><span class="setblk__r">Round ${r} · Set ${n}</span><span class="setblk__c">Courts ${COURT_A} & ${COURT_B}</span></div>
+      ${games.map(card).join('')}
+    </div>`;
+  };
+  const round = r => `
+    <div class="pser">${serveTxt(r)}</div>
+    ${set(r,1)}${set(r,2)}${set(r,3)}`;
+  const pill = revealed ? '<span class="lu__status is-revealed">Revealed</span>' : '<span class="lu__status is-locked">Locked</span>';
+  const note = revealed ? '' : `<div class="lu__reveal-note" style="margin:0 0 12px;">🔒 Opponent's lineup reveals 30 min before match — here's your team's.</div>`;
+  return `<div class="label">Lineup <span class="sub">${revealed ? 'Full matchup' : 'Your team'}</span></div>
+    <div class="lu" style="overflow:visible; background:none; border:none;">
+      <div class="lu__head" style="padding:0 0 12px; border-bottom:none;"><h3>Match lineup · ${MY} vs ${OPP}</h3>${pill}</div>
+      ${note}
+      <div class="lu__rtitle" style="margin-top:0;">Round 1</div>${round(1)}
+      <div class="lu__rtitle">Round 2</div>${round(2)}
+      <div class="lu__foot" style="border-top:1px solid var(--color-border); padding:11px 2px;"><span>🏓</span><span>You're in <b>3 of 12 games</b>.</span></div>
+    </div>`;
+}
+
+function setState(revealed) {
+  document.getElementById('t-rev').classList.toggle('is-active', revealed);
+  document.getElementById('t-lock').classList.toggle('is-active', !revealed);
+  document.getElementById('cap-view').innerHTML = capView(revealed);
+  document.getElementById('cur-view').innerHTML = curView(revealed);
+  document.getElementById('pro-view').innerHTML = proView(revealed);
+}
+setState(true);
+</script>
+</body>
+</html>
