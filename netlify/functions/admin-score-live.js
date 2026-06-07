@@ -4,6 +4,7 @@
 // GET ?circuit=I&division=3.5M&week=1
 //   → Returns all matches for that week with live score + pair status for each.
 //   → Designed for polling every 8–10 seconds from the admin dashboard.
+//   → Includes sanitized homeLineup/awayLineup games so admin can render live roster.
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
@@ -25,7 +26,6 @@ const SLOT_KEYS = [
 export default async (req) => {
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
-  const admin = verified.payload;
 
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
 
@@ -55,7 +55,7 @@ export default async (req) => {
       const homeId = m.teamA?.id;
       const awayId = m.teamB?.id;
 
-      // Fetch lineup lock status
+      // Fetch lineup lock status AND score record
       const [homeLineup, awayLineup, scoreRec] = await Promise.all([
         lineupStore.get(`lineup/${matchId}/${homeId}.json`, { type: 'json' }).catch(() => null),
         lineupStore.get(`lineup/${matchId}/${awayId}.json`, { type: 'json' }).catch(() => null),
@@ -66,12 +66,24 @@ export default async (req) => {
       const awayLocked = !!awayLineup?.lockedAt;
       const revealed   = homeLocked && awayLocked;
 
+      // Sanitized lineups for admin roster view (names + game assignments only)
+      const homeLineupSanitized = homeLineup
+        ? { teamId: homeLineup.teamId, teamName: homeLineup.teamName, games: homeLineup.games, lockedAt: homeLineup.lockedAt }
+        : null;
+      const awayLineupSanitized = awayLineup
+        ? { teamId: awayLineup.teamId, teamName: awayLineup.teamName, games: awayLineup.games, lockedAt: awayLineup.lockedAt }
+        : null;
+
       // Compute per-game and per-pair status from score record
       const games = scoreRec?.games || {};
       const winBy = m.championship ? 2 : 1;
       const gameStatuses = SLOT_KEYS.map(slot => ({
         slot,
         status: computeGameStatus(games[slot], winBy),
+        home: games[slot]?.home ?? null,
+        away: games[slot]?.away ?? null,
+        by: games[slot]?.by ?? null,
+        at: games[slot]?.at ?? null,
       }));
 
       const statusBySlot = Object.fromEntries(gameStatuses.map(g => [g.slot, g.status]));
@@ -102,7 +114,11 @@ export default async (req) => {
         return acc;
       }, { empty: 0, partial: 0, confirmed: 0, mismatch: 0 });
 
-      const mismatches = gameStatuses.filter(g => g.status === 'mismatch').map(g => g.slot);
+      const mismatches = gameStatuses.filter(g => g.status === 'mismatch').map(g => ({
+        slot: g.slot,
+        home: g.home,
+        away: g.away,
+      }));
 
       // Compute round-level and match-level points (only from confirmed games)
       const r1 = computeRound(games, 1, statusBySlot);
@@ -132,8 +148,15 @@ export default async (req) => {
         startTime: m.startTime || null,
         home: { id: homeId, name: m.teamA?.name },
         away: { id: awayId, name: m.teamB?.name },
-        lineup: { homeLocked, awayLocked, revealed },
+        lineup: {
+          homeLocked,
+          awayLocked,
+          revealed,
+          home: homeLineupSanitized,
+          away: awayLineupSanitized,
+        },
         score: {
+          games: gameStatuses,
           gamesConfirmed: counts.confirmed,
           gamesTotal: 12,
           mismatches,
@@ -143,7 +166,9 @@ export default async (req) => {
           round2: r2,
           matchPoints,
           homeSubmitted: !!scoreRec?.homeSubmittedAt,
+          homeSubmittedBy: scoreRec?.homeSubmittedBy || null,
           awaySubmitted: !!scoreRec?.awaySubmittedAt,
+          awaySubmittedBy: scoreRec?.awaySubmittedBy || null,
           finalizedAt: scoreRec?.finalizedAt || null,
         },
         state: matchState,
