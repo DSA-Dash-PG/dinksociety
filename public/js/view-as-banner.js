@@ -18,23 +18,26 @@
     ? (v.role === 'cocaptain' ? 'Co-Captain' : 'Captain')
     : 'Player';
 
+  // Ultra-slim strip (~20px) that docks ON TOP of the portal's bottom nav —
+  // never covers it (see reposition() below). Richard 2026-06-07: nav must be
+  // 100% visible while impersonating.
   const bar = document.createElement('div');
   bar.id = 'view-as-banner';
   bar.style.cssText =
     'position:fixed;left:0;right:0;bottom:0;z-index:99999;' +
-    'display:flex;align-items:center;justify-content:center;gap:12px;' +
-    'padding:10px 16px;background:#b45309;color:#fff;' +
-    'font:600 13px/1.3 system-ui,sans-serif;box-shadow:0 -2px 12px rgba(0,0,0,0.35);';
+    'display:flex;align-items:center;justify-content:center;gap:8px;' +
+    'padding:2px 10px;background:#b45309;color:#fff;' +
+    'font:600 11px/1.4 system-ui,sans-serif;';
 
   const text = document.createElement('span');
-  text.textContent = '👁 Admin view — ' + roleLabel + ': ' +
-    (v.name || '?') + ' (' + (v.team || '?') + ')';
+  text.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+  text.textContent = '👁 ' + roleLabel + ': ' + (v.name || '?') + ' (' + (v.team || '?') + ')';
 
   const btn = document.createElement('button');
   btn.textContent = 'Exit';
   btn.style.cssText =
-    'padding:5px 16px;border:1px solid rgba(255,255,255,0.6);border-radius:999px;' +
-    'background:transparent;color:#fff;font:600 12px system-ui,sans-serif;cursor:pointer;';
+    'padding:0 10px;border:1px solid rgba(255,255,255,0.6);border-radius:999px;' +
+    'background:transparent;color:#fff;font:600 11px/1.5 system-ui,sans-serif;cursor:pointer;flex:0 0 auto;';
   btn.addEventListener('click', async () => {
     btn.disabled = true;
     btn.textContent = 'Exiting…';
