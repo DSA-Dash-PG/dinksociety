@@ -132,6 +132,10 @@
     .lineup-round__title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); margin: 0 0 10px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
     .lineup-game { display: grid; grid-template-columns: 140px 1fr 1fr; gap: 8px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--color-border); font-size: 12px; }
     .lineup-game:last-child { border-bottom: none; }
+    /* Ringed set = the two games played simultaneously on Courts 1 & 2 */
+    .cap-set { position: relative; border: 2px solid rgba(23,215,176,0.45); border-radius: var(--radius-md); padding: 12px 12px 6px; margin: 18px 0 16px; }
+    .cap-set__pill { position: absolute; top: -10px; left: 12px; background: var(--color-surface); color: var(--color-teal); border: 1px solid rgba(23,215,176,0.45); padding: 1px 9px; border-radius: var(--radius-full); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+    .cap-set__hint { position: absolute; top: -8px; right: 12px; background: var(--color-surface); padding: 0 7px; font-size: 9px; color: var(--color-text-faint); }
     .lineup-game__type { font-size: 11px; color: var(--color-text-faint); }
     .lineup-game__type-num { font-weight: 800; color: var(--color-text-muted); margin-right: 6px; }
     .lineup-game select { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 11px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
@@ -663,6 +667,9 @@
     .lmob-dot.is-f { background: var(--color-gold); }
     .lmob-dot.is-m { background: var(--color-teal); }
     .lmob-round { margin-bottom: 14px; }
+    .lmob-set { position: relative; border: 2px solid rgba(23,215,176,0.45); border-radius: var(--radius-md); padding: 14px 8px 1px; margin: 14px 0 18px; }
+    .lmob-set__pill { position: absolute; top: -9px; left: 10px; background: var(--color-bg); color: var(--color-teal); border: 1px solid rgba(23,215,176,0.45); padding: 1px 8px; border-radius: var(--radius-full); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; }
+    .lmob-set__hint { position: absolute; top: -7px; right: 10px; background: var(--color-bg); padding: 0 6px; font-size: 9px; color: var(--color-text-faint); }
     .lmob-round__head { display: flex; align-items: center; justify-content: space-between; font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 6px 2px 10px; }
     .lmob-round__tally { font-size: 11px; font-weight: 700; color: var(--color-text-muted); letter-spacing: 0; text-transform: none; }
     .lmob-game { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 11px 12px; margin-bottom: 9px; }
@@ -844,6 +851,21 @@
       r2g6: { round: 2, game: 6, type: 'MIXED',  label: "Mixed" },
     };
     const SLOT_KEYS = Object.keys(SLOT_RULES);
+
+    // ── Set pairing ──────────────────────────────────────────────
+    // Two games share each court window: g1+g2, g3+g4, g5+g6 within a round
+    // are played SIMULTANEOUSLY on two courts, so one player can't be in both
+    // games of a pair ("set"). Mirrored server-side in lib/lineup-helpers.js.
+    function pairedSlotKey(slotKey) {
+      const m = slotKey.match(/^r(\d)g(\d)$/);
+      if (!m) return null;
+      const g = Number(m[2]);
+      return `r${m[1]}g${g % 2 === 1 ? g + 1 : g - 1}`;
+    }
+    function playersInDraftSlot(slotKey) {
+      const d = (state.lineupDraft && state.lineupDraft[slotKey]) || {};
+      return [d.p1, d.p2].filter(Boolean);
+    }
 
     const state = {
       me: null,
@@ -1792,6 +1814,16 @@
         }
 
         const options = buildPlayerOptions(roster, slot.type);
+        // Players already in the OTHER game of this set (played simultaneously
+        // on the other court) are grayed out with the reason.
+        const pairedKey = pairedSlotKey(slotKey);
+        const pairedGameNum = SLOT_RULES[pairedKey].game;
+        const busy = playersInDraftSlot(pairedKey);
+        const optHtml = (pos) => options.map(p => {
+          const cur = picks[pos];
+          const taken = busy.includes(p.id) && p.id !== cur;
+          return `<option value="${p.id}" ${p.id === cur ? 'selected' : ''} ${taken ? 'disabled' : ''}>${escapeHtml(p.name)} · ${p.gender}${taken ? ` — in G${pairedGameNum} (other court)` : ''}</option>`;
+        }).join('');
         return `
           <div class="lineup-game">
             <div class="lineup-game__type">
@@ -1799,24 +1831,31 @@
             </div>
             <select data-slot="${slotKey}" data-pos="p1">
               <option value="">&mdash; Player 1 &mdash;</option>
-              ${options.map(p => `<option value="${p.id}" ${p.id === picks.p1 ? 'selected' : ''}>${escapeHtml(p.name)} · ${p.gender}</option>`).join('')}
+              ${optHtml('p1')}
             </select>
             <select data-slot="${slotKey}" data-pos="p2">
               <option value="">&mdash; Player 2 &mdash;</option>
-              ${options.map(p => `<option value="${p.id}" ${p.id === picks.p2 ? 'selected' : ''}>${escapeHtml(p.name)} · ${p.gender}</option>`).join('')}
+              ${optHtml('p2')}
             </select>
           </div>
         `;
       };
 
+      // Games grouped into ringed "sets" — each pair plays at the same time.
+      const setBlock = (r, g) => `
+        <div class="cap-set">
+          <span class="cap-set__pill">Set ${Math.ceil(g / 2)} · G${g} + G${g + 1}</span>
+          <span class="cap-set__hint">same time, two courts</span>
+          ${renderGame(`r${r}g${g}`)}${renderGame(`r${r}g${g + 1}`)}
+        </div>`;
       container.innerHTML = `
         <div class="lineup-round">
           <h3 class="lineup-round__title">Round 1 &mdash; Home team serves first · Away team chooses side</h3>
-          ${['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6'].map(renderGame).join('')}
+          ${setBlock(1, 1)}${setBlock(1, 3)}${setBlock(1, 5)}
         </div>
         <div class="lineup-round">
           <h3 class="lineup-round__title">Round 2 &mdash; Home team chooses side · Away team serves first</h3>
-          ${['r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'].map(renderGame).join('')}
+          ${setBlock(2, 1)}${setBlock(2, 3)}${setBlock(2, 5)}
         </div>
       `;
 
@@ -1828,6 +1867,8 @@
             const val = e.target.value;
             if (!state.lineupDraft[slot]) state.lineupDraft[slot] = {};
             state.lineupDraft[slot][pos] = val || null;
+            // Re-render so the paired game's availability grays out instantly.
+            renderLineupBuilder(false, false);
           });
         });
       }
@@ -2922,7 +2963,14 @@
       const round = (r) => {
         const keys = SLOT_KEYS.filter(k => SLOT_RULES[k].round === r);
         const done = keys.filter(k => state.lineupDraft[k]?.p1 && state.lineupDraft[k]?.p2).length;
-        return `<div class="lmob-round"><div class="lmob-round__head"><span>Round ${r}</span><span class="lmob-round__tally">${done}/${keys.length} set</span></div>${keys.map(mobGameHTML).join('')}</div>`;
+        // Games grouped into ringed "sets" — each pair plays simultaneously
+        // on two courts, so a player can only be in one game per set.
+        const pairs = [];
+        for (let i = 0; i < keys.length; i += 2) {
+          const a = SLOT_RULES[keys[i]], b = SLOT_RULES[keys[i + 1]];
+          pairs.push(`<div class="lmob-set"><span class="lmob-set__pill">Set ${Math.ceil(a.game / 2)} · G${a.game} + G${b.game}</span><span class="lmob-set__hint">same time</span>${mobGameHTML(keys[i])}${mobGameHTML(keys[i + 1])}</div>`);
+        }
+        return `<div class="lmob-round"><div class="lmob-round__head"><span>Round ${r}</span><span class="lmob-round__tally">${done}/${keys.length} set</span></div>${pairs.join('')}</div>`;
       };
       $id('lineup-builder').innerHTML = `
         <div class="lmob-rules">Mixed = woman + man (woman listed first) · max <b>${LINEUP_MAX_GAMES} games</b> per player a night</div>
@@ -2954,9 +3002,13 @@
       const picks = state.lineupDraft[slotKey] || {};
       const partner = pos === 0 ? picks.p2 : picks.p1;
       const current = pos === 0 ? picks.p1 : picks.p2;
+      // Set rule: players in the paired game (other court, same time) are out.
+      const pairedKey = pairedSlotKey(slotKey);
+      const pairedGame = SLOT_RULES[pairedKey];
+      const busyAcrossSet = playersInDraftSlot(pairedKey);
       capSheetCtx = { slotKey, pos };
       $id('cap-sheet-title').textContent = `${slot.label} · ${allow === 'F' ? 'Woman' : 'Man'}`;
-      $id('cap-sheet-sub').textContent = `Round ${slot.round}, Game ${slot.game} · max ${LINEUP_MAX_GAMES} games/night`;
+      $id('cap-sheet-sub').textContent = `Round ${slot.round}, Game ${slot.game} · same time as G${pairedGame.game} · max ${LINEUP_MAX_GAMES} games/night`;
       const elig = (state.roster || []).filter(p => p.gender === allow);
       let rows;
       if (!elig.length) {
@@ -2964,9 +3016,14 @@
       } else {
         rows = elig.map(p => {
           const isPartner = p.id === partner;
+          const onOtherCourt = !isPartner && busyAcrossSet.includes(p.id) && p.id !== current;
           const atCap = (counts[p.id] || 0) >= LINEUP_MAX_GAMES && p.id !== current;
-          const disabled = isPartner || atCap;
-          const note = isPartner ? 'Already in this game' : atCap ? `At ${LINEUP_MAX_GAMES}-game limit` : p.id === current ? 'Currently selected' : `${counts[p.id] || 0}/${LINEUP_MAX_GAMES} games`;
+          const disabled = isPartner || onOtherCourt || atCap;
+          const note = isPartner ? 'Already in this game'
+            : onOtherCourt ? `Playing G${pairedGame.game} (other court)`
+            : atCap ? `At ${LINEUP_MAX_GAMES}-game limit`
+            : p.id === current ? 'Currently selected'
+            : `${counts[p.id] || 0}/${LINEUP_MAX_GAMES} games`;
           const tag = p.gender === 'F' ? '<span class="lmob-tag is-f">Woman</span>' : '<span class="lmob-tag is-m">Man</span>';
           return `<button type="button" class="lmob-pick ${disabled ? 'is-disabled' : ''}" onclick="capChoose('${p.id}')"><span class="lmob-av">${escapeHtml(initialsOf(p.name))}</span><span class="lmob-pick__nm">${escapeHtml(p.name)}<span class="lmob-pick__note">${note}</span></span>${tag}</button>`;
         }).join('');

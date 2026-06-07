@@ -35,6 +35,28 @@ export function checkDuplicateCombos(games, roundsPerMatch = 2, gamesPerRound = 
 }
 
 /**
+ * Set pairing: g1+g2, g3+g4, g5+g6 within each round are played
+ * SIMULTANEOUSLY on two courts, so one player can't appear in both games
+ * of a pair. Returns an error string or null. Mirrors the client-side
+ * graying in the captain lineup builder.
+ */
+export function checkSimultaneousPairs(games, rosterById) {
+  for (let round = 1; round <= 2; round++) {
+    for (let g = 1; g <= 6; g += 2) {
+      const a = games[`r${round}g${g}`] || {};
+      const b = games[`r${round}g${g + 1}`] || {};
+      const inB = new Set([b.p1, b.p2].filter(Boolean));
+      const dupe = [a.p1, a.p2].filter(Boolean).find(id => inB.has(id));
+      if (dupe) {
+        const name = rosterById?.get?.(dupe)?.name || 'A player';
+        return `${name} is in both G${g} and G${g + 1} of Round ${round} — those games are played at the same time on different courts.`;
+      }
+    }
+  }
+  return null;
+}
+
+/**
  * Checks: no duplicate combo (same pair of players) in consecutive games
  * within the same round. Same combo IS allowed across Round 1 & Round 2.
  * Returns an error string if a duplicate is found, else null.

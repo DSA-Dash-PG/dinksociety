@@ -16,7 +16,7 @@ import { orderMixedWomanFirst, checkGameCap } from './lib/lineup-rules.js';
 import { circuitCode } from './lib/circuit.js';
 import {
   SLOT_RULES, SLOT_KEYS,
-  checkDuplicateCombos, checkBackToBackCombos, checkSlotGender, checkRosterDepth,
+  checkDuplicateCombos, checkBackToBackCombos, checkSimultaneousPairs, checkSlotGender, checkRosterDepth,
   hardLockTime, formatOffset, prettySlot, sanitizeRevealedLineup,
 } from './lib/lineup-helpers.js';
 
@@ -206,6 +206,11 @@ export default async (req) => {
     // Back-to-back combo check within the same round (blocks save always, not just lock)
     const comboErr = checkBackToBackCombos(normalizedGames, rosterById);
     if (comboErr) return json({ error: comboErr }, 400);
+
+    // Set pairing: g1+g2 / g3+g4 / g5+g6 play simultaneously on two courts —
+    // a player can't be in both games of a pair (blocks save AND lock).
+    const pairErr = checkSimultaneousPairs(normalizedGames, rosterById);
+    if (pairErr) return json({ error: pairErr }, 400);
 
     // Duplicate-combo check: within a single round, no two games can have the
     // same pair of players. Across rounds is fine.
