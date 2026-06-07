@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="/js/short-name.js"></script>
 <style>
   :root {
     --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626; --color-surface-4:#2e2e2e;
@@ -752,7 +753,7 @@
           const r = s[1], gNo = s.slice(-1);
           const mine = lu.mine && lu.mine[s];
           const partner = mine ? (lu.mySlots[s] === 'p1' ? mine.p2 : mine.p1) : null;
-          const oppPair = lu.opp && lu.opp[s] ? [lu.opp[s].p1, lu.opp[s].p2].filter(Boolean).join(' / ') : null;
+          const oppPair = lu.opp && lu.opp[s] ? [lu.opp[s].p1, lu.opp[s].p2].filter(Boolean).map(shortName).join(' / ') : null;
           const st = slotState[s];
           let stateEl, liveCls = '';
           if (st === 'done') {
@@ -769,7 +770,7 @@
           }
           return `<div class="yn__row${liveCls}">
             <div class="yn__slot">R${r} · G${gNo}<br><span class="${t.cls}">${t.label}</span></div>
-            <div class="yn__body">${partner ? 'with ' + esc(partner) : '—'}${oppPair ? `<div class="yn__sub">vs ${esc(oppPair)}</div>` : ''}</div>
+            <div class="yn__body">${partner ? 'with ' + esc(shortName(partner)) : '—'}${oppPair ? `<div class="yn__sub">vs ${esc(oppPair)}</div>` : ''}</div>
             ${stateEl}
           </div>`;
         }).join('');
@@ -841,7 +842,7 @@
       const d = p.rankDelta;
       const dEl = d > 0 ? `<span class="lb__delta up">▲${d}</span>` : `<span class="lb__delta down">▼${-d}</span>`;
       return `<div class="lb ${p.me ? 'lb--me' : ''} hcard-tap" data-go="standings"><div class="lb__av">${initials(p.name)}</div>
-        <div class="lb__body"><div class="lb__name">${esc(p.name)}${p.me ? ' · you' : ''}</div><div class="lb__team">${esc(p.teamName || '')}</div></div>
+        <div class="lb__body"><div class="lb__name">${esc(shortName(p.name))}${p.me ? ' · you' : ''}</div><div class="lb__team">${esc(p.teamName || '')}</div></div>
         <div style="text-align:right;"><div class="lb__dsr">${p.dsr != null ? esc(p.dsr) : '—'}</div>${dEl}</div></div>`;
     }).join('') : '';
 
@@ -1159,7 +1160,7 @@
       const pp = wpct(p.won, p.played);
       const col = pp >= 60 ? '#22c55e' : pp <= 35 ? 'var(--color-red)' : 'var(--color-text-muted)';
       return `<div class="partner"><div class="partner__av">${initials(p.name)}</div>
-        <div style="font-weight:600;flex:1;min-width:0;">${esc(p.name)}</div>
+        <div style="font-weight:600;flex:1;min-width:0;">${esc(shortName(p.name))}</div>
         <span class="partner__rec"><b>${p.won}</b>–${p.played - p.won}</span>
         <span class="partner__pct" style="color:${col}">${pp}%</span></div>`;
     }).join('') + `<div class="ptot"><span>Total</span><span>${totW}–${totP - totW} <b>${wpct(totW, totP)}%</b></span></div>` : '';
@@ -1216,7 +1217,7 @@
     const top = g => pool.filter(p => (p.gender || '').toUpperCase().startsWith(g))
       .sort((a, b) => (rate(b) - rate(a)) || (b.w - a.w)).slice(0, 3);
     const row = (p, i) => `<div class="lb ${p.me?'lb--me':''}"><div class="lb__rank">${['🥇','🥈','🥉'][i] || i + 1}</div><div class="lb__av">${initials(p.name)}</div>
-      <div class="lb__body"><div class="lb__name">${esc(p.name)}${p.me?' · you':''}</div><div class="lb__team">${esc(p.teamName || '')}</div></div>
+      <div class="lb__body"><div class="lb__name">${esc(shortName(p.name))}${p.me?' · you':''}</div><div class="lb__team">${esc(p.teamName || '')}</div></div>
       <div style="text-align:right;"><div class="lb__dsr">${p.w}–${p.l}</div><span class="lb__delta flat">${Math.round(rate(p) * 100)}%</span></div></div>`;
     const f = top('F'), m = top('M');
     if (f.length) html += '<div class="label">♀ Women</div>' + f.map(row).join('');
@@ -1226,7 +1227,7 @@
 
   function powCard(lbl, p) {
     if (!p) return `<div class="potw__c"><div class="potw__lbl">${lbl}</div><div class="potw__name" style="color:var(--color-text-faint)">—</div></div>`;
-    return `<div class="potw__c"><div class="potw__lbl">${lbl}</div><div class="potw__name">${esc(p.name)}</div><div class="potw__team">${esc(p.teamName||'')}</div>${p.dsr!=null?'<div class="potw__dsr">DSR '+esc(p.dsr)+'</div>':''}</div>`;
+    return `<div class="potw__c"><div class="potw__lbl">${lbl}</div><div class="potw__name">${esc(shortName(p.name))}</div><div class="potw__team">${esc(p.teamName||'')}</div>${p.dsr!=null?'<div class="potw__dsr">DSR '+esc(p.dsr)+'</div>':''}</div>`;
   }
   function renderLbList() {
     const me = DATA.profile;
@@ -1237,7 +1238,7 @@
       const d = p.rankDelta;
       const delta = d == null ? '<span class="lb__delta flat">—</span>' : d > 0 ? '<span class="lb__delta up">▲' + d + '</span>' : d < 0 ? '<span class="lb__delta down">▼' + (-d) + '</span>' : '<span class="lb__delta flat">—</span>';
       return `<div class="lb ${p.me?'lb--me':''}"><div class="lb__rank">${i + 1}</div><div class="lb__av">${initials(p.name)}</div>
-        <div class="lb__body"><div class="lb__name">${esc(p.name)}${p.me?' · you':''}</div><div class="lb__team">${esc(p.teamName||'')}</div></div>
+        <div class="lb__body"><div class="lb__name">${esc(shortName(p.name))}${p.me?' · you':''}</div><div class="lb__team">${esc(p.teamName||'')}</div></div>
         <div style="text-align:right;"><div class="lb__dsr">${p.dsr != null ? esc(p.dsr) : '—'}</div>${delta}</div></div>`;
     }).join('');
   }
@@ -1251,7 +1252,7 @@
       <div><div class="ths__n">${st.matchPointsFor ?? 0}</div><div class="ths__l">Match pts</div></div>
     </div>` : '';
     const roster = (t.roster || []).map(p => `<div class="rost"><div class="rost__av">${initials(p.name)}</div>
-      <div class="rost__name">${esc(p.name)}${p.me?'<span class="me">YOU</span>':''}</div>
+      <div class="rost__name">${esc(shortName(p.name))}${p.me?'<span class="me">YOU</span>':''}</div>
       <span class="rost__g ${p.gender==='F'?'f':'m'}">${p.gender==='F'?'W':'M'}</span>
       <span class="rost__dsr">${p.dsr!=null?esc(p.dsr):'—'}</span></div>`).join('');
     $('v-team').innerHTML =

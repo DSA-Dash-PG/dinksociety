@@ -12,6 +12,7 @@
   <link rel="stylesheet" href="/css/shared.css">
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css">
+  <script src="/js/short-name.js"></script>
   <style>
     /* ═══════════════════════════════════════════════════════════
        CAPTAIN PORTAL — Night-Match Design System
@@ -1848,8 +1849,8 @@
               <div class="lineup-game__type">
                 <span class="lineup-game__type-num">G${slot.game}</span>${slot.label}
               </div>
-              <div style="font-size: 14px; font-weight: 500;">${escapeHtml(p1Name || '—')}</div>
-              <div style="font-size: 14px; font-weight: 500;">${escapeHtml(p2Name || '—')}</div>
+              <div style="font-size: 14px; font-weight: 500;">${escapeHtml(p1Name ? shortName(p1Name) : '—')}</div>
+              <div style="font-size: 14px; font-weight: 500;">${escapeHtml(p2Name ? shortName(p2Name) : '—')}</div>
             </div>
           `;
         }
@@ -1936,8 +1937,8 @@
         const slot = SLOT_RULES[slotKey];
         const m = mine[slotKey] || {};
         const o = opp[slotKey] || {};
-        const mineText = [m.p1Name, m.p2Name].filter(Boolean).join(' & ');
-        const oppText = [o.p1Name, o.p2Name].filter(Boolean).join(' & ');
+        const mineText = [m.p1Name, m.p2Name].filter(Boolean).map(shortName).join(' & ');
+        const oppText = [o.p1Name, o.p2Name].filter(Boolean).map(shortName).join(' & ');
 
         return `
           <div class="reveal-matchup">
@@ -2374,7 +2375,8 @@
 
     function formatPair(gamePicks) {
       if (!gamePicks) return '—';
-      const parts = [gamePicks.p1Name, gamePicks.p2Name].filter(Boolean);
+      // Display-only "First L." — covers every scoresheet pair (desktop + mobile)
+      const parts = [gamePicks.p1Name, gamePicks.p2Name].filter(Boolean).map(shortName);
       return parts.length ? parts.join(' & ') : '—';
     }
 
