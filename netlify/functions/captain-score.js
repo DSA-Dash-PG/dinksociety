@@ -291,6 +291,23 @@ function sanitizeLineup(lineup) {
   return { teamId: lineup.teamId, teamName: lineup.teamName, games: lineup.games };
 }
 
+// Match metadata safe to expose to captains (dropped in the week-1 QA
+// rewrite while the call site survived — every GET 500'd post-reveal).
+function publicMatchInfo(match) {
+  return {
+    id: match.id, week: match.week, court: match.court,
+    courtA: match.courtA ?? null,
+    courtB: match.courtB ?? null,
+    courtSet: match.courtSet ?? null,
+    championship: !!match.championship,
+    venue: match.venue || null,
+    scheduledAt: match.scheduledAt || null,
+    circuit: match.circuit, division: match.division,
+    home: { id: match.teamA.id, name: match.teamA.name },
+    away: { id: match.teamB.id, name: match.teamB.name },
+  };
+}
+
 // Resolve the captain's display name from the team roster (for the sign-off).
 function captainName(ctx) {
   const email = (ctx.user.email || '').toLowerCase();
