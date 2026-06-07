@@ -202,6 +202,21 @@
   .lu__reveal-note { background:rgba(0,0,0,0.25); border:1px dashed var(--color-border-strong); border-radius:var(--radius-sm); padding:10px 12px; font-size:11px; color:var(--color-text-muted); margin:12px 14px 2px; text-align:center; }
   .lu__foot { padding:11px 14px; border-top:1px solid var(--color-border); font-size:10px; color:var(--color-text-faint); line-height:1.5; display:flex; gap:7px; align-items:flex-start; }
   .lu__foot b { color:var(--color-text-muted); }
+  /* Games tab — Lineup segment: slim view-only scoresheet (captain-style set brackets) */
+  .lus__teams { display:grid; grid-template-columns:38px 1fr 16px 1fr; gap:6px; margin:14px 2px 14px; }
+  .lus__teams span { font-size:8px; letter-spacing:0.08em; text-transform:uppercase; font-weight:700; color:var(--color-text-faint); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .lus__teams .mine { color:var(--color-text-muted); }
+  .lus__teams .right { text-align:right; }
+  .lus__rhead { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:20px 2px 16px; line-height:1.7; }
+  .lus__rhead b { color:var(--color-text-muted); }
+  .lus__set { border:1.5px solid rgba(23,215,176,0.4); border-radius:var(--radius-md); padding:8px 8px 0; position:relative; margin-bottom:20px; }
+  .lus__pill { position:absolute; top:-9px; left:11px; background:var(--color-bg); border:1.5px solid rgba(23,215,176,0.4); border-radius:var(--radius-full); padding:1px 9px; font-size:8px; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-teal); font-weight:800; }
+  .lus__snote { position:absolute; top:-6px; right:11px; background:var(--color-bg); padding:0 6px; font-size:8px; color:var(--color-text-faint); }
+  .lus__set .g { margin:0; }
+  .lus__set .g:last-child { border-bottom:none; }
+  .lus__ph { display:inline-block; border:1px dashed var(--color-border-strong); border-radius:var(--radius-sm); padding:4px 8px; font-size:9px; color:var(--color-text-faint); line-height:1.4; font-style:normal; }
+  .lus__foot { margin:2px 2px 4px; font-size:10px; color:var(--color-text-faint); text-align:center; }
+  .lus__foot b { color:var(--color-text-muted); }
 
   .dsr { background:var(--color-surface); border:1px solid rgba(184,255,44,0.25); border-radius:var(--radius-lg); padding:20px; text-align:center; margin-bottom:14px; }
   .dsr__lbl { font-size:9px; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
@@ -832,7 +847,7 @@
           <span>Full lineup</span>
           <span class="sub2">all 12 games <span class="chev">▼</span></span>
         </div>
-        <div class="acc__body">${renderLineupCard(next, me)}</div>
+        <div class="acc__body">${renderLineupSheet(next, me, false)}</div>
       </div>`;
     }
 
@@ -911,12 +926,31 @@
       $('v-schedule').innerHTML = '<div class="muted">Couldn’t display your schedule. Pull down to refresh, or try again shortly.</div>';
     }
   }
+  // Games tab segments: Schedule = the team's season schedule; Lineup = the
+  // slim view-only scoresheet for the next/current match (captain-style sets).
+  let gamesSeg = 'schedule';
+  function wireGamesSeg() {
+    $('v-schedule').querySelectorAll('.seg__b[data-g]').forEach(b => b.addEventListener('click', () => {
+      if (gamesSeg === b.dataset.g) return;
+      gamesSeg = b.dataset.g;
+      renderSchedule();
+    }));
+  }
   function renderScheduleInner() {
     const sch = DATA.schedule || [], me = DATA.profile;
     const upcoming = sch.filter(m => !m.final);
     const results = sch.filter(m => m.final).reverse();
     const next = upcoming[0];
-    let html = '';
+    let html = `<div class="seg">
+      <div class="seg__b ${gamesSeg === 'schedule' ? 'is-active' : ''}" data-g="schedule">Schedule</div>
+      <div class="seg__b ${gamesSeg === 'lineup' ? 'is-active' : ''}" data-g="lineup">Lineup</div>
+    </div>`;
+    if (gamesSeg === 'lineup') {
+      html += renderLineupSheet(next, me, true);
+      $('v-schedule').innerHTML = html;
+      wireGamesSeg();
+      return;
+    }
     if (next) {
       const homeName = next.home ? me.teamName : next.opponent.name;
       const homeEmoji = next.home ? me.teamEmoji : next.opponent.emoji;
@@ -929,7 +963,7 @@
       const serveBlock = next.home
         ? `<div class="next__serve"><b>Round 1:</b> You serve first · opponent chooses side</div>`
         : `<div class="next__serve"><b>Round 1:</b> Opponent serves first · you choose side</div>`;
-      // Detail lives in the lineup card below once locked; here just nudge if not set.
+      // Detail lives in the Lineup segment once locked; here just nudge if not set.
       const youBlock = next.myLocked
         ? ''
         : `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>`;
@@ -944,7 +978,6 @@
         ${serveBlock}
         ${youBlock}
       </div>`;
-      if (next.lineup) html += renderLineupCard(next, me);
     }
     if (upcoming.length > (next?1:0)) {
       html += '<div class="label">Upcoming</div>';
@@ -960,8 +993,9 @@
         catch (e) { console.warn('skipping malformed match', m && m.id, e); }
       });
     }
-    if (!sch.length) html = '<div class="muted">No matches scheduled yet. Your season schedule will show up here.</div>';
+    if (!sch.length) html += '<div class="muted">No matches scheduled yet. Your season schedule will show up here.</div>';
     $('v-schedule').innerHTML = html;
+    wireGamesSeg();
   }
   function matchCard(m, me, isResult) {
     const homeName = m.home ? me.teamName : m.opponent.name;
@@ -1045,6 +1079,56 @@
         ${round(2)}
         <div class="lu__foot"><span>🏓</span><span>You're in <b>${n} of 12 game${n === 1 ? '' : 's'}</b>.</span></div>
       </div>`;
+  }
+
+  // Slim view-only scoresheet for the Games tab's Lineup segment (and the Home
+  // "Full lineup" accordion). Mirrors the captain scoresheet's set brackets:
+  // 3 sets per round (G1+G2 / G3+G4 / G5+G6 play simultaneously on two courts),
+  // my pair left, opponent right. No lock pills or warnings — the opponent
+  // column simply shows a dashed placeholder until the matchup reveals.
+  function renderLineupSheet(next, me, withContext) {
+    if (!next) return '<div class="muted">No upcoming match — the lineup shows here once your next match is scheduled.</div>';
+    const ctx = withContext ? `<div class="label">Lineup <span class="sub">Week ${next.week} · vs ${esc(next.opponent.name)}</span></div>` : '';
+    const lu = next.lineup;
+    if (!lu || !lu.mine) {
+      return ctx + '<div class="muted">Lineup not set yet. Your captain sets it before the match.</div>';
+    }
+    const revealed = !!lu.opp;
+    const nameEl = (side, pos, isMe) =>
+      `<div class="pl${isMe ? ' you' : ''}">${side && side[pos] ? esc(side[pos]) : '—'}${isMe ? '<span class="g__mine-tag">YOU</span>' : ''}</div>`;
+    const phCell = `<div class="g__pair g__pair--right"><span class="lus__ph">reveals 15 min<br>before start</span></div>`;
+    const setBlock = (r, s) => {
+      const rows = [2 * s - 1, 2 * s].map(gi => {
+        const slot = `r${r}g${gi}`;
+        const t = lineupGameType(slot);
+        const mineSide = lu.mine[slot];
+        const mePos = lu.mySlots ? lu.mySlots[slot] : null;
+        const oppCol = revealed
+          ? `<div class="g__pair g__pair--right">${nameEl(lu.opp[slot], 'p1', false)}${nameEl(lu.opp[slot], 'p2', false)}</div>`
+          : phCell;
+        return `<div class="g${mePos ? ' is-mine' : ''}">
+          <div class="g__no">G${gi}<small class="${t.cls}">${t.label}</small></div>
+          <div class="g__pair">${nameEl(mineSide, 'p1', mePos === 'p1')}${nameEl(mineSide, 'p2', mePos === 'p2')}</div>
+          <div class="g__vs">vs</div>
+          ${oppCol}
+        </div>`;
+      }).join('');
+      return `<div class="lus__set">
+        <span class="lus__pill">Set ${s} · G${2 * s - 1} + G${2 * s}</span>
+        <span class="lus__snote">same time, two courts</span>
+        ${rows}
+      </div>`;
+    };
+    const roundBlock = (r) => {
+      const serve = next.home
+        ? (r === 1 ? '<b>You serve first</b> · opponent chooses side' : '<b>You choose side</b> · opponent serves first')
+        : (r === 1 ? '<b>Opponent serves first</b> · you choose side' : '<b>Opponent chooses side</b> · you serve first');
+      return `<div class="lus__rhead">Round ${r} — ${serve}</div>` + [1, 2, 3].map(s => setBlock(r, s)).join('');
+    };
+    const teams = `<div class="lus__teams"><span></span><span class="mine">${esc(me.teamName)}</span><span></span><span class="right">${esc(next.opponent.name)}</span></div>`;
+    const n = lu.mySlots ? Object.keys(lu.mySlots).length : 0;
+    return ctx + teams + roundBlock(1) + roundBlock(2) +
+      `<div class="lus__foot">You're in <b>${n} of 12 game${n === 1 ? '' : 's'}</b></div>`;
   }
 
   // ---- standings (Teams / Players segments — Players absorbs the old Leaders tab) ----
