@@ -160,7 +160,7 @@ export default async (req) => {
         ? new Date(t.scheduledAt).toLocaleString('en-US', { weekday: 'long', hour: 'numeric', minute: '2-digit' })
         : null;
       const msg = `Reminder: your Week ${week} lineup isn't locked yet.\n\n`
-        + `Lineups lock 3 hours before first serve${when ? ` (your match: ${when})` : ''} — after that the league locks it for you. `
+        + `Lineups lock 1 hour before first serve${when ? ` (your match: ${when})` : ''} — after that the league locks it for you. `
         + `Open the captain portal, set your lineup, and hit Lock.`;
       const r = await deliver({
         team, emails, adminEmail: admin.email, body: msg,

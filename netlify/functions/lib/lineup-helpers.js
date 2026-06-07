@@ -130,6 +130,10 @@ export function checkRosterDepth(roster) {
   return `Not enough players to fill a lineup. With a ${MAX_GAMES_PER_NIGHT}-game-per-player cap you need at least ${minWomen} women and ${minMen} men (with a gender set) — you have ${women} ${women === 1 ? 'woman' : 'women'} and ${men} ${men === 1 ? 'man' : 'men'}. Add ${gaps.join(' and ')} to your roster, then lock.`;
 }
 
+// Season-configurable defaults — keep in sync with UI copy in captain.html / me.html.
+export const DEFAULT_LOCK_OFFSET_MIN = 60;    // lineups hard-lock 1 hour before match start
+export const DEFAULT_REVEAL_OFFSET_MIN = 15;  // matchup reveals 15 minutes before match start
+
 /**
  * The instant a lineup hard-locks: match start − offset (in minutes).
  * Returns a ms timestamp, or null when the match has no scheduled time (in which
@@ -140,6 +144,25 @@ export function hardLockTime(scheduledAt, offsetMin) {
   const t = Date.parse(scheduledAt);
   if (Number.isNaN(t)) return null;
   return t - offsetMin * 60000;
+}
+
+/**
+ * The instant a matchup is allowed to reveal: match start − offset (in minutes).
+ * Same shape as hardLockTime. Null when the match has no scheduled time.
+ */
+export function revealTime(scheduledAt, offsetMin = DEFAULT_REVEAL_OFFSET_MIN) {
+  return hardLockTime(scheduledAt, offsetMin);
+}
+
+/**
+ * Time gate for the simultaneous reveal: true once we're within `offsetMin`
+ * minutes of match start. A match with no scheduled time has no gate (reveals
+ * as soon as both lineups lock). Both-locked is checked by callers — this is
+ * ONLY the clock half of `revealed = bothLocked && isRevealTime(...)`.
+ */
+export function isRevealTime(scheduledAt, offsetMin = DEFAULT_REVEAL_OFFSET_MIN) {
+  const t = revealTime(scheduledAt, offsetMin);
+  return t === null || Date.now() >= t;
 }
 
 /** Human-friendly offset, e.g. 180 → "3 hours", 30 → "30 minutes". */

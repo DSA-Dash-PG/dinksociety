@@ -6,6 +6,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
+import { isRevealTime } from './lib/lineup-helpers.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -48,7 +49,8 @@ export default async (req) => {
 
         const myLocked = !!myLineup?.lockedAt;
         const oppLocked = !!oppLineup?.lockedAt;
-        const revealed = myLocked && oppLocked;
+        // Simultaneous reveal: both locked AND within 15 min of match start.
+        const revealed = myLocked && oppLocked && isRevealTime(m.scheduledAt);
 
         myMatches.push({
           id: m.id,

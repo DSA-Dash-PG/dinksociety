@@ -6,6 +6,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
+import { isRevealTime } from './lib/lineup-helpers.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -122,7 +123,8 @@ export default async (req) => {
           opp?.id ? lineupStore.get(`lineup/${mt.id}/${opp.id}.json`, { type: 'json' }).catch(() => null) : null,
         ]);
         myLocked = !!mine?.lockedAt;
-        revealed = myLocked && !!oppLu?.lockedAt;
+        // Simultaneous reveal: both locked AND within 15 min of match start.
+        revealed = myLocked && !!oppLu?.lockedAt && isRevealTime(mt.scheduledAt);
         if (mine?.games) {
           for (const [slot, g] of Object.entries(mine.games)) {
             if (g && (g.p1 === playerId || g.p2 === playerId)) myGames.push(SLOT_LABEL[slot] || slot);

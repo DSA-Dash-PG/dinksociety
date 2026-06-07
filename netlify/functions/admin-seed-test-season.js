@@ -172,9 +172,13 @@ export default async (req) => {
       for (let idx = 0; idx < pairings.length; idx++) {
         const [home, away] = pairings[idx];
         const matchId = `m_${CIRCUIT}_${DIVISION.toLowerCase()}_w${week}_${idx + 1}`;
-        const scheduledAt = new Date(baseDate.getTime() + (w * 7 * 86400000)).toISOString();
+        let scheduledAt = new Date(baseDate.getTime() + (w * 7 * 86400000)).toISOString();
 
         const state = weekState(week);
+        // Reveal is time-gated (both locked AND within 15 min of start), so the
+        // seeded 'revealed' QA week must sit INSIDE that window — schedule it
+        // 10 minutes from now or the matchup would stay hidden.
+        if (state === 'revealed') scheduledAt = new Date(Date.now() + 10 * 60000).toISOString();
         const cp = courtPlan[w][idx];
         const match = {
           id: matchId,

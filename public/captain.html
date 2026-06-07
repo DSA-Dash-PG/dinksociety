@@ -1736,7 +1736,7 @@
         // If revealed, fetch and render the live scoresheet. Before reveal,
         // render a read-only pre-game preview from my lineup so the captain
         // can sanity-check the sheet exactly as it will look on game day —
-        // opponent pairs populate when lineups release 30 min before match.
+        // opponent pairs populate when lineups release 15 min before match.
         if (data.status.revealed) {
           await refreshScoresheet();
         } else {
@@ -1759,7 +1759,7 @@
 
     // Pre-game preview: build a synthetic scoresheet record from MY lineup only.
     // The opponent's lineup is never fetched pre-reveal (blind-lineup rule) —
-    // their pair cells render a "Reveals 30 min before match" placeholder and
+    // their pair cells render a "Reveals 15 min before match" placeholder and
     // all score entry is disabled. Renders nothing until at least one of my
     // pairs is saved, and never on finalized matches.
     function renderScoresheetPreview(lineupData) {
@@ -1837,13 +1837,19 @@
         pillEl.innerHTML = '<span class="match-pill match-pill--locked">Locked</span>';
         const canUnlock = !!data.status.unlockable;
         const cutoffNote = data.status.hardLockAt
-          ? `You can still unlock and make changes until <strong>${formatLockCutoff(data.status.hardLockAt)}</strong>, when the lineup hard-locks.`
-          : 'You can still unlock and make changes until the lineup hard-locks before match time.';
+          ? `Locking now doesn't trap you — you can unlock and make changes anytime until <strong>${formatLockCutoff(data.status.hardLockAt)}</strong> (1 hour before game time), when the lineup hard-locks.`
+          : 'Locking now doesn’t trap you — you can unlock and make changes anytime until the lineup hard-locks 1 hour before game time.';
+        const revealNote = data.status.revealAt
+          ? `Both lineups are locked. The full matchup reveals at <strong>${formatLockCutoff(data.status.revealAt)}</strong> (15 minutes before game time).`
+          : 'Both lineups are locked. The full matchup reveals 15 minutes before game time.';
+        const waitingMsg = data.status.oppLocked
+          ? revealNote
+          : `Your lineup is locked. Waiting on ${escapeHtml(m.opponent.name)} — both lineups reveal together 15 minutes before game time.`;
         revealEl.innerHTML = `
           <div class="locked-notice">
-            <span>Your lineup is locked. Waiting on ${escapeHtml(m.opponent.name)}. You'll see the full matchup as soon as they lock theirs.</span>
+            <span>${waitingMsg}</span>
             ${canUnlock ? `<div style="margin-top:12px; opacity:0.85;">${cutoffNote}</div>
-            <button class="cap-btn cap-btn--ghost" id="unlock-lineup-btn" style="margin-top:10px;">Unlock to edit</button>` : ''}
+            <button class="cap-btn cap-btn--gold" id="unlock-lineup-btn" style="margin-top:12px; font-size:16px; font-weight:700; padding:14px 28px; letter-spacing:0.04em; width:100%; max-width:420px;">🔓 UNLOCK ROSTER</button>` : ''}
           </div>
         `;
         lockBtn.style.display = 'none';
@@ -2112,7 +2118,7 @@
       // I can edit my own scores anytime pre-final (never in pre-game preview)
       const canEdit = !final && !data.preview;
       // Pre-reveal: opponent pairs stay hidden (blind lineup) — placeholder text instead
-      const oppPairPlaceholder = 'Reveals 30 min before match';
+      const oppPairPlaceholder = 'Reveals 15 min before match';
       const myRoleIsHome = myRole === 'home';
 
       // Courts: A hosts games 1,3,5 · B hosts games 2,4,6 (two games run at once).
@@ -2476,7 +2482,7 @@
 
     function renderScoresheetBanner(data) {
       if (data.preview) {
-        return `<div class="ss-banner"><strong>Pre-game preview.</strong> This is your scoresheet exactly as it will look on game day. Your opponent's pairs stay hidden until both lineups reveal 30 minutes before first serve — score entry unlocks then. Use this to check your pairs are in line and ready to go.</div>`;
+        return `<div class="ss-banner"><strong>Pre-game preview.</strong> This is your scoresheet exactly as it will look on game day. Your opponent's pairs stay hidden until both lineups reveal 15 minutes before first serve — score entry unlocks then. Use this to check your pairs are in line and ready to go.</div>`;
       }
       const c = data.score?.computed || {};
       const final = !!data.score?.finalizedAt;
@@ -2808,7 +2814,7 @@
     // ===== Save / Lock =====
     $id('save-draft-btn').addEventListener('click', () => saveLineup('save'));
     $id('lock-lineup-btn').addEventListener('click', () => {
-      if (!confirm('Lock this lineup? You cannot change it after locking. Your opponent\u2019s picks will be revealed as soon as they lock theirs.')) return;
+      if (!confirm('Lock this lineup? Don\u2019t worry \u2014 you can still UNLOCK and make changes anytime until 1 hour before game time (as long as your opponent hasn\u2019t locked yet). Both lineups reveal together 15 minutes before the game starts.')) return;
       saveLineup('lock');
     });
 
@@ -2859,7 +2865,7 @@
 
     // ===== Unlock (reopen a locked lineup before the hard-lock window) =====
     async function unlockLineup() {
-      if (!confirm('Unlock this lineup so you can edit it? It won’t count as locked again until you re-lock it.')) return;
+      if (!confirm('Unlock your roster so you can edit it? Just remember to re-lock it before the 1-hour cutoff.')) return;
       const status = $id('lineup-status');
       const ub = $id('unlock-lineup-btn');
       if (ub) ub.disabled = true;
@@ -3473,7 +3479,7 @@
         const gs = games[slot] || {};
         const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
         const usPair = mySide === 'home' ? formatPair(homeLineup[slot]) : formatPair(awayLineup[slot]);
-        const themPair = data.preview ? 'Reveals 30 min before match'
+        const themPair = data.preview ? 'Reveals 15 min before match'
           : (mySide === 'home' ? formatPair(awayLineup[slot]) : formatPair(homeLineup[slot]));
         const mineDone = Number.isInteger(gs.mine?.home) && Number.isInteger(gs.mine?.away);
         let pillTxt = { confirmed: 'Matched ✓', mismatch: "Doesn't match", partial: 'Incomplete', empty: 'Not played' }[status] || 'Not played';
@@ -3638,7 +3644,7 @@
       const area = $id('next-landing-area');
       if (!area) return;
       if (!editable.length) {
-        area.innerHTML = `<div class="cap-card"><div class="cap-card__header"><h2 class="cap-card__title">Set a lineup</h2></div><div class="empty-state">No matches need a lineup right now. They'll show up here once the next match opens for lineups (locks 3 hours before match time).</div></div>`;
+        area.innerHTML = `<div class="cap-card"><div class="cap-card__header"><h2 class="cap-card__title">Set a lineup</h2></div><div class="empty-state">No matches need a lineup right now. They'll show up here once the next match opens for lineups (locks 1 hour before match time).</div></div>`;
         return;
       }
       const row = (m) => {

@@ -33,6 +33,7 @@ import {
   normalizeScore, entryComplete, isValidGame,
 } from './lib/score-helpers.js';
 import { logActivity } from './lib/activity-log.js';
+import { isRevealTime } from './lib/lineup-helpers.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -63,7 +64,9 @@ export default async (req) => {
     lineupStore.get(`lineup/${matchId}/${match.teamA.id}.json`, { type: 'json' }).catch(() => null),
     lineupStore.get(`lineup/${matchId}/${match.teamB.id}.json`, { type: 'json' }).catch(() => null),
   ]);
-  const revealed = !!lineupHome?.lockedAt && !!lineupAway?.lockedAt;
+  // Scoring opens at reveal: both lineups locked AND within 15 min of match start.
+  const revealed = !!lineupHome?.lockedAt && !!lineupAway?.lockedAt
+    && isRevealTime(match.scheduledAt, Number(seasonData?.lineupRevealOffsetMin) || undefined);
 
   // ===== GET =====
   if (req.method === 'GET') {

@@ -17,7 +17,8 @@ import { circuitCode } from './lib/circuit.js';
 import {
   SLOT_RULES, SLOT_KEYS,
   checkDuplicateCombos, checkBackToBackCombos, checkSimultaneousPairs, checkSlotGender, checkRosterDepth,
-  hardLockTime, formatOffset, prettySlot, sanitizeRevealedLineup,
+  hardLockTime, revealTime, isRevealTime, formatOffset, prettySlot, sanitizeRevealedLineup,
+  DEFAULT_LOCK_OFFSET_MIN, DEFAULT_REVEAL_OFFSET_MIN,
 } from './lib/lineup-helpers.js';
 import { logActivity } from './lib/activity-log.js';
 
@@ -39,9 +40,12 @@ export default async (req) => {
   const WEEKS = seasonData?.weeks || 8;
   const ROUNDS_PER_MATCH = seasonData?.roundsPerMatch || 2;
   const GAMES_PER_ROUND = seasonData?.gamesPerRound || 6;
-  // Lineups hard-lock this many minutes before match start. Season-configurable
-  // (default 3 hours) — keep in sync with the reveal offset rules in [[lineup-system]].
-  const LINEUP_LOCK_OFFSET_MIN = Number(seasonData?.lineupLockOffsetMin) || 180;
+  // Lineups hard-lock this many minutes before match start (default 1 hour), and
+  // the matchup reveals this many minutes before start (default 15) — BOTH locked
+  // AND inside the reveal window. Season-configurable; keep in sync with
+  // [[lineup-system]] and the copy in captain.html / me.html.
+  const LINEUP_LOCK_OFFSET_MIN = Number(seasonData?.lineupLockOffsetMin) || DEFAULT_LOCK_OFFSET_MIN;
+  const LINEUP_REVEAL_OFFSET_MIN = Number(seasonData?.lineupRevealOffsetMin) || DEFAULT_REVEAL_OFFSET_MIN;
 
   // Verify this captain is actually in this match
   const match = await findMatch(scheduleStore, matchId, ctx.team, WEEKS);
@@ -61,12 +65,16 @@ export default async (req) => {
 
     const myLocked = !!mine?.lockedAt;
     const oppLocked = !!opp?.lockedAt;
-    const revealed = myLocked && oppLocked;
+    // Simultaneous reveal: both locked AND we're inside the reveal window
+    // (15 min before start by default). Locking early no longer reveals early.
+    const revealed = myLocked && oppLocked && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
 
     // A locked lineup can be reopened by the captain only while it's still before
-    // the hard-lock window AND the opponent hasn't locked (i.e. nothing revealed).
+    // the hard-lock window AND the opponent hasn't locked (once both have locked
+    // the matchup is set — changing it needs an admin).
     const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
-    const unlockable = myLocked && !revealed && (cutoff === null || Date.now() < cutoff);
+    const unlockable = myLocked && !oppLocked && (cutoff === null || Date.now() < cutoff);
+    const revealAt = revealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
 
     return json({
       matchId,
@@ -80,7 +88,11 @@ export default async (req) => {
       scheduledAt: match.scheduledAt || null,
       myLineup: mine || null,
       oppLineup: revealed ? sanitizeRevealedLineup(opp) : null,
-      status: { myLocked, oppLocked, revealed, unlockable, hardLockAt: cutoff ? new Date(cutoff).toISOString() : null },
+      status: {
+        myLocked, oppLocked, revealed, unlockable,
+        hardLockAt: cutoff ? new Date(cutoff).toISOString() : null,
+        revealAt: revealAt ? new Date(revealAt).toISOString() : null,
+      },
     });
   }
 
@@ -106,7 +118,7 @@ export default async (req) => {
       }
       const opp = await lineupStore.get(oppKey, { type: 'json' }).catch(() => null);
       if (opp?.lockedAt) {
-        return json({ error: 'Both lineups are locked and the matchup is revealed — it can no longer be unlocked. Ask a league admin if you need a change.' }, 409);
+        return json({ error: 'Both lineups are now locked, so the matchup is set and can no longer be unlocked. Ask a league admin if you need a change.' }, 409);
       }
       const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
       if (cutoff !== null && Date.now() >= cutoff) {
@@ -263,9 +275,10 @@ export default async (req) => {
       });
     }
 
-    // Re-check reveal status after save
+    // Re-check reveal status after save (both locked AND inside the reveal window)
     const opp = await lineupStore.get(oppKey, { type: 'json' }).catch(() => null);
-    const revealed = !!record.lockedAt && !!opp?.lockedAt;
+    const revealed = !!record.lockedAt && !!opp?.lockedAt
+      && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
 
     return json({
       ok: true,
