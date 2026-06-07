@@ -53,6 +53,13 @@
   .me-team-switch:focus { outline:none; text-decoration:underline; }
   .me-team-switch option { direction:ltr; color:var(--color-text); background:var(--color-bg); }
   .appbar__av { width:34px; height:34px; border-radius:50%; background:var(--color-lime-dim); border:1px solid rgba(184,255,44,0.3); display:grid; place-items:center; font-size:13px; font-weight:800; color:var(--color-lime); cursor:pointer; }
+  /* Role toggle — mirrors .cap-role-seg in captain.html; shown only for team leaders */
+  .role-seg { display:none; background:var(--color-surface-3); border:1px solid var(--color-border); border-radius:9999px; padding:3px; gap:2px; }
+  .role-seg.show { display:flex; }
+  .role-seg__opt { font-family:inherit; font-size:10px; font-weight:800; border:none; cursor:pointer; background:transparent; color:var(--color-text-faint); border-radius:9999px; padding:5px 11px; white-space:nowrap; transition:color 160ms; }
+  .role-seg__opt:hover { color:var(--color-text-muted); }
+  .role-seg__opt.is-on { background:var(--color-lime); color:var(--color-text-inverse); }
+  .role-seg__opt.is-on:hover { color:var(--color-text-inverse); }
 
   .screen { padding:16px 16px calc(86px + env(safe-area-inset-bottom)); }
   .view { display:none; }
@@ -313,6 +320,10 @@
     <div class="appbar">
       <div><div class="appbar__brand">Dink Society</div><div class="appbar__title">Player</div></div>
       <div class="appbar__me">
+        <div class="role-seg" id="role-seg" role="group" aria-label="Switch view">
+          <button class="role-seg__opt" onclick="openCaptainTools(this)"><span>Captain</span></button>
+          <button class="role-seg__opt is-on" aria-current="true">Player</button>
+        </div>
         <div style="text-align:right"><div class="appbar__name" id="me-name">—</div><div class="appbar__team" id="me-team">—</div></div>
         <button class="appbar__chat" id="appbar-chat" aria-label="Team chat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -407,6 +418,8 @@
     const isLeader = !!(p.isCaptain || p.isCoCaptain);
     const capBtn = $('nb-captain');
     if (capBtn) capBtn.style.display = isLeader ? '' : 'none';
+    const roleSeg = $('role-seg');
+    if (roleSeg) roleSeg.classList.toggle('show', isLeader);
     const titleEl = document.querySelector('.appbar__title');
     if (titleEl) titleEl.textContent = p.isCaptain ? 'Captain' : p.isCoCaptain ? 'Co-Captain' : 'Player';
     renderHome(); renderSchedule(); renderStandings(); renderStats(); renderTeam();
