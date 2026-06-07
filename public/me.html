@@ -801,7 +801,7 @@
       const awayName = next.home ? next.opponent.name : me.teamName;
       const awayEmoji = next.home ? next.opponent.emoji : me.teamEmoji;
       const whenDate = next.scheduledAt ? new Date(next.scheduledAt).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }) : null;
-      const startT = next.startTime || MATCH_START_TIME;
+      const startT = matchStartLabel(next);
       const cd = fmtCountdown(next.scheduledAt);
       const eyebrow = next.status === 'live' ? 'Live now' : isMatchDay ? 'Match night' : 'Next match';
       const cdTxt = next.status === 'live' ? '' : cd ? ' · starts in ' + cd : '';
@@ -977,7 +977,11 @@
   }
 
   // ---- schedule ----
-  const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
+  const MATCH_START_TIME = '7:00 PM';   // fallback only — scheduledAt is the source of truth
+  const matchStartLabel = m => {
+    if (m && m.scheduledAt) { const d = new Date(m.scheduledAt); if (!isNaN(d)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+    return (m && m.startTime) || MATCH_START_TIME;
+  };
   // Error boundary: a single malformed match must never blank the whole view.
   function renderSchedule() {
     try {
@@ -1018,7 +1022,7 @@
       const awayName = next.home ? next.opponent.name : me.teamName;
       const awayEmoji = next.home ? next.opponent.emoji : me.teamEmoji;
       const whenDate = next.scheduledAt ? new Date(next.scheduledAt).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }) : null;
-      const startT = next.startTime || MATCH_START_TIME;
+      const startT = matchStartLabel(next);
       const when = whenDate ? `${whenDate} · ${startT}` : `${startT} · date TBD`;
       // Round 1 serving rule, personalized (home serves first, away chooses side)
       const serveBlock = next.home
@@ -1076,7 +1080,7 @@
       const serveLine = m.home
         ? `<div class="m__serve"><b>R1:</b> you serve · opponent picks side</div>`
         : `<div class="m__serve"><b>R1:</b> opponent serves · you pick side</div>`;
-      foot = `<div class="m__foot">${esc([m.court, dt, (m.startTime || MATCH_START_TIME)].filter(Boolean).join(' · '))}${serveLine}</div>`;
+      foot = `<div class="m__foot">${esc([m.court, dt, matchStartLabel(m)].filter(Boolean).join(' · '))}${serveLine}</div>`;
     }
     return `<div class="m"><div class="m__top"><span class="m__wk">WEEK ${m.week}</span>${pill}</div>
       <div class="m__body">

@@ -1540,7 +1540,7 @@
           ${upcoming.map(m => `
             <div class="cap-hero__sched-row">
               <div class="cap-hero__week-num">W${m.week}</div>
-              <div>vs ${escapeHtml(m.opponent.name)} <span class="cap-hero__sched-detail">${m.court ? '· ' + escapeHtml(m.court) : ''} ${m.scheduledAt ? '· ' + formatDateShort(m.scheduledAt) : ''} · ${m.startTime || MATCH_START_TIME}</span></div>
+              <div>vs ${escapeHtml(m.opponent.name)} <span class="cap-hero__sched-detail">${m.court ? '· ' + escapeHtml(m.court) : ''} ${m.scheduledAt ? '· ' + formatDateShort(m.scheduledAt) : ''} · ${matchStartLabel(m)}</span></div>
               <div class="cap-hero__sched-status">Locked when ready</div>
             </div>
           `).join('')}
@@ -1628,7 +1628,11 @@
       if (isNaN(d)) return '';
       return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     }
-    const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
+    const MATCH_START_TIME = '7:00 PM';   // fallback only — scheduledAt is the source of truth
+    const matchStartLabel = m => {
+      if (m && m.scheduledAt) { const d = new Date(m.scheduledAt); if (!isNaN(d)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
+      return (m && m.startTime) || MATCH_START_TIME;
+    };
 
     // ===== Match detail / lineup builder =====
     async function openMatch(matchId, opts) {
@@ -2445,7 +2449,7 @@
 
       const meta = [
         next.scheduledAt ? formatDateShort(next.scheduledAt) : null,
-        next.startTime || MATCH_START_TIME,
+        matchStartLabel(next),
         next.court,
       ].filter(Boolean).join(' · ');
 

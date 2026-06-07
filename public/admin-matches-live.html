@@ -180,8 +180,11 @@
   function renderCard(m) {
     const statePill = STATE_PILL[m.state] || 'pending';
     const stateLabel = STATE_LABELS[m.state] || m.state;
-    const MATCH_START_TIME = '7:00 PM';   // single start time for all matches
-    const courtLabel = (m.court ? `Courts ${m.court}` : 'Court TBD') + ` · ${m.startTime || MATCH_START_TIME}`;
+    const MATCH_START_TIME = '7:00 PM';   // fallback only — scheduledAt is the source of truth
+    const startLabel = (m.scheduledAt && !isNaN(new Date(m.scheduledAt)))
+      ? new Date(m.scheduledAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : (m.startTime || MATCH_START_TIME);
+    const courtLabel = (m.court ? `Courts ${m.court}` : 'Court TBD') + ` · ${startLabel}`;
 
     const r1Pairs = (m.score.pairStatuses || []).filter(p => p.round === 1);
     const r2Pairs = (m.score.pairStatuses || []).filter(p => p.round === 2);
