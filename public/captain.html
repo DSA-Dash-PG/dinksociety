@@ -916,6 +916,7 @@
       scoreDirty: false, // true while the captain has unsaved score entry
       scoreDraft: {},    // typed-but-unsaved score values, keyed "slot|side" — re-applied after any re-render so typing is never lost
       pendingScoreRender: false, // a post-save re-render was deferred because the captain was mid-typing
+      lastScoreSaveAt: 0, // ms timestamp of the last successful score PUT — shields against stale GET re-reads (blob store is eventually consistent)
     };
 
     const $id = (id) => document.getElementById(id);
@@ -1738,7 +1739,10 @@
         // can sanity-check the sheet exactly as it will look on game day —
         // opponent pairs populate when lineups release 15 min before match.
         if (data.status.revealed) {
-          await refreshScoresheet();
+          // Poll guard: never re-fetch/re-render the scoresheet over unsaved
+          // edits — defer to the captain's next blur instead.
+          if (!state.scoreDirty) await refreshScoresheet();
+          else state.pendingScoreRender = true;
         } else {
           renderScoresheetPreview(data);
         }
@@ -1795,6 +1799,18 @@
       if (!state.currentMatch) return;
       // Don't let background polling wipe scores the captain is still typing.
       if (state.scoreDirty && !force) return;
+      // Don't yank the DOM out from under a focused score box (kills focus +
+      // any keystroke that hasn't fired an input event yet). Defer instead.
+      if (!force && document.activeElement?.classList?.contains('ss-score-input')) {
+        state.pendingScoreRender = true;
+        return;
+      }
+      // Eventual-consistency shield: a GET fired right after our own PUT can
+      // return the PRE-save record (the blob store lags), and rendering that
+      // would visibly "lose" just-saved scores — the draft overlay can't help
+      // because drafts are pruned on successful save. The PUT response already
+      // rendered fresh state, so skipping this cycle costs nothing.
+      if (!force && Date.now() - (state.lastScoreSaveAt || 0) < 10000) return;
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, {
           credentials: 'include',
@@ -2096,9 +2112,13 @@
         area.innerHTML = '';
         return;
       }
-      // Rendering fresh server state — clears the unsaved-edit guard.
-      state.scoreDirty = false;
-      state.pendingScoreRender = false;
+      // NOTE: scoreDirty / pendingScoreRender are deliberately NOT reset here.
+      // A render doesn't mean the captain's edits are saved — resetting the
+      // dirty flag on every render let the next poll cycle wipe typed inputs.
+      // scoreDirty is owned by the input handlers (set), saveAllScoresInner
+      // (cleared after a successful PUT), and applyScoreDraft (re-set when
+      // unsaved drafts survive a re-render). pendingScoreRender is cleared by
+      // maybeRenderPendingScore right before it triggers the deferred render.
 
       // Phones get the set-based scoresheet (typed inputs + match math). Desktop keeps the table.
       if (typeof isMobileCap === 'function' && isMobileCap()) { renderScoresheetMobile(data); applyScoreDraft(); return; }
@@ -2668,6 +2688,7 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
+        state.lastScoreSaveAt = Date.now(); // arm the stale-GET shield in refreshScoresheet
 
         // Mark what we sent as the new baseline + prune matching drafts.
         sent.forEach(inp => {
