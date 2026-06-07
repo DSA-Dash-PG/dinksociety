@@ -166,6 +166,32 @@
     .mr__t--r { text-align: right; }
     .mr__vs { font-size: 9px; letter-spacing: 0.2em; color: var(--color-text-faint); text-align: center; font-weight: 700; }
     .mr__m { font-size: 10px; color: var(--color-text-faint); text-align: right; }
+    /* Match scheduler popover — ONE control owns day/time/venue/courts */
+    .schedpill { display:inline-flex; align-items:center; gap:7px; background:rgba(23,215,176,0.07); border:1px solid rgba(23,215,176,0.35); border-radius:999px; padding:6px 14px; font-size:12px; color:var(--color-text); cursor:pointer; font-family:inherit; }
+    .schedpill:hover { border-color: var(--color-teal); }
+    .schedpill--empty { border-style:dashed; border-color:rgba(232,181,66,0.5); background:rgba(232,181,66,0.06); color:#e8b542; }
+    .spop { position:absolute; z-index:300; background:var(--color-surface); border:1px solid var(--color-border-strong, rgba(255,255,255,0.18)); border-radius:14px; padding:16px; width:min(560px, calc(100vw - 32px)); box-shadow:0 12px 40px rgba(0,0,0,0.55); }
+    .spop__cols { display:flex; gap:16px; flex-wrap:wrap; }
+    .spop__cal { background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:10px; padding:10px; width:216px; flex-shrink:0; }
+    .spop__calhead { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+    .spop__calhead button { background:none; border:none; color:var(--color-text-faint); cursor:pointer; font-size:15px; padding:2px 8px; font-family:inherit; }
+    .spop__calhead span { font-size:11px; font-weight:700; }
+    .spop__grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; font-size:10px; text-align:center; }
+    .spop__dow { color:var(--color-text-faint); padding:2px 0; }
+    .spop__dow.lg { color:var(--color-lime, #b8ff2c); font-weight:700; }
+    .spop__day { padding:4px 0; color:var(--color-text-muted); border-radius:6px; cursor:pointer; border:1px solid transparent; }
+    .spop__day:hover { background:var(--color-surface-3); }
+    .spop__day.is-lg { border-color:rgba(23,215,176,0.4); color:var(--color-teal); font-weight:700; }
+    .spop__day.is-sel { background:var(--color-lime, #b8ff2c); color:#0e0e0e; font-weight:700; border-color:transparent; }
+    .spop__lbl { font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:0 0 7px; }
+    .spop__chips { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:13px; }
+    .spop__chip { border:1px solid var(--color-border-strong, rgba(255,255,255,0.18)); border-radius:999px; padding:5px 12px; font-size:12px; color:var(--color-text-muted); cursor:pointer; background:none; font-family:inherit; }
+    .spop__chip.is-on { background:var(--color-lime, #b8ff2c); color:#0e0e0e; border-color:transparent; font-weight:700; }
+    .spop__chip--venue.is-on { background:rgba(23,215,176,0.12); color:var(--color-teal); border-color:var(--color-teal); }
+    .spop__note { font-size:9px; color:var(--color-text-faint); margin-top:6px; }
+    .spop__prev { background:rgba(23,215,176,0.07); border:1px solid rgba(23,215,176,0.35); border-radius:8px; padding:8px 12px; font-size:11px; color:var(--color-teal); flex:1; min-width:200px; }
+    .spop__foot { display:flex; align-items:center; gap:10px; margin-top:14px; flex-wrap:wrap; }
+    .spop__ct { width:52px; padding:5px 6px; text-align:center; background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:8px; color:var(--color-text); font-family:inherit; font-size:12px; }
 
     /* ── Activity ─────────────────────────────────────────────── */
     .ai { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--color-border); font-size: 12px; align-items: flex-start; }
@@ -3299,11 +3325,13 @@
       const home = teams.find(t => t.id === homeId), away = teams.find(t => t.id === awayId);
       const ca = ($id('am-ca').value || '').trim(), cb = ($id('am-cb').value || '').trim();
       const dt = $id('am-dt').value ? new Date($id('am-dt').value).toISOString() : null;
+      // startTime is derived from scheduledAt — single source of truth.
+      const st = dt ? new Date(dt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null;
       btn.disabled = true; if (stat) { stat.textContent = 'Adding…'; stat.style.color = 'var(--color-text-faint)'; }
       try {
         await apiJSON('/.netlify/functions/admin-matches?circuit=I', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ division: div, week, teamA: { id: home.id, name: home.name }, teamB: { id: away.id, name: away.name }, courtA: ca || null, courtB: cb || null, scheduledAt: dt }),
+          body: JSON.stringify({ division: div, week, teamA: { id: home.id, name: home.name }, teamB: { id: away.id, name: away.name }, courtA: ca || null, courtB: cb || null, scheduledAt: dt, startTime: st }),
         });
         renderSched();
       } catch (e) { setErr(e.message); btn.disabled = false; }
@@ -3348,56 +3376,45 @@
     const wk = weeks.find(w => w.week === n);
     const card = $id('wk-card');
     if (!wk?.matches?.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
-    const inStyle = 'width:46px;padding:3px 6px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-family:inherit;font-size:12px;';
     card.innerHTML = '<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ' + n + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
       wk.matches.map(m => {
-        const dt = m.scheduledAt ? fdt(m.scheduledAt) : '—';
         const fin = m.finalizedAt;
-        const ca = m.courtA != null ? m.courtA : '';
-        const cb = m.courtB != null ? m.courtB : '';
-        const effTime = m.startTime || '7:00 PM';
-        return '<div class="mr"><div class="mr__t">' + h(m.teamA.name) + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(m.teamB.name) + '</div><div class="mr__m">' + h(m.court || '') + ' · ' + h(effTime) + (m.startTime ? '' : ' <span style="opacity:0.5">(default)</span>') + (fin ? ' · <span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '') + '<br><span style="font-size:9px">' + dt + '</span></div></div>' +
-          '<div style="display:flex;align-items:center;gap:6px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);flex-wrap:wrap;">' +
-            '<span>Courts (A: games 1·3·5, B: games 2·4·6):</span>' +
-            '<input type="number" min="1" max="20" value="' + h(String(ca)) + '" id="ct-A-' + h(m.id) + '" style="' + inStyle + '">' +
-            '<span>&amp;</span>' +
-            '<input type="number" min="1" max="20" value="' + h(String(cb)) + '" id="ct-B-' + h(m.id) + '" style="' + inStyle + '">' +
-            '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;">Date/time <input type="datetime-local" id="dt-' + h(m.id) + '" value="' + h(toLocalInput(m.scheduledAt)) + '" style="padding:3px 6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-family:inherit;font-size:12px;"></label>' +
-            '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;">Start time <input type="text" id="st-' + h(m.id) + '" value="' + h(m.startTime || '') + '" placeholder="7:00 PM" style="width:84px;padding:3px 6px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-family:inherit;font-size:12px;"></label>' +
-            '<label style="margin-left:10px;display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="champ-' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
-            '<button class="ab ab--outline ab--sm court-save" data-mid="' + h(m.id) + '">Save</button>' +
+        return '<div class="mr"><div class="mr__t">' + h(m.teamA.name) + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(m.teamB.name) + '</div><div class="mr__m">' + (fin ? '<span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '&nbsp;') + '</div></div>' +
+          '<div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);flex-wrap:wrap;">' +
+            '<button class="schedpill' + (m.scheduledAt ? '' : ' schedpill--empty') + ' sched-edit" data-mid="' + h(m.id) + '" id="sp-' + h(m.id) + '">' + schedPillLabel(m) + '</button>' +
+            '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="champ-tgl" data-mid="' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
             '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups (both)</button>' +
             '<button class="ab ab--outline ab--sm match-del" data-mid="' + h(m.id) + '" style="border-color:rgba(239,68,68,0.5);color:#ef4444;">Delete match</button>' +
             '<span id="cst-' + h(m.id) + '" style="margin-left:4px;"></span>' +
           '</div>';
       }).join('') + '</div>';
 
-    card.querySelectorAll('.court-save').forEach(btn => {
-      btn.addEventListener('click', async () => {
-        const mid = btn.dataset.mid;
-        const a = ($id('ct-A-' + mid).value || '').trim();
-        const b = ($id('ct-B-' + mid).value || '').trim();
+    // Scheduler pill → popover (one control owns day/time/venue/courts)
+    card.querySelectorAll('.sched-edit').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const m = wk.matches.find(x => x.id === btn.dataset.mid);
+        if (m) openSchedPop(btn, m, wk, weeks);
+      });
+    });
+
+    // Championship saves on toggle — no separate Save button anymore
+    card.querySelectorAll('.champ-tgl').forEach(cb => {
+      cb.addEventListener('change', async () => {
+        const mid = cb.dataset.mid;
         const stat = $id('cst-' + mid);
-        // Courts are optional (so you can set just a date), but if you fill one you must fill both.
-        if ((a && !b) || (!a && b)) { if (stat) { stat.textContent = 'Enter both courts, or leave both blank'; stat.style.color = 'var(--color-red,#ef4444)'; } return; }
-        btn.disabled = true; if (stat) { stat.textContent = 'Saving…'; stat.style.color = 'var(--color-text-faint)'; }
+        cb.disabled = true; if (stat) { stat.textContent = 'Saving…'; stat.style.color = 'var(--color-text-faint)'; }
         try {
-          const champ = !!($id('champ-' + mid) && $id('champ-' + mid).checked);
-          const stEl = $id('st-' + mid);
-          const st = stEl ? (stEl.value || '').trim() : '';
-          const dtEl = $id('dt-' + mid);
-          const dtVal = dtEl ? (dtEl.value || '').trim() : '';
-          const scheduledAt = dtVal ? new Date(dtVal).toISOString() : null;
-          const payload = { championship: champ, startTime: st || null, scheduledAt: scheduledAt };
-          if (a && b) { payload.courtA = a; payload.courtB = b; payload.court = 'Courts ' + a + ' & ' + b; }
           await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(mid), {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
+            body: JSON.stringify({ championship: cb.checked }),
           });
+          const m = wk.matches.find(x => x.id === mid);
+          if (m) m.championship = cb.checked;
           if (stat) { stat.textContent = 'Saved ✓'; stat.style.color = 'var(--color-teal)'; }
         } catch (e) {
+          cb.checked = !cb.checked;
           if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
-        } finally { btn.disabled = false; }
+        } finally { cb.disabled = false; }
       });
     });
 
@@ -3432,6 +3449,232 @@
         } finally { btn.disabled = false; }
       });
     });
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // Match scheduler popover — SINGLE SOURCE OF TRUTH for day, time,
+  // venue, and courts. Writes scheduledAt (drives lock/reveal timers)
+  // and DERIVES startTime from it (display-only downstream). The old
+  // separate Start-time text box is gone — it could disagree with
+  // scheduledAt, which is exactly the conflict this replaces.
+  // ════════════════════════════════════════════════════════════
+  const SP_TIMES = ['6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
+  let sp = null; // open-popover state
+
+  function schedPillLabel(m) {
+    if (!m.scheduledAt) return 'Set date & time';
+    const d = new Date(m.scheduledAt);
+    if (isNaN(d)) return 'Set date & time';
+    const ds = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const ts = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const loc = [m.venue, m.court].filter(Boolean).join(' · ');
+    return h(ds + ' · ' + ts + (loc ? ' · ' + loc : '')) + ' <span style="opacity:0.6">✎</span>';
+  }
+
+  function parseTime12(s) {
+    const m = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(String(s || '').trim());
+    if (!m) return null;
+    let hh = parseInt(m[1], 10) % 12;
+    if (/pm/i.test(m[3])) hh += 12;
+    return { h: hh, m: parseInt(m[2], 10) };
+  }
+  const fmtTime12 = d => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+
+  // League night = most common weekday among this division's scheduled
+  // matches (future-proof for leagues on other nights). Default: Monday.
+  function spLeagueDow(weeks) {
+    const counts = {};
+    for (const w of weeks) for (const m of (w.matches || [])) {
+      if (!m.scheduledAt) continue;
+      const d = new Date(m.scheduledAt);
+      if (isNaN(d)) continue;
+      counts[d.getDay()] = (counts[d.getDay()] || 0) + 1;
+    }
+    let best = 1, max = 0;
+    for (const [dw, c] of Object.entries(counts)) if (c > max) { max = c; best = parseInt(dw, 10); }
+    return best;
+  }
+
+  function spVenueList(weeks) {
+    const set = new Set();
+    for (const w of weeks) for (const m of (w.matches || [])) if (m.venue) set.add(m.venue);
+    return [...set];
+  }
+
+  function spClose() {
+    if (sp?.el) sp.el.remove();
+    document.removeEventListener('mousedown', spOutside, true);
+    sp = null;
+  }
+  function spOutside(e) {
+    if (sp && !sp.el.contains(e.target) && !e.target.closest('.sched-edit')) spClose();
+  }
+
+  function openSchedPop(anchor, m, weekObj, weeks) {
+    spClose();
+    const d = m.scheduledAt ? new Date(m.scheduledAt) : null;
+    const valid = d && !isNaN(d);
+    const today = new Date();
+    sp = {
+      match: m, weekObj, weeks,
+      date: valid ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null,
+      time: valid ? fmtTime12(d) : '7:00 PM',
+      venue: m.venue || null,
+      courtA: m.courtA != null ? String(m.courtA) : '',
+      courtB: m.courtB != null ? String(m.courtB) : '',
+      cursor: valid ? new Date(d.getFullYear(), d.getMonth(), 1) : new Date(today.getFullYear(), today.getMonth(), 1),
+      dow: spLeagueDow(weeks),
+    };
+    const el = document.createElement('div');
+    el.className = 'spop';
+    sp.el = el;
+    document.body.appendChild(el);
+    spRender();
+    const r = anchor.getBoundingClientRect();
+    const left = r.left + window.scrollX;
+    const maxLeft = window.scrollX + document.documentElement.clientWidth - el.offsetWidth - 16;
+    el.style.left = Math.max(8, Math.min(left, maxLeft)) + 'px';
+    el.style.top = (r.bottom + window.scrollY + 8) + 'px';
+    setTimeout(() => document.addEventListener('mousedown', spOutside, true), 0);
+  }
+
+  function spISO() {
+    if (!sp?.date) return null;
+    const t = parseTime12(sp.time) || { h: 19, m: 0 };
+    return new Date(sp.date.getFullYear(), sp.date.getMonth(), sp.date.getDate(), t.h, t.m).toISOString();
+  }
+
+  function spRender() {
+    const cur = sp.cursor;
+    const monthName = cur.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const firstDow = new Date(cur.getFullYear(), cur.getMonth(), 1).getDay();
+    const daysIn = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+    const dows = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+    let grid = dows.map((dd, i) => '<span class="spop__dow' + (i === sp.dow ? ' lg' : '') + '">' + dd + '</span>').join('');
+    for (let i = 0; i < firstDow; i++) grid += '<span></span>';
+    for (let day = 1; day <= daysIn; day++) {
+      const dt = new Date(cur.getFullYear(), cur.getMonth(), day);
+      const isSel = sp.date && dt.getTime() === sp.date.getTime();
+      const isLg = dt.getDay() === sp.dow;
+      grid += '<span class="spop__day' + (isSel ? ' is-sel' : isLg ? ' is-lg' : '') + '" data-day="' + day + '">' + day + '</span>';
+    }
+
+    const times = SP_TIMES.includes(sp.time) ? SP_TIMES.slice() : SP_TIMES.concat([sp.time]);
+    const timeChips = times.map(t =>
+      '<button class="spop__chip' + (t === sp.time ? ' is-on' : '') + '" data-time="' + h(t) + '">' + h(t) + '</button>'
+    ).join('') + '<button class="spop__chip" data-time-custom>Custom…</button>';
+
+    const venues = spVenueList(sp.weeks);
+    if (sp.venue && !venues.includes(sp.venue)) venues.push(sp.venue);
+    const venueChips = venues.map(v =>
+      '<button class="spop__chip spop__chip--venue' + (v === sp.venue ? ' is-on' : '') + '" data-venue="' + h(v) + '">' + h(v) + '</button>'
+    ).join('') + '<button class="spop__chip" data-venue-add>+ Add venue</button>';
+
+    let prev = 'Pick a date — lineups lock 1 hour before, reveal 15 min before.';
+    const iso = spISO();
+    if (iso) {
+      const t = new Date(iso).getTime();
+      prev = 'Lineups lock <b>' + h(fdt(new Date(t - 60 * 60000).toISOString())) + '</b> · reveal <b>' + h(fdt(new Date(t - 15 * 60000).toISOString())) + '</b>';
+    }
+
+    sp.el.innerHTML =
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
+        '<span style="font-size:12px;font-weight:700;">' + h(sp.match.teamA.name) + ' vs ' + h(sp.match.teamB.name) + '</span>' +
+        '<button id="spop-x" style="background:none;border:none;color:var(--color-text-faint);cursor:pointer;font-size:16px;font-family:inherit;">✕</button>' +
+      '</div>' +
+      '<div class="spop__cols">' +
+        '<div class="spop__cal">' +
+          '<div class="spop__calhead"><button id="spop-prev">‹</button><span>' + h(monthName) + '</span><button id="spop-next">›</button></div>' +
+          '<div class="spop__grid">' + grid + '</div>' +
+          '<div class="spop__note">League nights outlined</div>' +
+        '</div>' +
+        '<div style="flex:1;min-width:230px;">' +
+          '<div class="spop__lbl">Start time</div><div class="spop__chips">' + timeChips + '</div>' +
+          '<div class="spop__lbl">Venue</div><div class="spop__chips">' + venueChips + '</div>' +
+          '<div class="spop__lbl">Courts <span style="letter-spacing:0;font-weight:400;text-transform:none;">(A: games 1·3·5 / B: 2·4·6)</span></div>' +
+          '<div style="display:flex;gap:6px;align-items:center;">' +
+            '<input type="number" min="1" max="20" class="spop__ct" id="spop-ca" value="' + h(sp.courtA) + '">' +
+            '<span style="font-size:11px;color:var(--color-text-faint);">&amp;</span>' +
+            '<input type="number" min="1" max="20" class="spop__ct" id="spop-cb" value="' + h(sp.courtB) + '">' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="spop__foot">' +
+        '<div class="spop__prev">' + prev + '</div>' +
+        '<button class="ab ab--lime ab--sm" id="spop-save">Save</button>' +
+        '<button class="ab ab--outline ab--sm" id="spop-week">Apply to whole week</button>' +
+        '<span id="spop-stat" style="font-size:11px;"></span>' +
+      '</div>';
+
+    sp.el.querySelector('#spop-x').addEventListener('click', spClose);
+    sp.el.querySelector('#spop-prev').addEventListener('click', () => { sp.cursor = new Date(cur.getFullYear(), cur.getMonth() - 1, 1); spRender(); });
+    sp.el.querySelector('#spop-next').addEventListener('click', () => { sp.cursor = new Date(cur.getFullYear(), cur.getMonth() + 1, 1); spRender(); });
+    sp.el.querySelectorAll('.spop__day').forEach(dEl => dEl.addEventListener('click', () => {
+      sp.date = new Date(cur.getFullYear(), cur.getMonth(), parseInt(dEl.dataset.day, 10));
+      spRender();
+    }));
+    sp.el.querySelectorAll('[data-time]').forEach(tEl => tEl.addEventListener('click', () => { sp.time = tEl.dataset.time; spRender(); }));
+    const customT = sp.el.querySelector('[data-time-custom]');
+    if (customT) customT.addEventListener('click', () => {
+      const v = prompt('Start time (h:mm AM/PM):', sp.time);
+      if (v == null) return;
+      if (!parseTime12(v)) { alert('Use the format 7:00 PM'); return; }
+      sp.time = v.trim().toUpperCase().replace(/\s+/g, ' ');
+      spRender();
+    });
+    sp.el.querySelectorAll('[data-venue]').forEach(vEl => vEl.addEventListener('click', () => {
+      sp.venue = sp.venue === vEl.dataset.venue ? null : vEl.dataset.venue; // tap again to clear
+      spRender();
+    }));
+    const addV = sp.el.querySelector('[data-venue-add]');
+    if (addV) addV.addEventListener('click', () => {
+      const v = prompt('Venue name:');
+      if (!v || !v.trim()) return;
+      sp.venue = v.trim();
+      spRender();
+    });
+    sp.el.querySelector('#spop-ca').addEventListener('input', e => { sp.courtA = e.target.value.trim(); });
+    sp.el.querySelector('#spop-cb').addEventListener('input', e => { sp.courtB = e.target.value.trim(); });
+    sp.el.querySelector('#spop-save').addEventListener('click', () => spSave(false));
+    sp.el.querySelector('#spop-week').addEventListener('click', () => spSave(true));
+  }
+
+  async function spSave(applyWeek) {
+    const stat = sp.el.querySelector('#spop-stat');
+    const iso = spISO();
+    if (!iso) { if (stat) { stat.textContent = 'Pick a date first.'; stat.style.color = 'var(--color-red,#ef4444)'; } return; }
+    if ((sp.courtA && !sp.courtB) || (!sp.courtA && sp.courtB)) {
+      if (stat) { stat.textContent = 'Enter both courts, or leave both blank.'; stat.style.color = 'var(--color-red,#ef4444)'; }
+      return;
+    }
+    if (applyWeek && !confirm('Apply ' + sp.time + ' on ' + sp.date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }) + (sp.venue ? ' at ' + sp.venue : '') + ' to ALL ' + sp.weekObj.matches.length + ' matches in Week ' + sp.weekObj.week + '? Each match keeps its own courts.')) return;
+
+    // startTime is DERIVED from the picked time — never typed separately again.
+    const base = { scheduledAt: iso, startTime: sp.time, venue: sp.venue || null };
+    const mine = { ...base };
+    if (sp.courtA && sp.courtB) {
+      mine.courtA = sp.courtA; mine.courtB = sp.courtB;
+      mine.court = 'Courts ' + sp.courtA + ' & ' + sp.courtB;
+    }
+    const { weekObj, weeks, match } = sp;
+    const targets = applyWeek ? weekObj.matches : [match];
+    sp.el.querySelectorAll('button').forEach(b => { b.disabled = true; });
+    if (stat) { stat.textContent = 'Saving…'; stat.style.color = 'var(--color-text-faint)'; }
+    try {
+      for (const t of targets) {
+        const payload = t.id === match.id ? mine : base; // courts stay per-match on bulk apply
+        const r = await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(t.id), {
+          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        Object.assign(t, r.match || payload);
+      }
+      spClose();
+      selectWeek(weekObj.week, weeks);
+    } catch (e) {
+      sp.el.querySelectorAll('button').forEach(b => { b.disabled = false; });
+      if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
+    }
   }
 
   $id('sched-div').addEventListener('change', renderSched);
@@ -3524,8 +3767,10 @@
             ? '<button class="ab ab--sm ab--ghost" onclick="window._reopenMatch(\'' + h(m.id) + '\', this)">Reopen</button>'
             : '<button class="ab ab--sm ab--teal" onclick="window._finalizeMatch(\'' + h(m.id) + '\', this)">Finalize</button>'
           ) +
+          '<button class="ab ab--sm ab--ghost" onclick="window._editLineup(\'' + h(m.id) + '\', this)">✏️ Edit who played</button>' +
           '<button class="ab ab--sm ab--ghost" style="margin-left:auto;color:var(--color-red);" onclick="window._restartMatch(\'' + h(m.id) + '\', this)">Restart</button>' +
         '</div>' +
+        '<div id="sc-lineup-edit-' + h(m.id) + '"></div>' +
         '<div id="sc-status-' + h(m.id) + '" style="font-size:11px;margin-top:6px;"></div>' +
       '</div>';
     }).join('');
@@ -3648,6 +3893,131 @@
     } catch (e) {
       statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)';
     } finally { btnDone(srcBtn); } // no-op if loadScoreMatches re-rendered the card
+  };
+
+  // ── Edit who played (admin lineup correction — emergency-sub policy) ──
+  // Scores are untouched; player stats rebuild if the match is final.
+  // Both captains must have agreed at the court; reason goes in the activity log.
+  const lineupEditState = {}; // matchId → { data, teamId }
+
+  window._editLineup = async function(matchId, srcBtn) {
+    const panel = $id('sc-lineup-edit-' + matchId);
+    if (!panel) return;
+    if (panel.innerHTML) { panel.innerHTML = ''; delete lineupEditState[matchId]; return; } // toggle closed
+    panel.innerHTML = '<div class="loading">Loading lineups…</div>';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-edit-lineup?match=' + matchId);
+      lineupEditState[matchId] = { data, teamId: data.match.home.id };
+      renderLineupEdit(matchId);
+    } catch (e) {
+      panel.innerHTML = '<div style="font-size:11px;color:var(--color-red);">' + h(e.message) + '</div>';
+    }
+  };
+
+  window._lineupEditTeam = function(matchId, teamId) {
+    if (lineupEditState[matchId]) { lineupEditState[matchId].teamId = teamId; renderLineupEdit(matchId); }
+  };
+
+  function renderLineupEdit(matchId) {
+    const st = lineupEditState[matchId];
+    const panel = $id('sc-lineup-edit-' + matchId);
+    if (!st || !panel) return;
+    const { data, teamId } = st;
+    const roster = data.rosters[teamId] || [];
+    const games = (data.lineups[teamId] && data.lineups[teamId].games) || {};
+
+    const slots = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
+    const labels = ['R1 G1 · W Doubles','R1 G2 · M Doubles','R1 G3 · Mixed','R1 G4 · Mixed','R1 G5 · Mixed','R1 G6 · Mixed',
+                     'R2 G1 · W Doubles','R2 G2 · M Doubles','R2 G3 · Mixed','R2 G4 · Mixed','R2 G5 · Mixed','R2 G6 · Mixed'];
+    const slotGenders = (slot) => slot.endsWith('g1') ? ['F','F'] : slot.endsWith('g2') ? ['M','M'] : ['F','M']; // mixed = woman-first
+
+    const sel = (slot, pos, gender, current) => {
+      const opts = roster
+        .filter(p => !p.gender || p.gender === gender)
+        .map(p => '<option value="' + h(p.id) + '"' + (p.id === current ? ' selected' : '') + '>' + h(p.name) + (p.gender ? '' : ' (no gender set)') + '</option>')
+        .join('');
+      return '<select data-le-match="' + h(matchId) + '" data-le-slot="' + h(slot) + '" data-le-pos="' + pos + '" style="width:100%;padding:4px 6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:12px;font-family:inherit;">' +
+        '<option value="">—</option>' + opts + '</select>';
+    };
+
+    const teamBtn = (t) => '<button class="ab ab--sm ' + (t.id === teamId ? 'ab--teal' : 'ab--ghost') + '" onclick="window._lineupEditTeam(\'' + h(matchId) + '\',\'' + h(t.id) + '\')">' + h(t.name) + '</button>';
+
+    panel.innerHTML =
+      '<div style="border:1px solid var(--color-border);border-radius:8px;padding:12px;margin-top:12px;background:var(--color-surface-2);">' +
+        '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap;">' +
+          '<span style="font-weight:700;font-size:12px;">✏️ Edit who played</span>' +
+          teamBtn(data.match.home) + teamBtn(data.match.away) +
+          '<span style="font-size:10px;color:var(--color-text-faint);">Scores are NOT changed. Per league policy the sub must have been agreed by both captains at the court.</span>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:auto 1fr 1fr;gap:4px 8px;font-size:11px;align-items:center;">' +
+        slots.map((slot, i) => {
+          const g = games[slot] || {};
+          const [g1, g2] = slotGenders(slot);
+          return (i === 6 ? '<div style="grid-column:1/-1;border-top:1px solid var(--color-border);margin:4px 0;"></div>' : '') +
+            '<div style="color:var(--color-text-muted);white-space:nowrap;">' + labels[i] + '</div>' +
+            sel(slot, 'p1', g1, g.p1 || '') + sel(slot, 'p2', g2, g.p2 || '');
+        }).join('') +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap;">' +
+          '<input id="le-reason-' + h(matchId) + '" type="text" placeholder="Reason (required) — e.g. injury sub agreed at court by both captains" style="flex:1;min-width:240px;padding:6px 10px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:6px;color:var(--color-text);font-size:12px;font-family:inherit;">' +
+          '<button class="ab ab--lime ab--sm" onclick="window._applyLineupEdit(\'' + h(matchId) + '\', this)">Apply changes</button>' +
+          '<button class="ab ab--sm ab--ghost" onclick="window._editLineup(\'' + h(matchId) + '\')">Cancel</button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  window._applyLineupEdit = async function(matchId, srcBtn, force) {
+    const st = lineupEditState[matchId];
+    const statusEl = $id('sc-status-' + matchId);
+    if (!st) return;
+    const { data, teamId } = st;
+    const before = (data.lineups[teamId] && data.lineups[teamId].games) || {};
+
+    const reason = ($id('le-reason-' + matchId)?.value || '').trim();
+    if (!reason) { alert('A reason is required — it goes in the activity log.'); return; }
+
+    // Collect selects → only send slots that actually changed
+    const changes = {};
+    document.querySelectorAll('select[data-le-match="' + matchId + '"]').forEach(s => {
+      const slot = s.dataset.leSlot, pos = s.dataset.lePos;
+      if (!changes[slot]) changes[slot] = { p1: null, p2: null };
+      changes[slot][pos] = s.value || null;
+    });
+    const diff = {};
+    for (const [slot, picks] of Object.entries(changes)) {
+      const b = before[slot] || {};
+      const same = (picks.p1 === (b.p1 || null) && picks.p2 === (b.p2 || null))
+        || (picks.p1 === (b.p2 || null) && picks.p2 === (b.p1 || null)); // order-insensitive
+      if (!same) diff[slot] = picks;
+    }
+    if (!Object.keys(diff).length) { if (statusEl) { statusEl.textContent = 'No lineup changes to apply.'; statusEl.style.color = 'var(--color-text-faint)'; } return; }
+
+    if (srcBtn && !btnBusy(srcBtn, 'Applying…')) return;
+    if (statusEl) { statusEl.textContent = 'Applying lineup edit…'; statusEl.style.color = 'var(--color-text-faint)'; }
+    try {
+      const r = await apiJSON('/.netlify/functions/admin-edit-lineup', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ matchId, teamId, games: diff, reason, force: !!force }),
+      });
+      if (statusEl) {
+        statusEl.textContent = 'Lineup updated ✓ (' + r.slotsChanged.join(', ') + ')' + (r.standingsRebuilt ? ' — standings & player stats rebuilt' : '');
+        statusEl.style.color = 'var(--color-lime)';
+      }
+      const panel = $id('sc-lineup-edit-' + matchId);
+      if (panel) panel.innerHTML = '';
+      delete lineupEditState[matchId];
+      loadMatchScores(matchId); // refresh the per-game player names
+    } catch (e) {
+      // 409 soft-rule warning → admin may force past it (logged as overridden)
+      const msg = e.message || '';
+      if (!force && /max is|played at the same time|already paired|already plays/.test(msg)) {
+        if (confirm('Lineup rule violation:\n\n' + msg + '\n\nApply anyway as an admin override? (Logged in the activity log.)')) {
+          window._applyLineupEdit(matchId, null, true);
+        } else if (statusEl) { statusEl.textContent = 'Not applied.'; statusEl.style.color = 'var(--color-text-faint)'; }
+      } else if (statusEl) {
+        statusEl.textContent = msg; statusEl.style.color = 'var(--color-red)';
+      }
+    } finally { btnDone(srcBtn); }
   };
 
   // ═══════════════════════════════════════════════════════════

@@ -26,7 +26,7 @@
 //   contact.updated, captain.set, cocaptain.set, cocaptain.removed
 //   team.updated, roster.replaced
 //   transfer.requested, transfer.denied
-//   lineup.locked, lineup.unlocked
+//   lineup.locked, lineup.unlocked, lineup.admin-edited
 //   score.entry, score.signoff, score.withdrawn, match.finalized
 
 import { getStore } from '@netlify/blobs';
