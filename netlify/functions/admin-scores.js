@@ -8,6 +8,8 @@
 //      body: { games: { r1g1: { home: 11, away: 7 }, ... } }
 // POST ?match=<id>&action=finalize  → force-finalize a match
 // POST ?match=<id>&action=reopen    → un-finalize a match so scores can be edited
+// POST ?match=<id>&action=restart   → wipe ALL scores + sign-offs; match becomes a
+//                                     fresh scoresheet both captains can re-enter
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
@@ -38,7 +40,18 @@ export default async (req) => {
   if (req.method === 'GET') {
     const score = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
       || newScoreRecord(match);
-    return json({ match: matchInfo(match), score: decorate(score, !!match.championship) });
+    // Include lineups so the admin scoresheet can show who played each game
+    const lineupStore = getStore('lineups');
+    const [lineupHome, lineupAway] = await Promise.all([
+      lineupStore.get(`lineup/${matchId}/${match.teamA.id}.json`, { type: 'json' }).catch(() => null),
+      lineupStore.get(`lineup/${matchId}/${match.teamB.id}.json`, { type: 'json' }).catch(() => null),
+    ]);
+    return json({
+      match: matchInfo(match),
+      score: decorate(score, !!match.championship),
+      homeLineup: slimLineup(lineupHome),
+      awayLineup: slimLineup(lineupAway),
+    });
   }
 
   // ===== PUT — enter/update scores (acts as both sides) =====
@@ -154,7 +167,31 @@ export default async (req) => {
       return json({ ok: true, reopened: true, score: decorate(existing, !!match.championship) });
     }
 
-    return json({ error: 'action must be finalize or reopen' }, 400);
+    if (action === 'restart') {
+      // Wipe everything: both captains' entries, sign-offs, finalization.
+      // Lineups stay locked — captains can immediately re-enter scores or
+      // the teams can replay the games. Standings are rebuilt in case the
+      // match had already been finalized.
+      const fresh = newScoreRecord(match);
+      fresh.restartedAt = new Date().toISOString();
+      fresh.restartedBy = admin.email;
+
+      await scoresStore.setJSON(scoreKey, fresh);
+
+      // Clear final scores from schedule (no-op if never finalized)
+      await clearFinalScoreFromSchedule(scheduleStore, match);
+
+      // Rebuild standings — awaited so the serverless freeze can't kill it.
+      try {
+        await rebuildStandings(match.circuit);
+      } catch (err) {
+        console.error('rebuildStandings failed after restart:', err);
+      }
+
+      return json({ ok: true, restarted: true, score: decorate(fresh, !!match.championship) });
+    }
+
+    return json({ error: 'action must be finalize, reopen, or restart' }, 400);
   }
 
   return new Response('Method not allowed', { status: 405 });
@@ -179,6 +216,11 @@ async function findMatch(scheduleStore, matchId) {
     }
   }
   return null;
+}
+
+function slimLineup(lineup) {
+  if (!lineup) return null;
+  return { teamId: lineup.teamId, teamName: lineup.teamName, lockedAt: lineup.lockedAt || null, games: lineup.games || {} };
 }
 
 function matchInfo(match) {
