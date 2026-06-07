@@ -123,18 +123,6 @@
     .history-stat__pct { font-size: 11px; color: var(--color-text-faint); margin-top: 1px; }
     .history-empty { font-size: 12px; color: var(--color-text-faint); padding: var(--space-3) 0; text-align: center; }
 
-    /* ── Transactions ── */
-    .tx-list { display: flex; flex-direction: column; gap: 0; }
-    .tx-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
-    .tx-row:last-child { border-bottom: none; }
-    .tx-body { flex: 1; min-width: 0; }
-    .tx-route { font-size: 13px; font-weight: 700; color: var(--color-text); }
-    .tx-team { color: var(--color-text); text-decoration: none; }
-    .tx-team:hover { color: var(--color-teal); }
-    .tx-arrow { opacity: 0.6; font-weight: 400; }
-    .tx-note { font-size: 11px; font-style: italic; color: var(--color-text-muted); margin-top: 3px; }
-    .tx-date { font-size: 11px; color: var(--color-text-faint); flex-shrink: 0; }
-
     /* ── Loading / empty ── */
     .pp-loading { text-align: center; padding: 80px 20px; font-size: 14px; color: var(--color-text-faint); }
 
@@ -240,16 +228,6 @@
         } catch {}
       }
 
-      // Transfer/trade transactions for this player (all seasons; match by id + name)
-      let transactions = [];
-      try {
-        const txParams = new URLSearchParams();
-        if (resolvedId) txParams.set('playerId', resolvedId);
-        txParams.set('playerName', rosterPlayer.name);
-        const txr = await fetch('/.netlify/functions/public-transactions?' + txParams.toString());
-        if (txr.ok) transactions = (await txr.json()).transactions || [];
-      } catch {}
-
       // ── Ranking: league-wide, by DSR (composite), overall + within gender ──
       const norm = g => { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; };
       const myGender = norm(pStat?.gender || rosterPlayer.gender);
@@ -265,11 +243,11 @@
       const genderLabel = myGender === 'F' ? "Women's Ranking" : myGender === 'M' ? "Men's Ranking" : 'Division Ranking';
       const ranks = { dsr, overallRank, genderRank, genderLabel };
 
-      render(rosterPlayer, team, teamSlug, pStat, history, ranks, transactions);
+      render(rosterPlayer, team, teamSlug, pStat, history, ranks);
     }
 
     /* ─── Render ──────────────────────────────────────────── */
-    function render(rp, team, teamSlug, stat, history, ranks = {}, transactions = []) {
+    function render(rp, team, teamSlug, stat, history, ranks = {}) {
       const color    = avatarColor(team.name || rp.name);
 
       let html = '';
@@ -476,28 +454,6 @@
       }
 
       html += `</div>`;
-
-      /* ── TRANSACTIONS ── */
-      if (transactions.length) {
-        html += `<div class="pp-card">
-          <div class="pp-card__head">🔄 Transactions</div>
-          <div class="tx-list">
-            ${transactions.map(tx => {
-              const toSlug = tx.toTeamName ? slug(tx.toTeamName) : '';
-              const fromSlug = tx.fromTeamName ? slug(tx.fromTeamName) : '';
-              const toName = toSlug ? `<a href="/team?id=${toSlug}${LINK_SUFFIX}" class="tx-team">${esc(tx.toTeamName)}</a>` : `<span class="tx-team">${esc(tx.toTeamName || '—')}</span>`;
-              const fromName = fromSlug ? `<a href="/team?id=${fromSlug}${LINK_SUFFIX}" class="tx-team">${esc(tx.fromTeamName)}</a>` : `<span class="tx-team">${esc(tx.fromTeamName || '—')}</span>`;
-              return `<div class="tx-row">
-                <div class="tx-body">
-                  <div class="tx-route">${fromName} <span class="tx-arrow">→</span> ${toName}</div>
-                  ${tx.note ? `<div class="tx-note">"${esc(tx.note)}"</div>` : ''}
-                </div>
-                <div class="tx-date">${fmtDate(tx.transferredAt)}</div>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>`;
-      }
 
       document.getElementById('page-root').innerHTML = html;
     }

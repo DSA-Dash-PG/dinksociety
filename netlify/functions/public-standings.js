@@ -15,6 +15,7 @@
 //     h2h: { [opponentId]: { for, against } } }
 
 import { getStore } from '@netlify/blobs';
+import { etagJson } from './lib/http-cache.js';
 
 // Map internal division codes → display labels
 const DIVISION_LABELS = {
@@ -130,19 +131,13 @@ export default async (req) => {
     }
 
     if (!Object.keys(divisions).length) {
-      return new Response(JSON.stringify({
+      return etagJson(req, {
         empty: true,
         message: 'No standings yet. Come back once matches are underway.',
-      }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' },
       });
     }
 
-    return new Response(JSON.stringify({ divisions, lastUpdated }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=60' },
-    });
+    return etagJson(req, { divisions, lastUpdated });
 
   } catch (err) {
     console.error('public-standings error:', err);

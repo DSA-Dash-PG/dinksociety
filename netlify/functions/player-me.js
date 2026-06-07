@@ -3,6 +3,7 @@
 // profile, my stats, leaderboard (with Player of the Week), team, schedule.
 
 import { getStore } from '@netlify/blobs';
+import { etagJson, PRIVATE } from './lib/http-cache.js';
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
@@ -209,7 +210,9 @@ export default async (req) => {
     myTeams.unshift({ id: teamId, name: team.name, division, divisionLabel: team.divisionLabel || division });
   }
 
-  return json({
+  // ETag + private no-store: the portal's live poller sends If-None-Match,
+  // so unchanged payloads come back as an empty 304 instead of the full blob.
+  return etagJson(req, {
     profile: {
       playerId, name: player.name, gender: player.gender || null,
       teamId, teamName: team.name, teamEmoji: team.emoji || null,
@@ -228,7 +231,7 @@ export default async (req) => {
       roster,
     },
     schedule,
-  });
+  }, { cacheControl: PRIVATE });
 };
 
 function partnerNames(myStats, players) {
@@ -240,12 +243,6 @@ function partnerNames(myStats, players) {
     }
   }
   return out;
-}
-
-function json(body, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
-  });
 }
 
 export const config = { path: '/.netlify/functions/player-me' };

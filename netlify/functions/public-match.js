@@ -14,6 +14,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { normalizeScore } from './lib/score-helpers.js';
+import { etagJson } from './lib/http-cache.js';
 
 // Slot → discipline label. Matches lib ordering: g1 women's, g2 men's, rest mixed.
 const SLOT_TYPE = {
@@ -93,7 +94,7 @@ export default async (req) => {
       });
     }
 
-    return json({
+    return etagJson(req, {
       match: {
         id: found.id,
         week: found.week,
@@ -116,12 +117,13 @@ export default async (req) => {
   }
 };
 
+// Errors only — success responses go through etagJson (ETag + short CDN cache).
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=60',
+      'Cache-Control': 'no-store',
     },
   });
 }

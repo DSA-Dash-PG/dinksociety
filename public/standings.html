@@ -219,6 +219,7 @@
 
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
+  <script src="/js/live-poll.js"></script>
   <script>
   // ── Config ───────────────────────────────────────────────────────
   const SEASON = { id:(new URLSearchParams(location.search).get('season')||'circuit-i'), totalMatches:6, maxPtsPerMatch:4, playoffSpots:4 };
@@ -559,6 +560,21 @@
   }
 
   load();
+
+  // ── Live refresh ─────────────────────────────────────────────────
+  // Standings only move when matches finalize, so a relaxed 30s poll is
+  // plenty. ETag/304 + CDN caching make unchanged polls nearly free, and
+  // the poller sleeps whenever the tab is hidden.
+  DSLivePoll.create({
+    url: '/.netlify/functions/public-standings?season=' + SEASON.id,
+    interval: 30000,
+    onUpdate(data) {
+      standingsData = data;
+      isPreseason = !standingsData?.divisions;
+      renderTabs();   // keeps the active division selection
+      render();
+    },
+  }).start();
   </script>
 </body>
 </html>

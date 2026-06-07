@@ -121,21 +121,6 @@
     .roster-role--cocaptain { color: var(--color-teal); }
     .roster-dupr { font-size: 10px; color: var(--color-text-faint); margin-top: 1px; }
 
-    /* ── Transactions ── */
-    .tx-list { display: flex; flex-direction: column; gap: 0; }
-    .tx-row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--color-border); }
-    .tx-row:last-child { border-bottom: none; }
-    .tx-badge { font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 7px; border-radius: 4px; flex-shrink: 0; min-width: 38px; text-align: center; }
-    .tx-badge--in { color: var(--color-lime); background: var(--color-lime-ghost); }
-    .tx-badge--out { color: var(--color-text-faint); background: var(--color-surface-2); }
-    .tx-body { flex: 1; min-width: 0; }
-    .tx-player { font-size: 13px; font-weight: 700; color: var(--color-text); text-decoration: none; }
-    .tx-player:hover { color: var(--color-teal); }
-    .tx-route { font-size: 11px; color: var(--color-text-faint); margin-top: 2px; }
-    .tx-arrow { opacity: 0.6; }
-    .tx-note { font-size: 11px; font-style: italic; color: var(--color-text-muted); margin-top: 2px; }
-    .tx-date { font-size: 11px; color: var(--color-text-faint); flex-shrink: 0; }
-
     /* ── Empty / loading ── */
     .tp-empty { text-align: center; padding: 28px 16px; font-size: 13px; color: var(--color-text-faint); }
 
@@ -205,13 +190,6 @@
 
       document.title = `${team.name} · The Dink Society`;
       const teamSlug = slug(team.name);
-
-      /* transactions for this team (all seasons) */
-      let transactions = [];
-      try {
-        const txr = await fetch('/.netlify/functions/public-transactions?teamId=' + encodeURIComponent(team.id));
-        if (txr.ok) transactions = (await txr.json()).transactions || [];
-      } catch {}
 
       /* standings for this team */
       let rec = null, divTeamCount = 0;
@@ -406,16 +384,6 @@
         </div>` : ''}
       </div>`;
 
-      /* TRANSACTIONS */
-      if (transactions.length) {
-        html += `<div class="tp-card">
-          <div class="tp-card__head"><span class="tp-card__head-icon">🔄</span> Transactions</div>
-          <div class="tx-list">
-            ${transactions.map(tx => txRow(tx, team.id)).join('')}
-          </div>
-        </div>`;
-      }
-
       document.getElementById('page-root').innerHTML = html;
     }
 
@@ -432,27 +400,6 @@
         </div>
         <div class="leader-stat">${winP}%</div>
       </a>`;
-    }
-
-    function txRow(tx, thisTeamId) {
-      const incoming = tx.toTeamId === thisTeamId;
-      const badge = incoming
-        ? '<span class="tx-badge tx-badge--in">In</span>'
-        : '<span class="tx-badge tx-badge--out">Out</span>';
-      const pSlug = slug(tx.toTeamName || '');
-      const pHref = pSlug ? `/player?team=${pSlug}&name=${encodeURIComponent(tx.playerName)}${LINK_SUFFIX}` : null;
-      const nameHtml = pHref
-        ? `<a class="tx-player" href="${pHref}">${esc(shortName(tx.playerName))}</a>`
-        : `<span class="tx-player">${esc(shortName(tx.playerName))}</span>`;
-      return `<div class="tx-row">
-        ${badge}
-        <div class="tx-body">
-          ${nameHtml}
-          <div class="tx-route">${esc(tx.fromTeamName)} <span class="tx-arrow">→</span> ${esc(tx.toTeamName)}</div>
-          ${tx.note ? `<div class="tx-note">"${esc(tx.note)}"</div>` : ''}
-        </div>
-        <div class="tx-date">${fmtDate(tx.transferredAt)}</div>
-      </div>`;
     }
 
     function rosterCard(p, teamSlug) {

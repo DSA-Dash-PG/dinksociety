@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="/js/short-name.js"></script>
+<script src="/js/live-poll.js"></script>
 <style>
   :root {
     --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626; --color-surface-4:#2e2e2e;
@@ -466,7 +467,7 @@
   const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c]));
   const initials = n => String(n||'').replace(/[^A-Za-z ]/g,'').split(' ').filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase();
   const emo = t => { const v = (t && t.emoji) ? t.emoji : '🏓'; return /[a-z0-9]/i.test(v) ? `<span class="logo-text">${esc(v)}</span>` : v; };
-  let DATA = null, lbFilter = 'all';
+  let DATA = null, lbFilter = 'all', bootEtag = null;
 
   // ---- boot ----
   (async function init() {
@@ -475,6 +476,7 @@
       const res = await fetch(API + '/player-me', { credentials: 'include' });
       if (res.status === 401) return showLogin(err);
       if (!res.ok) throw new Error('load failed');
+      bootEtag = res.headers.get('ETag') || null;  // seeds the live poller
       DATA = await res.json();
       // Cross-season history + division standings — public endpoints, fetched in parallel.
       const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
@@ -522,6 +524,42 @@
     if (viewSection) viewSection.style.display = isLeader ? '' : 'none';
     renderHome(); renderSchedule(); renderStandings(); renderStats(); renderTeam();
     refreshChatBadge();
+    startLivePoll();
+  }
+
+  // ---- live refresh ----
+  // Re-polls player-me so the Home live strip, "Your night" rows, and the
+  // Games tab update as captains enter scores — no pull-to-refresh needed.
+  // Adaptive cadence: 12s while a match is live, 60s on match day (catches
+  // the lineup reveal + first scores), dormant otherwise. ETag/304 on the
+  // server side means an unchanged poll returns an empty 304, and the
+  // poller sleeps whenever the app is backgrounded.
+  let livePoller = null;
+  function livePollInterval() {
+    const sch = DATA?.schedule || [];
+    const upcoming = sch.filter(m => !m.final);
+    if (upcoming.some(m => m.status === 'live')) return 12000;
+    const today = new Date().toDateString();
+    if (upcoming.some(m => m.scheduledAt && new Date(m.scheduledAt).toDateString() === today)) return 60000;
+    return 0; // idle — DSLivePoll rechecks periodically in case a window opens
+  }
+  function startLivePoll() {
+    if (livePoller) return;
+    livePoller = DSLivePoll.create({
+      url: API + '/player-me',
+      etag: bootEtag,
+      fetchOpts: { credentials: 'include' },
+      interval: livePollInterval,
+      onUpdate(data) {
+        if (!data?.profile) return;            // ignore odd payloads (e.g. session expired)
+        // history + standings come from separate boot-time fetches — carry them over.
+        data.history = DATA?.history || [];
+        data.standings = DATA?.standings || null;
+        DATA = data;
+        renderHome(); renderSchedule(); renderStats(); renderTeam();
+      },
+    });
+    livePoller.start();
   }
 
   // ---- team switcher (players rostered on more than one team) ----
