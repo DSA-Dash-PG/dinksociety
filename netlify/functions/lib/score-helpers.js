@@ -1,15 +1,29 @@
 // netlify/functions/lib/score-helpers.js
-// Pure scoring computation/validation/formatting, extracted verbatim from
-// captain-score.js. No storage, auth, or request handling here.
+// Pure scoring computation/validation/formatting. No storage, auth, or
+// request handling here.
 //
-// Storage shape:
-//   game = { home: <homeScore>|null, away: <awayScore>|null, by, at }
+// ── Dual-entry verification model ───────────────────────────────────
+// Each team enters its OWN copy of every game score (like keeping their
+// own paper scoresheet). A game only counts once both versions match.
+//
+// Storage shape per slot:
+//   game = {
+//     home: N|null, away: N|null,          // canonical AGREED score — set only
+//                                          // when both entries match & valid
+//     homeEntry: { home, away, by, at } | null,   // home team's version
+//     awayEntry: { home, away, by, at } | null,   // away team's version
+//   }
 //
 // Computed status per game (server-derived, never persisted):
-//   'empty'      both scores null
-//   'partial'    one score entered
-//   'confirmed'  both entered AND a valid finished game
-//   'mismatch'   both entered but NOT valid (e.g. not won by 2) — needs fixing
+//   'empty'      neither team has entered anything
+//   'partial'    only one team has a complete entry (or an entry in progress)
+//   'confirmed'  both teams entered, versions MATCH, and it's a valid game
+//   'mismatch'   both teams entered but the versions DISAGREE (or match on
+//                an invalid score) — must be resolved before finalize
+//
+// Legacy records (single shared sheet: { home: N, away: N, by, at } — and the
+// old admin shape { home: { entered, by, at } }) are migrated on read: the
+// stored values are treated as agreed by both teams.
 
 export const SLOT_RULES = {
   r1g1: { round: 1, game: 1 }, r1g2: { round: 1, game: 2 },
@@ -30,9 +44,13 @@ export const PAIRS = [
   { id: 'r2p3', slots: ['r2g5','r2g6'], round: 2, pair: 3, label: 'Pair 3 · G5+G6' },
 ];
 
+export function emptyGame() {
+  return { home: null, away: null, homeEntry: null, awayEntry: null };
+}
+
 export function newScoreRecord(match) {
   const games = {};
-  for (const slot of SLOT_KEYS) games[slot] = { home: null, away: null };
+  for (const slot of SLOT_KEYS) games[slot] = emptyGame();
   return {
     matchId: match.id,
     circuit: match.circuit,
@@ -42,8 +60,8 @@ export function newScoreRecord(match) {
     home: { id: match.teamA.id, name: match.teamA.name },
     away: { id: match.teamB.id, name: match.teamB.name },
     games,
-    homeSubmittedAt: null, homeSubmittedBy: null,
-    awaySubmittedAt: null, awaySubmittedBy: null,
+    homeSubmittedAt: null, homeSubmittedBy: null, homeSignedName: null,
+    awaySubmittedAt: null, awaySubmittedBy: null, awaySignedName: null,
     finalizedAt: null,
     createdAt: new Date().toISOString(),
   };
@@ -56,13 +74,84 @@ export function toScore(v) {
   return n;
 }
 
+// An entry is "complete" when the team has typed both numbers.
+export function entryComplete(e) {
+  return !!e && Number.isInteger(e.home) && Number.isInteger(e.away);
+}
+
+export function entriesAgree(a, b) {
+  return entryComplete(a) && entryComplete(b) && a.home === b.home && a.away === b.away;
+}
+
+// ── Legacy migration ────────────────────────────────────────────────
+// Normalizes any historical game shape into the dual-entry shape, in place.
+// Old single-sheet values are treated as agreed by both teams.
+export function migrateGame(g) {
+  if (!g) return emptyGame();
+  if ('homeEntry' in g || 'awayEntry' in g) return g; // already new shape
+
+  const isAdminSide = v => v && typeof v === 'object' && 'entered' in v;
+  let home, away, by, at;
+  if (isAdminSide(g.home) || isAdminSide(g.away)) {
+    // Old admin-scores shape: { home: { entered, by, at }, away: {...} }
+    home = isAdminSide(g.home) ? toInt(g.home.entered) : null;
+    away = isAdminSide(g.away) ? toInt(g.away.entered) : null;
+    by = (isAdminSide(g.home) ? g.home.by : null) || (isAdminSide(g.away) ? g.away.by : null) || null;
+    at = (isAdminSide(g.home) ? g.home.at : null) || (isAdminSide(g.away) ? g.away.at : null) || null;
+  } else {
+    // Old captain shape: { home: N|null, away: N|null, by, at }
+    home = toInt(g.home);
+    away = toInt(g.away);
+    by = g.by || null;
+    at = g.at || null;
+  }
+
+  const hasAny = Number.isInteger(home) || Number.isInteger(away);
+  const entry = hasAny ? { home, away, by, at } : null;
+  return {
+    home: null, away: null, // canonical re-derived by syncCanonical
+    homeEntry: entry ? { ...entry } : null,
+    awayEntry: entry ? { ...entry } : null,
+  };
+}
+
+function toInt(v) { return Number.isInteger(v) ? v : null; }
+
+// Recompute the canonical agreed score for a game from its two entries.
+export function syncCanonical(game, winBy = 1) {
+  if (entriesAgree(game.homeEntry, game.awayEntry)
+      && isValidGame(game.homeEntry.home, game.homeEntry.away, winBy)) {
+    game.home = game.homeEntry.home;
+    game.away = game.homeEntry.away;
+  } else {
+    game.home = null;
+    game.away = null;
+  }
+  return game;
+}
+
+// Migrate + re-derive canonical for the entire record, in place.
+export function normalizeScore(score, championship = false) {
+  const winBy = championship ? 2 : 1;
+  score.games = score.games || {};
+  for (const slot of SLOT_KEYS) {
+    score.games[slot] = syncCanonical(migrateGame(score.games[slot]), winBy);
+  }
+  return score;
+}
+
 export function gameStatus(game, winBy = 1) {
-  const hHas = Number.isInteger(game?.home);
-  const aHas = Number.isInteger(game?.away);
-  if (!hHas && !aHas) return 'empty';
-  if (!hHas || !aHas) return 'partial';
-  // Both scores entered → 'confirmed' if it's a legal finished game, else 'mismatch'.
-  return isValidGame(game.home, game.away, winBy) ? 'confirmed' : 'mismatch';
+  const g = migrateGame(game);
+  const he = entryComplete(g.homeEntry);
+  const ae = entryComplete(g.awayEntry);
+  if (!he && !ae) {
+    const anyValue = [g.homeEntry, g.awayEntry]
+      .some(e => e && (Number.isInteger(e.home) || Number.isInteger(e.away)));
+    return anyValue ? 'partial' : 'empty';
+  }
+  if (!he || !ae) return 'partial';
+  if (!entriesAgree(g.homeEntry, g.awayEntry)) return 'mismatch';
+  return isValidGame(g.homeEntry.home, g.homeEntry.away, winBy) ? 'confirmed' : 'mismatch';
 }
 
 // Dink Society game validity. All games are first-to-11.
@@ -85,6 +174,8 @@ export function isValidGame(h, a, winBy = 1) {
 
 export function decorate(score, championship = false) {
   const winBy = championship ? 2 : 1;
+  normalizeScore(score, championship);
+
   // Status per game
   const gameStatuses = SLOT_KEYS.map(slot => ({
     slot,
@@ -120,7 +211,7 @@ export function decorate(score, championship = false) {
       slotStatuses: slotSts,
       confirmed: allConf,
       hasMismatch,
-      locked: false, // single-entry: no pair-sequential locking
+      locked: false, // no pair-sequential locking
       state: allConf ? 'confirmed'
            : hasMismatch ? 'mismatch'
            : hasPartial ? 'active'
@@ -155,8 +246,9 @@ export function computeRound(games, roundNum, gameStatuses) {
     const slot = `r${roundNum}g${g}`;
     if (statusBySlot[slot] !== 'confirmed') continue;
     const gs = games[slot];
-    const h = gs.home;
-    const a = gs.away;
+    // Canonical agreed score (synced by normalizeScore for confirmed games).
+    const h = Number.isInteger(gs.home) ? gs.home : gs.homeEntry?.home;
+    const a = Number.isInteger(gs.away) ? gs.away : gs.homeEntry?.away;
     scored++;
     if (h > a) homeGames++;
     else if (a > h) awayGames++;

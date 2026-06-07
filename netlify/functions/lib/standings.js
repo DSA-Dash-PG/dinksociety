@@ -14,6 +14,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
+import { normalizeScore } from './score-helpers.js';
 
 const DIVISIONS = ['3.0M', '3.5M', '3.5W'];
 
@@ -183,6 +184,7 @@ export async function rebuildStandings(circuit) {
         playerStats,
         week,
         weeklyPlayers,
+        championship: !!match.championship,
       });
     }
   }
@@ -322,7 +324,7 @@ function standingsComparator(a, b) {
 /**
  * Pulls lineup + score for a match, updates the playerStats map in place.
  */
-async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lineupStore, playerStats, week, weeklyPlayers }) {
+async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lineupStore, playerStats, week, weeklyPlayers, championship = false }) {
   const scoresStore = getStore('scores');
 
   const [lineupA, lineupB, score] = await Promise.all([
@@ -331,6 +333,10 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lin
     scoresStore.get(`score/${matchId}.json`, { type: 'json' }).catch(() => null),
   ]);
   if (!lineupA || !lineupB || !score?.games) return;
+
+  // Migrate any legacy score shape and re-derive the canonical agreed
+  // home/away values that the per-slot reads below depend on.
+  normalizeScore(score, championship);
 
   const teamA = teamsById.get(teamAId);
   const teamB = teamsById.get(teamBId);

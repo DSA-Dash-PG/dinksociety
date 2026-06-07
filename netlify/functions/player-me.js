@@ -93,13 +93,15 @@ export default async (req) => {
   })).sort((a, b) => (b.dsr ?? -1) - (a.dsr ?? -1));
 
   // ── Schedule (my team's matches) ──
+  // NOTE: a team can play MORE than one match in the same week (e.g. a
+  // make-up or admin-added game), so collect every match — not just the first.
   const schedule = [];
   if (division) {
     for (let w = 1; w <= 12; w++) {
       const data = await scheduleStore.get(`schedule/${circuit}/${division}/week-${w}.json`, { type: 'json' }).catch(() => null);
       if (!data?.matches) continue;
-      const mt = data.matches.find(m => m.teamA?.id === teamId || m.teamB?.id === teamId);
-      if (!mt) continue;
+      const myMatches = data.matches.filter(m => m.teamA?.id === teamId || m.teamB?.id === teamId);
+      for (const mt of myMatches) {
       const home = mt.teamA?.id === teamId;
       const opp = home ? mt.teamB : mt.teamA;
       const final = !!mt.finalizedAt;
@@ -150,14 +152,30 @@ export default async (req) => {
       // Live game scores, sanitized (numbers only — no submitter PII).
       // Only once lineups are revealed: before that there's nothing to score,
       // and it keeps the blind-lineup window airtight. home = teamA.
+      // Dual-entry model: show the AGREED score when both teams' entries
+      // match; otherwise fall back to MY OWN team's entry so players see the
+      // live numbers their captain is recording.
       let scores = null;
       if (!final && revealed) {
         const sc = await scoresStore.get(`score/${mt.id}.json`, { type: 'json' }).catch(() => null);
         if (sc?.games) {
+          const myEntryKey = home ? 'homeEntry' : 'awayEntry';
           scores = {};
           for (const s of LINEUP_SLOTS) {
             const g = sc.games[s];
-            if (g && (g.home != null || g.away != null)) scores[s] = { home: g.home ?? null, away: g.away ?? null };
+            if (!g) continue;
+            // Canonical agreed score first (also covers legacy records where
+            // home/away were stored directly).
+            let h = Number.isInteger(g.home) ? g.home : null;
+            let a = Number.isInteger(g.away) ? g.away : null;
+            if (h == null && a == null) {
+              const e = g[myEntryKey];
+              if (e && (Number.isInteger(e.home) || Number.isInteger(e.away))) {
+                h = Number.isInteger(e.home) ? e.home : null;
+                a = Number.isInteger(e.away) ? e.away : null;
+              }
+            }
+            if (h != null || a != null) scores[s] = { home: h, away: a };
           }
           if (!Object.keys(scores).length) scores = null;
         }
@@ -172,6 +190,7 @@ export default async (req) => {
         myLocked, revealed, myGames, lineup, scores,
         status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
       });
+      }
     }
   }
   schedule.sort((a, b) => a.week - b.week);

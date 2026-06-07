@@ -1,11 +1,14 @@
 // tests/score.test.js
-// Minimal unit tests for the pure scoring helpers extracted in Task 1.4.
+// Unit tests for the pure scoring helpers (dual-entry verification model).
 // Run with: npm test   (Node's built-in test runner — no dependencies)
 //
 // League rules under test (see lib/score-helpers.js):
 //   Regular season: first to exactly 11, win by 1 (winner scores exactly 11).
 //   Championship:   first to 11, win by 2 — 11–9 or better, or deuce ending
 //                   on exactly a 2-point lead (12–10, 13–11, …).
+//
+// Dual-entry model: each team enters its own copy of every game score.
+// A game is 'confirmed' only when both versions match and form a valid game.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -17,6 +20,9 @@ import {
   computeRound,
   decorate,
   newScoreRecord,
+  migrateGame,
+  normalizeScore,
+  entryComplete,
 } from '../netlify/functions/lib/score-helpers.js';
 
 // Helper: a fake match shaped like the schedule blobs captain-score reads.
@@ -28,16 +34,50 @@ function fakeMatch() {
   };
 }
 
-test('basic win: 11–7 is a valid regular-season game and reads as confirmed', () => {
+// Helper: both teams entered the same score (agreed game).
+function agreed(home, away) {
+  return {
+    home: null, away: null,
+    homeEntry: { home, away, by: 'home@x.com', at: 't' },
+    awayEntry: { home, away, by: 'away@x.com', at: 't' },
+  };
+}
+
+// Helper: the two teams entered different scores (mismatch).
+function disputed(homeVersion, awayVersion) {
+  return {
+    home: null, away: null,
+    homeEntry: { home: homeVersion[0], away: homeVersion[1], by: 'home@x.com', at: 't' },
+    awayEntry: { home: awayVersion[0], away: awayVersion[1], by: 'away@x.com', at: 't' },
+  };
+}
+
+test('basic win: 11–7 entered identically by both teams reads as confirmed', () => {
   assert.equal(isValidGame(11, 7), true);
-  assert.equal(gameStatus({ home: 11, away: 7 }), 'confirmed');
+  assert.equal(gameStatus(agreed(11, 7)), 'confirmed');
 });
 
-test('basic loss: away side winning 7–11 is valid and scores the round for away', () => {
+test('cross-check: both teams entered but versions DISAGREE → mismatch', () => {
+  const g = disputed([11, 7], [11, 9]);
+  assert.equal(gameStatus(g), 'mismatch');
+});
+
+test('one-sided entry: only the home team has entered → partial (not confirmed)', () => {
+  const g = {
+    home: null, away: null,
+    homeEntry: { home: 11, away: 7, by: 'home@x.com', at: 't' },
+    awayEntry: null,
+  };
+  assert.equal(gameStatus(g), 'partial');
+  assert.equal(entryComplete(g.homeEntry), true);
+  assert.equal(entryComplete(g.awayEntry), false);
+});
+
+test('basic loss: away winning 7–11 agreed by both → away takes the round', () => {
   assert.equal(isValidGame(7, 11), true);
-  // A full round of 6 games, away wins all → away gets the 2 round points.
   const games = {};
-  for (let g = 1; g <= 6; g++) games[`r1g${g}`] = { home: 5, away: 11 };
+  for (let g = 1; g <= 6; g++) games[`r1g${g}`] = agreed(5, 11);
+  normalizeScore({ games }, false);
   const statuses = Object.keys(games).map(slot => ({ slot, status: gameStatus(games[slot]) }));
   const round = computeRound(games, 1, statuses);
   assert.deepEqual(
@@ -46,29 +86,31 @@ test('basic loss: away side winning 7–11 is valid and scores the round for awa
   );
 });
 
-test('tie: a game cannot end level — 11–11 is invalid and flags as mismatch', () => {
+test('tie: a game cannot end level — agreed 11–11 is invalid and flags as mismatch', () => {
   assert.equal(isValidGame(11, 11), false);
-  assert.equal(gameStatus({ home: 11, away: 11 }), 'mismatch');
+  assert.equal(gameStatus(agreed(11, 11)), 'mismatch');
 });
 
 test('tied round: 3 games each → both sides get 1 round point', () => {
   const games = {};
-  for (let g = 1; g <= 3; g++) games[`r1g${g}`] = { home: 11, away: 8 };
-  for (let g = 4; g <= 6; g++) games[`r1g${g}`] = { home: 8, away: 11 };
+  for (let g = 1; g <= 3; g++) games[`r1g${g}`] = agreed(11, 8);
+  for (let g = 4; g <= 6; g++) games[`r1g${g}`] = agreed(8, 11);
+  normalizeScore({ games }, false);
   const statuses = Object.keys(games).map(slot => ({ slot, status: gameStatus(games[slot]) }));
   const round = computeRound(games, 1, statuses);
   assert.equal(round.homePoints, 1);
   assert.equal(round.awayPoints, 1);
 });
 
-test('missing score: one side entered → partial; nothing entered → empty; round awards no points until all 6 games confirmed', () => {
-  assert.equal(gameStatus({ home: 11, away: null }), 'partial');
-  assert.equal(gameStatus({ home: null, away: null }), 'empty');
+test('missing score: in-progress entry → partial; nothing entered → empty; round needs 6 confirmed games', () => {
+  assert.equal(gameStatus({ home: null, away: null, homeEntry: { home: 11, away: null, by: 'x', at: 't' }, awayEntry: null }), 'partial');
+  assert.equal(gameStatus({ home: null, away: null, homeEntry: null, awayEntry: null }), 'empty');
 
   // 5 confirmed games + 1 missing → no round points yet.
   const games = {};
-  for (let g = 1; g <= 5; g++) games[`r1g${g}`] = { home: 11, away: 3 };
-  games.r1g6 = { home: null, away: null };
+  for (let g = 1; g <= 5; g++) games[`r1g${g}`] = agreed(11, 3);
+  games.r1g6 = { home: null, away: null, homeEntry: null, awayEntry: null };
+  normalizeScore({ games }, false);
   const statuses = Object.keys(games).map(slot => ({ slot, status: gameStatus(games[slot]) }));
   const round = computeRound(games, 1, statuses);
   assert.equal(round.scoredGames, 5);
@@ -98,10 +140,30 @@ test('toScore: parses valid entries, nulls blanks, rejects out-of-range', () => 
   assert.equal(toScore('abc'), 'INVALID');
 });
 
-test('decorate: a fully-entered match computes winner, allows submit, and lists no mismatches', () => {
+test('legacy migration: old single-sheet { home, away } records read as agreed by both teams', () => {
+  const g = migrateGame({ home: 11, away: 7, by: 'someone@x.com', at: 't' });
+  assert.equal(gameStatus(g), 'confirmed');
+  // Old admin shape { home: { entered } } also migrates.
+  const ga = migrateGame({ home: { entered: 11, by: 'a', at: 't' }, away: { entered: 4, by: 'a', at: 't' } });
+  assert.equal(gameStatus(ga), 'confirmed');
+});
+
+test('normalizeScore: canonical agreed score is set only for confirmed games', () => {
+  const games = {
+    r1g1: agreed(11, 6),
+    r1g2: disputed([11, 7], [11, 9]),
+  };
+  normalizeScore({ games }, false);
+  assert.equal(games.r1g1.home, 11);
+  assert.equal(games.r1g1.away, 6);
+  assert.equal(games.r1g2.home, null);
+  assert.equal(games.r1g2.away, null);
+});
+
+test('decorate: a fully-agreed match computes winner, allows submit, and lists no mismatches', () => {
   const record = newScoreRecord(fakeMatch());
-  // Home wins every game 11–6 across both rounds.
-  for (const slot of SLOT_KEYS) record.games[slot] = { home: 11, away: 6 };
+  // Home wins every game 11–6 across both rounds — both teams agree.
+  for (const slot of SLOT_KEYS) record.games[slot] = agreed(11, 6);
 
   const d = decorate(record, false);
   assert.equal(d.computed.allConfirmed, true);
@@ -111,4 +173,15 @@ test('decorate: a fully-entered match computes winner, allows submit, and lists 
   assert.deepEqual(d.computed.mismatches, []);
   assert.deepEqual(d.computed.unentered, []);
   assert.equal(d.computed.counts.confirmed, 12);
+});
+
+test('decorate: a single disputed game blocks submit and is listed as a mismatch', () => {
+  const record = newScoreRecord(fakeMatch());
+  for (const slot of SLOT_KEYS) record.games[slot] = agreed(11, 6);
+  record.games.r2g3 = disputed([11, 6], [11, 8]);
+
+  const d = decorate(record, false);
+  assert.equal(d.computed.allConfirmed, false);
+  assert.equal(d.computed.canSubmit, false);
+  assert.deepEqual(d.computed.mismatches, ['r2g3']);
 });

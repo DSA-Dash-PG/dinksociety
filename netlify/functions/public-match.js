@@ -13,6 +13,7 @@
 // team's locked lineup. Only confirmed games (both scores entered) appear.
 
 import { getStore } from '@netlify/blobs';
+import { normalizeScore } from './lib/score-helpers.js';
 
 // Slot → discipline label. Matches lib ordering: g1 women's, g2 men's, rest mixed.
 const SLOT_TYPE = {
@@ -58,6 +59,10 @@ export default async (req) => {
       homeId ? lineupStore.get(`lineup/${matchId}/${homeId}.json`, { type: 'json' }).catch(() => null) : null,
       awayId ? lineupStore.get(`lineup/${matchId}/${awayId}.json`, { type: 'json' }).catch(() => null) : null,
     ]);
+
+    // Migrate any legacy score shape; reads below use the canonical agreed
+    // home/away values (only set once both teams' entries match).
+    if (score) normalizeScore(score, !!found.championship);
 
     const games = [];
     let totalHome = 0, totalAway = 0;

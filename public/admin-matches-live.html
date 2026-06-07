@@ -81,6 +81,19 @@
     /* Lineup pending note */
     .mc__lineup-note { padding: 10px 16px; font-size: 11px; color: var(--color-text-faint); text-align: center; }
 
+    /* Game-by-game detail: roster pairs + live scores */
+    .mc__games { border-top: 1px solid var(--color-border); padding: 6px 16px 8px; }
+    .mc__g-row { display: grid; grid-template-columns: 52px 1fr auto 1fr; gap: 8px; align-items: center; padding: 3px 0; font-size: 11px; border-bottom: 1px dotted var(--color-border); }
+    .mc__g-row:last-child { border-bottom: none; }
+    .mc__g-row--mismatch { background: var(--color-red-dim); border-radius: 4px; padding-left: 4px; padding-right: 4px; }
+    .mc__g-slot { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; color: var(--color-text-faint); }
+    .mc__g-pair { color: var(--color-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .mc__g-pair--right { text-align: right; }
+    .mc__g-score { font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .mc__g-score--ok { color: var(--color-teal); }
+    .mc__g-score--bad { color: var(--color-red, #ef4444); font-size: 10px; }
+    .mc__g-score--wait { color: var(--color-text-faint); font-size: 10px; }
+
     /* Last update */
     .last-update { text-align: center; font-size: 11px; color: var(--color-text-faint); margin-top: 24px; }
 
@@ -186,8 +199,38 @@
     `;
 
     const conflictHtml = m.score.mismatches?.length
-      ? `<div class="mc__conflict">⚠ Score mismatch: ${m.score.mismatches.map(s => s.toUpperCase().replace('R','R').replace('G',' G')).join(', ')}</div>`
+      ? `<div class="mc__conflict">⚠ Score mismatch (teams disagree): ${m.score.mismatches.map(x => slotLabel(x.slot)).join(', ')}</div>`
       : '';
+
+    // Game-by-game detail: who played (from locked lineups) + live scores.
+    // Shows the canonical agreed score when both teams match, otherwise each
+    // team's own version so the admin can see exactly where they differ.
+    const homeGames = m.lineup.home?.games || {};
+    const awayGames = m.lineup.away?.games || {};
+    const gamesHtml = m.lineup.revealed ? `
+      <div class="mc__games">
+        ${(m.score.games || []).map(g => {
+          const hp = pairNames(homeGames[g.slot]);
+          const ap = pairNames(awayGames[g.slot]);
+          let scoreCell;
+          if (Number.isInteger(g.home) && Number.isInteger(g.away)) {
+            scoreCell = `<span class="mc__g-score mc__g-score--ok">${g.home}–${g.away}</span>`;
+          } else if (g.status === 'mismatch') {
+            scoreCell = `<span class="mc__g-score mc__g-score--bad">H: ${entryTxt(g.homeEntry)} · A: ${entryTxt(g.awayEntry)}</span>`;
+          } else if (g.homeEntry || g.awayEntry) {
+            scoreCell = `<span class="mc__g-score mc__g-score--wait">H: ${entryTxt(g.homeEntry)} · A: ${entryTxt(g.awayEntry)}</span>`;
+          } else {
+            scoreCell = '<span class="mc__g-score mc__g-score--wait">—</span>';
+          }
+          return `<div class="mc__g-row mc__g-row--${g.status}">
+            <span class="mc__g-slot">${slotLabel(g.slot)}</span>
+            <span class="mc__g-pair">${esc(hp)}</span>
+            ${scoreCell}
+            <span class="mc__g-pair mc__g-pair--right">${esc(ap)}</span>
+          </div>`;
+        }).join('')}
+      </div>
+    ` : '';
 
     const lineupNote = !m.lineup.revealed
       ? `<div class="mc__lineup-note">
@@ -252,9 +295,32 @@
         ` : ''}
         ${lineupNote}
         ${conflictHtml}
+        ${gamesHtml}
         ${pointsHtml}
       </div>
     `;
+  }
+
+  // "First L. & First L." from a lineup game slot.
+  function pairNames(g) {
+    const short = (n) => {
+      const parts = String(n || '').trim().split(/\s+/);
+      if (!parts[0]) return '';
+      return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : parts[0];
+    };
+    const names = [g?.p1Name, g?.p2Name].filter(Boolean).map(short);
+    return names.length ? names.join(' & ') : '—';
+  }
+
+  function slotLabel(slot) {
+    const t = { g1: 'W', g2: 'M' }[slot.slice(2)] || 'X';
+    return `${slot.startsWith('r1') ? 'R1' : 'R2'}G${slot.slice(-1)} ${t === 'W' ? "W" : t === 'M' ? "M" : "X"}`;
+  }
+
+  function entryTxt(e) {
+    if (!e) return '—';
+    const v = (n) => Number.isInteger(n) ? n : '·';
+    return `${v(e.home)}–${v(e.away)}`;
   }
 
   function render(data) {

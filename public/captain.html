@@ -285,6 +285,36 @@
     .ss-banner--ready strong { color: var(--color-gold); }
     .ss-banner--mine-submitted { background: var(--color-teal-dim); border-color: rgba(37,201,164,0.15); color: var(--color-teal); }
     .ss-banner--mine-submitted strong { color: var(--color-teal); }
+
+    /* Dual-entry: the other team's conflicting version of a game */
+    .ss-theirs { margin-top: 4px; font-size: 10px; line-height: 1.45; color: var(--color-red, #ef4444); }
+    .ss-theirs strong { font-size: 12px; }
+
+    /* Floating save button (shows only while there are unsaved scores) */
+    .ss-float-save { position: fixed; right: 18px; bottom: 22px; z-index: 140; display: none; align-items: center; gap: 8px; padding: 12px 20px; border: none; border-radius: var(--radius-full); background: var(--color-lime); color: var(--color-text-inverse); font-family: inherit; font-size: 13px; font-weight: 800; cursor: pointer; box-shadow: 0 6px 24px rgba(0,0,0,0.45); }
+    .ss-float-save.is-on { display: inline-flex; }
+    .ss-float-save.is-saving { opacity: 0.7; pointer-events: none; }
+    .ss-float-save.is-saved { background: var(--color-teal); color: #fff; pointer-events: none; }
+    @media (max-width: 860px) { .ss-float-save { bottom: calc(64px + env(safe-area-inset-bottom)); right: 12px; } }
+
+    /* Captain sign-off (finalize) overlay */
+    .signoff-bg { position: fixed; inset: 0; background: rgba(0,0,0,0.82); display: flex; align-items: center; justify-content: center; z-index: 220; padding: 16px; }
+    .signoff { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); width: 100%; max-width: 480px; max-height: 86vh; overflow-y: auto; padding: 20px; }
+    .signoff h3 { margin: 0 0 4px; font-size: 17px; }
+    .signoff__sub { font-size: 12px; color: var(--color-text-faint); margin-bottom: 14px; }
+    .signoff__total { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 12px; background: var(--color-surface-2); border-radius: var(--radius-sm); margin-bottom: 12px; font-weight: 800; font-size: 15px; }
+    .signoff__total b { font-size: 22px; color: var(--color-gold); }
+    .signoff table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 14px; }
+    .signoff td, .signoff th { padding: 5px 6px; border-bottom: 1px solid var(--color-border); text-align: left; }
+    .signoff td.num { text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .signoff__agree { display: flex; gap: 10px; align-items: flex-start; padding: 12px; background: var(--color-gold-dim); border: 1px solid rgba(232,181,66,0.3); border-radius: var(--radius-sm); font-size: 12.5px; line-height: 1.5; margin-bottom: 14px; cursor: pointer; }
+    .signoff__agree input { margin-top: 2px; width: 16px; height: 16px; accent-color: var(--color-gold); flex-shrink: 0; }
+    .signoff__actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* Mobile scoresheet: typeable score input (replaces value-only stepper) */
+    .bgm__input { width: 52px; text-align: center; font-size: 20px; font-weight: 800; font-family: inherit; padding: 6px 2px; background: var(--color-surface-2); border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); color: var(--color-text); -moz-appearance: textfield; }
+    .bgm__input::-webkit-outer-spin-button, .bgm__input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .bgm__theirs { margin-top: 6px; font-size: 11px; font-weight: 600; color: var(--color-red, #ef4444); background: var(--color-red-dim); border-radius: var(--radius-sm); padding: 7px 10px; line-height: 1.45; }
     .ss-pair-group { margin-bottom: 14px; }
     .ss-pair-group--locked { opacity: 0.55; }
     .ss-pair-header { display: flex; align-items: center; gap: 10px; padding: 6px 0 5px; border-bottom: 1px solid var(--color-border-strong); margin-bottom: 6px; flex-wrap: wrap; }
@@ -547,6 +577,9 @@
         <!-- Scoresheet — populated once lineups are revealed -->
         <div id="scoresheet-area"></div>
       </div>
+
+      <!-- Floating save — visible whenever there are unsaved score edits -->
+      <button type="button" class="ss-float-save" id="ss-float-save">Save scores</button>
     </section>
 
     <!-- SCHEDULE (all matches list) -->
@@ -1605,8 +1638,61 @@
       state.currentMatch = state.matches.find(m => m.id === matchId);
       if (!state.currentMatch) return;
       state.scoreDirty = false; // fresh match — no unsaved edits yet
+      updateFloatingSave('clean');
+
+      // View mode — the Scoresheet tab shows ONLY scoring; the lineup flow
+      // shows ONLY the lineup work. Schedule clicks pick by match state.
+      const viaTab = opts && opts.viaTab;
+      if (viaTab === 'scoresheet') state.matchViewMode = 'score';
+      else if (viaTab === 'next') state.matchViewMode = 'lineup';
+      else {
+        const m = state.currentMatch;
+        state.matchViewMode = (m.finalizedAt || m.status?.revealed) ? 'score' : 'lineup';
+      }
 
       await refreshLineup();
+    }
+
+    // Show only the half of the match view the captain came here for:
+    //   'score'  → scoresheet only (no lineup builder / locked-lineup notice)
+    //   'lineup' → lineup work only (no scoresheet)
+    function applyMatchViewMode() {
+      const mode = state.matchViewMode || 'lineup';
+      const lineupIds = ['match-reveal-area', 'lineup-builder', 'lineup-actions', 'lineup-status'];
+      const ss = $id('scoresheet-area');
+      if (mode === 'score') {
+        lineupIds.forEach(id => { const el = $id(id); if (el) el.style.display = 'none'; });
+        if (ss) {
+          ss.style.display = '';
+          // Pre-reveal with nothing to preview: explain when scoring opens.
+          const st = state.lastLineupStatus;
+          if (st && !st.revealed && !ss.innerHTML.trim()) {
+            ss.innerHTML = `<div class="empty-state">Scoring opens once both teams' lineups are locked.${st.myLocked ? ' Waiting on your opponent.' : ' Your lineup isn’t locked yet — set it from the Lineup tab.'}</div>`;
+          }
+        }
+      } else {
+        if (ss) ss.style.display = 'none';
+        // Restore the lineup chrome that score mode may have hidden.
+        // (lineup-builder / lineup-actions visibility is owned by
+        //  renderMatchDetail, which runs before this.)
+        const ra = $id('match-reveal-area'); if (ra) ra.style.display = '';
+        const lst = $id('lineup-status'); if (lst) lst.style.display = '';
+        // Post-reveal there's no lineup work left — offer a jump to scoring.
+        const st = state.lastLineupStatus;
+        if (ra && st?.revealed && !$id('goto-scoresheet-btn')) {
+          const cta = document.createElement('div');
+          cta.style.cssText = 'margin-top:14px;text-align:right;';
+          cta.innerHTML = '<button class="cap-btn cap-btn--gold" id="goto-scoresheet-btn">Open scoresheet &rarr;</button>';
+          ra.appendChild(cta);
+          $id('goto-scoresheet-btn').addEventListener('click', () => {
+            state.matchViewMode = 'score';
+            document.querySelectorAll('.cap-tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab === 'scoresheet'));
+            setBnActive('score');
+            applyMatchViewMode();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          });
+        }
+      }
     }
 
     // `fresh` (optional) = the response body from a just-completed save/lock/unlock
@@ -1635,6 +1721,7 @@
         state.currentLineup = data.myLineup;
         state.oppLineup = data.oppLineup;
         state.lineupDraft = (data.myLineup?.games) || {};
+        state.lastLineupStatus = data.status || null;
         // Roster must be loaded before we can judge lineup eligibility (the gate).
         if (!(state.roster || []).length) { await loadRoster(true); }
         renderMatchDetail(data);
@@ -1648,6 +1735,7 @@
         } else {
           renderScoresheetPreview(data);
         }
+        applyMatchViewMode();
 
         // Poll if we've locked but opponent hasn't — to auto-reveal
         if (data.status.myLocked && !data.status.revealed) startPolling();
@@ -1659,7 +1747,7 @@
     }
 
     function isMatchFinal() {
-      return state.currentScore?.final === true;
+      return !!(state.currentScore?.score?.finalizedAt || state.currentMatch?.finalizedAt);
     }
 
     // Pre-game preview: build a synthetic scoresheet record from MY lineup only.
@@ -1722,7 +1810,7 @@
       $id('match-sub').innerHTML = `
         ${m.myRole === 'home' ? 'Home' : 'Away'}
         ${m.court ? ' · ' + escapeHtml(m.court) : ''}
-        · Circuit ${m.circuit === 'I' ? 'ONE' : m.circuit}
+        · ${escapeHtml((window.DS_SETTINGS && window.DS_SETTINGS.circuitName) || 'Season 1')}
       `;
 
       const pillEl = $id('match-status-pill');
@@ -2062,14 +2150,17 @@
 
           for (const g of gameNums) {
             const slot = `r${round}g${g}`;
-            const gs = games[slot] || { home: null, away: null };
+            const gs = games[slot] || {};
             const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
             const homePair = (data.preview && !myRoleIsHome) ? oppPairPlaceholder : formatPair(homeLineup[slot]);
             const awayPair = (data.preview && myRoleIsHome) ? oppPairPlaceholder : formatPair(awayLineup[slot]);
-            const hv = Number.isInteger(gs.home) ? gs.home : '';
-            const av = Number.isInteger(gs.away) ? gs.away : '';
 
-            // Single shared sheet: either captain may enter both scores for any game.
+            // Dual entry: these inputs are MY TEAM's version of the score.
+            // (Once both teams enter matching numbers the game confirms.)
+            const mine = gs.mine || { home: null, away: null };
+            const hv = Number.isInteger(mine.home) ? mine.home : '';
+            const av = Number.isInteger(mine.away) ? mine.away : '';
+
             const inputClass = () => {
               const cls = ['ss-score-input'];
               if (status === 'confirmed') cls.push('ss-score-input--confirmed');
@@ -2077,7 +2168,7 @@
               return cls.join(' ');
             };
 
-            const pill = renderStatusPill(status);
+            const cell = gameStatusCell(status, gs, final);
             const rowClass = status === 'confirmed' ? 'ss-row--confirmed'
                            : status === 'mismatch'  ? 'ss-row--mismatch' : '';
 
@@ -2100,7 +2191,7 @@
                     ${!canEdit ? 'disabled' : ''}>
                 </td>
                 <td class="ss-pair">${escapeHtml(awayPair)}</td>
-                <td class="ss-status-cell">${pill}</td>
+                <td class="ss-status-cell">${cell}</td>
               </tr>
             `);
           }
@@ -2181,21 +2272,25 @@
       const myLabel = myRole === 'home' ? homeName : awayName;
       const otherLabel = myRole === 'home' ? awayName : homeName;
 
+      const signLine = (signedName, at) => signedName
+        ? `<div class="ss-approval__time">Signed by ${escapeHtml(signedName)} &middot; ${formatTime(at)}</div>`
+        : (at ? `<div class="ss-approval__time">${formatTime(at)}</div>` : '');
+
       const submissions = `
         <div class="ss-approvals">
           <div class="ss-approval ${score.homeSubmittedAt ? 'ss-approval--done' : ''} ${myRole === 'home' ? 'ss-approval--mine' : ''}">
-            <div class="ss-approval__label">${escapeHtml(homeName)} submission</div>
+            <div class="ss-approval__label">${escapeHtml(homeName)} sign-off</div>
             <div class="ss-approval__value">
-              ${score.homeSubmittedAt ? '&check; Submitted' : 'Not yet submitted'}
+              ${score.homeSubmittedAt ? '&check; Agreed to final score' : 'Not yet signed off'}
             </div>
-            ${score.homeSubmittedAt ? `<div class="ss-approval__time">${formatTime(score.homeSubmittedAt)}</div>` : ''}
+            ${score.homeSubmittedAt ? signLine(score.homeSignedName, score.homeSubmittedAt) : ''}
           </div>
           <div class="ss-approval ${score.awaySubmittedAt ? 'ss-approval--done' : ''} ${myRole === 'away' ? 'ss-approval--mine' : ''}">
-            <div class="ss-approval__label">${escapeHtml(awayName)} submission</div>
+            <div class="ss-approval__label">${escapeHtml(awayName)} sign-off</div>
             <div class="ss-approval__value">
-              ${score.awaySubmittedAt ? '&check; Submitted' : 'Not yet submitted'}
+              ${score.awaySubmittedAt ? '&check; Agreed to final score' : 'Not yet signed off'}
             </div>
-            ${score.awaySubmittedAt ? `<div class="ss-approval__time">${formatTime(score.awaySubmittedAt)}</div>` : ''}
+            ${score.awaySubmittedAt ? signLine(score.awaySignedName, score.awaySubmittedAt) : ''}
           </div>
         </div>
       `;
@@ -2203,25 +2298,25 @@
       // Action buttons (none in pre-game preview — score entry unlocks at reveal)
       const actions = [];
       if (!final && !data.preview) {
-        // Batch save: enter several games (e.g. a whole round), then save together.
+        // Manual save is a fallback — entries also auto-save as you type.
         actions.push(`<button class="cap-btn cap-btn--primary" id="ss-save-btn">Save scores</button>`);
         if (!mySubmitted) {
           const ready = !!c.canSubmit;
           let label;
           if (ready) {
             label = otherSubmitted
-              ? `Submit final &mdash; ${escapeHtml(otherLabel)} is waiting`
-              : 'Submit final';
+              ? `Review &amp; sign off &mdash; ${escapeHtml(otherLabel)} has signed`
+              : 'Review &amp; sign off';
           } else {
             const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0) + (c.counts?.mismatch || 0);
-            label = `${remaining} game${remaining === 1 ? '' : 's'} need${remaining === 1 ? 's' : ''} a valid score`;
+            label = `${remaining} game${remaining === 1 ? '' : 's'} still need${remaining === 1 ? 's' : ''} matching scores`;
           }
           actions.push(`
             <button class="cap-btn cap-btn--gold" id="ss-submit-btn" ${ready ? '' : 'disabled'}>${label}</button>
           `);
         } else {
           actions.push(`
-            <button class="cap-btn cap-btn--ghost" id="ss-withdraw-btn">Withdraw my submission</button>
+            <button class="cap-btn cap-btn--ghost" id="ss-withdraw-btn">Withdraw my sign-off</button>
           `);
         }
       }
@@ -2243,11 +2338,15 @@
         ${final ? renderUpNextStrip() : ''}
       `;
 
-      // Either captain can edit any game. No per-field autosave — teams often
-      // enter several games at once, so saving is an explicit batch action.
+      // These inputs hold MY TEAM's version of each score. Auto-save kicks in
+      // shortly after typing stops; the floating button is the manual fallback.
       area.querySelectorAll('.ss-score-input:not([disabled])').forEach(inp => {
         inp.dataset.orig = inp.value;                       // baseline for change detection
-        inp.addEventListener('input', () => { state.scoreDirty = true; });
+        inp.addEventListener('input', () => {
+          state.scoreDirty = true;
+          updateFloatingSave('dirty');
+          scheduleAutoSave();
+        });
         inp.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); saveAllScores(); }
         });
@@ -2257,7 +2356,7 @@
       if (saveBtn) saveBtn.addEventListener('click', saveAllScores);
 
       const submitBtn = $id('ss-submit-btn');
-      if (submitBtn) submitBtn.addEventListener('click', submitFinal);
+      if (submitBtn) submitBtn.addEventListener('click', openSignoff);
 
       const withdrawBtn = $id('ss-withdraw-btn');
       if (withdrawBtn) withdrawBtn.addEventListener('click', withdrawSubmit);
@@ -2337,6 +2436,32 @@
       return pills[status] || pills.empty;
     }
 
+    // Dual-entry status cell: shows where the cross-check stands for one game,
+    // including the other team's conflicting version when there's a mismatch.
+    function gameStatusCell(status, gs, final) {
+      if (status === 'confirmed') {
+        return '<span class="ss-pill ss-pill--confirmed">&check; Matched</span>';
+      }
+      if (status === 'mismatch' && gs.theirs) {
+        return `<span class="ss-pill ss-pill--mismatch">&#9888; Doesn't match</span>
+          <div class="ss-theirs">Other team's version: <strong>${gs.theirs.home ?? '—'}&ndash;${gs.theirs.away ?? '—'}</strong><br>Confirm courtside, revise &amp; resave.</div>`;
+      }
+      if (status === 'mismatch') {
+        return '<span class="ss-pill ss-pill--mismatch">&#9888; Check score</span>';
+      }
+      const mineDone = Number.isInteger(gs.mine?.home) && Number.isInteger(gs.mine?.away);
+      if (mineDone && !gs.theirsEntered) {
+        return '<span class="ss-pill ss-pill--partial">Waiting on other team</span>';
+      }
+      if (!mineDone && gs.theirsEntered) {
+        return '<span class="ss-pill ss-pill--gold ss-pill--partial">Other team entered — add yours</span>';
+      }
+      if (gs.mine && (Number.isInteger(gs.mine.home) || Number.isInteger(gs.mine.away))) {
+        return '<span class="ss-pill ss-pill--partial">Incomplete</span>';
+      }
+      return '<span class="ss-pill ss-pill--empty">—</span>';
+    }
+
     function renderScoresheetBanner(data) {
       if (data.preview) {
         return `<div class="ss-banner"><strong>Pre-game preview.</strong> This is your scoresheet exactly as it will look on game day. Your opponent's pairs stay hidden until both lineups reveal 30 minutes before first serve — score entry unlocks then. Use this to check your pairs are in line and ready to go.</div>`;
@@ -2354,23 +2479,23 @@
       if (mismatches.length > 0) {
         return `
           <div class="ss-banner ss-banner--mismatch">
-            <strong>${mismatches.length} game${mismatches.length === 1 ? '' : 's'} don't match.</strong>
-            Talk to the other captain courtside, then both re-enter. The system will mark the games confirmed when you both type the same numbers.
+            <strong>${mismatches.length} game${mismatches.length === 1 ? '' : 's'} don't match the other team's entry.</strong>
+            Their version is shown in red on the affected game${mismatches.length === 1 ? '' : 's'}. Confirm with the other captain courtside, revise, and resave — the game confirms when both teams' numbers match.
             <span class="ss-banner__detail">Affected: ${mismatches.map(s => prettySlotShort(s)).join(', ')}</span>
           </div>
         `;
       }
 
       if (c.canSubmit && !mySubmitted) {
-        return `<div class="ss-banner ss-banner--ready"><strong>All 12 games confirmed.</strong> Tap "Submit final" below to finalize the match. Both captains must submit before scores are written to the leaderboard.</div>`;
+        return `<div class="ss-banner ss-banner--ready"><strong>All 12 games matched.</strong> Review the final score and sign off below. The match finalizes once both captains have signed.</div>`;
       }
 
       if (mySubmitted) {
-        return `<div class="ss-banner ss-banner--mine-submitted"><strong>You've submitted.</strong> Waiting on the other captain to submit. The match will finalize as soon as they do.</div>`;
+        return `<div class="ss-banner ss-banner--mine-submitted"><strong>You've signed off.</strong> Waiting on the other captain. The match finalizes as soon as they sign.</div>`;
       }
 
       const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0);
-      return `<div class="ss-banner"><strong>Both captains enter scores game-by-game.</strong> A game shows as confirmed when both numbers match. ${remaining} game${remaining === 1 ? '' : 's'} still to enter or confirm.</div>`;
+      return `<div class="ss-banner"><strong>Each team enters its own copy of every score.</strong> Scores save automatically as you type, and a game confirms when both teams' numbers match — like trading paper scoresheets. ${remaining} game${remaining === 1 ? '' : 's'} still to enter or match.</div>`;
     }
 
     function formatPair(gamePicks) {
@@ -2393,23 +2518,53 @@
     }
 
     // ===== Save flow =====
-    // Batch save: gather every game's home + away score from the sheet and
-    // persist them in one request. Supports entering several games at once
-    // (e.g. a whole round after back-to-back matches).
-    async function saveAllScores() {
-      const saveBtn = $id('ss-save-btn');
-      if (!btnBusy(saveBtn, 'Saving…')) return; // already saving — ignore repeat taps / Enter
-      try {
-        await saveAllScoresInner();
-      } finally { btnDone(saveBtn); } // no-op if refreshScoresheet re-rendered the button
+    // Scores auto-save shortly after typing stops (per game, as soon as the
+    // numbers change). The floating button + "Save scores" button are manual
+    // fallbacks and reassurance. Only MY TEAM's entries are sent — the other
+    // team keeps their own copy.
+    function scheduleAutoSave() {
+      if (state.autoSaveTimer) clearTimeout(state.autoSaveTimer);
+      state.autoSaveTimer = setTimeout(() => {
+        state.autoSaveTimer = null;
+        if (state.scoreDirty) saveAllScores(true);
+      }, 900);
     }
 
-    async function saveAllScoresInner() {
+    // Floating save pill: hidden when clean, shows while dirty/saving/saved.
+    function updateFloatingSave(mode) {
+      const btn = $id('ss-float-save');
+      if (!btn) return;
+      btn.classList.remove('is-on', 'is-saving', 'is-saved');
+      if (mode === 'dirty') { btn.classList.add('is-on'); btn.textContent = 'Save scores'; }
+      else if (mode === 'saving') { btn.classList.add('is-on', 'is-saving'); btn.textContent = 'Saving…'; }
+      else if (mode === 'saved') {
+        btn.classList.add('is-on', 'is-saved'); btn.textContent = '✓ Saved';
+        if (state.floatSaveTimer) clearTimeout(state.floatSaveTimer);
+        state.floatSaveTimer = setTimeout(() => { if (!state.scoreDirty) btn.classList.remove('is-on', 'is-saved'); }, 1800);
+      }
+      // 'clean' → stays hidden
+    }
+
+    async function saveAllScores(auto) {
+      if (state.scoreSaving) return; // a save is in flight — autosave will re-run if still dirty
+      state.scoreSaving = true;
+      const saveBtn = $id('ss-save-btn');
+      if (!auto) btnBusy(saveBtn, 'Saving…');
+      updateFloatingSave('saving');
+      try {
+        await saveAllScoresInner(auto);
+      } finally {
+        state.scoreSaving = false;
+        if (!auto) btnDone(saveBtn); // no-op if refreshScoresheet re-rendered the button
+      }
+    }
+
+    async function saveAllScoresInner(auto) {
       const area = $id('scoresheet-area');
       const games = {};
       let changes = 0;
-      // Only send games the captain actually changed — so two captains editing
-      // the same shared sheet never overwrite each other's saved games.
+      const sent = [];
+      // Only send what changed since the last save.
       area.querySelectorAll('.ss-score-input').forEach(inp => {
         const slot = inp.dataset.slot, side = inp.dataset.side;
         if (!slot || !side) return;
@@ -2418,18 +2573,22 @@
         if (cur === orig) return;
         if (!games[slot]) games[slot] = {};
         games[slot][side] = cur === '' ? null : Number(cur);
+        sent.push(inp);
         changes++;
       });
 
       const status = $id('ss-status');
       if (changes === 0) {
         state.scoreDirty = false;
-        if (status) { status.className = 'cap-status'; status.textContent = 'No changes to save.'; }
-        await refreshScoresheet(true);
+        updateFloatingSave('clean');
+        if (!auto) {
+          if (status) { status.className = 'cap-status'; status.textContent = 'No changes to save.'; }
+          await refreshScoresheet(true);
+        }
         return;
       }
 
-      if (status) { status.className = 'cap-status'; status.textContent = 'Saving…'; }
+      if (!auto && status) { status.className = 'cap-status'; status.textContent = 'Saving…'; }
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, {
           method: 'PUT',
@@ -2439,9 +2598,24 @@
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
-        state.scoreDirty = false;          // saved — safe to re-render
-        await refreshScoresheet(true);     // re-render with updated status pills + live totals
+
+        // Mark what we sent as the new baseline.
+        sent.forEach(inp => { inp.dataset.orig = inp.value.trim(); });
+        const stillDirty = Array.from(area.querySelectorAll('.ss-score-input'))
+          .some(inp => (inp.value || '').trim() !== (inp.dataset.orig || '').trim());
+        state.scoreDirty = stillDirty;
+        updateFloatingSave(stillDirty ? 'dirty' : 'saved');
+
+        // Re-render to refresh status pills + totals — but never yank the
+        // sheet out from under a captain who's mid-typing in another field.
+        const typing = document.activeElement && document.activeElement.classList?.contains('ss-score-input');
+        if (!stillDirty && !typing) {
+          await refreshScoresheet(true);
+          updateFloatingSave('saved');
+        }
       } catch (err) {
+        state.scoreDirty = true;
+        updateFloatingSave('dirty');
         if (status) {
           status.className = 'a-status is-err';
           status.textContent = err.message;
@@ -2449,19 +2623,78 @@
       }
     }
 
-    async function submitFinal() {
-      if (!confirm('Submit this scoresheet as final from your side?\n\nIf the other captain also submits, the match becomes FINAL and scores are written to the leaderboard. You can withdraw your submission until the other captain submits.')) return;
+    // ===== Sign-off (finalize) =====
+    // Shows the full agreed score summary; the captain checks "I agree" and
+    // signs. The match finalizes once BOTH captains have signed off.
+    function openSignoff() {
+      const sc = state.currentScore?.score;
+      if (!sc || !sc.computed?.canSubmit) return;
+      const c = sc.computed;
+      const m = state.currentScore.match;
+      const myRole = state.currentScore.myRole;
+      const otherName = myRole === 'home' ? m.away.name : m.home.name;
 
-      const status = $id('ss-status');
-      const btn = $id('ss-submit-btn');
-      if (!btnBusy(btn, 'Submitting…')) return;
+      const row = (slot) => {
+        const g = sc.games[slot] || {};
+        const r = slot.startsWith('r1') ? 1 : 2;
+        return `<tr>
+          <td>R${r} G${slot.slice(-1)} <span style="color:var(--color-text-faint);font-size:10px;">${SLOT_TYPE_LABEL[slot] || ''}</span></td>
+          <td class="num">${g.home ?? '—'}</td>
+          <td class="num">${g.away ?? '—'}</td>
+        </tr>`;
+      };
+
+      const overlay = document.createElement('div');
+      overlay.className = 'signoff-bg';
+      overlay.id = 'signoff-bg';
+      overlay.innerHTML = `
+        <div class="signoff">
+          <h3>Sign off on the final score</h3>
+          <div class="signoff__sub">Week ${m.week} &middot; ${escapeHtml(m.home.name)} vs ${escapeHtml(m.away.name)}</div>
+          <div class="signoff__total">
+            <span>${escapeHtml(m.home.name)}</span>
+            <b>${c.matchPoints.home} &ndash; ${c.matchPoints.away}</b>
+            <span>${escapeHtml(m.away.name)}</span>
+          </div>
+          <table>
+            <tr><th>Game</th><th style="text-align:center;">${escapeHtml(m.home.name)}</th><th style="text-align:center;">${escapeHtml(m.away.name)}</th></tr>
+            ${SLOT_KEYS.map(row).join('')}
+          </table>
+          <label class="signoff__agree">
+            <input type="checkbox" id="signoff-agree">
+            <span>I confirm these scores are correct and <strong>I agree to the final result</strong> on behalf of my team. This is my captain's signature — once ${escapeHtml(otherName)} also signs, the match is final and posts to the standings.</span>
+          </label>
+          <div class="signoff__actions">
+            <button class="cap-btn cap-btn--ghost" id="signoff-cancel">Cancel</button>
+            <button class="cap-btn cap-btn--gold" id="signoff-confirm" disabled>Sign &amp; submit</button>
+          </div>
+          <div class="cap-status" id="signoff-status"></div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      const close = () => overlay.remove();
+      overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+      $id('signoff-cancel').addEventListener('click', close);
+      $id('signoff-agree').addEventListener('change', (e) => {
+        $id('signoff-confirm').disabled = !e.target.checked;
+      });
+      $id('signoff-confirm').addEventListener('click', () => submitFinal(close));
+    }
+
+    async function submitFinal(closeOverlay) {
+      const status = $id('signoff-status') || $id('ss-status');
+      const btn = $id('signoff-confirm');
+      if (btn && !btnBusy(btn, 'Signing…')) return;
       try {
         const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}&action=submit`, {
           method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ agree: true }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Submit failed');
+        if (!res.ok) throw new Error(data.error || 'Sign-off failed');
         state.scoreDirty = false;
+        if (typeof closeOverlay === 'function') closeOverlay();
         await refreshScoresheet(true);
         await loadMatches();
       } catch (err) {
@@ -2469,11 +2702,12 @@
           status.className = 'a-status is-err';
           status.textContent = err.message;
         }
-      } finally { btnDone(btn); } // no-op if refreshScoresheet re-rendered the button
+        if (btn) btnDone(btn);
+      }
     }
 
     async function withdrawSubmit() {
-      if (!confirm('Withdraw your submission? You can re-submit later.')) return;
+      if (!confirm('Withdraw your sign-off? You can review and sign again later.')) return;
       const status = $id('ss-status');
       const btn = $id('ss-withdraw-btn');
       if (!btnBusy(btn, 'Withdrawing…')) return;
@@ -2590,6 +2824,8 @@
     function stopPolling() {
       if (state.pollTimer) { clearInterval(state.pollTimer); state.pollTimer = null; }
     }
+
+    $id('ss-float-save').addEventListener('click', () => saveAllScores(false));
 
     $id('back-to-matches').addEventListener('click', (e) => {
       e.preventDefault();
@@ -3143,32 +3379,46 @@
       const courtOf = (g) => (g % 2 === 1) ? courtA : courtB;
       const badgeOf = (t) => t === 'WOMENS' ? 'w' : t === 'MENS' ? 'm' : 'x';
 
+      // Dual entry: these inputs are MY TEAM's version of each score —
+      // typeable, with +/- steppers as a convenience.
       const sideStep = (slot, side, isUs) => {
-        const raw = Number.isInteger(games[slot]?.[side]) ? games[slot][side] : '';
-        const disp = raw === '' ? 0 : raw;
+        const mine = games[slot]?.mine || {};
+        const raw = Number.isInteger(mine[side]) ? mine[side] : '';
         return `<div class="bgm__side ${isUs ? 'bgm__side--us' : ''}">
           <div class="bgm__lbl">${isUs ? 'Us' : 'Them'}</div>
           <div class="bgm__stepper">
             <button type="button" class="bgm__step" onclick="capStep('${slot}','${side}',-1)" ${canEdit ? '' : 'disabled'}>&minus;</button>
-            <span class="bgm__val" id="val-${slot}-${side}">${disp}</span>
+            <input type="number" inputmode="numeric" min="0" max="30" class="ss-score-input bgm__input" id="inp-${slot}-${side}" data-slot="${slot}" data-side="${side}" data-orig="${raw}" value="${raw}" ${canEdit ? '' : 'disabled'}>
             <button type="button" class="bgm__step" onclick="capStep('${slot}','${side}',1)" ${canEdit ? '' : 'disabled'}>+</button>
-            <input type="hidden" class="ss-score-input" id="inp-${slot}-${side}" data-slot="${slot}" data-side="${side}" data-orig="${raw}" value="${raw}" ${canEdit ? '' : 'disabled'}>
           </div></div>`;
       };
       const gameCard = (g, round) => {
         const slot = `r${round}g${g}`;
         const slot_t = SLOT_RULES[slot];
+        const gs = games[slot] || {};
         const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
         const usPair = mySide === 'home' ? formatPair(homeLineup[slot]) : formatPair(awayLineup[slot]);
         const themPair = data.preview ? 'Reveals 30 min before match'
           : (mySide === 'home' ? formatPair(awayLineup[slot]) : formatPair(homeLineup[slot]));
-        const pillTxt = { confirmed: 'Recorded', mismatch: 'Check scores', partial: 'Incomplete', empty: 'Not played' }[status] || 'Not played';
+        const mineDone = Number.isInteger(gs.mine?.home) && Number.isInteger(gs.mine?.away);
+        let pillTxt = { confirmed: 'Matched ✓', mismatch: "Doesn't match", partial: 'Incomplete', empty: 'Not played' }[status] || 'Not played';
+        if (status === 'partial') {
+          if (mineDone && !gs.theirsEntered) pillTxt = 'Waiting on them';
+          else if (!mineDone && gs.theirsEntered) pillTxt = 'They entered — add yours';
+        }
         const cardCls = status === 'confirmed' ? 'bgm--confirmed' : status === 'mismatch' ? 'bgm--mismatch' : '';
+        const themTheirs = gs.theirs ? (mySide === 'home'
+          ? `${gs.theirs.home ?? '—'}–${gs.theirs.away ?? '—'}`
+          : `${gs.theirs.away ?? '—'}–${gs.theirs.home ?? '—'}`) : null;
+        const mismatchNote = (status === 'mismatch' && themTheirs)
+          ? `<div class="bgm__theirs">Their version (Us–Them): <strong>${themTheirs}</strong> — confirm with the other team, revise &amp; resave.</div>`
+          : '';
         return `<div class="bgm ${cardCls}">
           <div class="bgm__top"><span class="lmob-badge is-${badgeOf(slot_t.type)}">${slot_t.label}</span><span class="bgm__court">${courtOf(g) ? 'Court ' + escapeHtml(String(courtOf(g))) : ''}</span></div>
           <div class="bgm__pairs"><div class="bgm__pair bgm__pair--us">${escapeHtml(usPair)}</div><div class="bgm__vs">VS</div><div class="bgm__pair">${escapeHtml(themPair)}</div></div>
           <div class="bgm__scores">${sideStep(slot, mySide, true)}${sideStep(slot, oppSide, false)}</div>
           <div class="bgm__status"><span class="bgm__pill is-${status}">${pillTxt}</span></div>
+          ${mismatchNote}
         </div>`;
       };
       const setBlock = (round, setNum, g1, g2) => `
@@ -3180,7 +3430,13 @@
         const usG = mySide === 'home' ? (rs?.homeGames ?? 0) : (rs?.awayGames ?? 0);
         const themG = mySide === 'home' ? (rs?.awayGames ?? 0) : (rs?.homeGames ?? 0);
         let usP = 0, themP = 0;
-        for (let g = 1; g <= 6; g++) { const gs = games[`r${r}g${g}`]; if (Number.isInteger(gs?.home) && Number.isInteger(gs?.away)) { usP += gs[mySide]; themP += gs[oppSide]; } }
+        for (let g = 1; g <= 6; g++) {
+          const gs = games[`r${r}g${g}`];
+          // Agreed score if confirmed, else our own entry (live running total).
+          const src = (Number.isInteger(gs?.home) && Number.isInteger(gs?.away)) ? gs
+            : (Number.isInteger(gs?.mine?.home) && Number.isInteger(gs?.mine?.away)) ? gs.mine : null;
+          if (src) { usP += src[mySide]; themP += src[oppSide]; }
+        }
         const complete = rs?.scoredGames === 6;
         const usMP = complete ? (mySide === 'home' ? rs.homePoints : rs.awayPoints) : null;
         const themMP = complete ? (mySide === 'home' ? rs.awayPoints : rs.homePoints) : null;
@@ -3200,12 +3456,14 @@
         <div class="mth__note">${bothDone ? 'Final — this is what posts to the standings (max 4).' : 'Match points lock once all 6 games of each round have a winner.'}</div>
       </div>`;
 
-      // submissions + actions (reuse existing save/submit/withdraw handlers)
+      // sign-offs + actions (reuse existing save/sign-off/withdraw handlers)
       const mySubmitted = mySide === 'home' ? !!score.homeSubmittedAt : !!score.awaySubmittedAt;
       const otherSubmitted = mySide === 'home' ? !!score.awaySubmittedAt : !!score.homeSubmittedAt;
+      const mySigned = mySide === 'home' ? score.homeSignedName : score.awaySignedName;
+      const otherSigned = mySide === 'home' ? score.awaySignedName : score.homeSignedName;
       const submissions = `<div class="ss-approvals" style="margin-top:14px;">
-        <div class="ss-approval ${mySubmitted ? 'ss-approval--done' : 'ss-approval--mine'}"><div class="ss-approval__label">${escapeHtml(myName)} (you)</div><div class="ss-approval__value">${mySubmitted ? '✓ Submitted' : 'Not submitted'}</div></div>
-        <div class="ss-approval ${otherSubmitted ? 'ss-approval--done' : ''}"><div class="ss-approval__label">${escapeHtml(oppName)}</div><div class="ss-approval__value">${otherSubmitted ? '✓ Submitted' : 'Waiting'}</div></div>
+        <div class="ss-approval ${mySubmitted ? 'ss-approval--done' : 'ss-approval--mine'}"><div class="ss-approval__label">${escapeHtml(myName)} (you)</div><div class="ss-approval__value">${mySubmitted ? '✓ Signed off' : 'Not signed'}</div>${mySubmitted && mySigned ? `<div class="ss-approval__time">by ${escapeHtml(mySigned)}</div>` : ''}</div>
+        <div class="ss-approval ${otherSubmitted ? 'ss-approval--done' : ''}"><div class="ss-approval__label">${escapeHtml(oppName)}</div><div class="ss-approval__value">${otherSubmitted ? '✓ Signed off' : 'Waiting'}</div>${otherSubmitted && otherSigned ? `<div class="ss-approval__time">by ${escapeHtml(otherSigned)}</div>` : ''}</div>
       </div>`;
       const actions = [];
       if (!final && !data.preview) {
@@ -3213,10 +3471,10 @@
         if (!mySubmitted) {
           const ready = !!c.canSubmit;
           const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0) + (c.counts?.mismatch || 0);
-          const label = ready ? 'Submit final' : `${remaining} game${remaining === 1 ? '' : 's'} left`;
+          const label = ready ? 'Review & sign off' : `${remaining} game${remaining === 1 ? '' : 's'} left`;
           actions.push(`<button class="cap-btn cap-btn--gold" id="ss-submit-btn" style="flex:1;" ${ready ? '' : 'disabled'}>${label}</button>`);
         } else {
-          actions.push('<button class="cap-btn cap-btn--ghost" id="ss-withdraw-btn" style="flex:1;">Withdraw</button>');
+          actions.push('<button class="cap-btn cap-btn--ghost" id="ss-withdraw-btn" style="flex:1;">Withdraw sign-off</button>');
         }
       }
 
@@ -3232,9 +3490,20 @@
         </div>
         ${final ? renderUpNextStrip() : ''}`;
 
-      $id('ss-save-btn')?.addEventListener('click', saveAllScores);
-      $id('ss-submit-btn')?.addEventListener('click', submitFinal);
+      $id('ss-save-btn')?.addEventListener('click', () => saveAllScores(false));
+      $id('ss-submit-btn')?.addEventListener('click', openSignoff);
       $id('ss-withdraw-btn')?.addEventListener('click', withdrawSubmit);
+      // Typeable inputs: track edits + auto-save (same flow as desktop).
+      area.querySelectorAll('.ss-score-input:not([disabled])').forEach(inp => {
+        inp.addEventListener('input', () => {
+          state.scoreDirty = true;
+          updateFloatingSave('dirty');
+          scheduleAutoSave();
+        });
+        inp.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); inp.blur(); saveAllScores(); }
+        });
+      });
       const upNextBtn = $id('up-next-btn');
       if (upNextBtn) upNextBtn.addEventListener('click', (e) => { e.preventDefault(); const id = upNextBtn.dataset.matchId; if (id) openMatch(id, { hideBackLink: true, viaTab: 'next' }); });
     }
@@ -3244,8 +3513,9 @@
       let v = parseInt(inp.value, 10); if (isNaN(v)) v = 0;
       v = Math.max(0, Math.min(30, v + d));
       inp.value = v;
-      const span = $id('val-' + slot + '-' + side); if (span) span.textContent = v;
       state.scoreDirty = true;
+      updateFloatingSave('dirty');
+      scheduleAutoSave();
     }
 
     // ---------- tonight banner (schedule) ----------

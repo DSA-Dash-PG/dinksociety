@@ -22,8 +22,9 @@ export default async (req) => {
   try {
     const myMatches = [];
 
-    // Scan all weeks for this division in this circuit
-    for (let week = 1; week <= 7; week++) {
+    // Scan all weeks for this division in this circuit (incl. championship
+    // week 8 and any admin-added make-up weeks)
+    for (let week = 1; week <= 12; week++) {
       const key = `schedule/${circuit}/${division}/week-${week}.json`;
       const data = await scheduleStore.get(key, { type: 'json' });
       if (!data?.matches) continue;

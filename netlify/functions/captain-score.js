@@ -1,25 +1,28 @@
 // netlify/functions/captain-score.js
 //
-// Single-entry scoring with final dual-approval. One shared scoresheet:
-// either captain enters each game's home + away score once. The match
-// finalizes only when:
-//   1. All 12 games have a complete, valid score (to 11, win by 2)
-//   2. Both captains have tapped "Submit final" since the last edit
+// Dual-entry scoring with cross-check + captain sign-off. Each team enters
+// its OWN copy of every game score (like keeping their own paper sheet):
+//   - A game is CONFIRMED only when both teams' versions match and form a
+//     valid finished game.
+//   - A MISMATCH (versions disagree) blocks finalize; each captain sees the
+//     other team's version once they've entered their own, so they can
+//     confirm courtside, revise, and resave.
+//   - The match finalizes only when all 12 games are confirmed AND both
+//     captains have signed off ("I agree these scores are correct").
 //
-// GET   ?match=<id>                          → state + computed view
-// PUT   ?match=<id>                          → save game scores (either captain)
+// GET   ?match=<id>                          → state + computed view (my side)
+// PUT   ?match=<id>                          → save MY TEAM's game entries
 //                                                body: { games: { r1g1: { home: 11, away: 4 }, ... } }
-// POST  ?match=<id>&action=submit            → mark this captain's "I approve" flag
-// POST  ?match=<id>&action=withdraw          → revoke my approval (only allowed pre-finalize)
+// POST  ?match=<id>&action=submit            → sign off (body: { agree: true })
+// POST  ?match=<id>&action=withdraw          → revoke my sign-off (pre-finalize)
 //
-// Storage shape:
-//   game = { home: <homeScore>|null, away: <awayScore>|null, by, at }
+// Storage shape per slot (see lib/score-helpers.js):
+//   game = { home, away,                      // canonical agreed score
+//            homeEntry: {home,away,by,at},    // home team's version
+//            awayEntry: {home,away,by,at} }   // away team's version
 //
-// Computed status per game (server-derived, never persisted):
-//   'empty'      both scores null
-//   'partial'    one score entered
-//   'confirmed'  both entered AND a valid finished game
-//   'mismatch'   both entered but NOT a valid finished game — blocks save + submit
+// Anti-copy rule: a captain can't see the other team's version of a game
+// until their own entry for that game is complete.
 
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
@@ -27,6 +30,7 @@ import { rebuildStandings } from './lib/standings.js';
 import { circuitCode } from './lib/circuit.js';
 import {
   SLOT_KEYS, newScoreRecord, toScore, decorate, prettySlot,
+  normalizeScore, entryComplete, isValidGame,
 } from './lib/score-helpers.js';
 
 export default async (req) => {
@@ -52,6 +56,7 @@ export default async (req) => {
 
   const myRole = match.teamA.id === ctx.team.id ? 'home' : 'away';
   const scoreKey = `score/${matchId}.json`;
+  const winBy = match.championship ? 2 : 1;
 
   const [lineupHome, lineupAway] = await Promise.all([
     lineupStore.get(`lineup/${matchId}/${match.teamA.id}.json`, { type: 'json' }).catch(() => null),
@@ -75,16 +80,17 @@ export default async (req) => {
       match: publicMatchInfo(match),
       homeLineup: sanitizeLineup(lineupHome),
       awayLineup: sanitizeLineup(lineupAway),
-      score: decorate(score, match.championship),
+      score: viewForCaptain(decorate(score, match.championship), myRole),
     });
   }
 
   if (!revealed) return json({ error: 'Both lineups must be locked before scoring' }, 409);
 
-  // ===== PUT =====
+  // ===== PUT — save MY TEAM's entries =====
   if (req.method === 'PUT') {
     const existing = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
       || newScoreRecord(match);
+    normalizeScore(existing, match.championship);
 
     if (existing.finalizedAt) {
       return json({ error: 'Match is final. Contact admin to reopen.' }, 409);
@@ -93,15 +99,15 @@ export default async (req) => {
     const body = await req.json();
     const incoming = body.games || {};
     const now = new Date().toISOString();
+    const entryKey = myRole === 'home' ? 'homeEntry' : 'awayEntry';
     let changed = false;
 
-    // Single shared scoresheet: either captain may enter/edit any game's
-    // home + away scores. Incoming per slot: { home?: N|null, away?: M|null }.
+    // Each captain writes ONLY their own team's version of the score.
     for (const slot of SLOT_KEYS) {
       if (!(slot in incoming)) continue;
       const g = incoming[slot] || {};
-      if (!existing.games[slot]) existing.games[slot] = { home: null, away: null };
       const cur = existing.games[slot];
+      const myEntry = cur[entryKey] || { home: null, away: null, by: null, at: null };
       let slotChanged = false;
 
       for (const side of ['home', 'away']) {
@@ -111,52 +117,55 @@ export default async (req) => {
         if (newVal === 'INVALID') {
           return json({ error: `${prettySlot(slot)}: scores must be integers 0-30` }, 400);
         }
-        if (cur[side] === newVal) continue; // no change
-        cur[side] = newVal;
+        if (myEntry[side] === newVal) continue; // no change
+        myEntry[side] = newVal;
         slotChanged = true;
       }
 
       if (slotChanged) {
-        cur.by = ctx.user.email;
-        cur.at = now;
+        myEntry.by = ctx.user.email;
+        myEntry.at = now;
+        cur[entryKey] = myEntry;
         changed = true;
       }
     }
 
-    // Reject save if any fully-entered game pair is invalid (mismatch).
-    // Partial entries (one side only) are allowed mid-entry.
-    const winBy = match.championship ? 2 : 1;
-    const mismatchedSlots = SLOT_KEYS.filter(slot => {
-      const g = existing.games[slot];
-      if (!g) return false;
-      const hHas = Number.isInteger(g.home);
-      const aHas = Number.isInteger(g.away);
-      if (!hHas || !aHas) return false; // partial — ok
-      return !isValidGame(g.home, g.away, winBy);
+    // My own complete entries must each form a valid finished game.
+    // (Disagreeing with the other team is allowed — that's a mismatch,
+    // surfaced in the UI — but an impossible score is rejected outright.)
+    const invalidSlots = SLOT_KEYS.filter(slot => {
+      const e = existing.games[slot][entryKey];
+      if (!entryComplete(e)) return false; // partial mid-entry — ok
+      return !isValidGame(e.home, e.away, winBy);
     });
 
-    if (mismatchedSlots.length > 0) {
-      const labels = mismatchedSlots.map(prettySlot).join(', ');
+    if (invalidSlots.length > 0) {
+      const labels = invalidSlots.map(prettySlot).join(', ');
       const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
       return json({
-        error: `${mismatchedSlots.length} game(s) have invalid scores (${rule}): ${labels}. Fix before saving.`,
-        mismatchedSlots,
+        error: `${invalidSlots.length} game(s) have impossible scores (${rule}): ${labels}. Fix before saving.`,
+        invalidSlots,
       }, 400);
     }
 
-    // Any score change wipes both submit flags — both captains must re-approve.
+    // Re-derive canonical agreed scores from both entries.
+    normalizeScore(existing, match.championship);
+
+    // Any score change wipes both sign-offs — both captains must re-approve.
     if (changed && (existing.homeSubmittedAt || existing.awaySubmittedAt)) {
       existing.homeSubmittedAt = null;
       existing.homeSubmittedBy = null;
+      existing.homeSignedName = null;
       existing.awaySubmittedAt = null;
       existing.awaySubmittedBy = null;
+      existing.awaySignedName = null;
     }
 
     existing.updatedAt = now;
     existing.updatedBy = ctx.user.email;
 
     await scoresStore.setJSON(scoreKey, existing);
-    return json({ ok: true, score: decorate(existing, match.championship) });
+    return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
   }
 
   // ===== POST submit / withdraw =====
@@ -168,51 +177,60 @@ export default async (req) => {
 
     const existing = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
       || newScoreRecord(match);
+    normalizeScore(existing, match.championship);
 
     if (action === 'submit') {
       if (existing.finalizedAt) {
         return json({ error: 'Already finalized' }, 409);
       }
 
+      const body = await req.json().catch(() => ({}));
+      if (body.agree !== true) {
+        return json({ error: 'You must confirm you agree with the scores before signing off.' }, 400);
+      }
+
       const decorated = decorate(existing, match.championship);
 
-      // Check for mismatched slots first (invalid score pairs)
+      // Mismatched games (the two teams' versions disagree) block sign-off.
       const mismatchedSlots = decorated.computed.gameStatuses
         .filter(g => g.status === 'mismatch')
         .map(g => g.slot);
       if (mismatchedSlots.length > 0) {
-        const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
         const labels = mismatchedSlots.map(prettySlot).slice(0, 3).join(', ');
         const more = mismatchedSlots.length > 3 ? ` and ${mismatchedSlots.length - 3} more` : '';
         return json({
-          error: `Cannot submit — ${mismatchedSlots.length} game(s) have invalid scores (${rule}): ${labels}${more}. Both home and away scores must form a valid finished game.`,
+          error: `Cannot sign off — ${mismatchedSlots.length} game(s) don't match the other team's entry: ${labels}${more}. Confirm with the other captain, revise, and resave.`,
           mismatchedSlots,
         }, 400);
       }
 
-      // All games must be CONFIRMED (both sides entered + valid)
+      // All games must be CONFIRMED (both teams entered matching, valid scores)
       const unconfirmed = decorated.computed.gameStatuses.filter(g => g.status !== 'confirmed');
       if (unconfirmed.length > 0) {
         const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
         const labels = unconfirmed.map(g => prettySlot(g.slot)).slice(0, 3).join(', ');
         const more = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : '';
         return json({
-          error: `Cannot submit yet — ${unconfirmed.length} game(s) need a complete, valid score (${rule}): ${labels}${more}.`,
+          error: `Cannot sign off yet — ${unconfirmed.length} game(s) still need a matching, valid score from both teams (${rule}): ${labels}${more}.`,
         }, 400);
       }
 
       const now = new Date().toISOString();
+      const signedName = captainName(ctx) || ctx.user.email;
       if (myRole === 'home') {
         existing.homeSubmittedAt = now;
         existing.homeSubmittedBy = ctx.user.email;
+        existing.homeSignedName = signedName;
       } else {
         existing.awaySubmittedAt = now;
         existing.awaySubmittedBy = ctx.user.email;
+        existing.awaySignedName = signedName;
       }
 
-      // Both submitted → finalize and write to schedule
+      // Both signed → finalize and write to schedule
       if (existing.homeSubmittedAt && existing.awaySubmittedAt) {
         existing.finalizedAt = now;
+        await scoresStore.setJSON(scoreKey, existing);
         try {
           await writeFinalScoreToSchedule(scheduleStore, match, existing);
         } catch (err) {
@@ -220,10 +238,14 @@ export default async (req) => {
           // Don't block finalize — score record is already marked final
         }
         // Rebuild standings + player-stats aggregates for this Circuit.
-        // Wrapped so a standings error doesn't block the finalize itself.
-        rebuildStandings(match.circuit).catch(err =>
-          console.error('rebuildStandings failed post-finalize for match', matchId, 'circuit', match.circuit, ':', err)
-        );
+        // MUST be awaited: serverless execution freezes once the response
+        // returns, so a fire-and-forget rebuild silently never runs.
+        try {
+          await rebuildStandings(match.circuit);
+        } catch (err) {
+          console.error('rebuildStandings failed post-finalize for match', matchId, 'circuit', match.circuit, ':', err);
+        }
+        return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
       }
     } else {
       // Withdraw
@@ -233,14 +255,16 @@ export default async (req) => {
       if (myRole === 'home') {
         existing.homeSubmittedAt = null;
         existing.homeSubmittedBy = null;
+        existing.homeSignedName = null;
       } else {
         existing.awaySubmittedAt = null;
         existing.awaySubmittedBy = null;
+        existing.awaySignedName = null;
       }
     }
 
     await scoresStore.setJSON(scoreKey, existing);
-    return json({ ok: true, score: decorate(existing, match.championship) });
+    return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
   }
 
   return new Response('Method not allowed', { status: 405 });
@@ -267,32 +291,54 @@ function sanitizeLineup(lineup) {
   return { teamId: lineup.teamId, teamName: lineup.teamName, games: lineup.games };
 }
 
-function publicMatchInfo(match) {
-  return {
-    id: match.id, week: match.week, court: match.court,
-    courtA: match.courtA ?? null,
-    courtB: match.courtB ?? null,
-    courtSet: match.courtSet ?? null,
-    championship: !!match.championship,
-    venue: match.venue || null,
-    scheduledAt: match.scheduledAt || null,
-    circuit: match.circuit, division: match.division,
-    home: { id: match.teamA.id, name: match.teamA.name },
-    away: { id: match.teamB.id, name: match.teamB.name },
-  };
+// Resolve the captain's display name from the team roster (for the sign-off).
+function captainName(ctx) {
+  const email = (ctx.user.email || '').toLowerCase();
+  const p = (ctx.team.roster || []).find(x =>
+    (x.normalizedEmail || (x.email || '').toLowerCase()) === email);
+  return p?.name || null;
 }
 
-function isValidGame(h, a, winBy = 1) {
-  if (!Number.isInteger(h) || !Number.isInteger(a)) return false;
-  if (h === a) return false;
-  const hi = Math.max(h, a), lo = Math.min(h, a);
-  if (winBy === 2) {
-    if (hi < 11) return false;
-    if (hi - lo < 2) return false;
-    return hi === 11 ? lo <= 9 : (hi - lo) === 2;
+// Per-captain view of the score record:
+//   - my own entry is always visible/editable
+//   - the OTHER team's version of a game stays hidden until my entry for
+//     that game is complete (prevents just copying their numbers), then
+//     becomes visible so mismatches can be compared and resolved.
+//   - submitter emails are not exposed; signed names are.
+function viewForCaptain(decorated, myRole) {
+  const final = !!decorated.finalizedAt;
+  const mineKey = myRole === 'home' ? 'homeEntry' : 'awayEntry';
+  const theirsKey = myRole === 'home' ? 'awayEntry' : 'homeEntry';
+
+  const games = {};
+  for (const slot of SLOT_KEYS) {
+    const g = decorated.games[slot] || {};
+    const mine = g[mineKey] ? { home: g[mineKey].home, away: g[mineKey].away } : null;
+    const theirsEntered = entryComplete(g[theirsKey]);
+    const showTheirs = final || entryComplete(g[mineKey]);
+    games[slot] = {
+      home: g.home, away: g.away, // canonical agreed score (null until confirmed)
+      mine,
+      theirs: (showTheirs && g[theirsKey]) ? { home: g[theirsKey].home, away: g[theirsKey].away } : null,
+      theirsEntered, // they have a complete entry (even if hidden from me)
+    };
   }
-  if (hi !== 11) return false;
-  return lo >= 0 && lo <= 10;
+
+  return {
+    matchId: decorated.matchId,
+    week: decorated.week,
+    championship: decorated.championship,
+    home: decorated.home,
+    away: decorated.away,
+    games,
+    homeSubmittedAt: decorated.homeSubmittedAt,
+    awaySubmittedAt: decorated.awaySubmittedAt,
+    homeSignedName: decorated.homeSignedName || null,
+    awaySignedName: decorated.awaySignedName || null,
+    finalizedAt: decorated.finalizedAt,
+    updatedAt: decorated.updatedAt || null,
+    computed: decorated.computed,
+  };
 }
 
 async function writeFinalScoreToSchedule(scheduleStore, match, score) {

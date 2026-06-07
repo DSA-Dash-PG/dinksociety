@@ -731,75 +731,82 @@
       </div>`;
     }
 
-    // -- per-game states for the live match (done / live / upcoming) --
-    const sc = (next && next.scores) || {};
-    const underway = !!(next && next.revealed && (Object.keys(sc).length > 0 || (next.scheduledAt && Date.now() > new Date(next.scheduledAt).getTime())));
-    let liveSlot = null;
-    const slotState = {};
-    for (const s of HOME_SLOTS) {
-      const g = sc[s];
-      if (g && g.home != null && g.away != null) slotState[s] = 'done';
-      else if (underway && !liveSlot) { liveSlot = s; slotState[s] = 'live'; }
-      else slotState[s] = 'upcoming';
-    }
-
-    // -- "Your night": my games, personalized --
-    let night = '';
-    if (next && next.lineup && next.lineup.mySlots) {
-      const lu = next.lineup, mySlotKeys = HOME_SLOTS.filter(s => lu.mySlots[s]);
-      if (mySlotKeys.length) {
-        const rows = mySlotKeys.map(s => {
-          const t = lineupGameType(s);
-          const r = s[1], gNo = s.slice(-1);
-          const mine = lu.mine && lu.mine[s];
-          const partner = mine ? (lu.mySlots[s] === 'p1' ? mine.p2 : mine.p1) : null;
-          const oppPair = lu.opp && lu.opp[s] ? [lu.opp[s].p1, lu.opp[s].p2].filter(Boolean).map(shortName).join(' / ') : null;
-          const st = slotState[s];
-          let stateEl, liveCls = '';
-          if (st === 'done') {
-            const myPts = next.home ? sc[s].home : sc[s].away;
-            const oppPts = next.home ? sc[s].away : sc[s].home;
-            stateEl = myPts > oppPts ? `<span class="yn__state w">W ${myPts}–${oppPts}</span>` : `<span class="yn__state l">L ${myPts}–${oppPts}</span>`;
-          } else if (st === 'live') {
-            stateEl = '<span class="yn__state now">Up now</span>'; liveCls = ' is-live';
-          } else {
-            const idx = HOME_SLOTS.indexOf(s);
-            const eta = next.scheduledAt ? new Date(new Date(next.scheduledAt).getTime() + idx * GAME_MIN * 60000) : null;
-            const etaPast = eta && eta.getTime() < Date.now();
-            stateEl = eta ? `<span class="yn__state eta">${underway && etaPast ? 'soon' : '~' + eta.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}</span>` : '';
-          }
-          return `<div class="yn__row${liveCls}">
-            <div class="yn__slot">R${r} · G${gNo}<br><span class="${t.cls}">${t.label}</span></div>
-            <div class="yn__body">${partner ? 'with ' + esc(shortName(partner)) : '—'}${oppPair ? `<div class="yn__sub">vs ${esc(oppPair)}</div>` : ''}</div>
-            ${stateEl}
-          </div>`;
-        }).join('');
-        night = `<div class="yn">
-          <div class="yn__head"><h3>Your night</h3><span class="sub2">${mySlotKeys.length} game${mySlotKeys.length === 1 ? '' : 's'}</span></div>
-          ${rows}
-        </div>`;
-      } else if (next.myLocked && isMatchDay) {
-        night = `<div class="yn"><div class="yn__head"><h3>Your night</h3></div><div class="yn__none">You're not in this match's lineup — cheer loud. 📣</div></div>`;
-      }
-    }
-
-    // -- compact live strip: whole-match tally --
-    let live = '';
-    if (next && underway) {
-      let myW = 0, oppW = 0;
+    // -- "Your night" + live strip, PER MATCH --
+    // A team can play more than one match in the same week (e.g. a make-up
+    // game), so build these sections for every upcoming match of the current
+    // week — not just the first.
+    const nightMatches = next ? upcoming.filter(m => m.week === next.week) : [];
+    const multiNight = nightMatches.length > 1;
+    let night = '', live = '';
+    for (const nm of nightMatches) {
+      // per-game states for this match (done / live / upcoming)
+      const sc = nm.scores || {};
+      const underway = !!(nm.revealed && (Object.keys(sc).length > 0 || (nm.scheduledAt && Date.now() > new Date(nm.scheduledAt).getTime())));
+      let liveSlot = null;
+      const slotState = {};
       for (const s of HOME_SLOTS) {
         const g = sc[s];
-        if (!g || g.home == null || g.away == null) continue;
-        const myPts = next.home ? g.home : g.away, oppPts = next.home ? g.away : g.home;
-        if (myPts > oppPts) myW++; else if (oppPts > myPts) oppW++;
+        if (g && g.home != null && g.away != null) slotState[s] = 'done';
+        else if (underway && !liveSlot) { liveSlot = s; slotState[s] = 'live'; }
+        else slotState[s] = 'upcoming';
       }
-      const done = myW + oppW;
-      const nowLbl = liveSlot ? `R${liveSlot[1]} G${liveSlot.slice(-1)}` : null;
-      live = `<div class="livestrip hcard-tap" data-go="schedule">
-        <span class="livestrip__live"><span class="pulse"></span> Live${nowLbl ? ' · ' + nowLbl : ''}</span>
-        <span class="livestrip__tally">${myW} – ${oppW}</span>
-        <span class="livestrip__note">games · ${done} of 12 done</span>
-      </div>`;
+
+      // "Your night": my games in this match, personalized
+      if (nm.lineup && nm.lineup.mySlots) {
+        const lu = nm.lineup, mySlotKeys = HOME_SLOTS.filter(s => lu.mySlots[s]);
+        if (mySlotKeys.length) {
+          const rows = mySlotKeys.map(s => {
+            const t = lineupGameType(s);
+            const r = s[1], gNo = s.slice(-1);
+            const mine = lu.mine && lu.mine[s];
+            const partner = mine ? (lu.mySlots[s] === 'p1' ? mine.p2 : mine.p1) : null;
+            const oppPair = lu.opp && lu.opp[s] ? [lu.opp[s].p1, lu.opp[s].p2].filter(Boolean).map(shortName).join(' / ') : null;
+            const st = slotState[s];
+            let stateEl, liveCls = '';
+            if (st === 'done') {
+              const myPts = nm.home ? sc[s].home : sc[s].away;
+              const oppPts = nm.home ? sc[s].away : sc[s].home;
+              stateEl = myPts > oppPts ? `<span class="yn__state w">W ${myPts}–${oppPts}</span>` : `<span class="yn__state l">L ${myPts}–${oppPts}</span>`;
+            } else if (st === 'live') {
+              stateEl = '<span class="yn__state now">Up now</span>'; liveCls = ' is-live';
+            } else {
+              const idx = HOME_SLOTS.indexOf(s);
+              const eta = nm.scheduledAt ? new Date(new Date(nm.scheduledAt).getTime() + idx * GAME_MIN * 60000) : null;
+              const etaPast = eta && eta.getTime() < Date.now();
+              stateEl = eta ? `<span class="yn__state eta">${underway && etaPast ? 'soon' : '~' + eta.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}</span>` : '';
+            }
+            return `<div class="yn__row${liveCls}">
+              <div class="yn__slot">R${r} · G${gNo}<br><span class="${t.cls}">${t.label}</span></div>
+              <div class="yn__body">${partner ? 'with ' + esc(shortName(partner)) : '—'}${oppPair ? `<div class="yn__sub">vs ${esc(oppPair)}</div>` : ''}</div>
+              ${stateEl}
+            </div>`;
+          }).join('');
+          night += `<div class="yn">
+            <div class="yn__head"><h3>Your night${multiNight ? ' · vs ' + esc(nm.opponent.name) : ''}</h3><span class="sub2">${mySlotKeys.length} game${mySlotKeys.length === 1 ? '' : 's'}</span></div>
+            ${rows}
+          </div>`;
+        } else if (nm.myLocked && isMatchDay && !multiNight) {
+          night += `<div class="yn"><div class="yn__head"><h3>Your night</h3></div><div class="yn__none">You're not in this match's lineup — cheer loud. 📣</div></div>`;
+        }
+      }
+
+      // compact live strip: whole-match tally
+      if (underway) {
+        let myW = 0, oppW = 0;
+        for (const s of HOME_SLOTS) {
+          const g = sc[s];
+          if (!g || g.home == null || g.away == null) continue;
+          const myPts = nm.home ? g.home : g.away, oppPts = nm.home ? g.away : g.home;
+          if (myPts > oppPts) myW++; else if (oppPts > myPts) oppW++;
+        }
+        const done = myW + oppW;
+        const nowLbl = liveSlot ? `R${liveSlot[1]} G${liveSlot.slice(-1)}` : null;
+        live += `<div class="livestrip hcard-tap" data-go="schedule">
+          <span class="livestrip__live"><span class="pulse"></span> Live${multiNight ? ' vs ' + esc(nm.opponent.name) : ''}${nowLbl ? ' · ' + nowLbl : ''}</span>
+          <span class="livestrip__tally">${myW} – ${oppW}</span>
+          <span class="livestrip__note">games · ${done} of 12 done</span>
+        </div>`;
+      }
     }
 
     // -- full lineup, collapsed by default --
