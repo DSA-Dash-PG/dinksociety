@@ -264,6 +264,31 @@
   .rost__g { font-size:9px; font-weight:700; padding:2px 7px; border-radius:var(--radius-full); }
   .rost__g.f{background:var(--color-gold-dim);color:var(--color-gold);} .rost__g.m{background:var(--color-teal-dim);color:var(--color-teal);}
   .rost__dsr { font-size:13px; font-weight:800; color:var(--color-lime); width:46px; text-align:right; }
+  /* Team tab buildout: 4-tile hero, form chips, leaders, ranked roster */
+  .teamhero__stats--4 { gap:14px; }
+  .ths__n.lime { color:var(--color-lime); } .ths__n.red { color:var(--color-red); }
+  .tform { display:flex; align-items:center; gap:6px; margin:0 2px 4px; }
+  .tform__l { font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-right:2px; }
+  .tform__c { width:22px; height:22px; border-radius:6px; display:inline-grid; place-items:center; font-size:10px; font-weight:800; }
+  .tform__c.w { background:var(--color-lime-dim); color:var(--color-lime); }
+  .tform__c.l { background:var(--color-red-dim); color:var(--color-red); }
+  .tform__c.t { background:var(--color-surface-3); color:var(--color-text-muted); }
+  .tform__sub { font-size:10px; color:var(--color-text-faint); margin-left:4px; }
+  .tlead__grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .tlead { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:9px 11px; display:flex; gap:9px; align-items:center; min-width:0; }
+  .tlead__av { width:30px; height:30px; border-radius:50%; display:grid; place-items:center; font-size:10px; font-weight:800; flex-shrink:0; }
+  .tlead__av.gold { background:var(--color-gold-dim); color:var(--color-gold); }
+  .tlead__av.teal { background:var(--color-teal-dim); color:var(--color-teal); }
+  .tlead__t { min-width:0; }
+  .tlead__n { font-size:12px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tlead__s { font-size:9px; color:var(--color-text-faint); margin-top:1px; }
+  .rost--me { background:var(--color-lime-ghost); border-radius:var(--radius-sm); }
+  .rost--me .rost__name { color:var(--color-lime); }
+  .rost__rank { font-size:10px; color:var(--color-text-faint); width:16px; text-align:center; font-weight:700; flex-shrink:0; }
+  .rost__cap { font-size:8px; font-weight:800; letter-spacing:0.04em; background:var(--color-gold-dim); color:var(--color-gold); border-radius:4px; padding:1px 5px; margin-left:6px; vertical-align:1px; }
+  .rost__num { width:46px; text-align:right; flex-shrink:0; }
+  .rost__num .rost__dsr2 { font-size:13px; font-weight:800; color:var(--color-lime); }
+  .rost__num .rost__wl { font-size:8px; color:var(--color-text-faint); margin-top:1px; }
 
   .nav { position:fixed; bottom:0; left:50%; transform:translateX(-50%); width:100%; max-width:520px; display:flex; background:rgba(18,18,18,0.97); backdrop-filter:blur(12px); border-top:1px solid var(--color-border); padding:8px 8px calc(8px + env(safe-area-inset-bottom)); z-index:30; }
   .nb { flex:1; background:none; border:none; cursor:pointer; font-family:var(--font); display:flex; flex-direction:column; align-items:center; gap:3px; padding:5px 0; color:var(--color-text-faint); }
@@ -446,7 +471,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Games</span>
       </button>
-      <button class="nb" data-tab="captain" id="nb-captain" style="display:none">
+      <button class="nb" data-tab="team">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         <span>Team</span>
       </button>
@@ -514,10 +539,9 @@
     if (dAv) dAv.textContent = initials(p.name);
     if (dName) dName.textContent = p.name || 'Player';
     if (dEmail) dEmail.textContent = (p.email || '') + (p.isCaptain ? ' · Captain' : p.isCoCaptain ? ' · Co-Captain' : '');
-    // Captain tab + role toggle show only for team leaders.
+    // Role toggle shows only for team leaders. (The Team nav tab is for
+    // everyone — switching to the captain portal happens ONLY via the toggle.)
     const isLeader = !!(p.isCaptain || p.isCoCaptain);
-    const capBtn = $('nb-captain');
-    if (capBtn) capBtn.style.display = isLeader ? '' : 'none';
     const roleSeg = $('role-seg');
     if (roleSeg) roleSeg.style.display = isLeader ? 'flex' : 'none';
     const viewSection = $('ds-view-section');
@@ -691,7 +715,6 @@
   // goTab works for nav buttons AND views without a nav button (e.g. team,
   // reached from the Home team card) — those keep the current button lit.
   function goTab(t) {
-    if (t === 'captain') { openCaptainTools($('nb-captain')); return; }  // SSO bridge — navigates away
     const view = $('v-' + t);
     if (!view) return;
     trackTab(t);
@@ -1389,20 +1412,52 @@
   // ---- team ----
   function renderTeam() {
     const t = DATA.team || {}, me = DATA.profile, st = t.standing;
-    const heroStats = st ? `<div class="teamhero__stats">
+    const ros = t.roster || [];
+    // Per-player game W–L joins client-side from the leaderboard payload.
+    const lbById = new Map((DATA.leaderboard || []).map(p => [p.playerId, p]));
+
+    const diff = st ? (st.pointDiff || 0) : 0;
+    const heroStats = st ? `<div class="teamhero__stats teamhero__stats--4">
       <div><div class="ths__n gold">${ordinal(st.rank)}</div><div class="ths__l">Division</div></div>
       <div><div class="ths__n">${st.wins}–${st.losses}${st.ties?'–'+st.ties:''}</div><div class="ths__l">Record</div></div>
       <div><div class="ths__n">${st.matchPointsFor ?? 0}</div><div class="ths__l">Match pts</div></div>
+      <div><div class="ths__n ${diff>0?'lime':diff<0?'red':''}">${diff>0?'+':''}${diff}</div><div class="ths__l">Pt diff</div></div>
     </div>` : '';
-    const roster = (t.roster || []).map(p => `<div class="rost"><div class="rost__av">${initials(p.name)}</div>
-      <div class="rost__name">${esc(shortName(p.name))}${p.me?'<span class="me">YOU</span>':''}</div>
-      <span class="rost__g ${p.gender==='F'?'f':'m'}">${p.gender==='F'?'W':'M'}</span>
-      <span class="rost__dsr">${p.dsr!=null?esc(p.dsr):'—'}</span></div>`).join('');
+
+    // Recent form, oldest → newest (finalized matches only)
+    const results = (DATA.schedule || []).filter(m => m.final && m.result);
+    const form = results.length ? `<div class="tform"><span class="tform__l">Form</span>${
+      results.slice(-6).map(m => `<span class="tform__c ${m.result === 'W' ? 'w' : m.result === 'L' ? 'l' : 't'}" title="Week ${m.week}">${m.result}</span>`).join('')
+    }<span class="tform__sub">last ${Math.min(results.length, 6)} match${results.length === 1 ? '' : 'es'}</span></div>` : '';
+
+    // Team leaders — roster arrives sorted by DSR desc, so first of each gender wins
+    const topW = ros.find(p => p.gender === 'F' && p.dsr != null) || null;
+    const topM = ros.find(p => p.gender === 'M' && p.dsr != null) || null;
+    const leadCard = (p, label, cls) => p ? `<div class="tlead"><div class="tlead__av ${cls}">${initials(p.name)}</div>
+      <div class="tlead__t"><div class="tlead__n">${esc(shortName(p.name))}</div><div class="tlead__s">${label} · ${esc(p.dsr)} DSR</div></div></div>` : '';
+    const leaders = (topW || topM) ? `<div class="label">Team leaders</div><div class="tlead__grid">${leadCard(topW, 'Top woman', 'gold')}${leadCard(topM, 'Top man', 'teal')}</div>` : '';
+
+    // Roster ranked by DSR with captain badges + per-player game W–L
+    const roster = ros.map((p, i) => {
+      const lb = lbById.get(p.id);
+      const wl = lb && ((lb.w || 0) + (lb.l || 0) > 0) ? `${lb.w || 0}–${lb.l || 0}` : '';
+      const badge = p.isCaptain ? '<span class="rost__cap">C</span>' : p.isCoCaptain ? '<span class="rost__cap">CC</span>' : '';
+      return `<div class="rost${p.me ? ' rost--me' : ''}">
+        <span class="rost__rank">${i + 1}</span>
+        <div class="rost__av">${initials(p.name)}</div>
+        <div class="rost__name">${esc(shortName(p.name))}${badge}${p.me ? '<span class="me">YOU</span>' : ''}</div>
+        <span class="rost__g ${p.gender === 'F' ? 'f' : 'm'}">${p.gender === 'F' ? 'W' : 'M'}</span>
+        <div class="rost__num"><div class="rost__dsr2">${p.dsr != null ? esc(p.dsr) : '—'}</div>${wl ? `<div class="rost__wl">${wl}</div>` : ''}</div>
+      </div>`;
+    }).join('');
+
     $('v-team').innerHTML =
       `<div class="teamhero"><div class="teamhero__emoji">${emo({emoji:me.teamEmoji})}</div>
         <div class="teamhero__name">${esc(me.teamName)}</div>
         <div class="teamhero__div">${esc(me.divisionLabel || me.division || '')} · Season</div>${heroStats}</div>
-      <div class="label">Roster <span class="sub">${(t.roster||[]).length} players</span></div>${roster || '<div class="muted">Roster coming soon.</div>'}`;
+      ${form}
+      ${leaders}
+      <div class="label">Roster <span class="sub">by DSR · ${ros.length} players</span></div>${roster || '<div class="muted">Roster coming soon.</div>'}`;
   }
   function ordinal(n) { if (n == null) return '—'; const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 

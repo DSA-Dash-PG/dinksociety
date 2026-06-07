@@ -88,10 +88,14 @@ export default async (req) => {
   if (standings?.divisions?.[division]?.teams) {
     teamStanding = standings.divisions[division].teams.find(t => t.teamId === teamId) || null;
   }
+  const teamCapEmail = (team.captainEmail || '').toLowerCase();
   const roster = (team.roster || []).map(p => ({
     id: p.id, name: p.name, gender: p.gender || null,
     dsr: players[p.id]?.composite != null ? Math.round(players[p.id].composite * 10) / 10 : null,
     me: p.id === playerId,
+    // C / CC badges for the Team tab — flag on the roster entry OR captainEmail match
+    isCaptain: !!p.isCaptain || (!!teamCapEmail && (p.normalizedEmail || (p.email || '').toLowerCase()) === teamCapEmail),
+    isCoCaptain: !!p.isCoCaptain,
   })).sort((a, b) => (b.dsr ?? -1) - (a.dsr ?? -1));
 
   // ── Schedule (my team's matches) ──
