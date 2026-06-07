@@ -41,9 +41,14 @@ const BONUS_WEEK_TOP_TIED = 3;    // if multiple teams tied for week's highest
  * @returns {Promise<{standings: object, playerStats: object}>}
  */
 export async function rebuildStandings(circuit) {
-  const scheduleStore = getStore('schedule');
-  const lineupStore = getStore('lineups');
-  const teamsStore = getStore('teams');
+  // STRONG consistency is required here. rebuildStandings runs milliseconds
+  // after captain-score.js writes finalizedAt into the schedule blob and the
+  // score record — with default (eventual) reads it can get the PRE-write
+  // copies and silently rebuild standings/stats to zero. Confirmed in prod
+  // June 7 2026: schedule finalized at .260s, rebuild read stale at .604s.
+  const scheduleStore = getStore({ name: 'schedule', consistency: 'strong' });
+  const lineupStore = getStore({ name: 'lineups', consistency: 'strong' });
+  const teamsStore = getStore({ name: 'teams', consistency: 'strong' });
 
   // Load all schedule files for this circuit
   const { blobs: scheduleBlobs } = await scheduleStore.list({ prefix: `schedule/${circuit}/` });
@@ -325,7 +330,8 @@ function standingsComparator(a, b) {
  * Pulls lineup + score for a match, updates the playerStats map in place.
  */
 async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lineupStore, playerStats, week, weeklyPlayers, championship = false }) {
-  const scoresStore = getStore('scores');
+  // Strong read — the score record was written moments before finalize (see rebuildStandings).
+  const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
 
   const [lineupA, lineupB, score] = await Promise.all([
     lineupStore.get(`lineup/${matchId}/${teamAId}.json`, { type: 'json' }).catch(() => null),
