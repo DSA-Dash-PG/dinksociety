@@ -10,6 +10,7 @@
 
 import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
+import { recordLogin } from './lib/activity-log.js';
 
 export default async (req) => {
   const url = new URL(req.url);
@@ -53,6 +54,9 @@ export default async (req) => {
       email: record.email,
       expiresAt: sessionExpiry,
     }));
+
+    // Activity log (never throws)
+    await recordLogin({ email: record.email, role: 'admin' });
 
     // Set the session cookie and redirect
     const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';

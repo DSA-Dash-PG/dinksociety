@@ -10,9 +10,10 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { json } from './lib/registrations.js';
 import { rebuildStandings } from './lib/standings.js';
 import { circuitCode } from './lib/circuit.js';
+import { logActivity } from './lib/activity-log.js';
 
 // Core logic — also invoked by the admin-registration-update router.
-export async function run(body) {
+export async function run(body, admin = null) {
   const teamStore = getStore('teams');
 
   const { playerId, teamId } = body;
@@ -35,6 +36,14 @@ export async function run(body) {
   team.roster = roster;
   team.updatedAt = new Date().toISOString();
   await teamStore.set(teamId, JSON.stringify(team));
+
+  await logActivity({
+    type: 'player.removed',
+    actor: { email: admin?.email || null, role: 'admin' },
+    team,
+    player: { id: removed.id, name: removed.name },
+    details: `${removed.name} removed from ${team.name}`,
+  });
 
   // Refresh aggregates so the removed player stops showing on public pages.
   const circuit = circuitCode(team.circuit);

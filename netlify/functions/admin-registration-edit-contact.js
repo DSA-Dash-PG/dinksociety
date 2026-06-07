@@ -9,6 +9,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { json, findRegistration } from './lib/registrations.js';
+import { logActivity } from './lib/activity-log.js';
 
 // Core logic — also invoked by the admin-registration-update router.
 export async function run(body, admin) {
@@ -26,6 +27,11 @@ export async function run(body, admin) {
   const found = await findRegistration(regStore, id);
   if (!found) return json({ error: 'Registration not found' }, 404);
   const { reg, foundKey } = found;
+
+  // Snapshot old contact for the activity log (old → new)
+  const oldContact = reg.path === 'team' && reg.team
+    ? { name: reg.team.players?.[0]?.name || reg.team.captain || null, email: reg.team.players?.[0]?.email || null }
+    : { name: reg.agent?.name || null, email: reg.agent?.email || null };
 
   // Update the registration's primary contact slot
   if (reg.path === 'team' && reg.team) {
@@ -45,6 +51,7 @@ export async function run(body, admin) {
 
   // Sync the team record (keyed team/team_<regId>.json, or reg.teamId)
   let teamSynced = false;
+  let syncedTeam = null;
   const teamKeys = [`team/team_${id}.json`];
   if (reg.teamId) teamKeys.push(`team/${reg.teamId}.json`);
   for (const key of teamKeys) {
@@ -63,8 +70,22 @@ export async function run(body, admin) {
       team.updatedBy = admin.email;
       await teamStore.setJSON(key, team);
       teamSynced = true;
+      syncedTeam = team;
       break;
     } catch { /* try next key */ }
+  }
+
+  const changes = [];
+  if (newName && newName !== oldContact.name) changes.push(`name "${oldContact.name || '—'}" → "${newName}"`);
+  if (newEmail && newEmail !== (oldContact.email || '').toLowerCase()) changes.push(`email ${oldContact.email || '—'} → ${newEmail}`);
+  if (changes.length) {
+    await logActivity({
+      type: 'contact.updated',
+      actor: { email: admin?.email || null, role: 'admin' },
+      team: syncedTeam,
+      player: { id: null, name: newName || oldContact.name },
+      details: `Contact updated for ${newName || oldContact.name || 'registration ' + id}: ${changes.join(', ')}`,
+    });
   }
 
   return json({ ok: true, registration: reg, teamSynced });

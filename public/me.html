@@ -641,6 +641,7 @@
     if (t === 'captain') { openCaptainTools($('nb-captain')); return; }  // SSO bridge — navigates away
     const view = $('v-' + t);
     if (!view) return;
+    trackTab(t);
     document.querySelectorAll('.view').forEach(v => v.classList.remove('is-active'));
     view.classList.add('is-active');
     const btn = document.querySelector(`.nb[data-tab="${t}"]`);
@@ -648,6 +649,19 @@
     window.scrollTo(0, 0);
     if (t === 'chat') loadChat();
   }
+
+  // Usage beacon → admin Analytics tab. Fire-and-forget; never blocks the UI.
+  function trackTab(t) {
+    try {
+      const payload = JSON.stringify({ tab: t });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(API + '/activity-track', new Blob([payload], { type: 'application/json' }));
+      } else {
+        fetch(API + '/activity-track', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+      }
+    } catch {}
+  }
+  trackTab('home'); // initial portal load counts as a Home view
   document.querySelectorAll('.nb').forEach(b => b.addEventListener('click', () => goTab(b.dataset.tab)));
   $('appbar-chat').addEventListener('click', () => goTab('chat'));
 

@@ -32,6 +32,7 @@ import {
   SLOT_KEYS, newScoreRecord, toScore, decorate, prettySlot,
   normalizeScore, entryComplete, isValidGame,
 } from './lib/score-helpers.js';
+import { logActivity } from './lib/activity-log.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -165,6 +166,17 @@ export default async (req) => {
     existing.updatedBy = ctx.user.email;
 
     await scoresStore.setJSON(scoreKey, existing);
+
+    if (changed) {
+      await logActivity({
+        type: 'score.entry',
+        actor: { email: ctx.user.email, role: ctx.user.role },
+        team: ctx.team,
+        matchId, week: match.week, circuit: match.circuit,
+        details: `${ctx.team.name} updated their Week ${match.week} scoresheet (${match.teamA.name} vs ${match.teamB.name})`,
+      });
+    }
+
     return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
   }
 
@@ -245,6 +257,13 @@ export default async (req) => {
         } catch (err) {
           console.error('rebuildStandings failed post-finalize for match', matchId, 'circuit', match.circuit, ':', err);
         }
+        await logActivity({
+          type: 'match.finalized',
+          actor: { email: ctx.user.email, role: ctx.user.role },
+          team: ctx.team,
+          matchId, week: match.week, circuit: match.circuit,
+          details: `Week ${match.week} match finalized: ${match.teamA.name} vs ${match.teamB.name} (both captains signed off)`,
+        });
         return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
       }
     } else {
@@ -264,6 +283,17 @@ export default async (req) => {
     }
 
     await scoresStore.setJSON(scoreKey, existing);
+
+    await logActivity({
+      type: action === 'submit' ? 'score.signoff' : 'score.withdrawn',
+      actor: { email: ctx.user.email, role: ctx.user.role },
+      team: ctx.team,
+      matchId, week: match.week, circuit: match.circuit,
+      details: action === 'submit'
+        ? `${ctx.team.name} signed off on the Week ${match.week} scoresheet (${match.teamA.name} vs ${match.teamB.name})`
+        : `${ctx.team.name} withdrew their Week ${match.week} sign-off (${match.teamA.name} vs ${match.teamB.name})`,
+    });
+
     return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
   }
 

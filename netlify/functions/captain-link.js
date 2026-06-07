@@ -9,6 +9,7 @@ import {
   buildCaptainCookie,
   getTeamById,
 } from './lib/captain-auth.js';
+import { recordLogin } from './lib/activity-log.js';
 
 export default async (req) => {
   const url = new URL(req.url);
@@ -33,6 +34,11 @@ export default async (req) => {
     }
 
     const sessionId = await createSession(team, consumed.email);
+
+    // Activity log (never throws, test teams skipped)
+    const rosterEntry = (team.roster || []).find(p =>
+      (p.normalizedEmail || (p.email || '').toLowerCase()) === consumed.email.toLowerCase());
+    await recordLogin({ email: consumed.email, role: 'captain', name: rosterEntry?.name || null, team, playerId: rosterEntry?.id || null });
 
     return new Response(null, {
       status: 302,

@@ -19,6 +19,7 @@ import {
   checkDuplicateCombos, checkBackToBackCombos, checkSimultaneousPairs, checkSlotGender, checkRosterDepth,
   hardLockTime, formatOffset, prettySlot, sanitizeRevealedLineup,
 } from './lib/lineup-helpers.js';
+import { logActivity } from './lib/activity-log.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -119,6 +120,13 @@ export default async (req) => {
         updatedBy: ctx.user.email,
       };
       await lineupStore.setJSON(myKey, reopened);
+      await logActivity({
+        type: 'lineup.unlocked',
+        actor: { email: ctx.user.email, role: ctx.user.role },
+        team: ctx.team,
+        matchId, week: match.week, circuit: circuitCode(ctx.team.circuit),
+        details: `${ctx.team.name} reopened their Week ${match.week} lineup`,
+      });
       return json({ ok: true, locked: false, revealed: false, myLineup: reopened, oppLineup: null });
     }
 
@@ -244,6 +252,16 @@ export default async (req) => {
     };
 
     await lineupStore.setJSON(myKey, record);
+
+    if (action === 'lock') {
+      await logActivity({
+        type: 'lineup.locked',
+        actor: { email: ctx.user.email, role: ctx.user.role },
+        team: ctx.team,
+        matchId, week: match.week, circuit: circuitCode(ctx.team.circuit),
+        details: `${ctx.team.name} locked their Week ${match.week} lineup`,
+      });
+    }
 
     // Re-check reveal status after save
     const opp = await lineupStore.get(oppKey, { type: 'json' }).catch(() => null);

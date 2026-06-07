@@ -19,6 +19,7 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
 import { circuitCode } from './lib/circuit.js';
 import { rebuildStandings } from './lib/standings.js';
+import { logActivity } from './lib/activity-log.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -122,6 +123,17 @@ export default async (req) => {
     team.updatedBy = admin.email;
     await store.setJSON(teamKey, team);
 
+    await logActivity({
+      type: body.roster ? 'roster.replaced' : 'team.updated',
+      actor: { email: admin.email, role: 'admin' },
+      team,
+      details: ('name' in body && team.name !== oldName)
+        ? `Team renamed "${oldName}" → "${team.name}"`
+        : body.roster
+          ? `Roster replaced (${(team.roster || []).length} players)`
+          : `Team settings updated (${Object.keys(body).filter(k => allowed.includes(k)).join(', ') || 'fields'})`,
+    });
+
     // The team blob is the source of truth for the name, but the name is also
     // SNAPSHOTTED into schedule matches, score records, and lineup records when
     // those are created. On rename, push the new name into every copy so the
@@ -176,6 +188,13 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
+        await logActivity({
+          type: 'player.added',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          player: { id: newPlayer.id, name: newPlayer.name },
+          details: `${newPlayer.name} added to ${team.name}${newPlayer.email ? ` (${newPlayer.email})` : ''}`,
+        });
         // Refresh aggregates so the new player appears on public pages.
         rebuildStandings(circuitCode(team.circuit)).catch(err =>
           console.error('rebuildStandings after add-player failed:', err));
@@ -196,6 +215,13 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
+        await logActivity({
+          type: 'player.removed',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          player: { id: removed.id, name: removed.name },
+          details: `${removed.name} removed from ${team.name}`,
+        });
         // Refresh aggregates so the removed player stops showing on public pages.
         rebuildStandings(circuitCode(team.circuit)).catch(err =>
           console.error('rebuildStandings after remove-player failed:', err));
@@ -216,6 +242,13 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
+        await logActivity({
+          type: 'captain.set',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          player: { id: target.id, name: target.name },
+          details: `${target.name} set as captain of ${team.name}`,
+        });
         return json({ ok: true, captain: target });
       }
 
@@ -230,6 +263,13 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
+        await logActivity({
+          type: 'cocaptain.set',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          player: { id: target.id, name: target.name },
+          details: `${target.name} set as co-captain of ${team.name}`,
+        });
         return json({ ok: true, coCaptain: target });
       }
 
@@ -240,6 +280,12 @@ export default async (req) => {
         team.updatedAt = now;
         team.updatedBy = admin.email;
         await store.setJSON(teamKey, team);
+        await logActivity({
+          type: 'cocaptain.removed',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          details: `Co-captain removed on ${team.name}`,
+        });
         return json({ ok: true });
       }
 

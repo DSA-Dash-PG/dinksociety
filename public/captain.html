@@ -914,6 +914,8 @@
       oppLineup: null,
       pollTimer: null,
       scoreDirty: false, // true while the captain has unsaved score entry
+      scoreDraft: {},    // typed-but-unsaved score values, keyed "slot|side" — re-applied after any re-render so typing is never lost
+      pendingScoreRender: false, // a post-save re-render was deferred because the captain was mid-typing
     };
 
     const $id = (id) => document.getElementById(id);
@@ -2090,9 +2092,10 @@
       }
       // Rendering fresh server state — clears the unsaved-edit guard.
       state.scoreDirty = false;
+      state.pendingScoreRender = false;
 
-      // Phones get the set-based scoresheet (big steppers + match math). Desktop keeps the table.
-      if (typeof isMobileCap === 'function' && isMobileCap()) { renderScoresheetMobile(data); return; }
+      // Phones get the set-based scoresheet (typed inputs + match math). Desktop keeps the table.
+      if (typeof isMobileCap === 'function' && isMobileCap()) { renderScoresheetMobile(data); applyScoreDraft(); return; }
 
       const myRole = data.myRole;
       const homeName = data.match.home.name;
@@ -2348,10 +2351,12 @@
       area.querySelectorAll('.ss-score-input:not([disabled])').forEach(inp => {
         inp.dataset.orig = inp.value;                       // baseline for change detection
         inp.addEventListener('input', () => {
+          recordScoreDraft(inp);
           state.scoreDirty = true;
           updateFloatingSave('dirty');
           scheduleAutoSave();
         });
+        inp.addEventListener('blur', maybeRenderPendingScore);
         inp.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); saveAllScores(); }
         });
@@ -2375,6 +2380,8 @@
           if (id) openMatch(id, { hideBackLink: true, viaTab: 'next' });
         });
       }
+
+      applyScoreDraft(); // restore any typed-but-unsaved scores this render replaced
     }
 
     /**
@@ -2535,6 +2542,39 @@
       }, 900);
     }
 
+    // ----- Draft overlay: typed scores survive any re-render -----
+    // Every keystroke is recorded in state.scoreDraft. After a re-render the
+    // drafts are re-applied on top of server values, so a refresh racing with
+    // typing can never eat a score. Drafts are pruned once saved.
+    const scoreDraftKey = (inp) => `${inp.dataset.slot}|${inp.dataset.side}`;
+    function recordScoreDraft(inp) {
+      if (!inp.dataset.slot || !inp.dataset.side) return;
+      state.scoreDraft[scoreDraftKey(inp)] = inp.value;
+    }
+    function applyScoreDraft() {
+      const area = $id('scoresheet-area');
+      if (!area) return;
+      let dirty = false;
+      for (const [key, val] of Object.entries(state.scoreDraft)) {
+        const [slot, side] = key.split('|');
+        const inp = area.querySelector(`.ss-score-input[data-slot="${slot}"][data-side="${side}"]`);
+        if (!inp || inp.disabled) { delete state.scoreDraft[key]; continue; }
+        if ((inp.dataset.orig || '').trim() === String(val).trim()) { delete state.scoreDraft[key]; continue; } // saved — server already has it
+        inp.value = val;
+        dirty = true;
+      }
+      if (dirty) { state.scoreDirty = true; updateFloatingSave('dirty'); scheduleAutoSave(); }
+    }
+    // Deferred post-save re-render: runs once the captain stops typing.
+    function maybeRenderPendingScore() {
+      setTimeout(() => {
+        if (!state.pendingScoreRender || state.scoreSaving || state.scoreDirty) return;
+        if (document.activeElement?.classList?.contains('ss-score-input')) return; // moved to another score box
+        state.pendingScoreRender = false;
+        if (state.currentScore) renderScoresheet(state.currentScore);
+      }, 80);
+    }
+
     // Save status. On mobile the sticky scoresheet bar shows it inline
     // ("Saving… / ✓ All changes saved", then back to the progress count);
     // on desktop the floating save pill is the manual fallback.
@@ -2577,6 +2617,9 @@
       } finally {
         state.scoreSaving = false;
         if (!auto) btnDone(saveBtn); // no-op if refreshScoresheet re-rendered the button
+        // If the captain typed more while this save was in flight, the guard
+        // above swallowed that autosave — re-arm it so nothing sits unsaved.
+        if (state.scoreDirty) scheduleAutoSave();
       }
     }
 
@@ -2620,19 +2663,33 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Save failed');
 
-        // Mark what we sent as the new baseline.
-        sent.forEach(inp => { inp.dataset.orig = inp.value.trim(); });
+        // Mark what we sent as the new baseline + prune matching drafts.
+        sent.forEach(inp => {
+          inp.dataset.orig = inp.value.trim();
+          const key = scoreDraftKey(inp);
+          if ((state.scoreDraft[key] || '').trim() === inp.value.trim()) delete state.scoreDraft[key];
+        });
         const stillDirty = Array.from(area.querySelectorAll('.ss-score-input'))
           .some(inp => (inp.value || '').trim() !== (inp.dataset.orig || '').trim());
         state.scoreDirty = stillDirty;
         updateFloatingSave(stillDirty ? 'dirty' : 'saved');
 
-        // Re-render to refresh status pills + totals — but never yank the
-        // sheet out from under a captain who's mid-typing in another field.
-        const typing = document.activeElement && document.activeElement.classList?.contains('ss-score-input');
-        if (!stillDirty && !typing) {
-          await refreshScoresheet(true);
-          updateFloatingSave('saved');
+        // The PUT response is the updated scoresheet — render it locally
+        // (no second GET, so pills/rings/match math update instantly). If the
+        // captain is mid-typing, defer the re-render to their next blur; the
+        // draft overlay guarantees their keystrokes survive it either way.
+        if (data.score && state.currentScore) state.currentScore.score = data.score;
+        if (!stillDirty) {
+          const typing = document.activeElement && document.activeElement.classList?.contains('ss-score-input');
+          if (typing) {
+            state.pendingScoreRender = true;
+          } else if (data.score && state.currentScore) {
+            renderScoresheet(state.currentScore);
+            updateFloatingSave('saved');
+          } else {
+            await refreshScoresheet(true);
+            updateFloatingSave('saved');
+          }
         }
       } catch (err) {
         state.scoreDirty = true;
@@ -3533,10 +3590,12 @@
       // Typeable inputs: track edits + auto-save (same flow as desktop).
       area.querySelectorAll('.ss-score-input:not([disabled])').forEach(inp => {
         inp.addEventListener('input', () => {
+          recordScoreDraft(inp);
           state.scoreDirty = true;
           updateFloatingSave('dirty');
           scheduleAutoSave();
         });
+        inp.addEventListener('blur', maybeRenderPendingScore);
         inp.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') { e.preventDefault(); inp.blur(); saveAllScores(); }
         });

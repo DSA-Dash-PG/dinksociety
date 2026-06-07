@@ -14,6 +14,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { logActivity } from './lib/activity-log.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -64,6 +65,15 @@ async function executeTransfer({ teamsStore, logStore, fromTeam, toTeam, player,
     transferredAt: now,
   };
   await logStore.setJSON(`entry/${logEntry.id}.json`, logEntry);
+
+  await logActivity({
+    type: 'player.transferred',
+    actor: { email: transferredBy, role: 'admin' },
+    team: toTeam,
+    player: { id: player.id, name: player.name },
+    details: `${player.name} traded: ${fromTeam.name} → ${toTeam.name}${note ? ` (${note})` : ''}`,
+  });
+
   return logEntry;
 }
 
@@ -170,6 +180,13 @@ export default async (req) => {
     request.reviewedAt = new Date().toISOString();
     request.reviewNote = reviewNote || null;
     await requestsStore.setJSON(`request/${requestId}.json`, request);
+
+    await logActivity({
+      type: 'transfer.denied',
+      actor: { email: admin.email, role: 'admin' },
+      player: { id: request.playerId, name: request.playerName },
+      details: `Transfer request denied: ${request.playerName || request.playerId}${reviewNote ? ` (${reviewNote})` : ''}`,
+    });
 
     return json({ ok: true });
   }

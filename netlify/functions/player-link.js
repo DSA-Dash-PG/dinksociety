@@ -2,6 +2,8 @@
 // Magic-link callback: consume token → create player session → redirect to /me.html.
 
 import { consumePlayerToken, createPlayerSession, buildPlayerCookie } from './lib/player-auth.js';
+import { getStore } from '@netlify/blobs';
+import { recordLogin } from './lib/activity-log.js';
 
 export default async (req) => {
   const url = new URL(req.url);
@@ -14,6 +16,12 @@ export default async (req) => {
     const consumed = await consumePlayerToken(token);
     if (!consumed) return redirect('/me.html?error=invalid');
     const sessionId = await createPlayerSession({ playerId: consumed.playerId, teamId: consumed.teamId, email: consumed.email });
+
+    // Activity log: who's actually using the site (never throws, test teams skipped)
+    const team = await getStore('teams').get(`team/${consumed.teamId}.json`, { type: 'json' }).catch(() => null);
+    const rosterEntry = (team?.roster || []).find(p => p.id === consumed.playerId);
+    await recordLogin({ email: consumed.email, role: 'player', name: rosterEntry?.name || null, team, playerId: consumed.playerId });
+
     return new Response(null, {
       status: 302,
       headers: { Location: new URL('/me.html', siteUrl).toString(), 'Set-Cookie': buildPlayerCookie(sessionId) },
