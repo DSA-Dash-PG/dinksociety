@@ -9,6 +9,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { isRevealTime } from './lib/lineup-helpers.js';
 
 export default async (req) => {
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
@@ -92,7 +93,12 @@ export default async (req) => {
         scoresStore.get(`score/${mt.id}.json`, { type: 'json' }).catch(() => null),
       ]);
       const aLocked = !!la?.lockedAt, bLocked = !!lb?.lockedAt;
-      const revealed = aLocked && bLocked;
+      const bothLocked = aLocked && bLocked;
+      // A match is only "live" once it has REVEALED — both lineups locked AND
+      // we're inside the reveal window (15 min before start). Before that a
+      // both-locked match is just "ready", not live. (Without the time gate the
+      // admin showed matches as live hours early the moment captains locked.)
+      const revealed = bothLocked && isRevealTime(mt.scheduledAt);
       const final = !!mt.finalizedAt;
 
       // Match points: finalized → stored; otherwise compute live from the sheet.
