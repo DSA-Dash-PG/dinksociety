@@ -3243,30 +3243,26 @@
       const name = $id('rp-name').value.trim();
       const gender = $id('rp-gender').value;
       const email = $id('rp-email').value.trim();
-      const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-
-      // Gender + email are required: gender drives lineup slots, email is the
-      // player's sign-in. Flag everything that's missing at once.
-      const problems = [];
-      $id('rp-name-w').classList.toggle('is-bad', !name);
-      $id('rp-gender-w').classList.toggle('is-bad', !gender);
-      $id('rp-email-w').classList.toggle('is-bad', !emailOk);
-      if (!name) problems.push('name');
-      if (!gender) problems.push('gender');
-      if (!emailOk) problems.push(email ? 'a valid email' : 'email');
+      const emailOk = !email || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
       const errEl = $id('rp-err');
-      if (problems.length) {
-        errEl.textContent = 'Required: ' + problems.join(', ') + '.';
-        errEl.classList.add('show');
-        return;
-      }
+
+      // Only NAME is required to save, and a typed email must be valid — so a
+      // captain can build the roster incrementally without one incomplete
+      // player blocking the rest. Gender/email still get a soft nudge (they're
+      // needed for lineups / sign-in), shown in roster health, not a hard block.
+      $id('rp-name-w').classList.toggle('is-bad', !name);
+      $id('rp-email-w').classList.toggle('is-bad', !emailOk);
+      $id('rp-gender-w').classList.remove('is-bad');
+      if (!name) { errEl.textContent = 'Player needs a name.'; errEl.classList.add('show'); return; }
+      if (!emailOk) { errEl.textContent = 'That email doesn’t look valid — fix it or clear it.'; errEl.classList.add('show'); return; }
       errEl.classList.remove('show');
 
       const fields = { name, gender, email, phone: $id('rp-phone').value.trim() };
       const updated = state.roster.slice();
       if (rpIdx != null) updated[rpIdx] = { ...updated[rpIdx], ...fields };
       else updated.push({ id: null, ...fields });
-      saveRosterArray(updated, 'Roster saved.');
+      const note = (!gender || !email) ? 'Saved — still needs ' + [!gender && 'gender', !email && 'email'].filter(Boolean).join(' & ') + '.' : 'Roster saved.';
+      saveRosterArray(updated, note);
     });
 
     $id('rp-remove').addEventListener('click', () => {

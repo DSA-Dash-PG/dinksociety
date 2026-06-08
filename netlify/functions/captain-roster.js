@@ -42,22 +42,29 @@ export default async (req) => {
         return json({ error: `Roster cannot exceed ${MAX_ROSTER_SIZE} players` }, 400);
       }
 
-      // Validate each entry. Name, gender AND email are required: gender
-      // drives lineup slot enforcement, email is the player's portal sign-in.
+      // Validate each entry. Only NAME is strictly required so the captain can
+      // build the roster incrementally — gender and email are completed over
+      // time and surfaced as "incomplete" in roster health, NOT enforced here.
+      // (Hard-requiring email/gender on EVERY row meant one incomplete player
+      // blocked saving everyone — so an edit to a complete player was discarded
+      // and the captain got stuck in a loop. Format is still validated when a
+      // value IS provided; gender is enforced at lineup time, email at sign-in.)
       const cleaned = [];
       const ids = new Set();
       const existingById = new Map((ctx.team.roster || []).map(x => [x.id, x]));
       for (const p of roster) {
         if (!p || typeof p !== 'object') continue;
         const name = (p.name || '').toString().trim();
-        const gender = (p.gender || '').toString().toUpperCase();
         if (!name) return json({ error: 'Every player needs a name' }, 400);
-        if (!['M', 'F'].includes(gender)) {
-          return json({ error: `Player "${name}" needs a gender (M or F)` }, 400);
-        }
+
+        // Gender: optional here, but if set it must be M/F.
+        let gender = (p.gender || '').toString().toUpperCase();
+        if (gender && !['M', 'F'].includes(gender)) gender = '';
+
+        // Email: optional here, but if set it must be a valid address.
         const email = sanitize(p.email, 120);
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          return json({ error: `Player "${name}" needs a valid email (it's their sign-in)` }, 400);
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+          return json({ error: `${name}'s email doesn't look valid. Fix it or clear it, then save.` }, 400);
         }
 
         const id = p.id || generateId();
@@ -77,8 +84,8 @@ export default async (req) => {
           phone,
           // Normalized contact keys — recomputed on every save so they never
           // drift from the raw values. Used by the duplicate sweep.
-          normalizedEmail: normalizeEmail(email),
-          normalizedPhone: normalizePhone(phone),
+          normalizedEmail: email ? normalizeEmail(email) : null,
+          normalizedPhone: phone ? normalizePhone(phone) : null,
           dupr: sanitize(p.dupr, 10),
           linkedUserId: p.linkedUserId || (prev ? prev.linkedUserId : null) || null,
           ...(prev?.isCaptain ? { isCaptain: true } : {}),
