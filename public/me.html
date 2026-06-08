@@ -188,7 +188,6 @@
   .yn__state { font-size:11px; font-weight:800; white-space:nowrap; }
   .yn__state.w { color:var(--color-lime); } .yn__state.l { color:var(--color-red); }
   .yn__state.now { background:var(--color-lime); color:var(--color-text-inverse); padding:3px 9px; border-radius:var(--radius-full); font-size:9px; text-transform:uppercase; letter-spacing:0.04em; }
-  .yn__state.eta { color:var(--color-text-muted); font-weight:700; }
   .yn__none { font-size:11px; color:var(--color-text-faint); padding:6px 2px 0; }
 
   /* ── Home: compact live match strip ───── */
@@ -805,7 +804,6 @@
   // leads; other days the last result + season tiles lead. Built entirely
   // from the player-me payload — no extra fetches.
   const HOME_SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
-  const GAME_MIN = 13;   // rough minutes per game, for "you're up around..." estimates
   function fmtCountdown(iso) {
     if (!iso) return null;
     const ms = new Date(iso).getTime() - Date.now();
@@ -896,10 +894,8 @@
             } else if (st === 'live') {
               stateEl = '<span class="yn__state now">Up now</span>'; liveCls = ' is-live';
             } else {
-              const idx = HOME_SLOTS.indexOf(s);
-              const eta = nm.scheduledAt ? new Date(new Date(nm.scheduledAt).getTime() + idx * GAME_MIN * 60000) : null;
-              const etaPast = eta && eta.getTime() < Date.now();
-              stateEl = eta ? `<span class="yn__state eta">${underway && etaPast ? 'soon' : '~' + eta.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' })}</span>` : '';
+              // No time estimate — game order/pace varies too much to predict.
+              stateEl = '';
             }
             return `<div class="yn__row${liveCls}">
               <div class="yn__slot">R${r} · G${gNo}<br><span class="${t.cls}">${t.label}</span></div>
