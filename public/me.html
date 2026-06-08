@@ -300,6 +300,36 @@
   .lnk { color:inherit; text-decoration:none; }
   .lnk:active { opacity:0.6; }
   a.lnk:hover { text-decoration:underline; text-decoration-color:rgba(128,128,128,0.5); text-underline-offset:3px; }
+
+  /* ── In-app profile sheet ─────────────────────────── */
+  .psheet-scrim { position:fixed; inset:0; background:rgba(0,0,0,0.55); opacity:0; pointer-events:none; transition:opacity .22s ease; z-index:60; }
+  .psheet-scrim.is-open { opacity:1; pointer-events:auto; }
+  .psheet { position:fixed; left:0; right:0; bottom:0; top:0; background:var(--color-bg); z-index:61;
+    transform:translateY(100%); transition:transform .26s cubic-bezier(.4,0,.2,1); display:flex; flex-direction:column;
+    max-width:520px; margin:0 auto; box-shadow:0 -10px 40px rgba(0,0,0,0.4); }
+  .psheet.is-open { transform:translateY(0); }
+  .psheet__bar { display:flex; align-items:center; gap:8px; padding:14px 12px; border-bottom:1px solid var(--color-border); flex-shrink:0; }
+  .psheet__back { background:none; border:none; color:var(--color-text); font-size:28px; line-height:1; font-weight:700; padding:0 8px; cursor:pointer; font-family:inherit; }
+  .psheet__title { font-size:14px; font-weight:800; letter-spacing:0.02em; flex:1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .psheet__sp { width:36px; flex-shrink:0; }
+  .psheet__body { flex:1; overflow-y:auto; padding:16px 16px 32px; -webkit-overflow-scrolling:touch; }
+  .ph-hero { display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:8px 0 18px; }
+  .ph-av { width:64px; height:64px; border-radius:50%; background:var(--color-surface-3); border:1px solid var(--color-border-strong); display:grid; place-items:center; font-size:24px; font-weight:800; color:var(--color-text-muted); }
+  .ph-emoji { font-size:48px; line-height:1; }
+  .ph-name { font-size:20px; font-weight:800; }
+  .ph-sub { font-size:12px; color:var(--color-text-muted); }
+  .ph-tiles { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:4px 0 18px; }
+  .ph-tile { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:12px 6px; text-align:center; }
+  .ph-tile__n { font-size:18px; font-weight:800; } .ph-tile__n.lime { color:var(--color-lime); } .ph-tile__n.gold { color:var(--color-gold); } .ph-tile__n.red { color:var(--color-red); }
+  .ph-tile__l { font-size:9px; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:3px; }
+  .ph-row { display:flex; align-items:center; gap:11px; padding:10px 2px; border-bottom:1px solid var(--color-border); }
+  .ph-row:last-child { border-bottom:none; }
+  .ph-rank { width:22px; text-align:center; font-weight:800; color:var(--color-text-faint); font-size:12px; }
+  .ph-rav { width:30px; height:30px; border-radius:50%; background:var(--color-surface-3); display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--color-text-muted); }
+  .ph-rname { flex:1; font-size:13px; font-weight:600; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .ph-g { font-size:9px; font-weight:700; padding:2px 7px; border-radius:var(--radius-full); }
+  .ph-g.f { background:var(--color-gold-dim); color:var(--color-gold); } .ph-g.m { background:var(--color-teal-dim); color:var(--color-teal); }
+  .ph-empty { color:var(--color-text-faint); font-size:12px; padding:18px 0; text-align:center; }
   .rost { display:flex; align-items:center; gap:11px; padding:10px 4px; border-bottom:1px solid var(--color-border); }
   .rost:last-child { border-bottom:none; }
   .rost__av { width:30px; height:30px; border-radius:50%; background:var(--color-surface-3); display:grid; place-items:center; font-size:11px; font-weight:800; color:var(--color-text-muted); }
@@ -528,6 +558,18 @@
         <span>Standings</span>
       </button>
     </nav>
+
+    <!-- In-app profile sheet (player / team) — slides up over the portal so
+         tapping a name never leaves the mobile app. -->
+    <div class="psheet-scrim" id="psheet-scrim"></div>
+    <section class="psheet" id="psheet" role="dialog" aria-modal="true" aria-hidden="true">
+      <header class="psheet__bar">
+        <button class="psheet__back" id="psheet-back" aria-label="Back">‹</button>
+        <span class="psheet__title" id="psheet-title">Profile</span>
+        <span class="psheet__sp"></span>
+      </header>
+      <div class="psheet__body" id="psheet-body"></div>
+    </section>
   </div>
 
 <script>
@@ -543,9 +585,107 @@
   const _seasonSuffix = () => { const c = (DATA?.profile?.circuit || 'I').toLowerCase(); return c === 'i' ? '' : '&season=' + encodeURIComponent('circuit-' + c); };
   const teamHref = (id, name) => '/team?id=' + encodeURIComponent(id || slug(name || '')) + _seasonSuffix();
   const playerHref = (name, teamName) => '/player?team=' + slug(teamName || '') + '&name=' + encodeURIComponent(name || '') + _seasonSuffix();
-  // Wrap a name in a profile link (keeps existing inner markup/badges intact).
-  const teamLink = (id, name, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${teamHref(id, name)}">${inner}</a>`;
-  const playerLink = (name, teamName, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${playerHref(name, teamName)}">${inner}</a>`;
+  // Wrap a name in a profile link. The href is a graceful fallback — a
+  // delegated click handler intercepts these and opens an in-app sheet so the
+  // user never leaves the mobile portal (data-prof attributes drive that).
+  const teamLink = (id, name, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${teamHref(id, name)}" data-prof="team" data-pid="${esc(id || '')}" data-pteam="${esc(name || '')}">${inner}</a>`;
+  const playerLink = (name, teamName, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${playerHref(name, teamName)}" data-prof="player" data-pname="${esc(name || '')}" data-pteam="${esc(teamName || '')}">${inner}</a>`;
+
+  // ── In-app profile sheet ──────────────────────────────────────────
+  // Tapping a player/team name opens this sheet INSTEAD of navigating away,
+  // so the portal + bottom nav stay put. A small history stack lets the back
+  // button hop player → team → player and finally dismiss.
+  let _profStack = [];
+  let _teamsCache = null;
+  function _teamsData() {
+    if (_teamsCache) return _teamsCache;
+    const season = 'circuit-' + (DATA?.profile?.circuit || 'I').toLowerCase();
+    _teamsCache = fetch(API + '/public-teams?season=' + encodeURIComponent(season), { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { teams: [] }).then(d => d.teams || []).catch(() => []);
+    return _teamsCache;
+  }
+  function openProfileSheet(kind, data, _isBack) {
+    if (!_isBack) _profStack.push({ kind, data });
+    $('psheet').setAttribute('aria-hidden', 'false');
+    $('psheet').classList.add('is-open');
+    $('psheet-scrim').classList.add('is-open');
+    if (kind === 'player') renderPlayerProfile(data); else renderTeamProfile(data);
+  }
+  function profileBack() {
+    _profStack.pop();
+    const prev = _profStack[_profStack.length - 1];
+    if (prev) openProfileSheet(prev.kind, prev.data, true);
+    else closeProfileSheet();
+  }
+  function closeProfileSheet() {
+    _profStack = [];
+    $('psheet').classList.remove('is-open');
+    $('psheet-scrim').classList.remove('is-open');
+    $('psheet').setAttribute('aria-hidden', 'true');
+    setTimeout(() => { if (!$('psheet').classList.contains('is-open')) $('psheet-body').innerHTML = ''; }, 280);
+  }
+  function renderPlayerProfile({ name, teamName }) {
+    $('psheet-title').textContent = shortName(name) || 'Player';
+    const lb = (DATA?.leaderboard || []);
+    const key = String(name || '').trim().toLowerCase();
+    const row = lb.find(p => String(p.name||'').trim().toLowerCase() === key && (!teamName || String(p.teamName||'').trim().toLowerCase() === String(teamName).trim().toLowerCase()))
+             || lb.find(p => String(p.name||'').trim().toLowerCase() === key);
+    const g = norm(row?.gender);
+    const gChip = g === 'F' ? '<span class="ph-g f">Woman</span>' : g === 'M' ? '<span class="ph-g m">Man</span>' : '';
+    const teamLine = (row?.teamName || teamName)
+      ? `<div class="ph-sub">${teamLink(null, row?.teamName || teamName, esc(row?.teamName || teamName))}${gChip ? ' · ' + gChip : ''}</div>` : (gChip ? `<div class="ph-sub">${gChip}</div>` : '');
+    let tiles = '';
+    if (row) {
+      const wl = `${row.w || 0}–${row.l || 0}`;
+      tiles = `<div class="ph-tiles">
+        <div class="ph-tile"><div class="ph-tile__n">${row.rank != null ? '#' + row.rank : '—'}</div><div class="ph-tile__l">League rank</div></div>
+        <div class="ph-tile"><div class="ph-tile__n lime">${row.dsr != null ? row.dsr : '—'}</div><div class="ph-tile__l">DSR</div></div>
+        <div class="ph-tile"><div class="ph-tile__n">${wl}</div><div class="ph-tile__l">Game W–L</div></div>
+      </div>
+      <div class="ph-sub" style="text-align:center;">${row.gp || 0} game${(row.gp||0)===1?'':'s'} played this season</div>`;
+    } else {
+      tiles = '<div class="ph-empty">No ranked stats yet — this player hasn’t logged a game this season.</div>';
+    }
+    $('psheet-body').innerHTML = `<div class="ph-hero">
+      <div class="ph-av">${esc(initials(name))}</div>
+      <div class="ph-name">${esc(name)}</div>
+      ${teamLine}
+    </div>${tiles}`;
+  }
+  async function renderTeamProfile({ id, name }) {
+    $('psheet-title').textContent = name || 'Team';
+    // Standing from the already-loaded standings payload.
+    let st = null, emoji = null, divLabel = '';
+    const divs = DATA?.standings?.divisions || {};
+    for (const dk of Object.keys(divs)) {
+      const tm = (divs[dk].teams || []).find(t => (id && t.teamId === id) || slug(t.teamName) === slug(name));
+      if (tm) { st = tm; emoji = tm.teamEmoji; divLabel = divs[dk].divisionLabel || dk; break; }
+    }
+    const tiles = st ? `<div class="ph-tiles">
+        <div class="ph-tile"><div class="ph-tile__n gold">${ordinal(st.rank)}</div><div class="ph-tile__l">Division</div></div>
+        <div class="ph-tile"><div class="ph-tile__n">${st.wins}–${st.losses}${st.ties?'–'+st.ties:''}</div><div class="ph-tile__l">Record</div></div>
+        <div class="ph-tile"><div class="ph-tile__n lime">${st.matchPointsFor ?? 0}</div><div class="ph-tile__l">Match pts</div></div>
+      </div>` : '';
+    $('psheet-body').innerHTML = `<div class="ph-hero">
+      <div class="ph-emoji">${emo({ emoji })}</div>
+      <div class="ph-name">${esc(name)}</div>
+      ${divLabel ? `<div class="ph-sub">${esc(divLabel)}</div>` : ''}
+    </div>${tiles}<div class="label">Roster</div><div id="ph-roster"><div class="ph-empty">Loading roster…</div></div>`;
+    // Roster from public-teams (cached); names tap through to player sheets.
+    const teams = await _teamsData();
+    const team = teams.find(t => (id && t.id === id) || slug(t.name) === slug(name));
+    const rosterEl = $('ph-roster');
+    if (!rosterEl) return;
+    const ros = (team?.roster || []);
+    if (!ros.length) { rosterEl.innerHTML = '<div class="ph-empty">Roster not available.</div>'; return; }
+    rosterEl.innerHTML = ros.map((p, i) => {
+      const pg = norm(p.gender);
+      const gt = pg === 'F' ? '<span class="ph-g f">W</span>' : pg === 'M' ? '<span class="ph-g m">M</span>' : '';
+      return `<div class="ph-row"><span class="ph-rank">${i+1}</span><span class="ph-rav">${esc(initials(p.name))}</span>
+        <span class="ph-rname">${playerLink(p.name, team?.name || name, esc(p.name))}</span>${gt}</div>`;
+    }).join('');
+  }
+
   let DATA = null, lbFilter = 'all', bootEtag = null;
 
   // ---- boot ----
@@ -794,6 +934,19 @@
   trackTab('home'); // initial portal load counts as a Home view
   document.querySelectorAll('.nb').forEach(b => b.addEventListener('click', () => goTab(b.dataset.tab)));
   $('appbar-chat').addEventListener('click', () => goTab('chat'));
+
+  // Profile sheet: intercept name links so they open in-app instead of leaving
+  // the portal. Delegated, so it covers every current and future name link.
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a.lnk[data-prof]');
+    if (!a) return;
+    e.preventDefault();
+    if (a.dataset.prof === 'player') openProfileSheet('player', { name: a.dataset.pname, teamName: a.dataset.pteam });
+    else openProfileSheet('team', { id: a.dataset.pid || null, name: a.dataset.pteam });
+  });
+  $('psheet-back').addEventListener('click', profileBack);
+  $('psheet-scrim').addEventListener('click', closeProfileSheet);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('psheet').classList.contains('is-open')) closeProfileSheet(); });
 
   // ---- captain SSO bridge ----
   // Mint a captain session from the current player session, then open the
