@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player Next-Match Hero — Mockup</title>
+<style>
+  :root {
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12); --color-lime-ghost:rgba(184,255,44,0.06);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-gold:#f0c040; --color-gold-dim:rgba(240,192,64,0.12);
+    --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-full:999px;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:#070707; color:var(--color-text); font-family:var(--font); }
+  .stage { display:flex; flex-wrap:wrap; gap:28px; justify-content:center; padding:28px 16px 60px; }
+  .caption { width:100%; max-width:900px; margin:0 auto 4px; color:var(--color-text-muted); font-size:13px; line-height:1.6; }
+  .caption h1 { color:var(--color-text); font-size:20px; font-weight:800; margin:0 0 6px; }
+  .caption b { color:var(--color-text); } .caption .del { color:var(--color-red,#ff5c47); text-decoration:line-through; }
+  .phone { width:390px; max-width:100%; background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:26px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.5); align-self:flex-start; }
+  .phone__label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-teal); font-weight:700; text-align:center; padding:10px 0 0; }
+  .body { padding:14px; }
+  .label { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:18px 2px 9px; }
+
+  .next { background:linear-gradient(135deg, rgba(184,255,44,0.16), rgba(23,215,176,0.08)); border:1px solid rgba(184,255,44,0.28); border-radius:var(--radius-md); padding:14px; overflow:hidden; }
+  .next__eyebrow { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-lime); font-weight:800; display:flex; align-items:center; gap:6px; }
+  .pulse { width:7px; height:7px; border-radius:50%; background:var(--color-lime); display:inline-block; }
+  .next__row { display:flex; align-items:center; gap:12px; margin:12px 0 6px; }
+  .next__team { flex:1; text-align:center; } .next__emoji { font-size:28px; } .next__tn { font-size:13px; font-weight:700; margin-top:3px; }
+  .next__rec { font-size:10px; color:var(--color-text-muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .next__rec b { color:var(--color-text); }
+  .next__vs { font-size:11px; font-weight:800; color:var(--color-text-faint); }
+  .next__meta { font-size:11px; color:var(--color-text-muted); text-align:center; }
+  .next__serve { font-size:11px; color:var(--color-text-muted); text-align:center; margin-top:6px; }
+  .next__serve b { color:var(--color-text); }
+
+  /* integrated full-lineup toggle (replaces the lock message + separate card) */
+  .nlu { margin-top:12px; border:1px solid rgba(255,255,255,0.12); border-radius:var(--radius-sm); background:rgba(0,0,0,0.18); overflow:hidden; }
+  .nlu__head { display:flex; align-items:center; justify-content:space-between; width:100%; padding:11px 13px; background:none; border:none; color:var(--color-text); font-family:inherit; cursor:pointer; }
+  .nlu__t { font-size:12px; font-weight:800; }
+  .nlu__sub { font-size:10px; color:var(--color-text-faint); display:flex; align-items:center; gap:6px; }
+  .nlu__chev { transition:transform .18s ease; }
+  .nlu.is-open .nlu__chev { transform:rotate(180deg); }
+  .nlu__body { display:none; padding:2px 12px 12px; }
+  .nlu.is-open .nlu__body { display:block; }
+  .nlu__round { font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:10px 0 5px; }
+  .g { display:grid; grid-template-columns:34px 1fr 14px 1fr; gap:6px; align-items:center; padding:6px 4px; border-bottom:1px solid var(--color-border); font-size:11px; }
+  .g:last-child { border-bottom:none; }
+  .g.mine { background:var(--color-lime-ghost); box-shadow:inset 2px 0 0 var(--color-lime); border-radius:4px; }
+  .g__no { font-size:9px; font-weight:800; color:var(--color-text-faint); } .g__no small { display:block; color:var(--color-teal); }
+  .pl { color:var(--color-text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .pl.you { color:var(--color-lime); font-weight:700; }
+  .pl.right { text-align:right; } .vs { font-size:8px; color:var(--color-text-faint); text-align:center; }
+  .hidden { color:var(--color-text-faint); font-style:italic; font-size:10px; }
+  .reveal-note { font-size:10px; color:var(--color-text-faint); text-align:center; padding:8px 0 2px; }
+
+  .yn { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:12px 13px; margin-top:8px; }
+  .yn h3 { margin:0 0 6px; font-size:14px; font-weight:800; }
+  .yn__row { display:grid; grid-template-columns:54px 1fr; gap:10px; align-items:center; background:var(--color-surface-2); border-radius:var(--radius-sm); padding:8px 11px; margin-bottom:6px; font-size:12px; }
+  .yn__slot { font-size:9px; font-weight:800; color:var(--color-text-faint); } .yn__slot .mx { color:var(--color-teal); }
+
+  .tagdel { display:inline-block; font-size:9px; font-weight:800; color:var(--color-red,#ff5c47); border:1px solid rgba(255,92,71,0.4); border-radius:var(--radius-full); padding:1px 7px; }
+  .tagnew { display:inline-block; font-size:9px; font-weight:800; color:var(--color-lime); border:1px solid rgba(184,255,44,0.4); border-radius:var(--radius-full); padding:1px 7px; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption">
+      <h1>Next-match hero — lineup folded in, record shown</h1>
+      Changes: <span class="del">"Lineup locked — opponent's reveals 15 min before start."</span> message removed. The
+      <b>Full lineup</b> toggle now lives <b>inside the match card</b> (it's that match's lineup), not a separate container below.
+      Team <b>record shown as W–T–L</b> (e.g. <b>0–0–0</b> = Wins–Ties–Losses) under each team name. Phone <b>A</b> = collapsed · <b>B</b> = expanded.
+    </div>
+
+    <!-- A: collapsed -->
+    <div class="phone">
+      <div class="phone__label">A · Collapsed</div>
+      <div class="body">
+        <div class="label">Match night</div>
+        <div class="next">
+          <div class="next__eyebrow"><span class="pulse"></span> Match night · Week 1 · starts in 7h 15m</div>
+          <div class="next__row">
+            <div class="next__team"><div class="next__emoji">😤</div><div class="next__tn">Big Dink Energy</div><div class="next__rec"><b>0–0–0</b> W-T-L</div></div>
+            <div class="next__vs">VS</div>
+            <div class="next__team"><div class="next__emoji">0️⃣</div><div class="next__tn">Zero Zero Two</div><div class="next__rec"><b>0–0–0</b> W-T-L</div></div>
+          </div>
+          <div class="next__meta">Dink House · Courts 1 &amp; 2 · Mon, Jun 8 · 7:00 PM</div>
+          <div class="next__serve"><b>R1:</b> you serve · opponent picks side</div>
+
+          <div class="nlu">
+            <button class="nlu__head">
+              <span class="nlu__t">Full lineup</span>
+              <span class="nlu__sub">all 12 games <span class="nlu__chev">▾</span></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="yn">
+          <h3>Your night</h3>
+          <div class="yn__row"><div class="yn__slot">R1 · G5<br><span class="mx">Mixed</span></div><div>with Angel M.</div></div>
+          <div class="yn__row"><div class="yn__slot">R2 · G4<br><span class="mx">Mixed</span></div><div>with Kayo H.</div></div>
+        </div>
+        <div class="label" style="color:var(--color-text-faint);opacity:.5;">↓ no more separate "Full lineup" card here <span class="tagdel">removed</span></div>
+      </div>
+    </div>
+
+    <!-- B: expanded -->
+    <div class="phone">
+      <div class="phone__label" style="color:var(--color-lime);">B · Full lineup expanded (inside the card)</div>
+      <div class="body">
+        <div class="label">Match night</div>
+        <div class="next">
+          <div class="next__eyebrow"><span class="pulse"></span> Match night · Week 1 · starts in 7h 15m</div>
+          <div class="next__row">
+            <div class="next__team"><div class="next__emoji">😤</div><div class="next__tn">Big Dink Energy</div><div class="next__rec"><b>2–0–1</b> W-T-L</div></div>
+            <div class="next__vs">VS</div>
+            <div class="next__team"><div class="next__emoji">0️⃣</div><div class="next__tn">Zero Zero Two</div><div class="next__rec"><b>1–1–1</b> W-T-L</div></div>
+          </div>
+          <div class="next__meta">Dink House · Courts 1 &amp; 2 · Mon, Jun 8 · 7:00 PM</div>
+          <div class="next__serve"><b>R1:</b> you serve · opponent picks side</div>
+
+          <div class="nlu is-open">
+            <button class="nlu__head">
+              <span class="nlu__t">Full lineup</span>
+              <span class="nlu__sub">all 12 games <span class="nlu__chev">▾</span></span>
+            </button>
+            <div class="nlu__body">
+              <div class="nlu__round">Round 1 · you serve first</div>
+              <div class="g"><div class="g__no">G1<small>W</small></div><div class="pl">Jobeth Z. / Fiat T.</div><div class="vs">vs</div><div class="pl right hidden">Hidden</div></div>
+              <div class="g mine"><div class="g__no">G2<small>M</small></div><div class="pl you">Richard H. / Eli H.</div><div class="vs">vs</div><div class="pl right hidden">Hidden</div></div>
+              <div class="g"><div class="g__no">G3<small style="color:#17d7b0;">X</small></div><div class="pl">Jobeth Z. / Chandler H.</div><div class="vs">vs</div><div class="pl right hidden">Hidden</div></div>
+              <div class="g mine"><div class="g__no">G5<small style="color:#17d7b0;">X</small></div><div class="pl you">Angel M. / Richard H.</div><div class="vs">vs</div><div class="pl right hidden">Hidden</div></div>
+              <div class="nlu__round">Round 2 · you pick side</div>
+              <div class="g mine"><div class="g__no">G4<small style="color:#17d7b0;">X</small></div><div class="pl you">Kayo H. / Richard H.</div><div class="vs">vs</div><div class="pl right hidden">Hidden</div></div>
+              <div class="g"><div class="g__no">G6<small style="color:#17d7b0;">X</small></div><div class="pl">Angel M. / Eli H.</div><div class="vs">vs</div><div class="pl right hidden">Hidden</div></div>
+              <div class="reveal-note">🔒 Opponent's pairs reveal 15 minutes before first serve.</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="yn">
+          <h3>Your night</h3>
+          <div class="yn__row"><div class="yn__slot">R1 · G5<br><span class="mx">Mixed</span></div><div>with Angel M.</div></div>
+          <div class="yn__row"><div class="yn__slot">R2 · G4<br><span class="mx">Mixed</span></div><div>with Kayo H.</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

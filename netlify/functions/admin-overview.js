@@ -148,6 +148,11 @@ export default async (req) => {
     // reassigns the captain on the Teams page. Without this, Recent Activity
     // shows whoever registered the team, not the current captain.
     const captainByRegId = {};
+    // Current team NAME keyed by the registration it was created from — the
+    // registration blob keeps the name as it was at sign-up and is never
+    // updated when an admin renames the team, so anything showing a team name
+    // (e.g. outstanding balances) must resolve through this.
+    const teamNameByRegId = {};
     try {
       const { blobs: teamBlobs } = await teamsStore.list({ prefix: 'team/' });
       const teamRecords = (await Promise.all(
@@ -158,9 +163,16 @@ export default async (req) => {
         const flagged = (t.roster || []).find(p => p.isCaptain);
         const captainName = flagged?.name || t.captainName || t.captain || null;
         if (captainName) captainByRegId[t.registrationId] = captainName;
+        if (t.name) teamNameByRegId[t.registrationId] = t.name;
       }
     } catch (err) {
       console.error('admin-overview: failed to load teams for captain lookup:', err);
+    }
+
+    // Override outstanding-balance labels with the CURRENT team name (balanceTeams
+    // items are keyed by registration id = r.id, which is what teams link to).
+    for (const b of balanceTeams) {
+      if (teamNameByRegId[b.id]) b.name = teamNameByRegId[b.id];
     }
 
     // Recent 10 registrations sorted desc
