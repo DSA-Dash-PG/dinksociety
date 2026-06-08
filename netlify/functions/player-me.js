@@ -10,6 +10,7 @@ import { circuitCode } from './lib/circuit.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
 import { getActiveWaivers, getSignature, isWaiverSatisfied } from './lib/waiver.js';
+import { isAdminEmail } from './lib/admin-auth.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -30,6 +31,10 @@ export default async (req) => {
   const myEmail = player.normalizedEmail || (player.email || '').toLowerCase() || null;
   const isCaptain = !!player.isCaptain || (!!myEmail && (team.captainEmail || '').toLowerCase() === myEmail);
   const isCoCaptain = !!player.isCoCaptain && !isCaptain;
+  // Does this signed-in account also have admin rights? Drives the "Admin"
+  // toggle in the portal's view switcher. Checked against the SESSION email
+  // (authoritative), not the roster email.
+  const isAdmin = isAdminEmail(ctx.session?.email || myEmail);
 
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
@@ -248,7 +253,7 @@ export default async (req) => {
       playerId, name: player.name, gender: player.gender || null,
       teamId, teamName: team.name, teamEmoji: team.emoji || null,
       division, divisionLabel: team.divisionLabel || division, circuit,
-      isCaptain, isCoCaptain,
+      isCaptain, isCoCaptain, isAdmin,
     },
     myTeams,
     currentTeamId: teamId,

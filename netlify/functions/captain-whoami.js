@@ -7,6 +7,7 @@ import { findAllLeaderTeamsByEmail } from './lib/captain-auth.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
 import { circuitCode } from './lib/circuit.js';
 import { getActiveWaivers, listSignatures } from './lib/waiver.js';
+import { isAdminEmail } from './lib/admin-auth.js';
 
 export default async (req) => {
   const result = await verifyCaptainSession(req);
@@ -78,6 +79,7 @@ export default async (req) => {
     currentTeamId: teamEntry ? teamEntry.id : null,
     announcements,
     waiverGaps,
+    isAdmin: isAdminEmail(ctx.session?.email || ctx.user?.email),
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },

@@ -476,6 +476,7 @@
       </div>
       <div class="ds-header__right">
         <div class="ds-role-seg" role="group" aria-label="Switch view">
+          <button class="ds-role-seg__opt" id="cap-admin-view" onclick="openAdminTools(this)" style="display:none"><span>Admin</span></button>
           <span class="ds-role-seg__opt is-on" aria-current="true">Captain</span>
           <a href="/me.html" class="ds-role-seg__opt" id="cap-player-view">Player</a>
         </div>
@@ -508,6 +509,7 @@
         <div class="ds-drawer__section">
           <div class="ds-drawer__section-label">View</div>
           <div class="ds-dseg" role="group" aria-label="Switch view">
+            <button class="ds-dseg__opt" id="cap-admin-view-m" onclick="openAdminTools(this)" style="display:none"><span>Admin</span></button>
             <span class="ds-dseg__opt is-on" aria-current="true">Captain</span>
             <a class="ds-dseg__opt" href="/me.html">Player</a>
           </div>
@@ -1035,6 +1037,28 @@
       delete btn.dataset.busyHtml;
     }
 
+    // ===== Admin SSO bridge =====
+    // Captains who are also admins (email in ADMIN_EMAILS) can jump straight to
+    // the admin portal — admin-bootstrap mints an admin session from this one.
+    let _adminOpening = false;
+    window.openAdminTools = async function openAdminTools(btn) {
+      if (_adminOpening) return;
+      _adminOpening = true;
+      const lbl = btn.querySelector('span') || btn;
+      const orig = lbl.textContent;
+      lbl.textContent = 'Opening…';
+      try {
+        const res = await fetch('/.netlify/functions/admin-bootstrap', { method: 'POST', credentials: 'include' });
+        if (res.ok) { location.href = '/admin.html'; return; }
+        alert('Admin access not found for your account. If this looks wrong, ask the league office.');
+      } catch (e) {
+        alert('Could not open admin tools — please try again.');
+      } finally {
+        lbl.textContent = orig;
+        _adminOpening = false;
+      }
+    };
+
     // ===== Auth =====
     async function checkAuth() {
       try {
@@ -1062,6 +1086,8 @@
       const avSrc = (state.me.name || state.me.email || '?').replace(/@.*$/, '');
       const avInit = (avSrc.split(/[ ._-]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase()) || '?';
       ['ds-av-cap', 'ds-drawer-av'].forEach(i => { const el = $id(i); if (el) el.textContent = avInit; });
+      // Admin toggle — only for accounts in ADMIN_EMAILS.
+      ['cap-admin-view', 'cap-admin-view-m'].forEach(i => { const el = $id(i); if (el) el.style.display = state.me.isAdmin ? '' : 'none'; });
       renderTeamSwitcher();
       initTeamPhoto();
       // Load roster + schedule, then dispatch to the right state
@@ -1509,7 +1535,7 @@
             <div class="match-tile__body">
               <div class="match-tile__opponent">vs ${escapeHtml(m.opponent.name)}</div>
               <div class="match-tile__meta">
-                ${m.myRole === 'home' ? 'Home' : 'Away'}${m.court ? ' · ' + escapeHtml(m.court) : ''}
+                ${m.scheduledAt ? escapeHtml(formatDateShort(m.scheduledAt) + ' · ' + matchStartLabel(m)) : 'Date TBD'} · ${m.myRole === 'home' ? 'Home' : 'Away'}${m.court ? ' · ' + escapeHtml(m.court) : ''}
               </div>
             </div>
             <div>${pill}</div>

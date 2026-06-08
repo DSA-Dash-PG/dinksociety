@@ -308,17 +308,28 @@
     .si-card__order { position: absolute; top: 6px; left: 6px; background: rgba(14,14,14,0.8); color: var(--color-lime); font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 4px; }
 
     /* ── Mobile ───────────────────────────────────────────────── */
-    .mob-bar { display: none; background: var(--color-surface); border-bottom: 1px solid var(--color-border); padding: 12px 18px; align-items: center; justify-content: space-between; }
-    .mob-bar__brand { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; }
-    .mob-bar__ham { background: transparent; border: none; color: var(--color-text); font-size: 20px; cursor: pointer; padding: 4px 8px; }
+    .mob-bar { display: none; background: var(--color-bg); border-bottom: 1px solid var(--color-divider); padding: 13px 16px 12px; align-items: center; justify-content: space-between; }
+    .mob-bar__brand { display: flex; flex-direction: column; gap: 1px; }
+    .mob-bar__logo { font-size: 14px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.02em; line-height: 1; }
+    .mob-bar__tag { font-size: 8px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-teal); font-weight: 700; }
+    .mob-bar__right { display: flex; align-items: center; gap: 10px; }
+    .mob-pill { display: inline-flex; align-items: center; background: var(--color-lime-dim); color: var(--color-lime); font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; padding: 4px 9px; border-radius: var(--radius-full); }
+    .mob-av { width: 34px; height: 34px; border-radius: 50%; background: var(--color-surface-3); border: 1px solid var(--color-border-strong); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 800; cursor: pointer; color: var(--color-text); font-family: inherit; padding: 0; }
+    .mob-av:hover { border-color: var(--color-lime); }
     .mob-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 998; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .mob-overlay.is-open { opacity: 1; pointer-events: auto; }
+    /* View switcher in the drawer — phones only. */
+    .sb__viewseg { display: none; margin: 12px 14px 4px; background: var(--color-surface-3); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px; gap: 2px; }
+    .sb__vopt { flex: 1; text-align: center; font-size: 11px; font-weight: 800; color: var(--color-text-faint); border-radius: var(--radius-full); padding: 7px 0; text-decoration: none; transition: var(--transition); }
+    .sb__vopt:hover { color: var(--color-text-muted); }
+    .sb__vopt.is-on { background: var(--color-lime); color: var(--color-text-inverse); }
 
     @media (max-width: 860px) {
       .admin-shell { grid-template-columns: 1fr; }
-      .sb { position: fixed; left: 0; top: 0; bottom: 0; width: 240px; transform: translateX(-100%); transition: transform 0.25s ease; z-index: 999; }
+      .sb { position: fixed; right: 0; left: auto; top: 0; bottom: 0; width: 280px; max-width: 88%; transform: translateX(102%); transition: transform 0.25s ease; z-index: 999; }
       .sb.is-open { transform: translateX(0); }
-      .mob-bar { display: flex !important; }
+      .sb__viewseg { display: flex; }
+      .mob-bar { display: flex !important; position: sticky; top: 0; z-index: 50; }
       .admin-main { padding: 16px 14px 60px; }
       .arow { grid-template-columns: 1fr; }
       .stats-row { grid-template-columns: 1fr 1fr; }
@@ -356,32 +367,51 @@
 
   <!-- SHELL -->
   <div id="admin-shell" style="display:none;">
-    <div class="mob-bar"><span class="mob-bar__brand">Admin</span><button class="mob-bar__ham" id="mob-ham" aria-label="Menu">☰</button></div>
+    <div class="mob-bar">
+      <div class="mob-bar__brand"><span class="mob-bar__logo">The Dink Society</span><span class="mob-bar__tag">Admin Portal</span></div>
+      <div class="mob-bar__right">
+        <span class="mob-pill" id="mob-season-pill">Admin</span>
+        <button class="mob-av" id="mob-av" aria-label="Menu" aria-expanded="false">A</button>
+      </div>
+    </div>
     <div class="mob-overlay" id="mob-overlay"></div>
 
     <!-- Mobile quick-access bottom nav (phones only; full menu via the ☰ top bar) -->
     <nav class="am-bottomnav" id="am-bottomnav">
-      <button class="am-bn is-active" data-bn="schedule">
+      <button class="am-bn is-active" data-bn="overview">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>Overview</span>
+      </button>
+      <button class="am-bn" data-bn="schedule">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>Schedule</span>
-      </button>
-      <button class="am-bn" data-bn="teams">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-        <span>Trades</span>
       </button>
       <button class="am-bn" data-bn="scores">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
         <span>Score</span>
       </button>
+      <button class="am-bn" data-bn="teams">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        <span>Teams</span>
+      </button>
       <button class="am-bn" data-bn="messages">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
         <span>Messages</span>
+        <span class="am-bn__badge" id="am-bn-msg-badge" style="display:none;">0</span>
       </button>
     </nav>
 
     <div class="admin-shell">
       <aside class="sb" id="sb">
         <div class="sb__brand"><div class="sb__logo">The Dink Society</div><div class="sb__tag">Admin Portal</div></div>
+        <!-- View switcher (phones) — jump back to the player / captain portals.
+             Admin is the current view. Sessions are independent cookies, so these
+             land you in that portal if you're signed in there, else its login. -->
+        <div class="sb__viewseg" role="group" aria-label="Switch view">
+          <a class="sb__vopt" href="/me.html">Player</a>
+          <a class="sb__vopt" href="/captain.html">Captain</a>
+          <span class="sb__vopt is-on" aria-current="true">Admin</span>
+        </div>
         <nav class="sb__nav">
           <div class="sb__sec">League</div>
           <button class="sb__link is-active" data-tab="overview">
@@ -1076,11 +1106,18 @@
   function checkAuth() {
     api('/.netlify/functions/admin-whoami')
       .then(r => { if (!r.ok) throw 0; return r.json(); })
-      .then(d => { if (!d.admin) throw 0; $id('sb-email').textContent = d.email || 'admin'; showShell(); })
+      .then(d => { if (!d.admin) throw 0; $id('sb-email').textContent = d.email || 'admin'; setAdminAvatar(d.email); showShell(); })
       .catch(() => showLogin());
   }
 
   function showLogin() { $id('login-screen').style.display = 'block'; $id('admin-shell').style.display = 'none'; }
+
+  // Avatar initials for the mobile top bar — from the admin email's local part.
+  function setAdminAvatar(email) {
+    const src = String(email || 'Admin').replace(/@.*$/, '');
+    const init = (src.split(/[ ._-]+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase()) || 'A';
+    const av = $id('mob-av'); if (av) av.textContent = init;
+  }
 
   async function showShell() {
     $id('login-screen').style.display = 'none';
@@ -1877,13 +1914,17 @@
       if (t === 'moments') loadAdminGallery();
       if (t === 'activity') initActivityLog();
       if (t === 'analytics') renderAnalytics();
-      $id('sb').classList.remove('is-open');
-      $id('mob-overlay').classList.remove('is-open');
+      // Keep the bottom nav in sync when a tab is chosen from the drawer. Tabs
+      // that aren't one of the 5 nav slots just clear all highlights.
+      document.querySelectorAll('#am-bottomnav .am-bn').forEach(bn => bn.classList.toggle('is-active', bn.dataset.bn === t));
+      closeAdminDrawer();
     });
   });
 
-  $id('mob-ham')?.addEventListener('click', () => { $id('sb').classList.toggle('is-open'); $id('mob-overlay').classList.toggle('is-open'); });
-  $id('mob-overlay')?.addEventListener('click', () => { $id('sb').classList.remove('is-open'); $id('mob-overlay').classList.remove('is-open'); });
+  function openAdminDrawer() { $id('sb').classList.add('is-open'); $id('mob-overlay').classList.add('is-open'); $id('mob-av')?.setAttribute('aria-expanded', 'true'); }
+  function closeAdminDrawer() { $id('sb').classList.remove('is-open'); $id('mob-overlay').classList.remove('is-open'); $id('mob-av')?.setAttribute('aria-expanded', 'false'); }
+  $id('mob-av')?.addEventListener('click', () => { $id('sb').classList.contains('is-open') ? closeAdminDrawer() : openAdminDrawer(); });
+  $id('mob-overlay')?.addEventListener('click', closeAdminDrawer);
 
   // Mobile bottom nav → drive the existing sidebar tabs
   (function wireAdminBottomNav() {
@@ -2383,6 +2424,11 @@
       if (badge) {
         if (data.totalUnread > 0) { badge.textContent = data.totalUnread; badge.style.display = ''; }
         else badge.style.display = 'none';
+      }
+      const nb = $id('am-bn-msg-badge');
+      if (nb) {
+        if (data.totalUnread > 0) { nb.textContent = data.totalUnread; nb.style.display = ''; }
+        else nb.style.display = 'none';
       }
     } catch (e) { /* silent */ }
   }
@@ -4331,6 +4377,7 @@
     .am-bn.is-active { color: var(--color-lime); }
     .am-bn svg { width: 22px; height: 22px; }
     .am-bn span { font-size: 10px; font-weight: 700; }
+    .am-bn__badge { position: absolute; top: -1px; right: calc(50% - 22px); background: var(--color-red); color: #fff; font-size: 8px; font-weight: 800; border-radius: 9999px; padding: 1px 5px; min-width: 14px; text-align: center; }
   }
 
   /* Game-day command center */

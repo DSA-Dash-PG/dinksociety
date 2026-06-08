@@ -122,6 +122,21 @@
   .next__games { display:flex; gap:6px; flex-wrap:wrap; margin-top:7px; }
   .gtag { font-size:9px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; padding:3px 8px; border-radius:var(--radius-full); background:var(--color-lime-dim); color:var(--color-lime); }
 
+  /* ── Home/Away role badges (home enters scores, away verifies) ───── */
+  .role-pill { display:inline-flex; align-items:center; gap:4px; font-size:9px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; padding:3px 9px; border-radius:var(--radius-full); white-space:nowrap; }
+  .role-pill--home { background:var(--color-lime-dim); color:var(--color-lime); border:1px solid rgba(184,255,44,0.4); }
+  .role-pill--away { background:var(--color-surface-3); color:var(--color-text-muted); border:1px solid var(--color-border-strong); }
+  .next__role { margin-top:8px; }
+  .next__ha { display:flex; align-items:center; gap:8px; background:var(--color-lime-ghost); border:1px solid rgba(184,255,44,0.22); border-radius:var(--radius-sm); padding:10px 12px; font-size:11px; line-height:1.4; color:var(--color-text-muted); margin-bottom:12px; }
+  .next__ha b { color:var(--color-lime); font-weight:800; }
+  .next__ha svg { width:16px; height:16px; flex-shrink:0; color:var(--color-lime); }
+  .next__ha--away { background:var(--color-teal-dim); border-color:rgba(23,215,176,0.22); }
+  .next__ha--away b { color:var(--color-teal); }
+  .next__ha--away svg { color:var(--color-teal); }
+  .m__role { font-size:9px; font-weight:800; letter-spacing:0.05em; text-transform:uppercase; padding:3px 8px; border-radius:var(--radius-full); }
+  .m__role--home { background:var(--color-lime-dim); color:var(--color-lime); }
+  .m__role--away { background:var(--color-teal-dim); color:var(--color-teal); }
+
   .m { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:11px 13px; margin-bottom:8px; }
   .m__top { display:flex; align-items:center; gap:8px; margin-bottom:9px; }
   .m__wk { font-size:10px; color:var(--color-text-faint); letter-spacing:0.06em; font-weight:700; }
@@ -558,7 +573,8 @@
       </div>
       <div class="ds-header__right">
         <div class="ds-role-seg" id="role-seg" role="group" aria-label="Switch view" style="display:none">
-          <button class="ds-role-seg__opt" onclick="openCaptainTools(this)"><span>Captain</span></button>
+          <button class="ds-role-seg__opt" id="role-seg-admin" onclick="openAdminTools(this)" style="display:none"><span>Admin</span></button>
+          <button class="ds-role-seg__opt" id="role-seg-captain" onclick="openCaptainTools(this)"><span>Captain</span></button>
           <button class="ds-role-seg__opt is-on" aria-current="true">Player</button>
         </div>
         <button class="ds-chat" id="appbar-chat" aria-label="Messages">
@@ -583,7 +599,8 @@
         <div class="ds-drawer__section" id="ds-view-section" style="display:none">
           <div class="ds-drawer__section-label">View</div>
           <div class="ds-dseg" role="group" aria-label="Switch view">
-            <button class="ds-dseg__opt" onclick="openCaptainTools(this)"><span>Captain</span></button>
+            <button class="ds-dseg__opt" id="dseg-admin" onclick="openAdminTools(this)" style="display:none"><span>Admin</span></button>
+            <button class="ds-dseg__opt" id="dseg-captain" onclick="openCaptainTools(this)"><span>Captain</span></button>
             <span class="ds-dseg__opt is-on" aria-current="true">Player</span>
           </div>
         </div>
@@ -882,10 +899,14 @@
     // Role toggle shows only for team leaders. (The Team nav tab is for
     // everyone — switching to the captain portal happens ONLY via the toggle.)
     const isLeader = !!(p.isCaptain || p.isCoCaptain);
+    const isAdmin = !!p.isAdmin;
     const roleSeg = $('role-seg');
-    if (roleSeg) roleSeg.style.display = isLeader ? 'flex' : 'none';
+    if (roleSeg) roleSeg.style.display = (isLeader || isAdmin) ? 'flex' : 'none';
     const viewSection = $('ds-view-section');
-    if (viewSection) viewSection.style.display = isLeader ? '' : 'none';
+    if (viewSection) viewSection.style.display = (isLeader || isAdmin) ? '' : 'none';
+    // Captain chips show for team leaders; Admin chips for ADMIN_EMAILS accounts.
+    ['role-seg-captain','dseg-captain'].forEach(id => { const el = $(id); if (el) el.style.display = isLeader ? '' : 'none'; });
+    ['role-seg-admin','dseg-admin'].forEach(id => { const el = $(id); if (el) el.style.display = isAdmin ? '' : 'none'; });
     renderHome(); renderSchedule(); renderStandings(); renderStats(); renderTeam();
     refreshChatBadge();
     startLivePoll();
@@ -1203,6 +1224,25 @@
   // Mint a captain session from the current player session, then open the
   // captain portal. Works for captains AND co-captains — no second login.
   let capOpening = false;
+  let adminOpening = false;
+  async function openAdminTools(btn) {
+    if (adminOpening) return;
+    adminOpening = true;
+    const lbl = btn.querySelector('span:not(.nb__badge)');
+    const orig = lbl ? lbl.textContent : '';
+    if (lbl) lbl.textContent = 'Opening…';
+    try {
+      const res = await fetch(API + '/admin-bootstrap', { method: 'POST', credentials: 'include' });
+      if (res.ok) { location.href = '/admin.html'; return; }
+      alert('Admin access not found for your account. If this looks wrong, ask the league office.');
+    } catch (e) {
+      alert('Could not open admin tools — please try again.');
+    } finally {
+      if (lbl) lbl.textContent = orig;
+      adminOpening = false;
+    }
+  }
+
   async function openCaptainTools(btn) {
     if (capOpening) return;
     capOpening = true;
@@ -1278,11 +1318,12 @@
       hero = `<div class="next hcard-tap" data-go="schedule">
         <div class="next__eyebrow"><span class="pulse"></span> ${eyebrow} · Week ${next.week}${esc(cdTxt)}</div>
         <div class="next__row">
-          <div class="next__team">${teamLink(homeId, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}${homeRec ? `<div class="next__rec">${homeRec}</div>` : ''}</div>
+          <div class="next__team">${teamLink(homeId, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}${homeRec ? `<div class="next__rec">${homeRec}</div>` : ''}${sideBadge(true)}</div>
           <div class="next__vs">VS</div>
-          <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}</div>
+          <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}${sideBadge(false)}</div>
         </div>
         <div class="next__meta">${next.venue ? esc(next.venue) + ' · ' : ''}${esc(next.court || 'Court TBD')} · ${esc(whenDate ? whenDate + ' · ' + startT : startT + ' · date TBD')}${next.championship ? ' · 🏆' : ''}</div>
+        ${roleStrip(next.home, next.opponent.name)}
         ${nudge}
         ${lineupAcc}
       </div>`;
@@ -1564,11 +1605,12 @@
       html += `<div class="next">
         <div class="next__eyebrow"><span class="pulse"></span> ${next.status==='live'?'Live now':'Next match'} · Week ${next.week}</div>
         <div class="next__row">
-          <div class="next__team">${teamLink(homeId, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}${homeRec ? `<div class="next__rec">${homeRec}</div>` : ''}</div>
+          <div class="next__team">${teamLink(homeId, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}${homeRec ? `<div class="next__rec">${homeRec}</div>` : ''}${sideBadge(true)}</div>
           <div class="next__vs">VS</div>
-          <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}</div>
+          <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}${sideBadge(false)}</div>
         </div>
         <div class="next__meta">${next.venue ? esc(next.venue) + ' · ' : ''}${esc(next.court||'Court TBD')} · ${esc(when)}${next.championship?' · 🏆':''}</div>
+        ${roleStrip(next.home, next.opponent.name)}
         ${youBlock}
       </div>`;
     }
@@ -1589,6 +1631,26 @@
     if (!sch.length) html += '<div class="muted">No matches scheduled yet. Your season schedule will show up here.</div>';
     $('v-schedule').innerHTML = html;
     wireGamesSeg();
+  }
+  // ── Home/Away helpers ──
+  // The home team enters live scores; the away team verifies each game. These
+  // surface that role so captains/players know their job before the match.
+  // Per-side pill for the hero matchup (not viewer-relative — labels the side).
+  function sideBadge(isHomeSide) {
+    return `<div class="next__role"><span class="role-pill ${isHomeSide ? 'role-pill--home' : 'role-pill--away'}">${isHomeSide ? 'Home' : 'Away'}</span></div>`;
+  }
+  // Viewer-relative responsibility strip for the next-match hero.
+  function roleStrip(iAmHome, oppName) {
+    const opp = esc(oppName || 'Your opponent');
+    return iAmHome
+      ? `<div class="next__ha"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><div><b>You enter the scores.</b> ${opp} verifies after each game.</div></div>`
+      : `<div class="next__ha next__ha--away"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><div><b>You verify the scores.</b> ${opp} enters each game for you to confirm.</div></div>`;
+  }
+  // Compact viewer-relative badge for upcoming list rows.
+  function roleTag(iAmHome) {
+    return iAmHome
+      ? '<span class="m__role m__role--home">Home · you score</span>'
+      : '<span class="m__role m__role--away">Away · you verify</span>';
   }
   function matchCard(m, me, isResult, withScores) {
     const homeName = m.home ? me.teamName : m.opponent.name;
@@ -1615,7 +1677,8 @@
       center = '<div class="m__vs">VS</div>';
       foot = `<div class="m__foot">${esc([m.venue, m.court, dt, matchStartLabel(m)].filter(Boolean).join(' · '))}</div>`;
     }
-    return `<div class="m"><div class="m__top"><span class="m__wk">WEEK ${m.week}</span>${pill}</div>
+    const roleEl = isResult ? '' : roleTag(m.home);
+    return `<div class="m"><div class="m__top"><span class="m__wk">WEEK ${m.week}</span>${roleEl}${pill}</div>
       <div class="m__body">
         <div class="m__team">${teamLink(homeId, homeName, `<div class="m__emoji">${emo({emoji:homeEmoji})}</div><div class="m__tn">${esc(homeName)}</div>`)}</div>
         ${center}
