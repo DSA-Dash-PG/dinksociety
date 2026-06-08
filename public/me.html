@@ -133,6 +133,42 @@
   .m__sc { font-size:18px; font-weight:800; } .m__sc .w { color:var(--color-lime); } .m__vs { font-size:10px; font-weight:800; color:var(--color-text-faint); }
   .m__foot { font-size:10px; color:var(--color-text-faint); margin-top:9px; padding-top:8px; border-top:1px solid var(--color-border); }
   .m__foot b { color:var(--color-lime); }
+
+  /* ── Game-by-game scores toggle (Results) ───────── */
+  .m__toggle { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin-top:10px; padding:8px 0;
+    background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-sm);
+    font-size:10px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-muted); cursor:pointer; font-family:inherit; }
+  .m__toggle:active { opacity:.7; }
+  .m__toggle .chev { transition:transform .18s ease; font-size:9px; }
+  .m.is-open .m__toggle .chev { transform:rotate(180deg); }
+  .m__detail { display:none; margin-top:11px; }
+  .m.is-open .m__detail { display:block; }
+  .gs__rd { border:1px solid var(--color-border); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:9px; }
+  .gs__rdhead { padding:7px 10px 6px; }
+  .gs__badge { font-size:8px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; background:var(--color-lime); color:var(--color-text-inverse); padding:3px 9px; border-radius:var(--radius-full); }
+  .gs__badge.r2 { background:var(--color-teal); }
+  .gs__g { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; padding:7px 10px; border-top:1px solid var(--color-border); }
+  .gs__g:nth-child(odd) { background:rgba(255,255,255,0.015); }
+  .gs__g.is-mine { background:var(--color-lime-ghost); box-shadow:inset 2px 0 0 var(--color-lime); }
+  .gs__pair { font-size:10.5px; line-height:1.35; color:var(--color-text-muted); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .gs__pair.right { text-align:right; }
+  .gs__pair.is-winner { color:var(--color-lime); font-weight:700; }
+  .gs__you { display:inline-block; font-size:7px; font-weight:800; letter-spacing:0.06em; background:var(--color-lime); color:var(--color-text-inverse); border-radius:var(--radius-full); padding:1px 5px; margin-left:4px; vertical-align:1px; }
+  .gs__mid { text-align:center; min-width:64px; }
+  .gs__type { display:block; font-size:7.5px; font-weight:800; letter-spacing:0.1em; color:var(--color-text-faint); margin-bottom:1px; }
+  .gs__num { font-size:14px; font-weight:800; color:var(--color-text-faint); }
+  .gs__num .w, .gs__num2 .w { color:var(--color-lime); }
+  .gs__num .dash, .gs__num2 .dash { padding:0 3px; font-weight:600; opacity:.6; }
+  .gs__sum { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; padding:8px 10px; border-top:1px solid var(--color-border-strong); background:var(--color-surface-2); }
+  .gs__side { font-size:9.5px; color:var(--color-text-muted); }
+  .gs__side b { color:var(--color-text); font-size:11px; }
+  .gs__side.right { text-align:right; }
+  .gs__chip { font-size:9px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase; background:var(--color-surface-3); border:1px solid var(--color-border-strong); border-radius:var(--radius-full); padding:4px 10px; color:var(--color-text-muted); white-space:nowrap; }
+  .gs__chip b { color:var(--color-lime); font-size:11px; }
+  .gs__tot { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; align-items:center; padding:9px 11px; border:1px solid rgba(184,255,44,0.28); background:var(--color-lime-ghost); border-radius:var(--radius-sm); }
+  .gs__mid2 { text-align:center; }
+  .gs__cap { font-size:7.5px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); }
+  .gs__num2 { font-size:17px; font-weight:800; color:var(--color-text-faint); }
   .hcard-tap { cursor:pointer; }
   .hcard-tap:active { opacity:0.7; }
   .home-team { display:flex; align-items:center; gap:12px; }
@@ -1004,7 +1040,8 @@
   function renderScheduleInner() {
     const sch = DATA.schedule || [], me = DATA.profile;
     const upcoming = sch.filter(m => !m.final);
-    const results = sch.filter(m => m.final).reverse();
+    // Chronological — Week 1 first (sch is already week-sorted by the server).
+    const results = sch.filter(m => m.final);
     const next = upcoming[0];
     let html = `<div class="seg">
       <div class="seg__b ${gamesSeg === 'schedule' ? 'is-active' : ''}" data-g="schedule">Schedule</div>
@@ -1054,7 +1091,7 @@
     if (results.length) {
       html += '<div class="label">Results</div>';
       results.forEach(m => {
-        try { html += matchCard(m, me, true); }
+        try { html += matchCard(m, me, true, true); }
         catch (e) { console.warn('skipping malformed match', m && m.id, e); }
       });
     }
@@ -1062,7 +1099,7 @@
     $('v-schedule').innerHTML = html;
     wireGamesSeg();
   }
-  function matchCard(m, me, isResult) {
+  function matchCard(m, me, isResult, withScores) {
     const homeName = m.home ? me.teamName : m.opponent.name;
     const homeEmoji = m.home ? me.teamEmoji : m.opponent.emoji;
     const awayName = m.home ? m.opponent.name : me.teamName;
@@ -1074,6 +1111,12 @@
       const hMp = m.home ? m.myMp : m.oppMp, aMp = m.home ? m.oppMp : m.myMp;
       center = `<div class="m__sc"><span class="${hMp>aMp?'w':''}">${hMp ?? 0}</span>–<span class="${aMp>hMp?'w':''}">${aMp ?? 0}</span></div>`;
       foot = '<div class="m__foot">Match points</div>';
+      // Game-by-game toggle — only in the Games tab (withScores) for matches
+      // that have scores (final). Detail is lazy-fetched from public-match.
+      if (withScores && m.matchId) {
+        foot += `<button class="m__toggle" onclick="toggleGameScores(this, '${esc(m.matchId)}')"><span class="lbl">Show game scores</span> <span class="chev">▾</span></button>
+          <div class="m__detail"></div>`;
+      }
     } else {
       pill = m.status === 'live' ? '<span class="m__pill pill-live">Live</span>' : m.myLocked ? '<span class="m__pill pill-final">Lineup set</span>' : '<span class="m__pill pill-up">Upcoming</span>';
       center = '<div class="m__vs">VS</div>';
@@ -1088,6 +1131,89 @@
         ${center}
         <div class="m__team"><div class="m__emoji">${emo({emoji:awayEmoji})}</div><div class="m__tn">${esc(awayName)}</div></div>
       </div>${foot}</div>`;
+  }
+
+  // ── Game-by-game scores (Results toggle) ─────────────────────────
+  // Lazy-fetched from the public-match endpoint (same source as the public
+  // schedule page) and cached per match. Winner side rendered in lime; the
+  // signed-in player's games get the lime YOU treatment.
+  const gameScoreCache = {};
+  async function toggleGameScores(btn, matchId) {
+    const card = btn.closest('.m');
+    const body = card && card.querySelector('.m__detail');
+    if (!card || !body) return;
+    const open = card.classList.toggle('is-open');
+    btn.querySelector('.lbl').textContent = open ? 'Hide game scores' : 'Show game scores';
+    if (!open) return;
+    if (gameScoreCache[matchId]) { body.innerHTML = renderGameScores(gameScoreCache[matchId]); return; }
+    body.innerHTML = '<div class="muted" style="padding:6px 0;">Loading scores…</div>';
+    try {
+      const season = 'circuit-' + (DATA.profile?.circuit || 'I').toLowerCase();
+      const r = await fetch(API + '/public-match?season=' + encodeURIComponent(season) + '&match=' + encodeURIComponent(matchId), { credentials: 'include' });
+      if (!r.ok) throw 0;
+      const d = await r.json();
+      gameScoreCache[matchId] = d.match;
+      body.innerHTML = renderGameScores(d.match);
+    } catch {
+      body.innerHTML = '<div class="muted" style="padding:6px 0;">Scores unavailable right now.</div>';
+    }
+  }
+  function renderGameScores(mt) {
+    if (!mt || !mt.games || !mt.games.length) {
+      return '<div class="muted" style="padding:6px 0;">Game-by-game scores not posted.</div>';
+    }
+    const myName = (DATA.profile?.name || '').trim().toLowerCase();
+    const nm = (n) => {
+      const isMe = myName && String(n).trim().toLowerCase() === myName;
+      return esc(shortName(n)) + (isMe ? '<span class="gs__you">YOU</span>' : '');
+    };
+    const pairHtml = (arr) => (arr && arr.length) ? arr.map(nm).join(' / ') : '—';
+    const hasMe = (g) => myName && [...(g.homePlayers || []), ...(g.awayPlayers || [])]
+      .some(n => String(n).trim().toLowerCase() === myName);
+
+    let html = '', totH = 0, totA = 0, gamesH = 0, gamesA = 0;
+    [1, 2].forEach(rn => {
+      const games = mt.games.filter(g => g.round === rn);
+      if (!games.length) return;
+      let ptsH = 0, ptsA = 0, gwH = 0, gwA = 0;
+      const rows = games.map(g => {
+        const scored = g.home != null && g.away != null;
+        if (scored) { ptsH += g.home; ptsA += g.away; if (g.homeWin) gwH++; else gwA++; }
+        const num = scored
+          ? `<span class="gs__num"><span class="${g.homeWin ? 'w' : ''}">${g.home}</span><span class="dash">–</span><span class="${g.homeWin ? '' : 'w'}">${g.away}</span></span>`
+          : '<span class="gs__num">—</span>';
+        return `<div class="gs__g${hasMe(g) ? ' is-mine' : ''}">
+          <div class="gs__pair${scored && g.homeWin ? ' is-winner' : ''}">${pairHtml(g.homePlayers)}</div>
+          <div class="gs__mid"><span class="gs__type">${esc(g.type)}</span>${num}</div>
+          <div class="gs__pair right${scored && !g.homeWin ? ' is-winner' : ''}">${pairHtml(g.awayPlayers)}</div>
+        </div>`;
+      }).join('');
+      totH += ptsH; totA += ptsA; gamesH += gwH; gamesA += gwA;
+      const rd = rn === 1 ? mt.round1 : mt.round2;
+      const chip = (rd && rd.homePoints != null)
+        ? `R${rn} pts <b>${rd.homePoints}</b> – <b>${rd.awayPoints}</b>`
+        : `Round ${rn}`;
+      html += `<div class="gs__rd">
+        <div class="gs__rdhead"><span class="gs__badge${rn === 2 ? ' r2' : ''}">Round ${rn}</span></div>
+        ${rows}
+        <div class="gs__sum">
+          <div class="gs__side"><b>${rd ? rd.homeGames : gwH}</b> games · <b>${ptsH}</b> pts</div>
+          <div class="gs__chip">${chip}</div>
+          <div class="gs__side right"><b>${ptsA}</b> pts · <b>${rd ? rd.awayGames : gwA}</b> games</div>
+        </div>
+      </div>`;
+    });
+    const mpH = mt.matchPoints ? mt.matchPoints.home : null;
+    const mpA = mt.matchPoints ? mt.matchPoints.away : null;
+    const mpNum = (mpH != null && mpA != null)
+      ? `<span class="${mpH > mpA ? 'w' : ''}">${mpH}</span> <span class="dash">–</span> <span class="${mpA > mpH ? 'w' : ''}">${mpA}</span>`
+      : '—';
+    html += `<div class="gs__tot">
+      <div class="gs__side"><b>${gamesH}</b> games · <b>${totH}</b> pts</div>
+      <div class="gs__mid2"><div class="gs__cap">Match points</div><div class="gs__num2">${mpNum}</div></div>
+      <div class="gs__side right"><b>${totA}</b> pts · <b>${gamesA}</b> games</div>
+    </div>`;
+    return html;
   }
 
   // Full lineup card for the next/current match. Shows our team once locked;
