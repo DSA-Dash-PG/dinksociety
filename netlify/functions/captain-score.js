@@ -92,83 +92,100 @@ export default async (req) => {
 
   // ===== PUT — save MY TEAM's entries =====
   if (req.method === 'PUT') {
-    const existing = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
-      || newScoreRecord(match);
-    normalizeScore(existing, match.championship);
-
-    if (existing.finalizedAt) {
-      return json({ error: 'Match is final. Contact admin to reopen.' }, 409);
-    }
-
     const body = await req.json();
     const incoming = body.games || {};
-    const now = new Date().toISOString();
     const entryKey = myRole === 'home' ? 'homeEntry' : 'awayEntry';
-    let changed = false;
 
-    // Each captain writes ONLY their own team's version of the score.
-    for (const slot of SLOT_KEYS) {
-      if (!(slot in incoming)) continue;
-      const g = incoming[slot] || {};
-      const cur = existing.games[slot];
-      const myEntry = cur[entryKey] || { home: null, away: null, by: null, at: null };
-      let slotChanged = false;
+    // CONCURRENCY: both captains score at the same time (dual-entry design),
+    // and each save is a read-modify-write of ONE shared blob — without a
+    // guard, simultaneous saves silently wipe the other team's just-entered
+    // numbers (week-1 bug: "random" blank scores). Conditional write on the
+    // blob's etag + retry: if the other captain saved mid-flight, re-read and
+    // re-apply MY changes on top of theirs.
+    let existing = null, changed = false, saved = false;
+    for (let attempt = 0; attempt < 5 && !saved; attempt++) {
+      const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
+      existing = got?.data || newScoreRecord(match);
+      const etag = got?.etag || null;
+      normalizeScore(existing, match.championship);
 
-      for (const side of ['home', 'away']) {
-        if (!(side in g)) continue;
-        const raw = g[side];
-        const newVal = (raw === '' || raw === null || raw === undefined) ? null : toScore(raw);
-        if (newVal === 'INVALID') {
-          return json({ error: `${prettySlot(slot)}: scores must be integers 0-30` }, 400);
+      if (existing.finalizedAt) {
+        return json({ error: 'Match is final. Contact admin to reopen.' }, 409);
+      }
+
+      const now = new Date().toISOString();
+      changed = false;
+
+      // Each captain writes ONLY their own team's version of the score.
+      for (const slot of SLOT_KEYS) {
+        if (!(slot in incoming)) continue;
+        const g = incoming[slot] || {};
+        const cur = existing.games[slot];
+        const myEntry = cur[entryKey] || { home: null, away: null, by: null, at: null };
+        let slotChanged = false;
+
+        for (const side of ['home', 'away']) {
+          if (!(side in g)) continue;
+          const raw = g[side];
+          const newVal = (raw === '' || raw === null || raw === undefined) ? null : toScore(raw);
+          if (newVal === 'INVALID') {
+            return json({ error: `${prettySlot(slot)}: scores must be integers 0-30` }, 400);
+          }
+          if (myEntry[side] === newVal) continue; // no change
+          myEntry[side] = newVal;
+          slotChanged = true;
         }
-        if (myEntry[side] === newVal) continue; // no change
-        myEntry[side] = newVal;
-        slotChanged = true;
+
+        if (slotChanged) {
+          myEntry.by = ctx.user.email;
+          myEntry.at = now;
+          cur[entryKey] = myEntry;
+          changed = true;
+        }
       }
 
-      if (slotChanged) {
-        myEntry.by = ctx.user.email;
-        myEntry.at = now;
-        cur[entryKey] = myEntry;
-        changed = true;
+      // My own complete entries must each form a valid finished game.
+      // (Disagreeing with the other team is allowed — that's a mismatch,
+      // surfaced in the UI — but an impossible score is rejected outright.)
+      const invalidSlots = SLOT_KEYS.filter(slot => {
+        const e = existing.games[slot][entryKey];
+        if (!entryComplete(e)) return false; // partial mid-entry — ok
+        return !isValidGame(e.home, e.away, winBy);
+      });
+
+      if (invalidSlots.length > 0) {
+        const labels = invalidSlots.map(prettySlot).join(', ');
+        const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
+        return json({
+          error: `${invalidSlots.length} game(s) have impossible scores (${rule}): ${labels}. Fix before saving.`,
+          invalidSlots,
+        }, 400);
       }
+
+      // Re-derive canonical agreed scores from both entries.
+      normalizeScore(existing, match.championship);
+
+      // Any score change wipes both sign-offs — both captains must re-approve.
+      if (changed && (existing.homeSubmittedAt || existing.awaySubmittedAt)) {
+        existing.homeSubmittedAt = null;
+        existing.homeSubmittedBy = null;
+        existing.homeSignedName = null;
+        existing.awaySubmittedAt = null;
+        existing.awaySubmittedBy = null;
+        existing.awaySignedName = null;
+      }
+
+      existing.updatedAt = now;
+      existing.updatedBy = ctx.user.email;
+
+      const res = etag
+        ? await scoresStore.setJSON(scoreKey, existing, { onlyIfMatch: etag })
+        : await scoresStore.setJSON(scoreKey, existing, { onlyIfNew: true });
+      saved = !res || res.modified !== false; // lost the race → loop re-reads & re-applies
     }
-
-    // My own complete entries must each form a valid finished game.
-    // (Disagreeing with the other team is allowed — that's a mismatch,
-    // surfaced in the UI — but an impossible score is rejected outright.)
-    const invalidSlots = SLOT_KEYS.filter(slot => {
-      const e = existing.games[slot][entryKey];
-      if (!entryComplete(e)) return false; // partial mid-entry — ok
-      return !isValidGame(e.home, e.away, winBy);
-    });
-
-    if (invalidSlots.length > 0) {
-      const labels = invalidSlots.map(prettySlot).join(', ');
-      const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
-      return json({
-        error: `${invalidSlots.length} game(s) have impossible scores (${rule}): ${labels}. Fix before saving.`,
-        invalidSlots,
-      }, 400);
+    if (!saved) {
+      return json({ error: 'The other team was saving at the same moment — your scores were NOT saved. Please save again.' }, 503);
     }
-
-    // Re-derive canonical agreed scores from both entries.
-    normalizeScore(existing, match.championship);
-
-    // Any score change wipes both sign-offs — both captains must re-approve.
-    if (changed && (existing.homeSubmittedAt || existing.awaySubmittedAt)) {
-      existing.homeSubmittedAt = null;
-      existing.homeSubmittedBy = null;
-      existing.homeSignedName = null;
-      existing.awaySubmittedAt = null;
-      existing.awaySubmittedBy = null;
-      existing.awaySignedName = null;
-    }
-
-    existing.updatedAt = now;
-    existing.updatedBy = ctx.user.email;
-
-    await scoresStore.setJSON(scoreKey, existing);
 
     if (changed) {
       await logActivity({
@@ -190,102 +207,119 @@ export default async (req) => {
       return json({ error: 'action must be submit or withdraw' }, 400);
     }
 
-    const existing = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
-      || newScoreRecord(match);
-    normalizeScore(existing, match.championship);
-
-    if (action === 'submit') {
-      if (existing.finalizedAt) {
-        return json({ error: 'Already finalized' }, 409);
-      }
-
-      const body = await req.json().catch(() => ({}));
-      if (body.agree !== true) {
-        return json({ error: 'You must confirm you agree with the scores before signing off.' }, 400);
-      }
-
-      const decorated = decorate(existing, match.championship);
-
-      // Mismatched games (the two teams' versions disagree) block sign-off.
-      const mismatchedSlots = decorated.computed.gameStatuses
-        .filter(g => g.status === 'mismatch')
-        .map(g => g.slot);
-      if (mismatchedSlots.length > 0) {
-        const labels = mismatchedSlots.map(prettySlot).slice(0, 3).join(', ');
-        const more = mismatchedSlots.length > 3 ? ` and ${mismatchedSlots.length - 3} more` : '';
-        return json({
-          error: `Cannot sign off — ${mismatchedSlots.length} game(s) don't match the other team's entry: ${labels}${more}. Confirm with the other captain, revise, and resave.`,
-          mismatchedSlots,
-        }, 400);
-      }
-
-      // All games must be CONFIRMED (both teams entered matching, valid scores)
-      const unconfirmed = decorated.computed.gameStatuses.filter(g => g.status !== 'confirmed');
-      if (unconfirmed.length > 0) {
-        const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
-        const labels = unconfirmed.map(g => prettySlot(g.slot)).slice(0, 3).join(', ');
-        const more = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : '';
-        return json({
-          error: `Cannot sign off yet — ${unconfirmed.length} game(s) still need a matching, valid score from both teams (${rule}): ${labels}${more}.`,
-        }, 400);
-      }
-
-      const now = new Date().toISOString();
-      const signedName = captainName(ctx) || ctx.user.email;
-      if (myRole === 'home') {
-        existing.homeSubmittedAt = now;
-        existing.homeSubmittedBy = ctx.user.email;
-        existing.homeSignedName = signedName;
-      } else {
-        existing.awaySubmittedAt = now;
-        existing.awaySubmittedBy = ctx.user.email;
-        existing.awaySignedName = signedName;
-      }
-
-      // Both signed → finalize and write to schedule
-      if (existing.homeSubmittedAt && existing.awaySubmittedAt) {
-        existing.finalizedAt = now;
-        await scoresStore.setJSON(scoreKey, existing);
-        try {
-          await writeFinalScoreToSchedule(scheduleStore, match, existing);
-        } catch (err) {
-          console.error('writeFinalScoreToSchedule failed for match', matchId, ':', err);
-          // Don't block finalize — score record is already marked final
-        }
-        // Rebuild standings + player-stats aggregates for this Circuit.
-        // MUST be awaited: serverless execution freezes once the response
-        // returns, so a fire-and-forget rebuild silently never runs.
-        try {
-          await rebuildStandings(match.circuit);
-        } catch (err) {
-          console.error('rebuildStandings failed post-finalize for match', matchId, 'circuit', match.circuit, ':', err);
-        }
-        await logActivity({
-          type: 'match.finalized',
-          actor: { email: ctx.user.email, role: ctx.user.role },
-          team: ctx.team,
-          matchId, week: match.week, circuit: match.circuit,
-          details: `Week ${match.week} match finalized: ${match.teamA.name} vs ${match.teamB.name} (both captains signed off)`,
-        });
-        return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
-      }
-    } else {
-      // Withdraw
-      if (existing.finalizedAt) {
-        return json({ error: 'Match is finalized. Contact admin to reopen.' }, 409);
-      }
-      if (myRole === 'home') {
-        existing.homeSubmittedAt = null;
-        existing.homeSubmittedBy = null;
-        existing.homeSignedName = null;
-      } else {
-        existing.awaySubmittedAt = null;
-        existing.awaySubmittedBy = null;
-        existing.awaySignedName = null;
-      }
+    const body = action === 'submit' ? await req.json().catch(() => ({})) : null;
+    if (action === 'submit' && body.agree !== true) {
+      return json({ error: 'You must confirm you agree with the scores before signing off.' }, 400);
     }
 
-    await scoresStore.setJSON(scoreKey, existing);
+    // Same etag-guarded retry as PUT: without it, two captains signing off at
+    // the same moment each read a record missing the other's signature — the
+    // signatures clobber each other and the match never finalizes.
+    let existing = null, finalized = false, saved = false;
+    for (let attempt = 0; attempt < 5 && !saved; attempt++) {
+      const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
+      existing = got?.data || newScoreRecord(match);
+      const etag = got?.etag || null;
+      normalizeScore(existing, match.championship);
+      finalized = false;
+
+      if (action === 'submit') {
+        if (existing.finalizedAt) {
+          return json({ error: 'Already finalized' }, 409);
+        }
+
+        const decorated = decorate(existing, match.championship);
+
+        // Mismatched games (the two teams' versions disagree) block sign-off.
+        const mismatchedSlots = decorated.computed.gameStatuses
+          .filter(g => g.status === 'mismatch')
+          .map(g => g.slot);
+        if (mismatchedSlots.length > 0) {
+          const labels = mismatchedSlots.map(prettySlot).slice(0, 3).join(', ');
+          const more = mismatchedSlots.length > 3 ? ` and ${mismatchedSlots.length - 3} more` : '';
+          return json({
+            error: `Cannot sign off — ${mismatchedSlots.length} game(s) don't match the other team's entry: ${labels}${more}. Confirm with the other captain, revise, and resave.`,
+            mismatchedSlots,
+          }, 400);
+        }
+
+        // All games must be CONFIRMED (both teams entered matching, valid scores)
+        const unconfirmed = decorated.computed.gameStatuses.filter(g => g.status !== 'confirmed');
+        if (unconfirmed.length > 0) {
+          const rule = match.championship ? 'first to 11, win by 2' : 'first to 11';
+          const labels = unconfirmed.map(g => prettySlot(g.slot)).slice(0, 3).join(', ');
+          const more = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : '';
+          return json({
+            error: `Cannot sign off yet — ${unconfirmed.length} game(s) still need a matching, valid score from both teams (${rule}): ${labels}${more}.`,
+          }, 400);
+        }
+
+        const now = new Date().toISOString();
+        const signedName = captainName(ctx) || ctx.user.email;
+        if (myRole === 'home') {
+          existing.homeSubmittedAt = now;
+          existing.homeSubmittedBy = ctx.user.email;
+          existing.homeSignedName = signedName;
+        } else {
+          existing.awaySubmittedAt = now;
+          existing.awaySubmittedBy = ctx.user.email;
+          existing.awaySignedName = signedName;
+        }
+
+        // Both signed → finalize (side effects run after the write sticks)
+        if (existing.homeSubmittedAt && existing.awaySubmittedAt) {
+          existing.finalizedAt = now;
+          finalized = true;
+        }
+      } else {
+        // Withdraw
+        if (existing.finalizedAt) {
+          return json({ error: 'Match is finalized. Contact admin to reopen.' }, 409);
+        }
+        if (myRole === 'home') {
+          existing.homeSubmittedAt = null;
+          existing.homeSubmittedBy = null;
+          existing.homeSignedName = null;
+        } else {
+          existing.awaySubmittedAt = null;
+          existing.awaySubmittedBy = null;
+          existing.awaySignedName = null;
+        }
+      }
+
+      const res = etag
+        ? await scoresStore.setJSON(scoreKey, existing, { onlyIfMatch: etag })
+        : await scoresStore.setJSON(scoreKey, existing, { onlyIfNew: true });
+      saved = !res || res.modified !== false;
+    }
+    if (!saved) {
+      return json({ error: 'The other team was updating at the same moment — please try again.' }, 503);
+    }
+
+    if (finalized) {
+      try {
+        await writeFinalScoreToSchedule(scheduleStore, match, existing);
+      } catch (err) {
+        console.error('writeFinalScoreToSchedule failed for match', matchId, ':', err);
+        // Don't block finalize — score record is already marked final
+      }
+      // Rebuild standings + player-stats aggregates for this Circuit.
+      // MUST be awaited: serverless execution freezes once the response
+      // returns, so a fire-and-forget rebuild silently never runs.
+      try {
+        await rebuildStandings(match.circuit);
+      } catch (err) {
+        console.error('rebuildStandings failed post-finalize for match', matchId, 'circuit', match.circuit, ':', err);
+      }
+      await logActivity({
+        type: 'match.finalized',
+        actor: { email: ctx.user.email, role: ctx.user.role },
+        team: ctx.team,
+        matchId, week: match.week, circuit: match.circuit,
+        details: `Week ${match.week} match finalized: ${match.teamA.name} vs ${match.teamB.name} (both captains signed off)`,
+      });
+      return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
+    }
 
     await logActivity({
       type: action === 'submit' ? 'score.signoff' : 'score.withdrawn',
