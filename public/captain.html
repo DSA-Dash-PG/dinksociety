@@ -177,6 +177,15 @@
     .ros-gtag.none { background: var(--color-red-dim); color: var(--color-red); }
     .ros-call { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--color-border-strong); background: var(--color-surface-2); color: var(--color-teal); flex-shrink: 0; text-decoration: none; font-size: 15px; }
     .ros-call.off { color: var(--color-text-faint); pointer-events: none; opacity: 0.45; }
+    .ros-contact { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
+    .ros-contact .none { color: var(--color-text-faint); font-style: italic; }
+    .ros-actions { display: flex; gap: 7px; flex-shrink: 0; }
+    .ros-act { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--color-border-strong); background: var(--color-surface-2); flex-shrink: 0; text-decoration: none; font-size: 16px; }
+    .ros-act svg { width: 17px; height: 17px; }
+    .ros-act--call { color: var(--color-teal); }
+    .ros-act--text { color: var(--color-lime); }
+    .ros-act--email { color: var(--color-gold); }
+    .ros-act.off { color: var(--color-text-faint); pointer-events: none; opacity: 0.35; }
     .ros-chev { color: var(--color-text-faint); flex-shrink: 0; }
     /* Roster editor sheet fields */
     .ros-f { margin-bottom: 12px; }
@@ -1878,7 +1887,7 @@
           <div class="locked-notice">
             <span>${waitingMsg}</span>
             ${canUnlock ? `<div style="margin-top:12px; opacity:0.85;">${cutoffNote}</div>
-            <button class="cap-btn cap-btn--gold" id="unlock-lineup-btn" style="margin-top:12px; font-size:16px; font-weight:700; padding:14px 28px; letter-spacing:0.04em; width:100%; max-width:420px;">🔓 UNLOCK ROSTER</button>` : ''}
+            <button class="cap-btn cap-btn--gold" id="unlock-lineup-btn" style="margin-top:12px; font-size:13px; font-weight:700; padding:9px 18px; letter-spacing:0.02em;">🔓 Unlock roster</button>` : ''}
           </div>
         `;
         lockBtn.style.display = 'none';
@@ -3032,15 +3041,33 @@
       const gtag = p.gender === 'F' ? '<span class="ros-gtag f">W</span>'
         : p.gender === 'M' ? '<span class="ros-gtag m">M</span>'
         : '<span class="ros-gtag none">no gender</span>';
-      const phone = p.phone
-        ? `<div class="ros-phone">${escapeHtml(p.phone)}</div>`
-        : '<div class="ros-phone none">no phone on file</div>';
-      const call = p.phone
-        ? `<a class="ros-call" href="tel:${escapeAttr((p.phone || '').replace(/[^\d+]/g, ''))}" onclick="event.stopPropagation()" aria-label="Call ${escapeAttr(p.name)}">&#9742;</a>`
-        : '<span class="ros-call off">&#9742;</span>';
+      // Contact line: phone + email (whichever are on file).
+      const telDigits = (p.phone || '').replace(/[^\d+]/g, '');
+      const contactBits = [];
+      if (p.phone) contactBits.push(`<span>${escapeHtml(p.phone)}</span>`);
+      if (p.email) contactBits.push(`<span>${escapeHtml(p.email)}</span>`);
+      const contact = contactBits.length
+        ? `<div class="ros-contact">${contactBits.join('')}</div>`
+        : '<div class="ros-contact"><span class="none">no contact on file</span></div>';
+
+      // SVG icons (phone handset, chat bubble, envelope).
+      const icoCall = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>';
+      const icoText = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>';
+      const icoMail = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 5L2 7"/></svg>';
+
+      const callBtn = p.phone
+        ? `<a class="ros-act ros-act--call" href="tel:${escapeAttr(telDigits)}" onclick="event.stopPropagation()" aria-label="Call ${escapeAttr(p.name)}">${icoCall}</a>`
+        : `<span class="ros-act ros-act--call off" aria-hidden="true">${icoCall}</span>`;
+      const textBtn = p.phone
+        ? `<a class="ros-act ros-act--text" href="sms:${escapeAttr(telDigits)}" onclick="event.stopPropagation()" aria-label="Text ${escapeAttr(p.name)}">${icoText}</a>`
+        : `<span class="ros-act ros-act--text off" aria-hidden="true">${icoText}</span>`;
+      const emailBtn = p.email
+        ? `<a class="ros-act ros-act--email" href="mailto:${escapeAttr(p.email)}" onclick="event.stopPropagation()" aria-label="Email ${escapeAttr(p.name)}">${icoMail}</a>`
+        : `<span class="ros-act ros-act--email off" aria-hidden="true">${icoMail}</span>`;
+
       const inner = `<span class="ros-av">${escapeHtml(initialsOf(p.name || '?'))}</span>
-        <span class="ros-body"><span class="ros-name">${escapeHtml(p.name)} ${badge} ${gtag}</span>${phone}</span>
-        ${call}`;
+        <span class="ros-body"><span class="ros-name">${escapeHtml(p.name)} ${badge} ${gtag}</span>${contact}</span>
+        <span class="ros-actions">${callBtn}${textBtn}${emailBtn}</span>`;
       if (readOnly) return `<div class="ros-row ${lead ? 'is-lead' : ''}">${inner}</div>`;
       return `<button type="button" class="ros-row ${lead ? 'is-lead' : ''}" data-rid="${state.roster.indexOf(p)}">${inner}<span class="ros-chev">›</span></button>`;
     }
@@ -3728,7 +3755,13 @@
         <button class="mtonight__cta" onclick="capTonightOpen('${escapeAttr(m.id)}')">${live ? 'Enter scores →' : (m.status?.myLocked ? 'View match →' : 'Set lineup →')}</button>
       </div>`;
     }
-    function capTonightOpen(id) { openMatch(id, { viaTab: 'next' }); }
+    function capTonightOpen(id) {
+      // Live match → go straight to the scoresheet ("Enter scores"); otherwise
+      // open the lineup flow. Matches the CTA label in renderTonightBanner.
+      const m = (state.matches || []).find(x => x.id === id);
+      const live = m && m.status?.revealed && !m.finalizedAt;
+      openMatch(id, { viaTab: live ? 'scoresheet' : 'next' });
+    }
 
     // ---------- bottom nav ----------
     function setBnActive(name) {
