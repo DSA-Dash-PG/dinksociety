@@ -69,11 +69,12 @@ export default async (req) => {
     // (15 min before start by default). Locking early no longer reveals early.
     const revealed = myLocked && oppLocked && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
 
-    // A locked lineup can be reopened by the captain only while it's still before
-    // the hard-lock window AND the opponent hasn't locked (once both have locked
-    // the matchup is set — changing it needs an admin).
+    // A locked lineup can be reopened by the captain while it's still before the
+    // hard-lock window AND the matchup hasn't revealed. The opponent locking no
+    // longer blocks unlock: since reveal became time-gated (T-15), both-locked
+    // shows nobody anything, so reopening is harmless until the reveal.
     const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
-    const unlockable = myLocked && !oppLocked && (cutoff === null || Date.now() < cutoff);
+    const unlockable = myLocked && !revealed && (cutoff === null || Date.now() < cutoff);
     const revealAt = revealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
 
     return json({
@@ -108,8 +109,9 @@ export default async (req) => {
     // ========== UNLOCK ==========
     // Reopen a locked lineup for editing — but only while it's safe to do so:
     //   1. it must actually be locked,
-    //   2. the opponent must NOT be locked (once both lock, the matchup is
-    //      revealed and changing yours would defeat the blind-lineup anti-cheat),
+    //   2. the matchup must NOT have revealed (post-reveal changes would defeat
+    //      the blind-lineup anti-cheat — opponent locking alone no longer blocks
+    //      unlock, since the time-gated reveal means nobody has seen anything),
     //   3. we must still be before the hard-lock window (match start − offset).
     // Anything past those points needs an admin override (logged), not self-serve.
     if (action === 'unlock') {
@@ -117,8 +119,8 @@ export default async (req) => {
         return json({ error: 'Lineup is not locked.' }, 409);
       }
       const opp = await lineupStore.get(oppKey, { type: 'json' }).catch(() => null);
-      if (opp?.lockedAt) {
-        return json({ error: 'Both lineups are now locked, so the matchup is set and can no longer be unlocked. Ask a league admin if you need a change.' }, 409);
+      if (opp?.lockedAt && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN)) {
+        return json({ error: 'The matchup has been revealed and can no longer be unlocked. Ask a league admin if you need a change.' }, 409);
       }
       const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
       if (cutoff !== null && Date.now() >= cutoff) {
