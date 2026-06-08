@@ -215,8 +215,10 @@ export default async (req) => {
     myTeams.unshift({ id: teamId, name: team.name, division, divisionLabel: team.divisionLabel || division });
   }
 
-  // League announcements (admin broadcasts) relevant to this player's team.
-  const announcements = await getRelevantAnnouncements({ teamId, division, limit: 3 });
+  // League announcements relevant to this player's team — PLAYER audience only.
+  // Captain-addressed broadcasts stay in the captain portal; players see only
+  // notices the admin sent to players.
+  const announcements = await getRelevantAnnouncements({ teamId, division, limit: 3, audiences: ['players'] });
 
   // Liability waiver — must be signed for the current season + version.
   const waiverConfig = await getWaiverConfig();
