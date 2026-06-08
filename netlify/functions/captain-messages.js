@@ -36,6 +36,9 @@ export default async (req) => {
       team: { id: teamId, name: ctx.team.name },
       messages,
       unread: unreadCount(messages, reads, 'captain'),
+      // For read receipts: when the admin last read the thread. A captain's
+      // own message is "read" once adminReadAt is after it was sent.
+      reads: { adminReadAt: reads.adminReadAt || null, captainReadAt: reads.captainReadAt || null },
     });
   }
 

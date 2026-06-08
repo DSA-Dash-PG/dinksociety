@@ -64,6 +64,23 @@ export async function getPlayerRead(teamId, playerId) {
 }
 
 /**
+ * Every player's last-read time for a team, as { playerId: readAtISO }.
+ * Drives the group-chat "seen by" read receipts.
+ */
+export async function getAllPlayerReads(teamId) {
+  if (!teamId) return {};
+  const store = getTeamChatReadsStore();
+  const { blobs } = await store.list({ prefix: `team/${teamId}/` }).catch(() => ({ blobs: [] }));
+  const out = {};
+  await Promise.all(blobs.map(async b => {
+    const pid = b.key.split('/').pop().replace(/\.json$/, '');
+    const rec = await store.get(b.key, { type: 'json' }).catch(() => null);
+    if (pid && rec?.readAt) out[pid] = rec.readAt;
+  }));
+  return out;
+}
+
+/**
  * Mark the thread read for one player (records "now").
  */
 export async function setPlayerRead(teamId, playerId) {

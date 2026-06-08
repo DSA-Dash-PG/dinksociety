@@ -1320,6 +1320,14 @@
       return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
              d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     }
+    // Read-receipt ticks: grey single ✓ = delivered, teal double ✓✓ = read.
+    function msgTick(read) {
+      const col = read ? 'var(--color-teal)' : 'var(--color-text-faint)';
+      const t = read
+        ? '<svg width="20" height="11" viewBox="0 0 22 11" fill="none" style="display:block;"><path d="M1 6l3.5 3.5L11 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6l3.5 3.5L17 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+        : '<svg width="14" height="11" viewBox="0 0 16 11" fill="none" style="display:block;"><path d="M1 6l3.5 3.5L11 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      return '<span title="' + (read ? 'Read' : 'Delivered') + '" style="display:inline-flex;align-items:center;">' + t + '</span>';
+    }
 
     async function refreshCapMsgBadge() {
       try {
@@ -1344,13 +1352,17 @@
         if (!msgs.length) {
           pane.innerHTML = '<div class="empty-state">No messages yet. Send a note to the league below — questions, issues, anything.</div>';
         } else {
+          const adminReadAt = data.reads?.adminReadAt ? new Date(data.reads.adminReadAt).getTime() : 0;
           pane.innerHTML = msgs.map(m => {
             const mine = m.from === 'captain';
             const align = mine ? 'flex-end' : 'flex-start';
             const bg = mine ? 'background:var(--color-surface-2);' : 'background:var(--color-lime-dim);border:1px solid rgba(184,255,44,0.35);';
             const who = mine ? 'You' : 'League Admin';
+            // Read receipt on the captain's OWN messages: read once the admin
+            // last viewed the thread after this message was sent.
+            const tick = mine ? msgTick(adminReadAt > new Date(m.createdAt).getTime()) : '';
             return '<div style="display:flex;justify-content:' + align + ';"><div style="max-width:80%;padding:9px 13px;border-radius:12px;' + bg + 'font-size:13px;line-height:1.5;">' +
-              '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-faint);margin-bottom:3px;">' + who + ' · ' + fmtMsgTime(m.createdAt) + '</div>' +
+              '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-faint);margin-bottom:3px;display:flex;align-items:center;gap:5px;' + (mine ? 'justify-content:flex-end;' : '') + '">' + who + ' · ' + fmtMsgTime(m.createdAt) + tick + '</div>' +
               escapeHtml(m.body).replace(/\n/g, '<br>') + '</div></div>';
           }).join('');
         }

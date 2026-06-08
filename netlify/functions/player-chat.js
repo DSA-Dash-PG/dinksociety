@@ -14,7 +14,7 @@ import { sendEmail, renderTeamChatNotify } from './lib/email.js';
 import { normalizeEmail } from './lib/identity.js';
 import {
   listTeamChat, appendTeamChatMessage,
-  getPlayerRead, setPlayerRead, unreadCountForPlayer,
+  getPlayerRead, setPlayerRead, unreadCountForPlayer, getAllPlayerReads,
   getNotifyPref, setNotifyPref,
 } from './lib/team-chat.js';
 
@@ -38,17 +38,24 @@ export default async (req) => {
 
   // ── GET — load thread ──────────────────────────────────────
   if (req.method === 'GET') {
-    const [messages, reads, notifyEmail] = await Promise.all([
+    const [messages, reads, notifyEmail, allReads] = await Promise.all([
       listTeamChat(teamId),
       getPlayerRead(teamId, playerId),
       getNotifyPref(teamId, playerId),
+      getAllPlayerReads(teamId),
     ]);
+    // Read receipts: send each teammate's last-read time + their name so the
+    // client can show "Seen by N of M" on the player's own messages and reveal
+    // exactly who. Names only (no PII).
+    const roster = (team.roster || []).map(p => ({ id: p.id, name: p.name || 'Teammate' }));
     return json({
       team: { id: teamId, name: team.name },
       me: { playerId },
       messages,
       unread: unreadCountForPlayer(messages, reads, playerId),
       notifyEmail,
+      roster,                 // [{id,name}] — teammates incl. me
+      reads: allReads,        // { playerId: readAtISO }
     });
   }
 

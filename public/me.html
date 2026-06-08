@@ -501,7 +501,13 @@
   .cmsg__b { white-space:pre-wrap; word-break:break-word; }
   .cmsg.me { background:var(--color-lime-dim); border:1px solid rgba(184,255,44,0.25); color:var(--color-text); border-bottom-right-radius:4px; }
   .cmsg.them { background:var(--color-surface-2); border:1px solid var(--color-border); border-bottom-left-radius:4px; }
-  .cmsg__time { font-size:9px; color:var(--color-text-faint); margin:3px 4px 0; }
+  .cmsg__time { font-size:9px; color:var(--color-text-faint); margin:3px 4px 0; display:flex; align-items:center; gap:5px; }
+  .cmsg-row.me .cmsg__time { justify-content:flex-end; }
+  .cmsg__rr { display:inline-flex; align-items:center; gap:4px; background:none; border:none; padding:0; font-family:inherit; font-size:9px; color:var(--color-text-faint); cursor:pointer; }
+  .cmsg__rr.allseen { color:var(--color-teal); }
+  .cmsg__rr svg { display:block; }
+  .cmsg__seenlist { font-size:10px; color:var(--color-teal); margin:3px 4px 0; max-width:100%; line-height:1.4; }
+  .cmsg__seenlist.none { color:var(--color-text-faint); }
   .chat-composer { position:sticky; bottom:calc(74px + env(safe-area-inset-bottom)); background:var(--color-bg); display:flex; gap:8px; padding:8px 0 4px; }
   .chat-input { flex:1; resize:none; padding:11px 12px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-2); color:var(--color-text); font-family:inherit; font-size:13px; max-height:120px; }
   .chat-input:focus { outline:none; border-color:var(--color-lime); }
@@ -2035,6 +2041,13 @@
     const t = d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' });
     return sameDay ? t : d.toLocaleDateString([], { month:'short', day:'numeric' }) + ' · ' + t;
   }
+  // Read-receipt ticks for chat: grey single ✓ = delivered, teal double ✓✓ = all seen.
+  function chatTick(allSeen) {
+    const col = allSeen ? 'var(--color-teal)' : 'var(--color-text-faint)';
+    return allSeen
+      ? '<svg width="18" height="10" viewBox="0 0 22 11" fill="none"><path d="M1 6l3.5 3.5L11 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6l3.5 3.5L17 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg width="13" height="10" viewBox="0 0 16 11" fill="none"><path d="M1 6l3.5 3.5L11 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
   function setChatBadge(n) {
     const b = $('chat-badge'); if (!b) return;
     if (n > 0) { b.textContent = n > 9 ? '9+' : String(n); b.classList.add('show'); }
@@ -2091,14 +2104,43 @@
       if (!msgs.length) {
         thread.innerHTML = '<div class="chat-empty">No messages yet. Say hi to your team —<br>only your teammates can see this.</div>';
       } else {
+        // Group read receipts: teammates (roster minus me) who've read each of
+        // my own messages. Tap "Seen by …" to reveal exactly who.
+        const reads = data.reads || {};
+        const teammates = (data.roster || []).filter(p => p.id !== myId);
+        const M = teammates.length;
+        const seenNamesFor = (createdAt) => {
+          const t = new Date(createdAt).getTime();
+          return teammates.filter(p => reads[p.id] && new Date(reads[p.id]).getTime() > t).map(p => shortName(p.name));
+        };
         thread.innerHTML = msgs.map(m => {
           const mine = m.authorId === myId;
+          let rr = '';
+          if (mine && M > 0) {
+            const seen = seenNamesFor(m.createdAt);
+            const all = seen.length === M;
+            rr = `<button class="cmsg__rr${all ? ' allseen' : ''}" data-names="${esc(seen.join(', '))}">${chatTick(all)}<span>${all ? 'Seen by all' : 'Seen by ' + seen.length + ' of ' + M}</span></button>`;
+          } else if (mine) {
+            rr = chatTick(false);
+          }
           return `<div class="cmsg-row ${mine?'me':'them'}">
             ${mine ? '' : '<div class="cmsg__who">' + esc(m.authorName || 'Player') + '</div>'}
             <div class="cmsg ${mine?'me':'them'}"><div class="cmsg__b">${esc(m.body)}</div></div>
-            <div class="cmsg__time">${esc(fmtChatTime(m.createdAt))}</div>
+            <div class="cmsg__time">${esc(fmtChatTime(m.createdAt))}${rr}</div>
           </div>`;
         }).join('');
+        // Tap a "Seen by" receipt to reveal/hide the reader names.
+        thread.querySelectorAll('.cmsg__rr[data-names]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const names = btn.dataset.names;
+            let list = btn.closest('.cmsg-row').querySelector('.cmsg__seenlist');
+            if (list) { list.remove(); return; }
+            list = document.createElement('div');
+            list.className = 'cmsg__seenlist' + (names ? '' : ' none');
+            list.textContent = names ? '👁 ' + names : 'No teammates have seen this yet.';
+            btn.closest('.cmsg-row').appendChild(list);
+          });
+        });
         window.scrollTo(0, document.body.scrollHeight);
       }
       // Mark read now that the player is looking at the thread.

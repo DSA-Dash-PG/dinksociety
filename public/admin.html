@@ -2351,6 +2351,14 @@
     await loadInbox();
     if (_msgOpenTeam) openThread(_msgOpenTeam);
   }
+  // Read-receipt ticks: grey single ✓ = delivered, teal double ✓✓ = read.
+  function msgTick(read) {
+    const col = read ? 'var(--color-teal)' : 'var(--color-text-faint)';
+    const t = read
+      ? '<svg width="20" height="11" viewBox="0 0 22 11" fill="none" style="display:block;"><path d="M1 6l3.5 3.5L11 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 6l3.5 3.5L17 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+      : '<svg width="14" height="11" viewBox="0 0 16 11" fill="none" style="display:block;"><path d="M1 6l3.5 3.5L11 2" stroke="' + col + '" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    return '<span title="' + (read ? 'Read' : 'Delivered') + '" style="display:inline-flex;align-items:center;">' + t + '</span>';
+  }
 
   async function loadInbox() {
     const box = $id('msg-inbox');
@@ -2386,12 +2394,16 @@
       const data = await apiJSON('/.netlify/functions/admin-messages?teamId=' + encodeURIComponent(teamId));
       const team = data.team || {};
       const msgs = data.messages || [];
+      const captainReadAt = data.reads?.captainReadAt ? new Date(data.reads.captainReadAt).getTime() : 0;
       const bubbles = msgs.length ? msgs.map(m => {
         const mine = m.from === 'admin';
         const align = mine ? 'flex-end' : 'flex-start';
         const bg = mine ? 'var(--color-lime-dim);border:1px solid var(--color-lime)' : 'var(--color-surface-2)';
+        // Read receipt on the admin's OWN messages: read once the captain last
+        // viewed the thread after this message was sent.
+        const tick = mine ? msgTick(captainReadAt > new Date(m.createdAt).getTime()) : '';
         return '<div style="display:flex;justify-content:' + align + ';"><div style="max-width:78%;padding:9px 13px;border-radius:12px;background:' + bg + ';font-size:13px;line-height:1.5;">' +
-          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-faint);margin-bottom:3px;">' + h(mine ? 'League Admin' : (m.authorName || 'Captain')) + ' · ' + fdt(m.createdAt) + '</div>' +
+          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-faint);margin-bottom:3px;display:flex;align-items:center;gap:5px;' + (mine ? 'justify-content:flex-end;' : '') + '">' + h(mine ? 'League Admin' : (m.authorName || 'Captain')) + ' · ' + fdt(m.createdAt) + tick + '</div>' +
           h(m.body).replace(/\n/g, '<br>') + '</div></div>';
       }).join('') : '<div class="empty">No messages yet. Start the conversation below.</div>';
 

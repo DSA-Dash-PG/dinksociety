@@ -74,11 +74,15 @@ export default async (req) => {
       const teamsStore = getStore('teams');
       const team = await teamsStore.get(`team/${teamId}.json`, { type: 'json' }).catch(() => null);
       const messages = await listThread(teamId);
+      const reads = await getReads(teamId); // captainReadAt drives admin's read receipts
       await setRead(teamId, 'admin'); // viewing a thread clears admin unread
       return json({
         team: team ? { id: team.id, name: team.name, captainEmail: team.captainEmail || null,
           division: team.division, divisionLabel: team.divisionLabel } : { id: teamId },
         messages,
+        // For read receipts: when the captain last read. An admin's own message
+        // is "read" once captainReadAt is after it was sent.
+        reads: { captainReadAt: reads.captainReadAt || null, adminReadAt: reads.adminReadAt || null },
       });
     }
 
