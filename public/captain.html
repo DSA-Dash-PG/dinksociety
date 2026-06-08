@@ -3885,21 +3885,27 @@
       // ── tasks (the centerpiece) ──
       const tasks = [];
 
-      // 1) Lineups to set (upcoming, not locked, not final)
-      for (const m of matches) {
-        if (m.finalizedAt || m.status?.myLocked) continue;
+      // 1) Lineup for the NEXT match only. The action list surfaces just the
+      // soonest unplayed match's lineup — not every remaining week. A future
+      // week's lineup doesn't appear until the prior match is finalized, since
+      // availability shifts week to week. (Captains can still set any future
+      // lineup proactively from the Lineup tab; this is just the to-do nudge.)
+      const nextUnplayed = matches.find(m => !m.finalizedAt);
+      if (nextUnplayed && !nextUnplayed.status?.myLocked) {
+        const m = nextUnplayed;
         const lockAt = m.scheduledAt ? Date.parse(m.scheduledAt) - CAP_LOCK_OFFSET_MIN * 60000 : null;
-        if (lockAt != null && lockAt < now) continue; // past lock — admin only now
-        const cd = lockAt ? capCountdown(lockAt) : null;
-        const urgent = lockAt && (lockAt - now) < 6 * 3600000; // < 6h
-        tasks.push({
-          cls: urgent ? 'urgent' : 'soon', ic: '📋',
-          t: 'Set your lineup',
-          d: `vs ${escapeHtml(m.opponent.name)} · Week ${m.week}${m.court ? ' · ' + escapeHtml(m.court) : ''}`,
-          due: lockAt ? { cls: urgent ? 'red' : 'gold', txt: cd ? 'Locks in ' + cd : 'Locks soon' } : { cls: 'gold', txt: 'Set before match' },
-          go: () => capTonightOpen(m.id),
-          sort: lockAt || (now + 9e12),
-        });
+        if (!(lockAt != null && lockAt < now)) {  // not past the hard lock (admin-only then)
+          const cd = lockAt ? capCountdown(lockAt) : null;
+          const urgent = lockAt && (lockAt - now) < 6 * 3600000; // < 6h
+          tasks.push({
+            cls: urgent ? 'urgent' : 'soon', ic: '📋',
+            t: 'Set your lineup',
+            d: `vs ${escapeHtml(m.opponent.name)} · Week ${m.week} · your next match`,
+            due: lockAt ? { cls: urgent ? 'red' : 'gold', txt: cd ? 'Locks in ' + cd : 'Locks soon' } : { cls: 'gold', txt: 'Set before match' },
+            go: () => capTonightOpen(m.id),
+            sort: lockAt || (now + 9e12),
+          });
+        }
       }
 
       // 2) Scores to enter/confirm (revealed, not final)
