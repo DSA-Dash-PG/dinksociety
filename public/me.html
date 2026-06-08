@@ -108,8 +108,11 @@
   .next__eyebrow { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-lime); font-weight:800; display:flex; align-items:center; gap:6px; }
   .next__row { display:flex; align-items:center; gap:12px; margin:12px 0; }
   .next__team { flex:1; text-align:center; } .next__emoji { font-size:30px; } .next__tn { font-size:13px; font-weight:700; margin-top:3px; }
+  .next__rec { font-size:10px; color:var(--color-text-faint); margin-top:2px; font-variant-numeric:tabular-nums; }
   .next__vs { font-size:11px; font-weight:800; color:var(--color-text-faint); }
   .next__meta { font-size:11px; color:var(--color-text-muted); text-align:center; margin-bottom:12px; }
+  .acc--inhero { margin:12px 0 0; }
+  .acc--inhero .acc__head { background:rgba(0,0,0,0.2); border-color:rgba(255,255,255,0.12); }
   .next__serve { background:rgba(255,176,46,0.10); border:1px solid rgba(255,176,46,0.28); border-radius:var(--radius-sm); padding:9px 12px; font-size:11px; color:var(--color-text-muted); margin-bottom:12px; text-align:center; }
   .next__serve b { color:#ffb02e; }
   .m__serve { font-size:10px; color:var(--color-text-faint); margin-top:6px; }
@@ -361,8 +364,12 @@
   .waiver-title { font-size:18px; font-weight:800; margin:4px 0 0; }
   .waiver-body { padding:16px 18px; overflow-y:auto; font-size:13px; line-height:1.6; color:var(--color-text-muted); white-space:pre-wrap; word-break:break-word; flex:1; -webkit-overflow-scrolling:touch; }
   .waiver-foot { padding:14px 18px 18px; border-top:1px solid var(--color-border); background:var(--color-surface-2); }
+  .waiver-scrollhint { font-size:11px; font-weight:700; color:var(--color-gold); text-align:center; margin-bottom:10px; }
+  .waiver-scrollhint.hidden { display:none; }
   .waiver-agree { display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--color-text); line-height:1.4; cursor:pointer; }
+  .waiver-agree.is-locked { opacity:0.45; cursor:not-allowed; }
   .waiver-agree input { width:18px; height:18px; margin-top:1px; flex-shrink:0; accent-color:var(--color-lime); }
+  .waiver-agree input:disabled { cursor:not-allowed; }
   .waiver-name { width:100%; margin-top:12px; padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-text); font-family:inherit; font-size:15px; box-sizing:border-box; }
   .waiver-name:focus { outline:none; border-color:var(--color-lime); }
   .waiver-err { color:var(--color-red); font-size:12px; margin-top:8px; min-height:0; }
@@ -658,12 +665,13 @@
     <div class="waiver-gate" id="waiver-gate" role="dialog" aria-modal="true" aria-hidden="true">
       <div class="waiver-card">
         <div class="waiver-head">
-          <div class="waiver-eyebrow">Before you play</div>
+          <div class="waiver-eyebrow" id="waiver-eyebrow">Before you play</div>
           <h2 class="waiver-title" id="waiver-title">Liability Waiver &amp; Release</h2>
         </div>
         <div class="waiver-body" id="waiver-body"></div>
         <div class="waiver-foot">
-          <label class="waiver-agree"><input type="checkbox" id="waiver-agree"> <span>I have read and agree to the waiver above.</span></label>
+          <div class="waiver-scrollhint" id="waiver-scrollhint">⬇ Scroll to the bottom to read the full waiver</div>
+          <label class="waiver-agree" id="waiver-agree-label"><input type="checkbox" id="waiver-agree" disabled> <span>I have read and agree to the waiver above.</span></label>
           <input type="text" id="waiver-name" class="waiver-name" placeholder="Type your full legal name to sign" autocomplete="name">
           <div class="waiver-err" id="waiver-err"></div>
           <button class="waiver-sign" id="waiver-sign" disabled>Sign &amp; continue</button>
@@ -713,6 +721,15 @@
   // user never leaves the mobile portal (data-prof attributes drive that).
   const teamLink = (id, name, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${teamHref(id, name)}" data-prof="team" data-pid="${esc(id || '')}" data-pteam="${esc(name || '')}">${inner}</a>`;
   const playerLink = (name, teamName, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${playerHref(name, teamName)}" data-prof="player" data-pname="${esc(name || '')}" data-pteam="${esc(teamName || '')}">${inner}</a>`;
+  // Team record "W-T-L" (e.g. 0-0-0) from the loaded standings; null if unknown.
+  function teamRecordStr(id, name) {
+    const divs = DATA?.standings?.divisions || {};
+    for (const k of Object.keys(divs)) {
+      const tm = (divs[k].teams || []).find(t => (id && t.teamId === id) || slug(t.teamName) === slug(name || ''));
+      if (tm) return `${tm.wins || 0}-${tm.ties || 0}-${tm.losses || 0}`;
+    }
+    return null;
+  }
   // Read/dismissed league announcements (per device). Shared key with captain portal.
   function annReadSet() { try { return new Set(JSON.parse(localStorage.getItem('ds-ann-read') || '[]')); } catch { return new Set(); } }
   function annIsRead(id) { return annReadSet().has(id); }
@@ -1034,11 +1051,26 @@
       location.href = '/me.html';
     });
 
-    // ── Liability waiver gate ──
+    // ── Liability waiver gate (signs each required waiver in sequence) ──
     const wAgree = $('waiver-agree'), wName = $('waiver-name'), wSign = $('waiver-sign');
     const updateWaiverBtn = () => { if (wSign) wSign.disabled = !(wAgree?.checked && (wName?.value || '').trim().length >= 2); };
     wAgree?.addEventListener('change', updateWaiverBtn);
     wName?.addEventListener('input', updateWaiverBtn);
+    // The agree checkbox unlocks only after the player scrolls to the bottom of
+    // the waiver text (so they can't agree without reading it).
+    const wBody = $('waiver-body');
+    function checkWaiverScrolled() {
+      if (!wBody) return;
+      const atBottom = wBody.scrollTop + wBody.clientHeight >= wBody.scrollHeight - 24;
+      const fits = wBody.scrollHeight <= wBody.clientHeight + 4; // short waiver, no scroll needed
+      if (atBottom || fits) {
+        if (wAgree) wAgree.disabled = false;
+        $('waiver-agree-label')?.classList.remove('is-locked');
+        $('waiver-scrollhint')?.classList.add('hidden');
+      }
+    }
+    wBody?.addEventListener('scroll', checkWaiverScrolled);
+    window._checkWaiverScrolled = checkWaiverScrolled;
     $('waiver-signout')?.addEventListener('click', async () => {
       try { await fetch(API + '/player-logout', { method: 'POST', credentials: 'include' }); } catch {}
       location.href = '/me.html';
@@ -1048,7 +1080,7 @@
       if (err) err.textContent = '';
       const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Sending…';
       try {
-        const res = await fetch(API + '/player-email-waiver', { method: 'POST', credentials: 'include' });
+        const res = await fetch(API + '/player-email-waiver', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || 'Could not send the email.');
         btn.textContent = '✓ Sent to your email';
@@ -1059,19 +1091,26 @@
       }
     });
     wSign?.addEventListener('click', async () => {
+      const w = _waiverQueue[_waiverIdx];
+      if (!w) return;
       const err = $('waiver-err');
       if (err) err.textContent = '';
       wSign.disabled = true; wSign.textContent = 'Signing…';
       try {
         const res = await fetch(API + '/player-sign-waiver', {
           method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ signedName: wName.value.trim(), agree: !!wAgree.checked, version: DATA?.waiver?.version }),
+          body: JSON.stringify({ waiverId: w.id, signedName: wName.value.trim(), agree: !!wAgree.checked, version: w.version }),
         });
         const d = await res.json();
         if (!res.ok) throw new Error(d.error || 'Could not record your signature.');
-        if (DATA?.waiver) DATA.waiver.required = false;
-        $('waiver-gate').classList.remove('is-open');
-        $('waiver-gate').setAttribute('aria-hidden', 'true');
+        const wd = (DATA.waivers || []).find(x => x.id === w.id); if (wd) wd.required = false;
+        _waiverIdx++;
+        if (_waiverIdx >= _waiverQueue.length) {
+          $('waiver-gate').classList.remove('is-open');
+          $('waiver-gate').setAttribute('aria-hidden', 'true');
+        } else {
+          showWaiverStep();
+        }
       } catch (e) {
         if (err) err.textContent = e.message;
         wSign.disabled = false;
@@ -1079,15 +1118,30 @@
     });
   })();
 
-  function maybeShowWaiver() {
-    const w = DATA?.waiver;
-    if (!w || !w.required) return;
+  let _waiverQueue = [], _waiverIdx = 0;
+  function showWaiverStep() {
+    const w = _waiverQueue[_waiverIdx];
+    if (!w) return;
+    const multi = _waiverQueue.length > 1;
+    $('waiver-eyebrow').textContent = multi ? `Before you play · ${_waiverIdx + 1} of ${_waiverQueue.length}` : 'Before you play';
     $('waiver-title').textContent = w.title || 'Liability Waiver & Release';
     $('waiver-body').textContent = w.text || '';
-    const agree = $('waiver-agree'), name = $('waiver-name');
-    if (agree) agree.checked = false;
+    const agree = $('waiver-agree'), name = $('waiver-name'), err = $('waiver-err');
+    if (agree) { agree.checked = false; agree.disabled = true; }   // re-lock until scrolled
     if (name) name.value = '';
-    const sign = $('waiver-sign'); if (sign) sign.disabled = true;
+    if (err) err.textContent = '';
+    $('waiver-agree-label')?.classList.add('is-locked');
+    $('waiver-scrollhint')?.classList.remove('hidden');
+    const sign = $('waiver-sign'); if (sign) { sign.disabled = true; sign.textContent = (_waiverIdx + 1 < _waiverQueue.length) ? 'Sign & next' : 'Sign & continue'; }
+    $('waiver-body').scrollTop = 0;
+    // Short waivers that don't scroll should unlock immediately.
+    setTimeout(() => { if (window._checkWaiverScrolled) window._checkWaiverScrolled(); }, 50);
+  }
+  function maybeShowWaiver() {
+    _waiverQueue = (DATA?.waivers || []).filter(w => w.required);
+    _waiverIdx = 0;
+    if (!_waiverQueue.length) return;
+    showWaiverStep();
     const gate = $('waiver-gate');
     gate.classList.add('is-open');
     gate.setAttribute('aria-hidden', 'false');
@@ -1208,19 +1262,29 @@
       const cd = fmtCountdown(next.scheduledAt);
       const eyebrow = next.status === 'live' ? 'Live now' : isMatchDay ? 'Match night' : 'Next match';
       const cdTxt = next.status === 'live' ? '' : cd ? ' · starts in ' + cd : '';
-      // Pending nudge only — once locked, "Your night" below owns the detail.
-      const state = next.myLocked
-        ? (next.revealed ? '' : `<div class="next__you">🔒 Lineup locked — opponent's reveals 15 min before start.</div>`)
-        : `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>`;
+      const homeId = next.home ? me.teamId : next.opponent.id;
+      const awayId = next.home ? next.opponent.id : me.teamId;
+      const homeRec = teamRecordStr(homeId, homeName), awayRec = teamRecordStr(awayId, awayName);
+      // Lineup not set yet → small nudge. Once a lineup exists, the full lineup
+      // toggle (below, inside this card) owns it; no separate lock message.
+      const nudge = (!next.myLocked && !next.lineup)
+        ? `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>` : '';
+      // Full lineup folded INTO this match card (collapsed by default).
+      const lineupAcc = next.lineup
+        ? `<div class="acc acc--inhero${localStorage.getItem('ds-lineup-open') === '1' ? ' is-open' : ''}" id="home-lu-acc">
+            <div class="acc__head" id="home-lu-toggle"><span>Full lineup</span><span class="sub2">all 12 games <span class="chev">▼</span></span></div>
+            <div class="acc__body">${renderLineupSheet(next, me, false)}</div>
+          </div>` : '';
       hero = `<div class="next hcard-tap" data-go="schedule">
         <div class="next__eyebrow"><span class="pulse"></span> ${eyebrow} · Week ${next.week}${esc(cdTxt)}</div>
         <div class="next__row">
-          <div class="next__team">${teamLink(next.home ? me.teamId : next.opponent.id, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}</div>
+          <div class="next__team">${teamLink(homeId, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}${homeRec ? `<div class="next__rec">${homeRec}</div>` : ''}</div>
           <div class="next__vs">VS</div>
-          <div class="next__team">${teamLink(next.home ? next.opponent.id : me.teamId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}</div>
+          <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}</div>
         </div>
         <div class="next__meta">${next.venue ? esc(next.venue) + ' · ' : ''}${esc(next.court || 'Court TBD')} · ${esc(whenDate ? whenDate + ' · ' + startT : startT + ' · date TBD')}${next.championship ? ' · 🏆' : ''}</div>
-        ${state}
+        ${nudge}
+        ${lineupAcc}
       </div>`;
     }
 
@@ -1300,18 +1364,8 @@
       }
     }
 
-    // -- full lineup, collapsed by default --
-    let lulist = '';
-    if (next && next.lineup) {
-      const open = localStorage.getItem('ds-lineup-open') === '1';
-      lulist = `<div class="acc${open ? ' is-open' : ''}" id="home-lu-acc">
-        <div class="acc__head" id="home-lu-toggle">
-          <span>Full lineup</span>
-          <span class="sub2">all 12 games <span class="chev">▼</span></span>
-        </div>
-        <div class="acc__body">${renderLineupSheet(next, me, false)}</div>
-      </div>`;
-    }
+    // Full lineup now lives INSIDE the next-match hero (see above).
+    const lulist = '';
 
     // -- last result --
     const recap = last ? `<div class="label">Last match</div><div class="hcard-tap" data-go="schedule">${matchCard(last, me, true, true)}</div>` : '';
@@ -1335,7 +1389,7 @@
       <div class="mehead__av">${esc(initials(me.name))}</div>
       <div class="mehead__main">
         <div class="mehead__hi">${greeting}</div>
-        <div class="mehead__name">${esc(shortName(me.name))}</div>
+        <div class="mehead__name">${esc((me.name || '').trim().split(/\s+/)[0] || 'Player')}</div>
         ${capChip ? `<div class="mehead__chips">${capChip}</div>` : ''}
       </div>
       ${dsrVal !== '—' ? `<div class="mehead__dsr"><div class="mehead__dsrN">${dsrVal}</div><button class="mehead__dsrL" type="button" onclick="openDsrInfo(event)">Your DSR <i class="dsr-i">?</i></button></div>` : ''}
@@ -1429,8 +1483,8 @@
     $('v-home').innerHTML = html || '<div class="muted">No matches scheduled yet. Your season will show up here.</div>';
     $('v-home').querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => {
       // Don't hijack clicks on interactive children: the game-scores toggle,
-      // the expanded detail, or any profile link inside the card.
-      if (e.target.closest('a, .m__toggle, .m__detail')) return;
+      // the expanded detail, the in-hero full-lineup accordion, or any link.
+      if (e.target.closest('a, .m__toggle, .m__detail, .acc')) return;
       e.stopPropagation();
       goTab(el.dataset.go);
     }));
@@ -1500,23 +1554,21 @@
       const whenDate = next.scheduledAt ? new Date(next.scheduledAt).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }) : null;
       const startT = matchStartLabel(next);
       const when = whenDate ? `${whenDate} · ${startT}` : `${startT} · date TBD`;
-      // Round 1 serving rule, personalized (home serves first, away chooses side)
-      const serveBlock = next.home
-        ? `<div class="next__serve"><b>Round 1:</b> You serve first · opponent chooses side</div>`
-        : `<div class="next__serve"><b>Round 1:</b> Opponent serves first · you choose side</div>`;
-      // Detail lives in the Lineup segment once locked; here just nudge if not set.
+      const homeId = next.home ? me.teamId : next.opponent.id;
+      const awayId = next.home ? next.opponent.id : me.teamId;
+      const homeRec = teamRecordStr(homeId, homeName), awayRec = teamRecordStr(awayId, awayName);
+      // Nudge only if no lineup is set yet.
       const youBlock = next.myLocked
         ? ''
         : `<div class="next__you">Lineup not set yet. Your captain sets it before the match.</div>`;
       html += `<div class="next">
         <div class="next__eyebrow"><span class="pulse"></span> ${next.status==='live'?'Live now':'Next match'} · Week ${next.week}</div>
         <div class="next__row">
-          <div class="next__team">${teamLink(next.home ? me.teamId : next.opponent.id, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}</div>
+          <div class="next__team">${teamLink(homeId, homeName, `<div class="next__emoji">${emo({emoji:homeEmoji})}</div><div class="next__tn">${esc(homeName)}</div>`)}${homeRec ? `<div class="next__rec">${homeRec}</div>` : ''}</div>
           <div class="next__vs">VS</div>
-          <div class="next__team">${teamLink(next.home ? next.opponent.id : me.teamId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}</div>
+          <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}</div>
         </div>
         <div class="next__meta">${next.venue ? esc(next.venue) + ' · ' : ''}${esc(next.court||'Court TBD')} · ${esc(when)}${next.championship?' · 🏆':''}</div>
-        ${serveBlock}
         ${youBlock}
       </div>`;
     }
@@ -1561,10 +1613,7 @@
     } else {
       pill = m.status === 'live' ? '<span class="m__pill pill-live">Live</span>' : m.myLocked ? '<span class="m__pill pill-final">Lineup set</span>' : '<span class="m__pill pill-up">Upcoming</span>';
       center = '<div class="m__vs">VS</div>';
-      const serveLine = m.home
-        ? `<div class="m__serve"><b>R1:</b> you serve · opponent picks side</div>`
-        : `<div class="m__serve"><b>R1:</b> opponent serves · you pick side</div>`;
-      foot = `<div class="m__foot">${esc([m.venue, m.court, dt, matchStartLabel(m)].filter(Boolean).join(' · '))}${serveLine}</div>`;
+      foot = `<div class="m__foot">${esc([m.venue, m.court, dt, matchStartLabel(m)].filter(Boolean).join(' · '))}</div>`;
     }
     return `<div class="m"><div class="m__top"><span class="m__wk">WEEK ${m.week}</span>${pill}</div>
       <div class="m__body">

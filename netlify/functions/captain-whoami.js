@@ -5,6 +5,8 @@
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { findAllLeaderTeamsByEmail } from './lib/captain-auth.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
+import { circuitCode } from './lib/circuit.js';
+import { getActiveWaivers, listSignatures } from './lib/waiver.js';
 
 export default async (req) => {
   const result = await verifyCaptainSession(req);
@@ -49,6 +51,25 @@ export default async (req) => {
     ? await getRelevantAnnouncements({ teamId: teamEntry.id, division: teamEntry.division, limit: 3 })
     : [];
 
+  // Waiver gaps — roster players who still need to sign each active waiver,
+  // so the captain Home to-do can remind them.
+  let waiverGaps = [];
+  if (teamEntry && t) {
+    const season = circuitCode(t.circuit);
+    const roster = (t.roster || []).filter(p => p.id);
+    const active = await getActiveWaivers();
+    for (const w of active) {
+      const sigs = await listSignatures(w.id);
+      const missing = roster.filter(p => {
+        const s = sigs[p.id];
+        return !(s && s.version === w.version && String(s.season) === String(season));
+      });
+      if (missing.length) {
+        waiverGaps.push({ id: w.id, title: w.title, missing: missing.length, names: missing.map(p => p.name).slice(0, 8) });
+      }
+    }
+  }
+
   return new Response(JSON.stringify({
     captain: true,
     email: ctx.user.email,
@@ -56,6 +77,7 @@ export default async (req) => {
     team: teamEntry,
     currentTeamId: teamEntry ? teamEntry.id : null,
     announcements,
+    waiverGaps,
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },

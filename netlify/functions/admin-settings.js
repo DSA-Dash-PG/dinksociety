@@ -17,11 +17,13 @@ const DEFAULTS = {
   matchTime:      '7:00–9:00 PM',
   depositAmount:  100,
   balanceDueDate: '2026-06-01',
-  // Liability waiver — players sign on login; version bumps force a re-sign.
-  waiverEnabled:  false,
-  waiverTitle:    'Liability Waiver & Release',
-  waiverText:     '',
-  waiverVersion:  0,
+  // Liability waivers — players sign each enabled one on login; editing a
+  // waiver's text bumps its version, forcing everyone to re-sign that waiver.
+  // Two seeded: the league's own + the Dink House venue form.
+  waivers: [
+    { id: 'league',     title: 'The Dink Society — Liability Waiver & Release', text: '', version: 0, enabled: false },
+    { id: 'dink-house', title: 'Dink House — Participant Waiver & Release',     text: '', version: 0, enabled: false },
+  ],
 };
 
 function json(body, status = 200) {
@@ -38,7 +40,16 @@ export default async (req) => {
   if (req.method === 'GET') {
     try {
       const raw = await store.get('circuit-settings');
-      return json(raw ? JSON.parse(raw) : { ...DEFAULTS });
+      const s = raw ? JSON.parse(raw) : { ...DEFAULTS };
+      // Always expose a normalized waivers[] (migrate legacy single fields, and
+      // ensure both seeded waivers exist so the admin UI has cards to edit).
+      if (!Array.isArray(s.waivers)) {
+        s.waivers = [{ id: 'league', title: s.waiverTitle || DEFAULTS.waivers[0].title, text: s.waiverText || '', version: Number(s.waiverVersion) || 0, enabled: !!s.waiverEnabled }];
+      }
+      for (const seed of DEFAULTS.waivers) {
+        if (!s.waivers.some(w => w.id === seed.id)) s.waivers.push({ ...seed });
+      }
+      return json(s);
     } catch (e) {
       console.error('settings GET error:', e);
       return json({ ...DEFAULTS });
@@ -56,15 +67,32 @@ export default async (req) => {
       const existing = await store.get('circuit-settings');
       const prev = existing ? JSON.parse(existing) : { ...DEFAULTS };
 
-      // Waiver: editing the text (or an explicit re-sign request) bumps the
-      // version, which forces every player to sign again. Whitespace-only
-      // diffs don't count.
-      const prevText = (prev.waiverText ?? '').trim();
-      const nextText = (body.waiverText ?? prev.waiverText ?? '').trim();
-      const prevVersion = Number(prev.waiverVersion) || 0;
-      const textChanged = ('waiverText' in body) && nextText !== prevText;
-      const forceResign = body.bumpWaiverVersion === true;
-      const waiverVersion = (textChanged || forceResign) ? prevVersion + 1 : prevVersion;
+      // Waivers: a list of { id, title, text, version, enabled }. When the
+      // client sends `waivers`, each entry's version is bumped if its TEXT
+      // changed (or bumpVersion:true) vs the stored one — forcing re-sign of
+      // just that waiver. Migrate legacy single-waiver fields first.
+      const prevWaivers = Array.isArray(prev.waivers) ? prev.waivers
+        : [{ id: 'league', title: prev.waiverTitle || 'Liability Waiver', text: prev.waiverText || '', version: Number(prev.waiverVersion) || 0, enabled: !!prev.waiverEnabled }];
+      let waivers = prevWaivers;
+      if (Array.isArray(body.waivers)) {
+        const prevById = new Map(prevWaivers.map(w => [w.id, w]));
+        waivers = body.waivers.map(w => {
+          const id = String(w.id || ('w_' + Math.random().toString(36).slice(2, 8)));
+          const old = prevById.get(id) || {};
+          const oldText = (old.text ?? '').trim();
+          const newText = (w.text ?? old.text ?? '').trim();
+          const oldVer = Number(old.version) || 0;
+          const changed = ('text' in w) && newText !== oldText;
+          const force = w.bumpVersion === true;
+          return {
+            id,
+            title: w.title ?? old.title ?? 'Liability Waiver',
+            text: w.text ?? old.text ?? '',
+            version: (changed || force) ? oldVer + 1 : oldVer,
+            enabled: w.enabled ?? old.enabled ?? false,
+          };
+        });
+      }
 
       const updated = {
         ...prev,
@@ -79,13 +107,12 @@ export default async (req) => {
         matchTime:      body.matchTime      ?? prev.matchTime      ?? DEFAULTS.matchTime,
         depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
         balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
-        waiverEnabled:  body.waiverEnabled  ?? prev.waiverEnabled  ?? DEFAULTS.waiverEnabled,
-        waiverTitle:    body.waiverTitle    ?? prev.waiverTitle    ?? DEFAULTS.waiverTitle,
-        waiverText:     body.waiverText     ?? prev.waiverText     ?? DEFAULTS.waiverText,
-        waiverVersion,
+        waivers,
         updatedAt:    new Date().toISOString(),
         updatedBy:    admin.email || 'admin',
       };
+      // Drop legacy single-waiver fields now that the array is canonical.
+      delete updated.waiverEnabled; delete updated.waiverTitle; delete updated.waiverText; delete updated.waiverVersion;
 
       await store.set('circuit-settings', JSON.stringify(updated));
       return json(updated);

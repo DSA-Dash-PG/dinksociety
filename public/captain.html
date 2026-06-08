@@ -3958,7 +3958,20 @@
         }
       }
 
-      // 4) Balance due (best-effort; uses cached balance if present)
+      // 4) Waiver reminders — roster players who still need to sign.
+      for (const wg of (state.me?.waiverGaps || [])) {
+        if (!wg.missing) continue;
+        tasks.push({
+          cls: 'info', ic: '✍️',
+          t: `${wg.missing} ${wg.missing === 1 ? 'player needs' : 'players need'} to sign the waiver`,
+          d: `${escapeHtml(wg.title)} · ${escapeHtml((wg.names || []).map(n => n.split(' ')[0]).join(', '))}${wg.missing > (wg.names || []).length ? '…' : ''}`,
+          due: { cls: 'teal', txt: 'Remind them' },
+          go: () => document.querySelector('.cap-tab[data-tab="roster"]')?.click(),
+          sort: now + 4e6,
+        });
+      }
+
+      // 5) Balance due (best-effort; uses cached balance if present)
       if (state._balance && Number(state._balance.balanceDue) > 0) {
         tasks.push({
           cls: 'info', ic: '💳',

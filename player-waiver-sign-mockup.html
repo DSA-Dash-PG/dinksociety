@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player Waiver Signing — Mobile Mockup</title>
+<style>
+  :root {
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12); --color-teal:#17d7b0;
+    --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-full:999px;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:#070707; color:var(--color-text); font-family:var(--font); }
+  .stage { display:flex; flex-direction:column; align-items:center; gap:14px; padding:24px 16px 60px; }
+  .caption { width:100%; max-width:460px; color:var(--color-text-muted); font-size:13px; line-height:1.6; }
+  .caption h1 { color:var(--color-text); font-size:19px; font-weight:800; margin:0 0 6px; }
+  .caption b { color:var(--color-text); }
+  .phone { width:412px; max-width:100%; height:780px; background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:26px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.5); position:relative; }
+
+  .gate { position:absolute; inset:0; background:var(--color-bg); display:flex; flex-direction:column; align-items:center; padding:14px; }
+  .card { width:100%; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); display:flex; flex-direction:column; height:100%; overflow:hidden; }
+  .head { padding:16px 18px 12px; border-bottom:1px solid var(--color-border); flex-shrink:0; }
+  .eyebrow { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-lime); font-weight:800; }
+  .title { font-size:17px; font-weight:800; margin:5px 0 0; line-height:1.25; }
+  .pwbody { padding:16px 18px; overflow-y:auto; font-size:12.5px; line-height:1.6; color:var(--color-text-muted); white-space:pre-wrap; flex:1; }
+  .foot { padding:13px 18px 16px; border-top:1px solid var(--color-border); background:var(--color-surface-2); flex-shrink:0; }
+  .agree { display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--color-text); line-height:1.4; cursor:pointer; }
+  .agree input { width:18px; height:18px; margin-top:1px; flex-shrink:0; accent-color:var(--color-lime); }
+  .name { width:100%; margin-top:12px; padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-text); font-family:inherit; font-size:15px; }
+  .name:focus { outline:none; border-color:var(--color-lime); }
+  .sign { width:100%; margin-top:12px; padding:13px; border:none; border-radius:var(--radius-sm); background:var(--color-lime); color:var(--color-text-inverse); font-weight:800; font-size:14px; font-family:inherit; cursor:pointer; }
+  .sign:disabled { opacity:0.4; cursor:not-allowed; }
+  .altrow { display:flex; gap:8px; margin-top:10px; }
+  .link { flex:1; padding:10px; border:none; background:none; color:var(--color-text-faint); font-weight:700; font-size:12px; font-family:inherit; cursor:pointer; }
+  .dots { display:flex; gap:6px; justify-content:center; margin-top:10px; }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--color-surface-3); }
+  .dot.on { background:var(--color-lime); } .dot.done { background:var(--color-teal); }
+
+  .done-screen { position:absolute; inset:0; background:var(--color-bg); display:none; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px; gap:8px; }
+  .done-screen.show { display:flex; }
+  .done-screen .big { font-size:40px; } .done-screen h2 { margin:6px 0 0; font-size:20px; font-weight:800; }
+  .done-screen p { color:var(--color-text-muted); font-size:13px; line-height:1.5; margin:4px 0 0; }
+  .done-screen button { margin-top:16px; padding:11px 22px; border:none; border-radius:var(--radius-full); background:var(--color-lime); color:var(--color-text-inverse); font-weight:800; font-family:inherit; cursor:pointer; }
+  .toast { position:absolute; bottom:18px; left:50%; transform:translateX(-50%); background:var(--color-teal); color:var(--color-text-inverse); font-size:12px; font-weight:700; padding:8px 16px; border-radius:var(--radius-full); opacity:0; transition:opacity .2s; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption">
+      <h1>Player · signing waivers online (mobile)</h1>
+      The blocking step a player hits on login when waivers are required. They <b>read</b>, <b>check "I agree,"</b> and <b>type their full name to sign</b> — then it advances to the next waiver. Two are required here: the <b>League</b> waiver, then the <b>Dink House</b> venue waiver. <b>Try it — check the box, type a name, tap Sign.</b>
+    </div>
+
+    <div class="phone">
+      <div class="gate" id="gate">
+        <div class="card">
+          <div class="head">
+            <div class="eyebrow" id="eyebrow">Before you play · 1 of 2</div>
+            <div class="title" id="title"></div>
+          </div>
+          <div class="pwbody" id="pwbody"></div>
+          <div class="foot">
+            <div id="scrollhint" style="font-size:11px;font-weight:700;color:#f0c040;text-align:center;margin-bottom:10px;">⬇ Scroll to the bottom to read the full waiver</div>
+            <label class="agree" id="agree-label" style="opacity:0.45;"><input type="checkbox" id="agree" disabled> <span>I have read and agree to the waiver above.</span></label>
+            <input type="text" id="name" class="name" placeholder="Type your full legal name to sign">
+            <button class="sign" id="sign" disabled>Sign &amp; next</button>
+            <div class="altrow">
+              <button class="link" id="email">📧 Email a copy to me</button>
+              <button class="link">Not now — sign out</button>
+            </div>
+            <div class="dots" id="dots"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="done-screen" id="done">
+        <div class="big">✅</div>
+        <h2>You're all set, Leslie</h2>
+        <p>Both waivers signed. Welcome to The Dink Society.<br>A copy was sent to your email.</p>
+        <button onclick="location.reload()">↺ Replay</button>
+      </div>
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+
+  <script>
+    const waivers = [
+      { id:'league', title:'The Dink Society — Liability Waiver & Release', text:
+`Please read carefully. This is a legal document. By signing, you give up substantial rights.
+
+In consideration of being permitted to participate in The Dink Society pickleball league — including all matches, practices, warm-ups, and related events (the "League Activities") — I acknowledge and agree to the following:
+
+1. Eligibility. I am 18 or older and participating voluntarily, and I am physically able to participate.
+
+2. Assumption of Risk. Pickleball involves inherent risks — slips, falls, collisions, contact with the ball/paddles/players, overexertion, heat illness, and exposure to communicable illnesses — that may result in injury, disability, or death. I knowingly assume all such risks.
+
+3. Release & Waiver. To the fullest extent permitted by law, I release The Dink Society, its organizers, officers, captains, volunteers, sponsors, and partners from any and all claims arising out of my participation, including ordinary negligence. This does not apply to gross negligence or willful misconduct.
+
+4. Indemnification. I agree to indemnify and hold harmless the Released Parties.
+
+5. Venue Rules. I will abide by each venue's rules and sign any separate waiver a venue requires.
+
+6. Medical. I authorize emergency treatment and accept related costs. The League provides no medical/accident insurance.
+
+7. Photo & Media Release. I grant The Dink Society and its partners the irrevocable, perpetual right to photograph, film, and record me during League Activities, and to use my name, likeness, image, voice, and any resulting photos or video for any purpose — including marketing, advertising, promotion, social media, websites, and printed materials — in any medium, worldwide, without compensation, notice, or further approval. All such media remains the sole property of The Dink Society.
+
+8. Conduct. I will play safely, respectfully, and sportsmanlike.
+
+9. Electronic Signature. Typing my full legal name and submitting signs this agreement with the same effect as a handwritten signature.
+
+10. Governing Law. Governed by the laws of California.
+
+I HAVE READ THIS WAIVER, UNDERSTAND I AM GIVING UP SUBSTANTIAL RIGHTS INCLUDING THE RIGHT TO SUE, AND SIGN IT FREELY AND VOLUNTARILY.` },
+      { id:'dink-house', title:'Dink House — Participant Waiver & Release', text:
+`Participant's Waiver and Release of Liability, Assumption of Risk and Indemnity (Read Carefully Before Signing)
+
+I fully understand that my participation in playing pickleball on the property at 1495 W 139th St, Gardena, CA 90249 exposes me to the risk of personal injury, death, communicable diseases, illnesses, viruses, or property damage. I voluntarily participate and assume any such risks.
+
+I release, discharge, and agree not to sue the owners of Marquis Collection (Leslie Lee and Kevin Lee), their officers, employees, agents, and volunteers, for any injury, death, or damage arising out of my participation — including their active or passive negligence. This does not release any party for "gross negligence."
+
+I agree to indemnify and hold harmless Marquis Collection from any and all claims arising out of my participation.
+
+• An inherent risk of exposure to COVID-19 exists in any public space; I voluntarily assume that risk.
+• The activity may be hazardous, strenuous, and/or physical.
+• Participation may result in injury, death, or property damage.
+• Marquis Collection provides no accident, medical, liability, or workers' compensation insurance.
+• Photo/video release: staff may photograph or videotape me and use it to promote programs.
+• I will abide by the Code of Conduct and applicable laws.
+
+I HAVE READ THE ABOVE AND UNDERSTAND ITS TERMS FULLY. I UNDERSTAND I HAVE GIVEN UP SUBSTANTIAL RIGHTS BY SIGNING IT AND SIGN FREELY AND VOLUNTARILY.` },
+    ];
+    let idx = 0;
+    const $ = id => document.getElementById(id);
+    function renderStep(){
+      const w = waivers[idx];
+      $('eyebrow').textContent = `Before you play · ${idx+1} of ${waivers.length}`;
+      $('title').textContent = w.title;
+      $('pwbody').textContent = w.text;
+      $('pwbody').scrollTop = 0;
+      $('agree').checked = false; $('agree').disabled = true; $('name').value=''; $('sign').disabled = true;
+      $('agree-label').style.opacity = '0.45'; $('scrollhint').style.display = 'block';
+      $('sign').textContent = (idx+1 < waivers.length) ? 'Sign & next' : 'Sign & continue';
+      $('dots').innerHTML = waivers.map((_,i)=>`<span class="dot ${i<idx?'done':i===idx?'on':''}"></span>`).join('');
+      setTimeout(checkScrolled, 40);
+    }
+    function checkScrolled(){
+      const b = $('pwbody');
+      const atBottom = b.scrollTop + b.clientHeight >= b.scrollHeight - 24;
+      const fits = b.scrollHeight <= b.clientHeight + 4;
+      if (atBottom || fits) { $('agree').disabled = false; $('agree-label').style.opacity='1'; $('scrollhint').style.display='none'; }
+    }
+    document.getElementById('pwbody').addEventListener('scroll', checkScrolled);
+    const upd = () => { $('sign').disabled = !($('agree').checked && $('name').value.trim().length>=2); };
+    $('agree').addEventListener('change', upd);
+    $('name').addEventListener('input', upd);
+    $('sign').addEventListener('click', ()=>{
+      idx++;
+      if (idx >= waivers.length) { $('gate').style.display='none'; $('done').classList.add('show'); }
+      else { renderStep(); toast('Signed ✓ — next waiver'); }
+    });
+    $('email').addEventListener('click', ()=>{ const b=$('email'); b.textContent='✓ Sent to your email'; toast('Copy emailed'); setTimeout(()=>b.textContent='📧 Email a copy to me',2500); });
+    function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1600); }
+    renderStep();
+  </script>
+</body>
+</html>

@@ -1,10 +1,9 @@
 // netlify/functions/player-email-waiver.js
-// Authed. Emails a copy of the current waiver to the signed-in player's own
-// address (for their records). Works whether or not they've signed yet.
+// Authed. Emails a copy of the active waiver(s) to the signed-in player's own
+// address. Body { waiverId? } — omit to send all active waivers.
 
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
-import { circuitCode } from './lib/circuit.js';
-import { getWaiverConfig, getSignature } from './lib/waiver.js';
+import { getActiveWaivers } from './lib/waiver.js';
 import { sendEmail, renderWaiverCopy } from './lib/email.js';
 
 function json(body, status = 200) {
@@ -19,32 +18,35 @@ export default async (req) => {
   const verified = await verifyPlayerSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
   const ctx = verified.payload;
-  const { playerId, player } = ctx;
+  const { player } = ctx;
 
   const to = player.email || null;
   if (!to) return json({ error: 'No email on file for your account.' }, 400);
 
-  const config = await getWaiverConfig();
-  if (!config.text.trim()) return json({ error: 'No waiver text is available to send.' }, 409);
+  let body = {};
+  try { body = await req.json(); } catch { /* optional */ }
 
-  // Include their signature details if they've already signed the current one.
-  const sig = await getSignature(playerId);
-  const signedCurrent = sig && sig.version === config.version
-    && String(sig.season) === String(circuitCode(ctx.team.circuit));
+  let waivers = await getActiveWaivers();
+  if (body.waiverId) waivers = waivers.filter(w => w.id === body.waiverId);
+  if (!waivers.length) return json({ error: 'No waiver text is available to send.' }, 409);
+
+  // Combine into one email (each waiver titled).
+  const combined = waivers.map(w => `${w.title}\n\n${w.text}`).join('\n\n──────────\n\n');
+  const subject = waivers.length === 1
+    ? `${waivers[0].title} — The Dink Society`
+    : `Your Dink Society waivers (${waivers.length})`;
 
   try {
     await sendEmail({
       to,
-      subject: `${config.title || 'Liability Waiver'} — The Dink Society`,
+      subject,
       html: renderWaiverCopy({
-        title: config.title,
-        text: config.text,
+        title: waivers.length === 1 ? waivers[0].title : 'Your waivers',
+        text: combined,
         playerName: player.name || null,
-        signedName: signedCurrent ? sig.signedName : null,
-        signedAt: signedCurrent ? sig.signedAt : null,
       }),
     });
-    return json({ ok: true, sentTo: to });
+    return json({ ok: true, sentTo: to, count: waivers.length });
   } catch (e) {
     console.error('player-email-waiver send failed:', e);
     return json({ error: 'Could not send the email right now. Please try again.' }, 502);

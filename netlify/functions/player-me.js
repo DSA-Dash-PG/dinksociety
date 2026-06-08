@@ -9,7 +9,7 @@ import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
-import { getWaiverConfig, getSignature, isWaiverSatisfied } from './lib/waiver.js';
+import { getActiveWaivers, getSignature, isWaiverSatisfied } from './lib/waiver.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -227,17 +227,19 @@ export default async (req) => {
   // notices the admin sent to players.
   const announcements = await getRelevantAnnouncements({ teamId, division, limit: 3, audiences: ['players'] });
 
-  // Liability waiver — must be signed for the current season + version.
-  const waiverConfig = await getWaiverConfig();
-  const waiverSig = await getSignature(playerId);
-  const waiverSatisfied = isWaiverSatisfied({ config: waiverConfig, signature: waiverSig, season: circuit });
-  const waiver = {
-    required: waiverConfig.enabled && !!waiverConfig.text.trim() && !waiverSatisfied,
-    version: waiverConfig.version,
-    title: waiverConfig.title,
-    text: waiverConfig.text,
-    signedAt: waiverSig?.signedAt || null,
-  };
+  // Liability waivers — each active waiver must be signed for the current
+  // season + version. Returns the full list with a `required` flag per waiver.
+  const activeWaivers = await getActiveWaivers();
+  const waivers = await Promise.all(activeWaivers.map(async w => {
+    const sig = await getSignature(w.id, playerId);
+    const satisfied = isWaiverSatisfied({ waiver: w, signature: sig, season: circuit });
+    return {
+      id: w.id, title: w.title, text: w.text, version: w.version,
+      required: !satisfied,
+      signedAt: sig?.signedAt || null,
+      method: sig?.method || null,
+    };
+  }));
 
   // ETag + private no-store: the portal's live poller sends If-None-Match,
   // so unchanged payloads come back as an empty 304 instead of the full blob.
@@ -261,7 +263,7 @@ export default async (req) => {
     },
     schedule,
     announcements,
-    waiver,
+    waivers,
   }, { cacheControl: PRIVATE });
 };
 
