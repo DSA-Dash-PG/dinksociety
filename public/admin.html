@@ -94,6 +94,22 @@
     .pm-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.15s; }
     .pm-overlay.is-open { opacity: 1; pointer-events: auto; }
     .pm-modal { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); padding: 24px; width: 480px; max-width: 95vw; max-height: 85vh; overflow-y: auto; }
+    /* Waiver player-preview — mirrors the player login gate (me.html .waiver-*) */
+    .wvp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); z-index: 1002; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.15s; padding: 16px; }
+    .wvp-overlay.is-open { opacity: 1; pointer-events: auto; }
+    .wvp-phone { width: 380px; max-width: 100%; max-height: 88vh; background: var(--color-bg); border: 1px solid var(--color-border-strong); border-radius: var(--radius-lg); display: flex; flex-direction: column; overflow: hidden; }
+    .wvp-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 16px; border-bottom: 1px solid var(--color-border); flex-shrink: 0; }
+    .wvp-head b { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; }
+    .wvp-x { background: none; border: none; color: var(--color-text-muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 4px; }
+    .wvp-scroll { overflow-y: auto; padding: 18px; }
+    .wvp-eyebrow { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-lime); font-weight: 800; }
+    .wvp-title { font-size: 18px; font-weight: 800; margin: 6px 0 14px; color: var(--color-text); }
+    .wvp-body { font-size: 13px; line-height: 1.6; color: var(--color-text-muted); white-space: pre-wrap; word-break: break-word; }
+    .wvp-foot { border-top: 1px solid var(--color-border); padding: 14px 18px; flex-shrink: 0; }
+    .wvp-agree { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; color: var(--color-text); line-height: 1.4; }
+    .wvp-name { width: 100%; margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text-faint); font-size: 15px; box-sizing: border-box; }
+    .wvp-sign { width: 100%; margin-top: 12px; padding: 13px; border: none; border-radius: var(--radius-sm); background: var(--color-lime); color: var(--color-text-inverse); font-weight: 800; font-size: 14px; opacity: .85; }
+    .wvp-note { text-align: center; font-size: 10px; color: var(--color-text-faint); margin-top: 10px; }
     .pm-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
     .pm-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
     .pm-lbl { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--color-text-faint); }
@@ -1052,6 +1068,24 @@
     <div class="pm-modal" id="pm-modal-inner"></div>
   </div>
 
+  <!-- Waiver player-preview: shows the editor's live text exactly as a player sees it on login. -->
+  <div class="wvp-overlay" id="wvp-overlay" role="dialog" aria-modal="true" aria-label="Waiver preview">
+    <div class="wvp-phone">
+      <div class="wvp-head"><b>Player preview · mobile</b><button class="wvp-x" id="wvp-x" aria-label="Close preview">&times;</button></div>
+      <div class="wvp-scroll">
+        <div class="wvp-eyebrow">Before you play</div>
+        <div class="wvp-title" id="wvp-title"></div>
+        <div class="wvp-body" id="wvp-body"></div>
+      </div>
+      <div class="wvp-foot">
+        <label class="wvp-agree"><input type="checkbox" disabled style="width:auto;margin:2px 0 0;flex-shrink:0;"> I have read and agree to this waiver.</label>
+        <input class="wvp-name" value="Type your full legal name" disabled>
+        <button class="wvp-sign" disabled>Agree &amp; sign</button>
+        <div class="wvp-note">Preview only — this is exactly what players see on login.</div>
+      </div>
+    </div>
+  </div>
+
 <script>
 // ═══════════════════════════════════════════════════════════
 // ADMIN PORTAL — 100% LIVE DATA
@@ -1255,6 +1289,7 @@
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
           <button class="ab ab--lime ab--sm" data-wv-save="${h(w.id)}">Save</button>
+          <button class="ab ab--outline ab--sm" data-wv-preview="${h(w.id)}">Preview</button>
           <button class="ab ab--outline ab--sm" data-wv-resign="${h(w.id)}">Force re-sign</button>
         </div>
       </div>`).join('') || '<div class="empty">No waivers configured.</div>';
@@ -1263,6 +1298,7 @@
     host.querySelectorAll('[data-wv-resign]').forEach(b => b.addEventListener('click', () => {
       if (confirm('Force EVERY player to sign this waiver again? Bumps the version — everyone re-signs on next login.')) saveWaivers(b.dataset.wvResign, true);
     }));
+    host.querySelectorAll('[data-wv-preview]').forEach(b => b.addEventListener('click', () => openWaiverPreview(b.dataset.wvPreview)));
     // populate the compliance picker
     const pick = $id('waiver-pick');
     if (pick) {
@@ -1271,6 +1307,21 @@
       if (cur && waiverList().some(w => w.id === cur)) pick.value = cur;
     }
   }
+
+  // Player-faithful preview: render the LIVE (unsaved) editor text the same way
+  // me.html's waiver gate does — pre-wrap plain text via textContent.
+  function openWaiverPreview(id) {
+    const host = $id('waivers-editors'); if (!host) return;
+    const title = (host.querySelector(`[data-wv-title="${cssEsc(id)}"]`)?.value || '').trim() || 'Liability Waiver & Release';
+    const text  = host.querySelector(`[data-wv-text="${cssEsc(id)}"]`)?.value || '';
+    $id('wvp-title').textContent = title;
+    $id('wvp-body').textContent  = text.trim() || 'No waiver text yet — paste it into the box above, then preview.';
+    $id('wvp-overlay').classList.add('is-open');
+  }
+  function closeWaiverPreview() { $id('wvp-overlay').classList.remove('is-open'); }
+  $id('wvp-x')?.addEventListener('click', closeWaiverPreview);
+  $id('wvp-overlay')?.addEventListener('click', e => { if (e.target === $id('wvp-overlay')) closeWaiverPreview(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && $id('wvp-overlay')?.classList.contains('is-open')) closeWaiverPreview(); });
 
   // Collect all editor cards → POST the full waivers array (server bumps the
   // version of any whose text changed, or `bumpId` to force re-sign).
