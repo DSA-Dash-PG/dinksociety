@@ -964,7 +964,7 @@
     }
 
     // -- last result --
-    const recap = last ? `<div class="label">Last match</div><div class="hcard-tap" data-go="schedule">${matchCard(last, me, true)}</div>` : '';
+    const recap = last ? `<div class="label">Last match</div><div class="hcard-tap" data-go="schedule">${matchCard(last, me, true, true)}</div>` : '';
 
     // -- season tiles: my rank + DSR + team standing --
     const lb = (DATA.leaderboard || []).filter(p => !me.division || p.division === me.division);
@@ -1016,6 +1016,9 @@
     const html = order.map(k => blocks[k] || '').join('');
     $('v-home').innerHTML = html || '<div class="muted">No matches scheduled yet. Your season will show up here.</div>';
     $('v-home').querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => {
+      // Don't hijack clicks on interactive children: the game-scores toggle,
+      // the expanded detail, or any profile link inside the card.
+      if (e.target.closest('a, .m__toggle, .m__detail')) return;
       e.stopPropagation();
       goTab(el.dataset.go);
     }));
