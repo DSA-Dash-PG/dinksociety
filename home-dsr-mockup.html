@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Home Header — DSR Info Mockup</title>
+<style>
+  :root {
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12); --color-lime-ghost:rgba(184,255,44,0.06);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-gold:#f0c040; --color-gold-dim:rgba(240,192,64,0.12); --color-red:#ff5c47;
+    --radius-sm:8px; --radius-md:12px; --radius-lg:16px; --radius-full:999px;
+    --font:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; padding:0; background:#070707; color:var(--color-text); font-family:var(--font); }
+  .stage { display:flex; flex-wrap:wrap; gap:28px; justify-content:center; padding:28px 16px 60px; }
+  .caption { width:100%; max-width:900px; margin:0 auto 4px; color:var(--color-text-muted); font-size:13px; line-height:1.6; }
+  .caption h1 { color:var(--color-text); font-size:20px; font-weight:800; margin:0 0 6px; }
+  .caption b { color:var(--color-text); }
+  .phone { width:390px; max-width:100%; background:var(--color-bg); border:1px solid var(--color-border-strong); border-radius:26px; overflow:hidden; box-shadow:0 20px 60px rgba(0,0,0,0.5); align-self:flex-start; }
+  .phone__label { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-teal); font-weight:700; text-align:center; padding:10px 0 0; }
+  .body { padding:14px; }
+  .label { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin:18px 2px 9px; }
+
+  /* personalized "you" header */
+  .mehead { background:linear-gradient(135deg, rgba(184,255,44,0.14), rgba(23,215,176,0.06)); border:1px solid rgba(184,255,44,0.22); border-radius:var(--radius-lg); padding:14px; display:flex; align-items:center; gap:12px; }
+  .mehead__av { width:54px; height:54px; border-radius:50%; background:var(--color-surface-3); border:2px solid var(--color-lime); display:grid; place-items:center; font-size:19px; font-weight:800; color:var(--color-lime); flex-shrink:0; }
+  .mehead__main { flex:1; min-width:0; }
+  .mehead__hi { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-lime); font-weight:800; }
+  .mehead__name { font-size:19px; font-weight:800; line-height:1.1; margin-top:1px; }
+  .mehead__chips { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .chip { font-size:9px; font-weight:800; letter-spacing:0.03em; padding:3px 8px; border-radius:var(--radius-full); }
+  .chip-cap { background:var(--color-lime-dim); color:var(--color-lime); }
+  .mehead__dsr { text-align:center; flex-shrink:0; padding-left:4px; }
+  .mehead__dsrN { font-size:21px; font-weight:800; color:var(--color-lime); line-height:1; }
+  .mehead__dsrL { display:inline-flex; align-items:center; gap:3px; font-size:8px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:4px; cursor:pointer; }
+  .dsr-i { display:inline-grid; place-items:center; width:12px; height:12px; border-radius:50%; border:1px solid var(--color-text-faint); font-size:8px; font-style:normal; line-height:1; }
+
+  /* season tiles */
+  .sgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .stat { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:13px 6px; text-align:center; position:relative; }
+  .stat__n { font-size:22px; font-weight:800; } .stat__n.lime { color:var(--color-lime); } .stat__n.gold { color:var(--color-gold); }
+  .stat__l { display:inline-flex; align-items:center; justify-content:center; gap:3px; font-size:8px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:3px; }
+  .stat__l.tap { cursor:pointer; }
+  .stat__d { font-size:9px; font-weight:800; margin-top:3px; } .stat__d.up { color:var(--color-lime); }
+
+  /* ── DSR info popup ── */
+  .dsr-pop-scrim { position:fixed; inset:0; background:rgba(0,0,0,0.5); display:none; z-index:20; }
+  .dsr-pop-scrim.on { display:block; }
+  .dsr-pop { position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:100%; max-width:390px; background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:18px 18px 0 0; padding:18px 18px 26px; }
+  .dsr-pop h4 { margin:0 0 4px; font-size:15px; font-weight:800; display:flex; align-items:center; gap:7px; }
+  .dsr-pop h4 .tag { font-size:10px; font-weight:800; color:var(--color-lime); background:var(--color-lime-dim); border-radius:var(--radius-full); padding:2px 8px; }
+  .dsr-pop p { margin:8px 0 0; font-size:12.5px; line-height:1.55; color:var(--color-text-muted); }
+  .dsr-pop ul { margin:8px 0 0; padding-left:18px; font-size:12px; line-height:1.6; color:var(--color-text-muted); }
+  .dsr-pop__grab { width:40px; height:5px; border-radius:999px; background:var(--color-border-strong); margin:0 auto 12px; }
+  .dsr-pop__close { margin-top:14px; width:100%; padding:11px; border-radius:var(--radius-sm); border:1px solid var(--color-border-strong); background:var(--color-surface-2); color:var(--color-text); font-weight:700; font-size:13px; font-family:inherit; cursor:pointer; }
+</style>
+</head>
+<body>
+  <div class="stage">
+    <div class="caption">
+      <h1>Home header — cleaned up + DSR explainer</h1>
+      Changes: <b>removed the "MAN" chip</b> and the <b>division name</b> from the header (only Captain/Co-captain remains, when relevant). Added a tappable <b>ⓘ</b> on "Your DSR" (and the My DSR tile) that opens a short explainer. On desktop it also shows on hover; on phones it's tap-to-open. <b>Tap the DSR label in the mockup to see the popup.</b>
+    </div>
+
+    <div class="phone">
+      <div class="phone__label">Captain · clean header</div>
+      <div class="body">
+        <div class="mehead">
+          <div class="mehead__av">RH</div>
+          <div class="mehead__main">
+            <div class="mehead__hi">Good evening</div>
+            <div class="mehead__name">Richard H.</div>
+            <div class="mehead__chips"><span class="chip chip-cap">CAPTAIN</span></div>
+          </div>
+          <div class="mehead__dsr">
+            <div class="mehead__dsrN">54.7</div>
+            <div class="mehead__dsrL" onclick="openDsr()">Your DSR <i class="dsr-i">?</i></div>
+          </div>
+        </div>
+
+        <div class="label">Your season</div>
+        <div class="sgrid">
+          <div class="stat"><div class="stat__n">#6</div><div class="stat__l">My rank</div><div class="stat__d up">▲ 2 this wk</div></div>
+          <div class="stat"><div class="stat__n lime">54.7</div><div class="stat__l tap" onclick="openDsr()">My DSR <i class="dsr-i">?</i></div></div>
+          <div class="stat"><div class="stat__n gold">2nd</div><div class="stat__l">Team · 0–1</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="phone">
+      <div class="phone__label">Non-captain · no chips row</div>
+      <div class="body">
+        <div class="mehead">
+          <div class="mehead__av">AM</div>
+          <div class="mehead__main">
+            <div class="mehead__hi">Good evening</div>
+            <div class="mehead__name">Angel M.</div>
+          </div>
+          <div class="mehead__dsr">
+            <div class="mehead__dsrN">58.3</div>
+            <div class="mehead__dsrL" onclick="openDsr()">Your DSR <i class="dsr-i">?</i></div>
+          </div>
+        </div>
+        <div class="label">Your season</div>
+        <div class="sgrid">
+          <div class="stat"><div class="stat__n">#3</div><div class="stat__l">My rank</div><div class="stat__d up">▲ 1 this wk</div></div>
+          <div class="stat"><div class="stat__n lime">58.3</div><div class="stat__l tap" onclick="openDsr()">My DSR <i class="dsr-i">?</i></div></div>
+          <div class="stat"><div class="stat__n gold">2nd</div><div class="stat__l">Team · 0–1</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- DSR popup -->
+  <div class="dsr-pop-scrim" id="dsr-scrim" onclick="closeDsr()">
+    <div class="dsr-pop" onclick="event.stopPropagation()">
+      <div class="dsr-pop__grab"></div>
+      <h4>DSR <span class="tag">Dink Society Rating</span></h4>
+      <p>Your overall performance score for the season — one number that captures how you're playing across all your games.</p>
+      <p>It blends:</p>
+      <ul>
+        <li>Games won and lost</li>
+        <li>How close those games were (point differential)</li>
+        <li>The strength of who you played</li>
+      </ul>
+      <p>It updates after every match night. Higher is better — and it's what sets your rank on the leaderboard.</p>
+      <button class="dsr-pop__close" onclick="closeDsr()">Got it</button>
+    </div>
+  </div>
+
+  <script>
+    function openDsr(){ document.getElementById('dsr-scrim').classList.add('on'); }
+    function closeDsr(){ document.getElementById('dsr-scrim').classList.remove('on'); }
+  </script>
+</body>
+</html>

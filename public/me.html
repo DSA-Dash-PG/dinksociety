@@ -286,7 +286,24 @@
   .chip-div { background:var(--color-surface-3); color:var(--color-text-muted); }
   .mehead__dsr { text-align:center; flex-shrink:0; padding-left:4px; }
   .mehead__dsrN { font-size:21px; font-weight:800; color:var(--color-lime); line-height:1; }
-  .mehead__dsrL { font-size:8px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:3px; }
+  .mehead__dsrL { display:inline-flex; align-items:center; gap:3px; font-size:8px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:4px; background:none; border:none; font-family:inherit; cursor:pointer; padding:0; }
+  .stat__l--tap { background:none; border:none; font-family:inherit; cursor:pointer; }
+  .dsr-i { display:inline-grid; place-items:center; width:12px; height:12px; border-radius:50%; border:1px solid currentColor; font-size:8px; font-style:normal; line-height:1; opacity:0.85; }
+
+  /* DSR explainer popup */
+  .dsr-pop-scrim { position:fixed; inset:0; background:rgba(0,0,0,0.55); opacity:0; pointer-events:none; transition:opacity .2s ease; z-index:70; }
+  .dsr-pop-scrim.is-open { opacity:1; pointer-events:auto; }
+  .dsr-pop { position:fixed; left:0; right:0; bottom:0; max-width:520px; margin:0 auto; background:var(--color-surface);
+    border:1px solid var(--color-border-strong); border-radius:20px 20px 0 0; padding:16px 18px 26px; z-index:71;
+    transform:translateY(105%); transition:transform .24s cubic-bezier(.4,0,.2,1); }
+  .dsr-pop-scrim.is-open .dsr-pop { transform:translateY(0); }
+  .dsr-pop__grab { width:40px; height:5px; border-radius:999px; background:var(--color-border-strong); margin:0 auto 12px; }
+  .dsr-pop h4 { margin:0 0 4px; font-size:15px; font-weight:800; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .dsr-pop h4 .tag { font-size:10px; font-weight:800; color:var(--color-lime); background:var(--color-lime-dim); border-radius:var(--radius-full); padding:2px 8px; letter-spacing:0.02em; }
+  .dsr-pop p { margin:8px 0 0; font-size:12.5px; line-height:1.55; color:var(--color-text-muted); }
+  .dsr-pop ul { margin:8px 0 0; padding-left:18px; font-size:12px; line-height:1.6; color:var(--color-text-muted); }
+  .dsr-pop__close { margin-top:14px; width:100%; padding:11px; border-radius:var(--radius-sm); border:1px solid var(--color-border-strong); background:var(--color-surface-2); color:var(--color-text); font-weight:700; font-size:13px; font-family:inherit; cursor:pointer; }
+  .dsr-pop__close:active { opacity:0.6; }
   .bytype { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:6px 14px; }
   .bt__row { display:flex; align-items:center; justify-content:space-between; padding:11px 0; border-bottom:1px solid var(--color-border); font-size:12px; }
   .bt__row:last-child { border-bottom:none; }
@@ -595,6 +612,25 @@
       </header>
       <div class="psheet__body" id="psheet-body"></div>
     </section>
+
+    <!-- DSR explainer popup -->
+    <div class="dsr-pop-scrim" id="dsr-scrim">
+      <div class="dsr-pop" id="dsr-pop" role="dialog" aria-modal="true" aria-label="What is DSR?">
+        <div class="dsr-pop__grab"></div>
+        <h4>DSR <span class="tag">Dink Society Rating</span></h4>
+        <p>Your overall performance score for the season — one number for how you're playing across all your games. It's what sets your spot on the leaderboard.</p>
+        <p>It rewards:</p>
+        <ul>
+          <li>Winning your games</li>
+          <li>Winning by bigger margins</li>
+          <li>Coming through in close games</li>
+          <li>Playing consistently, week to week</li>
+          <li>Getting on the court (games played)</li>
+        </ul>
+        <p>It refreshes after every match night — higher is better.</p>
+        <button class="dsr-pop__close" type="button" id="dsr-pop-close">Got it</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -977,6 +1013,13 @@
   $('psheet-scrim').addEventListener('click', closeProfileSheet);
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('psheet').classList.contains('is-open')) closeProfileSheet(); });
 
+  // DSR explainer popup (tap the ⓘ on "Your DSR" / "My DSR").
+  function openDsrInfo(e) { if (e) { e.preventDefault(); e.stopPropagation(); } $('dsr-scrim').classList.add('is-open'); }
+  function closeDsrInfo() { $('dsr-scrim').classList.remove('is-open'); }
+  $('dsr-scrim').addEventListener('click', e => { if (e.target === $('dsr-scrim')) closeDsrInfo(); });
+  $('dsr-pop-close').addEventListener('click', closeDsrInfo);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDsrInfo(); });
+
   // ---- captain SSO bridge ----
   // Mint a captain session from the current player session, then open the
   // captain portal. Works for captains AND co-captains — no second login.
@@ -1157,23 +1200,20 @@
     const deltaHtml = delta == null || delta === 0 ? '' : delta > 0 ? ` <span class="lb__delta up">▲${delta}</span>` : ` <span class="lb__delta down">▼${-delta}</span>`;
 
     // ★ Personalized "you" header — makes Home unmistakably the player's own.
+    // Chips: captain/co-captain only (gender + division removed per Richard).
     const hr = new Date().getHours();
     const greeting = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
-    const gNorm = norm(me.gender);
     const capChip = me.isCaptain ? '<span class="chip chip-cap">CAPTAIN</span>'
       : me.isCoCaptain ? '<span class="chip chip-cap">CO-CAPTAIN</span>' : '';
-    const gChip = gNorm === 'F' ? '<span class="chip chip-g">WOMAN</span>'
-      : gNorm === 'M' ? '<span class="chip chip-g">MAN</span>' : '';
-    const divChip = (me.divisionLabel || me.division) ? `<span class="chip chip-div">${esc(me.divisionLabel || me.division)}</span>` : '';
     const dsrVal = fmtDsr(DATA.stats?.composite ?? myRow?.dsr);
     const mehead = `<div class="mehead">
       <div class="mehead__av">${esc(initials(me.name))}</div>
       <div class="mehead__main">
         <div class="mehead__hi">${greeting}</div>
         <div class="mehead__name">${esc(shortName(me.name))}</div>
-        <div class="mehead__chips">${capChip}${gChip}${divChip}</div>
+        ${capChip ? `<div class="mehead__chips">${capChip}</div>` : ''}
       </div>
-      ${dsrVal !== '—' ? `<div class="mehead__dsr"><div class="mehead__dsrN">${dsrVal}</div><div class="mehead__dsrL">Your DSR</div></div>` : ''}
+      ${dsrVal !== '—' ? `<div class="mehead__dsr"><div class="mehead__dsrN">${dsrVal}</div><button class="mehead__dsrL" type="button" onclick="openDsrInfo(event)">Your DSR <i class="dsr-i">?</i></button></div>` : ''}
     </div>`;
 
     // ★ First-person season tiles + trends + my personal game record.
@@ -1188,7 +1228,7 @@
       </div>` : '';
     const tiles = `<div class="label">Your season</div><div class="sgrid">
       <div class="stat hcard-tap" data-go="stats"><div class="stat__n">${fmtRank(myIdx >= 0 ? myIdx + 1 : null)}</div><div class="stat__l">My rank</div>${rankTrend}</div>
-      <div class="stat hcard-tap" data-go="stats"><div class="stat__n" style="color:var(--color-lime)">${fmtDsr(DATA.stats?.composite)}</div><div class="stat__l">My DSR</div></div>
+      <div class="stat hcard-tap" data-go="stats"><div class="stat__n" style="color:var(--color-lime)">${fmtDsr(DATA.stats?.composite)}</div><button class="stat__l stat__l--tap" type="button" onclick="openDsrInfo(event)">My DSR <i class="dsr-i">?</i></button></div>
       <div class="stat hcard-tap" data-go="standings"><div class="stat__n" style="color:var(--color-gold)">${ordinal(stnd?.rank)}</div><div class="stat__l">Team${stnd ? ' · ' + stnd.wins + '–' + stnd.losses : ''}</div></div>
     </div>${recordRow}`;
 
