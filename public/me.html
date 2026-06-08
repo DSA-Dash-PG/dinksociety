@@ -1367,20 +1367,26 @@
       </div>`;
     }
 
-    // ★ First-person season tiles + trends + my personal game record.
-    const rankTrend = delta == null || delta === 0
-      ? '<div class="stat__d flat">no change</div>'
-      : delta > 0 ? `<div class="stat__d up">▲ ${delta} this wk</div>` : `<div class="stat__d down">▼ ${-delta} this wk</div>`;
+    // ★ First-person season tiles. A player is UNRANKED until they've played
+    // (rank null) — show no rank and no trend at season start. Same for the
+    // team: no placeholder "1st" before any match has been played.
+    const myRank = myRow?.rank ?? null;           // null = unranked (0 games)
+    const ranked = myRank != null;
+    const rankTrend = (ranked && delta != null && delta !== 0)
+      ? (delta > 0 ? `<div class="stat__d up">▲ ${delta} this wk</div>` : `<div class="stat__d down">▼ ${-delta} this wk</div>`)
+      : '';
     const myW = myRow?.w || 0, myL = myRow?.l || 0, myGp = myRow?.gp || 0;
     const winPct = (myW + myL) > 0 ? Math.round(myW / (myW + myL) * 100) : null;
     const recordRow = myGp > 0 ? `<div class="srow2">
         <div class="stat hcard-tap" data-go="stats"><div class="stat__n">${myW}–${myL}</div><div class="stat__l">My game record</div></div>
         <div class="stat hcard-tap" data-go="stats"><div class="stat__n lime" style="color:var(--color-lime)">${winPct}%</div><div class="stat__l">Win rate · ${myGp} played</div></div>
       </div>` : '';
+    const teamPlayed = !!(stnd && ((stnd.wins || 0) + (stnd.losses || 0) + (stnd.ties || 0)) > 0);
+    const teamRank = teamPlayed ? ordinal(stnd.rank) : '—';
     const tiles = `<div class="label">Your season</div><div class="sgrid">
-      <div class="stat hcard-tap" data-go="stats"><div class="stat__n">${fmtRank(myIdx >= 0 ? myIdx + 1 : null)}</div><div class="stat__l">My rank</div>${rankTrend}</div>
+      <div class="stat hcard-tap" data-go="stats"><div class="stat__n">${fmtRank(myRank)}</div><div class="stat__l">My rank</div>${rankTrend}</div>
       <div class="stat hcard-tap" data-go="stats"><div class="stat__n" style="color:var(--color-lime)">${fmtDsr(DATA.stats?.composite)}</div><button class="stat__l stat__l--tap" type="button" onclick="openDsrInfo(event)">My DSR <i class="dsr-i">?</i></button></div>
-      <div class="stat hcard-tap" data-go="standings"><div class="stat__n" style="color:var(--color-gold)">${ordinal(stnd?.rank)}</div><div class="stat__l">Team${stnd ? ' · ' + stnd.wins + '–' + stnd.losses : ''}</div></div>
+      <div class="stat hcard-tap" data-go="standings"><div class="stat__n" style="color:var(--color-gold)">${teamRank}</div><div class="stat__l">Team${stnd ? ' · ' + stnd.wins + '–' + stnd.losses : ''}</div></div>
     </div>${recordRow}`;
 
     // -- player of the week --
@@ -1817,10 +1823,12 @@
     const me = DATA.profile, lb = DATA.leaderboard || [];
     const myRow = lb.find(p => p.me);
     let overall = null, gender = null;
-    if (myRow) {
+    // Unranked (0 games) → no ranks at all. Rank only among RANKED same-gender
+    // players so it doesn't count people who haven't played yet.
+    if (myRow && myRow.rank != null) {
       overall = myRow.rank;
       const myG = norm(me.gender);
-      const idx = lb.filter(p => norm(p.gender) === myG).findIndex(p => p.me);
+      const idx = lb.filter(p => p.rank != null && norm(p.gender) === myG).findIndex(p => p.me);
       gender = idx >= 0 ? idx + 1 : null;
     }
     const gLabel = norm(me.gender) === 'F' ? "Women's Rank" : norm(me.gender) === 'M' ? "Men's Rank" : 'Division Rank';
@@ -1971,10 +1979,13 @@
     let rows = (DATA.leaderboard || []).filter(p => !me.division || p.division === me.division);
     if (lbFilter !== 'all') rows = rows.filter(p => p.gender === lbFilter);
     if (!rows.length) { $('lblist').innerHTML = '<div class="muted">No ranked players yet.</div>'; return; }
-    $('lblist').innerHTML = rows.map((p, i) => {
+    $('lblist').innerHTML = rows.map((p) => {
       const d = p.rankDelta;
       const delta = d == null ? '<span class="lb__delta flat">—</span>' : d > 0 ? '<span class="lb__delta up">▲' + d + '</span>' : d < 0 ? '<span class="lb__delta down">▼' + (-d) + '</span>' : '<span class="lb__delta flat">—</span>';
-      return `<div class="lb ${p.me?'lb--me':''}"><div class="lb__rank">${i + 1}</div><div class="lb__av">${initials(p.name)}</div>
+      // The player's LEAGUE rank — stays with them no matter how the list is
+      // filtered/sorted. Unranked (0 games) shows "—".
+      const rk = p.rank != null ? p.rank : '—';
+      return `<div class="lb ${p.me?'lb--me':''}"><div class="lb__rank">${rk}</div><div class="lb__av">${initials(p.name)}</div>
         <div class="lb__body"><div class="lb__name">${playerLink(p.name, p.teamName, esc(shortName(p.name)))}${p.me?' · you':''}</div><div class="lb__team">${p.teamName ? teamLink(null, p.teamName, esc(p.teamName)) : ''}</div></div>
         <div style="text-align:right;"><div class="lb__dsr">${p.dsr != null ? esc(p.dsr) : '—'}</div>${delta}</div></div>`;
     }).join('');

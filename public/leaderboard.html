@@ -355,6 +355,20 @@
     if (!state.playerStats?.players) return [];
     return Object.values(state.playerStats.players);
   }
+  // Each player's canonical DSR rank (1 = highest DSR). Computed from the FULL
+  // board so it stays with the player no matter how the table is filtered,
+  // searched, or sorted. Only players with a DSR (≥1 game) are ranked; everyone
+  // else is unranked (→ "—"), so there's no fake ranking at season start.
+  function dsrRankMap() {
+    const ranked = playerList()
+      .filter(p => p.composite != null)
+      .sort((a, b) => (b.composite - a.composite)
+        || ((b.gamesWon || 0) - (a.gamesWon || 0))
+        || (a.name || '').localeCompare(b.name || ''));
+    const m = new Map();
+    ranked.forEach((p, i) => m.set(p.playerId, i + 1));
+    return m;
+  }
   function filteredPlayers(filter, searchQ) {
     filter = filter || state.filter;
     searchQ = (searchQ !== undefined ? searchQ : state.search).toLowerCase();
@@ -438,9 +452,10 @@
       return '<span class="rank-change rank-change--same">—</span>';
     };
 
+    const rankById = dsrRankMap();
     const rows = players.map((p, i) => {
-      // Plain sequential ranking — no medals or leader highlight.
-      const rankDisp = i + 1;
+      // The player's DSR rank — stable across search/filter/sort. Unranked → "—".
+      const rankDisp = rankById.get(p.playerId) ?? '—';
       const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
       const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
       return `<tr>

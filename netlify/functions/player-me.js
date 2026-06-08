@@ -68,7 +68,14 @@ export default async (req) => {
       w: p.gamesWon || 0, l: p.gamesLost || 0, rankDelta: p.rankDelta ?? null,
     }))
     .sort((a, b) => ((b.dsr ?? -1) - (a.dsr ?? -1)) || String(a.name || '').localeCompare(String(b.name || '')))
-    .map((p, i) => ({ ...p, rank: i + 1, me: p.playerId === playerId }));
+    // Rank ONLY players who have a DSR (played ≥1 game). Players with 0 games
+    // are unranked (rank: null) — no positional rank at season start.
+    .map((p) => {
+      const out = { ...p, rank: null, me: p.playerId === playerId };
+      return out;
+    });
+  let _rk = 0;
+  for (const p of leaderboard) { if (p.dsr != null) p.rank = ++_rk; }
 
   // Player of the Week (latest week, gender split)
   const pow = (standings?.weeklyTopPerformers || [])[0] || null;
