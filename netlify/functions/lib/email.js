@@ -175,3 +175,23 @@ export function renderCaptainMagicLink(magicUrl, teamName) {
     </div>
   `;
 }
+
+/**
+ * Render a copy of the liability waiver, emailed to the player for their
+ * own records.
+ */
+export function renderWaiverCopy({ title, text, playerName, signedName, signedAt }) {
+  const when = signedAt ? new Date(signedAt).toLocaleString('en-US', { dateStyle: 'long', timeStyle: 'short' }) : null;
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 560px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 24px;">THE DINK SOCIETY</div>
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 6px;">${escapeBody(title || 'Liability Waiver & Release')}</h1>
+      <p style="font-size: 13px; color: #8a8a8a; margin: 0 0 20px;">Your copy${playerName ? ', ' + escapeBody(playerName) : ''} — keep this for your records.</p>
+      ${signedName ? `<div style="font-size: 13px; color: #b8ff2c; margin: 0 0 18px; padding: 12px 14px; background: #161616; border-radius: 8px;">Signed by <b>${escapeBody(signedName)}</b>${when ? ' · ' + escapeBody(when) : ''}</div>` : ''}
+      <div style="font-size: 14px; color: #cfcfcf; line-height: 1.65; white-space: pre-wrap; word-break: break-word;">${escapeBody(text || '')}</div>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        The Dink Society · Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}

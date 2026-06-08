@@ -352,6 +352,26 @@
   .lnk:active { opacity:0.6; }
   a.lnk:hover { text-decoration:underline; text-decoration-color:rgba(128,128,128,0.5); text-underline-offset:3px; }
 
+  /* ── Liability waiver gate ────────────────────────── */
+  .waiver-gate { position:fixed; inset:0; z-index:90; background:var(--color-bg); display:none; flex-direction:column; align-items:center; padding:16px; overflow-y:auto; }
+  .waiver-gate.is-open { display:flex; }
+  .waiver-card { width:100%; max-width:560px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); display:flex; flex-direction:column; max-height:calc(100vh - 32px); overflow:hidden; }
+  .waiver-head { padding:18px 18px 12px; border-bottom:1px solid var(--color-border); }
+  .waiver-eyebrow { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-lime); font-weight:800; }
+  .waiver-title { font-size:18px; font-weight:800; margin:4px 0 0; }
+  .waiver-body { padding:16px 18px; overflow-y:auto; font-size:13px; line-height:1.6; color:var(--color-text-muted); white-space:pre-wrap; word-break:break-word; flex:1; -webkit-overflow-scrolling:touch; }
+  .waiver-foot { padding:14px 18px 18px; border-top:1px solid var(--color-border); background:var(--color-surface-2); }
+  .waiver-agree { display:flex; align-items:flex-start; gap:9px; font-size:13px; color:var(--color-text); line-height:1.4; cursor:pointer; }
+  .waiver-agree input { width:18px; height:18px; margin-top:1px; flex-shrink:0; accent-color:var(--color-lime); }
+  .waiver-name { width:100%; margin-top:12px; padding:12px 14px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-text); font-family:inherit; font-size:15px; box-sizing:border-box; }
+  .waiver-name:focus { outline:none; border-color:var(--color-lime); }
+  .waiver-err { color:var(--color-red); font-size:12px; margin-top:8px; min-height:0; }
+  .waiver-sign { width:100%; margin-top:12px; padding:13px; border:none; border-radius:var(--radius-sm); background:var(--color-lime); color:var(--color-text-inverse); font-weight:800; font-size:14px; font-family:inherit; cursor:pointer; }
+  .waiver-sign:disabled { opacity:0.4; cursor:not-allowed; }
+  .waiver-altrow { display:flex; gap:8px; margin-top:10px; }
+  .waiver-link { flex:1; padding:10px; border:none; background:none; color:var(--color-text-faint); font-weight:700; font-size:12px; font-family:inherit; cursor:pointer; }
+  .waiver-link:active { opacity:0.6; }
+
   /* ── In-app profile sheet ─────────────────────────── */
   .psheet-scrim { position:fixed; inset:0; background:rgba(0,0,0,0.55); opacity:0; pointer-events:none; transition:opacity .22s ease; z-index:60; }
   .psheet-scrim.is-open { opacity:1; pointer-events:auto; }
@@ -628,6 +648,27 @@
       <div class="psheet__body" id="psheet-body"></div>
     </section>
 
+    <!-- Liability waiver — blocking gate shown until the player signs. -->
+    <div class="waiver-gate" id="waiver-gate" role="dialog" aria-modal="true" aria-hidden="true">
+      <div class="waiver-card">
+        <div class="waiver-head">
+          <div class="waiver-eyebrow">Before you play</div>
+          <h2 class="waiver-title" id="waiver-title">Liability Waiver &amp; Release</h2>
+        </div>
+        <div class="waiver-body" id="waiver-body"></div>
+        <div class="waiver-foot">
+          <label class="waiver-agree"><input type="checkbox" id="waiver-agree"> <span>I have read and agree to the waiver above.</span></label>
+          <input type="text" id="waiver-name" class="waiver-name" placeholder="Type your full legal name to sign" autocomplete="name">
+          <div class="waiver-err" id="waiver-err"></div>
+          <button class="waiver-sign" id="waiver-sign" disabled>Sign &amp; continue</button>
+          <div class="waiver-altrow">
+            <button class="waiver-link" id="waiver-email">📧 Email a copy to me</button>
+            <button class="waiver-link" id="waiver-signout">Not now — sign out</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- DSR explainer popup -->
     <div class="dsr-pop-scrim" id="dsr-scrim">
       <div class="dsr-pop" id="dsr-pop" role="dialog" aria-modal="true" aria-label="What is DSR?">
@@ -825,6 +866,7 @@
     renderHome(); renderSchedule(); renderStandings(); renderStats(); renderTeam();
     refreshChatBadge();
     startLivePoll();
+    maybeShowWaiver();
   }
 
   // ---- live refresh ----
@@ -985,7 +1027,65 @@
       try { await fetch(API + '/player-logout', { method: 'POST', credentials: 'include' }); } catch {}
       location.href = '/me.html';
     });
+
+    // ── Liability waiver gate ──
+    const wAgree = $('waiver-agree'), wName = $('waiver-name'), wSign = $('waiver-sign');
+    const updateWaiverBtn = () => { if (wSign) wSign.disabled = !(wAgree?.checked && (wName?.value || '').trim().length >= 2); };
+    wAgree?.addEventListener('change', updateWaiverBtn);
+    wName?.addEventListener('input', updateWaiverBtn);
+    $('waiver-signout')?.addEventListener('click', async () => {
+      try { await fetch(API + '/player-logout', { method: 'POST', credentials: 'include' }); } catch {}
+      location.href = '/me.html';
+    });
+    $('waiver-email')?.addEventListener('click', async () => {
+      const btn = $('waiver-email'), err = $('waiver-err');
+      if (err) err.textContent = '';
+      const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Sending…';
+      try {
+        const res = await fetch(API + '/player-email-waiver', { method: 'POST', credentials: 'include' });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not send the email.');
+        btn.textContent = '✓ Sent to your email';
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 4000);
+      } catch (e) {
+        if (err) err.textContent = e.message;
+        btn.textContent = orig; btn.disabled = false;
+      }
+    });
+    wSign?.addEventListener('click', async () => {
+      const err = $('waiver-err');
+      if (err) err.textContent = '';
+      wSign.disabled = true; wSign.textContent = 'Signing…';
+      try {
+        const res = await fetch(API + '/player-sign-waiver', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ signedName: wName.value.trim(), agree: !!wAgree.checked, version: DATA?.waiver?.version }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not record your signature.');
+        if (DATA?.waiver) DATA.waiver.required = false;
+        $('waiver-gate').classList.remove('is-open');
+        $('waiver-gate').setAttribute('aria-hidden', 'true');
+      } catch (e) {
+        if (err) err.textContent = e.message;
+        wSign.disabled = false;
+      } finally { wSign.textContent = 'Sign & continue'; updateWaiverBtn(); }
+    });
   })();
+
+  function maybeShowWaiver() {
+    const w = DATA?.waiver;
+    if (!w || !w.required) return;
+    $('waiver-title').textContent = w.title || 'Liability Waiver & Release';
+    $('waiver-body').textContent = w.text || '';
+    const agree = $('waiver-agree'), name = $('waiver-name');
+    if (agree) agree.checked = false;
+    if (name) name.value = '';
+    const sign = $('waiver-sign'); if (sign) sign.disabled = true;
+    const gate = $('waiver-gate');
+    gate.classList.add('is-open');
+    gate.setAttribute('aria-hidden', 'false');
+  }
 
   // ---- tabs ----
   // goTab works for nav buttons AND views without a nav button (e.g. team,

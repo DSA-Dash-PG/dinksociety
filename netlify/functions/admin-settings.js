@@ -17,6 +17,11 @@ const DEFAULTS = {
   matchTime:      '7:00–9:00 PM',
   depositAmount:  100,
   balanceDueDate: '2026-06-01',
+  // Liability waiver — players sign on login; version bumps force a re-sign.
+  waiverEnabled:  false,
+  waiverTitle:    'Liability Waiver & Release',
+  waiverText:     '',
+  waiverVersion:  0,
 };
 
 function json(body, status = 200) {
@@ -51,6 +56,16 @@ export default async (req) => {
       const existing = await store.get('circuit-settings');
       const prev = existing ? JSON.parse(existing) : { ...DEFAULTS };
 
+      // Waiver: editing the text (or an explicit re-sign request) bumps the
+      // version, which forces every player to sign again. Whitespace-only
+      // diffs don't count.
+      const prevText = (prev.waiverText ?? '').trim();
+      const nextText = (body.waiverText ?? prev.waiverText ?? '').trim();
+      const prevVersion = Number(prev.waiverVersion) || 0;
+      const textChanged = ('waiverText' in body) && nextText !== prevText;
+      const forceResign = body.bumpWaiverVersion === true;
+      const waiverVersion = (textChanged || forceResign) ? prevVersion + 1 : prevVersion;
+
       const updated = {
         ...prev,
         circuitName:  body.circuitName  ?? prev.circuitName,
@@ -64,6 +79,10 @@ export default async (req) => {
         matchTime:      body.matchTime      ?? prev.matchTime      ?? DEFAULTS.matchTime,
         depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
         balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
+        waiverEnabled:  body.waiverEnabled  ?? prev.waiverEnabled  ?? DEFAULTS.waiverEnabled,
+        waiverTitle:    body.waiverTitle    ?? prev.waiverTitle    ?? DEFAULTS.waiverTitle,
+        waiverText:     body.waiverText     ?? prev.waiverText     ?? DEFAULTS.waiverText,
+        waiverVersion,
         updatedAt:    new Date().toISOString(),
         updatedBy:    admin.email || 'admin',
       };

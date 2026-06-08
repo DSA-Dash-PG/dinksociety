@@ -885,6 +885,36 @@
               <button class="ab ab--lime ab--sm" id="save-settings-btn">Save</button>
             </div>
           </div>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Liability waiver</h2><span class="ac__s">Players sign on login · re-signs each season</span></div>
+            <div class="arow">
+              <label style="display:flex;align-items:center;gap:8px;font-size:13px;">
+                <input type="checkbox" id="set-waiver-enabled" style="width:auto;margin:0;"> Require players to sign before using the portal
+              </label>
+            </div>
+            <div class="af"><label for="set-waiver-title">Waiver title</label><input type="text" id="set-waiver-title" placeholder="Liability Waiver & Release"></div>
+            <div class="af"><label for="set-waiver-text">Waiver text</label>
+              <textarea id="set-waiver-text" rows="9" style="width:100%;box-sizing:border-box;padding:11px 12px;border-radius:8px;border:1px solid var(--color-border);background:var(--color-surface-2);color:var(--color-text);font-family:inherit;font-size:13px;line-height:1.5;resize:vertical;" placeholder="Paste your full liability waiver and release text here. Editing this text bumps the version and requires every player to sign again."></textarea>
+            </div>
+            <div style="font-size:11px;color:var(--color-text-faint);margin:2px 0 8px;">Editing the text forces everyone to re-sign. Current version: <b id="waiver-version">0</b></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <button class="ab ab--lime ab--sm" id="save-waiver-btn">Save waiver</button>
+              <button class="ab ab--outline ab--sm" id="waiver-resign-btn">Force everyone to re-sign</button>
+              <div class="a-status" id="waiver-status" style="margin:0;"></div>
+            </div>
+            <div style="border-top:1px solid var(--color-border);margin:14px 0 0;padding-top:12px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                <div style="font-weight:700;font-size:13px;">Signatures <span id="waiver-count" style="color:var(--color-text-faint);font-weight:600;"></span></div>
+                <div style="display:flex;gap:6px;">
+                  <button class="ab ab--outline ab--sm" id="waiver-refresh-btn">↻</button>
+                  <button class="ab ab--outline ab--sm" id="waiver-export-btn">Export CSV</button>
+                </div>
+              </div>
+              <div id="waiver-compliance"><div class="loading">Load the settings tab to view signatures.</div></div>
+            </div>
+          </div>
+
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Admins</h2></div>
             <table class="at"><thead><tr><th>Email</th><th>Role</th></tr></thead>
@@ -1145,6 +1175,7 @@
       const d = new Date(SETTINGS.updatedAt);
       $id('settings-saved-at').textContent = 'Saved ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     }
+    applyWaiverSettings();
   }
 
   async function saveSettings() {
@@ -1177,6 +1208,63 @@
     setTimeout(() => { status.style.display = 'none'; }, 4000);
   }
   $id('save-settings-btn').addEventListener('click', saveSettings);
+
+  // ─── Liability waiver ─────────────────────────────────────
+  function applyWaiverSettings() {
+    $id('set-waiver-enabled').checked = !!SETTINGS.waiverEnabled;
+    $id('set-waiver-title').value = SETTINGS.waiverTitle || 'Liability Waiver & Release';
+    $id('set-waiver-text').value = SETTINGS.waiverText || '';
+    $id('waiver-version').textContent = SETTINGS.waiverVersion ?? 0;
+  }
+  async function saveWaiver(opts = {}) {
+    const status = $id('waiver-status');
+    const payload = {
+      waiverEnabled: $id('set-waiver-enabled').checked,
+      waiverTitle: $id('set-waiver-title').value.trim() || 'Liability Waiver & Release',
+      waiverText: $id('set-waiver-text').value,
+      ...(opts.bump ? { bumpWaiverVersion: true } : {}),
+    };
+    status.className = 'a-status'; status.textContent = 'Saving…';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      SETTINGS = { ...SETTINGS, ...data };
+      applyWaiverSettings();
+      status.className = 'a-status is-ok'; status.textContent = 'Waiver saved ✓ (version ' + (data.waiverVersion ?? 0) + ')';
+      loadWaiverCompliance();
+    } catch (e) {
+      status.className = 'a-status is-err'; status.textContent = e.message || 'Failed to save';
+    }
+    setTimeout(() => { status.textContent = ''; status.className = 'a-status'; }, 5000);
+  }
+  $id('save-waiver-btn').addEventListener('click', () => saveWaiver());
+  $id('waiver-resign-btn').addEventListener('click', () => {
+    if (confirm('Force EVERY player to sign the waiver again? This bumps the version — anyone who already signed will be asked to re-sign on their next login.')) saveWaiver({ bump: true });
+  });
+  $id('waiver-refresh-btn').addEventListener('click', loadWaiverCompliance);
+  $id('waiver-export-btn').addEventListener('click', () => {
+    window.location.href = '/.netlify/functions/admin-waivers?season=I&format=csv';
+  });
+
+  async function loadWaiverCompliance() {
+    const box = $id('waiver-compliance');
+    box.innerHTML = '<div class="loading">Loading signatures…</div>';
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-waivers?season=I');
+      $id('waiver-count').textContent = `· ${d.counts.signed}/${d.counts.total} signed`;
+      if (!d.players.length) { box.innerHTML = '<div class="empty">No players on rosters yet.</div>'; return; }
+      box.innerHTML = '<table class="at"><thead><tr><th>Player</th><th>Team</th><th>Status</th></tr></thead><tbody>' +
+        d.players.map(p => {
+          const badge = p.signed
+            ? `<span style="color:var(--color-lime);font-weight:700;">✓ Signed</span><div style="font-size:10px;color:var(--color-text-faint);">${p.signedAt ? new Date(p.signedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ''}</div>`
+            : '<span style="color:var(--color-gold);font-weight:700;">Not signed</span>';
+          return `<tr><td>${h(p.name)}${p.email ? `<div style="font-size:10px;color:var(--color-text-faint);">${h(p.email)}</div>` : ''}</td><td>${h(p.teamName)}</td><td>${badge}</td></tr>`;
+        }).join('') + '</tbody></table>';
+    } catch (e) {
+      box.innerHTML = '<div class="empty" style="color:var(--color-red)">' + h(e.message) + '</div>';
+    }
+  }
 
   // ═══════════════════════════════════════════════════════════
   // PLAYER OF THE WEEK
@@ -1743,7 +1831,7 @@
       if (t === 'scores') {}
       if (t === 'messages') renderMessages();
       if (t === 'potw') loadPotw();
-      if (t === 'settings') applySettings();
+      if (t === 'settings') { applySettings(); loadWaiverCompliance(); }
       if (t === 'moments') loadAdminGallery();
       if (t === 'activity') initActivityLog();
       if (t === 'analytics') renderAnalytics();
