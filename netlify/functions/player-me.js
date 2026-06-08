@@ -8,6 +8,7 @@ import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
+import { getRelevantAnnouncements } from './lib/announcements.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -213,6 +214,9 @@ export default async (req) => {
     myTeams.unshift({ id: teamId, name: team.name, division, divisionLabel: team.divisionLabel || division });
   }
 
+  // League announcements (admin broadcasts) relevant to this player's team.
+  const announcements = await getRelevantAnnouncements({ teamId, division, limit: 3 });
+
   // ETag + private no-store: the portal's live poller sends If-None-Match,
   // so unchanged payloads come back as an empty 304 instead of the full blob.
   return etagJson(req, {
@@ -234,6 +238,7 @@ export default async (req) => {
       roster,
     },
     schedule,
+    announcements,
   }, { cacheControl: PRIVATE });
 };
 

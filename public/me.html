@@ -273,6 +273,16 @@
   .srow2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
   .srow2 .stat__n { font-size:19px; }
 
+  /* league announcement card */
+  .announce { display:flex; gap:11px; background:var(--color-gold-dim); border:1px solid rgba(240,192,64,0.3); border-radius:var(--radius-md); padding:12px 13px; margin-bottom:4px; }
+  .announce__ic { font-size:18px; flex-shrink:0; line-height:1.3; }
+  .announce__main { flex:1; min-width:0; }
+  .announce__lbl { font-size:8px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-gold); font-weight:800; }
+  .announce__sub { font-size:13px; font-weight:700; margin-top:2px; }
+  .announce__body { font-size:12px; color:var(--color-text-muted); line-height:1.45; margin-top:3px; white-space:pre-wrap; word-break:break-word; }
+  .announce__time { font-size:10px; color:var(--color-text-faint); margin-top:5px; }
+  .announce__more { color:var(--color-gold); font-weight:700; cursor:pointer; }
+
   /* personalized "you" header */
   .mehead { background:linear-gradient(135deg, rgba(184,255,44,0.14), rgba(23,215,176,0.06)); border:1px solid rgba(184,255,44,0.22); border-radius:var(--radius-lg); padding:14px; display:flex; align-items:center; gap:12px; margin-bottom:4px; }
   .mehead__av { width:54px; height:54px; border-radius:50%; background:var(--color-surface-3); border:2px solid var(--color-lime); display:grid; place-items:center; font-size:19px; font-weight:800; color:var(--color-lime); flex-shrink:0; }
@@ -1216,6 +1226,26 @@
       ${dsrVal !== '—' ? `<div class="mehead__dsr"><div class="mehead__dsrN">${dsrVal}</div><button class="mehead__dsrL" type="button" onclick="openDsrInfo(event)">Your DSR <i class="dsr-i">?</i></button></div>` : ''}
     </div>`;
 
+    // ★ League announcement (latest admin broadcast relevant to my team).
+    let announce = '';
+    const ann = (DATA.announcements || [])[0];
+    if (ann) {
+      const lines = String(ann.body || '').split('\n').map(s => s.trim()).filter(Boolean);
+      const title = ann.subject || lines[0] || 'League announcement';
+      const rest = ann.subject ? lines.join('\n') : lines.slice(1).join('\n');
+      const when = ann.sentAt ? fmtChatTime(ann.sentAt) : '';
+      const more = (DATA.announcements || []).length > 1 ? ` · <span class="announce__more">${DATA.announcements.length - 1} more in Messages</span>` : '';
+      announce = `<div class="announce hcard-tap" data-go="chat">
+        <span class="announce__ic">📣</span>
+        <div class="announce__main">
+          <div class="announce__lbl">League announcement</div>
+          <div class="announce__sub">${esc(title)}</div>
+          ${rest ? `<div class="announce__body">${esc(rest)}</div>` : ''}
+          <div class="announce__time">${esc(when)}${more}</div>
+        </div>
+      </div>`;
+    }
+
     // ★ First-person season tiles + trends + my personal game record.
     const rankTrend = delta == null || delta === 0
       ? '<div class="stat__d flat">no change</div>'
@@ -1263,11 +1293,11 @@
         <div class="home-team__chev">›</div>
       </div>`;
 
-    const blocks = { mehead, hero, night, live, lulist, recap, tiles, potw, movers, coming, team };
-    // The "you" header always leads — it's what makes Home read as a profile.
+    const blocks = { mehead, announce, hero, night, live, lulist, recap, tiles, potw, movers, coming, team };
+    // The "you" header always leads; a league announcement sits right under it.
     const order = isMatchDay
-      ? ['mehead', 'hero', 'night', 'live', 'lulist', 'recap', 'tiles', 'potw', 'movers', 'coming', 'team']
-      : ['mehead', 'tiles', 'recap', 'hero', 'night', 'lulist', 'potw', 'movers', 'coming', 'team'];
+      ? ['mehead', 'announce', 'hero', 'night', 'live', 'lulist', 'recap', 'tiles', 'potw', 'movers', 'coming', 'team']
+      : ['mehead', 'announce', 'tiles', 'recap', 'hero', 'night', 'lulist', 'potw', 'movers', 'coming', 'team'];
     const html = order.map(k => blocks[k] || '').join('');
     $('v-home').innerHTML = html || '<div class="muted">No matches scheduled yet. Your season will show up here.</div>';
     $('v-home').querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => {

@@ -4,6 +4,7 @@
 
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { findAllLeaderTeamsByEmail } from './lib/captain-auth.js';
+import { getRelevantAnnouncements } from './lib/announcements.js';
 
 export default async (req) => {
   const result = await verifyCaptainSession(req);
@@ -43,12 +44,18 @@ export default async (req) => {
     teams.unshift(teamEntry);
   }
 
+  // League announcements (admin broadcasts) relevant to this team.
+  const announcements = teamEntry
+    ? await getRelevantAnnouncements({ teamId: teamEntry.id, division: teamEntry.division, limit: 3 })
+    : [];
+
   return new Response(JSON.stringify({
     captain: true,
     email: ctx.user.email,
     teams,
     team: teamEntry,
     currentTeamId: teamEntry ? teamEntry.id : null,
+    announcements,
   }), {
     status: 200,
     headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
