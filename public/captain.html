@@ -819,11 +819,18 @@
     .ctg__c { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 6px; text-align: center; }
     .ctg__n { font-size: 19px; font-weight: 800; } .ctg__n.lime { color: var(--color-lime); } .ctg__n.red { color: var(--color-red); }
     .ctg__l { font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-top: 4px; }
-    .cannounce { display: flex; gap: 11px; width: 100%; text-align: left; background: var(--color-gold-dim); border: 1px solid rgba(240,192,64,0.3); border-radius: var(--radius-md); padding: 12px 13px; cursor: pointer; font-family: inherit; color: var(--color-text); }
+    .cannounce { background: var(--color-gold-dim); border: 1px solid rgba(240,192,64,0.3); border-radius: var(--radius-md); overflow: hidden; }
+    .cannounce__head { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; background: none; border: none; padding: 12px 13px; cursor: pointer; font-family: inherit; color: var(--color-text); }
     .cannounce__ic { font-size: 18px; flex-shrink: 0; }
-    .cannounce__main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-    .cannounce__t { font-size: 13px; font-weight: 700; }
-    .cannounce__b { font-size: 12px; color: var(--color-text-muted); line-height: 1.45; white-space: pre-wrap; }
+    .cannounce__main { flex: 1; min-width: 0; }
+    .cannounce__lbl { font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-gold); font-weight: 800; }
+    .cannounce__t { font-size: 13px; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cannounce__chev { color: var(--color-gold); font-size: 12px; flex-shrink: 0; transition: transform .18s ease; }
+    .cannounce.is-open .cannounce__chev { transform: rotate(180deg); }
+    .cannounce__panel { display: none; padding: 0 13px 13px 51px; }
+    .cannounce.is-open .cannounce__panel { display: block; }
+    .cannounce__b { font-size: 12px; color: var(--color-text-muted); line-height: 1.5; white-space: pre-wrap; }
+    .cannounce__got { margin-top: 11px; padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid rgba(240,192,64,0.4); background: var(--color-gold-dim); color: var(--color-gold); font-weight: 800; font-size: 12px; font-family: inherit; cursor: pointer; }
 
     /* set-based mobile scoresheet — same ringed-set structure as the Lineup tab */
     .ssm-round__title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); margin: 22px 0 16px; padding-bottom: 8px; border-bottom: 1px solid var(--color-border); }
@@ -3807,6 +3814,11 @@
     }
     // ---------- tonight banner (schedule) ----------
     // ===== Captain Home — command center =====
+    // Read/dismissed league announcements (per device). Shares the localStorage
+    // key with the player portal so a notice read in one stays read in both.
+    function capAnnReadSet() { try { return new Set(JSON.parse(localStorage.getItem('ds-ann-read') || '[]')); } catch { return new Set(); } }
+    function capAnnIsRead(id) { return capAnnReadSet().has(id); }
+    function capAnnMarkRead(id) { if (!id) return; const s = capAnnReadSet(); s.add(id); try { localStorage.setItem('ds-ann-read', JSON.stringify([...s].slice(-50))); } catch {} }
     const CAP_LOCK_OFFSET_MIN = 60;   // lineups hard-lock 1h before start
     function capCountdown(ms) {
       const diff = ms - Date.now();
@@ -3984,19 +3996,25 @@
         <div class="ctg__c"><div class="ctg__n ${mpDiff > 0 ? 'lime' : mpDiff < 0 ? 'red' : ''}">${mpDiff > 0 ? '+' : ''}${mpDiff}</div><div class="ctg__l">Pt diff</div></div>
       </div>`;
 
-      // ── league announcement ──
+      // ── league announcement — collapsed; tap to read; "Got it" dismisses ──
       let announce = '';
-      const ann = (state.me?.announcements || [])[0];
+      const ann = (state.me?.announcements || []).find(a => a && a.id && !capAnnIsRead(a.id));
       if (ann) {
         const lines = String(ann.body || '').split('\n').map(s => s.trim()).filter(Boolean);
         const title = ann.subject || lines[0] || 'League announcement';
         const rest = ann.subject ? lines.join('\n') : lines.slice(1).join('\n');
         announce = `<div class="label">League announcement</div>
-          <button class="cannounce" onclick="document.querySelector('.cap-tab[data-tab=&quot;messages&quot;]')?.click()">
-            <span class="cannounce__ic">📣</span>
-            <span class="cannounce__main"><span class="cannounce__t">${escapeHtml(title)}</span>
-              ${rest ? `<span class="cannounce__b">${escapeHtml(rest)}</span>` : ''}</span>
-          </button>`;
+          <div class="cannounce" id="cap-announce" data-aid="${escapeAttr(ann.id)}">
+            <button class="cannounce__head" id="cap-announce-toggle">
+              <span class="cannounce__ic">📣</span>
+              <span class="cannounce__main"><span class="cannounce__lbl">From the league</span><span class="cannounce__t">${escapeHtml(title)}</span></span>
+              <span class="cannounce__chev">▼</span>
+            </button>
+            <div class="cannounce__panel">
+              ${rest ? `<div class="cannounce__b">${escapeHtml(rest)}</div>` : ''}
+              <button class="cannounce__got" id="cap-announce-got">Got it ✓</button>
+            </div>
+          </div>`;
       }
 
       const openCount = tasks.length;
@@ -4020,6 +4038,13 @@
           if (task && task.go) task.go();
         });
       });
+
+      // League announcement: toggle open / dismiss-on-read.
+      const annCard = $id('cap-announce');
+      if (annCard) {
+        $id('cap-announce-toggle')?.addEventListener('click', () => annCard.classList.toggle('is-open'));
+        $id('cap-announce-got')?.addEventListener('click', () => { capAnnMarkRead(annCard.dataset.aid); renderCaptainHome(); });
+      }
 
       // Best-effort balance fetch (once) so the billing task can appear.
       if (!state._balanceTried) {

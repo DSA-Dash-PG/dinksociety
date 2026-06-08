@@ -273,15 +273,20 @@
   .srow2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
   .srow2 .stat__n { font-size:19px; }
 
-  /* league announcement card */
-  .announce { display:flex; gap:11px; background:var(--color-gold-dim); border:1px solid rgba(240,192,64,0.3); border-radius:var(--radius-md); padding:12px 13px; margin-bottom:4px; }
-  .announce__ic { font-size:18px; flex-shrink:0; line-height:1.3; }
+  /* league announcement card (collapsed by default → toggle → dismiss) */
+  .announce { background:var(--color-gold-dim); border:1px solid rgba(240,192,64,0.3); border-radius:var(--radius-md); margin-bottom:4px; overflow:hidden; }
+  .announce__head { display:flex; align-items:center; gap:11px; width:100%; padding:12px 13px; background:none; border:none; font-family:inherit; color:var(--color-text); text-align:left; cursor:pointer; }
+  .announce__ic { font-size:18px; flex-shrink:0; }
   .announce__main { flex:1; min-width:0; }
   .announce__lbl { font-size:8px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-gold); font-weight:800; }
-  .announce__sub { font-size:13px; font-weight:700; margin-top:2px; }
-  .announce__body { font-size:12px; color:var(--color-text-muted); line-height:1.45; margin-top:3px; white-space:pre-wrap; word-break:break-word; }
-  .announce__time { font-size:10px; color:var(--color-text-faint); margin-top:5px; }
-  .announce__more { color:var(--color-gold); font-weight:700; cursor:pointer; }
+  .announce__sub { font-size:13px; font-weight:700; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .announce__chev { color:var(--color-gold); font-size:12px; flex-shrink:0; transition:transform .18s ease; }
+  .announce.is-open .announce__chev { transform:rotate(180deg); }
+  .announce__panel { display:none; padding:0 13px 13px 51px; }
+  .announce.is-open .announce__panel { display:block; }
+  .announce__body { font-size:12px; color:var(--color-text-muted); line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+  .announce__time { font-size:10px; color:var(--color-text-faint); margin-top:6px; }
+  .announce__got { margin-top:11px; padding:8px 16px; border-radius:var(--radius-full); border:1px solid rgba(240,192,64,0.4); background:var(--color-gold-dim); color:var(--color-gold); font-weight:800; font-size:12px; font-family:inherit; cursor:pointer; }
 
   /* personalized "you" header */
   .mehead { background:linear-gradient(135deg, rgba(184,255,44,0.14), rgba(23,215,176,0.06)); border:1px solid rgba(184,255,44,0.22); border-radius:var(--radius-lg); padding:14px; display:flex; align-items:center; gap:12px; margin-bottom:4px; }
@@ -661,6 +666,10 @@
   // user never leaves the mobile portal (data-prof attributes drive that).
   const teamLink = (id, name, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${teamHref(id, name)}" data-prof="team" data-pid="${esc(id || '')}" data-pteam="${esc(name || '')}">${inner}</a>`;
   const playerLink = (name, teamName, inner, cls) => `<a class="lnk${cls ? ' ' + cls : ''}" href="${playerHref(name, teamName)}" data-prof="player" data-pname="${esc(name || '')}" data-pteam="${esc(teamName || '')}">${inner}</a>`;
+  // Read/dismissed league announcements (per device). Shared key with captain portal.
+  function annReadSet() { try { return new Set(JSON.parse(localStorage.getItem('ds-ann-read') || '[]')); } catch { return new Set(); } }
+  function annIsRead(id) { return annReadSet().has(id); }
+  function annMarkRead(id) { if (!id) return; const s = annReadSet(); s.add(id); try { localStorage.setItem('ds-ann-read', JSON.stringify([...s].slice(-50))); } catch {} }
 
   // ── In-app profile sheet ──────────────────────────────────────────
   // Tapping a player/team name opens this sheet INSTEAD of navigating away,
@@ -1226,22 +1235,28 @@
       ${dsrVal !== '—' ? `<div class="mehead__dsr"><div class="mehead__dsrN">${dsrVal}</div><button class="mehead__dsrL" type="button" onclick="openDsrInfo(event)">Your DSR <i class="dsr-i">?</i></button></div>` : ''}
     </div>`;
 
-    // ★ League announcement (latest admin broadcast relevant to my team).
+    // ★ League announcement — collapsed by default; tap to read; "Got it"
+    // dismisses it (persisted, so a read notice doesn't come back).
     let announce = '';
-    const ann = (DATA.announcements || [])[0];
+    const ann = (DATA.announcements || []).find(a => a && a.id && !annIsRead(a.id));
     if (ann) {
       const lines = String(ann.body || '').split('\n').map(s => s.trim()).filter(Boolean);
       const title = ann.subject || lines[0] || 'League announcement';
       const rest = ann.subject ? lines.join('\n') : lines.slice(1).join('\n');
       const when = ann.sentAt ? fmtChatTime(ann.sentAt) : '';
-      const more = (DATA.announcements || []).length > 1 ? ` · <span class="announce__more">${DATA.announcements.length - 1} more in Messages</span>` : '';
-      announce = `<div class="announce hcard-tap" data-go="chat">
-        <span class="announce__ic">📣</span>
-        <div class="announce__main">
-          <div class="announce__lbl">League announcement</div>
-          <div class="announce__sub">${esc(title)}</div>
+      announce = `<div class="announce" id="home-announce" data-aid="${esc(ann.id)}">
+        <button class="announce__head" id="home-announce-toggle">
+          <span class="announce__ic">📣</span>
+          <span class="announce__main">
+            <span class="announce__lbl">League announcement</span>
+            <span class="announce__sub">${esc(title)}</span>
+          </span>
+          <span class="announce__chev">▼</span>
+        </button>
+        <div class="announce__panel">
           ${rest ? `<div class="announce__body">${esc(rest)}</div>` : ''}
-          <div class="announce__time">${esc(when)}${more}</div>
+          <div class="announce__time">${esc(when)}</div>
+          <button class="announce__got" id="home-announce-got">Got it ✓</button>
         </div>
       </div>`;
     }
@@ -1307,6 +1322,15 @@
       e.stopPropagation();
       goTab(el.dataset.go);
     }));
+    // League announcement: toggle open / dismiss-on-read.
+    const annCard = $('home-announce');
+    if (annCard) {
+      $('home-announce-toggle')?.addEventListener('click', () => annCard.classList.toggle('is-open'));
+      $('home-announce-got')?.addEventListener('click', () => {
+        annMarkRead(annCard.dataset.aid);
+        annCard.remove();
+      });
+    }
     const luToggle = $('home-lu-toggle');
     if (luToggle) luToggle.addEventListener('click', () => {
       const acc = $('home-lu-acc');
