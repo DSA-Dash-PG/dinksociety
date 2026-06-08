@@ -921,6 +921,8 @@
       <button class="cap-btn cap-btn--ghost" id="rp-cancel" style="flex: 1;">Cancel</button>
       <button class="cap-btn cap-btn--primary" id="rp-save" style="flex: 1;">Save player</button>
     </div>
+    <button class="cap-btn cap-btn--ghost" id="rp-cocaptain" style="width:100%;margin-top:10px;display:none;">⭐ Make co-captain</button>
+    <div class="ros-f" id="rp-cocaptain-note" style="display:none;font-size:11px;color:var(--color-text-faint);text-align:center;margin-top:8px;line-height:1.45;">A co-captain can set lineups and enter scores when you can't make a match.</div>
     <div style="display: flex; gap: 18px; justify-content: center; margin-top: 14px;">
       <button id="rp-transfer" style="background:none;border:none;color:var(--color-text-faint);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">⇄ Request transfer</button>
       <button id="rp-remove" style="background:none;border:none;color:var(--color-red);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Remove from roster</button>
@@ -3186,6 +3188,18 @@
       // Captains can't be removed or transferred from their own roster.
       $id('rp-remove').style.display = (p && !isCap(p)) ? '' : 'none';
       $id('rp-transfer').style.display = (p && !isCap(p) && p.id) ? '' : 'none';
+      // Co-captain control — only the HEAD captain manages co-captains, on a
+      // saved roster player who isn't the captain.
+      const amHeadCaptain = (state.me?.team?.role === 'captain');
+      const ccBtn = $id('rp-cocaptain'), ccNote = $id('rp-cocaptain-note');
+      if (amHeadCaptain && p && !isCap(p) && p.id) {
+        ccBtn.style.display = ''; ccNote.style.display = '';
+        ccBtn.textContent = p.isCoCaptain ? '✕ Remove co-captain' : '⭐ Make co-captain';
+        ccBtn.dataset.pid = p.id;
+        ccBtn.dataset.act = p.isCoCaptain ? 'remove' : 'add';
+      } else {
+        ccBtn.style.display = 'none'; ccNote.style.display = 'none';
+      }
       $id('rp-sheet').classList.add('is-open');
       $id('rp-scrim').classList.add('is-open');
     }
@@ -3267,6 +3281,28 @@
       const p = state.roster[rpIdx];
       closeRosterEditor();
       openTransferModal(p);
+    });
+
+    $id('rp-cocaptain').addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      const pid = btn.dataset.pid, act = btn.dataset.act;
+      if (!pid) return;
+      if (act === 'add' && !confirm('Make this player a co-captain? They’ll be able to set lineups and enter scores for the team.')) return;
+      if (!btnBusy(btn, act === 'add' ? 'Adding…' : 'Removing…')) return;
+      const errEl = $id('rp-err');
+      try {
+        const res = await fetch('/.netlify/functions/captain-cocaptain?action=' + act, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: pid }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not update co-captain.');
+        closeRosterEditor();
+        await loadRoster(); // refresh flags
+      } catch (err) {
+        if (errEl) { errEl.textContent = err.message; errEl.classList.add('show'); }
+      } finally { btnDone(btn); }
     });
 
     $id('rp-cancel').addEventListener('click', closeRosterEditor);
