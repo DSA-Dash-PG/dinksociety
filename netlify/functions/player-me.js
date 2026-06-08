@@ -159,14 +159,13 @@ export default async (req) => {
       // Live game scores, sanitized (numbers only — no submitter PII).
       // Only once lineups are revealed: before that there's nothing to score,
       // and it keeps the blind-lineup window airtight. home = teamA.
-      // Dual-entry model: show the AGREED score when both teams' entries
-      // match; otherwise fall back to MY OWN team's entry so players see the
-      // live numbers their captain is recording.
+      // Enter/confirm model: show the CONFIRMED canonical score when present;
+      // otherwise fall back to the HOME team's entry — the home captain is
+      // the single score-enterer, so that's the live number for BOTH teams.
       let scores = null;
       if (!final && revealed) {
         const sc = await scoresStore.get(`score/${mt.id}.json`, { type: 'json' }).catch(() => null);
         if (sc?.games) {
-          const myEntryKey = home ? 'homeEntry' : 'awayEntry';
           scores = {};
           for (const s of LINEUP_SLOTS) {
             const g = sc.games[s];
@@ -176,7 +175,7 @@ export default async (req) => {
             let h = Number.isInteger(g.home) ? g.home : null;
             let a = Number.isInteger(g.away) ? g.away : null;
             if (h == null && a == null) {
-              const e = g[myEntryKey];
+              const e = g.homeEntry;
               if (e && (Number.isInteger(e.home) || Number.isInteger(e.away))) {
                 h = Number.isInteger(e.home) ? e.home : null;
                 a = Number.isInteger(e.away) ? e.away : null;

@@ -241,6 +241,15 @@
     .ss-score-input--mine-entered { border-color: var(--color-gold); }
     .ss-score-input--other-entered { border-color: var(--color-teal); opacity: 0.6; }
     .ss-score-input--awaiting-other { opacity: 0.4; }
+    /* Enter/confirm model: away captain's read-only score + confirm buttons */
+    .ss-ro { display: inline-block; min-width: 55px; padding: 6px 4px; text-align: center; font-size: 13px; font-weight: 700; color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+    .ss-ro--confirmed { border-color: var(--color-teal); background: var(--color-teal-dim); }
+    .ss-ro--disputed { border-color: var(--color-red, #ef4444); background: var(--color-red-dim); }
+    .ss-confirm-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ss-btn-sm { font-size: 11px; padding: 5px 10px; }
+    .bgm__ro { width: 100%; padding: 10px 4px; text-align: center; font-size: 22px; font-weight: 800; color: var(--color-text); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); min-height: 46px; }
+    .bgm__confirm { display: flex; gap: 8px; justify-content: center; margin-top: 10px; }
+    .bgm__cbtn { font-size: 13px; padding: 10px 18px; }
 
     .ss-row--confirmed td { background: var(--color-teal-dim); }
     .ss-row--mismatch td { background: var(--color-red-dim); }
@@ -2193,41 +2202,37 @@
             const homePair = (data.preview && !myRoleIsHome) ? oppPairPlaceholder : formatPair(homeLineup[slot]);
             const awayPair = (data.preview && myRoleIsHome) ? oppPairPlaceholder : formatPair(awayLineup[slot]);
 
-            // Dual entry: these inputs are MY TEAM's version of the score.
-            // (Once both teams enter matching numbers the game confirms.)
-            const mine = gs.mine || { home: null, away: null };
-            const hv = Number.isInteger(mine.home) ? mine.home : '';
-            const av = Number.isInteger(mine.away) ? mine.away : '';
+            // Enter/confirm: HOME types the numbers; AWAY sees them read-only
+            // and confirms (or flags) per game.
+            const ent = gs.entered || { home: null, away: null };
+            const hv = Number.isInteger(ent.home) ? ent.home : '';
+            const av = Number.isInteger(ent.away) ? ent.away : '';
 
             const inputClass = () => {
               const cls = ['ss-score-input'];
               if (status === 'confirmed') cls.push('ss-score-input--confirmed');
-              else if (status === 'mismatch') cls.push('ss-score-input--mismatch');
+              else if (gs.disputed) cls.push('ss-score-input--mismatch');
               return cls.join(' ');
             };
 
-            const cell = gameStatusCell(status, gs, final);
+            const scoreCell = (side, val) => myRoleIsHome
+              ? `<input type="number" inputmode="numeric" min="0" max="30"
+                    class="${inputClass()}"
+                    value="${val}"
+                    data-slot="${slot}" data-side="${side}"
+                    ${!canEdit ? 'disabled' : ''}>`
+              : `<span class="ss-ro ${status === 'confirmed' ? 'ss-ro--confirmed' : ''} ${gs.disputed ? 'ss-ro--disputed' : ''}">${val === '' ? '—' : val}</span>`;
+
+            const cell = gameStatusCell(status, gs, final, myRoleIsHome, slot, canEdit);
             const rowClass = status === 'confirmed' ? 'ss-row--confirmed'
-                           : status === 'mismatch'  ? 'ss-row--mismatch' : '';
+                           : gs.disputed            ? 'ss-row--mismatch' : '';
 
             rows.push(`
               <tr class="${rowClass}">
                 <td><span class="ss-type">G${g}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span> ${courtTag(g)}</td>
                 <td class="ss-pair">${escapeHtml(homePair)}</td>
-                <td>
-                  <input type="number" inputmode="numeric" min="0" max="30"
-                    class="${inputClass()}"
-                    value="${hv}"
-                    data-slot="${slot}" data-side="home"
-                    ${!canEdit ? 'disabled' : ''}>
-                </td>
-                <td>
-                  <input type="number" inputmode="numeric" min="0" max="30"
-                    class="${inputClass()}"
-                    value="${av}"
-                    data-slot="${slot}" data-side="away"
-                    ${!canEdit ? 'disabled' : ''}>
-                </td>
+                <td>${scoreCell('home', hv)}</td>
+                <td>${scoreCell('away', av)}</td>
                 <td class="ss-pair">${escapeHtml(awayPair)}</td>
                 <td class="ss-status-cell">${cell}</td>
               </tr>
@@ -2336,8 +2341,19 @@
       // Action buttons (none in pre-game preview — score entry unlocks at reveal)
       const actions = [];
       if (!final && !data.preview) {
-        // Manual save is a fallback — entries also auto-save as you type.
-        actions.push(`<button class="cap-btn cap-btn--primary" id="ss-save-btn">Save scores</button>`);
+        if (myRoleIsHome) {
+          // Manual save is a fallback — entries also auto-save as you type.
+          actions.push(`<button class="cap-btn cap-btn--primary" id="ss-save-btn">Save scores</button>`);
+        } else {
+          // Away convenience: confirm every entered-but-unconfirmed game at once.
+          const confirmable = Object.keys(games).filter(s => {
+            const g = games[s];
+            return g?.enteredComplete && !g.confirmed && !g.disputed;
+          });
+          if (confirmable.length > 1) {
+            actions.push(`<button class="cap-btn cap-btn--primary" onclick="confirmGameScore(${JSON.stringify(confirmable).replace(/"/g, '&quot;')})">&check; Confirm all entered (${confirmable.length})</button>`);
+          }
+        }
         if (!mySubmitted) {
           const ready = !!c.canSubmit;
           let label;
@@ -2346,8 +2362,8 @@
               ? `Review &amp; sign off &mdash; ${escapeHtml(otherLabel)} has signed`
               : 'Review &amp; sign off';
           } else {
-            const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0) + (c.counts?.mismatch || 0);
-            label = `${remaining} game${remaining === 1 ? '' : 's'} still need${remaining === 1 ? 's' : ''} matching scores`;
+            const remaining = 12 - (c.counts?.confirmed || 0);
+            label = `${remaining} game${remaining === 1 ? '' : 's'} still to be confirmed`;
           }
           actions.push(`
             <button class="cap-btn cap-btn--gold" id="ss-submit-btn" ${ready ? '' : 'disabled'}>${label}</button>
@@ -2480,28 +2496,31 @@
 
     // Dual-entry status cell: shows where the cross-check stands for one game,
     // including the other team's conflicting version when there's a mismatch.
-    function gameStatusCell(status, gs, final) {
+    function gameStatusCell(status, gs, final, isHome, slot, canEdit) {
       if (status === 'confirmed') {
-        return '<span class="ss-pill ss-pill--confirmed">&check; Matched</span>';
+        return '<span class="ss-pill ss-pill--confirmed">&check; Confirmed</span>';
       }
-      if (status === 'mismatch' && gs.theirs) {
-        return `<span class="ss-pill ss-pill--mismatch">&#9888; Doesn't match</span>
-          <div class="ss-theirs">Other team's version: <strong>${gs.theirs.home ?? '—'}&ndash;${gs.theirs.away ?? '—'}</strong><br>Confirm courtside, revise &amp; resave.</div>`;
+      if (gs.disputed) {
+        return isHome
+          ? '<span class="ss-pill ss-pill--mismatch">&#9888; They flagged this</span><div class="ss-theirs">Talk to the other captain, fix the score, and they\'ll confirm the corrected number.</div>'
+          : '<span class="ss-pill ss-pill--mismatch">&#9888; Flagged — waiting on their fix</span>';
       }
-      if (status === 'mismatch') {
-        return '<span class="ss-pill ss-pill--mismatch">&#9888; Check score</span>';
+      if (gs.enteredComplete) {
+        if (isHome) return '<span class="ss-pill ss-pill--partial">Awaiting their confirm</span>';
+        if (!canEdit) return '<span class="ss-pill ss-pill--partial">Entered</span>';
+        return `<div class="ss-confirm-actions">
+          <button class="cap-btn cap-btn--primary ss-btn-sm" onclick="confirmGameScore('${slot}')">&check; Confirm</button>
+          <button class="cap-btn cap-btn--ghost ss-btn-sm" onclick="disputeGameScore('${slot}')">Not right</button>
+        </div>`;
       }
-      const mineDone = Number.isInteger(gs.mine?.home) && Number.isInteger(gs.mine?.away);
-      if (mineDone && !gs.theirsEntered) {
-        return '<span class="ss-pill ss-pill--partial">Waiting on other team</span>';
+      if (gs.entered && (Number.isInteger(gs.entered.home) || Number.isInteger(gs.entered.away))) {
+        return isHome
+          ? '<span class="ss-pill ss-pill--partial">Incomplete</span>'
+          : '<span class="ss-pill ss-pill--empty">Waiting on home team</span>';
       }
-      if (!mineDone && gs.theirsEntered) {
-        return '<span class="ss-pill ss-pill--gold ss-pill--partial">Other team entered — add yours</span>';
-      }
-      if (gs.mine && (Number.isInteger(gs.mine.home) || Number.isInteger(gs.mine.away))) {
-        return '<span class="ss-pill ss-pill--partial">Incomplete</span>';
-      }
-      return '<span class="ss-pill ss-pill--empty">—</span>';
+      return isHome
+        ? '<span class="ss-pill ss-pill--empty">—</span>'
+        : '<span class="ss-pill ss-pill--empty">Waiting on home team</span>';
     }
 
     function renderScoresheetBanner(data) {
@@ -2517,27 +2536,28 @@
         return `<div class="ss-banner ss-banner--final"><strong>Match finalized.</strong> Both captains submitted &mdash; scores committed to the Circuit leaderboard.</div>`;
       }
 
-      const mismatches = c.mismatches || [];
-      if (mismatches.length > 0) {
-        return `
-          <div class="ss-banner ss-banner--mismatch">
-            <strong>${mismatches.length} game${mismatches.length === 1 ? '' : 's'} don't match the other team's entry.</strong>
-            Their version is shown in red on the affected game${mismatches.length === 1 ? '' : 's'}. Confirm with the other captain courtside, revise, and resave — the game confirms when both teams' numbers match.
-            <span class="ss-banner__detail">Affected: ${mismatches.map(s => prettySlotShort(s)).join(', ')}</span>
-          </div>
-        `;
+      const isHome = myRole === 'home';
+      const gamesView = data.score?.games || {};
+      const disputedSlots = Object.keys(gamesView).filter(s => gamesView[s]?.disputed);
+      if (disputedSlots.length > 0) {
+        return isHome
+          ? `<div class="ss-banner ss-banner--mismatch"><strong>${disputedSlots.length} game${disputedSlots.length === 1 ? '' : 's'} flagged by the away team.</strong> Talk it over courtside, fix the score, and they'll confirm the corrected number.<span class="ss-banner__detail">Flagged: ${disputedSlots.map(s => prettySlotShort(s)).join(', ')}</span></div>`
+          : `<div class="ss-banner ss-banner--mismatch"><strong>You've flagged ${disputedSlots.length} game${disputedSlots.length === 1 ? '' : 's'}.</strong> Waiting on the home captain to fix — you'll confirm the corrected number.<span class="ss-banner__detail">Flagged: ${disputedSlots.map(s => prettySlotShort(s)).join(', ')}</span></div>`;
       }
 
       if (c.canSubmit && !mySubmitted) {
-        return `<div class="ss-banner ss-banner--ready"><strong>All 12 games matched.</strong> Review the final score and sign off below. The match finalizes once both captains have signed.</div>`;
+        return `<div class="ss-banner ss-banner--ready"><strong>All 12 games confirmed.</strong> Review the final score and sign off below. The match finalizes once both captains have signed.</div>`;
       }
 
       if (mySubmitted) {
         return `<div class="ss-banner ss-banner--mine-submitted"><strong>You've signed off.</strong> Waiting on the other captain. The match finalizes as soon as they sign.</div>`;
       }
 
-      const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0);
-      return `<div class="ss-banner"><strong>Each team enters its own copy of every score.</strong> Scores save automatically as you type, and a game confirms when both teams' numbers match — like trading paper scoresheets. ${remaining} game${remaining === 1 ? '' : 's'} still to enter or match.</div>`;
+      const confirmedCount = c.counts?.confirmed || 0;
+      const remaining = 12 - confirmedCount;
+      return isHome
+        ? `<div class="ss-banner"><strong>You enter every score; the away captain confirms each game.</strong> Scores save automatically as you type. ${remaining} game${remaining === 1 ? '' : 's'} still to enter or be confirmed.</div>`
+        : `<div class="ss-banner"><strong>The home captain enters the scores; you confirm each game.</strong> Tap Confirm on each correct score — or "Not right" to flag one for them to fix. ${remaining} game${remaining === 1 ? '' : 's'} not confirmed yet.</div>`;
     }
 
     function formatPair(gamePicks) {
@@ -2570,6 +2590,41 @@
         state.autoSaveTimer = null;
         if (state.scoreDirty) saveAllScores(true);
       }, 900);
+    }
+
+    // ----- Away captain: confirm / flag (enter-confirm model) -----
+    // confirmGameScore accepts a single slot or an array (confirm-all).
+    async function confirmGameScore(slotOrSlots) {
+      const slots = Array.isArray(slotOrSlots) ? slotOrSlots : [slotOrSlots];
+      return awayScoreAction('confirm', { slots });
+    }
+    async function disputeGameScore(slot) {
+      if (!confirm('Flag this score as not right?\n\nThe home captain will see the flag — talk it over, they fix the number, and you confirm the corrected score.')) return;
+      return awayScoreAction('dispute', { slot });
+    }
+    async function awayScoreAction(action, payload) {
+      const statusEl = $id('ss-status');
+      updateFloatingSave('saving');
+      try {
+        const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}&action=${action}`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed — try again');
+        if (data.score && state.currentScore) {
+          state.currentScore.score = data.score;
+          renderScoresheet(state.currentScore);
+        } else {
+          await refreshScoresheet(true);
+        }
+        updateFloatingSave('saved');
+      } catch (err) {
+        updateFloatingSave('clean');
+        if (statusEl) { statusEl.className = 'a-status is-err'; statusEl.textContent = err.message; }
+      }
     }
 
     // ----- Draft overlay: typed scores survive any re-render -----
@@ -3488,14 +3543,19 @@
       const courtOf = (g) => (g % 2 === 1) ? courtA : courtB;
       const badgeOf = (t) => t === 'WOMENS' ? 'w' : t === 'MENS' ? 'm' : 'x';
 
-      // Dual entry: these inputs are MY TEAM's version of each score — typed
-      // directly (numeric keypad on mobile, no steppers).
+      // Enter/confirm: the HOME captain types every score (numeric keypad);
+      // the AWAY captain sees the entered numbers read-only and confirms or
+      // flags each game.
+      const isHome = mySide === 'home';
       const sideStep = (slot, side, isUs) => {
-        const mine = games[slot]?.mine || {};
-        const raw = Number.isInteger(mine[side]) ? mine[side] : '';
+        const ent = games[slot]?.entered || {};
+        const raw = Number.isInteger(ent[side]) ? ent[side] : '';
+        const inner = (isHome && canEdit)
+          ? `<input type="number" inputmode="numeric" min="0" max="30" class="ss-score-input bgm__input" id="inp-${slot}-${side}" data-slot="${slot}" data-side="${side}" data-orig="${raw}" value="${raw}">`
+          : `<div class="bgm__ro">${raw === '' ? '' : raw}</div>`;
         return `<div class="bgm__side ${isUs ? 'bgm__side--us' : ''}">
           <div class="bgm__lbl">${isUs ? 'Us' : 'Them'}</div>
-          <input type="number" inputmode="numeric" min="0" max="30" class="ss-score-input bgm__input" id="inp-${slot}-${side}" data-slot="${slot}" data-side="${side}" data-orig="${raw}" value="${raw}" ${canEdit ? '' : 'disabled'}>
+          ${inner}
         </div>`;
       };
       const gameCard = (g, round) => {
@@ -3506,25 +3566,33 @@
         const usPair = mySide === 'home' ? formatPair(homeLineup[slot]) : formatPair(awayLineup[slot]);
         const themPair = data.preview ? 'Reveals 15 min before match'
           : (mySide === 'home' ? formatPair(awayLineup[slot]) : formatPair(homeLineup[slot]));
-        const mineDone = Number.isInteger(gs.mine?.home) && Number.isInteger(gs.mine?.away);
-        let pillTxt = { confirmed: 'Matched ✓', mismatch: "Doesn't match", partial: 'Incomplete', empty: 'Not played' }[status] || 'Not played';
-        if (status === 'partial') {
-          if (mineDone && !gs.theirsEntered) pillTxt = 'Waiting on them';
-          else if (!mineDone && gs.theirsEntered) pillTxt = 'They entered — add yours';
+        const entered = !!gs.enteredComplete;
+        const confirmable = !isHome && canEdit && entered && status !== 'confirmed' && !gs.disputed;
+
+        let pillTxt, pillCls = status;
+        if (status === 'confirmed') { pillTxt = 'Confirmed ✓'; }
+        else if (gs.disputed) {
+          pillCls = 'mismatch';
+          pillTxt = isHome ? 'They flagged this — fix & resave' : 'Flagged — waiting on their fix';
         }
-        const cardCls = status === 'confirmed' ? 'bgm--confirmed' : status === 'mismatch' ? 'bgm--mismatch' : '';
-        const themTheirs = gs.theirs ? (mySide === 'home'
-          ? `${gs.theirs.home ?? '—'}–${gs.theirs.away ?? '—'}`
-          : `${gs.theirs.away ?? '—'}–${gs.theirs.home ?? '—'}`) : null;
-        const mismatchNote = (status === 'mismatch' && themTheirs)
-          ? `<div class="bgm__theirs">Their version (Us–Them): <strong>${themTheirs}</strong> — confirm with the other team, revise &amp; resave.</div>`
-          : '';
+        else if (entered) { pillTxt = isHome ? 'Waiting on their confirm' : 'Confirm this score'; pillCls = 'partial'; }
+        else if (gs.entered && (Number.isInteger(gs.entered.home) || Number.isInteger(gs.entered.away))) {
+          pillTxt = isHome ? 'Incomplete' : 'Waiting on home team'; pillCls = isHome ? 'partial' : 'empty';
+        }
+        else { pillTxt = isHome ? 'Not played' : 'Waiting on home team'; pillCls = 'empty'; }
+
+        const cardCls = status === 'confirmed' ? 'bgm--confirmed' : gs.disputed ? 'bgm--mismatch' : '';
+        const confirmRow = confirmable
+          ? `<div class="bgm__confirm">
+              <button class="cap-btn cap-btn--primary bgm__cbtn" onclick="confirmGameScore('${slot}')">✓ Confirm</button>
+              <button class="cap-btn cap-btn--ghost bgm__cbtn" onclick="disputeGameScore('${slot}')">Not right</button>
+            </div>`
+          : `<div class="bgm__status"><span class="bgm__pill is-${pillCls}">${pillTxt}</span></div>`;
         return `<div class="bgm ${cardCls}">
           <div class="bgm__top"><span class="lmob-badge is-${badgeOf(slot_t.type)}">${slot_t.label}</span><span class="bgm__court">G${g}${courtOf(g) ? ' · Court ' + escapeHtml(String(courtOf(g))) : ''}</span></div>
           <div class="bgm__pairs"><div class="bgm__pair bgm__pair--us">${escapeHtml(usPair)}</div><div class="bgm__vs">VS</div><div class="bgm__pair">${escapeHtml(themPair)}</div></div>
           <div class="bgm__scores">${sideStep(slot, mySide, true)}${sideStep(slot, oppSide, false)}</div>
-          <div class="bgm__status"><span class="bgm__pill is-${status}">${pillTxt}</span></div>
-          ${mismatchNote}
+          ${confirmRow}
         </div>`;
       };
       // Ringed sets — identical structure to the Lineup tab. The ring
@@ -3588,14 +3656,25 @@
       // Scores auto-save as you type, so there's no manual save button.
       let bar = '';
       if (!final && !data.preview) {
-        const remaining = (c.counts?.empty || 0) + (c.counts?.partial || 0) + (c.counts?.mismatch || 0);
+        const remaining = 12 - (c.counts?.confirmed || 0);
         const defaultMsg = remaining
-          ? `${remaining} game${remaining === 1 ? '' : 's'} still to enter or match`
-          : 'All 12 games matched';
+          ? (isHome
+              ? `${remaining} game${remaining === 1 ? '' : 's'} still to enter or be confirmed`
+              : `${remaining} game${remaining === 1 ? '' : 's'} still to confirm`)
+          : 'All 12 games confirmed';
+        const confirmable = !isHome ? Object.keys(games).filter(s => {
+          const gv = games[s];
+          return gv?.enteredComplete && !gv.confirmed && !gv.disputed;
+        }) : [];
         let barBtn;
         if (!mySubmitted) {
           const ready = !!c.canSubmit;
-          barBtn = `<button class="cap-btn cap-btn--gold" id="ss-submit-btn" ${ready ? '' : 'disabled'}>Review &amp; sign off</button>`;
+          if (!isHome && !ready && confirmable.length > 1) {
+            // Away shortcut: confirm every entered-but-unconfirmed game at once.
+            barBtn = `<button class="cap-btn cap-btn--primary" onclick="confirmGameScore(${JSON.stringify(confirmable).replace(/"/g, '&quot;')})">✓ Confirm all (${confirmable.length})</button>`;
+          } else {
+            barBtn = `<button class="cap-btn cap-btn--gold" id="ss-submit-btn" ${ready ? '' : 'disabled'}>Review &amp; sign off</button>`;
+          }
         } else {
           barBtn = '<button class="cap-btn cap-btn--ghost" id="ss-withdraw-btn">Withdraw sign-off</button>';
         }

@@ -27,7 +27,7 @@
 //   team.updated, roster.replaced
 //   transfer.requested, transfer.denied
 //   lineup.locked, lineup.unlocked, lineup.admin-edited
-//   score.entry, score.signoff, score.withdrawn, match.finalized
+//   score.entry, score.confirmed, score.disputed, score.signoff, score.withdrawn, match.finalized
 
 import { getStore } from '@netlify/blobs';
 import { circuitCode, isTestTeam } from './circuit.js';

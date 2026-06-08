@@ -1,28 +1,33 @@
 // netlify/functions/captain-score.js
 //
-// Dual-entry scoring with cross-check + captain sign-off. Each team enters
-// its OWN copy of every game score (like keeping their own paper sheet):
-//   - A game is CONFIRMED only when both teams' versions match and form a
-//     valid finished game.
-//   - A MISMATCH (versions disagree) blocks finalize; each captain sees the
-//     other team's version once they've entered their own, so they can
-//     confirm courtside, revise, and resave.
+// Enter/confirm scoring with captain sign-off (model v3, June 7 2026 —
+// replaced symmetric dual-entry, whose simultaneous saves caused constant
+// races and double typing):
+//   - The HOME captain enters every game score.
+//   - The AWAY captain confirms each game (or flags it "not right" for the
+//     home captain to fix — away never types numbers).
+//   - A game is CONFIRMED when away's confirmation matches home's entry.
 //   - The match finalizes only when all 12 games are confirmed AND both
 //     captains have signed off ("I agree these scores are correct").
 //
 // GET   ?match=<id>                          → state + computed view (my side)
-// PUT   ?match=<id>                          → save MY TEAM's game entries
+// PUT   ?match=<id>                          → HOME ONLY: save game entries
 //                                                body: { games: { r1g1: { home: 11, away: 4 }, ... } }
+// POST  ?match=<id>&action=confirm           → AWAY ONLY: confirm games
+//                                                body: { slots: ['r1g1', ...] }
+// POST  ?match=<id>&action=dispute           → AWAY ONLY: flag a game as wrong
+//                                                body: { slot: 'r1g1' }
 // POST  ?match=<id>&action=submit            → sign off (body: { agree: true })
 // POST  ?match=<id>&action=withdraw          → revoke my sign-off (pre-finalize)
 //
-// Storage shape per slot (see lib/score-helpers.js):
+// Storage shape per slot (unchanged from dual-entry — see lib/score-helpers.js):
 //   game = { home, away,                      // canonical agreed score
-//            homeEntry: {home,away,by,at},    // home team's version
-//            awayEntry: {home,away,by,at} }   // away team's version
-//
-// Anti-copy rule: a captain can't see the other team's version of a game
-// until their own entry for that game is complete.
+//            homeEntry: {home,away,by,at},    // what home entered
+//            awayEntry: {home,away,by,at},    // set by away's CONFIRM (copy of homeEntry)
+//            dispute:   {by,at} | undefined } // away's "not right" flag
+// Keeping the shape means score-helpers (status/validity/canonical), admin
+// tools, and player views all keep working; "confirmed" is still
+// entries-agree. Home editing a game clears its confirmation AND dispute.
 
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
@@ -90,18 +95,19 @@ export default async (req) => {
 
   if (!revealed) return json({ error: 'Both lineups must be locked before scoring' }, 409);
 
-  // ===== PUT — save MY TEAM's entries =====
+  // ===== PUT — HOME captain enters scores =====
   if (req.method === 'PUT') {
+    if (myRole !== 'home') {
+      return json({ error: 'The home team enters the scores — you review and confirm each game.' }, 403);
+    }
     const body = await req.json();
     const incoming = body.games || {};
-    const entryKey = myRole === 'home' ? 'homeEntry' : 'awayEntry';
+    const entryKey = 'homeEntry';
 
-    // CONCURRENCY: both captains score at the same time (dual-entry design),
-    // and each save is a read-modify-write of ONE shared blob — without a
-    // guard, simultaneous saves silently wipe the other team's just-entered
-    // numbers (week-1 bug: "random" blank scores). Conditional write on the
-    // blob's etag + retry: if the other captain saved mid-flight, re-read and
-    // re-apply MY changes on top of theirs.
+    // CONCURRENCY: home enters while away confirms — still two writers on ONE
+    // shared blob, so every save is etag-guarded: if the other captain wrote
+    // mid-flight, re-read and re-apply MY changes on top of theirs (the
+    // unguarded version silently wiped scores in week-1 QA).
     let existing = null, changed = false, saved = false;
     for (let attempt = 0; attempt < 5 && !saved; attempt++) {
       const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
@@ -140,6 +146,10 @@ export default async (req) => {
           myEntry.by = ctx.user.email;
           myEntry.at = now;
           cur[entryKey] = myEntry;
+          // An edit invalidates away's confirmation and clears any "not
+          // right" flag — the new number needs a fresh confirm.
+          cur.awayEntry = null;
+          delete cur.dispute;
           changed = true;
         }
       }
@@ -200,11 +210,83 @@ export default async (req) => {
     return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
   }
 
-  // ===== POST submit / withdraw =====
+  // ===== POST confirm / dispute / submit / withdraw =====
   if (req.method === 'POST') {
     const action = url.searchParams.get('action');
-    if (!['submit', 'withdraw'].includes(action)) {
-      return json({ error: 'action must be submit or withdraw' }, 400);
+    if (!['confirm', 'dispute', 'submit', 'withdraw'].includes(action)) {
+      return json({ error: 'action must be confirm, dispute, submit or withdraw' }, 400);
+    }
+
+    // ── AWAY captain: confirm games / flag a game as wrong ──
+    if (action === 'confirm' || action === 'dispute') {
+      if (myRole !== 'away') {
+        return json({ error: 'Only the away team confirms scores — you enter them.' }, 403);
+      }
+      const aBody = await req.json().catch(() => ({}));
+      const slots = action === 'confirm'
+        ? (Array.isArray(aBody.slots) ? aBody.slots : aBody.slot ? [aBody.slot] : [])
+        : (aBody.slot ? [aBody.slot] : []);
+      if (!slots.length || slots.some(s => !SLOT_KEYS.includes(s))) {
+        return json({ error: 'Provide valid game slot(s) to ' + action }, 400);
+      }
+
+      let existing = null, saved = false;
+      for (let attempt = 0; attempt < 5 && !saved; attempt++) {
+        const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
+        existing = got?.data || newScoreRecord(match);
+        const etag = got?.etag || null;
+        normalizeScore(existing, match.championship);
+        if (existing.finalizedAt) {
+          return json({ error: 'Match is final. Contact admin to reopen.' }, 409);
+        }
+
+        const now = new Date().toISOString();
+        for (const slot of slots) {
+          const g = existing.games[slot];
+          if (!entryComplete(g.homeEntry) || !isValidGame(g.homeEntry.home, g.homeEntry.away, winBy)) {
+            return json({ error: `${prettySlot(slot)}: the home team hasn't entered a complete, valid score yet.` }, 409);
+          }
+          if (action === 'confirm') {
+            // Confirmation = away adopting home's numbers (entries-agree keeps
+            // all downstream status/finalize logic working unchanged).
+            g.awayEntry = { home: g.homeEntry.home, away: g.homeEntry.away, by: ctx.user.email, at: now };
+            delete g.dispute;
+          } else {
+            // "Not right" — flag for home to fix; clears any prior confirm.
+            g.awayEntry = null;
+            g.dispute = { by: ctx.user.email, at: now };
+          }
+        }
+
+        // A confirmation state change re-opens sign-offs (scores changed state).
+        if (existing.homeSubmittedAt || existing.awaySubmittedAt) {
+          existing.homeSubmittedAt = null; existing.homeSubmittedBy = null; existing.homeSignedName = null;
+          existing.awaySubmittedAt = null; existing.awaySubmittedBy = null; existing.awaySignedName = null;
+        }
+        normalizeScore(existing, match.championship);
+        existing.updatedAt = now;
+        existing.updatedBy = ctx.user.email;
+
+        const res = etag
+          ? await scoresStore.setJSON(scoreKey, existing, { onlyIfMatch: etag })
+          : await scoresStore.setJSON(scoreKey, existing, { onlyIfNew: true });
+        saved = !res || res.modified !== false;
+      }
+      if (!saved) {
+        return json({ error: 'The other team was saving at the same moment — please try again.' }, 503);
+      }
+
+      await logActivity({
+        type: action === 'confirm' ? 'score.confirmed' : 'score.disputed',
+        actor: { email: ctx.user.email, role: ctx.user.role },
+        team: ctx.team,
+        matchId, week: match.week, circuit: match.circuit,
+        details: action === 'confirm'
+          ? `${ctx.team.name} confirmed ${slots.length} game score(s) (${slots.map(prettySlot).join(', ')})`
+          : `${ctx.team.name} flagged ${prettySlot(slots[0])} as incorrect — home team to fix`,
+      });
+
+      return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
     }
 
     const body = action === 'submit' ? await req.json().catch(() => ({})) : null;
@@ -250,7 +332,7 @@ export default async (req) => {
           const labels = unconfirmed.map(g => prettySlot(g.slot)).slice(0, 3).join(', ');
           const more = unconfirmed.length > 3 ? ` and ${unconfirmed.length - 3} more` : '';
           return json({
-            error: `Cannot sign off yet — ${unconfirmed.length} game(s) still need a matching, valid score from both teams (${rule}): ${labels}${more}.`,
+            error: `Cannot sign off yet — ${unconfirmed.length} game(s) still need to be entered by the home team and confirmed by the away team (${rule}): ${labels}${more}.`,
           }, 400);
         }
 
@@ -383,28 +465,27 @@ function captainName(ctx) {
   return p?.name || null;
 }
 
-// Per-captain view of the score record:
-//   - my own entry is always visible/editable
-//   - the OTHER team's version of a game stays hidden until my entry for
-//     that game is complete (prevents just copying their numbers), then
-//     becomes visible so mismatches can be compared and resolved.
+// Per-captain view of the score record (enter/confirm model):
+//   - home's entry is visible to BOTH captains (away must see it to confirm)
+//   - `confirmed` = away has confirmed home's numbers (entries agree)
+//   - `disputed` = away flagged the game "not right" — home to fix
 //   - submitter emails are not exposed; signed names are.
 function viewForCaptain(decorated, myRole) {
-  const final = !!decorated.finalizedAt;
-  const mineKey = myRole === 'home' ? 'homeEntry' : 'awayEntry';
-  const theirsKey = myRole === 'home' ? 'awayEntry' : 'homeEntry';
-
   const games = {};
   for (const slot of SLOT_KEYS) {
     const g = decorated.games[slot] || {};
-    const mine = g[mineKey] ? { home: g[mineKey].home, away: g[mineKey].away } : null;
-    const theirsEntered = entryComplete(g[theirsKey]);
-    const showTheirs = final || entryComplete(g[mineKey]);
+    const entered = g.homeEntry ? { home: g.homeEntry.home, away: g.homeEntry.away } : null;
     games[slot] = {
       home: g.home, away: g.away, // canonical agreed score (null until confirmed)
-      mine,
-      theirs: (showTheirs && g[theirsKey]) ? { home: g[theirsKey].home, away: g[theirsKey].away } : null,
-      theirsEntered, // they have a complete entry (even if hidden from me)
+      entered,                                       // home's entry (both sides see it)
+      enteredComplete: entryComplete(g.homeEntry),
+      confirmed: entryComplete(g.homeEntry) && entryComplete(g.awayEntry)
+        && g.homeEntry.home === g.awayEntry.home && g.homeEntry.away === g.awayEntry.away,
+      disputed: !!g.dispute,
+      // legacy field names kept so older cached clients don't crash mid-rollout
+      mine: myRole === 'home' ? entered : (g.awayEntry ? { home: g.awayEntry.home, away: g.awayEntry.away } : null),
+      theirs: myRole === 'home' ? (g.awayEntry ? { home: g.awayEntry.home, away: g.awayEntry.away } : null) : entered,
+      theirsEntered: myRole === 'home' ? entryComplete(g.awayEntry) : entryComplete(g.homeEntry),
     };
   }
 
