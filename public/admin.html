@@ -137,6 +137,28 @@
     .bcp-portal { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; }
     .bcp-portal .rt-content { font-size: 13px; line-height: 1.6; color: var(--color-text-muted); }
 
+    /* ── Mobile Messages: Option A drill-in (master / detail) ───────── */
+    .msg-back { display: none; align-items: center; gap: 3px; background: none; border: none;
+      color: var(--color-text-muted); font-size: 14px; font-weight: 700; font-family: inherit;
+      cursor: pointer; padding: 2px 8px 10px 0; }
+    .msg-back .chev { font-size: 22px; line-height: 1; }
+    @media (max-width: 760px) {
+      /* inbox is full-width; the conversation drills in as its own screen */
+      #msg-grid { grid-template-columns: 1fr !important; }
+      #msg-thread-card { position: fixed; inset: 0; z-index: 60; margin: 0; border-radius: 0;
+        display: flex; flex-direction: column; padding: 12px 14px; background: var(--color-bg);
+        transform: translateX(100%); transition: transform .26s cubic-bezier(.4,0,.2,1); }
+      #msg-grid.msg-threadopen #msg-thread-card { transform: translateX(0); }
+      #msg-thread { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+      #msg-bubbles { flex: 1 !important; max-height: none !important; min-height: 0; }
+      .msg-back { display: inline-flex; }
+      /* broadcast + email-style composers slide up as bottom sheets */
+      #msg-broadcast-card, #msg-emailstyle-card { position: fixed; left: 0; right: 0; bottom: 0; top: auto;
+        margin: 0; max-height: 92vh; overflow-y: auto; z-index: 70; border-radius: 18px 18px 0 0;
+        border-top: 1px solid var(--color-border-strong); box-shadow: 0 -12px 40px rgba(0,0,0,0.55); }
+      #msg-emailstyle-card .two-col { grid-template-columns: 1fr !important; }
+    }
+
     /* Waiver rich-text editor */
     .wv-toolbar { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
     .wv-tb { min-width: 30px; height: 28px; padding: 0 7px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--color-surface-3); color: var(--color-text); font-size: 12px; font-family: inherit; cursor: pointer; line-height: 1; }
@@ -2753,6 +2775,7 @@
       }).join('') : '<div class="empty">No messages yet. Start the conversation below.</div>';
 
       pane.innerHTML =
+        '<button class="msg-back" id="msg-back-btn" type="button"><span class="chev">‹</span> Inbox</button>' +
         '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">' +
           '<strong style="font-size:14px;">' + h(team.name || teamId) + '</strong>' +
           '<span style="font-size:10px;color:var(--color-text-faint);">' + h(team.captainEmail || '') + '</span>' +
@@ -2766,11 +2789,20 @@
 
       const bub = $id('msg-bubbles'); if (bub) bub.scrollTop = bub.scrollHeight;
       $id('msg-reply-send').addEventListener('click', () => sendReply(teamId));
+      const _bk = $id('msg-back-btn'); if (_bk) _bk.addEventListener('click', closeThreadMobile);
+      // On mobile, slide the conversation in over the inbox (Option A drill-in).
+      const _g = $id('msg-grid'); if (_g) _g.classList.add('msg-threadopen');
       // refresh inbox unread state (opening marked it read server-side)
       loadInbox();
     } catch (e) {
       pane.innerHTML = '<div class="empty">Failed to load thread: ' + h(e.message) + '</div>';
     }
+  }
+
+  // Mobile drill-in: slide the conversation back out to reveal the inbox.
+  // (Desktop ignores the .msg-threadopen class — the two-pane stays put.)
+  function closeThreadMobile() {
+    const g = $id('msg-grid'); if (g) g.classList.remove('msg-threadopen');
   }
 
   async function sendReply(teamId) {
