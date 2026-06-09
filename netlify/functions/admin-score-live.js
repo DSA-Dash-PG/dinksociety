@@ -30,7 +30,9 @@ export default async (req) => {
 
   const scheduleStore = getStore('schedule');
   const lineupStore   = getStore('lineups');
-  const scoresStore   = getStore('scores');
+  // Strong reads: this is the live admin board, polled during play — eventual
+  // reads would flicker scores in and out as replicas lag captain writes.
+  const scoresStore   = getStore({ name: 'scores', consistency: 'strong' });
 
   // Determine which weeks to fetch (single week or all 1–8)
   const weeks = weekParam ? [parseInt(weekParam, 10)] : [1,2,3,4,5,6,7,8];

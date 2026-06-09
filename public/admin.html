@@ -110,6 +110,23 @@
     .wvp-name { width: 100%; margin-top: 12px; padding: 12px 14px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text-faint); font-size: 15px; box-sizing: border-box; }
     .wvp-sign { width: 100%; margin-top: 12px; padding: 13px; border: none; border-radius: var(--radius-sm); background: var(--color-lime); color: var(--color-text-inverse); font-weight: 800; font-size: 14px; opacity: .85; }
     .wvp-note { text-align: center; font-size: 10px; color: var(--color-text-faint); margin-top: 10px; }
+    /* Rich-text content (preview body + player gate parity) */
+    .wvp-body { white-space: normal; }
+    .rt-content h2 { font-size: 15px; font-weight: 800; color: var(--color-text); margin: 18px 0 6px; }
+    .rt-content h3, .rt-content h4 { font-size: 13px; font-weight: 800; color: var(--color-text); margin: 14px 0 5px; }
+    .rt-content p { margin: 0 0 10px; }
+    .rt-content ul, .rt-content ol { margin: 0 0 10px; padding-left: 20px; }
+    .rt-content li { margin: 3px 0; }
+    .rt-content b, .rt-content strong { color: var(--color-text); font-weight: 800; }
+    .rt-content a { color: var(--color-lime); }
+    /* Waiver rich-text editor */
+    .wv-toolbar { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
+    .wv-tb { min-width: 30px; height: 28px; padding: 0 7px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--color-surface-3); color: var(--color-text); font-size: 12px; font-family: inherit; cursor: pointer; line-height: 1; }
+    .wv-tb:hover { background: var(--color-surface-4); }
+    .wv-tb:active { opacity: .7; }
+    .wv-edit { width: 100%; box-sizing: border-box; min-height: 150px; max-height: 320px; overflow-y: auto; padding: 11px 12px; border-radius: 8px; border: 1px solid var(--color-border); background: var(--color-bg); color: var(--color-text); font-family: inherit; font-size: 13px; line-height: 1.55; }
+    .wv-edit:focus { outline: none; border-color: var(--color-lime); }
+    .wv-edit:empty:before { content: attr(data-placeholder); color: var(--color-text-faint); }
     .pm-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
     .pm-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
     .pm-lbl { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--color-text-faint); }
@@ -1075,7 +1092,7 @@
       <div class="wvp-scroll">
         <div class="wvp-eyebrow">Before you play</div>
         <div class="wvp-title" id="wvp-title"></div>
-        <div class="wvp-body" id="wvp-body"></div>
+        <div class="wvp-body rt-content" id="wvp-body"></div>
       </div>
       <div class="wvp-foot">
         <label class="wvp-agree"><input type="checkbox" disabled style="width:auto;margin:2px 0 0;flex-shrink:0;"> I have read and agree to this waiver.</label>
@@ -1274,18 +1291,74 @@
   // ─── Liability waivers (multi) ────────────────────────────
   function waiverList() { return Array.isArray(SETTINGS.waivers) ? SETTINGS.waivers : []; }
 
+  // ── Waiver rich text (keep sanitizer in sync with me.html + lib/email.js) ──
+  const WAIVER_ALLOWED = { b:1, strong:1, i:1, em:1, u:1, p:1, br:1, h2:1, h3:1, h4:1, ul:1, ol:1, li:1, a:1, div:1 };
+  const waiverDirty = new Set();   // ids whose editor was actually edited this render
+  function waiverLooksHtml(s) { return /<(\/?)(b|strong|i|em|u|p|br|h[1-6]|ul|ol|li|a|div)\b/i.test(String(s || '')); }
+  function sanitizeWaiverHtml(html) {
+    let s = String(html || '');
+    s = s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, '');
+    s = s.replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/<(\/?)([a-zA-Z0-9]+)([^>]*)>/g, (m, slash, tag, attrs) => {
+      tag = tag.toLowerCase();
+      if (!WAIVER_ALLOWED[tag]) return '';
+      if (slash) return '</' + tag + '>';
+      if (tag === 'br') return '<br>';
+      if (tag === 'a') {
+        const hm = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+        const href = hm ? (hm[2] || hm[3] || hm[4] || '') : '';
+        if (!/^https?:\/\//i.test(href)) return '<a>';
+        return '<a href="' + href.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">';
+      }
+      return '<' + tag + '>';
+    });
+    return s;
+  }
+  function rtEsc(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function mdInline(t) { return t.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/\*([^*]+)\*/g, '<i>$1</i>'); }
+  // Markdown → HTML, used on PASTE so the ready-to-paste drafts format themselves.
+  function mdToHtml(md) {
+    return String(md || '').replace(/\r\n/g, '\n').split(/\n{2,}/).map(b => {
+      b = b.replace(/\s+$/, ''); if (!b.trim()) return '';
+      const hm = b.match(/^(#{1,3})\s+([\s\S]*)$/);
+      if (hm) { const lvl = Math.min(4, hm[1].length + 1); return '<h' + lvl + '>' + mdInline(rtEsc(hm[2].trim())) + '</h' + lvl + '>'; }
+      const lines = b.split('\n');
+      if (lines.every(l => /^\s*[-*]\s+/.test(l))) return '<ul>' + lines.map(l => '<li>' + mdInline(rtEsc(l.replace(/^\s*[-*]\s+/, ''))) + '</li>').join('') + '</ul>';
+      if (lines.every(l => /^\s*\d+\.\s+/.test(l))) return '<ol>' + lines.map(l => '<li>' + mdInline(rtEsc(l.replace(/^\s*\d+\.\s+/, ''))) + '</li>').join('') + '</ol>';
+      return '<p>' + mdInline(rtEsc(b)).replace(/\n/g, '<br>') + '</p>';
+    }).join('');
+  }
+  // Initial editor contents: render stored HTML, or show legacy plain text as
+  // escaped paragraphs (NOT markdown-parsed, so it can't silently change before
+  // an edit). Markdown only formats on paste, where the user chose to paste it.
+  function waiverEditorHtml(text) {
+    if (waiverLooksHtml(text)) return sanitizeWaiverHtml(text);
+    const s = String(text || '');
+    if (!s.trim()) return '';
+    return s.replace(/\r\n/g, '\n').split(/\n{2,}/).map(b => b.trim() ? '<p>' + rtEsc(b).replace(/\n/g, '<br>') + '</p>' : '').join('');
+  }
+
   // Render an editor card per waiver (League + Dink House venue).
   function applyWaiverSettings() {
     const host = $id('waivers-editors'); if (!host) return;
     host.innerHTML = waiverList().map((w, i) => `
-      <div style="border:1px solid var(--color-border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--color-surface-2);">
+      <div class="wv-card" style="border:1px solid var(--color-border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--color-surface-2);">
         <label style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700;margin-bottom:8px;">
           <input type="checkbox" data-wv-enabled="${h(w.id)}" ${w.enabled ? 'checked' : ''} style="width:auto;margin:0;"> Require this waiver
           <span style="margin-left:auto;font-size:10px;color:var(--color-text-faint);font-weight:600;">v<span data-wv-ver="${h(w.id)}">${w.version ?? 0}</span> · ${h(w.id)}</span>
         </label>
         <div class="af"><label>Title</label><input type="text" data-wv-title="${h(w.id)}" value="${h(w.title || '')}"></div>
         <div class="af"><label>Waiver text</label>
-          <textarea data-wv-text="${h(w.id)}" rows="7" style="width:100%;box-sizing:border-box;padding:10px 11px;border-radius:8px;border:1px solid var(--color-border);background:var(--color-bg);color:var(--color-text);font-family:inherit;font-size:12px;line-height:1.5;resize:vertical;" placeholder="Paste the full waiver text. Editing it bumps the version and forces re-sign.">${h(w.text || '')}</textarea>
+          <div class="wv-toolbar">
+            <button type="button" class="wv-tb" data-cmd="bold" title="Bold"><b>B</b></button>
+            <button type="button" class="wv-tb" data-cmd="italic" title="Italic"><i>I</i></button>
+            <button type="button" class="wv-tb" data-cmd="underline" title="Underline"><u>U</u></button>
+            <button type="button" class="wv-tb" data-cmd="h3" title="Section heading">H</button>
+            <button type="button" class="wv-tb" data-cmd="ul" title="Bulleted list">&bull;</button>
+            <button type="button" class="wv-tb" data-cmd="ol" title="Numbered list">1.</button>
+            <button type="button" class="wv-tb" data-cmd="clear" title="Clear formatting">⌫</button>
+          </div>
+          <div class="wv-edit rt-content" contenteditable="true" data-wv-edit="${h(w.id)}" data-placeholder="Type or paste the waiver. Paste from the ready-to-paste file and formatting is kept. Editing bumps the version and forces re-sign.">${waiverEditorHtml(w.text)}</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
           <button class="ab ab--lime ab--sm" data-wv-save="${h(w.id)}">Save</button>
@@ -1299,6 +1372,37 @@
       if (confirm('Force EVERY player to sign this waiver again? Bumps the version — everyone re-signs on next login.')) saveWaivers(b.dataset.wvResign, true);
     }));
     host.querySelectorAll('[data-wv-preview]').forEach(b => b.addEventListener('click', () => openWaiverPreview(b.dataset.wvPreview)));
+
+    // Rich-text editors: fresh render starts clean (not dirty).
+    waiverDirty.clear();
+    host.querySelectorAll('.wv-edit').forEach(ed => {
+      ed.addEventListener('input', () => waiverDirty.add(ed.dataset.wvEdit));
+      // Paste as plain text → markdown-aware HTML, then sanitize (strips Word junk).
+      ed.addEventListener('paste', e => {
+        e.preventDefault();
+        const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+        document.execCommand('insertHTML', false, sanitizeWaiverHtml(mdToHtml(t)));
+        waiverDirty.add(ed.dataset.wvEdit);
+      });
+    });
+    host.querySelectorAll('.wv-tb').forEach(btn => {
+      btn.addEventListener('mousedown', e => e.preventDefault());  // keep the editor selection
+      btn.addEventListener('click', () => {
+        const ed = btn.closest('.wv-card')?.querySelector('.wv-edit');
+        if (!ed) return;
+        ed.focus();
+        try { document.execCommand('styleWithCSS', false, false); } catch (e) {}  // produce <b>/<i>, not styled spans
+        const cmd = btn.dataset.cmd;
+        if (cmd === 'bold') document.execCommand('bold');
+        else if (cmd === 'italic') document.execCommand('italic');
+        else if (cmd === 'underline') document.execCommand('underline');
+        else if (cmd === 'h3') document.execCommand('formatBlock', false, 'H3');
+        else if (cmd === 'ul') document.execCommand('insertUnorderedList');
+        else if (cmd === 'ol') document.execCommand('insertOrderedList');
+        else if (cmd === 'clear') { document.execCommand('removeFormat'); document.execCommand('formatBlock', false, 'P'); }
+        waiverDirty.add(ed.dataset.wvEdit);
+      });
+    });
     // populate the compliance picker
     const pick = $id('waiver-pick');
     if (pick) {
@@ -1308,14 +1412,15 @@
     }
   }
 
-  // Player-faithful preview: render the LIVE (unsaved) editor text the same way
-  // me.html's waiver gate does — pre-wrap plain text via textContent.
+  // Player-faithful preview: render the LIVE (unsaved) editor content exactly
+  // as me.html's waiver gate does — sanitized HTML.
   function openWaiverPreview(id) {
     const host = $id('waivers-editors'); if (!host) return;
     const title = (host.querySelector(`[data-wv-title="${cssEsc(id)}"]`)?.value || '').trim() || 'Liability Waiver & Release';
-    const text  = host.querySelector(`[data-wv-text="${cssEsc(id)}"]`)?.value || '';
+    const ed = host.querySelector(`[data-wv-edit="${cssEsc(id)}"]`);
+    const html = ed ? sanitizeWaiverHtml(ed.innerHTML).trim() : '';
     $id('wvp-title').textContent = title;
-    $id('wvp-body').textContent  = text.trim() || 'No waiver text yet — paste it into the box above, then preview.';
+    $id('wvp-body').innerHTML = html || '<span style="color:var(--color-text-faint)">No waiver text yet — type or paste it above, then preview.</span>';
     $id('wvp-overlay').classList.add('is-open');
   }
   function closeWaiverPreview() { $id('wvp-overlay').classList.remove('is-open'); }
@@ -1327,13 +1432,19 @@
   // version of any whose text changed, or `bumpId` to force re-sign).
   async function saveWaivers(bumpId = null) {
     const status = $id('waiver-status');
-    const waivers = waiverList().map(w => ({
-      id: w.id,
-      title: ($id('waivers-editors').querySelector(`[data-wv-title="${cssEsc(w.id)}"]`)?.value || '').trim() || w.title,
-      text: $id('waivers-editors').querySelector(`[data-wv-text="${cssEsc(w.id)}"]`)?.value ?? w.text,
-      enabled: !!$id('waivers-editors').querySelector(`[data-wv-enabled="${cssEsc(w.id)}"]`)?.checked,
-      ...(bumpId === w.id ? { bumpVersion: true } : {}),
-    }));
+    const waivers = waiverList().map(w => {
+      const ed = $id('waivers-editors').querySelector(`[data-wv-edit="${cssEsc(w.id)}"]`);
+      // Only re-serialize the body if the editor was actually touched — otherwise
+      // keep the stored text byte-for-byte so the version doesn't bump spuriously.
+      const text = (ed && waiverDirty.has(w.id)) ? sanitizeWaiverHtml(ed.innerHTML) : w.text;
+      return {
+        id: w.id,
+        title: ($id('waivers-editors').querySelector(`[data-wv-title="${cssEsc(w.id)}"]`)?.value || '').trim() || w.title,
+        text,
+        enabled: !!$id('waivers-editors').querySelector(`[data-wv-enabled="${cssEsc(w.id)}"]`)?.checked,
+        ...(bumpId === w.id ? { bumpVersion: true } : {}),
+      };
+    });
     status.className = 'a-status'; status.textContent = 'Saving…';
     try {
       const data = await apiJSON('/.netlify/functions/admin-settings', {

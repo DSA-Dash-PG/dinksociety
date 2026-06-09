@@ -38,7 +38,9 @@ export default async (req) => {
 
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
-  const scoresStore = getStore('scores');
+  // Strong reads so a player never sees a just-finalized score blink out
+  // (eventual replicas can briefly return the pre-write copy).
+  const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
   const statsStore = getStore('player-stats');
   const standingsStore = getStore('standings');
   const teamsStore = getStore('teams');

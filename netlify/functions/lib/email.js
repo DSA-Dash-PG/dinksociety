@@ -54,6 +54,38 @@ function escapeBody(text) {
   return esc.replace(/\n/g, '<br>');
 }
 
+// ── Rich-text waiver rendering (shared; keep in sync with public/admin.html
+//    and public/me.html copies of these two functions) ──────────────────
+// Waiver text may be HTML (from the admin rich-text editor) or legacy plain
+// text. `waiverLooksHtml` tells them apart; `sanitizeWaiverHtml` strips
+// everything outside a tiny allowlist so admin-authored markup is safe to
+// inject into the emailed copy.
+const WAIVER_ALLOWED = { b: 1, strong: 1, i: 1, em: 1, u: 1, p: 1, br: 1, h2: 1, h3: 1, h4: 1, ul: 1, ol: 1, li: 1, a: 1, div: 1 };
+
+export function waiverLooksHtml(s) {
+  return /<(\/?)(b|strong|i|em|u|p|br|h[1-6]|ul|ol|li|a|div)\b/i.test(String(s || ''));
+}
+
+export function sanitizeWaiverHtml(html) {
+  let s = String(html || '');
+  s = s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, '');
+  s = s.replace(/<!--[\s\S]*?-->/g, '');
+  s = s.replace(/<(\/?)([a-zA-Z0-9]+)([^>]*)>/g, (m, slash, tag, attrs) => {
+    tag = tag.toLowerCase();
+    if (!WAIVER_ALLOWED[tag]) return '';          // disallowed tag → drop, keep inner text
+    if (slash) return '</' + tag + '>';
+    if (tag === 'br') return '<br>';
+    if (tag === 'a') {
+      const hm = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+      const href = hm ? (hm[2] || hm[3] || hm[4] || '') : '';
+      if (!/^https?:\/\//i.test(href)) return '<a>';   // strip javascript:/relative/etc.
+      return '<a href="' + href.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">';
+    }
+    return '<' + tag + '>';                        // allowed tag, all attributes stripped
+  });
+  return s;
+}
+
 /**
  * Render an admin → captain announcement / message email.
  * @param {{ subject?: string, body: string, teamName: string, portalUrl: string }} opts
@@ -188,7 +220,9 @@ export function renderWaiverCopy({ title, text, playerName, signedName, signedAt
       <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 6px;">${escapeBody(title || 'Liability Waiver & Release')}</h1>
       <p style="font-size: 13px; color: #8a8a8a; margin: 0 0 20px;">Your copy${playerName ? ', ' + escapeBody(playerName) : ''} — keep this for your records.</p>
       ${signedName ? `<div style="font-size: 13px; color: #b8ff2c; margin: 0 0 18px; padding: 12px 14px; background: #161616; border-radius: 8px;">Signed by <b>${escapeBody(signedName)}</b>${when ? ' · ' + escapeBody(when) : ''}</div>` : ''}
-      <div style="font-size: 14px; color: #cfcfcf; line-height: 1.65; white-space: pre-wrap; word-break: break-word;">${escapeBody(text || '')}</div>
+      ${waiverLooksHtml(text)
+        ? `<div style="font-size: 14px; color: #cfcfcf; line-height: 1.65; word-break: break-word;">${sanitizeWaiverHtml(text)}</div>`
+        : `<div style="font-size: 14px; color: #cfcfcf; line-height: 1.65; white-space: pre-wrap; word-break: break-word;">${escapeBody(text || '')}</div>`}
       <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
         The Dink Society · Southern California Pickleball League
       </div>

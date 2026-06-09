@@ -28,7 +28,12 @@ export default async (req) => {
   if (!matchId) return json({ error: 'match id required' }, 400);
 
   const scheduleStore = getStore('schedule');
-  const scoresStore = getStore('scores');
+  // Strong consistency: admin score edits can land WHILE captains are entering
+  // the same match. Default (eventual) reads would let an admin write build on
+  // a stale copy and clobber a live captain entry; strong reads + the
+  // etag-guarded withScore() helper below make admin and captain writes safe
+  // against each other (same optimistic-concurrency model as captain-score.js).
+  const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
 
   // Find the match across all schedule files
   const match = await findMatch(scheduleStore, matchId);
@@ -56,44 +61,43 @@ export default async (req) => {
 
   // ===== PUT — enter/update scores (acts as both sides) =====
   if (req.method === 'PUT') {
-    const existing = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
-      || newScoreRecord(match);
-    normalizeScore(existing, !!match.championship);
-
     const body = await req.json();
     const incoming = body.games || {};
-    const now = new Date().toISOString();
 
-    for (const slot of SLOT_KEYS) {
-      if (!(slot in incoming)) continue;
-      const g = incoming[slot] || {};
+    const r = await withScore(scoresStore, scoreKey, match, (existing) => {
+      const now = new Date().toISOString();
+      for (const slot of SLOT_KEYS) {
+        if (!(slot in incoming)) continue;
+        const g = incoming[slot] || {};
 
-      const homeVal = toScore(g.home);
-      const awayVal = toScore(g.away);
-      if (homeVal === 'INVALID' || awayVal === 'INVALID') {
-        return json({ error: `${prettySlot(slot)}: scores must be integers 0-30` }, 400);
+        const homeVal = toScore(g.home);
+        const awayVal = toScore(g.away);
+        if (homeVal === 'INVALID' || awayVal === 'INVALID') {
+          return { error: `${prettySlot(slot)}: scores must be integers 0-30`, status: 400 };
+        }
+
+        // Admin override: write the same entry as BOTH teams' versions, or
+        // clear the slot entirely when both values are blank.
+        const cur = existing.games[slot];
+        if (homeVal === null && awayVal === null) {
+          cur.homeEntry = null;
+          cur.awayEntry = null;
+        } else {
+          const entry = { home: homeVal, away: awayVal, by: admin.email, at: now };
+          cur.homeEntry = { ...entry };
+          cur.awayEntry = { ...entry };
+        }
       }
 
-      // Admin override: write the same entry as BOTH teams' versions, or
-      // clear the slot entirely when both values are blank.
-      const cur = existing.games[slot];
-      if (homeVal === null && awayVal === null) {
-        cur.homeEntry = null;
-        cur.awayEntry = null;
-      } else {
-        const entry = { home: homeVal, away: awayVal, by: admin.email, at: now };
-        cur.homeEntry = { ...entry };
-        cur.awayEntry = { ...entry };
-      }
-    }
+      normalizeScore(existing, !!match.championship);
+      existing.updatedAt = now;
+      existing.updatedBy = admin.email;
+      existing.adminEdited = true;
+    });
 
-    normalizeScore(existing, !!match.championship);
-    existing.updatedAt = now;
-    existing.updatedBy = admin.email;
-    existing.adminEdited = true;
-
-    await scoresStore.setJSON(scoreKey, existing);
-    return json({ ok: true, score: decorate(existing, !!match.championship) });
+    if (r.abort) return json(r.abort, r.abort.status || 400);
+    if (r.conflict) return json({ error: 'A captain was saving at the same moment — please try again.' }, 503);
+    return json({ ok: true, score: decorate(r.record, !!match.championship) });
   }
 
   // ===== POST — finalize or reopen =====
@@ -101,31 +105,34 @@ export default async (req) => {
     const action = url.searchParams.get('action');
 
     if (action === 'finalize') {
-      const existing = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null);
-      if (!existing) return json({ error: 'No scores entered yet' }, 400);
+      const r = await withScore(scoresStore, scoreKey, match, (existing, existed) => {
+        if (!existed) return { error: 'No scores entered yet', status: 400 };
 
-      const decorated = decorate(existing, !!match.championship);
-      if (!decorated.computed.allConfirmed) {
-        return json({
-          error: `Cannot finalize — ${12 - decorated.computed.counts.confirmed} games still need scores.`,
-          unentered: decorated.computed.unentered,
-        }, 400);
-      }
+        const decorated = decorate(existing, !!match.championship);
+        if (!decorated.computed.allConfirmed) {
+          return {
+            error: `Cannot finalize — ${12 - decorated.computed.counts.confirmed} games still need scores.`,
+            unentered: decorated.computed.unentered,
+            status: 400,
+          };
+        }
 
-      const now = new Date().toISOString();
-      existing.homeSubmittedAt = existing.homeSubmittedAt || now;
-      existing.homeSubmittedBy = existing.homeSubmittedBy || admin.email;
-      existing.homeSignedName = existing.homeSignedName || 'League admin';
-      existing.awaySubmittedAt = existing.awaySubmittedAt || now;
-      existing.awaySubmittedBy = existing.awaySubmittedBy || admin.email;
-      existing.awaySignedName = existing.awaySignedName || 'League admin';
-      existing.finalizedAt = now;
-      existing.finalizedBy = admin.email;
+        const now = new Date().toISOString();
+        existing.homeSubmittedAt = existing.homeSubmittedAt || now;
+        existing.homeSubmittedBy = existing.homeSubmittedBy || admin.email;
+        existing.homeSignedName = existing.homeSignedName || 'League admin';
+        existing.awaySubmittedAt = existing.awaySubmittedAt || now;
+        existing.awaySubmittedBy = existing.awaySubmittedBy || admin.email;
+        existing.awaySignedName = existing.awaySignedName || 'League admin';
+        existing.finalizedAt = now;
+        existing.finalizedBy = admin.email;
+      });
 
-      await scoresStore.setJSON(scoreKey, existing);
+      if (r.abort) return json(r.abort, r.abort.status || 400);
+      if (r.conflict) return json({ error: 'A captain was saving at the same moment — please try again.' }, 503);
 
       // Write final scores to schedule
-      await writeFinalScoreToSchedule(scheduleStore, match, existing);
+      await writeFinalScoreToSchedule(scheduleStore, match, r.record);
 
       // Rebuild standings — awaited so the serverless freeze can't kill it.
       try {
@@ -134,25 +141,27 @@ export default async (req) => {
         console.error('rebuildStandings failed:', err);
       }
 
-      return json({ ok: true, finalized: true, score: decorate(existing, !!match.championship) });
+      return json({ ok: true, finalized: true, score: decorate(r.record, !!match.championship) });
     }
 
     if (action === 'reopen') {
-      const existing = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null);
-      if (!existing) return json({ error: 'No scores to reopen' }, 400);
+      const r = await withScore(scoresStore, scoreKey, match, (existing, existed) => {
+        if (!existed) return { error: 'No scores to reopen', status: 400 };
 
-      existing.finalizedAt = null;
-      existing.finalizedBy = null;
-      existing.homeSubmittedAt = null;
-      existing.homeSubmittedBy = null;
-      existing.homeSignedName = null;
-      existing.awaySubmittedAt = null;
-      existing.awaySubmittedBy = null;
-      existing.awaySignedName = null;
-      existing.reopenedAt = new Date().toISOString();
-      existing.reopenedBy = admin.email;
+        existing.finalizedAt = null;
+        existing.finalizedBy = null;
+        existing.homeSubmittedAt = null;
+        existing.homeSubmittedBy = null;
+        existing.homeSignedName = null;
+        existing.awaySubmittedAt = null;
+        existing.awaySubmittedBy = null;
+        existing.awaySignedName = null;
+        existing.reopenedAt = new Date().toISOString();
+        existing.reopenedBy = admin.email;
+      });
 
-      await scoresStore.setJSON(scoreKey, existing);
+      if (r.abort) return json(r.abort, r.abort.status || 400);
+      if (r.conflict) return json({ error: 'A captain was saving at the same moment — please try again.' }, 503);
 
       // Clear final scores from schedule
       await clearFinalScoreFromSchedule(scheduleStore, match);
@@ -164,19 +173,23 @@ export default async (req) => {
         console.error('rebuildStandings failed after reopen:', err);
       }
 
-      return json({ ok: true, reopened: true, score: decorate(existing, !!match.championship) });
+      return json({ ok: true, reopened: true, score: decorate(r.record, !!match.championship) });
     }
 
     if (action === 'restart') {
       // Wipe everything: both captains' entries, sign-offs, finalization.
       // Lineups stay locked — captains can immediately re-enter scores or
       // the teams can replay the games. Standings are rebuilt in case the
-      // match had already been finalized.
-      const fresh = newScoreRecord(match);
-      fresh.restartedAt = new Date().toISOString();
-      fresh.restartedBy = admin.email;
+      // match had already been finalized. Guarded so a re-wipe still wins
+      // cleanly if a captain write lands mid-restart.
+      const r = await withScore(scoresStore, scoreKey, match, (_existing) => {
+        const fresh = newScoreRecord(match);
+        fresh.restartedAt = new Date().toISOString();
+        fresh.restartedBy = admin.email;
+        return { replace: fresh };
+      });
 
-      await scoresStore.setJSON(scoreKey, fresh);
+      if (r.conflict) return json({ error: 'A captain was saving at the same moment — please try again.' }, 503);
 
       // Clear final scores from schedule (no-op if never finalized)
       await clearFinalScoreFromSchedule(scheduleStore, match);
@@ -188,7 +201,7 @@ export default async (req) => {
         console.error('rebuildStandings failed after restart:', err);
       }
 
-      return json({ ok: true, restarted: true, score: decorate(fresh, !!match.championship) });
+      return json({ ok: true, restarted: true, score: decorate(r.record, !!match.championship) });
     }
 
     return json({ error: 'action must be finalize, reopen, or restart' }, 400);
@@ -198,6 +211,34 @@ export default async (req) => {
 };
 
 // ===== Helpers =====
+
+// Optimistic, etag-guarded read-modify-write on the score blob — the same
+// concurrency model captain-score.js uses, so an admin edit can't silently
+// clobber a captain entry (or vice-versa). `mutate(record, existed)` either:
+//   - mutates `record` in place and returns nothing  → that record is written
+//   - returns { replace: newRecord }                 → newRecord is written
+//   - returns { error, status, ... }                 → abort without writing
+// Returns { record } on success, { abort } on a mutate-signalled error, or
+// { conflict: true } if 5 attempts all lost the race.
+async function withScore(scoresStore, scoreKey, match, mutate) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
+    const record = got?.data || newScoreRecord(match);
+    const etag = got?.etag || null;
+    normalizeScore(record, !!match.championship);
+
+    const out = mutate(record, !!got);
+    if (out && out.error) return { abort: out };
+    const toWrite = out && out.replace ? out.replace : record;
+
+    const res = etag
+      ? await scoresStore.setJSON(scoreKey, toWrite, { onlyIfMatch: etag })
+      : await scoresStore.setJSON(scoreKey, toWrite, { onlyIfNew: true });
+    const saved = !res || res.modified !== false;
+    if (saved) return { record: toWrite };
+  }
+  return { conflict: true };
+}
 
 async function findMatch(scheduleStore, matchId) {
   const { blobs } = await scheduleStore.list({ prefix: 'schedule/' });

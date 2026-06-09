@@ -50,7 +50,14 @@ export default async (req) => {
   if (!matchId) return json({ error: 'match id required' }, 400);
 
   const scheduleStore = getStore('schedule');
-  const scoresStore = getStore('scores');
+  // STRONG consistency on scores: this lambda does the read-modify-write etag
+  // loop AND the read-back. With default (eventual) reads, the etag read can
+  // return a stale replica — the conditional write then fails spuriously and
+  // burns retries (503 "save again"), and the GET read-back can return a
+  // pre-write copy so a just-saved score visibly vanishes until the store
+  // converges. Strong reads always reflect the latest write. (Same reasoning
+  // lib/standings.js documents for rebuildStandings.)
+  const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
   const lineupStore = getStore('lineups');
   const seasonStore = getStore('seasons');
   const seasonData = ctx.team.seasonId

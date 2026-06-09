@@ -378,6 +378,15 @@
   .waiver-eyebrow { font-size:9px; letter-spacing:0.16em; text-transform:uppercase; color:var(--color-lime); font-weight:800; }
   .waiver-title { font-size:18px; font-weight:800; margin:4px 0 0; }
   .waiver-body { padding:16px 18px; overflow-y:auto; font-size:13px; line-height:1.6; color:var(--color-text-muted); white-space:pre-wrap; word-break:break-word; flex:1; -webkit-overflow-scrolling:touch; }
+  /* Rich-text (HTML) waivers: let the markup control spacing, not pre-wrap. */
+  .waiver-body.is-html { white-space:normal; }
+  .waiver-body.is-html h2 { font-size:15px; font-weight:800; color:var(--color-text); margin:18px 0 6px; }
+  .waiver-body.is-html h3, .waiver-body.is-html h4 { font-size:13px; font-weight:800; color:var(--color-text); margin:14px 0 5px; }
+  .waiver-body.is-html p { margin:0 0 10px; }
+  .waiver-body.is-html ul, .waiver-body.is-html ol { margin:0 0 10px; padding-left:20px; }
+  .waiver-body.is-html li { margin:3px 0; }
+  .waiver-body.is-html b, .waiver-body.is-html strong { color:var(--color-text); font-weight:800; }
+  .waiver-body.is-html a { color:var(--color-lime); }
   .waiver-foot { padding:14px 18px 18px; border-top:1px solid var(--color-border); background:var(--color-surface-2); }
   .waiver-scrollhint { font-size:11px; font-weight:700; color:var(--color-gold); text-align:center; margin-bottom:10px; }
   .waiver-scrollhint.hidden { display:none; }
@@ -1139,6 +1148,36 @@
     });
   })();
 
+  // Waiver text may be rich text (HTML from the admin editor) or legacy plain
+  // text. Sanitize to a small allowlist before injecting. (Keep in sync with
+  // the copies in public/admin.html and netlify/functions/lib/email.js.)
+  const WAIVER_ALLOWED = { b:1, strong:1, i:1, em:1, u:1, p:1, br:1, h2:1, h3:1, h4:1, ul:1, ol:1, li:1, a:1, div:1 };
+  function waiverLooksHtml(s) { return /<(\/?)(b|strong|i|em|u|p|br|h[1-6]|ul|ol|li|a|div)\b/i.test(String(s || '')); }
+  function sanitizeWaiverHtml(html) {
+    let s = String(html || '');
+    s = s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, '');
+    s = s.replace(/<!--[\s\S]*?-->/g, '');
+    s = s.replace(/<(\/?)([a-zA-Z0-9]+)([^>]*)>/g, (m, slash, tag, attrs) => {
+      tag = tag.toLowerCase();
+      if (!WAIVER_ALLOWED[tag]) return '';
+      if (slash) return '</' + tag + '>';
+      if (tag === 'br') return '<br>';
+      if (tag === 'a') {
+        const hm = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+        const href = hm ? (hm[2] || hm[3] || hm[4] || '') : '';
+        if (!/^https?:\/\//i.test(href)) return '<a>';
+        return '<a href="' + href.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">';
+      }
+      return '<' + tag + '>';
+    });
+    return s;
+  }
+  function renderWaiverInto(el, text) {
+    if (!el) return;
+    if (waiverLooksHtml(text)) { el.innerHTML = sanitizeWaiverHtml(text); el.classList.add('is-html'); }
+    else { el.textContent = text || ''; el.classList.remove('is-html'); }
+  }
+
   let _waiverQueue = [], _waiverIdx = 0;
   function showWaiverStep() {
     const w = _waiverQueue[_waiverIdx];
@@ -1146,7 +1185,7 @@
     const multi = _waiverQueue.length > 1;
     $('waiver-eyebrow').textContent = multi ? `Before you play · ${_waiverIdx + 1} of ${_waiverQueue.length}` : 'Before you play';
     $('waiver-title').textContent = w.title || 'Liability Waiver & Release';
-    $('waiver-body').textContent = w.text || '';
+    renderWaiverInto($('waiver-body'), w.text);
     const agree = $('waiver-agree'), name = $('waiver-name'), err = $('waiver-err');
     if (agree) { agree.checked = false; agree.disabled = true; }   // re-lock until scrolled
     if (name) name.value = '';

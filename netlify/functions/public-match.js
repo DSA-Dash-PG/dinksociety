@@ -54,7 +54,7 @@ export default async (req) => {
     const awayId = found.teamB?.id || null;
 
     // Scores + both lineups (best-effort; lineups may be absent).
-    const scoresStore = getStore('scores');
+    const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
     const lineupStore = getStore('lineups');
     const [score, lineupA, lineupB] = await Promise.all([
       scoresStore.get(`score/${matchId}.json`, { type: 'json' }).catch(() => null),

@@ -22,7 +22,9 @@ export default async (req) => {
 
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
-  const scoresStore = getStore('scores');
+  // Strong reads: the gameday board polls live during play — eventual reads
+  // would flicker scores in and out as replicas lag behind captain writes.
+  const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
   const teamsStore = getStore('teams');
   const standingsStore = getStore('standings');
 
