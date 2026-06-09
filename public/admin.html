@@ -2792,6 +2792,7 @@
       const _bk = $id('msg-back-btn'); if (_bk) _bk.addEventListener('click', closeThreadMobile);
       // On mobile, slide the conversation in over the inbox (Option A drill-in).
       const _g = $id('msg-grid'); if (_g) _g.classList.add('msg-threadopen');
+      _msgSwipeBind();
       // refresh inbox unread state (opening marked it read server-side)
       loadInbox();
     } catch (e) {
@@ -2803,6 +2804,39 @@
   // (Desktop ignores the .msg-threadopen class — the two-pane stays put.)
   function closeThreadMobile() {
     const g = $id('msg-grid'); if (g) g.classList.remove('msg-threadopen');
+  }
+
+  // Swipe-right-to-go-back on the mobile conversation panel. Bound once; the
+  // panel follows the finger and snaps closed past ~80px. Vertical drags fall
+  // through to normal scrolling (we only hijack clearly-horizontal moves).
+  function _msgSwipeBind() {
+    const card = $id('msg-thread-card');
+    if (!card || card.dataset.swipeBound) return;
+    card.dataset.swipeBound = '1';
+    let x0 = 0, y0 = 0, dx = 0, horiz = false, dragging = false;
+    card.addEventListener('touchstart', (e) => {
+      if (!card.classList.contains || window.innerWidth > 760) { dragging = false; return; }
+      const t = e.touches[0]; x0 = t.clientX; y0 = t.clientY; dx = 0; horiz = false; dragging = true;
+    }, { passive: true });
+    card.addEventListener('touchmove', (e) => {
+      if (!dragging) return;
+      const t = e.touches[0]; const mx = t.clientX - x0, my = t.clientY - y0;
+      if (!horiz) {
+        if (Math.abs(mx) < 8 && Math.abs(my) < 8) return;     // not moved enough yet
+        if (Math.abs(my) > Math.abs(mx)) { dragging = false; return; } // vertical → let it scroll
+        horiz = true; card.style.transition = 'none';
+      }
+      dx = Math.max(0, mx);
+      card.style.transform = 'translateX(' + dx + 'px)';
+    }, { passive: true });
+    const end = () => {
+      if (!dragging) return; dragging = false;
+      card.style.transition = '';
+      if (horiz && dx > 80) closeThreadMobile();
+      card.style.transform = '';
+    };
+    card.addEventListener('touchend', end);
+    card.addEventListener('touchcancel', end);
   }
 
   async function sendReply(teamId) {
