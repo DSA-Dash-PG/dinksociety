@@ -297,6 +297,18 @@
     .ri__name:focus { outline: none; border-color: var(--color-lime); }
     .ri__remove { background: none; border: none; color: var(--color-text-faint); cursor: pointer; font-size: 16px; padding: 2px 4px; transition: color 0.15s; flex-shrink: 0; }
     .ri__remove:hover { color: #ef4444; }
+    .ri__archive { background: var(--color-surface-3); border: 1px solid var(--color-border-strong); color: var(--color-text-muted); cursor: pointer; font-family: inherit; font-size: 10px; font-weight: 700; padding: 4px 9px; border-radius: var(--radius-full); flex-shrink: 0; transition: all 0.15s; }
+    .ri__archive:hover { background: var(--color-surface-4); color: var(--color-text); }
+    /* Archived roster section (admin panel) */
+    .ri-arch { margin-top: 12px; border-top: 1px solid var(--color-border); padding-top: 10px; }
+    .ri-arch__head { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); margin: 0 0 8px 2px; }
+    .ri-arch__row { display: flex; align-items: center; gap: 9px; padding: 7px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 6px; background: var(--color-surface-2); opacity: 0.8; }
+    .ri-arch__row .ri__avatar { filter: grayscale(0.6); width: 24px; height: 24px; font-size: 10px; }
+    .ri-arch__info { flex: 1; min-width: 0; }
+    .ri-arch__name { font-size: 12px; font-weight: 600; }
+    .ri-arch__meta { font-size: 9px; color: var(--color-text-faint); margin-top: 1px; }
+    .ri-arch__restore { background: var(--color-lime-dim); color: var(--color-lime); border: none; border-radius: var(--radius-full); font-family: inherit; font-size: 10px; font-weight: 700; padding: 4px 11px; cursor: pointer; flex-shrink: 0; }
+    .ri-arch__restore:disabled { opacity: 0.5; cursor: default; }
     .ri__body { padding: 0 12px 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
     .ri__field { display: flex; flex-direction: column; gap: 3px; }
     .ri__field--full { grid-column: 1 / -1; }
@@ -2194,6 +2206,7 @@
   const AL_LABELS = {
     'admin.login': 'Admin login', 'captain.login': 'Captain login', 'player.login': 'Player login',
     'player.added': 'Player added', 'player.removed': 'Player removed', 'player.transferred': 'Player traded',
+    'player.archived': 'Player archived', 'player.restored': 'Player restored',
     'contact.updated': 'Contact updated', 'captain.set': 'Captain set', 'cocaptain.set': 'Co-captain set', 'cocaptain.removed': 'Co-captain removed',
     'team.updated': 'Team updated', 'roster.replaced': 'Roster replaced',
     'transfer.requested': 'Transfer requested', 'transfer.denied': 'Transfer denied',
@@ -3761,15 +3774,17 @@
   function renderRosterItems(roster) {
     if (!roster.length) return '<div class="empty" style="padding:12px;">No players on roster.</div>';
     // Sort alphabetically; preserve original index so actions reference the right slot
-    const sorted = roster.map((p, i) => [p, i]).sort((a, b) => (a[0].name||'').localeCompare(b[0].name||''));
-    return sorted.map(([p, i]) => {
+    const active = roster.map((p, i) => [p, i]).filter(([p]) => !p.archived).sort((a, b) => (a[0].name||'').localeCompare(b[0].name||''));
+    const archived = roster.map((p, i) => [p, i]).filter(([p]) => p.archived).sort((a, b) => (a[0].name||'').localeCompare(b[0].name||''));
+    const activeHtml = active.map(([p, i]) => {
       const roleClass = p.isCaptain ? 'ri--captain' : p.isCoCaptain ? 'ri--cocaptain' : '';
       const color = riColor(p.name);
       return '<div class="ri ' + roleClass + '" data-idx="' + i + '">' +
         '<div class="ri__head">' +
           '<div class="ri__avatar" style="background:' + color + '">' + riInit(p.name) + '</div>' +
           '<input type="text" class="ri__name" data-field="name" value="' + h(p.name) + '" placeholder="Player name">' +
-          '<button class="ri__remove" data-action="remove" data-idx="' + i + '" title="Remove">✕</button>' +
+          '<button class="ri__archive" data-action="archive" data-idx="' + i + '" title="Archive (reversible)">Archive</button>' +
+          '<button class="ri__remove" data-action="remove" data-idx="' + i + '" title="Delete permanently">✕</button>' +
         '</div>' +
         '<div class="ri__body">' +
           '<div class="ri__field ri__field--full">' +
@@ -3796,11 +3811,29 @@
         '</div>' +
       '</div>';
     }).join('');
+
+    const archivedHtml = archived.length ? (
+      '<div class="ri-arch">' +
+        '<div class="ri-arch__head">Archived · ' + archived.length + '</div>' +
+        archived.map(([p, i]) =>
+          '<div class="ri-arch__row" data-idx="' + i + '">' +
+            '<div class="ri__avatar" style="background:' + riColor(p.name) + '">' + riInit(p.name) + '</div>' +
+            '<div class="ri-arch__info"><div class="ri-arch__name">' + h(p.name) + '</div>' +
+              (p.archivedAt ? '<div class="ri-arch__meta">Archived ' + h(new Date(p.archivedAt).toLocaleDateString('en-US',{month:'short',day:'numeric'})) + (p.archivedBy ? ' · ' + h(p.archivedBy) : '') + '</div>' : '') +
+            '</div>' +
+            '<button class="ri-arch__restore" data-action="restore" data-idx="' + i + '">Restore</button>' +
+            '<button class="ri__remove" data-action="remove" data-idx="' + i + '" title="Delete permanently">✕</button>' +
+          '</div>'
+        ).join('') +
+      '</div>'
+    ) : '';
+
+    return (active.length ? activeHtml : '<div class="empty" style="padding:12px;">No active players.</div>') + archivedHtml;
   }
 
   function wireRosterActions() {
     $id('tdp-roster').querySelectorAll('[data-action]').forEach(btn => {
-      btn.addEventListener('click', (e) => {
+      btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const idx = parseInt(btn.dataset.idx);
         const action = btn.dataset.action;
@@ -3815,9 +3848,20 @@
           if (roster[idx]) roster[idx].isCoCaptain = true;
         } else if (action === 'set-player') {
           if (roster[idx]) { roster[idx].isCaptain = false; roster[idx].isCoCaptain = false; }
+        } else if (action === 'archive' || action === 'restore') {
+          // Reversible — handled server-side immediately (a plain roster save
+          // can't flip the flag), then mirrored locally so panel edits persist.
+          const p = roster[idx];
+          if (!p?.id) { // unsaved new player — archive is meaningless, just drop
+            if (action === 'archive') roster.splice(idx, 1);
+          } else {
+            const okFlip = await archivePlayerAdmin(currentPanelTeam.id, p.id, action, btn);
+            if (!okFlip) return; // server rejected — leave the row unchanged
+            if (action === 'archive') { p.archived = true; p.archivedAt = new Date().toISOString(); p.isCoCaptain = false; }
+            else { delete p.archived; delete p.archivedAt; delete p.archivedBy; }
+          }
         } else if (action === 'remove') {
-          if (roster.length <= 4) { alert('Cannot remove — team needs at least 4 players.'); return; }
-          if (!confirm('Remove ' + (roster[idx]?.name || 'this player') + ' from roster?')) return;
+          if (!confirm('Permanently delete ' + (roster[idx]?.name || 'this player') + '? This cannot be undone — use Archive to keep their record.')) return;
           roster.splice(idx, 1);
         }
         currentPanelTeam.roster = roster;
@@ -3825,6 +3869,22 @@
         wireRosterActions();
       });
     });
+  }
+
+  // Immediate archive/restore via the admin-teams action endpoint. Returns
+  // true on success, false (with an alert) on failure so the caller can abort.
+  async function archivePlayerAdmin(teamId, playerId, action, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(teamId) + '&action=' + (action === 'archive' ? 'archive-player' : 'restore-player'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ playerId }),
+      });
+      return true;
+    } catch (e) {
+      alert((action === 'archive' ? 'Archive' : 'Restore') + ' failed: ' + (e.message || 'unknown'));
+      if (btn) btn.disabled = false;
+      return false;
+    }
   }
 
   // ── Save panel changes ──

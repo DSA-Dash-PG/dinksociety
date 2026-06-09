@@ -105,7 +105,8 @@ export default async (req) => {
     teamStanding = standings.divisions[division].teams.find(t => t.teamId === teamId) || null;
   }
   const teamCapEmail = (team.captainEmail || '').toLowerCase();
-  const roster = (team.roster || []).map(p => ({
+  // Archived teammates drop off the Team tab (but the viewer always sees themselves).
+  const roster = (team.roster || []).filter(p => !p.archived || p.id === playerId).map(p => ({
     id: p.id, name: p.name, gender: p.gender || null,
     dsr: players[p.id]?.composite != null ? Math.round(players[p.id].composite * 10) / 10 : null,
     me: p.id === playerId,

@@ -159,6 +159,17 @@
     /* Roster list — read-only rows, tap to edit in the sheet */
     .ros-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 4px; border: none; border-bottom: 1px solid var(--color-border); background: none; color: var(--color-text); font-family: inherit; cursor: pointer; text-align: left; }
     .ros-row:last-child { border-bottom: none; }
+    /* Archived players — collapsed section under the active roster */
+    .ros-arch { margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 8px; }
+    .ros-arch__head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 4px; background: none; border: none; color: var(--color-text-faint); font-family: inherit; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; }
+    .ros-arch__n { display: inline-block; min-width: 16px; padding: 1px 6px; border-radius: var(--radius-full); background: var(--color-surface-3); color: var(--color-text-muted); font-size: 10px; margin-left: 6px; }
+    .ros-arch__chev { font-size: 10px; transition: transform 0.18s ease; }
+    .ros-arch__row { display: flex; align-items: center; gap: 12px; padding: 10px 4px; border-bottom: 1px solid var(--color-border); opacity: 0.75; }
+    .ros-arch__row:last-child { border-bottom: none; }
+    .ros-arch__row .ros-av { filter: grayscale(0.6); }
+    .ros-arch__meta { display: block; font-size: 10px; color: var(--color-text-faint); margin-top: 1px; }
+    .ros-arch__restore { margin-left: auto; flex-shrink: 0; background: var(--color-lime-dim); color: var(--color-lime); border: none; border-radius: var(--radius-full); font-family: inherit; font-size: 11px; font-weight: 700; padding: 6px 14px; cursor: pointer; }
+    .ros-arch__restore:disabled { opacity: 0.5; cursor: default; }
     .ros-row:hover { background: var(--color-surface-2); }
     div.ros-row { cursor: default; }
     div.ros-row:hover { background: none; }
@@ -936,7 +947,7 @@
     <div class="ros-f" id="rp-cocaptain-note" style="display:none;font-size:11px;color:var(--color-text-faint);text-align:center;margin-top:8px;line-height:1.45;">A co-captain can set lineups and enter scores when you can't make a match.</div>
     <div style="display: flex; gap: 18px; justify-content: center; margin-top: 14px;">
       <button id="rp-transfer" style="background:none;border:none;color:var(--color-text-faint);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">⇄ Request transfer</button>
-      <button id="rp-remove" style="background:none;border:none;color:var(--color-red);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Remove from roster</button>
+      <button id="rp-remove" style="background:none;border:none;color:var(--color-text-muted);font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;">Archive player</button>
     </div>
   </div>
 
@@ -1216,7 +1227,7 @@
     }
 
     function updateGenderWarning() {
-      const missing = (state.roster || []).filter(p => !p.gender || !['M','F'].includes(p.gender));
+      const missing = activeRoster().filter(p => !p.gender || !['M','F'].includes(p.gender));
       const banner = $id('gender-warning-banner');
       // Only surface the floating banner on the schedule list and roster views.
       // Next-match dispatcher renders its own state-0 view (more prominent),
@@ -1239,7 +1250,7 @@
     });
 
     function maybeShowGenderWarning() {
-      const missing = state.roster.filter(p => !p.gender);
+      const missing = activeRoster().filter(p => !p.gender);
       const banner = $id('gender-warning');
       if (!banner) return;
       if (missing.length === 0) {
@@ -1571,9 +1582,9 @@
       document.querySelectorAll('.cap-tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab === 'next'));
       stopPolling();
 
-      // STATE 0 — Roster incomplete
-      const missingGender = (state.roster || []).filter(p => !p.gender || !['M', 'F'].includes(p.gender));
-      const rosterEmpty = (state.roster || []).length === 0;
+      // STATE 0 — Roster incomplete (archived players don't count)
+      const missingGender = activeRoster().filter(p => !p.gender || !['M', 'F'].includes(p.gender));
+      const rosterEmpty = activeRoster().length === 0;
       if (rosterEmpty) {
         renderRosterIncomplete({ empty: true });
         return;
@@ -1697,7 +1708,7 @@
       ` : `
         <h2 class="cap-hero__heading">Finish your roster first.</h2>
         <p class="cap-hero__body">
-          <strong>${missing.length} of ${(state.roster || []).length} players</strong> don't have a gender set. We need this to enforce women's / men's / mixed slots when you lock a lineup.
+          <strong>${missing.length} of ${activeRoster().length} players</strong> don't have a gender set. We need this to enforce women's / men's / mixed slots when you lock a lineup.
         </p>
         <div class="cap-hero__missing-box">
           <div class="cap-hero__missing-label">Needs gender</div>
@@ -2051,7 +2062,7 @@
      * object { minWomen, minMen, women, men, noGender } or null if OK.
      */
     function lineupRosterShortfall() {
-      const roster = state.roster || [];
+      const roster = activeRoster();
       let womenDemand = 0, menDemand = 0;
       for (const key in SLOT_RULES) {
         const t = SLOT_RULES[key].type;
@@ -2094,7 +2105,7 @@
       // Phones get the tap-to-assign builder; desktop keeps the dropdown grid.
       if (typeof isMobileCap === 'function' && isMobileCap() && !locked && !revealed) { renderMobileLineup(); return; }
 
-      const roster = state.roster || [];
+      const roster = activeRoster();
       const container = $id('lineup-builder');
 
       const renderGame = (slotKey) => {
@@ -3149,9 +3160,13 @@
       const capEmail = (state.me?.team?.captainEmail || '').toLowerCase();
       return !!p.isCaptain || (!!capEmail && (p.email || '').toLowerCase() === capEmail);
     }
+    // Active = everyone not archived. Archived players keep their record + past
+    // games but leave the active roster, lineups, and capacity counts.
+    function activeRoster() { return (state.roster || []).filter(p => !p.archived); }
+    function archivedRoster() { return (state.roster || []).filter(p => p.archived); }
     function rosterSorted() {
       const rank = (p) => isCap(p) ? 0 : p.isCoCaptain ? 1 : 2;
-      return (state.roster || []).slice().sort((a, b) =>
+      return activeRoster().slice().sort((a, b) =>
         rank(a) - rank(b) || (a.name || '').localeCompare(b.name || ''));
     }
 
@@ -3208,14 +3223,66 @@
       }
 
       if (addBtn) addBtn.style.display = '';
-      if (!state.roster.length) {
+      const archived = archivedRoster();
+      if (!activeRoster().length && !archived.length) {
         container.innerHTML = '<div class="empty-state">Add your first player below.</div>';
         return;
       }
-      container.innerHTML = rosterSorted().map(p => rosterRowHtml(p, false)).join('');
+      const archivedBlock = archived.length ? `
+        <div class="ros-arch">
+          <button type="button" class="ros-arch__head" id="ros-arch-toggle">
+            <span>Archived <span class="ros-arch__n">${archived.length}</span></span>
+            <span class="ros-arch__chev">▼</span>
+          </button>
+          <div class="ros-arch__list" id="ros-arch-list" style="display:none;">
+            ${archived.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(p => `
+              <div class="ros-arch__row">
+                <span class="ros-av">${escapeHtml(initialsOf(p.name || '?'))}</span>
+                <span class="ros-body"><span class="ros-name">${escapeHtml(p.name)}</span><span class="ros-arch__meta">Archived${p.archivedAt ? ' · ' + escapeHtml(fmtArchivedDate(p.archivedAt)) : ''}</span></span>
+                <button type="button" class="ros-arch__restore" data-restore="${escapeAttr(p.id)}">Restore</button>
+              </div>`).join('')}
+          </div>
+        </div>` : '';
+      container.innerHTML = (activeRoster().length ? rosterSorted().map(p => rosterRowHtml(p, false)).join('') : '<div class="empty-state">No active players — restore one below or add a new player.</div>') + archivedBlock;
       container.querySelectorAll('.ros-row[data-rid]').forEach(row => {
         row.addEventListener('click', () => openRosterEditor(Number(row.dataset.rid)));
       });
+      const archToggle = $id('ros-arch-toggle');
+      if (archToggle) archToggle.addEventListener('click', () => {
+        const list = $id('ros-arch-list');
+        const open = list.style.display !== 'none';
+        list.style.display = open ? 'none' : '';
+        archToggle.querySelector('.ros-arch__chev').style.transform = open ? '' : 'rotate(180deg)';
+      });
+      container.querySelectorAll('[data-restore]').forEach(btn => {
+        btn.addEventListener('click', () => archivePlayer(btn.dataset.restore, 'restore', btn));
+      });
+    }
+
+    function fmtArchivedDate(iso) {
+      try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); }
+      catch { return ''; }
+    }
+
+    // Archive or restore a player via the server (flag flip, not array replace),
+    // then refresh the roster so active lists/lineups update.
+    async function archivePlayer(playerId, action, btn) {
+      if (!playerId) return;
+      if (btn) { btn.disabled = true; btn.textContent = action === 'archive' ? 'Archiving…' : 'Restoring…'; }
+      try {
+        const res = await fetch('/.netlify/functions/captain-archive-player?action=' + action, {
+          method: 'POST', credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId }),
+        });
+        const d = await res.json();
+        if (!res.ok) throw new Error(d.error || 'Could not update player.');
+        await loadRoster(true);
+        renderRoster();
+      } catch (e) {
+        alert(e.message || 'Could not update player.');
+        if (btn) { btn.disabled = false; btn.textContent = action === 'archive' ? 'Archive' : 'Restore'; }
+      }
     }
 
     // ── Roster editor sheet (the only place player info is edited) ──
@@ -3315,8 +3382,14 @@
     $id('rp-remove').addEventListener('click', () => {
       if (rpIdx == null) return;
       const p = state.roster[rpIdx];
-      if (!confirm(`Remove ${p.name} from the roster?`)) return;
-      saveRosterArray(state.roster.filter((_, i) => i !== rpIdx), 'Player removed.');
+      if (!p?.id) { // unsaved new player — just drop it locally
+        saveRosterArray(state.roster.filter((_, i) => i !== rpIdx), 'Player removed.');
+        closeRosterEditor();
+        return;
+      }
+      if (!confirm(`Archive ${p.name}? They'll leave the active roster and lineups but keep their stats — you can restore them anytime.`)) return;
+      closeRosterEditor();
+      archivePlayer(p.id, 'archive');
     });
 
     $id('rp-transfer').addEventListener('click', () => {
@@ -3632,14 +3705,14 @@
     }
     function lineupCounts() {
       const c = {};
-      (state.roster || []).forEach(p => { c[p.id] = 0; });
+      activeRoster().forEach(p => { c[p.id] = 0; });
       SLOT_KEYS.forEach(k => { const g = state.lineupDraft[k]; if (!g) return; [g.p1, g.p2].forEach(id => { if (id) c[id] = (c[id] || 0) + 1; }); });
       return c;
     }
     function renderMobileLineup() {
       const counts = lineupCounts();
       const setCount = SLOT_KEYS.filter(k => state.lineupDraft[k]?.p1 && state.lineupDraft[k]?.p2).length;
-      const chips = (state.roster || []).map(p => {
+      const chips = activeRoster().map(p => {
         const atCap = (counts[p.id] || 0) >= LINEUP_MAX_GAMES;
         return `<span class="lmob-chip ${atCap ? 'is-cap' : ''}"><span class="lmob-dot ${p.gender === 'F' ? 'is-f' : 'is-m'}"></span>${escapeHtml(p.name)} <b>${counts[p.id] || 0}/${LINEUP_MAX_GAMES}</b></span>`;
       }).join('');
@@ -3692,7 +3765,7 @@
       capSheetCtx = { slotKey, pos };
       $id('cap-sheet-title').textContent = `${slot.label} · ${allow === 'F' ? 'Woman' : 'Man'}`;
       $id('cap-sheet-sub').textContent = `Round ${slot.round}, Game ${slot.game} · same time as G${pairedGame.game} · max ${LINEUP_MAX_GAMES} games/night`;
-      const elig = (state.roster || []).filter(p => p.gender === allow);
+      const elig = activeRoster().filter(p => p.gender === allow);
       let rows;
       if (!elig.length) {
         rows = `<div class="empty-state">No ${allow === 'F' ? 'women' : 'men'} on your roster with a gender set. Add them in the Roster tab.</div>`;

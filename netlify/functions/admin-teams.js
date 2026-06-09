@@ -84,19 +84,26 @@ export default async (req) => {
 
     // Handle roster replacement (full roster array)
     if (body.roster && Array.isArray(body.roster)) {
-      team.roster = body.roster.map(p => ({
-        id: p.id || generatePlayerId(),
-        name: (p.name || '').trim(),
-        email: p.email || null,
-        phone: p.phone || null,
-        // Keep normalized keys in sync so player magic-link login keeps working.
-        normalizedEmail: normalizeEmail(p.email),
-        normalizedPhone: normalizePhone(p.phone),
-        gender: p.gender || '',
-        dupr: p.dupr || null,
-        isCaptain: !!p.isCaptain,
-        isCoCaptain: !!p.isCoCaptain,
-      })).filter(p => p.name);
+      // Archive state is owned by the archive/restore actions — preserve it from
+      // the stored roster by id so a plain roster save can't flip or wipe it.
+      const prevById = new Map((team.roster || []).map(x => [x.id, x]));
+      team.roster = body.roster.map(p => {
+        const prev = prevById.get(p.id) || null;
+        return {
+          id: p.id || generatePlayerId(),
+          name: (p.name || '').trim(),
+          email: p.email || null,
+          phone: p.phone || null,
+          // Keep normalized keys in sync so player magic-link login keeps working.
+          normalizedEmail: normalizeEmail(p.email),
+          normalizedPhone: normalizePhone(p.phone),
+          gender: p.gender || '',
+          dupr: p.dupr || null,
+          isCaptain: !!p.isCaptain,
+          isCoCaptain: !!p.isCoCaptain,
+          ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),
+        };
+      }).filter(p => p.name);
     }
 
     // Captain is anchored to captainEmail (the login identity). Adding or editing
@@ -226,6 +233,39 @@ export default async (req) => {
         rebuildStandings(circuitCode(team.circuit)).catch(err =>
           console.error('rebuildStandings after remove-player failed:', err));
         return json({ ok: true, removed, rosterCount: roster.length });
+      }
+
+      case 'archive-player':
+      case 'restore-player': {
+        const roster = team.roster || [];
+        const target = roster.find(p => p.id === body.playerId);
+        if (!target) return json({ error: 'Player not found on team' }, 404);
+        const archiving = action === 'archive-player';
+        if (archiving && target.isCaptain) {
+          return json({ error: 'The team captain cannot be archived. Reassign the captain role first.' }, 400);
+        }
+        if (archiving) {
+          target.archived = true;
+          target.archivedAt = now;
+          target.archivedBy = admin.email;
+          target.isCoCaptain = false;
+        } else {
+          delete target.archived; delete target.archivedAt; delete target.archivedBy;
+        }
+        team.roster = roster;
+        team.updatedAt = now;
+        team.updatedBy = admin.email;
+        await store.setJSON(teamKey, team);
+        await logActivity({
+          type: archiving ? 'player.archived' : 'player.restored',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          player: { id: target.id, name: target.name },
+          details: `${target.name} ${archiving ? 'archived' : 'restored'} on ${team.name}`,
+        }).catch(() => {});
+        rebuildStandings(circuitCode(team.circuit)).catch(err =>
+          console.error('rebuildStandings after archive failed:', err));
+        return json({ ok: true, action, player: { id: target.id, name: target.name, archived: !!target.archived }, activeCount: roster.filter(p => !p.archived).length });
       }
 
       case 'set-captain': {

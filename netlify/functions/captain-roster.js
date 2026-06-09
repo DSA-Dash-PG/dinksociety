@@ -90,6 +90,9 @@ export default async (req) => {
           linkedUserId: p.linkedUserId || (prev ? prev.linkedUserId : null) || null,
           ...(prev?.isCaptain ? { isCaptain: true } : {}),
           ...(prev?.isCoCaptain ? { isCoCaptain: true } : {}),
+          // Archive state is owned by the archive/restore endpoint — preserve it
+          // from the stored roster so an ordinary roster save can't flip or wipe it.
+          ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),
         });
       }
 

@@ -58,7 +58,7 @@ export default async (req) => {
           photoUrl: team.photo?.updatedAt
             ? `/.netlify/functions/team-photo-serve?id=${encodeURIComponent(team.id)}&v=${encodeURIComponent(team.photo.updatedAt)}`
             : null,
-          roster: (team.roster || []).map(p => ({
+          roster: (team.roster || []).filter(p => !p.archived).map(p => ({
             name: p.name,
             gender: p.gender || '',
             dupr: p.dupr || null,
