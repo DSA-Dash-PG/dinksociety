@@ -832,6 +832,15 @@
     .cannounce__panel { display: none; padding: 0 13px 13px 51px; }
     .cannounce.is-open .cannounce__panel { display: block; }
     .cannounce__b { font-size: 12px; color: var(--color-text-muted); line-height: 1.5; white-space: pre-wrap; }
+    .cannounce__b.is-html { white-space: normal; }
+    .cannounce__b.is-html p { margin: 0 0 8px; }
+    .cannounce__b.is-html h2, .cannounce__b.is-html h3, .cannounce__b.is-html h4 { font-size: 13px; font-weight: 800; color: var(--color-text); margin: 10px 0 4px; }
+    .cannounce__b.is-html ul, .cannounce__b.is-html ol { margin: 0 0 8px; padding-left: 18px; }
+    .cannounce__b.is-html b, .cannounce__b.is-html strong { color: var(--color-text); font-weight: 800; }
+    .cannounce__b.is-html a { color: var(--color-lime); }
+    .cannounce__att { display: flex; flex-direction: column; gap: 5px; margin-top: 10px; }
+    .cannounce__att a { font-size: 12px; color: var(--color-lime); text-decoration: none; }
+    .cannounce__att span { color: var(--color-text-faint); font-size: 11px; }
     .cannounce__got { margin-top: 11px; padding: 8px 16px; border-radius: var(--radius-full); border: 1px solid rgba(240,192,64,0.4); background: var(--color-gold-dim); color: var(--color-gold); font-weight: 800; font-size: 12px; font-family: inherit; cursor: pointer; }
 
     /* set-based mobile scoresheet — same ringed-set structure as the Lineup tab */
@@ -3473,6 +3482,31 @@
     }
     function escapeAttr(s) { return escapeHtml(s); }
 
+    // Rich-announcement rendering — same tag allowlist as the league waiver
+    // editor, so admin-authored broadcast markup is safe to inject here.
+    const ANNOUNCE_ALLOWED = { b:1, strong:1, i:1, em:1, u:1, p:1, br:1, h2:1, h3:1, h4:1, ul:1, ol:1, li:1, a:1, div:1 };
+    function announceLooksHtml(s) { return /<(\/?)(b|strong|i|em|u|p|br|h[1-6]|ul|ol|li|a|div)\b/i.test(String(s || '')); }
+    function sanitizeAnnounceHtml(html) {
+      let s = String(html || '');
+      s = s.replace(/<(script|style)[\s\S]*?<\/\1>/gi, '');
+      s = s.replace(/<!--[\s\S]*?-->/g, '');
+      s = s.replace(/<(\/?)([a-zA-Z0-9]+)([^>]*)>/g, (m, slash, tag, attrs) => {
+        tag = tag.toLowerCase();
+        if (!ANNOUNCE_ALLOWED[tag]) return '';
+        if (slash) return '</' + tag + '>';
+        if (tag === 'br') return '<br>';
+        if (tag === 'a') {
+          const hm = attrs.match(/\bhref\s*=\s*("([^"]*)"|'([^']*)'|([^\s>]+))/i);
+          const href = hm ? (hm[2] || hm[3] || hm[4] || '') : '';
+          if (!/^https?:\/\//i.test(href)) return '<a>';
+          return '<a href="' + href.replace(/"/g, '&quot;') + '" target="_blank" rel="noopener noreferrer">';
+        }
+        return '<' + tag + '>';
+      });
+      return s;
+    }
+    function fmtFileSize(b) { const n = Number(b) || 0; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(0) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
+
     // ===== Mobile drawer =====
     (function setupCaptainDrawer() {
       const ham = document.getElementById('ds-av-cap'); // avatar is the menu trigger
@@ -4089,9 +4123,18 @@
       let announce = '';
       const ann = (state.me?.announcements || []).find(a => a && a.id && !capAnnIsRead(a.id));
       if (ann) {
+        const hasHtml = ann.bodyHtml && announceLooksHtml(ann.bodyHtml);
         const lines = String(ann.body || '').split('\n').map(s => s.trim()).filter(Boolean);
-        const title = ann.subject || lines[0] || 'League announcement';
-        const rest = ann.subject ? lines.join('\n') : lines.slice(1).join('\n');
+        const title = ann.subject || (hasHtml ? 'League announcement' : (lines[0] || 'League announcement'));
+        let bodyEl = '';
+        if (hasHtml) {
+          bodyEl = `<div class="cannounce__b is-html">${sanitizeAnnounceHtml(ann.bodyHtml)}</div>`;
+        } else {
+          const rest = ann.subject ? lines.join('\n') : lines.slice(1).join('\n');
+          bodyEl = rest ? `<div class="cannounce__b">${escapeHtml(rest)}</div>` : '';
+        }
+        const atts = Array.isArray(ann.attachments) ? ann.attachments.filter(a => a && a.filename && a.url) : [];
+        const attEl = atts.length ? `<div class="cannounce__att">${atts.map(a => `<a href="${escapeAttr(a.url)}" target="_blank" rel="noopener noreferrer">📎 ${escapeHtml(a.filename)}${a.size ? ` <span>${fmtFileSize(a.size)}</span>` : ''}</a>`).join('')}</div>` : '';
         announce = `<div class="label">League announcement</div>
           <div class="cannounce" id="cap-announce" data-aid="${escapeAttr(ann.id)}">
             <button class="cannounce__head" id="cap-announce-toggle">
@@ -4100,7 +4143,8 @@
               <span class="cannounce__chev">▼</span>
             </button>
             <div class="cannounce__panel">
-              ${rest ? `<div class="cannounce__b">${escapeHtml(rest)}</div>` : ''}
+              ${bodyEl}
+              ${attEl}
               <button class="cannounce__got" id="cap-announce-got">Got it ✓</button>
             </div>
           </div>`;

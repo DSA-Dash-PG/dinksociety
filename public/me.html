@@ -303,6 +303,15 @@
   .announce__panel { display:none; padding:0 13px 13px 51px; }
   .announce.is-open .announce__panel { display:block; }
   .announce__body { font-size:12px; color:var(--color-text-muted); line-height:1.5; white-space:pre-wrap; word-break:break-word; }
+  .announce__body.is-html { white-space:normal; }
+  .announce__body.is-html p { margin:0 0 8px; }
+  .announce__body.is-html h2,.announce__body.is-html h3,.announce__body.is-html h4 { font-size:13px; font-weight:800; color:var(--color-text); margin:10px 0 4px; }
+  .announce__body.is-html ul,.announce__body.is-html ol { margin:0 0 8px; padding-left:18px; }
+  .announce__body.is-html b,.announce__body.is-html strong { color:var(--color-text); font-weight:800; }
+  .announce__body.is-html a { color:var(--color-gold); }
+  .announce__att { display:flex; flex-direction:column; gap:5px; margin-top:10px; }
+  .announce__att a { font-size:12px; color:var(--color-gold); text-decoration:none; }
+  .announce__att span { color:var(--color-text-faint); font-size:11px; }
   .announce__time { font-size:10px; color:var(--color-text-faint); margin-top:6px; }
   .announce__got { margin-top:11px; padding:8px 16px; border-radius:var(--radius-full); border:1px solid rgba(240,192,64,0.4); background:var(--color-gold-dim); color:var(--color-gold); font-weight:800; font-size:12px; font-family:inherit; cursor:pointer; }
 
@@ -1282,6 +1291,7 @@
   // text. Sanitize to a small allowlist before injecting. (Keep in sync with
   // the copies in public/admin.html and netlify/functions/lib/email.js.)
   const WAIVER_ALLOWED = { b:1, strong:1, i:1, em:1, u:1, p:1, br:1, h2:1, h3:1, h4:1, ul:1, ol:1, li:1, a:1, div:1 };
+  function fmtFileSize(b) { const n = Number(b) || 0; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(0) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
   function waiverLooksHtml(s) { return /<(\/?)(b|strong|i|em|u|p|br|h[1-6]|ul|ol|li|a|div)\b/i.test(String(s || '')); }
   function sanitizeWaiverHtml(html) {
     let s = String(html || '');
@@ -1610,9 +1620,19 @@
     let announce = '';
     const ann = (DATA.announcements || []).find(a => a && a.id && !annIsRead(a.id));
     if (ann) {
+      const hasHtml = ann.bodyHtml && waiverLooksHtml(ann.bodyHtml);
       const lines = String(ann.body || '').split('\n').map(s => s.trim()).filter(Boolean);
-      const title = ann.subject || lines[0] || 'League announcement';
-      const rest = ann.subject ? lines.join('\n') : lines.slice(1).join('\n');
+      const title = ann.subject || (hasHtml ? 'League announcement' : (lines[0] || 'League announcement'));
+      // Rich body → render sanitized HTML; legacy plain → keep the old split.
+      let bodyEl = '';
+      if (hasHtml) {
+        bodyEl = `<div class="announce__body is-html">${sanitizeWaiverHtml(ann.bodyHtml)}</div>`;
+      } else {
+        const rest = ann.subject ? lines.join('\n') : lines.slice(1).join('\n');
+        bodyEl = rest ? `<div class="announce__body">${esc(rest)}</div>` : '';
+      }
+      const atts = Array.isArray(ann.attachments) ? ann.attachments.filter(a => a && a.filename && a.url) : [];
+      const attEl = atts.length ? `<div class="announce__att">${atts.map(a => `<a href="${esc(a.url)}" target="_blank" rel="noopener noreferrer">📎 ${esc(a.filename)}${a.size ? ` <span>${fmtFileSize(a.size)}</span>` : ''}</a>`).join('')}</div>` : '';
       const when = ann.sentAt ? fmtChatTime(ann.sentAt) : '';
       announce = `<div class="announce" id="home-announce" data-aid="${esc(ann.id)}">
         <button class="announce__head" id="home-announce-toggle">
@@ -1624,7 +1644,8 @@
           <span class="announce__chev">▼</span>
         </button>
         <div class="announce__panel">
-          ${rest ? `<div class="announce__body">${esc(rest)}</div>` : ''}
+          ${bodyEl}
+          ${attEl}
           <div class="announce__time">${esc(when)}</div>
           <button class="announce__got" id="home-announce-got">Got it ✓</button>
         </div>

@@ -119,6 +119,24 @@
     .rt-content li { margin: 3px 0; }
     .rt-content b, .rt-content strong { color: var(--color-text); font-weight: 800; }
     .rt-content a { color: var(--color-lime); }
+    /* Broadcast composer extras */
+    .bc-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px 5px 10px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-full); background: var(--color-surface-3); font-size: 11px; color: var(--color-text); }
+    .bc-chip__sz { color: var(--color-text-faint); }
+    .bc-chip__x { border: none; background: none; color: var(--color-text-faint); cursor: pointer; font-size: 14px; line-height: 1; padding: 0 2px; }
+    .bc-chip__x:hover { color: var(--color-red); }
+    .bc-chip.is-uploading { opacity: 0.6; }
+    .bc-prev-lbl { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); margin-bottom: 5px; font-weight: 600; }
+    .bc-prev-frame { width: 100%; height: 360px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: #0e0e0e; }
+    /* Broadcast preview modal */
+    .bcp-modal { background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 14px; width: 100%; max-width: 540px; max-height: 86vh; display: flex; flex-direction: column; overflow: hidden; }
+    .bcp-tabs { display: flex; gap: 4px; margin-left: auto; margin-right: 10px; }
+    .bcp-tab { padding: 5px 12px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-full); background: var(--color-surface-3); color: var(--color-text-muted); font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .bcp-tab.is-on { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+    .bcp-scroll { overflow-y: auto; padding: 16px; }
+    .bcp-frame { width: 100%; height: 60vh; border: none; border-radius: 8px; background: #0e0e0e; }
+    .bcp-portal { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 12px; padding: 16px; }
+    .bcp-portal .rt-content { font-size: 13px; line-height: 1.6; color: var(--color-text-muted); }
+
     /* Waiver rich-text editor */
     .wv-toolbar { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px; }
     .wv-tb { min-width: 30px; height: 28px; padding: 0 7px; border: 1px solid var(--color-border-strong); border-radius: 6px; background: var(--color-surface-3); color: var(--color-text); font-size: 12px; font-family: inherit; cursor: pointer; line-height: 1; }
@@ -708,7 +726,34 @@
           <div class="am-head">
             <h1 class="am-title">Messages</h1>
             <div class="am-actions">
+              <button class="ab ab--outline ab--sm" id="msg-emailstyle-btn">✎ Email style</button>
               <button class="ab ab--lime ab--sm" id="msg-broadcast-btn">📣 New broadcast</button>
+            </div>
+          </div>
+
+          <!-- Email appearance (how league emails look) — hidden until opened -->
+          <div class="ac" id="msg-emailstyle-card" style="display:none;">
+            <div class="ac__h"><h2 class="ac__t">Email appearance</h2></div>
+            <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 12px;line-height:1.5;">Controls how every league email looks — broadcasts and 1:1 replies. Blank fields use the built-in default.</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;" class="two-col">
+              <div>
+                <div class="arow">
+                  <div class="af"><label for="et-header">Header / wordmark text</label><input type="text" id="et-header" placeholder="THE DINK SOCIETY" autocomplete="off"></div>
+                  <div class="af"><label for="et-accent">Accent color</label><input type="text" id="et-accent" placeholder="#b8ff2c" autocomplete="off"></div>
+                </div>
+                <div class="af"><label for="et-logo">Logo image URL (optional — replaces wordmark)</label><input type="text" id="et-logo" placeholder="https://… .png" autocomplete="off"></div>
+                <div class="af"><label for="et-button">Button label</label><input type="text" id="et-button" placeholder="Open captain portal" autocomplete="off"></div>
+                <div class="af"><label for="et-footer">Footer line</label><input type="text" id="et-footer" placeholder="The Dink Society · Southern California Pickleball League" autocomplete="off"></div>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:4px;">
+                  <button class="ab ab--lime ab--sm" id="et-save">Save appearance</button>
+                  <button class="ab ab--outline ab--sm" id="et-close">Done</button>
+                  <span class="a-status" id="et-status" style="display:none;"></span>
+                </div>
+              </div>
+              <div>
+                <div class="bc-prev-lbl">Live email preview</div>
+                <iframe id="et-preview" class="bc-prev-frame" title="Email preview"></iframe>
+              </div>
             </div>
           </div>
 
@@ -745,13 +790,33 @@
             <div class="arow">
               <div class="af"><label for="bc-subject">Subject (optional)</label><input type="text" id="bc-subject" placeholder="e.g. Tonight's matches delayed 1 hour" autocomplete="off"></div>
             </div>
-            <div class="af"><label for="bc-body">Message</label><textarea id="bc-body" rows="4" placeholder="Write your announcement…" style="resize:vertical;"></textarea></div>
+            <div class="af">
+              <label>Message</label>
+              <div class="wv-toolbar">
+                <button type="button" class="wv-tb" data-bccmd="bold" title="Bold"><b>B</b></button>
+                <button type="button" class="wv-tb" data-bccmd="italic" title="Italic"><i>I</i></button>
+                <button type="button" class="wv-tb" data-bccmd="underline" title="Underline"><u>U</u></button>
+                <button type="button" class="wv-tb" data-bccmd="h3" title="Heading">H</button>
+                <button type="button" class="wv-tb" data-bccmd="ul" title="Bulleted list">&bull;</button>
+                <button type="button" class="wv-tb" data-bccmd="ol" title="Numbered list">1.</button>
+                <button type="button" class="wv-tb" data-bccmd="link" title="Add link">🔗</button>
+                <button type="button" class="wv-tb" data-bccmd="clear" title="Clear formatting">⌫</button>
+              </div>
+              <div class="wv-edit rt-content" contenteditable="true" id="bc-body-rich" data-placeholder="Write your announcement… use the toolbar for bold, headings, lists, and links."></div>
+            </div>
+            <div class="af">
+              <label>Attachments (emailed as real files · PDF, images, Word, Excel)</label>
+              <div id="bc-attach-list" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;"></div>
+              <input type="file" id="bc-attach-input" multiple style="display:none;" accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt">
+              <button type="button" class="ab ab--outline ab--sm" id="bc-attach-btn">📎 Add files</button>
+            </div>
             <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:6px;flex-wrap:wrap;">
               <label style="display:flex;gap:6px;align-items:center;cursor:pointer;font-size:12px;color:var(--color-text-faint);">
                 <input type="checkbox" id="bc-email" checked> Also send email
               </label>
               <div style="display:flex;gap:8px;">
                 <button class="ab ab--outline ab--sm" id="bc-cancel">Cancel</button>
+                <button class="ab ab--ghost ab--sm" id="bc-preview">👁 Preview</button>
                 <button class="ab ab--lime ab--sm" id="bc-send">Send broadcast</button>
               </div>
             </div>
@@ -1083,6 +1148,24 @@
   <!-- Payment Manager Modal (dynamic content) -->
   <div class="pm-overlay" id="pm-overlay">
     <div class="pm-modal" id="pm-modal-inner"></div>
+  </div>
+
+  <!-- Broadcast preview: shows the email + portal exactly as recipients see them. -->
+  <div class="wvp-overlay" id="bcp-overlay" role="dialog" aria-modal="true" aria-label="Broadcast preview">
+    <div class="bcp-modal">
+      <div class="wvp-head" style="padding:14px 16px;border-bottom:1px solid var(--color-border);">
+        <b>Broadcast preview</b>
+        <div class="bcp-tabs">
+          <button class="bcp-tab is-on" data-bcp="email">Email</button>
+          <button class="bcp-tab" data-bcp="portal">In portal</button>
+        </div>
+        <button class="wvp-x" id="bcp-x" aria-label="Close preview">&times;</button>
+      </div>
+      <div class="bcp-scroll">
+        <iframe id="bcp-email" class="bcp-frame" title="Email preview"></iframe>
+        <div id="bcp-portal" class="bcp-portal" style="display:none;"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Waiver player-preview: shows the editor's live text exactly as a player sees it on login. -->
@@ -2691,6 +2774,164 @@
     } catch (e) { alert('Send failed: ' + (e.message || 'unknown')); btn.disabled = false; }
   }
 
+  // Uploaded-but-not-yet-sent attachments for the open broadcast.
+  let _bcAttachments = []; // { id, filename, size, contentType }
+
+  // Strip a sanitized rich body to plain text (client mirror of email.js).
+  function htmlToPlainClient(html) {
+    return String(html || '')
+      .replace(/<\/(p|div|h[1-6]|li|ul|ol)>/gi, '\n')
+      .replace(/<br\s*\/?>(?!$)/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+      .replace(/\n{3,}/g, '\n\n').trim();
+  }
+  function emailTemplateResolved() {
+    const t = (SETTINGS && SETTINGS.emailTemplate) || {};
+    const d = { accentColor: '#b8ff2c', headerText: 'THE DINK SOCIETY', buttonLabel: 'Open captain portal', footerText: 'The Dink Society · Southern California Pickleball League', logoUrl: '' };
+    const pick = (k) => (typeof t[k] === 'string' && t[k].trim()) ? t[k].trim() : d[k];
+    return {
+      accentColor: /^#[0-9a-fA-F]{3,8}$/.test((t.accentColor || '').trim()) ? t.accentColor.trim() : d.accentColor,
+      headerText: pick('headerText'), buttonLabel: pick('buttonLabel'), footerText: pick('footerText'),
+      logoUrl: /^https?:\/\//i.test((t.logoUrl || '').trim()) ? t.logoUrl.trim() : '',
+    };
+  }
+  // Faithful client copy of renderAdminMessage (email.js).
+  function buildEmailPreviewHtml({ subject, bodyHtml, attachments, template }) {
+    const t = template || emailTemplateResolved();
+    const header = t.logoUrl
+      ? `<img src="${h(t.logoUrl)}" alt="${h(t.headerText)}" style="max-height:40px;margin-bottom:28px;display:block;">`
+      : `<div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:32px;">${h(t.headerText)}</div>`;
+    const bodyBlock = (bodyHtml && bodyHtml.trim())
+      ? `<div style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 24px;">${sanitizeWaiverHtml(bodyHtml)}</div>`
+      : `<div style="font-size:15px;color:#666;line-height:1.65;margin:0 0 24px;font-style:italic;">(no message text)</div>`;
+    const atts = (attachments || []).filter(a => a && a.filename);
+    const attBlock = atts.length ? `<div style="margin:0 0 24px;padding:14px 16px;background:#161616;border-radius:8px;">
+        <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#8a8a8a;margin-bottom:8px;">Attachments</div>
+        ${atts.map(a => `<div style="font-size:14px;margin:4px 0;">📎 <span style="color:${h(t.accentColor)};">${h(a.filename)}</span>${a.size ? ` <span style="color:#666;font-size:12px;">(${fmtSizeClient(a.size)})</span>` : ''}</div>`).join('')}
+      </div>` : '';
+    return `<div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
+      ${header}
+      ${subject ? `<h1 style="font-size:22px;font-weight:800;color:#f5f5f5;margin:0 0 16px;">${h(subject)}</h1>` : ''}
+      ${bodyBlock}${attBlock}
+      <a href="#" style="display:inline-block;padding:14px 32px;background:${h(t.accentColor)};color:#0e0e0e;font-size:14px;font-weight:700;text-decoration:none;border-radius:9999px;">${h(t.buttonLabel)}</a>
+      <p style="font-size:13px;color:#777;margin-top:24px;line-height:1.5;">Reply to this message right inside the portal — that's the fastest way to reach the league.</p>
+      <div style="margin-top:40px;padding-top:20px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;">${h(t.footerText)}</div>
+    </div>`;
+  }
+  function fmtSizeClient(b) { const n = Number(b) || 0; if (n < 1024) return n + ' B'; if (n < 1048576) return (n / 1024).toFixed(0) + ' KB'; return (n / 1048576).toFixed(1) + ' MB'; }
+  function frameSrcdoc(inner) { return `<!DOCTYPE html><html><body style="margin:0;background:#0e0e0e;">${inner}</body></html>`; }
+
+  function bcRenderChips() {
+    const host = $id('bc-attach-list'); if (!host) return;
+    host.innerHTML = _bcAttachments.map(a => `<span class="bc-chip${a.uploading ? ' is-uploading' : ''}" data-aid="${h(a.tmpId || a.id)}">📎 ${h(a.filename)}${a.size ? ` <span class="bc-chip__sz">${fmtSizeClient(a.size)}</span>` : ''}${a.uploading ? ' …' : `<button type="button" class="bc-chip__x" data-rm="${h(a.id)}" aria-label="Remove">&times;</button>`}</span>`).join('');
+    host.querySelectorAll('[data-rm]').forEach(b => b.addEventListener('click', () => {
+      _bcAttachments = _bcAttachments.filter(a => a.id !== b.dataset.rm);
+      bcRenderChips();
+    }));
+  }
+  async function bcUploadFiles(files) {
+    for (const file of files) {
+      const tmpId = 'tmp_' + Math.random().toString(36).slice(2);
+      const placeholder = { id: tmpId, tmpId, filename: file.name, size: file.size, uploading: true };
+      _bcAttachments.push(placeholder); bcRenderChips();
+      try {
+        const fd = new FormData(); fd.append('file', file);
+        const r = await api('/.netlify/functions/broadcast-files-upload', { method: 'POST', body: fd });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || 'Upload failed');
+        Object.assign(placeholder, { id: data.id, tmpId: null, uploading: false, contentType: data.contentType });
+      } catch (e) {
+        _bcAttachments = _bcAttachments.filter(a => a !== placeholder);
+        alert('Could not attach ' + file.name + ': ' + (e.message || 'unknown'));
+      }
+      bcRenderChips();
+    }
+  }
+
+  // Rich editor: toolbar + paste-as-clean-html (mirrors the waiver editor).
+  function bcRichInit() {
+    const ed = $id('bc-body-rich'); if (!ed || ed._wired) return; ed._wired = true;
+    ed.addEventListener('paste', e => {
+      e.preventDefault();
+      const tx = (e.clipboardData || window.clipboardData).getData('text/plain');
+      document.execCommand('insertHTML', false, sanitizeWaiverHtml(mdToHtml(tx)));
+    });
+    document.querySelectorAll('[data-bccmd]').forEach(btn => {
+      btn.addEventListener('mousedown', e => e.preventDefault());
+      btn.addEventListener('click', () => {
+        ed.focus();
+        try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
+        const cmd = btn.dataset.bccmd;
+        if (cmd === 'bold') document.execCommand('bold');
+        else if (cmd === 'italic') document.execCommand('italic');
+        else if (cmd === 'underline') document.execCommand('underline');
+        else if (cmd === 'h3') document.execCommand('formatBlock', false, 'H3');
+        else if (cmd === 'ul') document.execCommand('insertUnorderedList');
+        else if (cmd === 'ol') document.execCommand('insertOrderedList');
+        else if (cmd === 'link') { const u = prompt('Link URL (https://…)'); if (u && /^https?:\/\//i.test(u)) document.execCommand('createLink', false, u); }
+        else if (cmd === 'clear') { document.execCommand('removeFormat'); document.execCommand('formatBlock', false, 'P'); }
+      });
+    });
+  }
+
+  // ── Email appearance card ──────────────────────────────────
+  function etRefreshPreview() {
+    const tpl = {
+      accentColor: ($id('et-accent').value || '').trim() || '#b8ff2c',
+      headerText: ($id('et-header').value || '').trim() || 'THE DINK SOCIETY',
+      buttonLabel: ($id('et-button').value || '').trim() || 'Open captain portal',
+      footerText: ($id('et-footer').value || '').trim() || 'The Dink Society · Southern California Pickleball League',
+      logoUrl: ($id('et-logo').value || '').trim(),
+    };
+    const html = buildEmailPreviewHtml({ subject: 'Sample subject', bodyHtml: '<p>This is how your league emails will look. <b>Bold</b>, lists, and links all render here.</p>', attachments: [{ filename: 'flyer.pdf', size: 248000 }], template: tpl });
+    $id('et-preview').srcdoc = frameSrcdoc(html);
+  }
+  function etLoadFields() {
+    const t = (SETTINGS && SETTINGS.emailTemplate) || {};
+    $id('et-header').value = t.headerText || '';
+    $id('et-accent').value = t.accentColor || '';
+    $id('et-logo').value = t.logoUrl || '';
+    $id('et-button').value = t.buttonLabel || '';
+    $id('et-footer').value = t.footerText || '';
+    etRefreshPreview();
+  }
+  async function etSave() {
+    const status = $id('et-status'); const btn = $id('et-save'); btn.disabled = true;
+    status.style.display = 'inline'; status.className = 'a-status is-info'; status.textContent = 'Saving…';
+    const emailTemplate = {
+      accentColor: ($id('et-accent').value || '').trim(),
+      headerText: ($id('et-header').value || '').trim(),
+      buttonLabel: ($id('et-button').value || '').trim(),
+      footerText: ($id('et-footer').value || '').trim(),
+      logoUrl: ($id('et-logo').value || '').trim(),
+    };
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emailTemplate }),
+      });
+      SETTINGS = { ...SETTINGS, ...data };
+      status.className = 'a-status is-ok'; status.textContent = 'Saved ✓';
+    } catch (e) {
+      status.className = 'a-status is-err'; status.textContent = e.message || 'Failed';
+    } finally { btn.disabled = false; setTimeout(() => { status.style.display = 'none'; }, 4000); }
+  }
+
+  function openBcPreview() {
+    const subject = ($id('bc-subject').value || '').trim();
+    const bodyHtml = sanitizeWaiverHtml($id('bc-body-rich').innerHTML).trim();
+    const ready = _bcAttachments.filter(a => !a.uploading);
+    $id('bcp-email').srcdoc = frameSrcdoc(buildEmailPreviewHtml({ subject, bodyHtml, attachments: ready }));
+    // Portal view = what a captain/player sees on their home announcement.
+    const attLinks = ready.length ? `<div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">${ready.map(a => `<span style="font-size:12px;color:var(--color-lime);">📎 ${h(a.filename)} <span style="color:var(--color-text-faint);">${fmtSizeClient(a.size)}</span></span>`).join('')}</div>` : '';
+    $id('bcp-portal').innerHTML = `<div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;margin-bottom:6px;">📣 League announcement</div>${subject ? `<div style="font-size:15px;font-weight:800;margin-bottom:8px;color:var(--color-text);">${h(subject)}</div>` : ''}<div class="rt-content">${bodyHtml || '<span style="color:var(--color-text-faint)">(no message text)</span>'}</div>${attLinks}`;
+    // default to email tab
+    document.querySelectorAll('.bcp-tab').forEach(x => x.classList.toggle('is-on', x.dataset.bcp === 'email'));
+    $id('bcp-email').style.display = ''; $id('bcp-portal').style.display = 'none';
+    $id('bcp-overlay').classList.add('is-open');
+  }
+  function closeBcPreview() { $id('bcp-overlay').classList.remove('is-open'); }
+
   function setupMsgUI() {
     if (_msgWired) return;
     _msgWired = true;
@@ -2699,6 +2940,8 @@
     $id('msg-broadcast-btn').addEventListener('click', () => {
       card.style.display = card.style.display === 'none' ? 'block' : 'none';
       if (card.style.display === 'block') {
+        $id('msg-emailstyle-card').style.display = 'none';
+        bcRichInit();
         // Populate division + team pickers fresh each open
         const dv = $id('bc-division');
         dv.innerHTML = DIVISIONS.map(d => '<option value="' + h(d.id) + '">' + h(d.name) + '</option>').join('');
@@ -2714,17 +2957,47 @@
       $id('bc-teams-wrap').style.display = e.target.value === 'teams' ? '' : 'none';
     });
     $id('bc-send').addEventListener('click', sendBroadcast);
+    $id('bc-preview').addEventListener('click', openBcPreview);
+
+    // Attachments
+    $id('bc-attach-btn').addEventListener('click', () => $id('bc-attach-input').click());
+    $id('bc-attach-input').addEventListener('change', (e) => { bcUploadFiles([...e.target.files]); e.target.value = ''; });
+
+    // Preview modal controls
+    $id('bcp-x').addEventListener('click', closeBcPreview);
+    $id('bcp-overlay').addEventListener('click', e => { if (e.target === $id('bcp-overlay')) closeBcPreview(); });
+    document.querySelectorAll('.bcp-tab').forEach(tab => tab.addEventListener('click', () => {
+      const which = tab.dataset.bcp;
+      document.querySelectorAll('.bcp-tab').forEach(x => x.classList.toggle('is-on', x === tab));
+      $id('bcp-email').style.display = which === 'email' ? '' : 'none';
+      $id('bcp-portal').style.display = which === 'portal' ? '' : 'none';
+    }));
+
+    // Email appearance card
+    const esCard = $id('msg-emailstyle-card');
+    $id('msg-emailstyle-btn').addEventListener('click', () => {
+      const open = esCard.style.display === 'none';
+      esCard.style.display = open ? 'block' : 'none';
+      if (open) { card.style.display = 'none'; etLoadFields(); }
+    });
+    $id('et-close').addEventListener('click', () => { esCard.style.display = 'none'; });
+    $id('et-save').addEventListener('click', etSave);
+    ['et-header', 'et-accent', 'et-logo', 'et-button', 'et-footer'].forEach(id => $id(id).addEventListener('input', etRefreshPreview));
   }
 
   async function sendBroadcast() {
     const scope = $id('bc-scope').value;
-    const body = ($id('bc-body').value || '').trim();
+    const bodyHtml = sanitizeWaiverHtml($id('bc-body-rich').innerHTML).trim();
+    const body = htmlToPlainClient(bodyHtml);
     const subject = ($id('bc-subject').value || '').trim();
     const status = $id('bc-status');
-    if (!body) { status.style.display = 'block'; status.className = 'a-status is-err'; status.textContent = 'Message body is required.'; return; }
+    const ready = _bcAttachments.filter(a => !a.uploading);
+    if (_bcAttachments.some(a => a.uploading)) { status.style.display = 'block'; status.className = 'a-status is-err'; status.textContent = 'Wait for attachments to finish uploading.'; return; }
+    if (!body && !ready.length) { status.style.display = 'block'; status.className = 'a-status is-err'; status.textContent = 'Add a message or at least one attachment.'; return; }
 
     const payload = {
-      action: 'broadcast', scope, subject, body,
+      action: 'broadcast', scope, subject, body, bodyHtml,
+      attachmentIds: ready.map(a => a.id),
       audience: $id('bc-audience').value, sendEmail: $id('bc-email').checked,
     };
     if (scope === 'division') payload.division = $id('bc-division').value;
@@ -2741,7 +3014,8 @@
       });
       status.className = 'a-status is-ok';
       status.textContent = 'Sent to ' + r.teamCount + ' team' + (r.teamCount === 1 ? '' : 's') + (r.emailed ? ' · ' + r.emailed + ' email' + (r.emailed === 1 ? '' : 's') + ' sent' : '');
-      $id('bc-body').value = ''; $id('bc-subject').value = '';
+      $id('bc-body-rich').innerHTML = ''; $id('bc-subject').value = '';
+      _bcAttachments = []; bcRenderChips();
       loadInbox();
     } catch (e) {
       status.className = 'a-status is-err'; status.textContent = 'Failed: ' + (e.message || 'unknown');

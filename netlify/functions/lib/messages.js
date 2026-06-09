@@ -34,9 +34,12 @@ export async function listThread(teamId) {
 
 /**
  * Append a message to a team's thread.
- * @param {{ teamId, from:'admin'|'captain', authorName?, authorEmail?, body, broadcastId?:string|null }} opts
+ * `bodyHtml` (sanitized rich text) and `attachments` are optional — used by
+ * broadcasts. Plain `body` is always kept for previews + legacy readers.
+ * @param {{ teamId, from:'admin'|'captain', authorName?, authorEmail?, body,
+ *           bodyHtml?:string|null, attachments?:Array, broadcastId?:string|null }} opts
  */
-export async function appendMessage({ teamId, from, authorName, authorEmail, body, broadcastId = null }) {
+export async function appendMessage({ teamId, from, authorName, authorEmail, body, bodyHtml = null, attachments = null, broadcastId = null }) {
   const store = getMessagesStore();
   const msg = {
     id: generateId(),
@@ -45,6 +48,8 @@ export async function appendMessage({ teamId, from, authorName, authorEmail, bod
     authorName: authorName || (from === 'admin' ? 'League Admin' : 'Captain'),
     authorEmail: authorEmail || null,
     body: String(body || '').slice(0, 5000),
+    bodyHtml: bodyHtml ? String(bodyHtml).slice(0, 20000) : null,
+    attachments: Array.isArray(attachments) && attachments.length ? attachments : null,
     broadcastId,
     createdAt: new Date().toISOString(),
   };

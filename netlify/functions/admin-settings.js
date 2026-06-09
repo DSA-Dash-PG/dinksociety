@@ -17,6 +17,9 @@ const DEFAULTS = {
   matchTime:      '7:00–9:00 PM',
   depositAmount:  100,
   balanceDueDate: '2026-06-01',
+  // Email appearance for league broadcasts/messages. Blank fields fall back to
+  // built-in defaults (see lib/email.js EMAIL_TEMPLATE_DEFAULTS).
+  emailTemplate: { accentColor: '#b8ff2c', headerText: 'THE DINK SOCIETY', buttonLabel: 'Open captain portal', footerText: 'The Dink Society · Southern California Pickleball League', logoUrl: '' },
   // Liability waivers — players sign each enabled one on login; editing a
   // waiver's text bumps its version, forcing everyone to re-sign that waiver.
   // Two seeded: the league's own + the Dink House venue form.
@@ -49,6 +52,7 @@ export default async (req) => {
       for (const seed of DEFAULTS.waivers) {
         if (!s.waivers.some(w => w.id === seed.id)) s.waivers.push({ ...seed });
       }
+      if (!s.emailTemplate) s.emailTemplate = { ...DEFAULTS.emailTemplate };
       return json(s);
     } catch (e) {
       console.error('settings GET error:', e);
@@ -107,6 +111,9 @@ export default async (req) => {
         matchTime:      body.matchTime      ?? prev.matchTime      ?? DEFAULTS.matchTime,
         depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
         balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
+        emailTemplate:  body.emailTemplate
+          ? { ...(prev.emailTemplate || DEFAULTS.emailTemplate), ...body.emailTemplate }
+          : (prev.emailTemplate ?? DEFAULTS.emailTemplate),
         waivers,
         updatedAt:    new Date().toISOString(),
         updatedBy:    admin.email || 'admin',

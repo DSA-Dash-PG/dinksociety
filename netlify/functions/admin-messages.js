@@ -11,10 +11,34 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { sendEmail, renderAdminMessage } from './lib/email.js';
+import {
+  sendEmail, renderAdminMessage, sanitizeMessageHtml, messageLooksHtml, htmlToPlain,
+} from './lib/email.js';
 import {
   listThread, appendMessage, getReads, setRead, unreadCount, generateId,
 } from './lib/messages.js';
+
+// Load the admin-configured email appearance (logo/accent/header/button/footer).
+async function getEmailTemplate() {
+  try {
+    const raw = await getStore({ name: 'config', consistency: 'strong' }).get('circuit-settings');
+    const s = raw ? JSON.parse(raw) : {};
+    return s.emailTemplate || null;
+  } catch { return null; }
+}
+
+// Resolve stored attachment ids → metadata + absolute serve URLs.
+async function resolveAttachments(ids, site) {
+  if (!Array.isArray(ids) || !ids.length) return [];
+  const store = getStore('broadcast-files');
+  const metas = await Promise.all(ids
+    .filter(id => /^[a-f0-9]{16}$/.test(String(id)))
+    .map(id => store.get(`meta/${id}.json`, { type: 'json' }).catch(() => null)));
+  return metas.filter(Boolean).map(m => ({
+    id: m.id, filename: m.filename, size: m.size, contentType: m.contentType,
+    url: `${site}/.netlify/functions/broadcast-files-serve?id=${m.id}&dl=1`,
+  }));
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -135,13 +159,14 @@ export default async (req) => {
 
     let emailed = 0;
     if (doEmail) {
+      const template = await getEmailTemplate();
       const tos = recipientEmails(team, 'captains');
       for (const to of tos) {
         try {
           await sendEmail({
             to,
             subject: `Message from The Dink Society — ${team.name}`,
-            html: renderAdminMessage({ body: text, teamName: team.name, portalUrl: `${siteUrl()}/captain.html` }),
+            html: renderAdminMessage({ body: text, teamName: team.name, portalUrl: `${siteUrl()}/captain.html`, template }),
           });
           emailed++;
         } catch (e) { console.error('reply email failed:', e); }
@@ -152,8 +177,25 @@ export default async (req) => {
 
   // ── Broadcast to many teams ────────────────────────────────
   if (action === 'broadcast') {
-    const { subject, body: text, scope, division, teamIds, audience = 'captains', sendEmail: doEmail } = body;
-    if (!text?.trim()) return json({ error: 'Message body required' }, 400);
+    const {
+      subject, body: rawText, bodyHtml: rawHtml, scope, division, teamIds,
+      audience = 'captains', sendEmail: doEmail, attachmentIds,
+    } = body;
+
+    // Rich body (sanitized) takes precedence; derive a plain-text copy for
+    // previews/fallback. Either a body or at least one attachment is required.
+    const safeHtml = (typeof rawHtml === 'string' && messageLooksHtml(rawHtml))
+      ? sanitizeMessageHtml(rawHtml) : '';
+    const text = (rawText && rawText.trim())
+      ? rawText.trim()
+      : (safeHtml ? htmlToPlain(safeHtml) : '');
+
+    const site = siteUrl();
+    const attachments = await resolveAttachments(attachmentIds, site);
+
+    if (!text && !attachments.length) {
+      return json({ error: 'Add a message or at least one attachment.' }, 400);
+    }
 
     const all = await listAllTeams();
     let targets;
@@ -167,13 +209,20 @@ export default async (req) => {
     }
     if (!targets.length) return json({ error: 'No teams matched the targeting.' }, 400);
 
+    const template = await getEmailTemplate();
+    // Resend attachments fetch each file by hosted URL at send time.
+    const mailAttachments = attachments.map(a => ({ filename: a.filename, path: a.url }));
+
     const broadcastId = generateId('bc_');
-    const composedBody = subject?.trim() ? `${subject.trim()}\n\n${text}` : text;
+    // Stored thread body keeps the subject inline (plain) for legacy readers;
+    // bodyHtml carries the rich version when present.
+    const composedBody = subject?.trim() && text ? `${subject.trim()}\n\n${text}` : text;
     let emailed = 0;
     for (const team of targets) {
       await appendMessage({
         teamId: team.id, from: 'admin', authorName: 'League Admin',
-        authorEmail: admin.email, body: composedBody, broadcastId,
+        authorEmail: admin.email, body: composedBody, bodyHtml: safeHtml || null,
+        attachments, broadcastId,
       });
       if (doEmail) {
         const tos = recipientEmails(team, audience);
@@ -182,7 +231,11 @@ export default async (req) => {
             await sendEmail({
               to,
               subject: subject?.trim() ? `${subject.trim()} — The Dink Society` : `Update from The Dink Society`,
-              html: renderAdminMessage({ subject, body: text, teamName: team.name, portalUrl: `${siteUrl()}/captain.html` }),
+              html: renderAdminMessage({
+                subject, bodyHtml: safeHtml, body: text, teamName: team.name,
+                portalUrl: `${site}/captain.html`, template, attachments,
+              }),
+              attachments: mailAttachments,
             });
             emailed++;
           } catch (e) { console.error('broadcast email failed:', e); }
@@ -193,7 +246,8 @@ export default async (req) => {
     // Log the broadcast
     try {
       await getStore('broadcasts').setJSON(`broadcast/${broadcastId}.json`, {
-        id: broadcastId, subject: subject || null, body: text, scope, division: division || null,
+        id: broadcastId, subject: subject || null, body: text, bodyHtml: safeHtml || null,
+        attachments, scope, division: division || null,
         teamIds: scope === 'teams' ? (teamIds || []) : null, audience, sentEmail: !!doEmail,
         teamCount: targets.length, emailed, sentBy: admin.email, sentAt: new Date().toISOString(),
       });

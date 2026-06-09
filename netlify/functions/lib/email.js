@@ -16,9 +16,12 @@ function getResend() {
 
 /**
  * Send a transactional email via Resend.
- * @param {{ to: string, subject: string, html: string, replyTo?: string }} opts
+ * @param {{ to: string, subject: string, html: string, replyTo?: string,
+ *           attachments?: Array<{ filename: string, path?: string, content?: string }> }} opts
+ *   attachments use Resend's shape: `path` (a hosted URL Resend fetches) or
+ *   `content` (base64). We use `path` pointing at broadcast-files-serve.
  */
-export async function sendEmail({ to, subject, html, replyTo }) {
+export async function sendEmail({ to, subject, html, replyTo, attachments }) {
   const from = process.env.EMAIL_FROM;
   if (!from) {
     console.warn('EMAIL_FROM missing — skipping email send');
@@ -41,8 +44,54 @@ export async function sendEmail({ to, subject, html, replyTo }) {
     payload.bcc = process.env.EMAIL_ADMIN_BCC;
   }
 
+  if (Array.isArray(attachments) && attachments.length) {
+    payload.attachments = attachments;
+  }
+
   const result = await r.emails.send(payload);
   return result;
+}
+
+/**
+ * Strip a sanitized rich-text body down to readable plain text. Used for
+ * inbox previews and as a fallback when no HTML body is stored.
+ */
+export function htmlToPlain(html) {
+  return String(html || '')
+    .replace(/<\/(p|div|h[1-6]|li|ul|ol)>/gi, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ').replace(/&amp;/gi, '&').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+// The message rich-text allowlist is identical to the waiver one — reuse it so
+// admin-authored broadcast markup is rendered safely in emails and portals.
+export const messageLooksHtml = waiverLooksHtml;
+export const sanitizeMessageHtml = sanitizeWaiverHtml;
+
+// Default email-appearance template. Admin overrides live in circuit-settings
+// under `emailTemplate`; renderAdminMessage merges them over these.
+export const EMAIL_TEMPLATE_DEFAULTS = {
+  accentColor: '#b8ff2c',
+  headerText: 'THE DINK SOCIETY',
+  buttonLabel: 'Open captain portal',
+  footerText: 'The Dink Society · Southern California Pickleball League',
+  logoUrl: '', // optional absolute image URL; falls back to headerText wordmark
+};
+
+/** Merge admin overrides over the defaults, ignoring blank fields. */
+export function resolveEmailTemplate(override) {
+  const o = override || {};
+  const pick = (k) => (typeof o[k] === 'string' && o[k].trim()) ? o[k].trim() : EMAIL_TEMPLATE_DEFAULTS[k];
+  return {
+    accentColor: /^#[0-9a-fA-F]{3,8}$/.test((o.accentColor || '').trim()) ? o.accentColor.trim() : EMAIL_TEMPLATE_DEFAULTS.accentColor,
+    headerText: pick('headerText'),
+    buttonLabel: pick('buttonLabel'),
+    footerText: pick('footerText'),
+    logoUrl: /^https?:\/\//i.test((o.logoUrl || '').trim()) ? o.logoUrl.trim() : '',
+  };
 }
 
 /**
@@ -88,25 +137,60 @@ export function sanitizeWaiverHtml(html) {
 
 /**
  * Render an admin → captain announcement / message email.
- * @param {{ subject?: string, body: string, teamName: string, portalUrl: string }} opts
+ *
+ * Accepts EITHER a rich `bodyHtml` (already sanitized) or a plain `body`.
+ * `template` overrides the league email appearance (accent color, header text,
+ * button label, footer, logo). `attachments` are rendered as a download list
+ * (the files are also attached to the email itself).
+ *
+ * @param {{ subject?:string, bodyHtml?:string, body?:string, teamName?:string,
+ *           portalUrl:string, template?:object,
+ *           attachments?:Array<{filename,url,size}> }} opts
  */
-export function renderAdminMessage({ subject, body, teamName, portalUrl }) {
+export function renderAdminMessage({ subject, bodyHtml, body, teamName, portalUrl, template, attachments }) {
+  const t = resolveEmailTemplate(template);
+  const accent = t.accentColor;
+
+  const header = t.logoUrl
+    ? `<img src="${t.logoUrl}" alt="${escapeBody(t.headerText)}" style="max-height: 40px; margin-bottom: 28px; display: block;">`
+    : `<div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">${escapeBody(t.headerText)}</div>`;
+
+  const bodyBlock = (typeof bodyHtml === 'string' && bodyHtml.trim())
+    ? `<div style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 24px;">${sanitizeMessageHtml(bodyHtml)}</div>`
+    : `<div style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 24px;">${escapeBody(body)}</div>`;
+
+  const atts = Array.isArray(attachments) ? attachments.filter(a => a && a.filename) : [];
+  const attBlock = atts.length ? `
+      <div style="margin: 0 0 24px; padding: 14px 16px; background: #161616; border-radius: 8px;">
+        <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #8a8a8a; margin-bottom: 8px;">Attachments</div>
+        ${atts.map(a => `<div style="font-size: 14px; margin: 4px 0;">📎 ${a.url ? `<a href="${a.url}" style="color: ${accent}; text-decoration: none;">${escapeBody(a.filename)}</a>` : escapeBody(a.filename)}${a.size ? ` <span style="color:#666;font-size:12px;">(${fmtSize(a.size)})</span>` : ''}</div>`).join('')}
+      </div>` : '';
+
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
-      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
+      ${header}
       ${subject ? `<h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 16px;">${escapeBody(subject)}</h1>` : ''}
-      <div style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 24px;">${escapeBody(body)}</div>
-      <a href="${portalUrl}" style="display: inline-block; padding: 14px 32px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
-        Open captain portal
+      ${bodyBlock}
+      ${attBlock}
+      <a href="${portalUrl}" style="display: inline-block; padding: 14px 32px; background: ${accent}; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
+        ${escapeBody(t.buttonLabel)}
       </a>
       <p style="font-size: 13px; color: #777; margin-top: 24px; line-height: 1.5;">
         Reply to this message right inside the portal — that's the fastest way to reach the league.
       </p>
       <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
-        Sent to ${escapeBody(teamName)} · The Dink Society · Southern California Pickleball League
+        ${teamName ? `Sent to ${escapeBody(teamName)} · ` : ''}${escapeBody(t.footerText)}
       </div>
     </div>
   `;
+}
+
+/** Human-readable file size for attachment lists. */
+export function fmtSize(bytes) {
+  const n = Number(bytes) || 0;
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(0) + ' KB';
+  return (n / 1024 / 1024).toFixed(1) + ' MB';
 }
 
 /**
