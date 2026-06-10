@@ -4135,6 +4135,9 @@
         return '<div class="mr"><div class="mr__t">' + h(m.teamA.name) + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(m.teamB.name) + '</div><div class="mr__m">' + (fin ? '<span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '&nbsp;') + '</div></div>' +
           '<div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);flex-wrap:wrap;">' +
             '<button class="schedpill' + (m.scheduledAt ? '' : ' schedpill--empty') + ' sched-edit" data-mid="' + h(m.id) + '" id="sp-' + h(m.id) + '">' + schedPillLabel(m) + '</button>' +
+            '<span style="display:inline-flex;align-items:center;gap:4px;">Home <select class="team-edit" data-side="A" data-mid="' + h(m.id) + '" style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:3px 6px;font-size:11px;">' + teamEditOptions(m.teamA.id) + '</select></span>' +
+            '<button class="ab ab--outline ab--sm match-swap" data-mid="' + h(m.id) + '" title="Swap home and away">⇄ Swap</button>' +
+            '<span style="display:inline-flex;align-items:center;gap:4px;">Away <select class="team-edit" data-side="B" data-mid="' + h(m.id) + '" style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:3px 6px;font-size:11px;">' + teamEditOptions(m.teamB.id) + '</select></span>' +
             '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="champ-tgl" data-mid="' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
             '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups (both)</button>' +
             '<button class="ab ab--outline ab--sm match-del" data-mid="' + h(m.id) + '" style="border-color:rgba(239,68,68,0.5);color:#ef4444;">Delete match</button>' +
@@ -4147,6 +4150,63 @@
       btn.addEventListener('click', () => {
         const m = wk.matches.find(x => x.id === btn.dataset.mid);
         if (m) openSchedPop(btn, m, wk, weeks);
+      });
+    });
+
+    // Reassign a team on either side (Home / Away dropdowns)
+    card.querySelectorAll('.team-edit').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const mid = sel.dataset.mid, side = sel.dataset.side;
+        const m = wk.matches.find(x => x.id === mid);
+        if (!m) return;
+        const stat = $id('cst-' + mid);
+        const team = (window.__schedTeams || []).find(t => t.id === sel.value);
+        const prevId = side === 'A' ? m.teamA.id : m.teamB.id;
+        const otherId = side === 'A' ? m.teamB.id : m.teamA.id;
+        if (!team) { sel.value = prevId; return; }
+        if (team.id === otherId) {
+          if (stat) { stat.textContent = 'A team cannot play itself'; stat.style.color = '#ef4444'; }
+          sel.value = prevId;
+          return;
+        }
+        const field = side === 'A' ? 'teamA' : 'teamB';
+        sel.disabled = true; if (stat) { stat.textContent = 'Saving…'; stat.style.color = 'var(--color-text-faint)'; }
+        try {
+          await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(mid), {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [field]: { id: team.id, name: team.name } }),
+          });
+          renderSched();
+        } catch (e) {
+          if (stat) { stat.textContent = e.message; stat.style.color = '#ef4444'; }
+          sel.value = prevId;
+          sel.disabled = false;
+        }
+      });
+    });
+
+    // Swap home/away in one click
+    card.querySelectorAll('.match-swap').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const mid = btn.dataset.mid;
+        const m = wk.matches.find(x => x.id === mid);
+        if (!m) return;
+        if (m.finalizedAt && !confirm('This match is FINAL. Swapping home/away may misalign the recorded scores. Continue?')) return;
+        const stat = $id('cst-' + mid);
+        btn.disabled = true; if (stat) { stat.textContent = 'Swapping…'; stat.style.color = 'var(--color-text-faint)'; }
+        try {
+          await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(mid), {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              teamA: { id: m.teamB.id, name: m.teamB.name },
+              teamB: { id: m.teamA.id, name: m.teamA.name },
+            }),
+          });
+          renderSched();
+        } catch (e) {
+          if (stat) { stat.textContent = e.message; stat.style.color = '#ef4444'; }
+          btn.disabled = false;
+        }
       });
     });
 
@@ -4213,6 +4273,12 @@
   // ════════════════════════════════════════════════════════════
   const SP_TIMES = ['6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
   let sp = null; // open-popover state
+
+  function teamEditOptions(selId) {
+    return (window.__schedTeams || []).map(t =>
+      '<option value="' + h(t.id) + '"' + (t.id === selId ? ' selected' : '') + '>' + h(t.name) + '</option>'
+    ).join('');
+  }
 
   function schedPillLabel(m) {
     if (!m.scheduledAt) return 'Set date & time';

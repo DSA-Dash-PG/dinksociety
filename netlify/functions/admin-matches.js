@@ -90,7 +90,7 @@ export default async (req) => {
     if (!matchId) return json({ error: 'matchId required' }, 400);
 
     const body = await req.json();
-    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'venue', 'notes'];
+    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'venue', 'notes', 'teamA', 'teamB'];
     const updates = {};
     for (const f of allowedFields) {
       if (f in body) updates[f] = body[f];
@@ -106,6 +106,16 @@ export default async (req) => {
       if (!data?.matches) continue;
       const m = data.matches.find(x => x.id === matchId);
       if (m) {
+        // Team reassignment (incl. home/away swap): normalize and guard
+        // against a team being scheduled to play itself.
+        if ('teamA' in updates || 'teamB' in updates) {
+          const newA = 'teamA' in updates ? updates.teamA : m.teamA;
+          const newB = 'teamB' in updates ? updates.teamB : m.teamB;
+          if (!newA?.id || !newB?.id) return json({ error: 'teamA and teamB must each have an id' }, 400);
+          if (newA.id === newB.id) return json({ error: 'A team cannot play itself' }, 400);
+          if ('teamA' in updates) updates.teamA = { id: newA.id, name: newA.name || '' };
+          if ('teamB' in updates) updates.teamB = { id: newB.id, name: newB.name || '' };
+        }
         Object.assign(m, updates);
         data.updatedAt = new Date().toISOString();
         data.updatedBy = admin.email;
