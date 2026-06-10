@@ -1525,6 +1525,20 @@
     }
 
     // ===== Matches list =====
+    // Order matches by when they're actually PLAYED: a real scheduledAt date
+    // always wins over the week number, so a game placed in the "wrong" week
+    // (or simply sooner by date) still surfaces as the next match. Matches
+    // with no date fall back to week order and sort after any dated match.
+    function matchOrder(a, b) {
+      const ta = a?.scheduledAt ? Date.parse(a.scheduledAt) : NaN;
+      const tb = b?.scheduledAt ? Date.parse(b.scheduledAt) : NaN;
+      const da = Number.isNaN(ta), db = Number.isNaN(tb);
+      if (!da && !db) return ta - tb;
+      if (!da) return -1;
+      if (!db) return 1;
+      return (a?.week || 0) - (b?.week || 0);
+    }
+
     async function loadMatches(silent) {
       try {
         const res = await fetch('/.netlify/functions/captain-schedule', { credentials: 'include' });
@@ -1629,13 +1643,13 @@
       // 2. Earliest unrevealed where my lineup isn't locked
       const needsMyLineup = matches
         .filter(m => !m.status.revealed && !m.finalizedAt && !m.status.myLocked)
-        .sort((a, b) => a.week - b.week)[0];
+        .sort(matchOrder)[0];
       if (needsMyLineup) return needsMyLineup;
 
       // 3. Earliest unrevealed where I locked but opp didn't
       const waiting = matches
         .filter(m => !m.status.revealed && !m.finalizedAt && m.status.myLocked && !m.status.oppLocked)
-        .sort((a, b) => a.week - b.week)[0];
+        .sort(matchOrder)[0];
       if (waiting) return waiting;
 
       // 4. Most recently finalized
@@ -1653,7 +1667,7 @@
       if (!state.matches || !state.matches.length) { try { await loadMatches(); } catch {} }
       const matches = state.matches || [];
       const live = matches.find(m => m.status?.revealed && !m.finalizedAt)
-                || matches.filter(m => !m.finalizedAt).sort((a, b) => a.week - b.week)[0]
+                || matches.filter(m => !m.finalizedAt).sort(matchOrder)[0]
                 || matches.filter(m => m.finalizedAt)
                           .sort((a, b) => new Date(b.finalizedAt) - new Date(a.finalizedAt))[0];
       if (live) { openMatch(live.id, { viaTab: 'scoresheet' }); return; }
@@ -4021,7 +4035,7 @@
       if (!area) return;
       const team = state.me?.team || {};
       const roster = state.roster || [];
-      const matches = (state.matches || []).slice().sort((a, b) => a.week - b.week);
+      const matches = (state.matches || []).slice().sort(matchOrder);
       const now = Date.now();
 
       // ── greeting ──
@@ -4273,7 +4287,7 @@
     function renderTonightBanner() {
       const matches = state.matches || [];
       const m = matches.find(x => x.status?.revealed && !x.finalizedAt)
-        || matches.filter(x => !x.finalizedAt).sort((a, b) => a.week - b.week)[0];
+        || matches.filter(x => !x.finalizedAt).sort(matchOrder)[0];
       if (!m) return '';
       const live = m.status?.revealed && !m.finalizedAt;
       const meta = [m.myRole === 'home' ? 'Home' : 'Away', m.court].filter(Boolean).join(' · ');
@@ -4299,7 +4313,7 @@
     // Lineup tab is single-purpose: setting lineups. Opens the one editable match,
     // or shows a picker of matches whose lineup you can still set/change.
     function capLineupJump() {
-      const editable = (state.matches || []).filter(m => !m.status?.revealed && !m.finalizedAt).sort((a, b) => a.week - b.week);
+      const editable = (state.matches || []).filter(m => !m.status?.revealed && !m.finalizedAt).sort(matchOrder);
       if (editable.length === 1) { openMatch(editable[0].id, { viaTab: 'next' }); return; }
       renderLineupPicker(editable);
     }

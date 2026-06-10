@@ -49,11 +49,34 @@ export default async (req) => {
     return json({ circuit, week: null, matches: [], kpis: emptyKpis(), lineupLocks: { lockedTeams: 0, totalTeams: 0, notLocked: [] }, alerts: { notLockedCount: 0, liveCount: 0, pendingApprovalCount: 0, priorIncompleteCount: 0 }, pendingApproval: [], priorIncomplete: [], standingsUpdatedAt });
   }
 
-  // Pick the week.
+  // Pick the week. Prefer the week containing the match that's actually
+  // happening soonest by DATE — so a game placed in the "wrong" week (or just
+  // scheduled sooner) still becomes the focus, instead of rigidly snapping to
+  // the lowest week number. A stale, never-finalized match in an old week
+  // shouldn't hijack the view (it surfaces under priorIncomplete instead), so
+  // we look for the soonest match at/after ~6h ago; only if none is currently
+  // relevant do we fall back to the globally-soonest dated match, then the
+  // lowest unfinished week, then the last week with any matches.
   let week = weekParam ? parseInt(weekParam, 10) : null;
   if (!week || !weekFiles[week]) {
-    week = allWeeks.find(w => weekFiles[w].some(f => (f.data.matches || []).some(mt => !mt.finalizedAt)))
-      || allWeeks[allWeeks.length - 1];
+    const now = Date.now();
+    const RECENT_MS = 6 * 3600000; // a match up to 6h old still counts as "tonight"
+    let upcoming = null;        // { week, t } — soonest live/upcoming match
+    let anyDated = null;        // { week, t } — globally soonest dated match
+    let lowestUnfinished = null;
+    for (const w of allWeeks) {
+      for (const f of weekFiles[w]) {
+        for (const mt of (f.data.matches || [])) {
+          if (mt.finalizedAt) continue;
+          if (lowestUnfinished == null) lowestUnfinished = w;
+          const t = mt.scheduledAt ? Date.parse(mt.scheduledAt) : NaN;
+          if (Number.isNaN(t)) continue;
+          if (!anyDated || t < anyDated.t) anyDated = { week: w, t };
+          if (t >= now - RECENT_MS && (!upcoming || t < upcoming.t)) upcoming = { week: w, t };
+        }
+      }
+    }
+    week = (upcoming || anyDated)?.week ?? lowestUnfinished ?? allWeeks[allWeeks.length - 1];
   }
 
   // Team emoji lookup (one pass).
