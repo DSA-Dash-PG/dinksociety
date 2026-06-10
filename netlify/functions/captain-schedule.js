@@ -6,7 +6,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
-import { isRevealTime } from './lib/lineup-helpers.js';
+import { isRevealTime, DEFAULT_LOCK_OFFSET_MIN } from './lib/lineup-helpers.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -18,7 +18,16 @@ export default async (req) => {
   const scheduleStore = getStore('schedule');
   const lineupStore = getStore('lineups');
   const teamsStore = getStore('teams');
+  const seasonStore = getStore('seasons');
   const myEmoji = ctx.team.emoji || '';
+
+  // Season-configurable lineup hard-lock offset (minutes before start). The
+  // captain UI reads this so its countdowns/locks match the server instead of
+  // assuming a hard-coded 60. Keep in sync with captain-lineup.js.
+  const seasonData = ctx.team.seasonId
+    ? await seasonStore.get(ctx.team.seasonId, { type: 'json' }).catch(() => null)
+    : null;
+  const lineupLockOffsetMin = Number(seasonData?.lineupLockOffsetMin) || DEFAULT_LOCK_OFFSET_MIN;
 
   try {
     const myMatches = [];
@@ -85,7 +94,7 @@ export default async (req) => {
 
     myMatches.sort((a, b) => a.week - b.week);
 
-    return new Response(JSON.stringify({ matches: myMatches }), {
+    return new Response(JSON.stringify({ matches: myMatches, lineupLockOffsetMin }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
     });

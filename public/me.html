@@ -1010,6 +1010,7 @@
       if (!res.ok) throw new Error('load failed');
       bootEtag = res.headers.get('ETag') || null;  // seeds the live poller
       DATA = await res.json();
+      sortDataSchedule();
       // Cross-season history + division standings — public endpoints, fetched in parallel.
       const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
       const season = 'circuit-' + circ.toLowerCase();
@@ -1092,6 +1093,7 @@
         data.history = DATA?.history || [];
         data.standings = DATA?.standings || null;
         DATA = data;
+        sortDataSchedule();
         renderHome(); renderSchedule(); renderStats(); renderTeam();
       },
     });
@@ -1744,6 +1746,22 @@
     if (m && m.scheduledAt) { const d = new Date(m.scheduledAt); if (!isNaN(d)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
     return (m && m.startTime) || MATCH_START_TIME;
   };
+  // Order the schedule by when matches are actually PLAYED (real date wins;
+  // undated fall back to week) so the "next match" on Home and Games follows
+  // the calendar, not the week number a game was filed under.
+  function sortDataSchedule() {
+    if (DATA && Array.isArray(DATA.schedule)) {
+      DATA.schedule.sort((a, b) => {
+        const ta = a && a.scheduledAt ? Date.parse(a.scheduledAt) : NaN;
+        const tb = b && b.scheduledAt ? Date.parse(b.scheduledAt) : NaN;
+        const da = Number.isNaN(ta), db = Number.isNaN(tb);
+        if (!da && !db) return ta - tb;
+        if (!da) return -1;
+        if (!db) return 1;
+        return ((a && a.week) || 0) - ((b && b.week) || 0);
+      });
+    }
+  }
   // Error boundary: a single malformed match must never blank the whole view.
   function renderSchedule() {
     try {
