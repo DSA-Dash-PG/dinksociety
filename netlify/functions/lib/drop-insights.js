@@ -90,22 +90,44 @@ export async function livePerformers(circuit) {
     if (teamOfWeek) break;
   }
 
-  let risers = [];
+  let risers = [], climbers = [];
   const ps = await getStore('player-stats').get(`player-stats/${code}.json`, { type: 'json' }).catch(() => null);
   if (ps && ps.players) {
-    risers = Object.values(ps.players)
+    const all = Object.values(ps.players);
+    risers = all
       .filter(p => Number.isFinite(p.rankDelta) && p.rankDelta !== 0)
       .sort((a, b) => b.rankDelta - a.rankDelta)
       .slice(0, 4)
       .map(p => ({ name: p.name, teamName: p.teamName || null, delta: Math.abs(p.rankDelta), dir: p.rankDelta >= 0 ? 'up' : 'dn' }));
+
+    // Top Climbers — players who GAINED the most DSR rank spots this week.
+    // Current overall rank from season DSR; fromRank = current + spots gained.
+    const ranked = all.filter(p => Number.isFinite(p.dsr))
+      .sort((a, b) => b.dsr - a.dsr);
+    const rankOf = new Map();
+    ranked.forEach((p, i) => rankOf.set(p.playerId ?? p.name, i + 1));
+    climbers = all
+      .filter(p => Number.isFinite(p.rankDelta) && p.rankDelta > 0)
+      .sort((a, b) => b.rankDelta - a.rankDelta)
+      .slice(0, 6)
+      .map(p => {
+        const rank = rankOf.get(p.playerId ?? p.name) ?? null;
+        return {
+          name: p.name, teamName: p.teamName || null, delta: p.rankDelta,
+          rank, fromRank: rank != null ? rank + p.rankDelta : null,
+        };
+      });
   }
+
+  // Tabbed Top Performers (top 6 × dsr/diff/pts × M/F) from the week's leaders.
+  const topPerformers = (latest && latest.leaders) ? latest.leaders : null;
 
   return normPerformers({
     potw: {
-      men: pm && { name: pm.name, teamName: pm.teamName, w: pm.w, l: pm.l, dsr: pm.dsr, diff: pm.diff },
-      women: pf && { name: pf.name, teamName: pf.teamName, w: pf.w, l: pf.l, dsr: pf.dsr, diff: pf.diff },
+      men: pm && { name: pm.name, teamName: pm.teamName, w: pm.w, l: pm.l, dsr: pm.dsr, diff: pm.diff, ps: pm.ps },
+      women: pf && { name: pf.name, teamName: pf.teamName, w: pf.w, l: pf.l, dsr: pf.dsr, diff: pf.diff, ps: pf.ps },
     },
-    teamOfWeek, risers,
+    teamOfWeek, risers, climbers, topPerformers,
   });
 }
 

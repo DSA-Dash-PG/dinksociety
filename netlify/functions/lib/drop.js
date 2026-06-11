@@ -91,14 +91,31 @@ function estimateReadMins(leadHtml, storylines) {
   return Math.max(1, Math.round(words / 200));
 }
 
-// Snapshot performers (POTW M/F + Team of the Week + DSR risers) for storage.
+// Snapshot performers for storage:
+//   potw M/F, Team of the Week, DSR risers (legacy), the tabbed Top Performers
+//   leaderboard (top 6 × dsr/diff/pts × M/F), and Top Climbers (DSR rank jumps).
 function normPerformers(p = {}) {
   const player = (x) => x ? {
     playerId: x.playerId || null,
     name: String(x.name || '').slice(0, 80),
     teamName: x.teamName ? String(x.teamName).slice(0, 80) : null,
-    w: x.w ?? null, l: x.l ?? null, dsr: x.dsr ?? null, diff: x.diff ?? null,
+    w: x.w ?? null, l: x.l ?? null, dsr: x.dsr ?? null, diff: x.diff ?? null, ps: x.ps ?? null,
     isChef: x.isChef !== false, // K'CHN chef badge
+  } : null;
+  // A ranked leaderboard row (Top Performers tabs). Slimmer than `player`.
+  const row = (x) => x ? {
+    playerId: x.playerId || null,
+    name: String(x.name || '').slice(0, 80),
+    teamName: x.teamName ? String(x.teamName).slice(0, 80) : null,
+    w: x.w ?? null, l: x.l ?? null, dsr: x.dsr ?? null, diff: x.diff ?? null, ps: x.ps ?? null,
+  } : null;
+  const list = (a) => Array.isArray(a) ? a.slice(0, 6).map(row).filter(Boolean) : [];
+  const metricSet = (m) => (m && (m.dsr || m.diff || m.pts)) ? {
+    dsr: list(m.dsr), diff: list(m.diff), pts: list(m.pts),
+  } : null;
+  const tp = p?.topPerformers;
+  const topPerformers = (tp && (tp.men || tp.women)) ? {
+    men: metricSet(tp.men), women: metricSet(tp.women),
   } : null;
   return {
     potw: {
@@ -111,6 +128,16 @@ function normPerformers(p = {}) {
       record: p.teamOfWeek.record ? String(p.teamOfWeek.record).slice(0, 40) : null,
       note: p.teamOfWeek.note ? String(p.teamOfWeek.note).slice(0, 200) : null,
     } : null,
+    topPerformers,
+    climbers: Array.isArray(p?.climbers)
+      ? p.climbers.slice(0, 6).map(c => ({
+          name: String(c.name || '').slice(0, 80),
+          teamName: c.teamName ? String(c.teamName).slice(0, 80) : null,
+          delta: Number.isFinite(+c.delta) ? +c.delta : null,
+          rank: Number.isFinite(+c.rank) ? +c.rank : null,
+          fromRank: Number.isFinite(+c.fromRank) ? +c.fromRank : null,
+        }))
+      : [],
     risers: Array.isArray(p?.risers)
       ? p.risers.slice(0, 6).map(r => ({
           name: String(r.name || '').slice(0, 80),

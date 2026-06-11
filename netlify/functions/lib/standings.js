@@ -596,12 +596,24 @@ function buildWeeklyTopPerformers(weekly, weekMeta = {}) {
     if (!players.length) continue;
     const maxGames = Math.max(1, ...players.map(p => p.gamesPlayed));
     players.forEach(p => { p._wdsr = compositeScore(p, maxGames); });
+    const mapP = p => ({ playerId: p.playerId, name: p.name, teamName: p.teamName, teamId: p.teamId,
+      gender: p.gender, dsr: Math.round(p._wdsr * 10) / 10, w: p.gamesWon, l: p.gamesLost, ps: p.ps, diff: p.diff });
     const topN = g => players.filter(p => normGender(p.gender) === g)
       .sort((a, b) => (b._wdsr - a._wdsr) || (b.diff - a.diff))
       .slice(0, 3)
-      .map(p => ({ playerId: p.playerId, name: p.name, teamName: p.teamName, teamId: p.teamId,
-        gender: p.gender, dsr: Math.round(p._wdsr * 10) / 10, w: p.gamesWon, l: p.gamesLost, ps: p.ps, diff: p.diff }));
-    out.push({ week: wk, label: `Week ${wk}`, date: weekMeta[wk]?.date || null, men: topN('M'), women: topN('F') });
+      .map(mapP);
+    // Top-6 leaders by each metric (dsr / diff / ps) per gender — powers The
+    // Drop's tabbed "Top Performers" card. Sorted independently so the Best-Diff
+    // and Most-Points leaders aren't constrained to the DSR top 6.
+    const lead = (g, key) => players.filter(p => normGender(p.gender) === g)
+      .sort((a, b) => ((b[key] ?? -Infinity) - (a[key] ?? -Infinity)) || (b._wdsr - a._wdsr) || (b.diff - a.diff))
+      .slice(0, 6)
+      .map(mapP);
+    const leaders = {
+      men:   { dsr: lead('M', '_wdsr'), diff: lead('M', 'diff'), pts: lead('M', 'ps') },
+      women: { dsr: lead('F', '_wdsr'), diff: lead('F', 'diff'), pts: lead('F', 'ps') },
+    };
+    out.push({ week: wk, label: `Week ${wk}`, date: weekMeta[wk]?.date || null, men: topN('M'), women: topN('F'), leaders });
   }
   return out.sort((a, b) => b.week - a.week);
 }
