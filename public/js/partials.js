@@ -80,4 +80,5 @@ function highlightNav() {
 // ═══════════════════════════════════════════════════════════════
 setInterval(() => {
   if (document.visibilityState !== 'visible') return;
-  fetch('/.netlif
+  fetch('/.netlify/functions/ping').catch(() => {});
+}, 4 * 60 * 1000);

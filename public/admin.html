@@ -528,6 +528,10 @@
             Messages <span class="sb__badge" id="sb-msg-ct" style="display:none;">0</span>
           </button>
           <div class="sb__sec">Content</div>
+          <button class="sb__link" data-tab="drop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            The Drop <span class="sb__badge" id="sb-drop-ct" style="display:none;">0</span>
+          </button>
           <button class="sb__link" data-tab="moments">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             Photos
@@ -864,6 +868,83 @@
         </section>
 
         <!-- PHOTOS -->
+        <!-- THE DROP -->
+        <style>
+          .drop-chip{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;vertical-align:middle;}
+          .drop-chip.draft{background:var(--color-gold-dim);color:var(--color-gold);}
+          .drop-chip.published{background:var(--color-lime-dim);color:var(--color-lime);}
+          .drop-weekrow{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;background:var(--color-surface-2);}
+          .drop-weekrow:hover{border-color:var(--color-border-strong);}
+          .drop-weekrow .wk{font-weight:800;font-size:13px;min-width:54px;color:var(--color-text);}
+          .drop-weekrow .ti{flex:1;min-width:0;font-size:13px;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+          .drop-weekrow .auto{font-size:10px;color:var(--color-text-faint);text-transform:uppercase;letter-spacing:.06em;}
+          .drop-story{border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--color-surface-2);}
+          .drop-story .arow{margin-bottom:8px;}
+          .drop-story textarea{width:100%;font-family:inherit;line-height:1.55;}
+          .drop-story .sx-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+          .drop-story .sx-head .grip{color:var(--color-text-faint);font-size:12px;font-weight:800;}
+          .drop-story .sx-rm{margin-left:auto;background:none;border:none;color:var(--color-red);cursor:pointer;font-size:12px;font-weight:700;}
+          .drop-perf{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;font-size:12px;color:var(--color-text-muted);}
+          .drop-perf .pf{border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;background:var(--color-surface-2);}
+          .drop-perf .pf h6{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 6px;}
+          .drop-perf .pf b{color:var(--color-text);}
+          .drop-pubbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--color-border);}
+          .drop-ck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);text-transform:none;letter-spacing:0;cursor:pointer;}
+          .drop-ck input{width:auto;margin:0;}
+        </style>
+        <section class="admin-section" data-section="drop">
+          <div class="am-head">
+            <h1 class="am-title">The Drop</h1>
+            <div class="am-actions">
+              <button class="ab ab--lime ab--sm" id="drop-generate-btn">✨ Draft with Claude</button>
+              <button class="ab ab--outline ab--sm" id="drop-new-btn">+ New week</button>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:640px;">The weekly editorial. The Tuesday task drafts each week from the stats; you review, edit, and <b>Approve &amp; Publish</b> here. Nothing reaches the homepage, email, or portals until you publish.</p>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Weeks</h2><span class="ac__s" id="drop-list-status"></span></div>
+            <div id="drop-weeks"><div class="loading">Loading…</div></div>
+          </div>
+
+          <!-- Editor -->
+          <div class="ac" id="drop-editor" style="display:none;">
+            <div class="ac__h">
+              <h2 class="ac__t">Edit · <span id="drop-ed-week">Week</span> <span id="drop-ed-status" class="drop-chip"></span></h2>
+              <span class="ac__s" id="drop-ed-saved"></span>
+            </div>
+            <div class="arow">
+              <div class="af" style="max-width:120px;"><label for="drop-f-week">Week #</label><input type="number" id="drop-f-week" min="1" max="20"></div>
+              <div class="af"><label for="drop-f-kicker">Kicker</label><input type="text" id="drop-f-kicker" placeholder="The Drop · Week 5" autocomplete="off"></div>
+              <div class="af"><label for="drop-f-byline">Byline</label><input type="text" id="drop-f-byline" placeholder="By The Society Desk" autocomplete="off"></div>
+            </div>
+            <div class="af"><label for="drop-f-title">Lead headline</label><input type="text" id="drop-f-title" placeholder="The one storyline of the week" autocomplete="off"></div>
+            <div class="af"><label for="drop-f-dek">Dek (sub-headline)</label><input type="text" id="drop-f-dek" placeholder="One line that sets up the lead" autocomplete="off"></div>
+            <div class="af">
+              <label for="drop-f-lead">Lead story <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— blank line = new paragraph · start a line with &gt; for a pull-quote</span></label>
+              <textarea id="drop-f-lead" rows="8" style="width:100%;font-family:inherit;line-height:1.6;"></textarea>
+            </div>
+
+            <div class="ac__h" style="margin-top:8px;"><h2 class="ac__t" style="font-size:12px;">Storylines <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— Claude picks 3–4; edit or reorder freely</span></h2></div>
+            <div id="drop-stories"></div>
+            <button class="ab ab--outline ab--sm" id="drop-addstory-btn" style="margin-top:4px;">+ Add storyline</button>
+
+            <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Performers rail <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— auto-filled from this week's stats, snapshotted at publish</span></h2></div>
+            <div id="drop-performers" class="drop-perf"><div class="loading">Loading…</div></div>
+
+            <div class="drop-pubbar">
+              <label class="drop-ck"><input type="checkbox" id="drop-ch-portal" checked> Portal announcement</label>
+              <label class="drop-ck"><input type="checkbox" id="drop-ch-email" checked> Email players</label>
+              <div style="flex:1;"></div>
+              <span class="a-status" id="drop-pub-status" style="display:none;"></span>
+              <button class="ab ab--outline ab--sm" id="drop-regen-btn" title="Re-draft this week with Claude (replaces the current draft)">↻ Regenerate</button>
+              <button class="ab ab--outline ab--sm" id="drop-preview-btn">Preview ↗</button>
+              <button class="ab ab--outline ab--sm" id="drop-save-btn">Save draft</button>
+              <button class="ab ab--lime ab--sm" id="drop-publish-btn">Approve &amp; Publish</button>
+            </div>
+          </div>
+        </section>
+
         <section class="admin-section" data-section="moments">
           <div class="am-head"><h1 class="am-title">Photos</h1></div>
           <div class="ac">
@@ -2057,6 +2138,7 @@
       if (t === 'schedule') { renderGameday(); renderSched(); }
       if (t === 'scores') {}
       if (t === 'messages') renderMessages();
+      if (t === 'drop') renderDrop();
       if (t === 'settings') { applySettings(); loadWaiverCompliance(); }
       if (t === 'moments') loadAdminGallery();
       if (t === 'activity') initActivityLog();
