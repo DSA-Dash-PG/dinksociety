@@ -67,7 +67,19 @@ export async function livePerformers(circuit) {
     for (const w of wks) {
       const ids = wt[w];
       if (ids && ids.length) {
-        const t = (div.teams || []).find(x => x.teamId === ids[0]);
+        // Several teams can tie on weekly match points (e.g. two 4–0 sweeps both
+        // earn 4). Don't take the arbitrary first entry — break the tie by the
+        // genuinely better week: game differential, then games won, then overall
+        // Circuit rank, then total points.
+        const tied = ids.map(id => (div.teams || []).find(x => x.teamId === id)).filter(Boolean);
+        const gd = t => (t.totalGamesWon || 0) - (t.totalGamesLost || 0);
+        tied.sort((a, b) =>
+          gd(b) - gd(a) ||
+          (b.totalGamesWon || 0) - (a.totalGamesWon || 0) ||
+          (a.rank || 99) - (b.rank || 99) ||
+          (b.societyCircuitPoints || 0) - (a.societyCircuitPoints || 0)
+        );
+        const t = tied[0];
         if (t) teamOfWeek = { name: t.teamName, emoji: t.teamEmoji || null, record: `${t.wins || 0}–${t.losses || 0}`, note: null };
         break;
       }
