@@ -53,7 +53,8 @@ function highlightNav() {
   const path = location.pathname;
   let key = null;
 
-  if (path.includes('schedule'))         key = 'schedule';
+  if (path.includes('drop'))             key = 'drop';
+  else if (path.includes('schedule'))    key = 'schedule';
   else if (path.includes('standing'))    key = 'standings';
   else if (path.includes('leaderboard')) key = 'leaderboard';
   else if (path.includes('stats'))       key = 'stats';
@@ -79,5 +80,4 @@ function highlightNav() {
 // ═══════════════════════════════════════════════════════════════
 setInterval(() => {
   if (document.visibilityState !== 'visible') return;
-  fetch('/.netlify/functions/ping').catch(() => {});
-}, 4 * 60 * 1000);
+  fetch('/.netlif

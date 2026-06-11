@@ -367,46 +367,36 @@
       document.getElementById('rc-standings').style.display='';
     }
 
+    /* ---- The Drop teaser (published editorial) ---- */
+    function renderDropTeaser(drop){
+      var sec=document.getElementById('rc-drop');
+      if(!sec)return;
+      if(!drop){ sec.style.display='none'; return; }
+      var k=document.getElementById('rc-drop-kicker'); if(k)k.textContent=drop.kicker||('The Drop · Week '+drop.week);
+      var t=document.getElementById('rc-drop-title'); if(t)t.textContent=drop.title||'';
+      var by=document.getElementById('rc-drop-byline'); if(by)by.innerHTML=esc(drop.byline||'By The Society Desk')+' · '+(drop.readMins||4)+' min read';
+      var ex=document.getElementById('rc-drop-excerpt');
+      if(ex){
+        var lead=String(drop.leadHtml||'').replace(/<blockquote[\s\S]*?<\/blockquote>/gi,'');
+        // first paragraph gets the dropcap; keep it to ~2 paragraphs for the teaser
+        var paras=lead.match(/<p[\s\S]*?<\/p>/gi)||[];
+        if(paras.length){
+          ex.innerHTML = paras.slice(0,2).map(function(p,i){ return i===0?p.replace('<p','<p class="dropcap"'):p; }).join('');
+        } else if(drop.dek){ ex.innerHTML='<p class="dropcap">'+esc(drop.dek)+'</p>'; }
+      }
+      var read=document.getElementById('rc-drop-read'); if(read)read.setAttribute('href','/drop.html?week='+drop.week);
+      var cv=document.getElementById('rc-drop-cover'); if(cv)cv.textContent='Week '+drop.week+' · The Drop';
+      // "Also in this issue" = the picked storylines beyond the lead
+      var aside=document.getElementById('rc-drop-aside');
+      if(aside && drop.storylines && drop.storylines.length>1){
+        aside.innerHTML=drop.storylines.slice(1,5).map(function(s){ return '<li>'+esc(s.title||s.tag||'')+'</li>'; }).join('');
+      }
+      sec.style.display='';
+    }
+
     /* ---- Fetch + wire ---- */
     Promise.all([
       fetch('/.netlify/functions/public-leaderboard').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch('/.netlify/functions/public-standings').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-leaderboard?view=players').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
-    ]).then(function(res){
-      var lb=res[0],st=res[1],pl=res[2];
-
-      // PS fallback: enrich weeklyTopPerformers entries from the players aggregate (season PS) when weekly ps is absent
-      var perf=(lb&&lb.weeklyTopPerformers)||[];
-      var latest=perf.length?perf[0]:null;
-      if(latest&&pl&&pl.players){
-        ['men','women'].forEach(function(g){(latest[g]||[]).forEach(function(p){
-          if(p.ps==null&&pl.players[p.playerId]&&pl.players[p.playerId].ps!=null)p.ps=pl.players[p.playerId].ps;
-        });});
-      }
-      renderPotwDsr(latest);
-
-      // Standings — first division in the blob
-      if(st&&st.divisions){
-        var divKey=Object.keys(st.divisions)[0];
-        var div=st.divisions[divKey];
-        // teams that topped the most recent played week (for the "Top Wk" marker)
-        var topIds=[];
-        if(div&&div.weeklyTopTeams){
-          var wks=Object.keys(div.weeklyTopTeams).map(Number).sort(function(a,b){return b-a;});
-          for(var i=0;i<wks.length;i++){var arr=div.weeklyTopTeams[wks[i]];if(arr&&arr.length){topIds=arr;break;}}
-        }
-        if(div&&div.teams&&div.teams.length){renderStandings(div,topIds);}
-      }
-
-      // If nothing rendered at all, show a gentle empty state
-      var anyShown=document.getElementById('rc-potw').style.display===''||document.getElementById('rc-standings').style.display==='';
-      if(!anyShown){
-        var m=document.querySelector('#recap .recap-top');
-        if(m)m.innerHTML='<div class="rc-empty">The season is warming up — standings and Players of the Week appear here once Week 1 results are in.</div>';
-        var d=document.getElementById('rc-drop');if(d)d.style.display='none';
-      }
-    });
-  })();
-  </script>
-</body>
-</html>
+      fetch('/.netlify/functions/public-leaderboard?view=players').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch

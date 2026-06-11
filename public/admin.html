@@ -528,6 +528,10 @@
             Messages <span class="sb__badge" id="sb-msg-ct" style="display:none;">0</span>
           </button>
           <div class="sb__sec">Content</div>
+          <button class="sb__link" data-tab="drop">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            The Drop <span class="sb__badge" id="sb-drop-ct" style="display:none;">0</span>
+          </button>
           <button class="sb__link" data-tab="moments">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
             Photos
@@ -859,6 +863,83 @@
             </div>
             <div class="ac" id="msg-thread-card">
               <div id="msg-thread"><div class="empty">Select a team to view the conversation.</div></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- THE DROP -->
+        <style>
+          .drop-chip{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;vertical-align:middle;}
+          .drop-chip.draft{background:var(--color-gold-dim);color:var(--color-gold);}
+          .drop-chip.published{background:var(--color-lime-dim);color:var(--color-lime);}
+          .drop-weekrow{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;background:var(--color-surface-2);}
+          .drop-weekrow:hover{border-color:var(--color-border-strong);}
+          .drop-weekrow .wk{font-weight:800;font-size:13px;min-width:54px;color:var(--color-text);}
+          .drop-weekrow .ti{flex:1;min-width:0;font-size:13px;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+          .drop-weekrow .auto{font-size:10px;color:var(--color-text-faint);text-transform:uppercase;letter-spacing:.06em;}
+          .drop-story{border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px;margin-bottom:10px;background:var(--color-surface-2);}
+          .drop-story .arow{margin-bottom:8px;}
+          .drop-story textarea{width:100%;font-family:inherit;line-height:1.55;}
+          .drop-story .sx-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+          .drop-story .sx-head .grip{color:var(--color-text-faint);font-size:12px;font-weight:800;}
+          .drop-story .sx-rm{margin-left:auto;background:none;border:none;color:var(--color-red);cursor:pointer;font-size:12px;font-weight:700;}
+          .drop-perf{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;font-size:12px;color:var(--color-text-muted);}
+          .drop-perf .pf{border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;background:var(--color-surface-2);}
+          .drop-perf .pf h6{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 6px;}
+          .drop-perf .pf b{color:var(--color-text);}
+          .drop-pubbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--color-border);}
+          .drop-ck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);text-transform:none;letter-spacing:0;cursor:pointer;}
+          .drop-ck input{width:auto;margin:0;}
+        </style>
+        <section class="admin-section" data-section="drop">
+          <div class="am-head">
+            <h1 class="am-title">The Drop</h1>
+            <div class="am-actions">
+              <button class="ab ab--lime ab--sm" id="drop-generate-btn">✨ Draft with Claude</button>
+              <button class="ab ab--outline ab--sm" id="drop-new-btn">+ New week</button>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:640px;">The weekly editorial. The Tuesday task drafts each week from the stats; you review, edit, and <b>Approve &amp; Publish</b> here. Nothing reaches the homepage, email, or portals until you publish.</p>
+
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Weeks</h2><span class="ac__s" id="drop-list-status"></span></div>
+            <div id="drop-weeks"><div class="loading">Loading…</div></div>
+          </div>
+
+          <!-- Editor -->
+          <div class="ac" id="drop-editor" style="display:none;">
+            <div class="ac__h">
+              <h2 class="ac__t">Edit · <span id="drop-ed-week">Week</span> <span id="drop-ed-status" class="drop-chip"></span></h2>
+              <span class="ac__s" id="drop-ed-saved"></span>
+            </div>
+            <div class="arow">
+              <div class="af" style="max-width:120px;"><label for="drop-f-week">Week #</label><input type="number" id="drop-f-week" min="1" max="20"></div>
+              <div class="af"><label for="drop-f-kicker">Kicker</label><input type="text" id="drop-f-kicker" placeholder="The Drop · Week 5" autocomplete="off"></div>
+              <div class="af"><label for="drop-f-byline">Byline</label><input type="text" id="drop-f-byline" placeholder="By The Society Desk" autocomplete="off"></div>
+            </div>
+            <div class="af"><label for="drop-f-title">Lead headline</label><input type="text" id="drop-f-title" placeholder="The one storyline of the week" autocomplete="off"></div>
+            <div class="af"><label for="drop-f-dek">Dek (sub-headline)</label><input type="text" id="drop-f-dek" placeholder="One line that sets up the lead" autocomplete="off"></div>
+            <div class="af">
+              <label for="drop-f-lead">Lead story <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— blank line = new paragraph · start a line with &gt; for a pull-quote</span></label>
+              <textarea id="drop-f-lead" rows="8" style="width:100%;font-family:inherit;line-height:1.6;"></textarea>
+            </div>
+
+            <div class="ac__h" style="margin-top:8px;"><h2 class="ac__t" style="font-size:12px;">Storylines <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— Claude picks 3–4; edit or reorder freely</span></h2></div>
+            <div id="drop-stories"></div>
+            <button class="ab ab--outline ab--sm" id="drop-addstory-btn" style="margin-top:4px;">+ Add storyline</button>
+
+            <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Performers rail <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— auto-filled from this week's stats, snapshotted at publish</span></h2></div>
+            <div id="drop-performers" class="drop-perf"><div class="loading">Loading…</div></div>
+
+            <div class="drop-pubbar">
+              <label class="drop-ck"><input type="checkbox" id="drop-ch-portal" checked> Portal announcement</label>
+              <label class="drop-ck"><input type="checkbox" id="drop-ch-email" checked> Email players</label>
+              <div style="flex:1;"></div>
+              <span class="a-status" id="drop-pub-status" style="display:none;"></span>
+              <button class="ab ab--outline ab--sm" id="drop-regen-btn" title="Re-draft this week with Claude (replaces the current draft)">↻ Regenerate</button>
+              <button class="ab ab--outline ab--sm" id="drop-preview-btn">Preview ↗</button>
+              <button class="ab ab--outline ab--sm" id="drop-save-btn">Save draft</button>
+              <button class="ab ab--lime ab--sm" id="drop-publish-btn">Approve &amp; Publish</button>
             </div>
           </div>
         </section>
@@ -2057,6 +2138,7 @@
       if (t === 'schedule') { renderGameday(); renderSched(); }
       if (t === 'scores') {}
       if (t === 'messages') renderMessages();
+      if (t === 'drop') renderDrop();
       if (t === 'settings') { applySettings(); loadWaiverCompliance(); }
       if (t === 'moments') loadAdminGallery();
       if (t === 'activity') initActivityLog();
@@ -4819,102 +4901,4 @@
         uploadBtn.disabled = true; statusEl.textContent = 'Compressing…'; statusEl.style.color = 'var(--color-text-faint)';
         try {
           var compressed = await compressImage(file);
-          statusEl.textContent = 'Uploading (' + (compressed.size / 1024 / 1024).toFixed(1) + 'MB)…';
-          var fd = new FormData(); fd.append('file', compressed); fd.append('slot', slot); fd.append('label', label);
-          var r = await fetch(API_UPLOAD, { method: 'POST', body: fd, credentials: 'include' }); var data = await r.json();
-          if (!r.ok) throw new Error(data.error || 'Upload failed');
-          statusEl.textContent = 'Uploaded to ' + slot; statusEl.style.color = 'var(--color-teal)';
-          fileInput.value = ''; document.getElementById('si-label').value = '';
-          await loadSiteImages();
-        } catch (e) { statusEl.textContent = e.message; statusEl.style.color = 'var(--color-red)'; }
-        finally { uploadBtn.disabled = false; }
-      });
-    }
-
-    async function deleteSiteImage(id, slot) {
-      if (!confirm('Remove this image from the site?')) return;
-      try {
-        var r = await fetch(API_LIST, { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ action: 'delete', id: id, slot: slot }) });
-        if (!r.ok) throw new Error('Delete failed');
-        await loadSiteImages();
-      } catch (e) { alert('Failed to delete: ' + e.message); }
-    }
-
-    // Load when tab becomes active
-    var loaded = false;
-    var observer = new MutationObserver(function() {
-      var section = document.querySelector('[data-section="site-images"]');
-      if (section && section.classList.contains('is-active') && !loaded) { loaded = true; loadSiteImages(); }
-    });
-    var main = document.querySelector('.admin-main');
-    if (main) observer.observe(main, { subtree: true, attributes: true, attributeFilter: ['class'] });
-    var section = document.querySelector('[data-section="site-images"]');
-    if (section && section.classList.contains('is-active')) { loadSiteImages(); }
-  })();
-
-  // ─── Init ─────────────────────────────────────────────────
-  checkAuth();
-})();
-</script>
-
-<style>
-  /* Admin mobile bottom nav — phones only */
-  .am-bottomnav { display: none; }
-  @media (max-width: 860px) {
-    #admin-shell { padding-bottom: 78px; }
-    .am-bottomnav {
-      display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
-      background: rgba(18,18,18,0.97); backdrop-filter: blur(12px);
-      border-top: 1px solid var(--color-border);
-      padding: 7px 6px calc(7px + env(safe-area-inset-bottom));
-    }
-    .am-bn { flex: 1; background: none; border: none; cursor: pointer; font-family: inherit; position: relative;
-      display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0; color: var(--color-text-faint); }
-    .am-bn.is-active { color: var(--color-lime); }
-    .am-bn svg { width: 22px; height: 22px; }
-    .am-bn span { font-size: 10px; font-weight: 700; }
-    .am-bn__badge { position: absolute; top: -1px; right: calc(50% - 22px); background: var(--color-red); color: #fff; font-size: 8px; font-weight: 800; border-radius: 9999px; padding: 1px 5px; min-width: 14px; text-align: center; }
-  }
-
-  /* Game-day command center */
-  .gd { margin-bottom: 22px; }
-  .gd__alert { display: flex; gap: 8px; align-items: center; background: var(--color-gold-dim); border: 1px solid rgba(240,192,64,0.3); border-radius: var(--radius-md); padding: 11px 13px; margin-bottom: 12px; font-size: 12px; color: var(--color-gold); font-weight: 600; }
-  .gd__kpis { display: grid; grid-template-columns: repeat(4,1fr); gap: 7px; margin-bottom: 6px; }
-  .gd__kpi { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 4px; text-align: center; }
-  .gd__kn { font-size: 19px; font-weight: 800; }
-  .gd__kn.live { color: var(--color-lime); } .gd__kn.done { color: var(--color-teal); } .gd__kn.warn { color: var(--color-gold); }
-  .gd__kl { font-size: 8px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-top: 2px; }
-  .gd__lbl { font-size: 9px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin: 16px 2px 8px; }
-  .gd__locks { font-size: 12px; color: var(--color-text-muted); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 11px 13px; line-height: 1.4; }
-  .gd__lockchip { display: inline-block; font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 9999px; background: var(--color-gold-dim); color: var(--color-gold); margin: 3px 4px 0 0; }
-  .gd__m { display: flex; align-items: center; gap: 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 7px; }
-  .gd__m--live { border-color: rgba(184,255,44,0.35); background: linear-gradient(180deg, rgba(184,255,44,0.04), transparent); }
-  .gd__div { font-size: 9px; font-weight: 700; color: var(--color-teal); background: var(--color-teal-dim); padding: 2px 6px; border-radius: 5px; flex-shrink: 0; }
-  .gd__mt { flex: 1; min-width: 0; font-size: 13px; font-weight: 600; }
-  .gd__mt small { display: block; font-size: 10px; color: var(--color-text-faint); font-weight: 500; margin-top: 2px; }
-  .gd__sc { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
-  .gd__pill { font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; padding: 3px 7px; border-radius: 9999px; flex-shrink: 0; }
-  .gd__pill.live { background: var(--color-lime-dim); color: var(--color-lime); }
-  .gd__pill.final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
-  .gd__pill.awaiting { background: var(--color-gold-dim); color: var(--color-gold); }
-  .gd__refresh { font-size: 11px; color: var(--color-teal); cursor: pointer; background: none; border: none; font-family: inherit; font-weight: 700; letter-spacing: 0; text-transform: none; }
-
-  /* Overview — action required panel */
-  .ova { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
-  .ova__item { display: flex; align-items: center; gap: 12px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; }
-  .ova__item--warn { border-color: rgba(240,192,64,0.35); }
-  .ova__item--danger { border-color: rgba(229,62,62,0.4); }
-  .ova__ico { font-size: 16px; flex-shrink: 0; width: 24px; text-align: center; }
-  .ova__body { flex: 1; min-width: 0; }
-  .ova__t { font-size: 13px; font-weight: 700; }
-  .ova__s { font-size: 11px; color: var(--color-text-faint); margin-top: 2px; line-height: 1.45; }
-  .ova__clear { display: flex; align-items: center; gap: 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; font-size: 12px; font-weight: 600; color: var(--color-teal); margin-bottom: 20px; }
-  .ov-qa { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
-  .ov-health { font-size: 11px; color: var(--color-text-faint); margin: -12px 0 18px; }
-  @media (max-width: 700px) {
-    .ova__item { flex-wrap: wrap; }
-    .ova__body { flex-basis: calc(100% - 80px); }
-  }
-</style>
-</body>
-</html>
+          statusEl.textContent = 'Uploading (' + (compressed.
