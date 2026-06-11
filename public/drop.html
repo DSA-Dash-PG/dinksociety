@@ -272,10 +272,16 @@
         + '<div class="state"><h2>No Drop yet</h2><p>'+esc(msg||'The first Drop lands after Week 1.')+'</p></div>';
     }
 
-    var api = '/.netlify/functions/public-drop' + (reqWeek?('?week='+encodeURIComponent(reqWeek)):'');
-    function getJSON(u){ return fetch(u).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }
+    // Preview mode (?preview=1) renders the DRAFT via the authenticated admin
+    // endpoint, so editors can see a week before it's published. Normal mode
+    // uses the public endpoint (published Drops only).
+    var reqPreview = qs('preview');
+    var api = reqPreview
+      ? ('/.netlify/functions/admin-drop?week=' + encodeURIComponent(reqWeek||''))
+      : ('/.netlify/functions/public-drop' + (reqWeek?('?week='+encodeURIComponent(reqWeek)):''));
+    function getJSON(u, creds){ return fetch(u, creds?{credentials:'include'}:undefined).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }
     Promise.all([
-      getJSON(api),
+      getJSON(api, !!reqPreview),
       getJSON('/.netlify/functions/public-drop?view=index'),
       getJSON('/.netlify/functions/public-leaderboard?view=players'),
       getJSON('/.netlify/functions/public-standings'),
@@ -292,9 +298,14 @@
         }
       } catch(e){ IDX = null; }
       var pubWeeks = (idx && idx.weeks ? idx.weeks.map(function(w){ return w.week; }) : []);
-      if(!data || data.empty || !data.drop){ showEmpty(data && data.message); renderWeekpick(-1, pubWeeks); return; }
-      render(data.drop);
-      renderWeekpick(data.drop.week, pubWeeks);
+      // Preview: admin-drop returns {record, livePerformers}. Normal: public-drop returns {drop}.
+      var dropObj = null;
+      if(reqPreview){
+        if(data && data.record){ dropObj = data.record; var pf=dropObj.performers; if(!pf || !pf.potw || (!pf.potw.men && !pf.potw.women)) dropObj.performers = data.livePerformers || pf; }
+      } else if(data && !data.empty && data.drop){ dropObj = data.drop; }
+      if(!dropObj){ showEmpty(reqPreview ? 'Nothing to preview yet — save the draft first, and make sure you are logged into admin in this browser.' : (data && data.message)); renderWeekpick(-1, pubWeeks); return; }
+      render(dropObj);
+      renderWeekpick(dropObj.week, pubWeeks);
     });
   })();
   </script>
