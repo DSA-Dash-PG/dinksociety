@@ -536,10 +536,6 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
             Site Images
           </button>
-          <button class="sb__link" data-tab="potw">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M15.477 12.89L17 22l-5-3-5 3 1.523-9.11"/></svg>
-            Player of Week
-          </button>
           <div class="sb__sec">Insights</div>
           <button class="sb__link" data-tab="activity">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/><circle cx="19" cy="19" r="0.5"/></svg>
@@ -959,57 +955,7 @@
         </section>
 
         <!-- SETTINGS -->
-        <!-- PLAYER OF THE WEEK -->
-        <section class="admin-section" data-section="potw">
-          <div class="am-head">
-            <h1 class="am-title">Player of the Week</h1>
-            <span class="ac__s" id="potw-saved-at"></span>
-          </div>
-          <div style="display:inline-flex;align-items:center;gap:8px;background:#000;border:1px solid rgba(255,255,255,0.12);border-radius:7px;padding:6px 12px;margin-bottom:20px;">
-            <span style="font-size:16px;font-weight:900;color:#f0d020;letter-spacing:0.06em;font-style:italic;">K'CHN</span>
-            <span style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.4);">Flagship Sponsor</span>
-          </div>
-          <p style="font-size:13px;color:var(--color-text-faint);margin:0 0 20px;">Set the featured male and female players of the week. These appear on the homepage and leaderboard page.</p>
-
-          <div class="arow">
-            <!-- Male -->
-            <div class="ac" style="flex:1;">
-              <div class="ac__h">
-                <h2 class="ac__t" style="color:var(--color-lime);">Male Player</h2>
-              </div>
-              <div class="af"><label for="potw-m-name">Player name</label><input type="text" id="potw-m-name" placeholder="Full name"></div>
-              <div class="af" style="margin-top:10px;"><label for="potw-m-team">Team</label><input type="text" id="potw-m-team" placeholder="Team name"></div>
-              <div class="arow" style="margin-top:10px;gap:8px;">
-                <div class="af"><label for="potw-m-rank">Rank</label><input type="number" id="potw-m-rank" min="1" placeholder="1"></div>
-                <div class="af"><label for="potw-m-wins">Wins</label><input type="number" id="potw-m-wins" min="0" placeholder="0"></div>
-                <div class="af"><label for="potw-m-losses">Losses</label><input type="number" id="potw-m-losses" min="0" placeholder="0"></div>
-              </div>
-            </div>
-            <!-- Female -->
-            <div class="ac" style="flex:1;">
-              <div class="ac__h">
-                <h2 class="ac__t" style="color:var(--color-teal);">Female Player</h2>
-              </div>
-              <div class="af"><label for="potw-f-name">Player name</label><input type="text" id="potw-f-name" placeholder="Full name"></div>
-              <div class="af" style="margin-top:10px;"><label for="potw-f-team">Team</label><input type="text" id="potw-f-team" placeholder="Team name"></div>
-              <div class="arow" style="margin-top:10px;gap:8px;">
-                <div class="af"><label for="potw-f-rank">Rank</label><input type="number" id="potw-f-rank" min="1" placeholder="1"></div>
-                <div class="af"><label for="potw-f-wins">Wins</label><input type="number" id="potw-f-wins" min="0" placeholder="0"></div>
-                <div class="af"><label for="potw-f-losses">Losses</label><input type="number" id="potw-f-losses" min="0" placeholder="0"></div>
-              </div>
-            </div>
-          </div>
-
-          <div class="arow" style="margin-top:4px;">
-            <div class="af" style="max-width:120px;"><label for="potw-week">Week #</label><input type="number" id="potw-week" min="1" max="8" placeholder="1"></div>
-          </div>
-
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:16px;">
-            <div class="a-status" id="potw-status" style="margin:0;flex:1;margin-right:12px;"></div>
-            <button class="ab ab--outline ab--sm" id="potw-clear-btn" style="margin-right:8px;">Clear</button>
-            <button class="ab ab--lime ab--sm" id="potw-save-btn">Save & Publish</button>
-          </div>
-        </section>
+        <!-- Player of the Week is auto-derived from weekly DSR (see homepage / leaderboard) — no manual admin needed. -->
 
         <section class="admin-section" data-section="settings">
           <div class="am-head"><h1 class="am-title">Settings</h1></div>
@@ -1624,85 +1570,8 @@
     } catch (e) { alert(e.message || 'Could not update'); }
   }
 
-  // ═══════════════════════════════════════════════════════════
-  // PLAYER OF THE WEEK
-  // ═══════════════════════════════════════════════════════════
-  async function loadPotw() {
-    try {
-      const r = await fetch('/.netlify/functions/player-of-week');
-      if (!r.ok) return;
-      const d = await r.json();
-      if (d.empty) return;
-      const m = d.male || {};
-      const f = d.female || {};
-      if ($id('potw-m-name')) $id('potw-m-name').value = m.name || '';
-      if ($id('potw-m-team')) $id('potw-m-team').value = m.team || '';
-      if ($id('potw-m-rank')) $id('potw-m-rank').value = m.rank || '';
-      if ($id('potw-m-wins')) $id('potw-m-wins').value = m.wins ?? '';
-      if ($id('potw-m-losses')) $id('potw-m-losses').value = m.losses ?? '';
-      if ($id('potw-f-name')) $id('potw-f-name').value = f.name || '';
-      if ($id('potw-f-team')) $id('potw-f-team').value = f.team || '';
-      if ($id('potw-f-rank')) $id('potw-f-rank').value = f.rank || '';
-      if ($id('potw-f-wins')) $id('potw-f-wins').value = f.wins ?? '';
-      if ($id('potw-f-losses')) $id('potw-f-losses').value = f.losses ?? '';
-      if ($id('potw-week') && d.week) $id('potw-week').value = d.week;
-      if (d.updatedAt && $id('potw-saved-at')) {
-        const t = new Date(d.updatedAt);
-        $id('potw-saved-at').textContent = 'Last saved ' + t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      }
-    } catch (e) { console.warn('POTW load error', e); }
-  }
-
-  async function savePotw() {
-    const btn = $id('potw-save-btn');
-    const status = $id('potw-status');
-    btn.disabled = true; btn.textContent = 'Saving…';
-    status.style.display = 'none';
-    const mName = $id('potw-m-name')?.value.trim();
-    const fName = $id('potw-f-name')?.value.trim();
-    const body = {
-      week: parseInt($id('potw-week')?.value) || null,
-      male: mName ? {
-        name: mName,
-        team: $id('potw-m-team')?.value.trim() || null,
-        rank: parseInt($id('potw-m-rank')?.value) || null,
-        wins: parseInt($id('potw-m-wins')?.value) ?? null,
-        losses: parseInt($id('potw-m-losses')?.value) ?? null,
-      } : null,
-      female: fName ? {
-        name: fName,
-        team: $id('potw-f-team')?.value.trim() || null,
-        rank: parseInt($id('potw-f-rank')?.value) || null,
-        wins: parseInt($id('potw-f-wins')?.value) ?? null,
-        losses: parseInt($id('potw-f-losses')?.value) ?? null,
-      } : null,
-    };
-    try {
-      const r = await fetch('/.netlify/functions/player-of-week', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-      if (!r.ok) throw new Error('Save failed');
-      status.className = 'a-status is-ok'; status.textContent = '✓ Published!'; status.style.display = 'block';
-      const now = new Date();
-      if ($id('potw-saved-at')) $id('potw-saved-at').textContent = 'Last saved ' + now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    } catch (e) {
-      status.className = 'a-status is-err'; status.textContent = e.message || 'Save failed'; status.style.display = 'block';
-    }
-    btn.disabled = false; btn.textContent = 'Save & Publish';
-    setTimeout(() => { status.style.display = 'none'; }, 4000);
-  }
-
-  async function clearPotw() {
-    if (!confirm('Clear the current Player of the Week?')) return;
-    const btn = $id('potw-clear-btn');
-    if (!btnBusy(btn, 'Clearing…')) return;
-    try {
-      await fetch('/.netlify/functions/player-of-week', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ male: null, female: null, week: null }) });
-    } finally { btnDone(btn); }
-    ['potw-m-name','potw-m-team','potw-m-rank','potw-m-wins','potw-m-losses','potw-f-name','potw-f-team','potw-f-rank','potw-f-wins','potw-f-losses','potw-week'].forEach(id => { if ($id(id)) $id(id).value = ''; });
-    if ($id('potw-saved-at')) $id('potw-saved-at').textContent = 'Cleared';
-  }
-
-  $id('potw-save-btn')?.addEventListener('click', savePotw);
-  $id('potw-clear-btn')?.addEventListener('click', clearPotw);
+  // Player of the Week is auto-derived from weekly DSR (weeklyTopPerformers) —
+  // surfaced on the homepage + leaderboard. No manual admin entry.
 
   // ═══════════════════════════════════════════════════════════
   // SEASONS — full season & division management
@@ -2188,7 +2057,6 @@
       if (t === 'schedule') { renderGameday(); renderSched(); }
       if (t === 'scores') {}
       if (t === 'messages') renderMessages();
-      if (t === 'potw') loadPotw();
       if (t === 'settings') { applySettings(); loadWaiverCompliance(); }
       if (t === 'moments') loadAdminGallery();
       if (t === 'activity') initActivityLog();

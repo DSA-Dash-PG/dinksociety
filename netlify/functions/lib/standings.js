@@ -513,7 +513,7 @@ function ensureWeeklyPlayer(weekly, week, pid, player, team) {
   if (!m.has(pid)) m.set(pid, {
     playerId: pid, name: player.name, gender: player.gender || null,
     teamId: team?.id || null, teamName: team?.name || null,
-    gamesPlayed: 0, gamesWon: 0, gamesLost: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0,
+    gamesPlayed: 0, gamesWon: 0, gamesLost: 0, ps: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0,
   });
   return m.get(pid);
 }
@@ -522,6 +522,7 @@ function bumpWeeklyPlayer(weekly, week, pid, player, team, won, myScore, oppScor
   if (week == null) return;
   const p = ensureWeeklyPlayer(weekly, week, pid, player, team);
   p.gamesPlayed++; if (won) p.gamesWon++; else p.gamesLost++;
+  if (Number.isInteger(myScore)) p.ps += myScore;
   if (Number.isInteger(myScore) && Number.isInteger(oppScore)) {
     const d = myScore - oppScore; p.diff += d; p.gameDiffs.push(d);
     if (Math.abs(d) <= 3) { p.clutchG++; if (won) p.clutchW++; }
@@ -541,7 +542,7 @@ function buildWeeklyTopPerformers(weekly, weekMeta = {}) {
       .sort((a, b) => (b._wdsr - a._wdsr) || (b.diff - a.diff))
       .slice(0, 3)
       .map(p => ({ playerId: p.playerId, name: p.name, teamName: p.teamName, teamId: p.teamId,
-        gender: p.gender, dsr: Math.round(p._wdsr * 10) / 10, w: p.gamesWon, l: p.gamesLost, diff: p.diff }));
+        gender: p.gender, dsr: Math.round(p._wdsr * 10) / 10, w: p.gamesWon, l: p.gamesLost, ps: p.ps, diff: p.diff }));
     out.push({ week: wk, label: `Week ${wk}`, date: weekMeta[wk]?.date || null, men: topN('M'), women: topN('F') });
   }
   return out.sort((a, b) => b.week - a.week);
