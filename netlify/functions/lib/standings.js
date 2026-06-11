@@ -50,12 +50,14 @@ export async function rebuildStandings(circuit) {
   const lineupStore = getStore({ name: 'lineups', consistency: 'strong' });
   const teamsStore = getStore({ name: 'teams', consistency: 'strong' });
 
-  // Load all schedule files for this circuit
+  // Load all schedule files for this circuit. Keep the blob key alongside the
+  // data so we can backfill per-match rally totals (pointsA/pointsB) into any
+  // match finalized before that field existed.
   const { blobs: scheduleBlobs } = await scheduleStore.list({ prefix: `schedule/${circuit}/` });
   const weekFiles = [];
   for (const b of scheduleBlobs) {
     const data = await scheduleStore.get(b.key, { type: 'json' });
-    if (data?.matches) weekFiles.push(data);
+    if (data?.matches) weekFiles.push({ key: b.key, data, dirty: false });
   }
 
   // Load all team records (needed for player names)
@@ -101,7 +103,8 @@ export async function rebuildStandings(circuit) {
   }
 
   // Process each finalized match
-  for (const weekFile of weekFiles) {
+  for (const wf of weekFiles) {
+    const weekFile = wf.data;
     const div = weekFile.division;
     const week = weekFile.week;
     if (!divisionBuckets[div]) divisionBuckets[div] = { teams: new Map(), weekly: {} };
@@ -198,7 +201,7 @@ export async function rebuildStandings(circuit) {
 
       // ========== Player stats ==========
       // Need the lineup to know who played, then cross-reference scores
-      await accumulatePlayerStats({
+      const acc = await accumulatePlayerStats({
         matchId: match.id,
         teamAId: teamA.id,
         teamBId: teamB.id,
@@ -211,8 +214,27 @@ export async function rebuildStandings(circuit) {
         weeklyPlayers,
         championship: !!match.championship,
       });
+
+      // Backfill per-match rally totals (pointsA/pointsB) onto the schedule for
+      // any match finalized before captain-score started writing them, so the
+      // week-snapshot views (which read the schedule) get PS/PA too. Only marks
+      // the file dirty when a value is actually missing or stale.
+      if (acc) {
+        if (match.pointsA !== acc.pointsA || match.pointsB !== acc.pointsB) {
+          match.pointsA = acc.pointsA;
+          match.pointsB = acc.pointsB;
+          wf.dirty = true;
+        }
+      }
     }
   }
+
+  // Persist any schedule files whose matches were backfilled above.
+  await Promise.all(
+    weekFiles
+      .filter(wf => wf.dirty)
+      .map(wf => scheduleStore.setJSON(wf.key, wf.data))
+  );
 
   // Compute weekly top teams
   for (const div of Object.keys(divisionBuckets)) {
@@ -359,7 +381,7 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
     lineupStore.get(`lineup/${matchId}/${teamBId}.json`, { type: 'json' }).catch(() => null),
     scoresStore.get(`score/${matchId}.json`, { type: 'json' }).catch(() => null),
   ]);
-  if (!lineupA || !lineupB || !score?.games) return;
+  if (!lineupA || !lineupB || !score?.games) return null;
 
   // Migrate any legacy score shape and re-derive the canonical agreed
   // home/away values that the per-slot reads below depend on.
@@ -372,6 +394,9 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
   const rosterA = new Map((teamA?.roster || []).map(p => [p.id, p]));
   const rosterB = new Map((teamB?.roster || []).map(p => [p.id, p]));
 
+  // Per-match rally totals (home = teamA), returned for schedule backfill.
+  let matchPointsScoredA = 0, matchPointsScoredB = 0;
+
   for (const slot of SLOT_KEYS) {
     const slotType = SLOT_TYPE[slot];
     const gs = score.games[slot];
@@ -383,6 +408,8 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
 
     // Team rally-point totals (PS = scored, PA = allowed). Counts every
     // completed game's points for the night. teamA is always the home side.
+    matchPointsScoredA += homeScore;
+    matchPointsScoredB += awayScore;
     if (teamRowA) { teamRowA.pointsScored += homeScore; teamRowA.pointsAgainst += awayScore; }
     if (teamRowB) { teamRowB.pointsScored += awayScore; teamRowB.pointsAgainst += homeScore; }
 
@@ -436,6 +463,8 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
     ensurePlayer(playerStats, pid, player, teamB);
     playerStats.get(pid).matchesPlayed++;
   }
+
+  return { pointsA: matchPointsScoredA, pointsB: matchPointsScoredB };
 }
 
 // A fresh standings row for a team (all counters zeroed).
