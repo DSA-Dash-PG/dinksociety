@@ -372,7 +372,26 @@
       B.matchPointsFor += m.scoreB; B.matchPointsAgainst += m.scoreA;
       A.totalGamesWon += m.gamesA ?? 0; A.totalGamesLost += m.gamesB ?? 0;
       B.totalGamesWon += m.gamesB ?? 0; B.totalGamesLost += m.gamesA ?? 0;
-      if (m.scoreA > m.scoreB) { A.wins++; B.losses++; }
+      // W/L/T are tallied per ROUND (2 per match), mirroring how PTS accrues —
+      // a match can yield 2-0, 1-0-1, 0-1-1, etc. Read each round's own points;
+      // fall back to its games count, then to match-level pts for legacy data
+      // that carries no per-round breakdown.
+      const rounds = [m.round1, m.round2].filter(Boolean);
+      if (rounds.length) {
+        for (const r of rounds) {
+          let hp = r.homePoints, ap = r.awayPoints;
+          if (hp == null || ap == null) {
+            const hg = r.homeGames || 0, ag = r.awayGames || 0;
+            if (hg === 0 && ag === 0) continue;
+            hp = hg > ag ? 2 : hg < ag ? 0 : 1;
+            ap = ag > hg ? 2 : ag < hg ? 0 : 1;
+          }
+          if (hp === 0 && ap === 0) continue;
+          if (hp > ap) { A.wins++; B.losses++; }
+          else if (ap > hp) { B.wins++; A.losses++; }
+          else { A.ties++; B.ties++; }
+        }
+      } else if (m.scoreA > m.scoreB) { A.wins++; B.losses++; }
       else if (m.scoreB > m.scoreA) { B.wins++; A.losses++; }
       else { A.ties++; B.ties++; }
       (A.h2h[m.teamBId] = A.h2h[m.teamBId] || { for: 0, against: 0 });

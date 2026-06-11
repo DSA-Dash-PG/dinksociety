@@ -152,15 +152,33 @@ export async function rebuildStandings(circuit) {
       b.totalGamesWon += (r1.awayGames || 0) + (r2.awayGames || 0);
       b.totalGamesLost += (r1.homeGames || 0) + (r2.homeGames || 0);
 
-      // W/L/T + match-win bonus
+      // W/L/T are tallied per ROUND (2 rounds per match), not per match — so a
+      // single match can produce 2-0, 1-0-1, 0-1-1, etc. Each round is won
+      // (2 league pts), tied (1 pt), or lost (0 pts) by games taken, exactly
+      // mirroring how PTS (matchPoints = round1 pts + round2 pts) accrues.
+      // Read each round's own home/away points; fall back to the games count
+      // for any legacy record written before points were stored.
+      for (const r of [r1, r2]) {
+        let hp = r.homePoints, ap = r.awayPoints;
+        if (hp == null || ap == null) {
+          const hg = r.homeGames || 0, ag = r.awayGames || 0;
+          if (hg === 0 && ag === 0) continue;            // round not played
+          hp = hg > ag ? 2 : hg < ag ? 0 : 1;
+          ap = ag > hg ? 2 : ag < hg ? 0 : 1;
+        }
+        if (hp === 0 && ap === 0) continue;              // round not completed
+        if (hp > ap) { a.wins++; b.losses++; }
+        else if (ap > hp) { b.wins++; a.losses++; }
+        else { a.ties++; b.ties++; }
+      }
+
+      // Match-win bonus (Society Circuit points) is still awarded at the match
+      // level, based on total match points.
       if (matchPointsA > matchPointsB) {
-        a.wins++; b.losses++;
         a.weeklyBonusPoints += BONUS_MATCH_WIN;
       } else if (matchPointsB > matchPointsA) {
-        b.wins++; a.losses++;
         b.weeklyBonusPoints += BONUS_MATCH_WIN;
       } else {
-        a.ties++; b.ties++;
         a.weeklyBonusPoints += BONUS_MATCH_TIE;
         b.weeklyBonusPoints += BONUS_MATCH_TIE;
       }

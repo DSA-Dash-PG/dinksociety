@@ -68,6 +68,16 @@ export default async (req) => {
             // Games-won tally (round1 + round2), shown under the match-points score
             gamesA: m.finalizedAt ? gamesA : null,
             gamesB: m.finalizedAt ? gamesB : null,
+            // Per-round results — used by standings week snapshots to tally W/L/T
+            // per round (2 rounds/match) the same way the live blob does.
+            round1: m.finalizedAt && m.round1 ? {
+              homeGames: m.round1.homeGames ?? 0, awayGames: m.round1.awayGames ?? 0,
+              homePoints: m.round1.homePoints ?? null, awayPoints: m.round1.awayPoints ?? null,
+            } : null,
+            round2: m.finalizedAt && m.round2 ? {
+              homeGames: m.round2.homeGames ?? 0, awayGames: m.round2.awayGames ?? 0,
+              homePoints: m.round2.homePoints ?? null, awayPoints: m.round2.awayPoints ?? null,
+            } : null,
             finalizedAt: m.finalizedAt || null,
             status: m.finalizedAt ? 'final' : 'scheduled',
             division: data.division,
