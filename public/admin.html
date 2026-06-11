@@ -5271,7 +5271,7 @@
     var btn=$d('drop-publish-btn'); if(!btnBusy(btn,'Publishing…')) return;
     var payload=Object.assign({action:'publish',channels:{email:$d('drop-ch-email').checked,portal:$d('drop-ch-portal').checked}},collectDrop());
     apiJSON('/.netlify/functions/admin-drop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      .then(function(d){ var b=d&&d.broadcast; dropStatus('✓ Published'+(b?(' · emailed '+b.emailed+' across '+b.teamCount+' teams'):'')); renderDrop(); openDropWeek(payload.week); })
+      .then(function(d){ var b=d&&d.broadcast; var msg='✓ Published'; if(b){ msg+=' · emailed '+b.emailed+'/'+(b.recipients!=null?b.recipients:b.emailed)+' across '+b.teamCount+' teams'; if(b.failed){ msg+=' · '+b.failed+' failed: '+(b.firstError||'unknown error'); } } dropStatus(msg, !(b&&b.failed)); renderDrop(); openDropWeek(payload.week); })
       .catch(function(e){ dropStatus(e.message||'Publish failed',false); })
       .finally(function(){ btnDone(btn); });
   }

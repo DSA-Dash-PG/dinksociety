@@ -49,6 +49,13 @@ export async function sendEmail({ to, subject, html, replyTo, attachments }) {
   }
 
   const result = await r.emails.send(payload);
+  // Resend reports failures in the response body, NOT by throwing. If we don't
+  // check this, a rejected send (unverified from-address, rate limit, test-mode,
+  // bad recipient) looks exactly like success and callers over-count "sent".
+  if (result && result.error) {
+    const e = result.error;
+    throw new Error(`Resend rejected send to ${Array.isArray(to) ? to.join(',') : to}: ${e.message || e.name || JSON.stringify(e)}`);
+  }
   return result;
 }
 

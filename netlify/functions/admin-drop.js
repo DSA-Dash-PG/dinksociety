@@ -76,7 +76,8 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
   const teams = await listAllTeams();
   const broadcastId = generateId('bc_');
   const template = await getEmailTemplate();
-  let emailed = 0;
+  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+  let recipients = 0, emailed = 0, failed = 0, firstError = null;
 
   for (const team of teams) {
     // Portal announcement (shows on player + captain portals via announcements.js).
@@ -87,6 +88,7 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
     });
     if (doEmail) {
       const tos = recipientEmails(team, audience);
+      recipients += tos.length;
       for (const to of tos) {
         try {
           await sendEmail({
@@ -94,10 +96,16 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
             html: renderAdminMessage({ subject, bodyHtml, body: text, teamName: team.name, portalUrl: link, template }),
           });
           emailed++;
-        } catch (e) { console.error('drop email failed:', e); }
+          await sleep(120);  // stay under Resend's per-second send limit on big blasts
+        } catch (e) {
+          failed++;
+          if (!firstError) firstError = e.message || String(e);
+          console.error('drop email failed:', e);
+        }
       }
     }
   }
+  if (doEmail) console.log(`drop broadcast week ${rec.week}: ${recipients} recipients, ${emailed} sent, ${failed} failed${firstError ? ' · first error: ' + firstError : ''}`);
 
   // Log to the broadcasts store so it surfaces as a league announcement, gated
   // to players (the recap is for everyone).
@@ -105,13 +113,14 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
     await getStore('broadcasts').setJSON(`broadcast/${broadcastId}.json`, {
       id: broadcastId, subject, body: text, bodyHtml,
       attachments: [], scope: 'all', division: null, teamIds: null,
-      audience: 'players', sentEmail: !!doEmail, teamCount: teams.length, emailed,
+      audience: 'players', sentEmail: !!doEmail, teamCount: teams.length,
+      recipients, emailed, failed, firstError,
       sentBy: rec.sentBy || 'desk@dinksociety.app', sentAt: new Date().toISOString(),
       kind: 'drop', dropWeek: rec.week,
     });
   } catch (e) { console.error('drop broadcast log failed:', e); }
 
-  return { broadcastId, teamCount: teams.length, emailed };
+  return { broadcastId, teamCount: teams.length, recipients, emailed, failed, firstError };
 }
 
 function recipientEmails(team, audience) {
