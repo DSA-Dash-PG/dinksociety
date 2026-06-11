@@ -19,7 +19,34 @@ export default async (req) => {
   if (req.method === 'GET') {
     const circuit = url.searchParams.get('circuit') || 'I';
     const division = url.searchParams.get('division');
-    if (!division) return json({ error: 'division required' }, 400);
+    const all = url.searchParams.get('all') === '1' || (!division && url.searchParams.has('all'));
+
+    // ── All-divisions mode: list every schedule blob for this circuit and
+    // return every match, regardless of division. This surfaces games that
+    // live in a division no longer in the admin dropdown (e.g. auto-generated
+    // or leftover test games) so they can be seen and deleted. Each match is
+    // stamped with its division and week so the UI can label/filter them.
+    if (all || !division) {
+      const { blobs } = await store.list({ prefix: `schedule/${circuit}/` });
+      const weekMap = {};
+      const divisions = new Set();
+      for (const b of blobs) {
+        const data = await store.get(b.key, { type: 'json' }).catch(() => null);
+        if (!data?.matches) continue;
+        if (data.circuit && data.circuit !== circuit) continue; // season isolation
+        // Derive division/week from the blob (key shape: schedule/<circuit>/<division>/week-<n>.json)
+        const parts = b.key.split('/');
+        const div = data.division || parts[2] || '';
+        const wk = data.week || parseInt((parts[3] || '').replace(/\D+/g, ''), 10) || 1;
+        if (div) divisions.add(div);
+        if (!weekMap[wk]) weekMap[wk] = { week: wk, circuit, matches: [] };
+        for (const m of (data.matches || [])) {
+          weekMap[wk].matches.push({ ...m, division: div, week: wk });
+        }
+      }
+      const weeks = Object.values(weekMap).sort((a, b) => a.week - b.week);
+      return json({ circuit, all: true, divisions: [...divisions], weeks });
+    }
 
     const weeks = [];
     for (let w = 1; w <= 12; w++) {
@@ -29,7 +56,7 @@ export default async (req) => {
       weeks.push({
         week: w,
         circuit, division,
-        matches: data.matches || [],
+        matches: (data.matches || []).map(m => ({ ...m, division, week: w })),
         generatedAt: data.generatedAt,
         updatedAt: data.updatedAt,
       });

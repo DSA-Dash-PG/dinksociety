@@ -726,6 +726,27 @@
             </div>
           </div>
           <div id="gameday"></div>
+
+          <!-- ALL GAMES — every match across every division & week, with full
+               editing + delete. Surfaces games in divisions not in the dropdown
+               (e.g. auto-generated/leftover test games). -->
+          <div class="ac" id="all-games-card" style="margin-bottom:18px;">
+            <div class="ac__h" style="flex-wrap:wrap;gap:10px;">
+              <h2 class="ac__t">All games</h2>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;">
+                <label style="display:inline-flex;align-items:center;gap:5px;color:var(--color-text-faint);">Week
+                  <select id="ag-week" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;"><option value="all">All weeks</option></select>
+                </label>
+                <label style="display:inline-flex;align-items:center;gap:5px;color:var(--color-text-faint);">Division
+                  <select id="ag-div" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;"><option value="all">All divisions</option></select>
+                </label>
+                <button class="ab ab--outline ab--sm" id="ag-reload">↻ Reload</button>
+                <span class="ac__s" id="ag-count"></span>
+              </div>
+            </div>
+            <div id="ag-out"><div class="loading">Loading every game…</div></div>
+          </div>
+
           <div id="sched-out"><div class="loading">Select a division above.</div></div>
         </section>
 
@@ -2135,7 +2156,7 @@
       if (t === 'seasons') loadAndRenderSeasons();
       if (t === 'registrations') renderReg();
       if (t === 'teams') renderTeams();
-      if (t === 'schedule') { renderGameday(); renderSched(); }
+      if (t === 'schedule') { renderGameday(); renderAllGames(); renderSched(); }
       if (t === 'scores') {}
       if (t === 'messages') renderMessages();
       if (t === 'drop') renderDrop();
@@ -4052,7 +4073,9 @@
         apiJSON('/.netlify/functions/admin-teams'),
       ]);
       const weeks = data.weeks || [];
-      const divTeams = (teamsData.teams || []).filter(t => t.division === div).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const allTeams = (teamsData.teams || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      window.__allTeams = allTeams;
+      const divTeams = allTeams.filter(t => t.division === div);
       window.__schedTeams = divTeams;
       const addForm = addMatchFormHTML(divTeams);
 
@@ -4067,50 +4090,78 @@
       ).join('') + '</div><div class="ac" id="wk-card"></div>' + addForm;
 
       $$('.wc').forEach(c => c.addEventListener('click', () => selectWeek(parseInt(c.dataset.week), weeks)));
-      selectWeek(weeks[0].week, weeks);
+      const startWeek = weeks.some(w => w.week === _schedWeek) ? _schedWeek : weeks[0].week;
+      selectWeek(startWeek, weeks);
       wireAddMatch(div);
     } catch (e) {
       out.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
     }
   }
 
-  function selectWeek(n, weeks) {
-    $$('.wc').forEach(c => c.classList.toggle('is-active', parseInt(c.dataset.week) === n));
-    const wk = weeks.find(w => w.week === n);
-    const card = $id('wk-card');
-    if (!wk?.matches?.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
-    card.innerHTML = '<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ' + n + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
-      wk.matches.map(m => {
-        const fin = m.finalizedAt;
-        return '<div class="mr"><div class="mr__t">' + h(m.teamA.name) + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(m.teamB.name) + '</div><div class="mr__m">' + (fin ? '<span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '&nbsp;') + '</div></div>' +
-          '<div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);flex-wrap:wrap;">' +
-            '<button class="schedpill' + (m.scheduledAt ? '' : ' schedpill--empty') + ' sched-edit" data-mid="' + h(m.id) + '" id="sp-' + h(m.id) + '">' + schedPillLabel(m) + '</button>' +
-            '<span style="display:inline-flex;align-items:center;gap:4px;">Home <select class="team-edit" data-side="A" data-mid="' + h(m.id) + '" style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:3px 6px;font-size:11px;">' + teamEditOptions(m.teamA.id) + '</select></span>' +
-            '<button class="ab ab--outline ab--sm match-swap" data-mid="' + h(m.id) + '" title="Swap home and away">⇄ Swap</button>' +
-            '<span style="display:inline-flex;align-items:center;gap:4px;">Away <select class="team-edit" data-side="B" data-mid="' + h(m.id) + '" style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:3px 6px;font-size:11px;">' + teamEditOptions(m.teamB.id) + '</select></span>' +
-            '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="champ-tgl" data-mid="' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
-            '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups (both)</button>' +
-            '<button class="ab ab--outline ab--sm match-del" data-mid="' + h(m.id) + '" style="border-color:rgba(239,68,68,0.5);color:#ef4444;">Delete match</button>' +
-            '<span id="cst-' + h(m.id) + '" style="margin-left:4px;"></span>' +
-          '</div>';
-      }).join('') + '</div>';
+  // Friendly division name from its id (falls back to the raw id for
+  // orphan/auto-generated divisions that aren't in the configured list).
+  function divName(id) {
+    if (!id) return '—';
+    const d = (DIVISIONS || []).find(x => x.id === id);
+    return d ? d.name : id;
+  }
 
-    // Scheduler pill → popover (one control owns day/time/venue/courts)
-    card.querySelectorAll('.sched-edit').forEach(btn => {
+  // Team <option> list scoped to a match's division. Falls back to all teams
+  // when the division has no teams (e.g. an orphaned game) so the dropdown is
+  // never empty. Uses window.__allTeams (every team), set by both renderers.
+  function teamEditOptionsFor(m, selId) {
+    const all = window.__allTeams || window.__schedTeams || [];
+    let pool = all.filter(t => t.division === m.division);
+    if (!pool.length) pool = all;
+    return pool.map(t =>
+      '<option value="' + h(t.id) + '"' + (t.id === selId ? ' selected' : '') + '>' + h(t.name) + '</option>'
+    ).join('');
+  }
+
+  // Shared per-match control block — used by both the per-division week cards
+  // and the All Games master list. Pass showMeta:true to prefix a division +
+  // week label (needed in the master list, which spans every division/week).
+  function matchRowHTML(m, showMeta) {
+    const fin = m.finalizedAt;
+    const A = m.teamA || {}, B = m.teamB || {};
+    const meta = showMeta
+      ? '<div style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-text-faint);margin:14px 0 4px;">' + h(divName(m.division)) + ' · Week ' + h(m.week) + '</div>'
+      : '';
+    return meta +
+      '<div class="mr"><div class="mr__t">' + h(A.name || 'TBD') + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(B.name || 'TBD') + '</div><div class="mr__m">' + (fin ? '<span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '&nbsp;') + '</div></div>' +
+      '<div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);flex-wrap:wrap;">' +
+        '<button class="schedpill' + (m.scheduledAt ? '' : ' schedpill--empty') + ' sched-edit" data-mid="' + h(m.id) + '" id="sp-' + h(m.id) + '">' + schedPillLabel(m) + '</button>' +
+        '<span style="display:inline-flex;align-items:center;gap:4px;">Home <select class="team-edit" data-side="A" data-mid="' + h(m.id) + '" style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:3px 6px;font-size:11px;">' + teamEditOptionsFor(m, A.id) + '</select></span>' +
+        '<button class="ab ab--outline ab--sm match-swap" data-mid="' + h(m.id) + '" title="Swap home and away">⇄ Swap</button>' +
+        '<span style="display:inline-flex;align-items:center;gap:4px;">Away <select class="team-edit" data-side="B" data-mid="' + h(m.id) + '" style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:3px 6px;font-size:11px;">' + teamEditOptionsFor(m, B.id) + '</select></span>' +
+        '<label style="display:inline-flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" class="champ-tgl" data-mid="' + h(m.id) + '"' + (m.championship ? ' checked' : '') + '> Championship (win by 2)</label>' +
+        '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups (both)</button>' +
+        '<button class="ab ab--outline ab--sm match-del" data-mid="' + h(m.id) + '" style="border-color:rgba(239,68,68,0.5);color:#ef4444;">Delete match</button>' +
+        '<span id="cst-' + h(m.id) + '" style="margin-left:4px;"></span>' +
+      '</div>';
+  }
+
+  // Wire all per-match controls inside `scope`. `matchesRef` is the array the
+  // handlers look matches up in; `weeksCtx` feeds the scheduler popover; and
+  // `refresh` re-renders the owning view after any server change.
+  function wireMatchRows(scope, matchesRef, weeksCtx, refresh) {
+    scope.querySelectorAll('.sched-edit').forEach(btn => {
       btn.addEventListener('click', () => {
-        const m = wk.matches.find(x => x.id === btn.dataset.mid);
-        if (m) openSchedPop(btn, m, wk, weeks);
+        const m = matchesRef.find(x => x.id === btn.dataset.mid);
+        if (!m) return;
+        const wkObj = (weeksCtx || []).find(w => (w.matches || []).some(x => x.id === m.id))
+          || { week: m.week, matches: matchesRef.filter(x => x.week === m.week) };
+        openSchedPop(btn, m, wkObj, weeksCtx || [wkObj], refresh);
       });
     });
 
-    // Reassign a team on either side (Home / Away dropdowns)
-    card.querySelectorAll('.team-edit').forEach(sel => {
+    scope.querySelectorAll('.team-edit').forEach(sel => {
       sel.addEventListener('change', async () => {
         const mid = sel.dataset.mid, side = sel.dataset.side;
-        const m = wk.matches.find(x => x.id === mid);
+        const m = matchesRef.find(x => x.id === mid);
         if (!m) return;
         const stat = $id('cst-' + mid);
-        const team = (window.__schedTeams || []).find(t => t.id === sel.value);
+        const team = (window.__allTeams || window.__schedTeams || []).find(t => t.id === sel.value);
         const prevId = side === 'A' ? m.teamA.id : m.teamB.id;
         const otherId = side === 'A' ? m.teamB.id : m.teamA.id;
         if (!team) { sel.value = prevId; return; }
@@ -4126,7 +4177,7 @@
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ [field]: { id: team.id, name: team.name } }),
           });
-          renderSched();
+          refresh();
         } catch (e) {
           if (stat) { stat.textContent = e.message; stat.style.color = '#ef4444'; }
           sel.value = prevId;
@@ -4135,11 +4186,10 @@
       });
     });
 
-    // Swap home/away in one click
-    card.querySelectorAll('.match-swap').forEach(btn => {
+    scope.querySelectorAll('.match-swap').forEach(btn => {
       btn.addEventListener('click', async () => {
         const mid = btn.dataset.mid;
-        const m = wk.matches.find(x => x.id === mid);
+        const m = matchesRef.find(x => x.id === mid);
         if (!m) return;
         if (m.finalizedAt && !confirm('This match is FINAL. Swapping home/away may misalign the recorded scores. Continue?')) return;
         const stat = $id('cst-' + mid);
@@ -4152,7 +4202,7 @@
               teamB: { id: m.teamA.id, name: m.teamA.name },
             }),
           });
-          renderSched();
+          refresh();
         } catch (e) {
           if (stat) { stat.textContent = e.message; stat.style.color = '#ef4444'; }
           btn.disabled = false;
@@ -4160,8 +4210,7 @@
       });
     });
 
-    // Championship saves on toggle — no separate Save button anymore
-    card.querySelectorAll('.champ-tgl').forEach(cb => {
+    scope.querySelectorAll('.champ-tgl').forEach(cb => {
       cb.addEventListener('change', async () => {
         const mid = cb.dataset.mid;
         const stat = $id('cst-' + mid);
@@ -4171,7 +4220,7 @@
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ championship: cb.checked }),
           });
-          const m = wk.matches.find(x => x.id === mid);
+          const m = matchesRef.find(x => x.id === mid);
           if (m) m.championship = cb.checked;
           if (stat) { stat.textContent = 'Saved ✓'; stat.style.color = 'var(--color-teal)'; }
         } catch (e) {
@@ -4181,7 +4230,7 @@
       });
     });
 
-    card.querySelectorAll('.match-del').forEach(btn => {
+    scope.querySelectorAll('.match-del').forEach(btn => {
       btn.addEventListener('click', async () => {
         const mid = btn.dataset.mid;
         if (!confirm('Delete this match? It will be removed from the schedule (any lineups/scores for it are orphaned).')) return;
@@ -4189,7 +4238,7 @@
         btn.disabled = true; if (stat) { stat.textContent = 'Deleting…'; stat.style.color = 'var(--color-text-faint)'; }
         try {
           await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(mid), { method: 'DELETE' });
-          renderSched();
+          refresh();
         } catch (e) {
           if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
           btn.disabled = false;
@@ -4197,7 +4246,7 @@
       });
     });
 
-    card.querySelectorAll('.lineup-unlock').forEach(btn => {
+    scope.querySelectorAll('.lineup-unlock').forEach(btn => {
       btn.addEventListener('click', async () => {
         const mid = btn.dataset.mid;
         const stat = $id('cst-' + mid);
@@ -4206,12 +4255,25 @@
         try {
           const r = await apiJSON('/.netlify/functions/admin-unlock-lineups?matchId=' + encodeURIComponent(mid), { method: 'POST' });
           if (stat) { stat.textContent = 'Reopened ✓ (' + (r.lineupsUnlocked || 0) + ' lineups)'; stat.style.color = 'var(--color-gold)'; }
-          renderSched();
+          refresh();
         } catch (e) {
           if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
         } finally { btn.disabled = false; }
       });
     });
+  }
+
+  let _schedWeek = null; // remembered selected week so refreshes don't jump
+
+  function selectWeek(n, weeks) {
+    _schedWeek = n;
+    $$('.wc').forEach(c => c.classList.toggle('is-active', parseInt(c.dataset.week) === n));
+    const wk = weeks.find(w => w.week === n);
+    const card = $id('wk-card');
+    if (!wk?.matches?.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
+    card.innerHTML = '<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ' + n + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
+      wk.matches.map(m => matchRowHTML(m, false)).join('') + '</div>';
+    wireMatchRows(card, wk.matches, weeks, renderSched);
   }
 
   // ════════════════════════════════════════════════════════════
@@ -4279,13 +4341,13 @@
     if (sp && !sp.el.contains(e.target) && !e.target.closest('.sched-edit')) spClose();
   }
 
-  function openSchedPop(anchor, m, weekObj, weeks) {
+  function openSchedPop(anchor, m, weekObj, weeks, refresh) {
     spClose();
     const d = m.scheduledAt ? new Date(m.scheduledAt) : null;
     const valid = d && !isNaN(d);
     const today = new Date();
     sp = {
-      match: m, weekObj, weeks,
+      match: m, weekObj, weeks, refresh,
       date: valid ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null,
       time: valid ? fmtTime12(d) : '7:00 PM',
       venue: m.venue || null,
@@ -4438,8 +4500,9 @@
         });
         Object.assign(t, r.match || payload);
       }
+      const refresh = sp.refresh;
       spClose();
-      selectWeek(weekObj.week, weeks);
+      if (refresh) refresh(); else selectWeek(weekObj.week, weeks);
     } catch (e) {
       sp.el.querySelectorAll('button').forEach(b => { b.disabled = false; });
       if (stat) { stat.textContent = e.message; stat.style.color = 'var(--color-red,#ef4444)'; }
@@ -4447,6 +4510,76 @@
   }
 
   $id('sched-div').addEventListener('change', renderSched);
+
+  // ════════════════════════════════════════════════════════════
+  // ALL GAMES — every match across every division & week in one list,
+  // with week/division filters and full per-row editing + delete. Loads
+  // via admin-matches all-divisions mode, so games sitting in a division
+  // that's no longer in the dropdown (auto-generated/leftover test games)
+  // show up here and can be deleted.
+  // ════════════════════════════════════════════════════════════
+  const _agState = { all: [], weeks: [] };
+
+  async function renderAllGames() {
+    const out = $id('ag-out');
+    if (!out) return;
+    out.innerHTML = '<div class="loading">Loading every game…</div>';
+    try {
+      const [data, teamsData] = await Promise.all([
+        apiJSON('/.netlify/functions/admin-matches?circuit=I&all=1'),
+        apiJSON('/.netlify/functions/admin-teams'),
+      ]);
+      window.__allTeams = (teamsData.teams || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      const weeks = data.weeks || [];
+      _agState.weeks = weeks;
+      _agState.all = weeks.flatMap(w => w.matches || []);
+      populateAgFilters(weeks, data.divisions || []);
+      renderAgList();
+    } catch (e) {
+      out.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
+    }
+  }
+
+  function populateAgFilters(weeks, presentDivs) {
+    const wkSel = $id('ag-week'), dvSel = $id('ag-div');
+    if (!wkSel || !dvSel) return;
+    const curWk = wkSel.value || 'all', curDv = dvSel.value || 'all';
+    const wkNums = [...new Set(weeks.map(w => w.week))].sort((a, b) => a - b);
+    wkSel.innerHTML = '<option value="all">All weeks</option>' +
+      wkNums.map(n => '<option value="' + n + '">Week ' + n + '</option>').join('');
+    // Union of divisions actually present (incl. orphans) and configured ones.
+    const divIds = [...new Set([...(presentDivs || []), ...((DIVISIONS || []).map(d => d.id))])];
+    dvSel.innerHTML = '<option value="all">All divisions</option>' +
+      divIds.map(id => '<option value="' + h(id) + '">' + h(divName(id)) + '</option>').join('');
+    if ([...wkSel.options].some(o => o.value === curWk)) wkSel.value = curWk;
+    if ([...dvSel.options].some(o => o.value === curDv)) dvSel.value = curDv;
+  }
+
+  function renderAgList() {
+    const out = $id('ag-out');
+    if (!out) return;
+    const wkF = ($id('ag-week') || {}).value || 'all';
+    const dvF = ($id('ag-div') || {}).value || 'all';
+    let matches = _agState.all || [];
+    if (wkF !== 'all') matches = matches.filter(m => String(m.week) === wkF);
+    if (dvF !== 'all') matches = matches.filter(m => (m.division || '') === dvF);
+    matches = matches.slice().sort((a, b) =>
+      (a.week - b.week) ||
+      String(a.division || '').localeCompare(String(b.division || '')) ||
+      String((a.teamA || {}).name || '').localeCompare(String((b.teamA || {}).name || '')));
+    const cnt = $id('ag-count');
+    if (cnt) cnt.textContent = matches.length + ' game' + (matches.length === 1 ? '' : 's');
+    if (!matches.length) {
+      out.innerHTML = '<div class="empty" style="padding:22px">No games match these filters.</div>';
+      return;
+    }
+    out.innerHTML = '<div style="padding:4px 18px 14px;">' + matches.map(m => matchRowHTML(m, true)).join('') + '</div>';
+    // Refresh both the master list and the per-division card below after edits.
+    wireMatchRows(out, matches, _agState.weeks, () => { renderAllGames(); renderSched(); });
+  }
+
+  ['ag-week', 'ag-div'].forEach(id => { const el = $id(id); if (el) el.addEventListener('change', renderAgList); });
+  { const r = $id('ag-reload'); if (r) r.addEventListener('click', renderAllGames); }
 
   // ── Generate schedule ──
   $id('gen-sched-btn').addEventListener('click', async () => {
