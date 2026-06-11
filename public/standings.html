@@ -143,8 +143,11 @@
 
     /* Optional columns */
     .col-opt { }
-    @media (max-width: 800px) { .col-opt { display: none; } .stand-table { font-size: 12px; } }
-    @media (max-width: 560px) { .stand-table th, .stand-table td { padding: 8px 5px; } .team-emoji { display: none; } }
+    /* On narrow screens keep every column but shrink the type and let the table
+       scroll sideways inside .stand-table-wrap (overflow-x:auto) instead of
+       hiding the optional columns. */
+    @media (max-width: 800px) { .stand-table { font-size: 11px; } .stand-table th, .stand-table td { padding: 8px 6px; } }
+    @media (max-width: 560px) { .stand-table { font-size: 10.5px; } .stand-table th, .stand-table td { padding: 7px 5px; } .team-emoji { display: none; } }
 
     /* Legend */
     .legend-card {
@@ -320,7 +323,7 @@
     const teams = divTeams.map((t, i) => ({
       rank:0, teamId:t.id, teamName:t.name, teamEmoji:t.emoji||'🏓',
       wins:0, losses:0, ties:0, matchesPlayed:0,
-      matchPointsFor:0, matchPointsAgainst:0, pointDiff:0,
+      matchPointsFor:0, matchPointsAgainst:0, pointsScored:0, pointsAgainst:0, pointDiff:0,
       totalGamesWon:0, totalGamesLost:0,
       maxPts: SEASON.totalMatches * SEASON.maxPtsPerMatch, status:null, h2h:{},
     }));
@@ -362,7 +365,7 @@
     const rows = new Map(base.map(t => [t.teamId, {
       ...t, wins: 0, losses: 0, ties: 0, matchesPlayed: 0,
       matchPointsFor: 0, matchPointsAgainst: 0, totalGamesWon: 0, totalGamesLost: 0,
-      pointDiff: 0, h2h: {}, status: null,
+      pointsScored: 0, pointsAgainst: 0, pointDiff: 0, h2h: {}, status: null,
     }]));
     for (const m of divisionMatchesThrough(throughWeek)) {
       const A = rows.get(m.teamAId), B = rows.get(m.teamBId);
@@ -372,6 +375,8 @@
       B.matchPointsFor += m.scoreB; B.matchPointsAgainst += m.scoreA;
       A.totalGamesWon += m.gamesA ?? 0; A.totalGamesLost += m.gamesB ?? 0;
       B.totalGamesWon += m.gamesB ?? 0; B.totalGamesLost += m.gamesA ?? 0;
+      A.pointsScored += m.pointsA ?? 0; A.pointsAgainst += m.pointsB ?? 0;
+      B.pointsScored += m.pointsB ?? 0; B.pointsAgainst += m.pointsA ?? 0;
       // W/L/T are tallied per ROUND (2 per match), mirroring how PTS accrues —
       // a match can yield 2-0, 1-0-1, 0-1-1, etc. Read each round's own points;
       // fall back to its games count, then to match-level pts for legacy data
@@ -400,7 +405,7 @@
       B.h2h[m.teamAId].for += m.scoreB; B.h2h[m.teamAId].against += m.scoreA;
     }
     const teams = [...rows.values()].map(t => {
-      t.pointDiff = t.matchPointsFor - t.matchPointsAgainst;
+      t.pointDiff = t.pointsScored - t.pointsAgainst;   // DIFF = PS − PA
       t.remaining = SEASON.totalMatches - t.matchesPlayed;
       t.maxPts = t.matchPointsFor + t.remaining * SEASON.maxPtsPerMatch;
       return t;
@@ -497,7 +502,7 @@
     // The season has "started" once at least one week has been played.
     const seasonStarted = !preseason && weeksPlayed > 0;
     const showPlayoffLine = hunt && teams.length > spots;
-    const cols = hunt ? 12 : 11; // MAX column only exists in hunt mode
+    const cols = hunt ? 14 : 13; // +PS +PA; MAX column only exists in hunt mode
 
     // Before the season starts there is no meaningful ranking — list alphabetically.
     if (!seasonStarted) {
@@ -528,6 +533,8 @@
       const diffCls  = !seasonStarted ? 'col-muted' : diff>0 ? 'col-diff-pos' : diff<0 ? 'col-diff-neg' : '';
       const ptsCls   = pts===0 ? 'col-pts col-pts--zero' : 'col-pts';
       const rds      = !seasonStarted ? '—' : (t.matchesPlayed || 0) * 2;
+      const psFor    = !seasonStarted ? '—' : (t.pointsScored || 0);
+      const psAg     = !seasonStarted ? '—' : (t.pointsAgainst || 0);
       const badge    = hunt ? badgeHtml(t.status) : '';
 
       rows += '<tr class="' + (seasonStarted && idx===0 ? 'stand-row--leader' : '') + '">'
@@ -544,6 +551,8 @@
         + '<td class="col-opt col-muted">' + pb + '</td>'
         + '<td class="col-opt">' + t.totalGamesWon + '</td>'
         + '<td class="col-opt col-muted">' + t.totalGamesLost + '</td>'
+        + '<td class="col-opt">' + psFor + '</td>'
+        + '<td class="col-opt col-muted">' + psAg + '</td>'
         + '<td class="' + diffCls + '">' + diffStr + '</td>'
         + (hunt ? '<td class="col-opt col-muted">' + t.maxPts + '</td>' : '')
         + '</tr>';
@@ -577,7 +586,9 @@
       + '<th class="col-opt" title="' + (hunt ? 'Points Back of the playoff line' : 'Points Back from #1') + '">PB</th>'
       + '<th class="col-opt" title="Games Won (all rounds)">GW</th>'
       + '<th class="col-opt" title="Games Lost">GL</th>'
-      + '<th title="Points Differential">DIFF</th>'
+      + '<th class="col-opt" title="Points Scored (all games)">PS</th>'
+      + '<th class="col-opt" title="Points Against (all games)">PA</th>'
+      + '<th title="Points Differential (PS − PA)">DIFF</th>'
       + (hunt ? '<th class="col-opt" title="Max possible points">MAX</th>' : '')
       + '</tr></thead>'
       + '<tbody>' + rows + '</tbody>'
@@ -620,7 +631,9 @@
       + '<div class="legend-item"><abbr>PB</abbr> = ' + pbDesc + '</div>'
       + '<div class="legend-item"><abbr>GW</abbr> = Games Won (across all rounds)</div>'
       + '<div class="legend-item"><abbr>GL</abbr> = Games Lost (across all rounds)</div>'
-      + '<div class="legend-item"><abbr>DIFF</abbr> = Points Differential (PTS − PA)</div>'
+      + '<div class="legend-item"><abbr>PS</abbr> = Points Scored (all games)</div>'
+      + '<div class="legend-item"><abbr>PA</abbr> = Points Against (all games)</div>'
+      + '<div class="legend-item"><abbr>DIFF</abbr> = Points Differential (PS − PA)</div>'
       + huntItems
       + huntBlock
       + '</div>'

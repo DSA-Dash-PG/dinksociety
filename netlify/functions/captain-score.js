@@ -530,6 +530,19 @@ async function writeFinalScoreToSchedule(scheduleStore, match, score) {
   m.round1 = decorated.computed.round1;
   m.round2 = decorated.computed.round2;
 
+  // Total rally points for the night (PS/PA): sum every confirmed game's score.
+  let pointsA = 0, pointsB = 0;
+  for (const gstat of decorated.computed.gameStatuses) {
+    if (gstat.status !== 'confirmed') continue;
+    const g = score.games[gstat.slot];
+    const h = Number.isInteger(g?.home) ? g.home : g?.homeEntry?.home;
+    const a = Number.isInteger(g?.away) ? g.away : g?.homeEntry?.away;
+    if (Number.isInteger(h)) pointsA += h;
+    if (Number.isInteger(a)) pointsB += a;
+  }
+  m.pointsA = pointsA;
+  m.pointsB = pointsB;
+
   data.updatedAt = new Date().toISOString();
   await scheduleStore.setJSON(match.scheduleKey, data);
 }

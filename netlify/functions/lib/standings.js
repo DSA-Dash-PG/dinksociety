@@ -202,6 +202,8 @@ export async function rebuildStandings(circuit) {
         matchId: match.id,
         teamAId: teamA.id,
         teamBId: teamB.id,
+        teamRowA: a,
+        teamRowB: b,
         teamsById,
         lineupStore,
         playerStats,
@@ -257,6 +259,7 @@ export async function rebuildStandings(circuit) {
       t.rank = idx + 1;
       t.placementBonus = PLACEMENT_BONUS[idx] ?? 0;
       t.societyCircuitPoints = t.weeklyBonusPoints + t.placementBonus;
+      t.pointDiff = t.pointsScored - t.pointsAgainst;  // DIFF = PS − PA
     });
 
     divisions[div] = {
@@ -326,7 +329,7 @@ export async function rebuildStandings(circuit) {
  *   1. Match points (more = better)
  *   2. Total games won (more = better)
  *   3. Head-to-head match points (between tied teams)
- *   4. Point differential (for − against)
+ *   4. Rally-point differential (PS − PA)
  */
 function standingsComparator(a, b) {
   if (b.matchPointsFor !== a.matchPointsFor) return b.matchPointsFor - a.matchPointsFor;
@@ -339,15 +342,15 @@ function standingsComparator(a, b) {
     if (aVsB.for !== bVsA.for) return bVsA.for - aVsB.for;
   }
 
-  const aDiff = a.matchPointsFor - a.matchPointsAgainst;
-  const bDiff = b.matchPointsFor - b.matchPointsAgainst;
+  const aDiff = a.pointsScored - a.pointsAgainst;
+  const bDiff = b.pointsScored - b.pointsAgainst;
   return bDiff - aDiff;
 }
 
 /**
  * Pulls lineup + score for a match, updates the playerStats map in place.
  */
-async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lineupStore, playerStats, week, weeklyPlayers, championship = false }) {
+async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, teamRowB, teamsById, lineupStore, playerStats, week, weeklyPlayers, championship = false }) {
   // Strong read — the score record was written moments before finalize (see rebuildStandings).
   const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
 
@@ -377,6 +380,12 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamsById, lin
     const homeScore = gs?.home;
     const awayScore = gs?.away;
     if (!Number.isInteger(homeScore) || !Number.isInteger(awayScore)) continue;
+
+    // Team rally-point totals (PS = scored, PA = allowed). Counts every
+    // completed game's points for the night. teamA is always the home side.
+    if (teamRowA) { teamRowA.pointsScored += homeScore; teamRowA.pointsAgainst += awayScore; }
+    if (teamRowB) { teamRowB.pointsScored += awayScore; teamRowB.pointsAgainst += homeScore; }
+
     if (homeScore === awayScore) continue; // a game must have a winner
 
     const homeWon = homeScore > awayScore;
@@ -438,6 +447,8 @@ function newTeamRow(teamId, teamName, division) {
     matchesPlayed: 0,
     wins: 0, losses: 0, ties: 0,
     matchPointsFor: 0, matchPointsAgainst: 0,
+    pointsScored: 0, pointsAgainst: 0,   // rally points across all games (PS/PA)
+    pointDiff: 0,                        // PS − PA
     sweeps: 0,
     totalGamesWon: 0, totalGamesLost: 0,
     weeklyBonusPoints: 0,

@@ -78,6 +78,9 @@ export default async (req) => {
               homeGames: m.round2.homeGames ?? 0, awayGames: m.round2.awayGames ?? 0,
               homePoints: m.round2.homePoints ?? null, awayPoints: m.round2.awayPoints ?? null,
             } : null,
+            // Total rally points (PS/PA) for week-snapshot standings.
+            pointsA: m.finalizedAt ? (m.pointsA ?? null) : null,
+            pointsB: m.finalizedAt ? (m.pointsB ?? null) : null,
             finalizedAt: m.finalizedAt || null,
             status: m.finalizedAt ? 'final' : 'scheduled',
             division: data.division,
