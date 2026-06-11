@@ -892,8 +892,8 @@
         <!-- THE DROP -->
         <style>
           .drop-chip{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;padding:2px 8px;border-radius:999px;vertical-align:middle;}
-          .drop-chip.draft{background:var(--color-gold-dim);color:var(--color-gold);}
-          .drop-chip.published{background:var(--color-lime-dim);color:var(--color-lime);}
+          .drop-chip.draft{background:var(--color-gold-dim,rgba(240,192,64,0.12));color:var(--color-gold,#f0c040);}
+          .drop-chip.published{background:var(--color-lime-dim,rgba(184,255,44,0.12));color:var(--color-lime,#b8ff2c);}
           .drop-weekrow{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:8px;cursor:pointer;background:var(--color-surface-2);}
           .drop-weekrow:hover{border-color:var(--color-border-strong);}
           .drop-weekrow .wk{font-weight:800;font-size:13px;min-width:54px;color:var(--color-text);}
@@ -942,8 +942,18 @@
             <div class="af"><label for="drop-f-title">Lead headline</label><input type="text" id="drop-f-title" placeholder="The one storyline of the week" autocomplete="off"></div>
             <div class="af"><label for="drop-f-dek">Dek (sub-headline)</label><input type="text" id="drop-f-dek" placeholder="One line that sets up the lead" autocomplete="off"></div>
             <div class="af">
-              <label for="drop-f-lead">Lead story <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— blank line = new paragraph · start a line with &gt; for a pull-quote</span></label>
-              <textarea id="drop-f-lead" rows="8" style="width:100%;font-family:inherit;line-height:1.6;"></textarea>
+              <label>Lead story <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— use the toolbar for bold, headings, lists, and links · paste keeps formatting</span></label>
+              <div class="wv-toolbar" id="drop-lead-tb">
+                <button type="button" class="wv-tb" data-rtcmd="bold" title="Bold"><b>B</b></button>
+                <button type="button" class="wv-tb" data-rtcmd="italic" title="Italic"><i>I</i></button>
+                <button type="button" class="wv-tb" data-rtcmd="underline" title="Underline"><u>U</u></button>
+                <button type="button" class="wv-tb" data-rtcmd="h3" title="Heading">H</button>
+                <button type="button" class="wv-tb" data-rtcmd="ul" title="Bulleted list">&bull;</button>
+                <button type="button" class="wv-tb" data-rtcmd="ol" title="Numbered list">1.</button>
+                <button type="button" class="wv-tb" data-rtcmd="link" title="Add link">🔗</button>
+                <button type="button" class="wv-tb" data-rtcmd="clear" title="Clear formatting">⌫</button>
+              </div>
+              <div class="wv-edit rt-content" contenteditable="true" id="drop-f-lead" data-placeholder="The lead story… use the toolbar to format."></div>
             </div>
 
             <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Around the League <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— a bright spot for every team. One per line: <b>Team Name :: blurb</b> · shows above the storylines</span></h2></div>
@@ -5137,14 +5147,63 @@
       $d('drop-f-byline').value=(rec&&rec.byline)||'By The Society Desk';
       $d('drop-f-title').value=(rec&&rec.title)||'';
       $d('drop-f-dek').value=(rec&&rec.dek)||'';
-      $d('drop-f-lead').value = rec ? dHtmlToText(rec.leadHtml) : '';
+      $d('drop-f-lead').innerHTML = (rec&&rec.leadHtml) || '';
       $d('drop-f-teams').value = (rec&&rec.teamReports) ? dFormatTeamReports(rec.teamReports) : '';
-      DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){ return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',body:dHtmlToText(s.html),chips:s.chips||[]}; }) : [];
+      DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){ return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',bodyHtml:s.html||'',chips:s.chips||[]}; }) : [];
       renderStories();
-      renderPerformers((rec&&rec.performers)||DROP.live);
+      // Drafts preview the CURRENT live stats (the snapshot only freezes at publish);
+      // a published record shows its frozen snapshot, falling back to live if empty.
+      renderPerformers(dPerfToShow(rec, DROP.live));
       $d('drop-publish-btn').textContent = stt==='published'?'Re-publish':'Approve & Publish';
       $d('drop-editor').scrollIntoView({behavior:'smooth',block:'start'});
     }).catch(function(e){ alert('Could not load week: '+(e.message||e)); });
+  }
+  // Reusable rich-text toolbar markup (storyline bodies render many of these).
+  function dRichToolbarHtml(){
+    return '<div class="wv-toolbar">'
+      +'<button type="button" class="wv-tb" data-rtcmd="bold" title="Bold"><b>B</b></button>'
+      +'<button type="button" class="wv-tb" data-rtcmd="italic" title="Italic"><i>I</i></button>'
+      +'<button type="button" class="wv-tb" data-rtcmd="underline" title="Underline"><u>U</u></button>'
+      +'<button type="button" class="wv-tb" data-rtcmd="ul" title="Bulleted list">&bull;</button>'
+      +'<button type="button" class="wv-tb" data-rtcmd="link" title="Add link">🔗</button>'
+      +'<button type="button" class="wv-tb" data-rtcmd="clear" title="Clear formatting">⌫</button>'
+      +'</div>';
+  }
+  // Wire a contenteditable rich editor: toolbar commands + paste-as-clean-markdown
+  // + change callback. Mirrors the broadcast/waiver editors; tags match the
+  // server sanitizer (b/i/u/h/ul/ol/li/a/p) so nothing is silently stripped.
+  function dRichWire(toolbarEl, ed, onChange){
+    if(!ed || ed._rtw) return; ed._rtw=true;
+    ed.addEventListener('paste', function(e){ e.preventDefault(); var tx=(e.clipboardData||window.clipboardData).getData('text/plain'); document.execCommand('insertHTML',false, sanitizeWaiverHtml(mdToHtml(tx))); if(onChange) onChange(); });
+    ed.addEventListener('input', function(){ if(onChange) onChange(); });
+    if(toolbarEl) toolbarEl.querySelectorAll('[data-rtcmd]').forEach(function(btn){
+      btn.addEventListener('mousedown', function(e){ e.preventDefault(); });
+      btn.addEventListener('click', function(){
+        ed.focus();
+        try{ document.execCommand('styleWithCSS',false,false); }catch(e){}
+        var cmd=btn.dataset.rtcmd;
+        if(cmd==='bold') document.execCommand('bold');
+        else if(cmd==='italic') document.execCommand('italic');
+        else if(cmd==='underline') document.execCommand('underline');
+        else if(cmd==='h3') document.execCommand('formatBlock',false,'H3');
+        else if(cmd==='ul') document.execCommand('insertUnorderedList');
+        else if(cmd==='ol') document.execCommand('insertOrderedList');
+        else if(cmd==='link'){ var u=prompt('Link URL (https://…)'); if(u&&/^https?:\/\//i.test(u)) document.execCommand('createLink',false,u); }
+        else if(cmd==='clear'){ document.execCommand('removeFormat'); document.execCommand('formatBlock',false,'P'); }
+        if(onChange) onChange();
+      });
+    });
+  }
+  function dChipsToStr(chips){
+    return (chips||[]).map(function(c){ var l=(c&&c.label!=null)?String(c.label):''; var v=(c&&c.value!=null)?String(c.value):''; return v!==''? l+': '+v : l; }).filter(Boolean).join(', ');
+  }
+  function dStrToChips(str){
+    return String(str||'').split(',').map(function(part){
+      var t=part.trim(); if(!t) return null;
+      var idx=t.indexOf(':');
+      if(idx<0) return { label:t, value:'' };
+      return { label:t.slice(0,idx).trim(), value:t.slice(idx+1).trim() };
+    }).filter(function(c){ return c && c.label; }).slice(0,4);
   }
   function renderStories(){
     var box=$d('drop-stories'); if(!box) return;
@@ -5154,16 +5213,27 @@
           +'<button type="button" class="sx-rm" data-rm="'+i+'">Remove</button></div>'
         +'<div class="arow"><div class="af" style="max-width:170px;"><label>Tag</label><input type="text" class="sx-tag" value="'+dEsc(s.tag)+'" placeholder="e.g. Upset"></div>'
           +'<div class="af"><label>Headline</label><input type="text" class="sx-title" value="'+dEsc(s.title)+'"></div></div>'
-        +'<textarea class="sx-body" rows="4" placeholder="The storyline… (blank line = paragraph, > = pull-quote)">'+dEsc(s.body)+'</textarea>'
+        +'<div class="af"><label>Body</label>'+dRichToolbarHtml()
+          +'<div class="wv-edit rt-content sx-body" contenteditable="true" data-placeholder="The storyline… use the toolbar to format.">'+(s.bodyHtml||'')+'</div></div>'
+        +'<div class="af" style="margin-top:8px;"><label>Chips <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional stat pills · <b>label: value</b>, comma-separated (e.g. <b>Smash record: 4–0, Meeting: Week 2</b>)</span></label>'
+          +'<input type="text" class="sx-chips" value="'+dEsc(dChipsToStr(s.chips))+'" placeholder="label: value, label: value"></div>'
         +'</div>';
     }).join('') || '<div class="empty" style="font-size:12px;">No storylines yet — add one or draft with Claude.</div>';
     box.querySelectorAll('.drop-story').forEach(function(row){
       var i=+row.dataset.i;
       row.querySelector('.sx-tag').addEventListener('input',function(e){ DROP.stories[i].tag=e.target.value; });
       row.querySelector('.sx-title').addEventListener('input',function(e){ DROP.stories[i].title=e.target.value; });
-      row.querySelector('.sx-body').addEventListener('input',function(e){ DROP.stories[i].body=e.target.value; });
+      var ed=row.querySelector('.sx-body');
+      dRichWire(row.querySelector('.wv-toolbar'), ed, function(){ DROP.stories[i].bodyHtml=ed.innerHTML; });
+      row.querySelector('.sx-chips').addEventListener('input',function(e){ DROP.stories[i].chips=dStrToChips(e.target.value); });
     });
     box.querySelectorAll('[data-rm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.stories.splice(+b.dataset.rm,1); renderStories(); }); });
+  }
+  function dHasPerf(p){ return !!(p && ((p.potw&&(p.potw.men||p.potw.women)) || p.teamOfWeek || (p.risers&&p.risers.length))); }
+  function dPerfToShow(rec, live){
+    var snap = rec && rec.performers;
+    if(rec && rec.status==='published') return dHasPerf(snap) ? snap : live;
+    return dHasPerf(live) ? live : snap; // draft/new: prefer current live stats
   }
   function renderPerformers(p){
     var box=$d('drop-performers'); if(!box) return;
@@ -5183,9 +5253,9 @@
       byline: $d('drop-f-byline').value.trim(),
       title: $d('drop-f-title').value.trim(),
       dek: $d('drop-f-dek').value.trim(),
-      leadHtml: dTextToHtml($d('drop-f-lead').value),
+      leadHtml: $d('drop-f-lead').innerHTML,
       teamReports: dParseTeamReports($d('drop-f-teams').value),
-      storylines: DROP.stories.map(function(s){ return { tag:s.tag, tagKind:s.tagKind||'note', title:s.title, html:dTextToHtml(s.body), chips:s.chips||[] }; })
+      storylines: DROP.stories.map(function(s){ return { tag:s.tag, tagKind:s.tagKind||'note', title:s.title, html:s.bodyHtml||'', chips:s.chips||[] }; })
     };
   }
   function dropStatus(msg,ok){ var el=$d('drop-pub-status'); if(!el) return; el.style.display=''; el.textContent=msg; el.className='a-status '+(ok===false?'is-err':'is-ok'); }
@@ -5220,7 +5290,7 @@
     $d('drop-ed-week').textContent='Week '+w; var stEl=$d('drop-ed-status'); stEl.textContent='new'; stEl.className='drop-chip draft';
     $d('drop-ed-saved').textContent='Unsaved';
     $d('drop-f-week').value=w; $d('drop-f-kicker').value='The Drop · Week '+w; $d('drop-f-byline').value='By The Society Desk';
-    $d('drop-f-title').value=''; $d('drop-f-dek').value=''; $d('drop-f-lead').value=''; $d('drop-f-teams').value='';
+    $d('drop-f-title').value=''; $d('drop-f-dek').value=''; $d('drop-f-lead').innerHTML=''; $d('drop-f-teams').value='';
     renderStories(); renderPerformers(null);
     $d('drop-publish-btn').textContent='Approve & Publish';
   }
@@ -5229,7 +5299,8 @@
     var g=$d('drop-generate-btn'); if(g) g.addEventListener('click',function(){ generateDrop(false); });
     var rg=$d('drop-regen-btn'); if(rg) rg.addEventListener('click',function(){ if(confirm('Regenerate this week with Claude? Replaces the current draft text.')) generateDrop(true); });
     var nw=$d('drop-new-btn'); if(nw) nw.addEventListener('click',newDropWeek);
-    var as=$d('drop-addstory-btn'); if(as) as.addEventListener('click',function(){ DROP.stories.push({tag:'',tagKind:'note',title:'',body:'',chips:[]}); renderStories(); });
+    var as=$d('drop-addstory-btn'); if(as) as.addEventListener('click',function(){ DROP.stories.push({tag:'',tagKind:'note',title:'',bodyHtml:'',chips:[]}); renderStories(); });
+    dRichWire($d('drop-lead-tb'), $d('drop-f-lead'), null);
     var sv=$d('drop-save-btn'); if(sv) sv.addEventListener('click',saveDrop);
     var pb=$d('drop-publish-btn'); if(pb) pb.addEventListener('click',publishDropWeek);
     var pv=$d('drop-preview-btn'); if(pv) pv.addEventListener('click',function(){ if(DROP.week) window.open('/drop.html?week='+DROP.week+'&preview=1','_blank'); });
