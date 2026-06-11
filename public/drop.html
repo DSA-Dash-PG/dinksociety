@@ -79,6 +79,14 @@
   #drop .chip{ font-size:12px; color:var(--color-text-muted); background:var(--color-surface-2); border:1px solid var(--color-border); padding:3px 10px; border-radius:999px; }
   #drop .chip b{ color:var(--color-text); }
 
+  /* around the league */
+  #drop .leaguegrid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0 6px; }
+  @media(max-width:680px){ #drop .leaguegrid{ grid-template-columns:1fr; } }
+  #drop .teamrep{ border:1px solid var(--color-border); border-left:3px solid var(--color-lime); border-radius:var(--radius-sm); background:var(--color-surface); padding:13px 15px; }
+  #drop .teamrep__nm{ font-family:var(--serif); font-weight:600; font-size:17px; margin-bottom:5px; }
+  #drop .teamrep__bl{ font-size:14px; line-height:1.55; color:var(--color-text-muted); }
+  #drop .teamrep__bl .ds-ent{ color:var(--color-lime); }
+
   /* performers rail */
   #drop .rail{ display:flex; flex-direction:column; gap:16px; position:sticky; top:84px; align-self:start; }
   @media(max-width:880px){ #drop .rail{ position:static; } }
@@ -216,17 +224,27 @@
     function render(drop){
       var root = document.getElementById('dp-root');
       var lead = '<article class="lead">'
-        + '<span class="kicker">'+esc((drop.storylines&&drop.storylines[0]&&drop.storylines[0].tag) || 'The Drop')+'</span>'
+        + '<span class="kicker">The Lead</span>'
         + '<h2>'+L(drop.title)+'</h2>'
         + (drop.dek?'<p class="dek">'+L(drop.dek)+'</p>':'')
         + '<div class="byline"><div class="badge">D</div><div>'+esc(drop.byline||'By The Society Desk')+' · Dink Society editorial</div></div>'
         + '<div class="bodycopy">'+Lhtml(drop.leadHtml)+'</div></article>';
 
-      var rest = (drop.storylines||[]).slice(1);
+      var rest = (drop.storylines||[]).slice(0);
       var stories = '';
       if(rest.length){
         stories = '<div class="sec-head"><h3>Also This Week</h3><span class="rule"></span><span class="count">'+rest.length+' storyline'+(rest.length>1?'s':'')+'</span></div>'
           + rest.map(storyHtml).join('');
+      }
+
+      // Around the League — a bright spot for every team, shown BEFORE the storylines.
+      var league = '';
+      var trs = drop.teamReports||[];
+      if(trs.length){
+        league = '<div class="sec-head"><h3>Around the League</h3><span class="rule"></span><span class="count">'+trs.length+' team'+(trs.length>1?'s':'')+'</span></div>'
+          + '<div class="leaguegrid">'
+          + trs.map(function(r){ return '<div class="teamrep"><div class="teamrep__nm">'+entTeam(r.team)+'</div><div class="teamrep__bl">'+L(r.blurb)+'</div></div>'; }).join('')
+          + '</div>';
       }
 
       var aside = '<aside><div class="rail">'+performerHtml(drop.performers)+'</div></aside>';
@@ -241,7 +259,7 @@
         + '<span>'+esc(dateStr(drop.publishedAt))+'</span><span class="dot">·</span><span>'+esc((drop.readMins||4)+' min read')+'</span></div>'
         + '<div class="tagline">The storylines, players, and teams that mattered this week.</div></header>';
 
-      root.innerHTML = head + '<div class="wrap"><div class="layout"><main>'+lead+stories+'</main>'+aside+'</div>'+tease+'</div>';
+      root.innerHTML = head + '<div class="wrap"><div class="layout"><main>'+lead+league+stories+'</main>'+aside+'</div>'+tease+'</div>';
       document.title = 'The Drop · '+(drop.kicker||('Week '+drop.week))+' — The Dink Society';
       if(window.DSEntity && IDX) window.DSEntity.mount(root, IDX);
     }

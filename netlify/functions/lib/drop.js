@@ -56,6 +56,16 @@ function normStoryline(s = {}) {
   };
 }
 
+// "Around the League" — a short summary for every team, so even swept teams get
+// a bright spot. Each entry is { team, blurb }.
+function normTeamReports(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(0, 24).map(r => ({
+    team: String(r?.team || '').slice(0, 80),
+    blurb: String(r?.blurb || '').slice(0, 600),
+  })).filter(r => r.team && r.blurb);
+}
+
 // Build the editorial portion of a record from arbitrary input (generator or
 // admin edit). Does NOT set status/performers — see saveDraft/publishDrop.
 function normEditorial(input = {}) {
@@ -70,6 +80,7 @@ function normEditorial(input = {}) {
     byline: String(input.byline || 'By The Society Desk').slice(0, 120),
     readMins: Number.isFinite(+input.readMins) ? Math.max(1, Math.min(20, Math.round(+input.readMins))) : estimateReadMins(leadHtml, storylines),
     leadHtml,
+    teamReports: normTeamReports(input.teamReports),
     storylines,
   };
 }
@@ -202,6 +213,7 @@ export function toPublic(rec) {
     byline: rec.byline,
     readMins: rec.readMins,
     leadHtml: rec.leadHtml,
+    teamReports: rec.teamReports || [],
     storylines: rec.storylines || [],
     performers: rec.performers || null,
     publishedAt: rec.publishedAt || null,

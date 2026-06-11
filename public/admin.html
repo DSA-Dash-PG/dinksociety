@@ -946,6 +946,11 @@
               <textarea id="drop-f-lead" rows="8" style="width:100%;font-family:inherit;line-height:1.6;"></textarea>
             </div>
 
+            <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Around the League <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— a bright spot for every team. One per line: <b>Team Name :: blurb</b> · shows above the storylines</span></h2></div>
+            <div class="af">
+              <textarea id="drop-f-teams" rows="7" style="width:100%;font-family:inherit;line-height:1.6;" placeholder="Smash Society :: An 11–1 dismantling and both Players of the Week…&#10;Timog Cal :: Lost 11–1, but that one game came against the league's best — frame it."></textarea>
+            </div>
+
             <div class="ac__h" style="margin-top:8px;"><h2 class="ac__t" style="font-size:12px;">Storylines <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— Claude picks 3–4; edit or reorder freely</span></h2></div>
             <div id="drop-stories"></div>
             <button class="ab ab--outline ab--sm" id="drop-addstory-btn" style="margin-top:4px;">+ Add storyline</button>
@@ -5088,6 +5093,15 @@
     s = s.replace(/<\/p>\s*<p>/gi,'\n\n').replace(/<br\s*\/?>/gi,'\n').replace(/<\/?p>/gi,'').replace(/<[^>]+>/g,'');
     var ta = document.createElement('textarea'); ta.innerHTML = s; return ta.value.trim();
   }
+  function dParseTeamReports(t){
+    return String(t==null?'':t).split(/\n+/).map(function(line){
+      line=line.trim(); if(!line) return null;
+      var i=line.indexOf('::');
+      if(i<0){ i=line.indexOf(' - '); if(i>=0) return {team:line.slice(0,i).trim(), blurb:line.slice(i+3).trim()}; return null; }
+      return { team:line.slice(0,i).trim(), blurb:line.slice(i+2).trim() };
+    }).filter(function(x){ return x && x.team && x.blurb; });
+  }
+  function dFormatTeamReports(arr){ return (arr||[]).map(function(r){ return r.team+' :: '+r.blurb; }).join('\n'); }
   function renderDrop(){
     if(!DROP.wired) wireDrop();
     var box=$d('drop-weeks'); var st=$d('drop-list-status');
@@ -5124,6 +5138,7 @@
       $d('drop-f-title').value=(rec&&rec.title)||'';
       $d('drop-f-dek').value=(rec&&rec.dek)||'';
       $d('drop-f-lead').value = rec ? dHtmlToText(rec.leadHtml) : '';
+      $d('drop-f-teams').value = (rec&&rec.teamReports) ? dFormatTeamReports(rec.teamReports) : '';
       DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){ return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',body:dHtmlToText(s.html),chips:s.chips||[]}; }) : [];
       renderStories();
       renderPerformers((rec&&rec.performers)||DROP.live);
@@ -5169,6 +5184,7 @@
       title: $d('drop-f-title').value.trim(),
       dek: $d('drop-f-dek').value.trim(),
       leadHtml: dTextToHtml($d('drop-f-lead').value),
+      teamReports: dParseTeamReports($d('drop-f-teams').value),
       storylines: DROP.stories.map(function(s){ return { tag:s.tag, tagKind:s.tagKind||'note', title:s.title, html:dTextToHtml(s.body), chips:s.chips||[] }; })
     };
   }
@@ -5204,7 +5220,7 @@
     $d('drop-ed-week').textContent='Week '+w; var stEl=$d('drop-ed-status'); stEl.textContent='new'; stEl.className='drop-chip draft';
     $d('drop-ed-saved').textContent='Unsaved';
     $d('drop-f-week').value=w; $d('drop-f-kicker').value='The Drop · Week '+w; $d('drop-f-byline').value='By The Society Desk';
-    $d('drop-f-title').value=''; $d('drop-f-dek').value=''; $d('drop-f-lead').value='';
+    $d('drop-f-title').value=''; $d('drop-f-dek').value=''; $d('drop-f-lead').value=''; $d('drop-f-teams').value='';
     renderStories(); renderPerformers(null);
     $d('drop-publish-btn').textContent='Approve & Publish';
   }
