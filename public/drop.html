@@ -133,9 +133,15 @@
 
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
+  <script src="/js/entity-cards.js"></script>
   <script>
   (function () {
     var SN = (typeof shortName === 'function') ? shortName : function (s) { return s || ''; };
+    var IDX = null; // entity index (players/teams) for editorial links + hover cards
+    function entTeam(name){ if(!name) return ''; return '<a class="ds-ent" data-ent="'+esc(name)+'" href="'+window.DSEntity.teamHref(name)+'">'+esc(name)+'</a>'; }
+    function entPlayer(name, teamName, display){ if(!name) return esc(display||''); var d=(display!=null?display:name); return '<a class="ds-ent" data-ent="'+esc(name)+'" href="'+window.DSEntity.playerHref(name, teamName||'')+'">'+esc(d)+'</a>'; }
+    function L(text){ return (window.DSEntity && IDX) ? window.DSEntity.linkify(esc(text), IDX) : esc(text); }
+    function Lhtml(html){ return (window.DSEntity && IDX) ? window.DSEntity.linkify(html||'', IDX) : (html||''); }
     function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
     function initials(name){ if(!name) return '?'; var p=String(name).trim().split(/\s+/); return ((p[0][0]||'')+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
     function rec(w,l){ return (w==null?0:w)+'–'+(l==null?0:l); }
@@ -168,8 +174,8 @@
         [['Men\'s',pm],['Women\'s',pf]].forEach(function(pair){
           var g=pair[0], p=pair[1]; if(!p) return;
           html += '<div class="potw"><div class="av">'+esc(initials(p.name))+(p.isChef!==false?'<span class="chef">👨‍🍳</span>':'')+'</div>'
-            + '<div><div class="gender">'+g+'</div><div class="nm">'+esc(SN(p.name))+'</div>'
-            + '<div class="sub">'+esc(p.teamName||'')+(p.w!=null?' · '+esc(rec(p.w,p.l)):'')+(p.dsr!=null?' · DSR '+esc(p.dsr):'')+'</div></div></div>';
+            + '<div><div class="gender">'+g+'</div><div class="nm">'+entPlayer(p.name, p.teamName, SN(p.name))+'</div>'
+            + '<div class="sub">'+entTeam(p.teamName)+(p.w!=null?' · '+esc(rec(p.w,p.l)):'')+(p.dsr!=null?' · DSR '+esc(p.dsr):'')+'</div></div></div>';
         });
         html += '</div>';
       }
@@ -178,7 +184,7 @@
       if(t && t.name){
         html += '<div class="card"><h5>Team of the Week</h5><div class="tow">'
           + '<div class="crest">'+(t.emoji?esc(t.emoji):esc(initials(t.name)))+'</div>'
-          + '<div><div class="nm">'+esc(t.name)+'</div>'
+          + '<div><div class="nm">'+entTeam(t.name)+'</div>'
           + (t.record?'<div class="rec">'+esc(t.record)+'</div>':'')
           + (t.note?'<div class="note">'+esc(t.note)+'</div>':'')
           + '</div></div></div>';
@@ -188,7 +194,7 @@
       if(rs.length){
         html += '<div class="card"><h5>Biggest Movers · DSR</h5>';
         rs.forEach(function(r,i){
-          html += '<div class="riser"><div class="who"><span class="rk">'+(r.dir==='dn'?'—':(i+1))+'</span><b>'+esc(SN(r.name))+'</b></div>'
+          html += '<div class="riser"><div class="who"><span class="rk">'+(r.dir==='dn'?'—':(i+1))+'</span><b>'+entPlayer(r.name, r.teamName, SN(r.name))+'</b></div>'
             + '<span class="delta '+(r.dir==='dn'?'dn':'up')+'">'+(r.dir==='dn'?'▼':'▲')+' '+esc(r.delta!=null?r.delta:'')+'</span></div>';
         });
         html += '</div>';
@@ -201,8 +207,8 @@
       var chips = (s.chips||[]).map(function(c){ return '<span class="chip">'+esc(c.label)+(c.value!=null&&c.value!==''?' <b>'+esc(c.value)+'</b>':'')+'</span>'; }).join('');
       return '<article class="story"><div class="num">'+('0'+(i+2)).slice(-2)+'</div><div>'
         + (s.tag?'<span class="kicker '+storyTagClass(s.tagKind)+'">'+esc(s.tag)+'</span>':'')
-        + (s.title?'<h4>'+esc(s.title)+'</h4>':'')
-        + '<div class="bodycopy">'+(s.html||'')+'</div>'
+        + (s.title?'<h4>'+L(s.title)+'</h4>':'')
+        + '<div class="bodycopy">'+Lhtml(s.html)+'</div>'
         + (chips?'<div class="chips">'+chips+'</div>':'')
         + '</div></article>';
     }
@@ -211,10 +217,10 @@
       var root = document.getElementById('dp-root');
       var lead = '<article class="lead">'
         + '<span class="kicker">'+esc((drop.storylines&&drop.storylines[0]&&drop.storylines[0].tag) || 'The Drop')+'</span>'
-        + '<h2>'+esc(drop.title)+'</h2>'
-        + (drop.dek?'<p class="dek">'+esc(drop.dek)+'</p>':'')
+        + '<h2>'+L(drop.title)+'</h2>'
+        + (drop.dek?'<p class="dek">'+L(drop.dek)+'</p>':'')
         + '<div class="byline"><div class="badge">D</div><div>'+esc(drop.byline||'By The Society Desk')+' · Dink Society editorial</div></div>'
-        + '<div class="bodycopy">'+(drop.leadHtml||'')+'</div></article>';
+        + '<div class="bodycopy">'+Lhtml(drop.leadHtml)+'</div></article>';
 
       var rest = (drop.storylines||[]).slice(1);
       var stories = '';
@@ -237,6 +243,7 @@
 
       root.innerHTML = head + '<div class="wrap"><div class="layout"><main>'+lead+stories+'</main>'+aside+'</div>'+tease+'</div>';
       document.title = 'The Drop · '+(drop.kicker||('Week '+drop.week))+' — The Dink Society';
+      if(window.DSEntity && IDX) window.DSEntity.mount(root, IDX);
     }
 
     function dateStr(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }catch(e){ return ''; } }
@@ -248,11 +255,24 @@
     }
 
     var api = '/.netlify/functions/public-drop' + (reqWeek?('?week='+encodeURIComponent(reqWeek)):'');
+    function getJSON(u){ return fetch(u).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }
     Promise.all([
-      fetch(api).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }),
-      fetch('/.netlify/functions/public-drop?view=index').then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; })
+      getJSON(api),
+      getJSON('/.netlify/functions/public-drop?view=index'),
+      getJSON('/.netlify/functions/public-leaderboard?view=players'),
+      getJSON('/.netlify/functions/public-standings'),
+      getJSON('/.netlify/functions/public-teams')
     ]).then(function(res){
-      var data = res[0], idx = res[1];
+      var data = res[0], idx = res[1], pl = res[2], st = res[3], tm = res[4];
+      try {
+        if(window.DSEntity){
+          IDX = window.DSEntity.buildIndex({
+            teams: (tm && tm.teams) ? tm.teams : [],
+            players: (pl && pl.players) ? Object.values(pl.players) : [],
+            standings: st || null
+          });
+        }
+      } catch(e){ IDX = null; }
       var pubWeeks = (idx && idx.weeks ? idx.weeks.map(function(w){ return w.week; }) : []);
       if(!data || data.empty || !data.drop){ showEmpty(data && data.message); renderWeekpick(-1, pubWeeks); return; }
       render(data.drop);

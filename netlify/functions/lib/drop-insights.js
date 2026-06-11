@@ -3,13 +3,8 @@
 // Reads a circuit's finalized results + aggregates and distills the raw
 // "story fodder" for The Drop: win streaks, upsets, blowouts, risers, and the
 // week's performers. The weekly scheduled generator (drop-generate.js) feeds
-// this brief to the model; the pure helpers (buildTimelines / computeStreaks /
-// detectUpsets / detectBlowouts) are unit-tested in tests/.
-//
-// Match shape (from the schedule blob, see standings.js):
-//   { week, division, teamA:{id,name}, teamB:{id,name}, scoreA, scoreB,
-//     round1:{homeGames,awayGames}, round2:{homeGames,awayGames},
-//     finalizedAt, scheduledAt }
+// this brief to the model; the pure helpers live in drop-stats.js (no
+// @netlify/blobs import) so they stay unit-testable.
 
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
@@ -87,7 +82,7 @@ export async function livePerformers(circuit) {
       .filter(p => Number.isFinite(p.rankDelta) && p.rankDelta !== 0)
       .sort((a, b) => b.rankDelta - a.rankDelta)
       .slice(0, 4)
-      .map(p => ({ name: p.name, delta: Math.abs(p.rankDelta), dir: p.rankDelta >= 0 ? 'up' : 'dn' }));
+      .map(p => ({ name: p.name, teamName: p.teamName || null, delta: Math.abs(p.rankDelta), dir: p.rankDelta >= 0 ? 'up' : 'dn' }));
   }
 
   return normPerformers({
@@ -114,7 +109,6 @@ export async function buildWeeklyBrief(circuit, weekOverride = null) {
     return { division: m.division, teamA: m.a.name, teamB: m.b.name, score: `${m.pa}–${m.pb}`, winner, sweep: m.sweep };
   });
 
-  // Date of the week (earliest scheduled match that week).
   let date = null;
   for (const m of matches) {
     if (m.week === week && m.scheduledAt && (!date || new Date(m.scheduledAt) < new Date(date))) date = m.scheduledAt;

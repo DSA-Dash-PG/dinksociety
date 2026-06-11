@@ -254,6 +254,7 @@
   <div data-partial="footer"></div>
 
   <script src="/js/partials.js"></script>
+  <script src="/js/entity-cards.js"></script>
 
   <script>
   /* ═══════════════════════════════════════════════════════════════
@@ -262,6 +263,11 @@
      ═══════════════════════════════════════════════════════════════ */
   (function () {
     var SN = (typeof shortName === 'function') ? shortName : function (s) { return s || ''; };
+    // Editorial-only entity links + hover cards (The Drop teaser), built from the
+    // players + standings data already fetched below.
+    var DROP_IDX = null;
+    function LZ(text){ return (window.DSEntity && DROP_IDX) ? window.DSEntity.linkify(esc(text), DROP_IDX) : esc(text); }
+    function LZhtml(html){ return (window.DSEntity && DROP_IDX) ? window.DSEntity.linkify(html||'', DROP_IDX) : (html||''); }
     function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
     function initials(name){if(!name)return '?';var p=String(name).trim().split(/\s+/);return ((p[0][0]||'')+(p.length>1?p[p.length-1][0]:'')).toUpperCase();}
     function rec(w,l){return (w==null?0:w)+'–'+(l==null?0:l);}
@@ -374,23 +380,24 @@
       var drop = payload && payload.drop;
       if(!drop){ sec.style.display='none'; return; }
       var k=document.getElementById('rc-drop-kicker'); if(k)k.textContent=drop.kicker||('The Drop · Week '+drop.week);
-      var t=document.getElementById('rc-drop-title'); if(t)t.textContent=drop.title||'';
+      var t=document.getElementById('rc-drop-title'); if(t)t.innerHTML=LZ(drop.title||'');
       var bl=String(drop.byline||'By The Society Desk').replace(/^By\s+/i,'');
       var by=document.getElementById('rc-drop-byline'); if(by)by.innerHTML='By <b>'+esc(bl)+'</b> · '+(drop.readMins||4)+' min read';
       var ex=document.getElementById('rc-drop-excerpt');
       if(ex){
         var paras=String(drop.leadHtml||'').match(/<p[\s\S]*?<\/p>/gi)||[];
         if(paras.length){
-          ex.innerHTML = paras.slice(0,2).map(function(p,i){ return i===0 ? p.replace(/^<p/i,'<p class="dropcap"') : p; }).join('');
-        } else if(drop.dek){ ex.innerHTML='<p class="dropcap">'+esc(drop.dek)+'</p>'; }
+          ex.innerHTML = LZhtml(paras.slice(0,2).map(function(p,i){ return i===0 ? p.replace(/^<p/i,'<p class="dropcap"') : p; }).join(''));
+        } else if(drop.dek){ ex.innerHTML='<p class="dropcap">'+LZ(drop.dek)+'</p>'; }
       }
       var read=document.getElementById('rc-drop-read'); if(read)read.setAttribute('href','/drop.html?week='+drop.week);
       var cv=document.getElementById('rc-drop-cover'); if(cv)cv.textContent='Week '+drop.week+' · The Drop';
       var aside=document.getElementById('rc-drop-aside');
       if(aside && drop.storylines && drop.storylines.length>1){
-        aside.innerHTML=drop.storylines.slice(1,5).map(function(s){ return '<li>'+esc(s.title||s.tag||'')+'</li>'; }).join('');
+        aside.innerHTML=drop.storylines.slice(1,5).map(function(s){ return '<li>'+LZ(s.title||s.tag||'')+'</li>'; }).join('');
       }
       sec.style.display='';
+      if(window.DSEntity && DROP_IDX) window.DSEntity.mount(sec, DROP_IDX);
     }
 
     /* ---- Fetch + wire ---- */
@@ -401,6 +408,18 @@
       fetch('/.netlify/functions/public-drop').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]).then(function(res){
       var lb=res[0],st=res[1],pl=res[2],dropPayload=res[3];
+
+      // Build the editorial entity index (player/team names → links + hover cards)
+      // from data already fetched — used ONLY by the Drop teaser below.
+      try {
+        if(window.DSEntity){
+          DROP_IDX = window.DSEntity.buildIndex({
+            teams: [],
+            players: (pl && pl.players) ? Object.values(pl.players) : [],
+            standings: st || null
+          });
+        }
+      } catch(e){ DROP_IDX = null; }
 
       // PS fallback: enrich weeklyTopPerformers entries from the players aggregate (season PS) when weekly ps is absent
       var perf=(lb&&lb.weeklyTopPerformers)||[];
