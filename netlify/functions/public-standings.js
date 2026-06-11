@@ -60,22 +60,33 @@ export default async (req) => {
       for (const [divId, divData] of Object.entries(newBlob.divisions)) {
         if (division && divId !== division) continue;
 
-        const teams = (divData.teams || []).map((t, i) => ({
-          rank:                i + 1,
-          teamId:              t.teamId,
-          teamName:            t.teamName,
-          teamEmoji:           teamEmojis[t.teamId] || '',
-          wins:                t.wins       ?? t.w ?? 0,
-          losses:              t.losses     ?? t.l ?? 0,
-          ties:                t.ties       ?? t.t ?? 0,
-          matchesPlayed:       t.matchesPlayed ?? (t.wins ?? 0) + (t.losses ?? 0) + (t.ties ?? 0),
-          matchPointsFor:      t.matchPointsFor  ?? t.pts ?? 0,
-          matchPointsAgainst:  t.matchPointsAgainst ?? 0,
-          pointDiff:           t.matchPointsFor  - (t.matchPointsAgainst ?? 0),
-          totalGamesWon:       t.totalGamesWon  ?? t.gw ?? 0,
-          totalGamesLost:      t.totalGamesLost ?? t.gl ?? 0,
-          h2h:                 t.headToHead ?? {},
-        }));
+        const teams = (divData.teams || []).map((t, i) => {
+          // Rally points (PS/PA). DIFF = PS − PA. Fall back to match-point diff
+          // only for blobs rebuilt before PS/PA existed.
+          const ps = t.pointsScored ?? null;
+          const pa = t.pointsAgainst ?? null;
+          const diff = (ps != null && pa != null)
+            ? ps - pa
+            : (t.matchPointsFor ?? 0) - (t.matchPointsAgainst ?? 0);
+          return {
+            rank:                i + 1,
+            teamId:              t.teamId,
+            teamName:            t.teamName,
+            teamEmoji:           teamEmojis[t.teamId] || '',
+            wins:                t.wins       ?? t.w ?? 0,
+            losses:              t.losses     ?? t.l ?? 0,
+            ties:                t.ties       ?? t.t ?? 0,
+            matchesPlayed:       t.matchesPlayed ?? 0,
+            matchPointsFor:      t.matchPointsFor  ?? t.pts ?? 0,
+            matchPointsAgainst:  t.matchPointsAgainst ?? 0,
+            pointsScored:        ps ?? 0,
+            pointsAgainst:       pa ?? 0,
+            pointDiff:           diff,
+            totalGamesWon:       t.totalGamesWon  ?? t.gw ?? 0,
+            totalGamesLost:      t.totalGamesLost ?? t.gl ?? 0,
+            h2h:                 t.headToHead ?? {},
+          };
+        });
 
         divisions[divId] = {
           divisionLabel: DIVISION_LABELS[divId] || divId,
