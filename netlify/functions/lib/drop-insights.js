@@ -80,7 +80,10 @@ export async function livePerformers(circuit) {
           (b.societyCircuitPoints || 0) - (a.societyCircuitPoints || 0)
         );
         const t = tied[0];
-        if (t) teamOfWeek = { name: t.teamName, emoji: t.teamEmoji || null, record: `${t.wins || 0}–${t.losses || 0}`, note: null };
+        // Show the match-point score (the recognizable "4–0" sweep on the
+        // scoreboard/standings) rather than the per-round W–L tally, which reads
+        // as a confusing "2–0" for a team that swept both rounds.
+        if (t) teamOfWeek = { name: t.teamName, emoji: t.teamEmoji || null, record: `${t.matchPointsFor || 0}–${t.matchPointsAgainst || 0}`, note: null };
         break;
       }
     }
