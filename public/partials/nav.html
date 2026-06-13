@@ -66,25 +66,166 @@
     { href: '/schedule.html',    nav: 'schedule',    label: 'Schedule' },
     { href: '/standings.html',   nav: 'standings',   label: 'Standings' },
     { href: '/leaderboard.html', nav: 'leaderboard', label: 'Leaderboard' },
-    { href: '/teams.html',       nav: 'teams',       label: 'Teams' },
-    { href: '/gallery.html',     nav: 'gallery',     label: 'Gallery' },
+    // Teams is a mega-menu: the trigger links to /teams.html and a hover/tap
+    // panel lists every team (populated from public-teams below).
+    { href: '/teams.html',       nav: 'teams',       label: 'Teams', mega: true },
+    // Gallery is hidden until there are photos to show. To re-enable, just
+    // un-comment this line — no other change needed.
+    // { href: '/gallery.html',     nav: 'gallery',     label: 'Gallery' },
     { href: '/rules.html',       nav: 'rules',       label: 'Rules' },
   ];
 
-  function buildNavLinks(container, beforeEl) {
+  /* SVG chevron used by the mega trigger / drawer accordion. */
+  var CHEV = '<svg class="ds-mega-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+
+  // Build the desktop Teams mega-menu wrapper.
+  function buildDesktopMega(item) {
+    var wrap = document.createElement('div');
+    wrap.className = 'ds-mega has-mega';
+    wrap.setAttribute('data-mega', item.nav);
+    wrap.innerHTML =
+      '<button class="ds-mega-trigger" data-nav="' + item.nav + '" aria-expanded="false" aria-haspopup="true">' +
+        item.label + CHEV +
+      '</button>' +
+      '<div class="ds-mega-panel" role="menu">' +
+        '<div class="ds-mega-head">' +
+          '<span class="ds-mega-lbl">' + item.label + '</span>' +
+          '<a href="' + item.href + '">All Teams' +
+            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>' +
+          '</a>' +
+        '</div>' +
+        '<div class="ds-mega-grid" data-mega-grid><div class="ds-mega-msg">Loading teams&hellip;</div></div>' +
+      '</div>';
+    return wrap;
+  }
+
+  // Build the drawer (mobile) Teams accordion.
+  function buildDrawerAcc(item) {
+    var wrap = document.createElement('div');
+    wrap.className = 'ds-drawer-acc';
+    wrap.setAttribute('data-drawer-acc', item.nav);
+    wrap.innerHTML =
+      '<button class="ds-drawer-acc-btn" data-nav="' + item.nav + '" aria-expanded="false">' +
+        item.label + CHEV +
+      '</button>' +
+      '<div class="ds-drawer-acc-body" data-drawer-acc-body>' +
+        '<a href="' + item.href + '" class="ds-drawer-acc-all">All Teams &rarr;</a>' +
+      '</div>';
+    return wrap;
+  }
+
+  function buildNavLinks(container, beforeEl, surface) {
     if (!container) return;
     NAV_ITEMS.forEach(function (item) {
-      var a = document.createElement('a');
-      a.setAttribute('href', item.href);
-      a.setAttribute('data-nav', item.nav);
-      a.textContent = item.label;
-      container.insertBefore(a, beforeEl || null);
+      var el;
+      if (item.mega) {
+        el = surface === 'drawer' ? buildDrawerAcc(item) : buildDesktopMega(item);
+      } else {
+        el = document.createElement('a');
+        el.setAttribute('href', item.href);
+        el.setAttribute('data-nav', item.nav);
+        el.textContent = item.label;
+      }
+      container.insertBefore(el, beforeEl || null);
     });
   }
 
   var desktopLinks = document.querySelector('.ds-nav-links');
-  buildNavLinks(desktopLinks, desktopLinks ? desktopLinks.querySelector('.ds-nav-login') : null);
-  buildNavLinks(document.querySelector('.ds-nav-drawer-links'), null);
+  buildNavLinks(desktopLinks, desktopLinks ? desktopLinks.querySelector('.ds-nav-login') : null, 'desktop');
+  buildNavLinks(document.querySelector('.ds-nav-drawer-links'), null, 'drawer');
+
+  /* ── Teams mega-menu: open on click (hover handled by CSS), populate from API ── */
+  (function wireTeamsMega() {
+    var mega = document.querySelector('.ds-mega[data-mega="teams"]');
+    if (mega) {
+      var trigger = mega.querySelector('.ds-mega-trigger');
+      // Click the trigger toggles the panel (touch / trackpad friendly).
+      // Cmd/Ctrl-click or a second click on an open menu still navigates.
+      trigger.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey) { location.href = '/teams.html'; return; }
+        e.preventDefault();
+        var isOpen = mega.classList.toggle('is-open');
+        trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+      document.addEventListener('click', function (e) {
+        if (!mega.contains(e.target)) {
+          mega.classList.remove('is-open');
+          trigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { mega.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); }
+      });
+    }
+
+    // Drawer accordion expand/collapse.
+    var acc = document.querySelector('.ds-drawer-acc[data-drawer-acc="teams"]');
+    if (acc) {
+      var accBtn = acc.querySelector('.ds-drawer-acc-btn');
+      accBtn.addEventListener('click', function () {
+        var isOpen = acc.classList.toggle('is-open');
+        accBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      });
+    }
+
+    // ── Populate both surfaces from public-teams ──
+    var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
+    var SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
+    function slugify(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+    function logoHtml(t) {
+      var color = t.color || '#b8ff2c';
+      if (t.photoUrl) {
+        return '<span class="ds-mega-logo" style="background-image:url(\'' + esc(t.photoUrl) + '\');background-size:cover;background-position:center;"></span>';
+      }
+      return '<span class="ds-mega-logo" style="background:radial-gradient(120% 120% at 50% 25%, ' + esc(color) + '33 0%, var(--color-surface-2) 75%)">' + esc(t.emoji || '🏓') + '</span>';
+    }
+
+    fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        var teams = (data && data.teams) || [];
+        teams = teams.slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
+
+        var grid = document.querySelector('.ds-mega-grid[data-mega-grid]');
+        var accBody = document.querySelector('.ds-drawer-acc-body[data-drawer-acc-body]');
+
+        if (!teams.length) {
+          if (grid) grid.innerHTML = '<div class="ds-mega-msg">No teams yet.</div>';
+          return;
+        }
+
+        // Only show the division sub-label when teams actually span >1 division
+        // (a single-division season would otherwise repeat the same label).
+        var divs = {};
+        teams.forEach(function (t) { divs[t.divisionLabel || t.division || ''] = 1; });
+        var showSub = Object.keys(divs).filter(Boolean).length > 1;
+
+        if (grid) {
+          grid.innerHTML = teams.map(function (t) {
+            var url = '/team?id=' + slugify(t.name) + SUFFIX;
+            var sub = showSub ? (t.divisionLabel || t.division || '') : '';
+            return '<a class="ds-mega-team" href="' + url + '">' + logoHtml(t) +
+              '<span class="ds-mega-txt"><span class="ds-mega-nm">' + esc(t.name) + '</span>' +
+              (sub ? '<span class="ds-mega-sub">' + esc(sub) + '</span>' : '') +
+              '</span></a>';
+          }).join('');
+        }
+        if (accBody) {
+          var allLink = accBody.querySelector('.ds-drawer-acc-all');
+          var html = teams.map(function (t) {
+            var url = '/team?id=' + slugify(t.name) + SUFFIX;
+            return '<a href="' + url + '">' + logoHtml(t) + esc(t.name) + '</a>';
+          }).join('');
+          accBody.insertAdjacentHTML('beforeend', html);
+          if (allLink) accBody.insertBefore(allLink, accBody.firstChild); // keep "All Teams" on top
+        }
+      })
+      .catch(function () {
+        var grid = document.querySelector('.ds-mega-grid[data-mega-grid]');
+        if (grid) grid.innerHTML = '<div class="ds-mega-msg"><a href="/teams.html" style="color:var(--color-lime);">View all teams &rarr;</a></div>';
+      });
+  })();
 
   /* ── Drawer ── */
   var ham = document.getElementById('ds-nav-ham');
