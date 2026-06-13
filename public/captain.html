@@ -1095,6 +1095,18 @@
       }
     };
 
+    // ===== Usage beacon → admin Analytics =====
+    // Fire-and-forget; never blocks the UI. event:'visit' on shell entry counts
+    // a session-gapped visit; tab clicks (default) bump the per-tab counter.
+    function capBeacon(payload) {
+      try {
+        const body = JSON.stringify(payload);
+        const url = '/.netlify/functions/activity-track';
+        if (navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+        else fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+      } catch {}
+    }
+
     // ===== Auth =====
     async function checkAuth() {
       try {
@@ -1115,6 +1127,7 @@
     function enterShell() {
       $id('login-screen').style.display = 'none';
       $id('cap-shell').style.display = 'block';
+      capBeacon({ tab: 'home', event: 'visit' }); // portal load = a visit
       $id('cap-team-name').textContent = state.me.team.name;
       $id('cap-team-meta').textContent = `${state.me.team.circuit === 'I' ? 'Season 1' : 'Circuit ' + state.me.team.circuit} · ${state.me.team.divisionLabel || state.me.team.division}`;
       $id('cap-email').textContent = state.me.email;
@@ -1351,6 +1364,7 @@
         document.querySelectorAll('.cap-tab').forEach(b => b.classList.remove('is-active'));
         btn.classList.add('is-active');
         const tab = btn.dataset.tab;
+        capBeacon({ tab });
         if (tab === 'next') {
           // Re-dispatch to whatever the current state warrants
           dispatchToNext();

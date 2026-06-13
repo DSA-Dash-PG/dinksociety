@@ -131,13 +131,18 @@ async function analytics(store) {
   const activeLast24h = people.filter(p => p.lastSeenAt && new Date(p.lastSeenAt).getTime() > dayAgo).length;
 
   const tabTotals = {};
+  let totalVisits = 0;
   for (const p of people) {
+    totalVisits += p.visitCount || 0;
     for (const [tab, n] of Object.entries(p.tabs || {})) {
       tabTotals[tab] = (tabTotals[tab] || 0) + n;
     }
   }
 
   people.sort((a, b) => (b.lastSeenAt || '').localeCompare(a.lastSeenAt || ''));
+
+  // ── Anonymous public-page traffic (pageview/<day>.json) ──────────
+  const publicTraffic = await publicTrafficStats(store);
 
   return json({
     stats: {
@@ -146,11 +151,45 @@ async function analytics(store) {
       activeLast7Days,
       activeLast24h,
       neverLoggedIn: neverLoggedIn.length,
+      totalVisits,
       tabTotals,
     },
     people,
     neverLoggedIn,
+    publicTraffic,
   });
+}
+
+// Roll up the per-day anonymous pageview blobs into 7-/30-day totals,
+// top pages, and a daily series for the last 30 days.
+async function publicTrafficStats(store) {
+  const empty = { last7Days: { hits: 0, uniques: 0 }, last30Days: { hits: 0, uniques: 0 }, topPages: [], byDay: [] };
+  try {
+    const { blobs } = await store.list({ prefix: 'pageview/' }).catch(() => ({ blobs: [] }));
+    if (!blobs.length) return empty;
+    const dayStr = (ms) => new Date(ms).toISOString().slice(0, 10);
+    const since7 = dayStr(Date.now() - 7 * 864e5);
+    const since30 = dayStr(Date.now() - 30 * 864e5);
+    // 'pageview/' is 9 chars → key.slice(9, 19) is the YYYY-MM-DD.
+    const keys = blobs.map(b => b.key).filter(k => k.slice(9, 19) >= since30).sort();
+    const docs = (await Promise.all(keys.map(k => store.get(k, { type: 'json' }).catch(() => null)))).filter(Boolean);
+
+    const last7 = { hits: 0, uniques: 0 };
+    const last30 = { hits: 0, uniques: 0 };
+    const pageTotals = {};
+    const byDay = [];
+    for (const d of docs) {
+      const uniques = Array.isArray(d.visitors) ? d.visitors.length : (d.uniques || 0);
+      last30.hits += d.hits || 0; last30.uniques += uniques;
+      if ((d.date || '') >= since7) { last7.hits += d.hits || 0; last7.uniques += uniques; }
+      for (const [p, n] of Object.entries(d.pages || {})) pageTotals[p] = (pageTotals[p] || 0) + n;
+      byDay.push({ date: d.date, hits: d.hits || 0, uniques });
+    }
+    const topPages = Object.entries(pageTotals).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([path, hits]) => ({ path, hits }));
+    return { last7Days: last7, last30Days: last30, topPages, byDay };
+  } catch {
+    return empty;
+  }
 }
 
 export const config = { path: '/.netlify/functions/admin-activity-log' };

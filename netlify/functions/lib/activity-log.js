@@ -11,7 +11,12 @@
 //
 //   seen/<email>.json                   — one mutable record per person
 //     { email, name, role, teamId, teamName, firstLoginAt, lastLoginAt,
-//       loginCount, lastSeenAt, tabs: { home: n, schedule: n, ... } }
+//       loginCount, lastSeenAt, lastVisitAt, visitCount,
+//       tabs: { home: n, schedule: n, ... } }
+//
+//   pageview/<YYYY-MM-DD>.json           — one mutable record per day (ANON)
+//     { date, hits, pages: { '/': n, ... }, visitors: [ vid, ... ] }
+//     No PII — vid is a random per-browser id from localStorage.
 //
 // RULES:
 //   - logActivity / recordLogin / recordSeen NEVER throw — an activity-log
@@ -28,11 +33,17 @@
 //   transfer.requested, transfer.denied
 //   lineup.locked, lineup.unlocked, lineup.admin-edited
 //   score.entry, score.confirmed, score.disputed, score.signoff, score.withdrawn, match.finalized
+//   admin.visit, captain.visit, player.visit
 
 import { getStore } from '@netlify/blobs';
 import { circuitCode, isTestTeam } from './circuit.js';
 
 const STORE = 'activity-log';
+
+// A new "visit" is a portal load whose previous activity is older than this.
+// Tab switches within a session keep lastSeenAt fresh, so they don't count.
+const VISIT_GAP_MS = 30 * 60 * 1000; // 30 min
+const ANON_VISITOR_CAP = 5000;       // max unique ids stored per day blob
 
 function randomId(bytes = 5) {
   const arr = new Uint8Array(bytes);
@@ -156,4 +167,86 @@ export async function recordSeen({ email, tab = null, name = null, team = null }
   } catch (err) {
     console.error('recordSeen failed (non-fatal):', err);
   }
+}
+
+/**
+ * Record a portal *visit* — fired on page load (cookie OR magic-link auth).
+ * Uses a session-gap heuristic so it counts genuine return trips rather than
+ * every tab click: a visit is only counted when the last activity is older
+ * than VISIT_GAP_MS. On a new visit it bumps visitCount on the seen/ record
+ * AND writes a `<role>.visit` event for the Activity timeline. Always refreshes
+ * lastSeenAt + the landing-tab counter. Never throws; test teams skipped.
+ */
+export async function recordVisit({ email, role = 'player', tab = null, name = null, team = null }) {
+  try {
+    if (!email) return;
+    if (team && isTestTeam(team)) return;
+    const norm = email.toLowerCase();
+    const store = getStore(STORE);
+    const key = `seen/${encodeURIComponent(norm)}.json`;
+    const now = Date.now();
+    const existing = await store.get(key, { type: 'json' }).catch(() => null);
+    const rec = existing || { email: norm, loginCount: 0, tabs: {} };
+    const last = rec.lastSeenAt ? new Date(rec.lastSeenAt).getTime() : 0;
+    const isNewVisit = !last || (now - last) > VISIT_GAP_MS;
+
+    if (role) rec.role = role || rec.role || null;
+    if (name && !rec.name) rec.name = name;
+    if (team) { rec.teamId = rec.teamId || team.id || null; rec.teamName = rec.teamName || team.name || null; }
+    if (tab) {
+      rec.tabs = rec.tabs || {};
+      const t = String(tab).slice(0, 24).replace(/[^a-z0-9_-]/gi, '');
+      if (t) rec.tabs[t] = (rec.tabs[t] || 0) + 1;
+    }
+    if (isNewVisit) {
+      rec.visitCount = (rec.visitCount || 0) + 1;
+      rec.lastVisitAt = new Date(now).toISOString();
+    }
+    rec.lastSeenAt = new Date(now).toISOString();
+    await store.setJSON(key, rec);
+
+    if (isNewVisit) {
+      await logActivity({
+        type: `${role || 'player'}.visit`,
+        actor: { email: norm, role },
+        team,
+        player: rec.playerId ? { id: rec.playerId, name: rec.name } : null,
+        details: `${rec.name || norm} opened the ${role || 'player'} portal${team?.name ? ` (${team.name})` : ''}`,
+      });
+    }
+  } catch (err) {
+    console.error('recordVisit failed (non-fatal):', err);
+  }
+}
+
+/**
+ * Record an ANONYMOUS public-page view. No session, no PII — `vid` is a random
+ * per-browser id (localStorage) used only to estimate daily uniques. Rolls up
+ * into one mutable blob per day. Never throws.
+ */
+export async function recordPageview({ path, vid = null }) {
+  try {
+    const store = getStore(STORE);
+    const day = new Date().toISOString().slice(0, 10);
+    const key = `pageview/${day}.json`;
+    const rec = (await store.get(key, { type: 'json' }).catch(() => null))
+      || { date: day, hits: 0, pages: {}, visitors: [] };
+    rec.hits = (rec.hits || 0) + 1;
+    const p = normalizePath(path);
+    rec.pages = rec.pages || {};
+    rec.pages[p] = (rec.pages[p] || 0) + 1;
+    rec.visitors = rec.visitors || [];
+    if (vid && rec.visitors.length < ANON_VISITOR_CAP && !rec.visitors.includes(vid)) {
+      rec.visitors.push(vid);
+    }
+    await store.setJSON(key, rec);
+  } catch (err) {
+    console.error('recordPageview failed (non-fatal):', err);
+  }
+}
+
+function normalizePath(path) {
+  let p = String(path || '/').split('?')[0].split('#')[0].toLowerCase().slice(0, 80);
+  if (!p.startsWith('/')) p = '/' + p;
+  return p || '/';
 }

@@ -1369,17 +1369,20 @@
   }
 
   // Usage beacon → admin Analytics tab. Fire-and-forget; never blocks the UI.
-  function trackTab(t) {
+  // event:'visit' on page load counts a session-gapped visit; tab switches
+  // (default) just bump the tab counter + lastSeenAt.
+  function trackBeacon(payload) {
     try {
-      const payload = JSON.stringify({ tab: t });
+      const body = JSON.stringify(payload);
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(API + '/activity-track', new Blob([payload], { type: 'application/json' }));
+        navigator.sendBeacon(API + '/activity-track', new Blob([body], { type: 'application/json' }));
       } else {
-        fetch(API + '/activity-track', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: payload, keepalive: true }).catch(() => {});
+        fetch(API + '/activity-track', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
       }
     } catch {}
   }
-  trackTab('home'); // initial portal load counts as a Home view
+  function trackTab(t) { trackBeacon({ tab: t }); }
+  trackBeacon({ tab: 'home', event: 'visit' }); // initial portal load = a visit
   document.querySelectorAll('.nb').forEach(b => b.addEventListener('click', () => goTab(b.dataset.tab)));
   $('appbar-chat').addEventListener('click', () => goTab('chat'));
 

@@ -75,6 +75,29 @@ function highlightNav() {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Anonymous pageview beacon — counts public-page traffic for the admin
+// Analytics tab. No PII: ds_vid is a random per-browser id used only to
+// estimate daily uniques. partials.js loads on public pages ONLY (not the
+// me/captain/admin portals), so this never double-counts authed sessions.
+// Fire-and-forget; one hit per page load.
+// ═══════════════════════════════════════════════════════════════
+(function trackPublicPageview() {
+  try {
+    let vid = localStorage.getItem('ds_vid');
+    if (!vid) {
+      vid = (window.crypto && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : (Date.now().toString(36) + Math.random().toString(16).slice(2));
+      localStorage.setItem('ds_vid', vid);
+    }
+    const body = JSON.stringify({ path: location.pathname, vid });
+    const url = '/.netlify/functions/activity-public';
+    if (navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+    else fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+  } catch {}
+})();
+
+// ═══════════════════════════════════════════════════════════════
 // Keep-warm ping — fires every 4 minutes while the tab is visible,
 // so Netlify functions stay warm during active browsing.
 // ═══════════════════════════════════════════════════════════════

@@ -909,6 +909,15 @@
           .drop-perf .pf{border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;background:var(--color-surface-2);}
           .drop-perf .pf h6{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 6px;}
           .drop-perf .pf b{color:var(--color-text);}
+          .drop-perf .pf.wide{grid-column:1/-1;}
+          .dperf-tabs{display:flex;gap:4px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:8px;padding:3px;margin-bottom:8px;}
+          .dperf-tabs button{flex:1;font:inherit;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--color-text-muted);background:none;border:0;padding:5px 4px;border-radius:6px;cursor:pointer;}
+          .dperf-tabs button.on{background:var(--color-lime);color:var(--color-text-inverse);}
+          .dperf-panel{display:none;grid-template-columns:1fr 1fr;gap:10px;}
+          .dperf-panel.on{display:grid;}
+          .dperf-col .dperf-g{display:block;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:3px;}
+          .dperf-row{display:flex;justify-content:space-between;gap:8px;padding:2px 0;}
+          .dperf-row b{color:var(--color-lime);}
           .drop-pubbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--color-border);}
           .drop-ck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);text-transform:none;letter-spacing:0;cursor:pointer;}
           .drop-ck input{width:auto;margin:0;}
@@ -1214,10 +1223,14 @@
             <div class="ac"><div class="ac__h"><h2 class="ac__t">Never logged in</h2><span class="ac__s" id="an-never-ct" style="font-size:11px;color:var(--color-text-faint);"></span></div><div id="an-never" style="max-height:320px;overflow-y:auto;"><div class="loading">Loading…</div></div></div>
           </div>
           <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Public site traffic</h2><span class="ac__s" style="font-size:11px;color:var(--color-text-faint);">anonymous · all visitors</span></div>
+            <div id="an-public"><div class="loading">Loading…</div></div>
+          </div>
+          <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Who's using the site</h2></div>
             <div style="overflow-x:auto;">
-            <table class="at"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Logins</th><th>Last login</th><th>Last seen</th><th>Top tab</th></tr></thead>
-            <tbody id="an-people"><tr><td colspan="7" class="loading">Loading…</td></tr></tbody></table>
+            <table class="at"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Logins</th><th>Visits</th><th>Last login</th><th>Last seen</th><th>Top tab</th></tr></thead>
+            <tbody id="an-people"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody></table>
             </div>
           </div>
         </section>
@@ -1353,6 +1366,13 @@
   async function showShell() {
     $id('login-screen').style.display = 'none';
     $id('admin-shell').style.display = 'block';
+    // Usage beacon → Analytics: portal load = a visit. Fire-and-forget.
+    try {
+      const body = JSON.stringify({ tab: 'admin', event: 'visit' });
+      const url = '/.netlify/functions/activity-track';
+      if (navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
+      else fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+    } catch {}
     await Promise.all([loadSettings(), loadDivisions()]);
     populateDivisionDropdowns();
     populateWeekDropdowns();
@@ -2294,7 +2314,28 @@
         '<div class="sc"><div class="sc__l">Have logged in</div><div class="sc__v sc__v--teal">' + ((s.rosteredPlayers || 0) - (s.neverLoggedIn || 0)) + '</div><div class="sc__sub">' + pct + '% of roster</div></div>' +
         '<div class="sc"><div class="sc__l">Active · 7 days</div><div class="sc__v">' + (s.activeLast7Days || 0) + '</div><div class="sc__sub">seen this week</div></div>' +
         '<div class="sc"><div class="sc__l">Active · 24 hrs</div><div class="sc__v sc__v--gold">' + (s.activeLast24h || 0) + '</div><div class="sc__sub">seen today</div></div>' +
+        '<div class="sc"><div class="sc__l">Member visits</div><div class="sc__v">' + (s.totalVisits || 0).toLocaleString() + '</div><div class="sc__sub">portal sessions (all time)</div></div>' +
         '<div class="sc"><div class="sc__l">Never logged in</div><div class="sc__v" style="color:' + ((s.neverLoggedIn || 0) > 0 ? 'var(--color-red,#e53e3e)' : 'var(--color-teal)') + '">' + (s.neverLoggedIn || 0) + '</div><div class="sc__sub">worth a nudge</div></div>';
+
+      // Public site traffic (anonymous)
+      const pt = data.publicTraffic || {};
+      const p7 = pt.last7Days || { hits: 0, uniques: 0 };
+      const p30 = pt.last30Days || { hits: 0, uniques: 0 };
+      const topPages = pt.topPages || [];
+      const maxPage = topPages.length ? topPages[0].hits : 0;
+      $id('an-public').innerHTML =
+        '<div class="stats-row" style="margin-bottom:14px;">' +
+        '<div class="sc"><div class="sc__l">Pageviews · 7 days</div><div class="sc__v sc__v--teal">' + (p7.hits || 0).toLocaleString() + '</div><div class="sc__sub">' + (p7.uniques || 0).toLocaleString() + ' unique visitors</div></div>' +
+        '<div class="sc"><div class="sc__l">Pageviews · 30 days</div><div class="sc__v">' + (p30.hits || 0).toLocaleString() + '</div><div class="sc__sub">' + (p30.uniques || 0).toLocaleString() + ' unique visitors</div></div>' +
+        '</div>' +
+        '<div style="font-size:11px;color:var(--color-text-muted);margin-bottom:8px;">Top pages · last 30 days</div>' +
+        (topPages.length ? topPages.map(pg =>
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">' +
+          '<div style="width:140px;font-size:11px;color:var(--color-text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + h(pg.path) + '</div>' +
+          '<div style="flex:1;height:8px;background:var(--color-surface-2);border-radius:4px;overflow:hidden;"><div style="height:100%;width:' + (maxPage ? Math.max(3, Math.round(100 * pg.hits / maxPage)) : 0) + '%;background:var(--color-teal);border-radius:4px;"></div></div>' +
+          '<div style="width:50px;text-align:right;font-size:11px;font-weight:700;font-variant-numeric:tabular-nums;">' + pg.hits.toLocaleString() + '</div>' +
+          '</div>').join('')
+          : '<div class="empty">No public pageviews recorded yet.</div>');
 
       // Tab usage bars
       const tabs = Object.entries(s.tabTotals || {}).sort((a, b) => b[1] - a[1]);
@@ -2327,12 +2368,13 @@
           '<td>' + h(p.teamName || '—') + '</td>' +
           '<td style="text-transform:capitalize;">' + h(p.role || '—') + '</td>' +
           '<td style="font-variant-numeric:tabular-nums;">' + (p.loginCount || 0) + '</td>' +
+          '<td style="font-variant-numeric:tabular-nums;">' + (p.visitCount || 0) + '</td>' +
           '<td style="white-space:nowrap;">' + fdt(p.lastLoginAt) + '</td>' +
           '<td style="white-space:nowrap;">' + fdt(p.lastSeenAt) + '</td>' +
           '<td style="text-transform:capitalize;">' + (top ? h(top[0]) + ' <span style="color:var(--color-text-faint);font-size:10px;">×' + top[1] + '</span>' : '—') + '</td>' +
           '</tr>';
       }).join('')
-        : '<tr><td colspan="7" class="empty">No logins recorded yet — activity starts tracking from now.</td></tr>';
+        : '<tr><td colspan="8" class="empty">No logins recorded yet — activity starts tracking from now.</td></tr>';
     } catch (e) {
       $id('an-stats').innerHTML = '<div class="empty">Failed to load analytics: ' + h(e.message) + '</div>';
     }
@@ -5229,7 +5271,7 @@
     });
     box.querySelectorAll('[data-rm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.stories.splice(+b.dataset.rm,1); renderStories(); }); });
   }
-  function dHasPerf(p){ return !!(p && ((p.potw&&(p.potw.men||p.potw.women)) || p.teamOfWeek || (p.risers&&p.risers.length))); }
+  function dHasPerf(p){ return !!(p && ((p.potw&&(p.potw.men||p.potw.women)) || p.teamOfWeek || (p.topPerformers&&(p.topPerformers.men||p.topPerformers.women)) || (p.climbers&&p.climbers.length) || (p.risers&&p.risers.length))); }
   function dPerfToShow(rec, live){
     var snap = rec && rec.performers;
     if(rec && rec.status==='published') return dHasPerf(snap) ? snap : live;
@@ -5243,9 +5285,30 @@
     html+=pf("K'CHN POTW · M", p.potw&&p.potw.men);
     html+=pf("K'CHN POTW · F", p.potw&&p.potw.women);
     if(p.teamOfWeek) html+='<div class="pf"><h6>Team of the Week</h6><b>'+(p.teamOfWeek.emoji?dEsc(p.teamOfWeek.emoji)+' ':'')+dEsc(p.teamOfWeek.name)+'</b>'+(p.teamOfWeek.record?' · '+dEsc(p.teamOfWeek.record):'')+'</div>';
-    if(p.risers&&p.risers.length) html+='<div class="pf"><h6>Risers</h6>'+p.risers.map(function(r){ return dEsc(r.name)+' '+(r.dir==='dn'?'▼':'▲')+(r.delta!=null?Math.abs(r.delta):''); }).join('<br>')+'</div>';
+    // Top Performers — tabbed (DSR / Best Diff / Most Pts), top 5 M & F
+    var tp = p.topPerformers;
+    if(tp && (tp.men||tp.women)){
+      function dperfVal(x,k){ return k==='diff'?((x.diff>0?'+':'')+(x.diff!=null?x.diff:'—')) : k==='pts'?(x.ps!=null?x.ps:'—') : (x.dsr!=null?x.dsr:'—'); }
+      function dperfCol(label,set,k){ var arr=(set&&set[k])||[]; if(!arr.length) return '<div class="dperf-col"></div>';
+        return '<div class="dperf-col"><span class="dperf-g">'+label+'</span>'+arr.slice(0,5).map(function(x,i){ return '<div class="dperf-row"><span>'+(i+1)+'. '+dEsc(x.name)+'</span><b>'+dEsc(dperfVal(x,k))+'</b></div>'; }).join('')+'</div>'; }
+      html+='<div class="pf wide"><h6>Top Performers</h6><div class="dperf">'
+        +'<div class="dperf-tabs"><button class="on" data-k="dsr">DSR</button><button data-k="diff">Best Diff</button><button data-k="pts">Most Pts</button></div>';
+      ['dsr','diff','pts'].forEach(function(k,idx){ html+='<div class="dperf-panel'+(idx===0?' on':'')+'" data-tab="'+k+'">'+dperfCol('Men',tp.men,k)+dperfCol('Women',tp.women,k)+'</div>'; });
+      html+='</div></div>';
+    }
+    // Top Climbers — DSR rank jumps (falls back to up-only risers)
+    var cl=(p.climbers||[]).slice();
+    if(!cl.length && p.risers) cl=p.risers.filter(function(r){return r.dir!=='dn';}).map(function(r){return {name:r.name,delta:r.delta,rank:null,fromRank:null};});
+    if(cl.length) html+='<div class="pf"><h6>Top Climbers</h6>'+cl.slice(0,6).map(function(c){ return dEsc(c.name)+' ▲'+(c.delta!=null?c.delta:'')+(c.rank!=null&&c.fromRank!=null?' (#'+c.fromRank+'→#'+c.rank+')':''); }).join('<br>')+'</div>';
     box.innerHTML = html || '<div class="empty" style="font-size:12px;">No performer data yet.</div>';
   }
+  // Top Performers preview tab switcher (delegated)
+  document.addEventListener('click',function(e){
+    var b=e.target.closest('#drop-performers .dperf-tabs button'); if(!b) return;
+    var wrap=b.closest('.dperf'); if(!wrap) return; var k=b.getAttribute('data-k');
+    wrap.querySelectorAll('.dperf-tabs button').forEach(function(x){ x.classList.toggle('on',x===b); });
+    wrap.querySelectorAll('.dperf-panel').forEach(function(pn){ pn.classList.toggle('on',pn.getAttribute('data-tab')===k); });
+  });
   function collectDrop(){
     return {
       week: Number($d('drop-f-week').value)||DROP.week,
