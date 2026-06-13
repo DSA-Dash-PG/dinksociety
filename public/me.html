@@ -546,7 +546,9 @@
   .hnote { font-size:11px; color:var(--color-text-faint); margin-top:10px; text-align:center; }
 
   /* standings table */
-  .st-head, .st-row { display:grid; grid-template-columns:24px 1fr 48px 32px 40px; gap:8px; align-items:center; }
+  .st-head, .st-row { display:grid; grid-template-columns:22px 1fr auto 44px 30px 36px; gap:8px; align-items:center; }
+  .st-dsr { text-align:right; }
+  .st-dsr .dsr-chip { display:inline-block; background:var(--color-teal); color:var(--color-text-inverse); font-weight:800; font-size:11px; padding:2px 8px; border-radius:var(--radius-full); font-variant-numeric:tabular-nums; }
   .st-head { padding:0 13px 8px; font-size:9px; letter-spacing:0.06em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; }
   .st-list { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:2px 13px; }
   .st-row { padding:11px 0; border-bottom:1px solid var(--color-border); font-size:13px; }
@@ -2116,13 +2118,25 @@
       $('st-body').innerHTML = '<div class="muted">Standings populate as matches finalize.</div>';
       return;
     }
+    // Team DSR = sum of each rated player's DSR, keyed by team name (and id when present).
+    const dsrByTeam = {};
+    (DATA.leaderboard || []).forEach(p => {
+      if (p.dsr == null) return;
+      const d = Number(p.dsr); if (isNaN(d)) return;
+      [p.teamId, String(p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { dsrByTeam[k] = (dsrByTeam[k] || 0) + d; });
+    });
+    Object.keys(dsrByTeam).forEach(k => { dsrByTeam[k] = Math.round(dsrByTeam[k] * 10) / 10; });
+    const teamDSR = t => { const v = dsrByTeam[t.teamId] ?? dsrByTeam[String(t.teamName || '').toLowerCase()]; return v != null ? v : null; };
+
     const rows = teams.map(t => {
       const mine = t.teamId === me.teamId;
       const diff = t.pointDiff || 0;
       const diffCls = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat';
+      const dsr = teamDSR(t);
       return `<div class="st-row ${mine ? 'st-row--me' : ''}">
         <div class="st-rank">${t.rank}</div>
         <div class="st-team">${teamLink(t.teamId, t.teamName, `<span class="st-emoji">${emo({ emoji: t.teamEmoji })}</span><span class="st-name">${esc(t.teamName)}${mine ? ' · you' : ''}</span>`, 'st-link')}</div>
+        <div class="st-dsr">${dsr != null ? '<span class="dsr-chip">' + dsr + '</span>' : '—'}</div>
         <div class="st-wl">${t.wins}–${t.losses}${t.ties ? '–' + t.ties : ''}</div>
         <div class="st-pts">${t.matchPointsFor ?? 0}</div>
         <div class="st-diff ${diffCls}">${diff > 0 ? '+' : ''}${diff}</div>
@@ -2130,9 +2144,9 @@
     }).join('');
     $('st-body').innerHTML =
       `<div class="label">Standings <span class="sub">${esc(div.divisionLabel || myDiv)}</span></div>
-       <div class="st-head"><div class="st-rank">#</div><div class="st-team">Team</div><div class="st-wl">W–L</div><div class="st-pts">PTS</div><div class="st-diff">DIFF</div></div>
+       <div class="st-head"><div class="st-rank">#</div><div class="st-team">Team</div><div class="st-dsr">DSR</div><div class="st-wl">W–L</div><div class="st-pts">PTS</div><div class="st-diff">DIFF</div></div>
        <div class="st-list">${rows}</div>
-       <div class="st-legend">PTS = match points (win ×2 + tie ×1) · DIFF = point differential</div>`;
+       <div class="st-legend">DSR = total team DSR (sum of player ratings) · PTS = match points (win ×2 + tie ×1) · DIFF = point differential</div>`;
   }
 
   // ---- stats ----  (mirrors the public player profile: rankings, awards, season stats, partners, history)

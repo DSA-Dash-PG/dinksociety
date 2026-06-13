@@ -119,6 +119,10 @@
     /* Stat cells */
     .col-pts       { font-weight: 800; font-size: 15px; color: var(--color-lime); }
     .col-pts--zero { color: var(--color-text-faint); }
+    /* Team DSR column */
+    .col-dsr-h { text-align: right; }
+    .col-dsr   { text-align: right; }
+    .dsr-chip  { display: inline-block; background: var(--color-teal); color: var(--color-text-inverse); font-weight: 800; font-size: 12px; padding: 3px 9px; border-radius: var(--radius-full); font-variant-numeric: tabular-nums; }
     .col-diff-pos  { color: var(--color-teal); font-weight: 600; }
     .col-diff-neg  { color: var(--color-red);  font-weight: 600; }
     .col-muted     { color: var(--color-text-faint); }
@@ -248,6 +252,25 @@
   // ── State ────────────────────────────────────────────────────────
   let standingsData = null, teamsData = null, scheduleData = null, activeDivision = '', isPreseason = false, divCount = 0;
   let selectedWeek = 'current'; // 'current' or a week number (snapshot through that week)
+  let dsrByTeam = {}; // teamId / lowercased teamName → summed Team DSR
+  const CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
+
+  // Team DSR = sum of each rated player's DSR (composite, gamesPlayed>0), keyed by id + name.
+  function buildDsrByTeam(pstats) {
+    const map = {};
+    if (!pstats || pstats.empty) return map;
+    Object.values(pstats.players || {}).forEach(p => {
+      if (!(p.gamesPlayed > 0) || p.composite == null) return;
+      const d = Math.round(p.composite * 10) / 10;
+      [p.teamId, (p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { map[k] = (map[k] || 0) + d; });
+    });
+    Object.keys(map).forEach(k => { map[k] = Math.round(map[k] * 10) / 10; });
+    return map;
+  }
+  const teamDSR = t => {
+    const v = dsrByTeam[t.teamId] ?? dsrByTeam[String(t.teamName || '').toLowerCase()];
+    return v != null ? v : null;
+  };
 
   // Links carry the current season so navigation stays in context (e.g. test season).
   const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
@@ -257,14 +280,16 @@
   // ── Bootstrap ────────────────────────────────────────────────────
   async function load() {
     try {
-      const [sr, tr, sc] = await Promise.all([
+      const [sr, tr, sc, pr] = await Promise.all([
         fetch('/.netlify/functions/public-standings?season=' + SEASON.id).then(r => r.ok ? r.json() : null),
         fetch('/.netlify/functions/public-teams?season='    + SEASON.id).then(r => r.ok ? r.json() : null),
         fetch('/.netlify/functions/public-schedule?season=' + SEASON.id).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
       standingsData = sr;
       teamsData     = tr;
       scheduleData  = sc;
+      dsrByTeam     = buildDsrByTeam(pr);
     } catch { standingsData = { empty: true }; }
 
     isPreseason = !standingsData?.divisions;
@@ -502,7 +527,7 @@
     // The season has "started" once at least one week has been played.
     const seasonStarted = !preseason && weeksPlayed > 0;
     const showPlayoffLine = hunt && teams.length > spots;
-    const cols = hunt ? 14 : 13; // +PS +PA; MAX column only exists in hunt mode
+    const cols = hunt ? 15 : 14; // +DSR; +PS +PA; MAX column only exists in hunt mode
 
     // Before the season starts there is no meaningful ranking — list alphabetically.
     if (!seasonStarted) {
@@ -535,6 +560,7 @@
       const rds      = !seasonStarted ? '—' : (t.matchesPlayed || 0) * 2;
       const psFor    = !seasonStarted ? '—' : (t.pointsScored || 0);
       const psAg     = !seasonStarted ? '—' : (t.pointsAgainst || 0);
+      const dsr      = teamDSR(t);
       const badge    = hunt ? badgeHtml(t.status) : '';
 
       rows += '<tr class="' + (seasonStarted && idx===0 ? 'stand-row--leader' : '') + '">'
@@ -543,6 +569,7 @@
         + '  <a class="team-name team-name-link" href="' + teamHref(t) + '">'  + esc(t.teamName)  + '</a>'
         + badge
         + '</div></td>'
+        + '<td class="col-dsr">' + (dsr != null ? '<span class="dsr-chip">' + dsr + '</span>' : '<span class="col-muted">—</span>') + '</td>'
         + '<td class="col-opt col-muted">' + rds + '</td>'
         + '<td>' + t.wins + '</td>'
         + '<td>' + t.losses + '</td>'
@@ -578,6 +605,7 @@
       + '<thead><tr>'
       + '<th class="col-rank">#</th>'
       + '<th class="col-team">Team</th>'
+      + '<th class="col-dsr-h" title="Total Team DSR (sum of roster ratings)">DSR</th>'
       + '<th class="col-opt" title="Rounds Played (2 per match)">RDS</th>'
       + '<th title="Round Wins">W</th>'
       + '<th title="Round Losses">L</th>'
