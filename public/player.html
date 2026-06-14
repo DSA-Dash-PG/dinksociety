@@ -312,10 +312,21 @@
         }
         if (gSum > 0) avgPartnerDsr = wSum / gSum;
       }
+      // Avg Opponent DSR — game-weighted mean of opponents' composite ratings.
+      let avgOpponentDsr = null, opponentCount = 0;
+      if (pStat?.opponents) {
+        let wSum = 0, gSum = 0;
+        for (const [pid, v] of Object.entries(pStat.opponents)) {
+          const played = v && typeof v === 'object' ? (v.played || 0) : (v || 0);
+          const comp = playersMap[pid]?.composite;
+          if (played > 0 && comp != null) { wSum += comp * played; gSum += played; opponentCount++; }
+        }
+        if (gSum > 0) avgOpponentDsr = wSum / gSum;
+      }
       const pointsWonPct = (pStat && (pStat.ps + pStat.pa) > 0)
         ? Math.round(pStat.ps / (pStat.ps + pStat.pa) * 1000) / 10
         : null;
-      const metrics = { avgPartnerDsr, pointsWonPct };
+      const metrics = { avgPartnerDsr, avgOpponentDsr, opponentCount, pointsWonPct };
 
       render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics);
     }
@@ -378,6 +389,7 @@
         const gwPct = pct(stat.gamesWon, stat.gamesPlayed);
         const ptPct = metrics.pointsWonPct;
         const apd   = metrics.avgPartnerDsr;
+        const aod   = metrics.avgOpponentDsr;
         const card = (val, lbl, sub, cls = '') => `<div class="mlp-card ${cls}"><div class="mlp-card__val">${val}</div><div class="mlp-card__lbl">${lbl}</div>${sub ? `<div class="mlp-card__sub">${sub}</div>` : ''}</div>`;
 
         html += `<div class="mlp-panel">
@@ -387,7 +399,7 @@
             ${card(`<span class="val--teal">${ptPct != null ? ptPct + '%' : '—'}</span>`, 'Points Won %', `${stat.ps} – ${stat.pa}`)}
             ${card(`<span class="val--teal">${ptPct != null ? ptPct + '%' : '—'}</span>`, 'Avg Points %', 'season total', 'is-est')}
             ${card(`<span class="val--lime">${apd != null ? apd.toFixed(1) : '—'}</span>`, 'Avg Partner DSR', `${Object.keys(stat.partners || {}).length} partners`)}
-            ${card(`<span class="is-na">N/A</span>`, 'Avg Opponent DSR', 'needs match data')}
+            ${card(`<span class="${aod != null ? 'val--lime' : 'is-na'}">${aod != null ? aod.toFixed(1) : 'N/A'}</span>`, 'Avg Opponent DSR', aod != null ? `${metrics.opponentCount} opponents` : 'needs match data')}
           </div>`;
 
         // Discipline breakdown.
@@ -407,7 +419,7 @@
             }).join('')}
           </tbody></table>`;
         }
-        html += `<div class="mlp-note"><b>Avg Points %</b> shows the season total (points won ÷ points played) — a true per-game average needs per-game point data. <b>Avg Opponent DSR</b> needs game-level opponent tracking, which isn't stored yet.</div>`;
+        html += `<div class="mlp-note"><b>Avg Points %</b> shows the season total (points won ÷ points played) — a true per-game average needs per-game point data.${aod == null ? ' <b>Avg Opponent DSR</b> needs game-level opponent tracking, which isn\'t stored yet.' : ''}</div>`;
         html += `</div>`;
       }
 

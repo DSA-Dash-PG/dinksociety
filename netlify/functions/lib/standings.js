@@ -427,13 +427,13 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
     for (const pid of homePlayers) {
       const player = rosterA.get(pid);
       if (!player) continue;
-      bumpPlayer(playerStats, pid, player, teamA, slotType, homeWon, homePlayers.filter(p => p !== pid), homeScore, awayScore);
+      bumpPlayer(playerStats, pid, player, teamA, slotType, homeWon, homePlayers.filter(p => p !== pid), homeScore, awayScore, awayPlayers);
       if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamA, homeWon, homeScore, awayScore);
     }
     for (const pid of awayPlayers) {
       const player = rosterB.get(pid);
       if (!player) continue;
-      bumpPlayer(playerStats, pid, player, teamB, slotType, !homeWon, awayPlayers.filter(p => p !== pid), awayScore, homeScore);
+      bumpPlayer(playerStats, pid, player, teamB, slotType, !homeWon, awayPlayers.filter(p => p !== pid), awayScore, homeScore, homePlayers);
       if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamB, !homeWon, awayScore, homeScore);
     }
 
@@ -510,12 +510,13 @@ function ensurePlayer(map, pid, player, team) {
       clutchW: 0,    // wins in close games (margin ≤ 3)
       clutchG: 0,    // close games played
       composite: null,
-      partners: {}, // { partnerId: { played, won } }
+      partners: {},  // { partnerId: { played, won } }
+      opponents: {}, // { opponentId: { played, won } }
     });
   }
 }
 
-function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = null, oppScore = null) {
+function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = null, oppScore = null, opponents = []) {
   ensurePlayer(map, pid, player, team);
   const p = map.get(pid);
   p.gamesPlayed++;
@@ -540,6 +541,12 @@ function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = n
     if (!p.partners[partnerId]) p.partners[partnerId] = { played: 0, won: 0 };
     p.partners[partnerId].played++;
     if (won) p.partners[partnerId].won++;
+  }
+
+  for (const opponentId of opponents) {
+    if (!p.opponents[opponentId]) p.opponents[opponentId] = { played: 0, won: 0 };
+    p.opponents[opponentId].played++;
+    if (won) p.opponents[opponentId].won++;
   }
 }
 
