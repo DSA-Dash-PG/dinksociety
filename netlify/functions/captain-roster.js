@@ -88,6 +88,12 @@ export default async (req) => {
           normalizedPhone: phone ? normalizePhone(phone) : null,
           dupr: sanitize(p.dupr, 10),
           linkedUserId: p.linkedUserId || (prev ? prev.linkedUserId : null) || null,
+          // Profile bio fields + photo + pending-approval state are owned by the
+          // player-profile / player-photo / approval endpoints. Preserve them
+          // from the stored roster so an ordinary roster save can't wipe them.
+          ...(prev?.profile ? { profile: prev.profile } : {}),
+          ...(prev?.pendingProfile ? { pendingProfile: prev.pendingProfile } : {}),
+          ...(prev?.photo ? { photo: prev.photo } : {}),
           ...(prev?.isCaptain ? { isCaptain: true } : {}),
           ...(prev?.isCoCaptain ? { isCoCaptain: true } : {}),
           // Archive state is owned by the archive/restore endpoint — preserve it

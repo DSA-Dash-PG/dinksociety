@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Standings — Team DSR placement mockups</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12); --color-lime-ghost:rgba(184,255,44,0.06);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12); --color-red:#ff5c47; --color-red-dim:rgba(255,92,71,0.12);
+    --color-gold:#f0c040; --max-w:1100px; --gutter:20px; --radius-lg:20px; --radius-full:9999px;
+    --space-3:.75rem; --space-4:1rem; --space-5:1.25rem;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:var(--max-w);margin:0 auto;padding:44px var(--gutter) 80px;}
+  .doc-h1{font-size:1.4rem;font-weight:800;margin:0 0 6px;}
+  .doc-p{color:var(--color-text-muted);font-size:.9rem;margin:0 0 8px;max-width:64ch;line-height:1.5;}
+  .variant-label{display:flex;align-items:baseline;gap:12px;margin:48px 0 14px;border-top:1px solid var(--color-border);padding-top:36px;}
+  .variant-label:first-of-type{border-top:none;padding-top:8px;margin-top:24px;}
+  .tag{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-inverse);background:var(--color-lime);padding:5px 12px;border-radius:var(--radius-full);}
+  .tag--ghost{background:var(--color-surface-3);color:var(--color-text-muted);}
+  .variant-label h2{font-size:1.1rem;font-weight:800;margin:0;}
+  .variant-label .note{font-size:.82rem;color:var(--color-text-faint);}
+
+  /* ── standings card (mirrors live styles) ── */
+  .stand-card{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;}
+  .stand-card__hd{padding:var(--space-5) var(--space-5) 0;display:flex;align-items:baseline;gap:var(--space-3);}
+  .stand-card__title{font-size:14px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;margin:0;}
+  .stand-card__updated{font-size:10px;color:var(--color-text-faint);margin-left:auto;}
+  .stand-table-wrap{overflow-x:auto;padding:var(--space-4) 0 0;}
+  .stand-table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap;}
+  .stand-table th{text-align:right;padding:6px 10px;font-size:9px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;border-bottom:1px solid var(--color-border-strong);}
+  .stand-table th:first-child,.stand-table th.col-team{text-align:left;}
+  .stand-table td{padding:11px 10px;border-bottom:1px solid var(--color-border);text-align:right;}
+  .stand-table td:first-child,.stand-table td.col-team{text-align:left;}
+  .stand-table tr:last-child td{border-bottom:none;}
+  .stand-table tbody tr:hover td{background:var(--color-surface-2);}
+  .col-rank{width:36px;color:var(--color-text-faint);font-weight:800;font-size:12px;}
+  .stand-row--leader td{background:var(--color-lime-ghost);}
+  .col-team{min-width:170px;}
+  .team-cell{display:flex;align-items:center;gap:9px;}
+  .team-emoji{font-size:18px;flex-shrink:0;width:24px;text-align:center;}
+  .team-name{font-weight:700;color:var(--color-text);}
+  .col-pts{font-weight:800;font-size:15px;color:var(--color-lime);}
+  .col-diff-pos{color:var(--color-teal);font-weight:600;} .col-diff-neg{color:var(--color-red);font-weight:600;}
+  .col-muted{color:var(--color-text-faint);}
+  .pts-note{padding:var(--space-4) var(--space-5);font-size:11px;color:var(--color-text-faint);border-top:1px solid var(--color-border);}
+
+  /* ── DSR treatments ── */
+  /* A: subline under team name */
+  .team-stack{display:flex;flex-direction:column;gap:1px;}
+  .team-dsr-sub{font-size:10px;font-weight:700;letter-spacing:.04em;color:var(--color-teal);}
+  .team-dsr-sub span{color:var(--color-text-faint);font-weight:600;}
+
+  /* B: own column */
+  .col-dsr{font-weight:800;font-size:14px;color:var(--color-text-inverse);}
+  .dsr-chip{display:inline-block;background:var(--color-teal);color:var(--color-text-inverse);font-weight:800;font-size:12px;padding:3px 10px;border-radius:var(--radius-full);font-variant-numeric:tabular-nums;}
+
+  /* C: ghost watermark behind name */
+  .team-cell--ghost{position:relative;}
+  .team-ghost{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:26px;font-weight:900;color:rgba(23,215,176,0.13);font-variant-numeric:tabular-nums;pointer-events:none;letter-spacing:-.02em;}
+  .col-team--ghost{min-width:210px;}
+
+  td.num{font-variant-numeric:tabular-nums;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="doc-h1">Standings — Team DSR placement</h1>
+  <p class="doc-p">Two ways to surface total Team DSR (sum of each team's player ratings) on the standings table, plus a "ghost" take on the behind-the-name idea. Mixed Doubles division, sample data.</p>
+
+  <!-- ════ VARIANT A — under the team name ════ -->
+  <div class="variant-label"><span class="tag">Option A</span><h2>DSR under the team name</h2><span class="note">Secondary teal line beneath each name — no extra column, stays compact</span></div>
+  <div class="stand-card">
+    <div class="stand-card__hd"><h2 class="stand-card__title">Mixed Doubles</h2><span class="stand-card__updated">Updated Jun 13</span></div>
+    <div class="stand-table-wrap"><table class="stand-table">
+      <thead><tr><th class="col-rank">#</th><th class="col-team">Team</th><th>W</th><th>L</th><th>T</th><th title="Match Points">PTS</th><th>GW</th><th>GL</th><th>DIFF</th></tr></thead>
+      <tbody id="rowsA"></tbody>
+    </table></div>
+    <div class="pts-note"><strong style="color:var(--color-text-muted);">Team DSR</strong> = sum of the roster's player ratings · Tiebreaker: PTS → GW → H2H → DIFF</div>
+  </div>
+
+  <!-- ════ VARIANT B — own column ════ -->
+  <div class="variant-label"><span class="tag">Option B</span><h2>DSR in its own column</h2><span class="note">Dedicated DSR column (teal chip) right after the team name — most prominent, MLP-style</span></div>
+  <div class="stand-card">
+    <div class="stand-card__hd"><h2 class="stand-card__title">Mixed Doubles</h2><span class="stand-card__updated">Updated Jun 13</span></div>
+    <div class="stand-table-wrap"><table class="stand-table">
+      <thead><tr><th class="col-rank">#</th><th class="col-team">Team</th><th title="Total Team DSR">DSR</th><th>W</th><th>L</th><th>T</th><th title="Match Points">PTS</th><th>GW</th><th>GL</th><th>DIFF</th></tr></thead>
+      <tbody id="rowsB"></tbody>
+    </table></div>
+    <div class="pts-note"><strong style="color:var(--color-text-muted);">DSR</strong> = total Team DSR (sum of roster ratings)</div>
+  </div>
+
+  <!-- ════ VARIANT C — ghost watermark ════ -->
+  <div class="variant-label"><span class="tag tag--ghost">Bonus</span><h2>DSR ghosted behind the name</h2><span class="note">Faint oversized number watermark — literal "behind the name." Stylish but less legible</span></div>
+  <div class="stand-card">
+    <div class="stand-card__hd"><h2 class="stand-card__title">Mixed Doubles</h2><span class="stand-card__updated">Updated Jun 13</span></div>
+    <div class="stand-table-wrap"><table class="stand-table">
+      <thead><tr><th class="col-rank">#</th><th class="col-team">Team</th><th>W</th><th>L</th><th>T</th><th title="Match Points">PTS</th><th>GW</th><th>GL</th><th>DIFF</th></tr></thead>
+      <tbody id="rowsC"></tbody>
+    </table></div>
+    <div class="pts-note">The faded number behind each team is its total Team DSR.</div>
+  </div>
+</div>
+
+<script>
+  const teams = [
+    { emoji:'🥅', name:'Net Gains',     w:8, l:2, t:0, pts:30, gw:48, gl:24, diff:'+96', dsr:'624.1' },
+    { emoji:'🎸', name:'Dink Floyd',    w:7, l:3, t:0, pts:26, gw:44, gl:28, diff:'+61', dsr:'611.5' },
+    { emoji:'🔄', name:'Kitchen Sync',  w:6, l:4, t:0, pts:24, gw:41, gl:31, diff:'+38', dsr:'598.2' },
+    { emoji:'🎮', name:'Smash Bros',    w:5, l:5, t:0, pts:20, gw:37, gl:35, diff:'+9',  dsr:'572.0' },
+    { emoji:'🏓', name:'Paddle Battle',  w:5, l:5, t:0, pts:19, gw:35, gl:37, diff:'-4',  dsr:'565.8' },
+    { emoji:'🃏', name:'Court Jesters', w:4, l:6, t:0, pts:16, gw:32, gl:40, diff:'-22', dsr:'540.3' },
+    { emoji:'🔮', name:'Net Prophets',  w:3, l:7, t:0, pts:12, gw:28, gl:44, diff:'-51', dsr:'519.6' },
+    { emoji:'🥒', name:'Dilly Dinkers', w:2, l:8, t:1, pts:9,  gw:24, gl:48, diff:'-78', dsr:'498.1' },
+  ];
+  const rank = (i)=>`<td class="col-rank">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td>`;
+  const diffCls = d => d.startsWith('+') ? 'col-diff-pos' : d.startsWith('-') ? 'col-diff-neg' : '';
+  const tail = t => `<td class="num">${t.w}</td><td class="num">${t.l}</td><td class="col-muted num">${t.t}</td><td class="col-pts num">${t.pts}</td><td class="col-muted num">${t.gw}</td><td class="col-muted num">${t.gl}</td><td class="${diffCls(t.diff)} num">${t.diff}</td>`;
+
+  // A — subline
+  document.getElementById('rowsA').innerHTML = teams.map((t,i)=>`
+    <tr class="${i===0?'stand-row--leader':''}">${rank(i)}
+      <td class="col-team"><div class="team-cell">
+        <span class="team-emoji">${t.emoji}</span>
+        <div class="team-stack"><span class="team-name">${t.name}</span><span class="team-dsr-sub">${t.dsr} <span>Team DSR</span></span></div>
+      </div></td>${tail(t)}
+    </tr>`).join('');
+
+  // B — own column
+  document.getElementById('rowsB').innerHTML = teams.map((t,i)=>`
+    <tr class="${i===0?'stand-row--leader':''}">${rank(i)}
+      <td class="col-team"><div class="team-cell"><span class="team-emoji">${t.emoji}</span><span class="team-name">${t.name}</span></div></td>
+      <td><span class="dsr-chip">${t.dsr}</span></td>${tail(t)}
+    </tr>`).join('');
+
+  // C — ghost watermark
+  document.getElementById('rowsC').innerHTML = teams.map((t,i)=>`
+    <tr class="${i===0?'stand-row--leader':''}">${rank(i)}
+      <td class="col-team col-team--ghost"><div class="team-cell team-cell--ghost">
+        <span class="team-emoji">${t.emoji}</span><span class="team-name">${t.name}</span>
+        <span class="team-ghost">${t.dsr}</span>
+      </div></td>${tail(t)}
+    </tr>`).join('');
+</script>
+</body>
+</html>

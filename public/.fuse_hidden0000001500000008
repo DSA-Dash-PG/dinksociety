@@ -49,7 +49,7 @@
   .ds-header { background:var(--color-surface); border-bottom:1px solid var(--color-border); padding:12px 16px; display:flex; justify-content:space-between; align-items:center; gap:8px; position:sticky; top:0; z-index:100; }
   .ds-header__left { min-width:0; }
   .ds-header__brand { font-size:9px; letter-spacing:0.2em; text-transform:uppercase; color:var(--color-teal); font-weight:700; margin-bottom:2px; white-space:nowrap; }
-  .ds-header__title { font-size:14px; font-weight:800; font-style:italic; text-transform:uppercase; letter-spacing:0.04em; margin:0; color:var(--color-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ds-header__title { font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; margin:0; color:var(--color-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   .ds-header__right { display:flex; align-items:center; gap:8px; flex-shrink:0; }
   .ds-role-seg { display:flex; background:var(--color-surface-3); border:1px solid var(--color-border); border-radius:var(--radius-full); padding:3px; gap:2px; }
   .ds-role-seg__opt { font-family:var(--font-body); font-size:11px; font-weight:800; border:none; cursor:pointer; background:transparent; color:var(--color-text-faint); border-radius:var(--radius-full); padding:6px 12px; text-decoration:none; white-space:nowrap; transition:var(--transition); }
@@ -429,24 +429,6 @@
   .psheet__close { width:30px; height:30px; border-radius:50%; border:1px solid var(--color-border); background:var(--color-surface-2); color:var(--color-text-muted); font-size:16px; line-height:1; cursor:pointer; font-family:inherit; flex-shrink:0; display:grid; place-items:center; }
   .psheet__close:active { opacity:0.6; }
   .psheet__body { flex:1; overflow-y:auto; padding:16px 16px 32px; -webkit-overflow-scrolling:touch; }
-  /* ── Edit my profile form ── */
-  .pf-form { display:flex; flex-direction:column; gap:10px; }
-  .pf-pending { font-size:12px; font-weight:600; color:var(--color-gold); background:rgba(245,200,66,0.12); border:1px solid rgba(245,200,66,0.3); border-radius:var(--radius-md); padding:9px 11px; }
-  .pf-photo { display:flex; align-items:center; gap:14px; padding:6px 0 10px; border-bottom:1px solid var(--color-border); }
-  .pf-photo__av { width:72px; height:72px; border-radius:16px; overflow:hidden; flex-shrink:0; display:grid; place-items:center; background:var(--color-surface-3); border:1px solid var(--color-border); font-size:22px; font-weight:800; color:var(--color-lime); }
-  .pf-photo__av img { width:100%; height:100%; object-fit:cover; }
-  .pf-photo__act { display:flex; flex-direction:column; gap:6px; align-items:flex-start; }
-  .pf-row { display:flex; align-items:center; gap:10px; font-size:13px; font-weight:700; }
-  .pf-row > span { width:96px; flex-shrink:0; color:var(--color-text-muted); }
-  .pf-row input, .pf-row select { flex:1; min-width:0; font:inherit; font-size:13px; font-weight:600; padding:9px 11px; border-radius:var(--radius-md); border:1px solid var(--color-border); background:var(--color-surface-2); color:var(--color-text); }
-  .pf-row input:disabled { color:var(--color-text-faint); }
-  .pf-hint { font-size:10.5px; color:var(--color-text-faint); margin:-4px 0 4px 106px; line-height:1.4; }
-  .pf-btn { font:inherit; font-size:12.5px; font-weight:800; padding:8px 16px; border-radius:var(--radius-md); border:1px solid var(--color-lime); background:var(--color-lime); color:#0a0f08; cursor:pointer; }
-  .pf-btn:disabled { opacity:0.5; cursor:default; }
-  .pf-btn--ghost { background:transparent; color:var(--color-text); border-color:var(--color-border); }
-  .pf-btn--full { width:100%; padding:12px; margin-top:6px; }
-  .pf-status { font-size:11.5px; font-weight:600; min-height:14px; color:var(--color-text-faint); }
-  .pf-status--main { text-align:center; }
   .ph-hero { display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:8px 0 18px; }
   .ph-av { width:64px; height:64px; border-radius:50%; background:var(--color-surface-3); border:1px solid var(--color-border-strong); display:grid; place-items:center; font-size:24px; font-weight:800; color:var(--color-text-muted); }
   .ph-emoji { font-size:48px; line-height:1; }
@@ -700,7 +682,6 @@
         </div>
         <div class="ds-drawer__section">
           <div class="ds-drawer__section-label">Account</div>
-          <button class="ds-drawer__link" id="ds-drawer-editprofile">Edit my profile</button>
           <button class="ds-drawer__link ds-drawer__link--danger" id="ds-drawer-signout">Sign out</button>
         </div>
       </nav>
@@ -859,126 +840,6 @@
     $('psheet-scrim').classList.remove('is-open');
     $('psheet').setAttribute('aria-hidden', 'true');
     setTimeout(() => { if (!$('psheet').classList.contains('is-open')) $('psheet-body').innerHTML = ''; }, 280);
-  }
-
-  // ── Edit my profile (self-service, admin-approval gated) ──────────
-  var _PF_COMPRESS = { MAX_DIM: 2500, QUALITY: 0.92, TARGET: 5 * 1024 * 1024 };
-  async function _pfCompress(file) {
-    if (file.size <= _PF_COMPRESS.TARGET && file.type === 'image/jpeg') return file;
-    const img = await new Promise((resolve, reject) => {
-      const i = new Image(), u = URL.createObjectURL(file);
-      i.onload = () => { URL.revokeObjectURL(u); resolve(i); };
-      i.onerror = () => { URL.revokeObjectURL(u); reject(new Error('Could not load image')); };
-      i.src = u;
-    });
-    let w = img.naturalWidth, h = img.naturalHeight;
-    if (w > _PF_COMPRESS.MAX_DIM || h > _PF_COMPRESS.MAX_DIM) { const sc = _PF_COMPRESS.MAX_DIM / Math.max(w, h); w = Math.round(w * sc); h = Math.round(h * sc); }
-    const c = document.createElement('canvas'); c.width = w; c.height = h;
-    c.getContext('2d').drawImage(img, 0, 0, w, h);
-    let q = _PF_COMPRESS.QUALITY;
-    let blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q));
-    while (blob.size > _PF_COMPRESS.TARGET && q > 0.6) { q -= 0.05; blob = await new Promise(r => c.toBlob(r, 'image/jpeg', q)); }
-    return new File([blob], (file.name || 'photo').replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
-  }
-
-  function openMyProfileEditor() {
-    const me = DATA?.profile;
-    if (!me) return;
-    const bio = me.bio || {};
-    const pend = me.pendingProfile || null;
-    _profStack = [{ kind: 'editme' }];
-    $('psheet-title').textContent = 'Edit my profile';
-    $('psheet-back').hidden = true;
-    $('psheet').setAttribute('aria-hidden', 'false');
-    $('psheet').classList.add('is-open');
-    $('psheet-scrim').classList.add('is-open');
-
-    const genderTxt = me.gender === 'F' ? 'Female' : me.gender === 'M' ? 'Male' : '—';
-    const opt = (v, cur) => `<option value="${v}"${v === cur ? ' selected' : ''}>${v || '—'}</option>`;
-    const pendNote = pend
-      ? `<div class="pf-pending">⏳ You have edits awaiting admin approval. Saving again replaces them.</div>` : '';
-    const photoSrc = me.hasPhoto
-      ? `${API}/player-photo-serve?id=${encodeURIComponent(me.playerId)}&v=${encodeURIComponent(me.photoUpdatedAt || '')}`
-      : '';
-
-    $('psheet-body').innerHTML = `
-      <div class="pf-form">
-        ${pendNote}
-        <div class="pf-photo">
-          <div class="pf-photo__av" id="pf-av">${photoSrc ? `<img src="${esc(photoSrc)}" alt="">` : esc(initials(me.name))}</div>
-          <div class="pf-photo__act">
-            <label class="pf-btn pf-btn--ghost">Choose photo<input type="file" id="pf-file" accept="image/jpeg,image/png,image/webp" hidden></label>
-            <button class="pf-btn" id="pf-photo-save" disabled>Upload</button>
-            <div class="pf-status" id="pf-photo-status"></div>
-          </div>
-        </div>
-
-        <label class="pf-row"><span>Gender</span><input value="${genderTxt}" disabled></label>
-        <div class="pf-hint">Gender is set by your captain (used for lineups).</div>
-
-        <label class="pf-row"><span>Height</span><input id="pf-height" maxlength="16" placeholder="e.g. 5'8&quot;" value="${esc(bio.height || '')}"></label>
-        <label class="pf-row"><span>Date of birth</span><input id="pf-dob" type="date" value="${esc(bio.dob || '')}"></label>
-        <div class="pf-hint">Only your age is shown publicly — never your date of birth.</div>
-        <label class="pf-row"><span>Plays</span><select id="pf-plays">${opt('', bio.plays || '')}${opt('Right', bio.plays)}${opt('Left', bio.plays)}${opt('Both', bio.plays)}</select></label>
-        <label class="pf-row"><span>City</span><input id="pf-city" maxlength="60" value="${esc(bio.city || '')}"></label>
-        <label class="pf-row"><span>Home court</span><input id="pf-court" maxlength="80" value="${esc(bio.homeCourt || '')}"></label>
-
-        <button class="pf-btn pf-btn--full" id="pf-save">Submit for approval</button>
-        <div class="pf-status pf-status--main" id="pf-save-status"></div>
-        <div class="pf-hint" style="text-align:center">Changes go live once a league admin approves them.</div>
-      </div>`;
-
-    // Photo wiring
-    let pickedPhoto = null;
-    $('pf-file').addEventListener('change', e => {
-      pickedPhoto = e.target.files && e.target.files[0];
-      $('pf-photo-save').disabled = !pickedPhoto;
-      if (pickedPhoto) {
-        const url = URL.createObjectURL(pickedPhoto);
-        $('pf-av').innerHTML = `<img src="${url}" alt="">`;
-      }
-    });
-    $('pf-photo-save').addEventListener('click', async () => {
-      if (!pickedPhoto) return;
-      const st = $('pf-photo-status'), btn = $('pf-photo-save');
-      btn.disabled = true;
-      try {
-        st.style.color = 'var(--color-text-faint)'; st.textContent = 'Compressing…';
-        const f = await _pfCompress(pickedPhoto);
-        st.textContent = 'Uploading…';
-        const fd = new FormData();
-        fd.append('file', f); fd.append('playerId', me.playerId); fd.append('teamId', me.teamId);
-        const r = await fetch(API + '/player-photo-upload', { method: 'POST', body: fd, credentials: 'include' });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.error || 'Upload failed');
-        st.style.color = 'var(--color-teal)';
-        st.textContent = d.status === 'live' ? 'Photo updated!' : '⏳ Photo sent for admin approval.';
-      } catch (e) { st.style.color = 'var(--color-red)'; st.textContent = e.message; btn.disabled = false; }
-    });
-
-    // Field save
-    $('pf-save').addEventListener('click', async () => {
-      const btn = $('pf-save'), st = $('pf-save-status');
-      btn.disabled = true; st.style.color = 'var(--color-text-faint)'; st.textContent = 'Saving…';
-      const profile = {
-        height: $('pf-height').value.trim(),
-        dob: $('pf-dob').value.trim(),
-        plays: $('pf-plays').value,
-        city: $('pf-city').value.trim(),
-        homeCourt: $('pf-court').value.trim(),
-      };
-      try {
-        const r = await fetch(API + '/player-profile', {
-          method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: me.playerId, teamId: me.teamId, profile }),
-        });
-        const d = await r.json().catch(() => ({}));
-        if (!r.ok) throw new Error(d.error || 'Save failed');
-        st.style.color = 'var(--color-teal)';
-        st.textContent = d.status === 'live' ? 'Saved!' : '⏳ Submitted for admin approval.';
-      } catch (e) { st.style.color = 'var(--color-red)'; st.textContent = e.message; }
-      btn.disabled = false;
-    });
   }
   // Tab switcher for the in-app player profile (Overview / Partners).
   function phTab(t) {
@@ -1357,12 +1218,6 @@
         });
       });
     }
-
-    // Edit my profile
-    $('ds-drawer-editprofile').addEventListener('click', () => {
-      closeDrawer();
-      openMyProfileEditor();
-    });
 
     // Sign out
     $('ds-drawer-signout').addEventListener('click', async () => {

@@ -9,6 +9,7 @@
 // Player emails are stripped for privacy.
 
 import { getStore } from '@netlify/blobs';
+import { publicProfile } from './lib/profile.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -58,14 +59,29 @@ export default async (req) => {
           photoUrl: team.photo?.updatedAt
             ? `/.netlify/functions/team-photo-serve?id=${encodeURIComponent(team.id)}&v=${encodeURIComponent(team.photo.updatedAt)}`
             : null,
-          roster: (team.roster || []).filter(p => !p.archived).map(p => ({
-            name: p.name,
-            gender: p.gender || '',
-            dupr: p.dupr || null,
-            isCaptain: capEmail
-              ? (p.email || '').toLowerCase() === capEmail
-              : (p.role === 'captain' || p.isCaptain || false),
-          })),
+          roster: (team.roster || []).filter(p => !p.archived).map(p => {
+            // Approved bio fields only — DOB is converted to a computed age and
+            // never emitted. Pending (unapproved) edits are NOT exposed here.
+            const prof = publicProfile(p);
+            return {
+              id: p.id || null,
+              name: p.name,
+              gender: p.gender || '',
+              dupr: p.dupr || null,
+              isCaptain: capEmail
+                ? (p.email || '').toLowerCase() === capEmail
+                : (p.role === 'captain' || p.isCaptain || false),
+              // MLP-style profile fields (approved only)
+              height: prof.height,
+              age: prof.age,
+              plays: prof.plays,
+              city: prof.city,
+              homeCourt: prof.homeCourt,
+              photoUrl: p.photo?.updatedAt
+                ? `/.netlify/functions/player-photo-serve?id=${encodeURIComponent(p.id)}&v=${encodeURIComponent(p.photo.updatedAt)}`
+                : null,
+            };
+          }),
         });
       } catch {}
     }

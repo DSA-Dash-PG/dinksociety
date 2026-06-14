@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Drop — Redesign Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet" />
+<style>
+/* ── Design tokens lifted from shared.css (dark) so this mockup renders standalone ── */
+:root{
+  --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+  --color-border:rgba(255,255,255,.08); --color-border-strong:rgba(255,255,255,.14);
+  --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+  --color-lime:#b8ff2c; --color-lime-active:#94d10b; --color-lime-dim:rgba(184,255,44,.12); --color-lime-ghost:rgba(184,255,44,.06);
+  --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,.12);
+  --color-red:#ff5c47; --color-gold:#f0c040; --color-gold-dim:rgba(240,192,64,.12);
+  --color-divider:rgba(255,255,255,.06);
+  --kchn-gold:#f0d020;
+  --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-full:999px;
+  --max-w:1200px; --gutter:24px;
+  --serif:'Newsreader',Georgia,serif;
+}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+
+/* annotation callouts (mockup-only, not for production) */
+.note{max-width:1040px;margin:0 auto;padding:10px 16px;border-left:3px solid var(--color-lime);background:var(--color-lime-ghost);border-radius:0 8px 8px 0;font-size:13px;color:var(--color-text-muted);}
+.note b{color:var(--color-lime);}
+.mockbar{position:fixed;bottom:0;left:0;right:0;z-index:300;background:#000;border-top:1px solid var(--color-border-strong);padding:8px 16px;font-size:12px;color:var(--color-text-faint);text-align:center;}
+.mockbar b{color:var(--color-lime);}
+
+/* ── simplified fixed nav, matches ds-nav so the back-button clearance fix is visible ── */
+.ds-nav{position:fixed;top:0;left:0;right:0;z-index:100;background:rgba(14,14,14,.86);backdrop-filter:blur(10px);border-bottom:1px solid var(--color-border);}
+.ds-nav-inner{max-width:var(--max-w);margin:0 auto;min-height:64px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 var(--gutter);}
+.ds-nav-brand{display:flex;align-items:center;gap:10px;}
+.ds-nav-brand .logo{width:34px;height:34px;border-radius:9px;background:var(--color-lime);color:var(--color-text-inverse);display:grid;place-items:center;font-weight:900;font-size:18px;}
+.ds-nav-brand strong{font-size:14px;font-weight:900;letter-spacing:.02em;display:block;line-height:1;}
+.ds-nav-brand small{font-size:9px;letter-spacing:.18em;text-transform:uppercase;color:var(--color-text-faint);}
+.ds-nav-links{display:flex;gap:4px;}
+.ds-nav-links a{font-size:13px;font-weight:700;color:var(--color-text-muted);text-decoration:none;padding:8px 12px;border-radius:8px;}
+.ds-nav-links a.on{background:var(--color-lime-dim);color:var(--color-lime);}
+.ds-nav-cta{font-size:13px;font-weight:800;color:var(--color-text);}
+@media(max-width:900px){.ds-nav-links{display:none;}}
+
+/* ════════════════════════════════════════════════════════════════
+   THE DROP — redesigned. Scoped under #drop.
+   ════════════════════════════════════════════════════════════════ */
+#drop a{color:inherit;}
+#drop .wrap{max-width:1040px;margin:0 auto;padding:0 var(--gutter);}
+
+/* CHANGE 1 — crumbs clear the fixed 64px nav (was padding:18px → overlapped). */
+#drop .crumbs{max-width:1040px;margin:0 auto;padding:88px var(--gutter) 0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+#drop .crumbs a.back{font-size:13px;font-weight:700;color:var(--color-text-muted);text-decoration:none;}
+#drop .crumbs a.back:hover{color:var(--color-text);}
+#drop .weekpick{display:flex;gap:6px;flex-wrap:wrap;}
+#drop .weekpick a{font-size:12px;font-weight:800;width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px solid var(--color-border);color:var(--color-text-faint);text-decoration:none;}
+#drop .weekpick a.on{background:var(--color-lime);color:var(--color-text-inverse);border-color:var(--color-lime);}
+
+/* masthead — CHANGE 2: no "THE WEEKLY WORD" eyebrow, CHANGE 3: no italic tagline. */
+#drop .masthead{text-align:center;padding:30px 0 26px;border-bottom:1px solid var(--color-border);background:radial-gradient(900px 320px at 50% -30%,var(--color-lime-ghost),transparent 60%);}
+#drop .masthead h1{font-family:var(--serif);font-weight:600;font-size:clamp(3rem,2rem+5vw,5.4rem);line-height:.9;letter-spacing:-.02em;margin:0 0 14px;}
+#drop .masthead h1 .lime{color:var(--color-lime);}
+#drop .masthead .meta{font-size:13px;color:var(--color-text-muted);font-weight:500;display:flex;gap:9px;justify-content:center;align-items:center;flex-wrap:wrap;}
+#drop .masthead .meta .dot{color:var(--color-text-faint);}
+
+/* lead — now single column (rail content moved to full-width Honors band) */
+#drop .lead{max-width:760px;margin:0 auto;padding:40px 0 30px;}
+#drop .kicker{display:inline-block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--color-lime);border:1px solid var(--color-lime-active);padding:4px 11px;border-radius:999px;margin-bottom:16px;}
+#drop .lead h2{font-family:var(--serif);font-weight:600;font-size:clamp(1.9rem,1.4rem+1.6vw,2.7rem);line-height:1.08;letter-spacing:-.015em;margin:0 0 14px;}
+#drop .lead .dek{font-size:18px;color:var(--color-text-muted);margin-bottom:20px;line-height:1.5;}
+#drop .byline{display:flex;align-items:center;gap:12px;padding-bottom:24px;margin-bottom:24px;border-bottom:1px solid var(--color-border);font-size:13px;color:var(--color-text-faint);}
+#drop .byline .badge{width:34px;height:34px;border-radius:8px;background:var(--color-lime);color:var(--color-text-inverse);display:grid;place-items:center;font-family:var(--serif);font-weight:600;font-size:18px;}
+#drop .byline b{color:var(--color-text);font-weight:600;}
+#drop .lead .bodycopy{font-size:17px;color:var(--color-text);line-height:1.65;}
+#drop .lead .bodycopy p{margin:0 0 18px;}
+#drop .lead .bodycopy p:first-of-type::first-letter{font-family:var(--serif);font-weight:600;font-size:3.1em;line-height:.72;float:left;padding:6px 10px 0 0;color:var(--color-lime);}
+
+/* ── CHANGE 4: full-width "This Week's Honors" band, home-matched cards ── */
+#drop .honors{border-top:1px solid var(--color-border);border-bottom:1px solid var(--color-border);background:linear-gradient(180deg,var(--color-surface),var(--color-bg));padding:34px 0 40px;margin:10px 0 0;}
+#drop .honors__in{max-width:1040px;margin:0 auto;padding:0 var(--gutter);}
+#drop .honors__head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px;}
+#drop .honors__head .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--color-lime);}
+#drop .honors__head .eyebrow::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--color-lime);box-shadow:0 0 10px var(--color-lime);}
+#drop .blocklbl{display:flex;align-items:center;gap:10px;margin:26px 0 12px;}
+#drop .blocklbl h3{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text);}
+#drop .blocklbl .rule{flex:1;height:1px;background:var(--color-border);}
+#drop .blocklbl .more{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--color-lime);text-decoration:none;white-space:nowrap;}
+#drop .blocklbl .kchn{background:#000;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:4px 10px;font-size:12px;font-weight:900;font-style:italic;color:var(--kchn-gold);letter-spacing:.05em;}
+
+/* POTW cards — copied from home #recap .pcard so it looks/feels identical */
+#drop .potw__cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch;}
+@media(max-width:680px){#drop .potw__cards{grid-template-columns:1fr;}}
+#drop .pcard{position:relative;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:linear-gradient(160deg,var(--color-surface),var(--color-bg));padding:16px 16px 15px;overflow:hidden;}
+#drop .pcard::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;}
+#drop .pcard.m::before{background:var(--color-lime);}
+#drop .pcard.f::before{background:var(--color-teal);}
+#drop .pcard__badge{position:absolute;top:13px;right:13px;font-size:9px;font-weight:900;font-style:italic;color:var(--kchn-gold);background:#000;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:3px 7px;}
+#drop .pcard__cat{font-size:8.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);}
+#drop .pcard__row{display:flex;align-items:center;gap:12px;margin:11px 0 14px;}
+#drop .pav{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;flex-shrink:0;background:var(--color-surface-2);}
+#drop .pcard.m .pav{border:2px solid var(--color-lime);color:var(--color-lime);}
+#drop .pcard.f .pav{border:2px solid var(--color-teal);color:var(--color-teal);}
+#drop .pcard__name{font-size:16px;font-weight:900;text-transform:uppercase;letter-spacing:-.01em;line-height:1.05;color:var(--color-text);}
+#drop .pcard__team{font-size:11px;color:var(--color-text-muted);margin-top:3px;}
+#drop .pcard__stats{margin-top:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;border-top:1px solid var(--color-divider);padding-top:12px;}
+#drop .pcard__stats .l{font-size:8px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:3px;}
+#drop .pcard__stats .v{font-size:16px;font-weight:900;line-height:1;color:var(--color-text);}
+#drop .pcard.m .v.hot{color:var(--color-lime);}
+#drop .pcard.f .v.hot{color:var(--color-teal);}
+
+/* Team of the Week — small companion card */
+#drop .totw{display:flex;align-items:center;gap:14px;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:16px;margin-top:14px;}
+#drop .totw .crest{width:52px;height:52px;border-radius:13px;flex:none;background:var(--color-lime);display:grid;place-items:center;font-family:var(--serif);font-weight:600;font-size:21px;color:var(--color-text-inverse);}
+#drop .totw .nm{font-weight:900;font-size:16px;text-transform:uppercase;letter-spacing:-.01em;}
+#drop .totw .rec{font-size:13px;color:var(--color-lime-active);font-weight:800;margin-top:2px;}
+#drop .totw .note{font-size:12.5px;color:var(--color-text-muted);margin-top:3px;}
+
+/* Top Performers — home-style two-column top-3 lists (DSR / Diff / Wins variants) */
+#drop .perf__cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:680px){#drop .perf__cols{grid-template-columns:1fr;}}
+#drop .perf-col{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:14px 14px 8px;}
+#drop .perf-col h4{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 4px;}
+#drop .prow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--color-divider);}
+#drop .prow:first-of-type{border-top:none;}
+#drop .prk{font-size:12px;font-weight:900;color:var(--color-text-faint);width:14px;flex-shrink:0;}
+#drop .prow.lead .prk{color:var(--color-gold);}
+#drop .pinfo{min-width:0;flex:1;}
+#drop .pnm{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--color-text);}
+#drop .ptm{font-size:10px;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#drop .pval{margin-left:auto;font-size:15px;font-weight:900;flex-shrink:0;}
+#drop .perf-col.m .pval{color:var(--color-lime);}
+#drop .perf-col.f .pval{color:var(--color-teal);}
+
+/* Top Climbers — biggest DSR rank jumps */
+#drop .climbers{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+@media(max-width:680px){#drop .climbers{grid-template-columns:1fr;}}
+#drop .climb{display:flex;align-items:center;gap:13px;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:linear-gradient(160deg,var(--color-surface),var(--color-bg));padding:14px;position:relative;overflow:hidden;}
+#drop .climb::before{content:'';position:absolute;inset:0 auto 0 0;width:3px;background:var(--color-teal);}
+#drop .climb .cav{width:42px;height:42px;border-radius:50%;flex:none;background:var(--color-surface-2);border:2px solid var(--color-teal);color:var(--color-teal);display:grid;place-items:center;font-weight:900;font-size:14px;}
+#drop .climb .cnm{font-weight:900;font-size:14px;text-transform:uppercase;letter-spacing:-.01em;line-height:1.05;}
+#drop .climb .ctm{font-size:11px;color:var(--color-text-muted);margin-top:2px;}
+#drop .climb .cjump{margin-left:auto;text-align:right;flex:none;}
+#drop .climb .cdelta{font-size:18px;font-weight:900;color:var(--color-teal);line-height:1;}
+#drop .climb .cdelta::before{content:'▲ ';font-size:12px;}
+#drop .climb .crank{font-size:10px;color:var(--color-text-faint);font-weight:700;margin-top:3px;white-space:nowrap;}
+
+/* around the league */
+#drop .sec-head{display:flex;align-items:baseline;gap:14px;margin:44px 0 4px;}
+#drop .sec-head h3{font-family:var(--serif);font-size:14px;letter-spacing:.04em;font-weight:600;text-transform:uppercase;color:var(--color-text);}
+#drop .sec-head .rule{flex:1;height:1px;background:var(--color-border);}
+#drop .sec-head .count{font-size:12px;color:var(--color-text-faint);font-weight:700;}
+#drop .leaguegrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0 6px;}
+@media(max-width:680px){#drop .leaguegrid{grid-template-columns:1fr;}}
+#drop .teamrep{border:1px solid var(--color-border);border-left:3px solid var(--color-lime);border-radius:var(--radius-sm);background:var(--color-surface);padding:13px 15px;}
+#drop .teamrep__nm{font-family:var(--serif);font-weight:600;font-size:17px;margin-bottom:5px;}
+#drop .teamrep__bl{font-size:14px;line-height:1.55;color:var(--color-text-muted);}
+#drop .teamrep__bl .ds-ent{color:var(--color-lime);}
+
+/* storylines */
+#drop .story{display:grid;grid-template-columns:40px 1fr;gap:18px;padding:24px 0;border-bottom:1px solid var(--color-border);}
+#drop .story .num{font-family:var(--serif);font-size:28px;font-weight:600;color:var(--color-text-faint);line-height:1;}
+#drop .story .skicker{display:inline-block;font-size:11px;letter-spacing:.16em;text-transform:uppercase;font-weight:800;color:var(--color-lime);border:1px solid var(--color-lime-active);padding:4px 11px;border-radius:999px;margin-bottom:10px;}
+#drop .story h4{font-family:var(--serif);font-size:23px;font-weight:600;line-height:1.15;margin:0 0 8px;letter-spacing:-.01em;}
+#drop .story .bodycopy{color:var(--color-text-muted);font-size:15.5px;line-height:1.6;}
+#drop .chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+#drop .chip{font-size:12px;color:var(--color-text-muted);background:var(--color-surface-2);border:1px solid var(--color-border);padding:3px 10px;border-radius:999px;}
+#drop .chip b{color:var(--color-text);}
+
+/* tease */
+#drop .tease{border-top:1px solid var(--color-border);margin-top:30px;padding:38px 0 0;text-align:center;}
+#drop .tease .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--color-lime);justify-content:center;}
+#drop .tease .eyebrow::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--color-lime);box-shadow:0 0 10px var(--color-lime);}
+#drop .tease h3{font-family:var(--serif);font-size:25px;font-weight:600;margin:6px 0 8px;}
+#drop .tease p{color:var(--color-text-muted);max-width:520px;margin:0 auto 20px;}
+#drop .cta{display:inline-block;background:var(--color-lime);color:var(--color-text-inverse);font-weight:800;font-size:14px;text-decoration:none;padding:12px 26px;border-radius:10px;}
+#drop section.pad{padding-bottom:90px;}
+</style>
+</head>
+<body>
+
+<!-- simplified fixed nav (for clearance demo) -->
+<header class="ds-nav">
+  <div class="ds-nav-inner">
+    <div class="ds-nav-brand">
+      <div class="logo">D</div>
+      <div><strong>THE DINK SOCIETY</strong><small>Season 1</small></div>
+    </div>
+    <nav class="ds-nav-links">
+      <a href="#">Home</a><a href="#" class="on">The Drop</a><a href="#">Schedule</a>
+      <a href="#">Standings</a><a href="#">Leaderboard</a><a href="#">Teams</a><a href="#">Rules</a>
+    </nav>
+    <span class="ds-nav-cta">Player Login</span>
+  </div>
+</header>
+
+<main id="drop">
+
+  <div class="note"><b>FIX —</b> Back button / week picker now sit <b>88px</b> below the top so they clear the fixed 64px nav (was 18px → overlapping).</div>
+
+  <div class="crumbs">
+    <a class="back" href="#">← Weekly Recap</a>
+    <nav class="weekpick"><a class="on" href="#">1</a></nav>
+  </div>
+
+  <!-- MASTHEAD: eyebrow + tagline REMOVED -->
+  <header class="masthead">
+    <h1>The <span class="lime">Drop</span></h1>
+    <div class="meta"><span>The Drop · Week 1</span><span class="dot">·</span><span>Thursday, June 11, 2026</span><span class="dot">·</span><span>2 min read</span></div>
+  </header>
+  <div class="note"><b>REMOVED —</b> the &ldquo;&#9679; THE WEEKLY WORD&rdquo; eyebrow and the italic line &ldquo;The storylines, players, and teams that mattered this week.&rdquo;</div>
+
+  <!-- LEAD (single column) -->
+  <article class="lead">
+    <span class="kicker">The Lead</span>
+    <h2>Week One: Smash Society Opens With a Statement, and the K'CHN Gets Loud</h2>
+    <p class="dek">Two perfect sweeps, one gritty upset, and a 1-for-11 night that still found its silver lining — Season 1 is officially on.</p>
+    <div class="byline"><div class="badge">D</div><div>By <b>The Society Desk</b> · Dink Society editorial</div></div>
+    <div class="bodycopy">
+      <p>If you blinked during Smash Society's opener, you missed the whole thing. They ran Timog Cal off the courts 4–0 and finished the night 11 games to 1 — the kind of margin that makes a scoreboard operator check the batteries.</p>
+      <p>But Smash isn't alone at the summit. K'CHN answered with a 4–0 sweep of their own over What the Dink?!, riding a perfect night from Katrina Nicasio to sit second only on game differential. Two undefeated teams, zero margin for error — and they meet head-to-head in Week 2.</p>
+    </div>
+  </article>
+
+  <div class="note"><b>NEW BAND —</b> full-width &ldquo;This Week's Honors&rdquo; replaces the cramped right rail. POTW cards now match the home page exactly; Top Performers + Top Climbers added below.</div>
+
+  <!-- ════ THIS WEEK'S HONORS (full-width band) ════ -->
+  <section class="honors">
+    <div class="honors__in">
+
+      <div class="honors__head">
+        <span class="eyebrow">This Week's Honors</span>
+      </div>
+
+      <!-- POTW — redesigned to match home #recap pcards -->
+      <div class="blocklbl">
+        <span class="kchn">K'CHN</span>
+        <h3>Players of the Week</h3>
+        <span class="rule"></span>
+      </div>
+      <div class="potw__cards">
+        <div class="pcard m">
+          <div class="pcard__badge">K'CHN</div>
+          <div class="pcard__cat">Male · POTW</div>
+          <div class="pcard__row">
+            <div class="pav">DC</div>
+            <div><div class="pcard__name">Devin C.</div><div class="pcard__team">Smash Society</div></div>
+          </div>
+          <div class="pcard__stats">
+            <div><div class="l">Rec</div><div class="v hot">4–0</div></div>
+            <div><div class="l">PS</div><div class="v">44</div></div>
+            <div><div class="l">Diff</div><div class="v">+31</div></div>
+            <div><div class="l">DSR</div><div class="v">93.1</div></div>
+          </div>
+        </div>
+        <div class="pcard f">
+          <div class="pcard__badge">K'CHN</div>
+          <div class="pcard__cat">Female · POTW</div>
+          <div class="pcard__row">
+            <div class="pav">AK</div>
+            <div><div class="pcard__name">Annie K.</div><div class="pcard__team">Smash Society</div></div>
+          </div>
+          <div class="pcard__stats">
+            <div><div class="l">Rec</div><div class="v hot">4–0</div></div>
+            <div><div class="l">PS</div><div class="v">44</div></div>
+            <div><div class="l">Diff</div><div class="v">+35</div></div>
+            <div><div class="l">DSR</div><div class="v">96.4</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Team of the Week -->
+      <div class="totw">
+        <div class="crest">SS</div>
+        <div><div class="nm">Smash Society — Team of the Week</div><div class="rec">4–0 · 11–1 games</div><div class="note">Opened the season with the league's loudest statement.</div></div>
+      </div>
+
+      <!-- ════ TOP PERFORMERS — 3 RANKING VARIANTS TO CHOOSE FROM ════ -->
+      <div class="note" style="margin-top:30px"><b>PICK ONE —</b> three ways to rank &ldquo;Top Performers of the Week.&rdquo; Variants <b>A / B / C</b> below. The final build ships just the one you choose.</div>
+
+      <!-- Variant A: DSR (mirrors home page) -->
+      <div class="blocklbl">
+        <h3>Top Performers · <span style="color:var(--color-lime)">Variant A — DSR</span></h3>
+        <span class="rule"></span>
+        <a class="more" href="#">Leaderboard →</a>
+      </div>
+      <div class="perf__cols">
+        <div class="perf-col m">
+          <h4>Men · Top 3</h4>
+          <div class="prow lead"><span class="prk">1</span><div class="pinfo"><div class="pnm">Devin C.</div><div class="ptm">Smash Society · 4–0</div></div><span class="pval">93.1</span></div>
+          <div class="prow"><span class="prk">2</span><div class="pinfo"><div class="pnm">Marco T.</div><div class="ptm">K'CHN · 4–0</div></div><span class="pval">91.8</span></div>
+          <div class="prow"><span class="prk">3</span><div class="pinfo"><div class="pnm">Shay C.</div><div class="ptm">ZERO ZERO TWO · 4–0</div></div><span class="pval">90.2</span></div>
+        </div>
+        <div class="perf-col f">
+          <h4>Women · Top 3</h4>
+          <div class="prow lead"><span class="prk">1</span><div class="pinfo"><div class="pnm">Annie K.</div><div class="ptm">Smash Society · 4–0</div></div><span class="pval">96.4</span></div>
+          <div class="prow"><span class="prk">2</span><div class="pinfo"><div class="pnm">Shay C.</div><div class="ptm">ZERO ZERO TWO · 4–0</div></div><span class="pval">95.7</span></div>
+          <div class="prow"><span class="prk">3</span><div class="pinfo"><div class="pnm">Katrina N.</div><div class="ptm">K'CHN · 4–0</div></div><span class="pval">94.1</span></div>
+        </div>
+      </div>
+
+      <!-- Variant B: Game differential -->
+      <div class="blocklbl">
+        <h3>Top Performers · <span style="color:var(--color-lime)">Variant B — Best Differential</span></h3>
+        <span class="rule"></span>
+        <a class="more" href="#">Leaderboard →</a>
+      </div>
+      <div class="perf__cols">
+        <div class="perf-col m">
+          <h4>Men · Top 3</h4>
+          <div class="prow lead"><span class="prk">1</span><div class="pinfo"><div class="pnm">Shay C.</div><div class="ptm">ZERO ZERO TWO · 4–0</div></div><span class="pval">+35</span></div>
+          <div class="prow"><span class="prk">2</span><div class="pinfo"><div class="pnm">Devin C.</div><div class="ptm">Smash Society · 4–0</div></div><span class="pval">+31</span></div>
+          <div class="prow"><span class="prk">3</span><div class="pinfo"><div class="pnm">Marco T.</div><div class="ptm">K'CHN · 4–0</div></div><span class="pval">+28</span></div>
+        </div>
+        <div class="perf-col f">
+          <h4>Women · Top 3</h4>
+          <div class="prow lead"><span class="prk">1</span><div class="pinfo"><div class="pnm">Annie K.</div><div class="ptm">Smash Society · 4–0</div></div><span class="pval">+35</span></div>
+          <div class="prow"><span class="prk">2</span><div class="pinfo"><div class="pnm">Shay C.</div><div class="ptm">ZERO ZERO TWO · 4–0</div></div><span class="pval">+35</span></div>
+          <div class="prow"><span class="prk">3</span><div class="pinfo"><div class="pnm">Katrina N.</div><div class="ptm">K'CHN · 4–0</div></div><span class="pval">+23</span></div>
+        </div>
+      </div>
+
+      <!-- Variant C: Most wins -->
+      <div class="blocklbl">
+        <h3>Top Performers · <span style="color:var(--color-lime)">Variant C — Most Wins</span></h3>
+        <span class="rule"></span>
+        <a class="more" href="#">Leaderboard →</a>
+      </div>
+      <div class="perf__cols">
+        <div class="perf-col m">
+          <h4>Men · Top 3</h4>
+          <div class="prow lead"><span class="prk">1</span><div class="pinfo"><div class="pnm">Devin C.</div><div class="ptm">Smash Society · +31</div></div><span class="pval">4–0</span></div>
+          <div class="prow"><span class="prk">2</span><div class="pinfo"><div class="pnm">Shay C.</div><div class="ptm">ZERO ZERO TWO · +35</div></div><span class="pval">4–0</span></div>
+          <div class="prow"><span class="prk">3</span><div class="pinfo"><div class="pnm">Marco T.</div><div class="ptm">K'CHN · +28</div></div><span class="pval">4–0</span></div>
+        </div>
+        <div class="perf-col f">
+          <h4>Women · Top 3</h4>
+          <div class="prow lead"><span class="prk">1</span><div class="pinfo"><div class="pnm">Annie K.</div><div class="ptm">Smash Society · +35</div></div><span class="pval">4–0</span></div>
+          <div class="prow"><span class="prk">2</span><div class="pinfo"><div class="pnm">Katrina N.</div><div class="ptm">K'CHN · +23</div></div><span class="pval">4–0</span></div>
+          <div class="prow"><span class="prk">3</span><div class="pinfo"><div class="pnm">Shay C.</div><div class="ptm">ZERO ZERO TWO · +35</div></div><span class="pval">4–0</span></div>
+        </div>
+      </div>
+
+      <!-- ════ TOP CLIMBERS — biggest DSR rank jumps ════ -->
+      <div class="blocklbl">
+        <h3>Top Climbers</h3>
+        <span class="rule"></span>
+        <span style="font-size:11px;color:var(--color-text-faint);font-weight:700;">Biggest DSR rank jumps</span>
+      </div>
+      <div class="climbers">
+        <div class="climb">
+          <div class="cav">SC</div>
+          <div><div class="cnm">Shay C.</div><div class="ctm">ZERO ZERO TWO</div></div>
+          <div class="cjump"><div class="cdelta">14</div><div class="crank">#41 → #27</div></div>
+        </div>
+        <div class="climb">
+          <div class="cav">MT</div>
+          <div><div class="cnm">Marco T.</div><div class="ctm">K'CHN</div></div>
+          <div class="cjump"><div class="cdelta">9</div><div class="crank">#22 → #13</div></div>
+        </div>
+        <div class="climb">
+          <div class="cav">KN</div>
+          <div><div class="cnm">Katrina N.</div><div class="ctm">K'CHN</div></div>
+          <div class="cjump"><div class="cdelta">7</div><div class="crank">#19 → #12</div></div>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <div class="wrap">
+    <!-- AROUND THE LEAGUE (kept) -->
+    <div class="sec-head"><h3>Around the League</h3><span class="rule"></span><span class="count">6 teams</span></div>
+    <div class="leaguegrid">
+      <div class="teamrep"><div class="teamrep__nm">Smash Society</div><div class="teamrep__bl">Annie Kang's 4–0 anchored an 11–1 night. <span class="ds-ent">+18 weekly bonus.</span></div></div>
+      <div class="teamrep"><div class="teamrep__nm">K'CHN</div><div class="teamrep__bl">Katrina Nicasio's perfect debut led a deeper, balanced sweep. <span class="ds-ent">Second on differential.</span></div></div>
+    </div>
+
+    <!-- STORYLINES (kept) -->
+    <div class="sec-head"><h3>Also This Week</h3><span class="rule"></span><span class="count">2 storylines</span></div>
+    <article class="story"><div class="num">02</div><div>
+      <span class="skicker">Collision Course</span>
+      <h4>Two Sweepers, One Survivor — Smash vs. K'CHN in Week 2</h4>
+      <div class="bodycopy">Both Smash Society and K'CHN opened with identical 4–0 sweeps and matching unbeaten records, and the schedule has wasted no time pitting them against each other in Week 2. Someone's flawless start ends next week.</div>
+      <div class="chips"><span class="chip">Smash Record <b>4–0</b></span><span class="chip">K'CHN Record <b>4–0</b></span><span class="chip">Meeting <b>Week 2</b></span></div>
+    </div></article>
+    <article class="story"><div class="num">03</div><div>
+      <span class="skicker">Photo Finish</span>
+      <h4>The Closest Race in the League Was at the Very Top</h4>
+      <div class="bodycopy">The tightest margin of Week 1 wasn't in the standings — it was on the DSR leaderboard. Annie Kang topped the women's chart at 96.4, edging Shay C. at 95.7 by a sliver of seven-tenths.</div>
+      <div class="chips"><span class="chip">Kang DSR <b>96.4</b></span><span class="chip">Margin <b>0.7</b></span><span class="chip">Both <b>+35 diff</b></span></div>
+    </div></article>
+
+    <!-- TEASE -->
+    <section class="pad">
+    <div class="tease"><div class="eyebrow">Next Drop · Tuesday</div><h3>The week after never waits</h3>
+      <p>New results, new storylines. We'll have the word the morning after game night.</p>
+      <a class="cta" href="#">Back to Weekly Recap</a>
+    </div>
+    </section>
+  </div>
+
+</main>
+
+<div class="mockbar">MOCKUP — <b>The Drop</b> redesign · green callout boxes are annotations only and won't ship · Top Performers shows 3 variants (A/B/C) to choose from</div>
+
+</body>
+</html>

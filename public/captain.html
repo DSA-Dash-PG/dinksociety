@@ -960,6 +960,30 @@
     <div class="ros-f" id="rp-email-w"><label>Email<span class="ros-req">*</span> <span style="text-transform:none;letter-spacing:0;font-weight:500;">(used for player sign-in)</span></label><input id="rp-email" type="email" placeholder="player@email.com"></div>
     <div class="ros-f"><label>Phone</label><input id="rp-phone" type="tel" placeholder="(555) 123-4567"></div>
     <div class="ros-err" id="rp-err"></div>
+
+    <!-- Profile details — gated behind admin approval -->
+    <div id="rp-profile-section" style="display:none;border-top:1px solid var(--color-border);margin-top:14px;padding-top:14px;">
+      <div style="font-size:11px;font-weight:800;letter-spacing:0.04em;text-transform:uppercase;color:var(--color-text-muted);margin-bottom:4px;">Profile details</div>
+      <div style="font-size:11px;color:var(--color-text-faint);margin-bottom:12px;line-height:1.45;">Photo &amp; the fields below need a league admin's approval before they show publicly.</div>
+      <div id="rp-pending-note" style="display:none;font-size:11px;font-weight:600;color:var(--color-gold);background:rgba(245,200,66,0.12);border:1px solid rgba(245,200,66,0.3);border-radius:var(--radius-sm);padding:8px 10px;margin-bottom:12px;">⏳ Edits awaiting admin approval.</div>
+
+      <div class="ros-f" style="display:flex;align-items:center;gap:12px;">
+        <div id="rp-photo-prev" style="width:60px;height:60px;border-radius:12px;overflow:hidden;flex-shrink:0;display:grid;place-items:center;background:var(--color-surface-3);border:1px solid var(--color-border);font-size:18px;font-weight:800;color:var(--color-lime);"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px;align-items:flex-start;">
+          <label class="cap-btn cap-btn--ghost" style="padding:7px 14px;">Choose photo<input type="file" id="rp-photo-file" accept="image/jpeg,image/png,image/webp" hidden></label>
+          <button class="cap-btn cap-btn--primary" id="rp-photo-btn" style="padding:7px 14px;" disabled>Upload photo</button>
+          <div class="cap-status" id="rp-photo-status" style="margin:0;"></div>
+        </div>
+      </div>
+
+      <div class="ros-f"><label>Height</label><input id="rp-height" type="text" maxlength="16" placeholder="e.g. 5'8&quot;"></div>
+      <div class="ros-f"><label>Date of birth <span style="text-transform:none;letter-spacing:0;font-weight:500;">(only age is shown publicly)</span></label><input id="rp-dob" type="date"></div>
+      <div class="ros-f"><label>Plays</label><select id="rp-plays"><option value="">—</option><option value="Right">Right</option><option value="Left">Left</option><option value="Both">Both</option></select></div>
+      <div class="ros-f"><label>City</label><input id="rp-city" type="text" maxlength="60"></div>
+      <div class="ros-f"><label>Home court</label><input id="rp-court" type="text" maxlength="80"></div>
+      <button class="cap-btn cap-btn--primary" id="rp-profile-save" style="width:100%;">Submit profile for approval</button>
+      <div class="cap-status" id="rp-profile-status" style="margin-top:8px;text-align:center;"></div>
+    </div>
     <div style="display: flex; gap: 9px; margin-top: 4px;">
       <button class="cap-btn cap-btn--ghost" id="rp-cancel" style="flex: 1;">Cancel</button>
       <button class="cap-btn cap-btn--primary" id="rp-save" style="flex: 1;">Save player</button>
@@ -3384,6 +3408,31 @@
       } else {
         ccBtn.style.display = 'none'; ccNote.style.display = 'none';
       }
+      // Profile details + photo — only for a saved player (needs an id to submit).
+      const profSec = $id('rp-profile-section');
+      if (p && p.id) {
+        profSec.style.display = '';
+        const bio = p.profile || {};
+        $id('rp-height').value = bio.height || '';
+        $id('rp-dob').value = bio.dob || '';
+        $id('rp-plays').value = bio.plays || '';
+        $id('rp-city').value = bio.city || '';
+        $id('rp-court').value = bio.homeCourt || '';
+        $id('rp-pending-note').style.display = p.pendingProfile ? '' : 'none';
+        const prev = $id('rp-photo-prev');
+        if (p.photo && p.photo.updatedAt) {
+          prev.innerHTML = `<img src="/.netlify/functions/player-photo-serve?id=${encodeURIComponent(p.id)}&v=${encodeURIComponent(p.photo.updatedAt)}" style="width:100%;height:100%;object-fit:cover;">`;
+        } else {
+          prev.textContent = (p.name || '?').replace(/[^A-Za-z ]/g,'').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0,2).toUpperCase();
+        }
+        $id('rp-photo-status').textContent = '';
+        $id('rp-profile-status').textContent = '';
+        $id('rp-photo-btn').disabled = true;
+        $id('rp-photo-file').value = '';
+        _rpPickedPhoto = null;
+      } else {
+        profSec.style.display = 'none';
+      }
       $id('rp-sheet').classList.add('is-open');
       $id('rp-scrim').classList.add('is-open');
     }
@@ -3493,6 +3542,58 @@
 
     $id('rp-cancel').addEventListener('click', closeRosterEditor);
     $id('rp-scrim').addEventListener('click', closeRosterEditor);
+
+    // ── Profile details (admin-approval gated) ──────────────────
+    let _rpPickedPhoto = null;
+    $id('rp-photo-file').addEventListener('change', (e) => {
+      _rpPickedPhoto = e.target.files && e.target.files[0];
+      $id('rp-photo-btn').disabled = !_rpPickedPhoto;
+      if (_rpPickedPhoto) $id('rp-photo-prev').innerHTML = `<img src="${URL.createObjectURL(_rpPickedPhoto)}" style="width:100%;height:100%;object-fit:cover;">`;
+    });
+    $id('rp-photo-btn').addEventListener('click', async () => {
+      if (_rpPickedPhoto == null || rpIdx == null) return;
+      const p = state.roster[rpIdx]; if (!p || !p.id) return;
+      const st = $id('rp-photo-status'), btn = $id('rp-photo-btn');
+      btn.disabled = true;
+      try {
+        st.className = 'cap-status'; st.textContent = 'Compressing…';
+        const f = await compressTeamPhoto(_rpPickedPhoto);
+        st.textContent = 'Uploading…';
+        const fd = new FormData();
+        fd.append('file', f); fd.append('playerId', p.id); fd.append('teamId', state.me.team.id);
+        const r = await fetch('/.netlify/functions/player-photo-upload', { method: 'POST', body: fd, credentials: 'include' });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Upload failed');
+        st.className = 'cap-status is-success';
+        st.textContent = d.status === 'live' ? 'Photo updated!' : '⏳ Sent for admin approval.';
+        $id('rp-pending-note').style.display = '';
+      } catch (e) { st.className = 'cap-status is-err'; st.textContent = e.message; btn.disabled = false; }
+    });
+    $id('rp-profile-save').addEventListener('click', async () => {
+      if (rpIdx == null) return;
+      const p = state.roster[rpIdx]; if (!p || !p.id) return;
+      const btn = $id('rp-profile-save'), st = $id('rp-profile-status');
+      if (!btnBusy(btn, 'Submitting…')) return;
+      const profile = {
+        height: $id('rp-height').value.trim(),
+        dob: $id('rp-dob').value.trim(),
+        plays: $id('rp-plays').value,
+        city: $id('rp-city').value.trim(),
+        homeCourt: $id('rp-court').value.trim(),
+      };
+      try {
+        const r = await fetch('/.netlify/functions/player-profile', {
+          method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId: p.id, teamId: state.me.team.id, profile }),
+        });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Save failed');
+        st.className = 'cap-status is-success';
+        st.textContent = d.status === 'live' ? 'Saved!' : '⏳ Submitted for admin approval.';
+        $id('rp-pending-note').style.display = d.status === 'live' ? 'none' : '';
+      } catch (e) { st.className = 'cap-status is-err'; st.textContent = e.message; }
+      finally { btnDone(btn); }
+    });
 
     // ── Transfer request modal ──────────────────────────────────
     let xferModal = null;

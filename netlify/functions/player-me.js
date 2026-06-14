@@ -257,6 +257,12 @@ export default async (req) => {
       teamId, teamName: team.name, teamEmoji: team.emoji || null,
       division, divisionLabel: team.divisionLabel || division, circuit,
       isCaptain, isCoCaptain, isAdmin,
+      // Owner-only: the player's own bio fields (incl. DOB), any pending edit
+      // awaiting admin approval, and whether an approved photo exists.
+      bio: player.profile || {},
+      pendingProfile: player.pendingProfile || null,
+      hasPhoto: !!(player.photo && player.photo.updatedAt),
+      photoUpdatedAt: player.photo?.updatedAt || null,
     },
     myTeams,
     currentTeamId: teamId,

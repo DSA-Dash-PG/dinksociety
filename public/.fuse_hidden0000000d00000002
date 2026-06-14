@@ -1,0 +1,798 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Standings &middot; The Dink Society</title>
+  <meta name="description" content="Division standings for The Dink Society pickleball league." />
+  <!-- Open Graph / social preview -->
+  <meta property="og:title" content="Standings · The Dink Society" />
+  <meta property="og:description" content="Division standings for The Dink Society pickleball league." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="The Dink Society" />
+  <meta property="og:url" content="https://dinksociety.netlify.app/standings" />
+  <meta property="og:image" content="https://dinksociety.netlify.app/img/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Standings · The Dink Society" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Standings · The Dink Society" />
+  <meta name="twitter:description" content="Division standings for The Dink Society pickleball league." />
+  <meta name="twitter:image" content="https://dinksociety.netlify.app/img/og-image.png" />
+
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .stand-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+
+    /* Tabs */
+    .div-tabs { display: flex; gap: 3px; margin-bottom: var(--space-4); flex-wrap: wrap; }
+    .div-tab {
+      padding: 8px 16px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700;
+      border: 1px solid var(--color-border); background: transparent; color: var(--color-text-faint);
+      cursor: pointer; transition: all var(--transition); font-family: inherit;
+    }
+    .div-tab:hover  { color: var(--color-text); background: var(--color-surface-2); }
+    .div-tab.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+
+    /* Pre-season banner */
+    .preseason-banner {
+      background: var(--color-lime-ghost); border: 1px solid var(--color-lime-dim);
+      border-radius: var(--radius-md); padding: 12px var(--space-5);
+      display: flex; align-items: center; gap: var(--space-3);
+      margin-bottom: var(--space-4); font-size: 13px; font-weight: 600;
+    }
+    .preseason-banner__dot {
+      width: 8px; height: 8px; border-radius: 50%; background: var(--color-lime);
+      flex-shrink: 0; box-shadow: 0 0 0 3px var(--color-lime-dim);
+    }
+    .preseason-banner__label { color: var(--color-lime); flex: 1; }
+    .preseason-banner__note  { color: var(--color-text-faint); font-weight: 400; font-size: 12px; }
+
+    /* Cards */
+    .stand-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); overflow: hidden; margin-bottom: var(--space-4);
+    }
+    .stand-card__hd {
+      padding: var(--space-5) var(--space-5) 0;
+      display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
+    }
+    .stand-card__title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin: 0; }
+    .stand-card__sub   { font-size: 11px; color: var(--color-text-faint); }
+    .stand-card__updated { font-size: 10px; color: var(--color-text-faint); margin-left: auto; }
+
+    /* Table wrapper */
+    .stand-table-wrap { overflow-x: auto; padding: var(--space-4) 0 0; }
+    .stand-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+    .stand-table th {
+      text-align: right; padding: 6px 8px; font-size: 9px;
+      letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-faint);
+      font-weight: 700; border-bottom: 1px solid var(--color-border-strong);
+    }
+    .stand-table th:first-child, .stand-table th.col-team { text-align: left; }
+    .stand-table td { padding: 10px 8px; border-bottom: 1px solid var(--color-border); text-align: right; }
+    .stand-table td:first-child, .stand-table td.col-team { text-align: left; }
+    .stand-table tr:last-child td { border-bottom: none; }
+    .stand-table tbody tr:hover td { background: var(--color-surface-2); }
+
+    /* Rank */
+    .col-rank { width: 36px; color: var(--color-text-faint); font-weight: 800; font-size: 12px; }
+    .col-rank--1 { color: #f0c040; }
+    .col-rank--2 { color: #c0c8d0; }
+    .col-rank--3 { color: #cd7f32; }
+    .stand-row--leader td { background: var(--color-lime-ghost); }
+
+    /* Team cell */
+    .col-team { min-width: 160px; }
+    .team-cell  { display: flex; align-items: center; gap: 8px; }
+    .team-emoji { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+    .team-name  { font-weight: 800; font-style: italic; text-transform: uppercase; color: var(--color-text); }
+    a.team-name-link { color: inherit; text-decoration: none; cursor: pointer; }
+    a.team-name-link:hover { color: var(--color-lime); text-decoration: underline; }
+    .team-badge {
+      display: inline-flex; align-items: center;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 2px 7px; border-radius: var(--radius-full); white-space: nowrap; flex-shrink: 0;
+    }
+    .team-badge--clinched   { background: var(--color-lime-dim);  color: var(--color-lime); }
+    .team-badge--eliminated { background: var(--color-red-dim);   color: var(--color-red); }
+    .team-badge--inhunt     { background: var(--color-gold-dim);  color: var(--color-gold); }
+
+    /* Week filter chips + snapshot note + rivalry banner */
+    .wk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
+    .wk-chip { border: 1px solid var(--color-border-strong, rgba(255,255,255,0.16)); background: none; border-radius: var(--radius-full); padding: 5px 13px; font-size: 12px; color: var(--color-text-muted); cursor: pointer; font-family: inherit; transition: border-color 0.15s ease; }
+    .wk-chip:hover:not(:disabled) { border-color: var(--color-text-muted); }
+    .wk-chip.is-active { background: var(--color-lime); color: #0e0e0e; border-color: var(--color-lime); font-weight: 700; }
+    .wk-chip.is-rivalry { border-color: rgba(240,192,64,0.5); color: var(--color-gold); }
+    .wk-chip.is-rivalry.is-active { background: var(--color-gold); color: #0e0e0e; border-color: var(--color-gold); }
+    .wk-chip:disabled { opacity: 0.35; cursor: default; }
+    .wk-note { font-size: 11px; color: var(--color-text-muted); margin: 0 2px 10px; }
+    .wk-note b { color: var(--color-text); }
+    .rivalry-banner { display: inline-flex; background: var(--color-gold-dim); color: var(--color-gold); border-radius: var(--radius-full); padding: 5px 14px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 12px; }
+
+    /* Stat cells */
+    .col-pts       { font-weight: 800; font-size: 15px; color: var(--color-lime); }
+    .col-pts--zero { color: var(--color-text-faint); }
+    /* Team DSR column */
+    .col-dsr-h { text-align: right; }
+    .col-dsr   { text-align: right; }
+    .dsr-chip  { display: inline-block; background: var(--color-teal); color: var(--color-text-inverse); font-weight: 800; font-size: 12px; padding: 3px 9px; border-radius: var(--radius-full); font-variant-numeric: tabular-nums; }
+    .col-diff-pos  { color: var(--color-teal); font-weight: 600; }
+    .col-diff-neg  { color: var(--color-red);  font-weight: 600; }
+    .col-muted     { color: var(--color-text-faint); }
+
+    /* Playoff cutline */
+    .cutline-row td { padding: 0 8px !important; border-bottom: none !important; }
+    .cutline-inner {
+      border-top: 2px dashed rgba(255,255,255,0.18);
+      display: flex; align-items: center; gap: 8px; padding: 5px 0 3px;
+      font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--color-text-faint);
+    }
+
+    /* Points note */
+    .pts-note {
+      padding: var(--space-4) var(--space-5);
+      font-size: 11px; color: var(--color-text-faint);
+      border-top: 1px solid var(--color-border);
+      display: flex; flex-wrap: wrap; gap: 6px 16px;
+    }
+    .pts-note strong { color: var(--color-text-muted); }
+
+    /* Optional columns */
+    .col-opt { }
+    /* On narrow screens keep every column but shrink the type and let the table
+       scroll sideways inside .stand-table-wrap (overflow-x:auto) instead of
+       hiding the optional columns. */
+    @media (max-width: 800px) { .stand-table { font-size: 11px; } .stand-table th, .stand-table td { padding: 8px 6px; } }
+    @media (max-width: 560px) { .stand-table { font-size: 10.5px; } .stand-table th, .stand-table td { padding: 7px 5px; } .team-emoji { display: none; } }
+
+    /* Legend */
+    .legend-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4);
+    }
+    .legend-title {
+      font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--color-text-faint); margin: 0 0 var(--space-4);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .legend-title::before { content: ''; display: block; width: 12px; height: 1px; background: var(--color-border-strong); }
+    .legend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 5px 20px; }
+    .legend-item { font-size: 12px; color: var(--color-text-muted); }
+    .legend-item abbr { font-weight: 800; color: var(--color-text); text-decoration: none; font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+    .legend-divider { grid-column: 1 / -1; border: none; border-top: 1px solid var(--color-border); margin: 4px 0; }
+    .legend-badges { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 20px; margin-top: 2px; }
+    .legend-badge-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); }
+    .legend-tiebreak {
+      grid-column: 1 / -1; margin-top: 6px; padding: 10px 14px;
+      background: var(--color-surface-2); border-radius: var(--radius-sm);
+      font-size: 11px; color: var(--color-text-faint); line-height: 1.6;
+    }
+    .legend-tiebreak strong { color: var(--color-text-muted); }
+
+    /* H2H */
+    .section-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4);
+    }
+    .section-card__title { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 4px; }
+    .section-card__sub   { font-size: 12px; color: var(--color-text-faint); margin: 0 0 var(--space-4); }
+    .h2h-wrap { overflow-x: auto; }
+    .h2h-table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+    .h2h-table th {
+      padding: 6px 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--color-text-faint);
+      border-bottom: 1px solid var(--color-border-strong); text-align: center; white-space: nowrap;
+    }
+    .h2h-table th.h2h-lbl  { text-align: left; min-width: 120px; }
+    .h2h-table th.h2h-tot  { color: var(--color-text); }
+    .h2h-table td { padding: 9px 10px; border-bottom: 1px solid var(--color-border); text-align: center; font-variant-numeric: tabular-nums; }
+    .h2h-table tr:last-child td { border-bottom: none; }
+    .h2h-table td.h2h-team { text-align: left; font-weight: 700; white-space: nowrap; }
+    .h2h-table td.h2h-self { background: var(--color-surface-2); color: var(--color-text-faint); }
+    .h2h-win  { color: var(--color-lime); font-weight: 700; }
+    .h2h-loss { color: var(--color-red); }
+    .h2h-tie  { color: var(--color-text-muted); }
+    .h2h-total { font-weight: 700; }
+    .h2h-note  { margin-top: var(--space-3); font-size: 11px; color: var(--color-text-faint); }
+
+    /* Trajectory */
+    .traj-legend { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-bottom: var(--space-4); }
+    .traj-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); }
+    .traj-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    #traj-canvas { width: 100%; height: 220px; display: block; }
+
+    /* Empty */
+    .empty-state { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--color-text-faint); }
+
+    @media (max-width: 720px) {
+      .legend-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body data-page="standings">
+  <div data-partial="nav"></div>
+
+  <div class="page-hero">
+    <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="standings"></div>
+    <div class="page-hero__gradient"></div>
+    <div class="page-hero__content">
+      <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
+      <h1 class="page-hero__title">Standings</h1>
+    </div>
+  </div>
+
+  <div class="stand-shell">
+
+    <nav class="div-tabs" id="div-tabs"></nav>
+    <div id="stand-content"><div class="empty-state">Loading&hellip;</div></div>
+
+  </div>
+
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+  <script src="/js/live-poll.js"></script>
+  <script>
+  // ── Config ───────────────────────────────────────────────────────
+  const SEASON = { id:(new URLSearchParams(location.search).get('season')||'circuit-i'), totalMatches:6, maxPtsPerMatch:4, playoffSpots:4 };
+  // Week 6 = Rivalry Week, the LAST week of the regular season. The playoff
+  // picture (badges, cutline, points-back-of-line) only turns on then —
+  // weeks 1–5 are a plain standings table.
+  const RIVALRY_WEEK = 6;
+  const DIV_LABELS = { '3-5-mixed':'3.0 - 3.5 Mixed','3-0-mixed':'3.0 - 3.5 Mixed','3.5M':'3.0 - 3.5 Mixed','3.0M':'3.0 - 3.5 Mixed' };
+  const TEAM_COLORS = ['#b8ff2c','#17d7b0','#f0c040','#ff7b54','#a78bfa','#f472b6','#60a5fa','#34d399'];
+
+  // ── State ────────────────────────────────────────────────────────
+  let standingsData = null, teamsData = null, scheduleData = null, activeDivision = '', isPreseason = false, divCount = 0;
+  let selectedWeek = 'current'; // 'current' or a week number (snapshot through that week)
+  let dsrByTeam = {}; // teamId / lowercased teamName → summed Team DSR
+  const CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
+
+  // Team DSR = sum of each rated player's DSR (composite, gamesPlayed>0), keyed by id + name.
+  function buildDsrByTeam(pstats) {
+    const map = {};
+    if (!pstats || pstats.empty) return map;
+    Object.values(pstats.players || {}).forEach(p => {
+      if (!(p.gamesPlayed > 0) || p.composite == null) return;
+      const d = Math.round(p.composite * 10) / 10;
+      [p.teamId, (p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { map[k] = (map[k] || 0) + d; });
+    });
+    Object.keys(map).forEach(k => { map[k] = Math.round(map[k] * 10) / 10; });
+    return map;
+  }
+  const teamDSR = t => {
+    const v = dsrByTeam[t.teamId] ?? dsrByTeam[String(t.teamName || '').toLowerCase()];
+    return v != null ? v : null;
+  };
+
+  // Links carry the current season so navigation stays in context (e.g. test season).
+  const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
+  function slug(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team';}
+  function teamHref(t){const id=t.teamId||slug(t.teamName);return '/team?id='+encodeURIComponent(id)+LINK_SUFFIX;}
+
+  // ── Bootstrap ────────────────────────────────────────────────────
+  async function load() {
+    try {
+      const [sr, tr, sc, pr] = await Promise.all([
+        fetch('/.netlify/functions/public-standings?season=' + SEASON.id).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-teams?season='    + SEASON.id).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-schedule?season=' + SEASON.id).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      standingsData = sr;
+      teamsData     = tr;
+      scheduleData  = sc;
+      dsrByTeam     = buildDsrByTeam(pr);
+    } catch { standingsData = { empty: true }; }
+
+    isPreseason = !standingsData?.divisions;
+    renderTabs();
+    render();
+  }
+
+  // ── Tabs ─────────────────────────────────────────────────────────
+  function renderTabs() {
+    const el  = document.getElementById('div-tabs');
+    let divs  = standingsData?.divisions
+      ? Object.keys(standingsData.divisions).sort()
+      : [...new Set((teamsData?.teams || []).map(t => t.division).filter(Boolean))].sort();
+    divCount = divs.length;
+    if (!divs.length) { el.innerHTML = ''; return; }
+    if (!activeDivision || !divs.includes(activeDivision)) activeDivision = divs[0];
+
+    // Only one active division — it's known, so hide the selector pill entirely
+    if (divs.length < 2) { el.innerHTML = ''; return; }
+
+    // Build label map from actual data first (divisionLabel field), fall back to hard-coded map
+    const labelMap = {};
+    (teamsData?.teams || []).forEach(t => {
+      if (t.division && t.divisionLabel && !labelMap[t.division]) labelMap[t.division] = t.divisionLabel;
+    });
+    if (standingsData?.divisions) {
+      Object.entries(standingsData.divisions).forEach(([d, data]) => {
+        if (data?.divisionLabel && !labelMap[d]) labelMap[d] = data.divisionLabel;
+      });
+    }
+    const tabLabel = d => labelMap[d] || DIV_LABELS[d] || d;
+
+    el.innerHTML = divs.map(d =>
+      '<button class="div-tab' + (d === activeDivision ? ' is-active' : '') + '" data-div="' + esc(d) + '">' + esc(tabLabel(d)) + '</button>'
+    ).join('');
+    el.querySelectorAll('.div-tab').forEach(btn => btn.addEventListener('click', () => {
+      activeDivision = btn.dataset.div;
+      el.querySelectorAll('.div-tab').forEach(b => b.classList.toggle('is-active', b.dataset.div === activeDivision));
+      render();
+    }));
+  }
+
+  // ── Dispatch ─────────────────────────────────────────────────────
+  function render() {
+    const el = document.getElementById('stand-content');
+    isPreseason ? renderPreseason(el) : renderLive(el);
+  }
+
+  // ── Pre-season ───────────────────────────────────────────────────
+  function renderPreseason(el) {
+    const divTeams = (teamsData?.teams || []).filter(t => !activeDivision || t.division === activeDivision);
+    if (!divTeams.length) {
+      el.innerHTML = '<div class="empty-state">No teams registered yet — check back soon.</div>';
+      return;
+    }
+    const teams = divTeams.map((t, i) => ({
+      rank:0, teamId:t.id, teamName:t.name, teamEmoji:t.emoji||'🏓',
+      wins:0, losses:0, ties:0, matchesPlayed:0,
+      matchPointsFor:0, matchPointsAgainst:0, pointsScored:0, pointsAgainst:0, pointDiff:0,
+      totalGamesWon:0, totalGamesLost:0,
+      maxPts: SEASON.totalMatches * SEASON.maxPtsPerMatch, status:null, h2h:{},
+    }));
+    // Use divisionLabel from the first team, fall back to DIV_LABELS map, then raw code
+    const divLabel = divTeams[0]?.divisionLabel || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
+    el.innerHTML = standingsCardHtml(teams, true, '', divLabel) + legendCardHtml();
+  }
+
+  // ── Week snapshots ───────────────────────────────────────────────
+  // Rebuilt client-side from finalized matches through the selected week,
+  // using the SAME tiebreakers as the live blob (PTS → GW → H2H → DIFF).
+  function divisionMatchesThrough(week) {
+    const out = [];
+    for (const w of (scheduleData?.weeks || [])) {
+      if (w.week > week) continue;
+      for (const m of (w.matches || [])) {
+        if (activeDivision && m.division && m.division !== activeDivision) continue;
+        if (!m.finalizedAt || m.scoreA == null || m.scoreB == null) continue;
+        out.push({ ...m, week: w.week });
+      }
+    }
+    return out;
+  }
+  function playedWeeksSet() {
+    const set = new Set();
+    for (const w of (scheduleData?.weeks || [])) {
+      if ((w.matches || []).some(m =>
+        (!activeDivision || !m.division || m.division === activeDivision) && m.finalizedAt)) set.add(w.week);
+    }
+    return set;
+  }
+  function h2hCmp(a, b) {
+    const ab = a.h2h?.[b.teamId], ba = b.h2h?.[a.teamId];
+    if (ab && ba && ab.for !== ba.for) return ba.for - ab.for;
+    return 0;
+  }
+  function buildSnapshot(throughWeek) {
+    const base = standingsData?.divisions?.[activeDivision]?.teams || [];
+    const rows = new Map(base.map(t => [t.teamId, {
+      ...t, wins: 0, losses: 0, ties: 0, matchesPlayed: 0,
+      matchPointsFor: 0, matchPointsAgainst: 0, totalGamesWon: 0, totalGamesLost: 0,
+      pointsScored: 0, pointsAgainst: 0, pointDiff: 0, h2h: {}, status: null,
+    }]));
+    for (const m of divisionMatchesThrough(throughWeek)) {
+      const A = rows.get(m.teamAId), B = rows.get(m.teamBId);
+      if (!A || !B) continue;
+      A.matchesPlayed++; B.matchesPlayed++;
+      A.matchPointsFor += m.scoreA; A.matchPointsAgainst += m.scoreB;
+      B.matchPointsFor += m.scoreB; B.matchPointsAgainst += m.scoreA;
+      A.totalGamesWon += m.gamesA ?? 0; A.totalGamesLost += m.gamesB ?? 0;
+      B.totalGamesWon += m.gamesB ?? 0; B.totalGamesLost += m.gamesA ?? 0;
+      A.pointsScored += m.pointsA ?? 0; A.pointsAgainst += m.pointsB ?? 0;
+      B.pointsScored += m.pointsB ?? 0; B.pointsAgainst += m.pointsA ?? 0;
+      // W/L/T are tallied per ROUND (2 per match), mirroring how PTS accrues —
+      // a match can yield 2-0, 1-0-1, 0-1-1, etc. Read each round's own points;
+      // fall back to its games count, then to match-level pts for legacy data
+      // that carries no per-round breakdown.
+      const rounds = [m.round1, m.round2].filter(Boolean);
+      if (rounds.length) {
+        for (const r of rounds) {
+          let hp = r.homePoints, ap = r.awayPoints;
+          if (hp == null || ap == null) {
+            const hg = r.homeGames || 0, ag = r.awayGames || 0;
+            if (hg === 0 && ag === 0) continue;
+            hp = hg > ag ? 2 : hg < ag ? 0 : 1;
+            ap = ag > hg ? 2 : ag < hg ? 0 : 1;
+          }
+          if (hp === 0 && ap === 0) continue;
+          if (hp > ap) { A.wins++; B.losses++; }
+          else if (ap > hp) { B.wins++; A.losses++; }
+          else { A.ties++; B.ties++; }
+        }
+      } else if (m.scoreA > m.scoreB) { A.wins++; B.losses++; }
+      else if (m.scoreB > m.scoreA) { B.wins++; A.losses++; }
+      else { A.ties++; B.ties++; }
+      (A.h2h[m.teamBId] = A.h2h[m.teamBId] || { for: 0, against: 0 });
+      A.h2h[m.teamBId].for += m.scoreA; A.h2h[m.teamBId].against += m.scoreB;
+      (B.h2h[m.teamAId] = B.h2h[m.teamAId] || { for: 0, against: 0 });
+      B.h2h[m.teamAId].for += m.scoreB; B.h2h[m.teamAId].against += m.scoreA;
+    }
+    const teams = [...rows.values()].map(t => {
+      t.pointDiff = t.pointsScored - t.pointsAgainst;   // DIFF = PS − PA
+      t.remaining = SEASON.totalMatches - t.matchesPlayed;
+      t.maxPts = t.matchPointsFor + t.remaining * SEASON.maxPtsPerMatch;
+      return t;
+    });
+    teams.sort((a, b) =>
+      (b.matchPointsFor - a.matchPointsFor) ||
+      (b.totalGamesWon - a.totalGamesWon) ||
+      h2hCmp(a, b) ||
+      (b.pointDiff - a.pointDiff) ||
+      String(a.teamName).localeCompare(String(b.teamName)));
+    teams.forEach((t, i) => { t.rank = i + 1; });
+    return teams;
+  }
+
+  // ── Week filter chips ────────────────────────────────────────────
+  function weekChipsHtml() {
+    if (!scheduleData?.weeks?.length) return '';
+    const played = playedWeeksSet();
+    let chips = '';
+    for (let w = 1; w <= SEASON.totalMatches; w++) {
+      const rivalry = w === RIVALRY_WEEK;
+      const on = selectedWeek === w;
+      const enabled = played.has(w);
+      chips += '<button class="wk-chip' + (on ? ' is-active' : '') + (rivalry ? ' is-rivalry' : '') + '"'
+        + (enabled ? '' : ' disabled title="No results yet"') + ' data-wk="' + w + '">'
+        + 'Wk ' + w + (rivalry ? ' · Rivalry' : '') + '</button>';
+    }
+    chips += '<button class="wk-chip' + (selectedWeek === 'current' ? ' is-active' : '') + '" data-wk="current">Current</button>';
+    return '<div class="wk-chips">' + chips + '</div>';
+  }
+  function wireWeekChips(el) {
+    el.querySelectorAll('.wk-chip').forEach(btn => btn.addEventListener('click', () => {
+      const v = btn.dataset.wk;
+      selectedWeek = v === 'current' ? 'current' : parseInt(v, 10);
+      render();
+    }));
+  }
+
+  // ── Live season ──────────────────────────────────────────────────
+  function renderLive(el) {
+    const divData = standingsData?.divisions?.[activeDivision];
+    if (!divData?.teams?.length) {
+      el.innerHTML = '<div class="empty-state">No standings for this division yet.</div>';
+      return;
+    }
+    const weeksPlayedLive = Math.max(0, ...divData.teams.map(t => t.matchesPlayed || 0));
+    const divLabel = divData.divisionLabel
+      || (teamsData?.teams || []).find(t => t.division === activeDivision)?.divisionLabel
+      || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
+
+    let teams, hunt, updated = '', preTable = '';
+    if (selectedWeek === 'current') {
+      teams = divData.teams.map(t => {
+        const remaining = SEASON.totalMatches - (t.matchesPlayed || 0);
+        return { ...t, remaining, maxPts: t.matchPointsFor + remaining * SEASON.maxPtsPerMatch };
+      });
+      // The hunt turns on once Week 5 is complete — i.e. Rivalry Week (the
+      // last week of the regular season) is the week being played.
+      hunt = weeksPlayedLive >= RIVALRY_WEEK - 1;
+      updated = standingsData.lastUpdated
+        ? '<span class="stand-card__updated">Updated ' + fmtDate(standingsData.lastUpdated) + '</span>' : '';
+      if (hunt && weeksPlayedLive < RIVALRY_WEEK) {
+        preTable = '<div class="rivalry-banner">Rivalry week · last week of the regular season</div>';
+      }
+    } else {
+      teams = buildSnapshot(selectedWeek);
+      hunt = selectedWeek >= RIVALRY_WEEK;
+      const played = Math.min(selectedWeek, playedWeeksSet().size);
+      preTable = '<div class="wk-note">Standings through <b>Week ' + selectedWeek + '</b> · '
+        + played + ' of ' + SEASON.totalMatches + ' weeks played</div>';
+    }
+
+    if (hunt) computeStatus(teams); else teams.forEach(t => { t.status = null; });
+
+    el.innerHTML = weekChipsHtml() + preTable
+      + standingsCardHtml(teams, false, updated, divLabel, hunt)
+      + legendCardHtml(hunt)
+      + (selectedWeek === 'current' ? h2hCardHtml(teams) + trajectoryCardHtml(teams, divData.weeklyData) : '');
+    wireWeekChips(el);
+  }
+
+  // ── Standings card ───────────────────────────────────────────────
+  // `hunt` = playoff-picture mode: ONLY during/after Rivalry Week (Week 6,
+  // the last week of the regular season). Weeks 1–5 render a plain table —
+  // no badges, no cutline, no playoff math.
+  function standingsCardHtml(teams, preseason, updatedHtml, divLabel, hunt) {
+    updatedHtml = updatedHtml || '';
+    divLabel = divLabel || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
+    const spots = SEASON.playoffSpots;
+    hunt = !!hunt;
+
+    // How many weeks of matches have been completed (max across teams).
+    const weeksPlayed = teams.length ? Math.max(0, ...teams.map(t => t.matchesPlayed || 0)) : 0;
+    // The season has "started" once at least one week has been played.
+    const seasonStarted = !preseason && weeksPlayed > 0;
+    const showPlayoffLine = hunt && teams.length > spots;
+    const cols = hunt ? 15 : 14; // +DSR; +PS +PA; MAX column only exists in hunt mode
+
+    // Before the season starts there is no meaningful ranking — list alphabetically.
+    if (!seasonStarted) {
+      teams = [...teams].sort((a, b) => String(a.teamName).localeCompare(String(b.teamName)));
+    }
+
+    let rows = '';
+
+    teams.forEach((t, idx) => {
+      // Playoff cutline row (hunt mode only)
+      if (showPlayoffLine && idx === spots) {
+        rows += '<tr class="cutline-row"><td colspan="' + cols + '" style="padding:0 8px">'
+              + '<div class="cutline-inner">PLAYOFF LINE · TOP ' + spots + '</div></td></tr>';
+      }
+
+      const rankCls = !seasonStarted ? '' : idx===0 ? 'col-rank--1' : idx===1 ? 'col-rank--2' : idx===2 ? 'col-rank--3' : '';
+      const rankSym = !seasonStarted ? (idx+1) : (idx===0 ? '🥇' : idx===1 ? '🥈' : idx===2 ? '🥉' : idx+1);
+
+      const pts      = t.matchPointsFor;
+      // PB: weeks 1–5 = points back from #1 (standard). Hunt mode = points
+      // back of the PLAYOFF LINE (— for teams already above it).
+      let pb;
+      if (!seasonStarted) pb = '—';
+      else if (hunt) pb = idx < spots ? '—' : (teams[spots - 1].matchPointsFor - pts);
+      else pb = idx === 0 ? '—' : (teams[0].matchPointsFor - pts);
+      const diff     = t.pointDiff || 0;
+      const diffStr  = !seasonStarted ? '—' : (diff===0 ? '0' : diff>0 ? '+'+diff : String(diff));
+      const diffCls  = !seasonStarted ? 'col-muted' : diff>0 ? 'col-diff-pos' : diff<0 ? 'col-diff-neg' : '';
+      const ptsCls   = pts===0 ? 'col-pts col-pts--zero' : 'col-pts';
+      const rds      = !seasonStarted ? '—' : (t.matchesPlayed || 0) * 2;
+      const psFor    = !seasonStarted ? '—' : (t.pointsScored || 0);
+      const psAg     = !seasonStarted ? '—' : (t.pointsAgainst || 0);
+      const dsr      = teamDSR(t);
+      const badge    = hunt ? badgeHtml(t.status) : '';
+
+      rows += '<tr class="' + (seasonStarted && idx===0 ? 'stand-row--leader' : '') + '">'
+        + '<td class="col-rank ' + rankCls + '">' + rankSym + '</td>'
+        + '<td class="col-team"><div class="team-cell">'
+        + '  <a class="team-name team-name-link" href="' + teamHref(t) + '">'  + esc(t.teamName)  + '</a>'
+        + badge
+        + '</div></td>'
+        + '<td class="col-dsr">' + (dsr != null ? '<span class="dsr-chip">' + dsr + '</span>' : '<span class="col-muted">—</span>') + '</td>'
+        + '<td class="col-opt col-muted">' + rds + '</td>'
+        + '<td>' + t.wins + '</td>'
+        + '<td>' + t.losses + '</td>'
+        + '<td class="col-opt col-muted">' + t.ties + '</td>'
+        + '<td class="' + ptsCls + '">' + pts + '</td>'
+        + '<td class="col-opt col-muted">' + pb + '</td>'
+        + '<td class="col-opt">' + t.totalGamesWon + '</td>'
+        + '<td class="col-opt col-muted">' + t.totalGamesLost + '</td>'
+        + '<td class="col-opt">' + psFor + '</td>'
+        + '<td class="col-opt col-muted">' + psAg + '</td>'
+        + '<td class="' + diffCls + '">' + diffStr + '</td>'
+        + (hunt ? '<td class="col-opt col-muted">' + t.maxPts + '</td>' : '')
+        + '</tr>';
+    });
+
+    const note = !seasonStarted
+      ? '<div class="pts-note">Teams listed alphabetically. Stats will populate after Week 1.</div>'
+      : '<div class="pts-note">'
+        + '<span><strong>Point System:</strong> Win = 2 pts · Tie = 1 pt · Loss = 0 pts · Max 4 pts per match (2 rounds)</span>'
+        + '<span><strong>Tiebreaker:</strong> PTS → GW → Head-to-Head → DIFF</span>'
+        + (hunt && teams.length > spots ? '<span>Top ' + spots + ' advance to playoffs · Bottom ' + (teams.length - spots) + ' play consolation bracket</span>' : '')
+        + '</div>';
+
+    // With a single known division, the title is redundant — show only the updated stamp
+    const headerInner = (divCount < 2)
+      ? updatedHtml
+      : '  <h2 class="stand-card__title">' + esc(divLabel) + '</h2>' + updatedHtml;
+
+    return '<div class="stand-card">'
+      + (headerInner ? '<div class="stand-card__hd">' + headerInner + '</div>' : '')
+      + '<div class="stand-table-wrap">'
+      + '<table class="stand-table">'
+      + '<thead><tr>'
+      + '<th class="col-rank">#</th>'
+      + '<th class="col-team">Team</th>'
+      + '<th class="col-dsr-h" title="Total Team DSR (sum of roster ratings)">DSR</th>'
+      + '<th class="col-opt" title="Rounds Played (2 per match)">RDS</th>'
+      + '<th title="Round Wins">W</th>'
+      + '<th title="Round Losses">L</th>'
+      + '<th class="col-opt" title="Round Ties">T</th>'
+      + '<th title="Match Points (W\xd72 + T\xd71)">PTS</th>'
+      + '<th class="col-opt" title="' + (hunt ? 'Points Back of the playoff line' : 'Points Back from #1') + '">PB</th>'
+      + '<th class="col-opt" title="Games Won (all rounds)">GW</th>'
+      + '<th class="col-opt" title="Games Lost">GL</th>'
+      + '<th class="col-opt" title="Points Scored (all games)">PS</th>'
+      + '<th class="col-opt" title="Points Against (all games)">PA</th>'
+      + '<th title="Points Differential (PS − PA)">DIFF</th>'
+      + (hunt ? '<th class="col-opt" title="Max possible points">MAX</th>' : '')
+      + '</tr></thead>'
+      + '<tbody>' + rows + '</tbody>'
+      + '</table></div>'
+      + note
+      + '</div>';
+  }
+
+  // ── Legend card ──────────────────────────────────────────────────
+  // Playoff items (MAX, badges, cutline explainer) only show in hunt mode —
+  // i.e. Rivalry Week (Week 6), the last week of the regular season.
+  function legendCardHtml(hunt) {
+    const pbDesc = hunt ? 'Points Back of the playoff line' : 'Points Back from #1';
+    const huntItems = !hunt ? '' :
+        '<div class="legend-item"><abbr>MAX</abbr> = Best possible end-of-season pts (current + weeks remaining \xd7 4)</div>';
+    const huntBlock = !hunt
+      ? '<hr class="legend-divider" />'
+        + '<div class="legend-tiebreak">'
+        + '  The <strong>playoff picture</strong> (Clinched / In the Hunt badges, the playoff line, and points back of it) '
+        + '  appears in <strong>Week ' + RIVALRY_WEEK + ' — Rivalry Week</strong>, the last week of the regular season. '
+        + '  Until then this is the straight table.'
+        + '</div>'
+      : '<hr class="legend-divider" />'
+        + '<div class="legend-badges">'
+        + '  <div class="legend-badge-item"><span class="team-badge team-badge--clinched">Clinched</span>Locked into the top ' + SEASON.playoffSpots + ' regardless of remaining results</div>'
+        + '  <div class="legend-badge-item"><span class="team-badge team-badge--inhunt">In the Hunt</span>Could still climb in or fall out tonight</div>'
+        + '  <div class="legend-badge-item"><span class="team-badge team-badge--eliminated">Out</span>Mathematically can’t reach the top ' + SEASON.playoffSpots + '</div>'
+        + '</div>'
+        + '<div class="legend-tiebreak">'
+        + '  Top ' + SEASON.playoffSpots + ' seeds after Rivalry Week advance to the Week 7 playoff bracket; the rest play a consolation match.'
+        + '</div>';
+    return '<div class="legend-card">'
+      + '<p class="legend-title">Column Key</p>'
+      + '<div class="legend-grid">'
+      + '<div class="legend-item"><abbr>RDS</abbr> = Rounds Played (2 per match)</div>'
+      + '<div class="legend-item"><abbr>W</abbr> = Round Wins</div>'
+      + '<div class="legend-item"><abbr>L</abbr> = Round Losses</div>'
+      + '<div class="legend-item"><abbr>T</abbr> = Round Ties</div>'
+      + '<div class="legend-item"><abbr>PTS</abbr> = Match Points (W \xd7 2 + T \xd7 1)</div>'
+      + '<div class="legend-item"><abbr>PB</abbr> = ' + pbDesc + '</div>'
+      + '<div class="legend-item"><abbr>GW</abbr> = Games Won (across all rounds)</div>'
+      + '<div class="legend-item"><abbr>GL</abbr> = Games Lost (across all rounds)</div>'
+      + '<div class="legend-item"><abbr>PS</abbr> = Points Scored (all games)</div>'
+      + '<div class="legend-item"><abbr>PA</abbr> = Points Against (all games)</div>'
+      + '<div class="legend-item"><abbr>DIFF</abbr> = Points Differential (PS − PA)</div>'
+      + huntItems
+      + huntBlock
+      + '</div>'
+      + '</div>';
+  }
+
+  // ── H2H card ─────────────────────────────────────────────────────
+  function h2hCardHtml(teams) {
+    const hasData = teams.some(t => t.h2h && Object.keys(t.h2h).length > 0);
+    if (!hasData) {
+      return '<div class="section-card">'
+        + '<h3 class="section-card__title">🤺 Head-to-Head Matrix</h3>'
+        + '<p class="section-card__sub">Who owns who — match points in every matchup</p>'
+        + '<div class="empty-state" style="padding:28px 20px">Head-to-head results will appear after Week 1.</div>'
+        + '</div>';
+    }
+
+    const hdCols = teams.map(t =>
+      '<th title="' + esc(t.teamName) + '">' + esc(t.teamEmoji || t.teamName.split(' ')[0]) + '</th>'
+    ).join('');
+
+    const bodyRows = teams.map(rt => {
+      const cells = teams.map(ct => {
+        if (rt.teamId === ct.teamId) return '<td class="h2h-self">—</td>';
+        const e = rt.h2h?.[ct.teamId];
+        if (!e) return '<td class="col-muted">—</td>';
+        const cls = e.for > e.against ? 'h2h-win' : e.for < e.against ? 'h2h-loss' : 'h2h-tie';
+        return '<td class="' + cls + '">' + e.for + '–' + e.against + '</td>';
+      }).join('');
+      const tf = Object.values(rt.h2h||{}).reduce((s,v) => s+(v.for||0), 0);
+      const ta = Object.values(rt.h2h||{}).reduce((s,v) => s+(v.against||0), 0);
+      const tc = tf>ta ? 'h2h-win' : tf<ta ? 'h2h-loss' : 'h2h-tie';
+      return '<tr><td class="h2h-team">' + esc(rt.teamEmoji) + ' <a class="team-name-link" href="' + teamHref(rt) + '">' + esc(rt.teamName) + '</a></td>'
+           + cells
+           + '<td class="h2h-total ' + tc + '">' + tf + '–' + ta + '</td></tr>';
+    }).join('');
+
+    return '<div class="section-card">'
+      + '<h3 class="section-card__title">🤺 Head-to-Head Matrix</h3>'
+      + '<p class="section-card__sub">Who owns who — match points in every matchup</p>'
+      + '<div class="h2h-wrap"><table class="h2h-table">'
+      + '<thead><tr><th class="h2h-lbl">TEAM ↓ VS →</th>' + hdCols + '<th class="h2h-tot">TOTAL</th></tr></thead>'
+      + '<tbody>' + bodyRows + '</tbody>'
+      + '</table></div>'
+      + '<p class="h2h-note">Each cell = match pts (your score – opponent score). 🟢 = win &nbsp; 🔴 = loss &nbsp; Row = your results vs each opponent.</p>'
+      + '</div>';
+  }
+
+  // ── Trajectory card ──────────────────────────────────────────────
+  function trajectoryCardHtml(teams, weeklyData) {
+    if (!weeklyData || Object.keys(weeklyData).length < 2) {
+      return '<div class="section-card">'
+        + '<h3 class="section-card__title">📈 Team Ranking Trajectory</h3>'
+        + '<p class="section-card__sub">How each team’s rank has moved week by week</p>'
+        + '<div class="empty-state" style="padding:28px 20px">Trajectory chart appears after Week 2.</div>'
+        + '</div>';
+    }
+    const legendHtml = teams.map((t, i) =>
+      '<div class="traj-legend-item">'
+      + '<div class="traj-dot" style="background:' + TEAM_COLORS[i % TEAM_COLORS.length] + '"></div>'
+      + '<span>' + esc(t.teamName) + '</span>'
+      + '</div>'
+    ).join('');
+    return '<div class="section-card">'
+      + '<h3 class="section-card__title">📈 Team Ranking Trajectory</h3>'
+      + '<p class="section-card__sub">How each team’s rank has moved week by week</p>'
+      + '<div class="traj-legend">' + legendHtml + '</div>'
+      + '<canvas id="traj-canvas"></canvas>'
+      + '</div>';
+    // TODO: draw chart on canvas after rendering using weeklyData rank history
+  }
+
+  // ── Status computation ───────────────────────────────────────────
+  function computeStatus(teams) {
+    const spots = SEASON.playoffSpots;
+    if (teams.length <= spots) { teams.forEach(t => t.status = null); return; }
+    const sorted = [...teams].sort((a, b) => b.matchPointsFor - a.matchPointsFor);
+    teams.forEach(t => {
+      if (!t.matchesPlayed) { t.status = null; return; }
+      const rank = sorted.findIndex(s => s.teamId === t.teamId) + 1;
+      if (rank <= spots) {
+        const belowMax = Math.max(...sorted.slice(spots).map(s => s.maxPts));
+        t.status = t.matchPointsFor > belowMax ? 'clinched' : 'inhunt';
+      } else {
+        t.status = t.maxPts < sorted[spots - 1].matchPointsFor ? 'eliminated' : 'inhunt';
+      }
+    });
+  }
+
+  function badgeHtml(s) {
+    if (!s) return '';
+    if (s==='clinched')   return '<span class="team-badge team-badge--clinched">Clinched</span>';
+    if (s==='eliminated') return '<span class="team-badge team-badge--eliminated">Out</span>';
+    if (s==='inhunt')     return '<span class="team-badge team-badge--inhunt">In the Hunt</span>';
+    return '';
+  }
+
+  // ── Utilities ────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})
+           + ' ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  }
+
+  load();
+
+  // ── Live refresh ─────────────────────────────────────────────────
+  // Standings only move when matches finalize, so a relaxed 30s poll is
+  // plenty. ETag/304 + CDN caching make unchanged polls nearly free, and
+  // the poller sleeps whenever the tab is hidden.
+  DSLivePoll.create({
+    url: '/.netlify/functions/public-standings?season=' + SEASON.id,
+    interval: 30000,
+    onUpdate(data) {
+      standingsData = data;
+      isPreseason = !standingsData?.divisions;
+      // Refresh the schedule too so week-filter chips + snapshots pick up
+      // newly finalized matches (CDN-cached 60s — cheap).
+      fetch('/.netlify/functions/public-schedule?season=' + SEASON.id)
+        .then(r => r.ok ? r.json() : null)
+        .then(sc => { if (sc) { scheduleData = sc; render(); } })
+        .catch(() => {});
+      renderTabs();   // keeps the active division selection
+      render();
+    },
+  }).start();
+  </script>
+</body>
+</html>

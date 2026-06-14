@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Open Graph / social preview -->
+  <meta property="og:title" content="Leaderboard · The Dink Society" />
+  <meta property="og:description" content="Southern California&#x27;s social pickleball league. Season 1 · June 2026." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="The Dink Society" />
+  <meta property="og:url" content="https://dinksociety.app/leaderboard" />
+  <meta property="og:image" content="https://dinksociety.app/img/og-image.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Leaderboard · The Dink Society" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Leaderboard · The Dink Society" />
+  <meta name="twitter:description" content="Southern California&#x27;s social pickleball league. Season 1 · June 2026." />
+  <meta name="twitter:image" content="https://dinksociety.app/img/og-image.png" />
+
+  <title>Leaderboard · The Dink Society</title>
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <script src="/js/short-name.js"></script>
+  <style>
+    .lb-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+    a.ds-link { color: inherit; text-decoration: none; cursor: pointer; }
+    a.ds-link:hover { color: var(--color-lime); text-decoration: underline; }
+
+    /* Controls */
+    .lb-controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:var(--space-4); }
+    .lb-controls select { padding:8px 14px; background:var(--color-surface-2); border:1px solid var(--color-border); color:var(--color-text); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; cursor:pointer; }
+    .lb-controls select:focus { border-color:var(--color-lime); outline:none; }
+
+    /* Tabs */
+    .lb-tabs { display:flex; gap:3px; margin:var(--space-5) 0 var(--space-4); flex-wrap:wrap; }
+    .lb-tab { padding:8px 16px; border-radius:var(--radius-full); font-size:11px; font-weight:700; border:1px solid var(--color-border); background:transparent; color:var(--color-text-faint); cursor:pointer; transition:all var(--transition); font-family:inherit; }
+    .lb-tab:hover { color:var(--color-text); background:var(--color-surface-2); }
+    .lb-tab.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
+
+    .lb-section { display:none; }
+    .lb-section.is-active { display:block; }
+
+    /* Generic card */
+    .lb-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:var(--space-5); margin-bottom:var(--space-4); }
+    .lb-card__title { font-size:14px; font-weight:800; font-style:italic; text-transform:uppercase; letter-spacing:0.04em; margin:0 0 4px; }
+    .lb-card__sub   { font-size:12px; color:var(--color-text-faint); margin:0 0 var(--space-4); }
+
+    /* ── RANKINGS ──────────────────────────────────────────────────── */
+    .lb-search-row { display:flex; gap:8px; margin-bottom:var(--space-4); flex-wrap:wrap; }
+    .lb-search {
+      flex:1; min-width:200px; padding:8px 14px 8px 36px;
+      background:var(--color-surface-2); border:1px solid var(--color-border);
+      color:var(--color-text); border-radius:var(--radius-sm); font-size:12px;
+      font-family:inherit; outline:none; position:relative;
+    }
+    .lb-search:focus { border-color:var(--color-lime); }
+    .lb-search-wrap { position:relative; flex:1; min-width:200px; }
+    .lb-search-wrap::before { content:'🔍'; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:13px; pointer-events:none; }
+    .lb-filter-row { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:var(--space-4); }
+    .lb-filter-btn { padding:5px 12px; font-size:10px; border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent; color:var(--color-text-faint); cursor:pointer; font-family:inherit; font-weight:600; transition:all var(--transition); }
+    .lb-filter-btn.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
+
+    .rank-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .rank-table th { text-align:left; padding:8px 8px; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; border-bottom:1px solid var(--color-border-strong); white-space:nowrap; }
+    .rank-table th.r { text-align:right; }
+    .rank-table td { padding:9px 8px; border-bottom:1px solid var(--color-border); vertical-align:middle; }
+    .rank-table td.r { text-align:right; font-variant-numeric:tabular-nums; }
+    .rank-table tr:last-child td { border-bottom:none; }
+    .rank-table tbody tr:hover td { background:var(--color-surface-2); }
+    .rank-num { color:var(--color-text-faint); font-weight:800; min-width:24px; display:inline-block; }
+    .rank-num--1 { color:#f0c040; }
+    .rank-num--2 { color:#c0c8d0; }
+    .rank-num--3 { color:#cd7f32; }
+    .rank-change { font-size:10px; font-weight:700; min-width:28px; display:inline-block; text-align:center; }
+    .rank-change--up   { color:var(--color-lime); }
+    .rank-change--down { color:var(--color-red); }
+    .rank-change--same { color:var(--color-text-faint); }
+    .rank-row--leader td { background:var(--color-lime-ghost); }
+
+    .player-cell { display:flex; align-items:center; gap:10px; }
+    .player-avatar {
+      width:32px; height:32px; border-radius:50%; background:var(--color-surface-3);
+      display:flex; align-items:center; justify-content:center;
+      font-size:10px; font-weight:900; flex-shrink:0; color:var(--color-lime);
+      border:1.5px solid var(--color-lime-dim);
+    }
+    .player-avatar--f { color:var(--color-teal); border-color:var(--color-teal-dim); }
+    .player-name  { font-weight:800; font-style:italic; text-transform:uppercase; }
+    .player-team  { font-size:10px; color:var(--color-text-faint); margin-top:1px; }
+    .win-pct      { font-weight:800; color:var(--color-lime); }
+    .win-pct--low { color:var(--color-text-muted); }
+    .col-opt {}
+    @media(max-width:720px){ .col-opt { display:none; } .rank-table { font-size:11px; } }
+
+    /* ── K'CHN TOP CHEFS ───────────────────────────────────────────── */
+    .kchn-logo { display:inline-flex; align-items:center; background:#000; border:1px solid rgba(255,255,255,0.12); border-radius:7px; padding:5px 11px; }
+    .kchn-logo span { font-size:16px; font-weight:900; color:#f0d020; letter-spacing:0.06em; font-style:italic; }
+    .kchn-header { display:flex; align-items:center; gap:12px; margin-bottom:var(--space-5); }
+    .kchn-title { font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; margin:0; }
+    .kchn-sub   { font-size:12px; color:var(--color-text-faint); margin:2px 0 0; }
+
+    /* Weekly podium */
+    .week-block { margin-bottom:var(--space-5); }
+    .week-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.12em; color:var(--color-text-faint); text-align:center; margin-bottom:var(--space-3); }
+    .podium { display:grid; grid-template-columns:1fr 1.1fr 1fr; gap:10px; }
+    .podium-card {
+      background:var(--color-surface-2); border:1px solid var(--color-border);
+      border-radius:var(--radius-md); padding:var(--space-4) var(--space-3);
+      text-align:center; display:flex; flex-direction:column; align-items:center; gap:6px;
+    }
+    .podium-card--first { background:var(--color-lime-ghost); border-color:var(--color-lime-dim); }
+    .podium-avatar {
+      width:44px; height:44px; border-radius:50%; background:var(--color-surface-3);
+      display:flex; align-items:center; justify-content:center;
+      font-size:13px; font-weight:900; border:2px solid var(--color-border-strong);
+    }
+    .podium-avatar--first { border-color:var(--color-lime); }
+    .podium-name  { font-size:13px; font-weight:800; font-style:italic; text-transform:uppercase; }
+    .podium-team  { font-size:10px; color:var(--color-text-faint); }
+    .podium-score { font-size:18px; font-weight:900; color:var(--color-lime); }
+    .podium-meta  { font-size:10px; color:var(--color-text-faint); }
+    .podium-place { font-size:9px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); }
+    .podium-place--1 { color:var(--color-lime); }
+
+    /* Player of the Week — collapsible weekly winners */
+    .chef-week-head { display:flex; align-items:center; gap:8px; cursor:pointer; user-select:none; margin-bottom:var(--space-3); }
+    .chef-week-caret { color:var(--color-text-faint); font-size:11px; display:inline-block; transition:transform .15s; }
+    .chef-week-label { color:var(--color-text-faint); font-size:11px; letter-spacing:0.1em; font-weight:700; text-transform:uppercase; }
+    .pow-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .pow-col-label { font-size:10px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; margin-bottom:8px; }
+    .pow-winner { border:1px solid var(--color-border); border-radius:var(--radius-md); padding:14px; display:flex; flex-direction:column; gap:8px; }
+    .pow-winner__top { display:flex; align-items:center; gap:10px; }
+    .pow-winner__name { font-size:14px; font-weight:800; font-style:italic; text-transform:uppercase; }
+    .pow-winner__stats { display:flex; align-items:baseline; justify-content:space-between; }
+    .pow-winner__dsr { font-size:24px; font-weight:900; line-height:1; }
+    .pow-winner__rec { font-size:11px; color:var(--color-text-muted); font-variant-numeric:tabular-nums; }
+    .pow-mentions { margin-top:4px; border-top:1px solid var(--color-divider); }
+    .pow-mention { display:flex; align-items:center; gap:8px; padding:6px 2px; font-size:12px; }
+    .pow-mention__name { font-weight:600; }
+    .pow-mention__team { color:var(--color-text-faint); }
+    .pow-mention__dsr { margin-left:auto; color:var(--color-text-muted); }
+    .pow-collapsed { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:10px 12px; background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-md); }
+    .pow-chip { display:flex; align-items:center; gap:8px; min-width:0; }
+    .pow-chip__name { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pow-chip__dsr { margin-left:auto; font-size:14px; font-weight:800; }
+    @media(max-width:600px){ .pow-cols { grid-template-columns:1fr; } .pow-collapsed { grid-template-columns:1fr; } }
+
+    /* Season chefs grid */
+    .chefs-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
+    @media(max-width:600px){ .chefs-grid { grid-template-columns:1fr; } }
+
+    /* ── TEAM LEADERS ─────────────────────────────────────────────── */
+    .teams-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--space-4); }
+    .team-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; }
+    .team-card__hd { padding:12px var(--space-4); border-bottom:1px solid var(--color-border); display:flex; align-items:center; gap:8px; }
+    .team-card__name { font-size:13px; font-weight:800; font-style:italic; text-transform:uppercase; letter-spacing:0.04em; }
+    .team-card__body { padding:var(--space-3) 0; }
+    .team-player { display:flex; align-items:center; gap:10px; padding:8px var(--space-4); border-bottom:1px solid var(--color-border); }
+    .team-player:last-child { border-bottom:none; }
+    .team-player__rank { width:18px; font-size:11px; font-weight:800; color:var(--color-text-faint); flex-shrink:0; }
+    .team-player__rank--1 { color:var(--color-lime); }
+    .team-player__av {
+      width:30px; height:30px; border-radius:50%; background:var(--color-surface-2);
+      display:flex; align-items:center; justify-content:center;
+      font-size:9px; font-weight:900; flex-shrink:0;
+      border:1.5px solid var(--color-border-strong);
+    }
+    .team-player__av--m { border-color:var(--color-lime-dim); color:var(--color-lime); }
+    .team-player__av--f { border-color:var(--color-teal-dim); color:var(--color-teal); }
+    .team-player__name { flex:1; font-size:13px; font-weight:700; font-style:italic; text-transform:uppercase; }
+    .team-player__stats { font-size:10px; color:var(--color-text-faint); margin-top:1px; }
+    .team-player__pct { font-size:12px; font-weight:800; padding:2px 8px; border-radius:var(--radius-full); background:var(--color-lime-dim); color:var(--color-lime); }
+    .team-player__pct--mid { background:var(--color-gold-dim); color:var(--color-gold); }
+    .team-player__pct--low { background:var(--color-surface-3); color:var(--color-text-muted); }
+
+    /* ── HOT STREAKS ──────────────────────────────────────────────── */
+    .streak-table { width:100%; border-collapse:collapse; font-size:12px; }
+    .streak-table th { text-align:left; padding:8px; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; border-bottom:1px solid var(--color-border-strong); }
+    .streak-table td { padding:10px 8px; border-bottom:1px solid var(--color-border); vertical-align:middle; }
+    .streak-table tr:last-child td { border-bottom:none; }
+    .streak-badge { display:inline-block; padding:2px 8px; border-radius:var(--radius-full); font-size:9px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; }
+    .streak-badge--fire { background:rgba(255,92,71,0.15); color:var(--color-red); }
+    .streak-badge--hot  { background:var(--color-lime-dim); color:var(--color-lime); }
+    .form-dots { display:flex; gap:3px; flex-wrap:wrap; }
+    .form-dot  { width:14px; height:14px; border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:7px; font-weight:900; }
+    .form-dot--w { background:rgba(184,255,44,0.25); color:var(--color-lime); }
+    .form-dot--l { background:rgba(255,92,71,0.2);  color:var(--color-red); }
+    .form-score { font-weight:800; color:var(--color-text-muted); font-size:12px; }
+
+    .coming-soon {
+      background:var(--color-surface); border:1px solid var(--color-border);
+      border-radius:var(--radius-lg); padding:var(--space-5); margin-bottom:var(--space-4);
+      display:flex; align-items:flex-start; gap:12px;
+    }
+    .coming-soon__icon { font-size:24px; flex-shrink:0; }
+    .coming-soon__title { font-size:13px; font-weight:700; margin:0 0 4px; }
+    .coming-soon__body  { font-size:12px; color:var(--color-text-faint); margin:0; }
+
+    .empty-state { text-align:center; padding:40px 20px; font-size:13px; color:var(--color-text-faint); }
+
+    @media(max-width:720px){
+      .lb-card { padding:var(--space-4); }
+      .podium { gap:6px; }
+      .podium-card { padding:var(--space-3) var(--space-2); }
+      .podium-score { font-size:15px; }
+    }
+  </style>
+</head>
+<body data-page="leaderboard">
+  <div data-partial="nav"></div>
+  <div class="page-hero page-hero--sponsor">
+    <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="leaderboard"></div>
+    <div class="page-hero__gradient"></div>
+    <div class="page-hero__content">
+      <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
+      <h1 class="page-hero__title" id="lb-title">Leaderboard</h1>
+      <div class="page-hero__presented">
+        <span class="page-hero__presented-label">Presented by</span>
+        <div class="kchn-logo"><span>K'CHN</span></div>
+      </div>
+    </div>
+  </div>
+
+  <main class="lb-shell">
+
+    <div class="lb-controls">
+      <select id="circuit-select"><option value="I">Season 1</option><option value="TEST">🧪 TEST Season</option></select>
+      <select id="division-select">
+        <option value="">All divisions</option>
+        <option value="3-5-mixed">3.0–3.5 Mixed</option>
+      </select>
+    </div>
+
+    <nav class="lb-tabs">
+      <button class="lb-tab is-active" data-tab="rankings">🏆 Rankings</button>
+      <button class="lb-tab" data-tab="topchefs">👨‍🍳 K'CHN Top Chefs</button>
+      <button class="lb-tab" data-tab="leaders">🎯 Team Leaders</button>
+      <button class="lb-tab" data-tab="streaks">🔥 Hot Streaks</button>
+      <button class="lb-tab" data-tab="analytics">📊 Analytics</button>
+    </nav>
+
+    <!-- RANKINGS -->
+    <section class="lb-section is-active" data-section="rankings">
+      <div id="rankings-content"><div class="empty-state">Loading…</div></div>
+    </section>
+
+    <!-- K'CHN TOP CHEFS -->
+    <section class="lb-section" data-section="topchefs">
+      <div id="topchefs-content"><div class="empty-state">Loading…</div></div>
+    </section>
+
+    <!-- TEAM LEADERS -->
+    <section class="lb-section" data-section="leaders">
+      <div id="leaders-content"><div class="empty-state">Loading…</div></div>
+    </section>
+
+    <!-- HOT STREAKS -->
+    <section class="lb-section" data-section="streaks">
+      <div id="streaks-content"><div class="empty-state">Loading…</div></div>
+    </section>
+
+    <!-- ANALYTICS -->
+    <section class="lb-section" data-section="analytics">
+      <div id="analytics-content"></div>
+    </section>
+
+  </main>
+
+  <div data-partial="footer"></div>
+  <script>
+  // ── Config ───────────────────────────────────────────────────────
+  const DIV_LABELS = {
+    '3.0M':'3.0 Mixed','3.5M':'3.0–3.5 Mixed',
+    '3-0-mixed':'3.0 Mixed','3-5-mixed':'3.0–3.5 Mixed'
+  };
+  const SLOT_LABELS = { womens:"Women's", mens:"Men's", mixed:'Mixed' };
+
+  const state = {
+    circuit:'I', division:'', tab:'rankings',
+    filter:'all', search:'', sort:'dsr', sortDir:'desc',
+    playerStats:null, standings:null, potw:null
+  };
+
+  const $ = id => document.getElementById(id);
+
+  // ── Profile links (carry the current season/circuit forward) ─────
+  function _seasonSuffix(){ return state.circuit === 'I' ? '' : '&season=circuit-' + state.circuit.toLowerCase(); }
+  function _slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'x'; }
+  function teamLinkHtml(name, id){ if(!name) return ''; const ref=id||_slug(name); return '<a class="ds-link" href="/team?id='+encodeURIComponent(ref)+_seasonSuffix()+'">'+esc(name)+'</a>'; }
+  // Display shows "First L."; the href keeps the FULL name so profile links
+  // and search keep working on real names.
+  function playerLinkHtml(name, teamName){ if(!name) return esc(name||''); return '<a class="ds-link" href="/player?team='+encodeURIComponent(_slug(teamName))+'&name='+encodeURIComponent(name)+_seasonSuffix()+'">'+esc(shortName(name))+'</a>'; }
+
+  // ── URL ──────────────────────────────────────────────────────────
+  function readUrl() {
+    const p = new URLSearchParams(window.location.search);
+    if (p.get('circuit'))  state.circuit  = p.get('circuit');
+    if (p.get('division')) state.division = p.get('division');
+    const v = p.get('view');
+    // Legacy redirects
+    if (v) state.tab = (v === 'society' || v === 'standings') ? 'rankings' : v;
+    $('circuit-select').value  = state.circuit;
+    $('division-select').value = state.division || '';
+    activateTab(state.tab, true);
+  }
+  function writeUrl() {
+    const p = new URLSearchParams();
+    if (state.circuit !== 'I')    p.set('circuit', state.circuit);
+    if (state.division)           p.set('division', state.division);
+    if (state.tab !== 'rankings') p.set('view', state.tab);
+    const q = p.toString();
+    history.replaceState({}, '', q ? `?${q}` : window.location.pathname);
+  }
+
+  // ── Data ─────────────────────────────────────────────────────────
+  async function loadPlayerStats() {
+    try {
+      const r = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}&view=players`);
+      state.playerStats = r.ok ? await r.json() : { empty:true };
+    } catch { state.playerStats = { empty:true }; }
+  }
+  async function loadStandings() {
+    try {
+      let r = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}`);
+      if (!r.ok) throw 0;
+      state.standings = await r.json();
+      if (state.standings?.empty) {
+        r = await fetch('/.netlify/functions/public-standings?season=circuit-i');
+        if (r.ok) { const d = await r.json(); if (!d.empty) state.standings = d; }
+      }
+    } catch {
+      try {
+        const r = await fetch('/.netlify/functions/public-standings?season=circuit-i');
+        state.standings = r.ok ? await r.json() : { empty:true };
+      } catch { state.standings = { empty:true }; }
+    }
+  }
+  async function loadPotw() {
+    try {
+      const r = await fetch('/.netlify/functions/player-of-week');
+      if (r.ok) { const d = await r.json(); if (!d.empty) state.potw = d; }
+    } catch {}
+  }
+
+  // ── Hero ─────────────────────────────────────────────────────────
+  function renderHero() {
+    /* Title is static ("Leaderboard"); kept for call-site compatibility. */
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────
+  function playerList() {
+    if (!state.playerStats?.players) return [];
+    return Object.values(state.playerStats.players);
+  }
+  // Each player's canonical DSR rank (1 = highest DSR). Computed from the FULL
+  // board so it stays with the player no matter how the table is filtered,
+  // searched, or sorted. Only players with a DSR (≥1 game) are ranked; everyone
+  // else is unranked (→ "—"), so there's no fake ranking at season start.
+  function dsrRankMap() {
+    const ranked = playerList()
+      .filter(p => p.composite != null)
+      .sort((a, b) => (b.composite - a.composite)
+        || ((b.gamesWon || 0) - (a.gamesWon || 0))
+        || (a.name || '').localeCompare(b.name || ''));
+    const m = new Map();
+    ranked.forEach((p, i) => m.set(p.playerId, i + 1));
+    return m;
+  }
+  function filteredPlayers(filter, searchQ) {
+    filter = filter || state.filter;
+    searchQ = (searchQ !== undefined ? searchQ : state.search).toLowerCase();
+    const rows = playerList()
+      .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ) || (p.teamName||'').toLowerCase().includes(searchQ))
+      .map(p => {
+        // GP / WON / LOSS respect the active game-type filter
+        const s = filter === 'all'
+          ? { played: p.gamesPlayed||0, won: p.gamesWon||0 }
+          : (p.byType?.[filter] || { played:0, won:0 });
+        // PS / PA / DIFF and per-game averages are always season totals
+        const gp = p.gamesPlayed || 0;
+        const ps = p.ps || 0, pa = p.pa || 0, diff = (p.diff != null ? p.diff : ps - pa);
+        return { ...p,
+          _played: s.played, _won: s.won, _lost: s.played - s.won,
+          _rate: s.played ? s.won/s.played : 0,
+          _dsr: p.composite,
+          _ps: ps, _pa: pa, _diff: diff,
+          _aps: gp ? ps/gp : 0, _apa: gp ? pa/gp : 0, _avgDiff: gp ? diff/gp : 0,
+        };
+      });
+
+    // Sort by the active column (default: DSR desc). Nulls sink to the bottom.
+    const KEY = { dsr:'_dsr', gp:'_played', won:'_won', loss:'_lost',
+                  ps:'_ps', pa:'_pa', diff:'_diff', aps:'_aps', apa:'_apa', avgdiff:'_avgDiff' };
+    const k = KEY[state.sort] || '_dsr';
+    const dir = state.sortDir === 'asc' ? 1 : -1;
+    const num = v => (v == null || Number.isNaN(v)) ? -Infinity : v;
+    rows.sort((a,b) => {
+      const d = (num(a[k]) - num(b[k])) * dir;
+      if (d) return d;
+      // Tiebreak: DSR, then wins, then alphabetical by name. Keeps zeroed
+      // (yet-to-play) players in clean A→Z order at the bottom of the board.
+      return (num(b._dsr) - num(a._dsr)) || (b._won - a._won)
+        || (a.name||'').localeCompare(b.name||'');
+    });
+    return rows;
+  }
+
+  function noData(msg) {
+    return `<div class="empty-state">${esc(msg||'No data yet — check back after Week 1.')}</div>`;
+  }
+  function initials(name) {
+    if (!name) return '?';
+    const p = name.trim().split(' ');
+    return (p[0][0] + (p[p.length-1]?.[0]||'')).toUpperCase();
+  }
+  function pctClass(rate) {
+    return rate >= 0.65 ? '' : rate >= 0.5 ? 'team-player__pct--mid' : 'team-player__pct--low';
+  }
+
+  // ── RANKINGS ─────────────────────────────────────────────────────
+  function renderRankings() {
+    const el = $('rankings-content');
+    const filters = ['all','womens','mens','mixed'];
+    const fbtns = filters.map(f =>
+      `<button class="lb-filter-btn ${state.filter===f?'is-active':''}" data-filter="${f}">${f==='all'?'All games':SLOT_LABELS[f]}</button>`
+    ).join('');
+
+    if (!state.playerStats || state.playerStats.empty) {
+      el.innerHTML = `<div class="lb-card">
+        <div class="lb-search-row">
+          <div class="lb-search-wrap"><input class="lb-search" id="rank-search" placeholder="Search player name…" value="${esc(state.search)}" /></div>
+        </div>
+        <div class="lb-filter-row">${fbtns}</div>
+        ${noData(state.playerStats?.message)}
+      </div>`;
+      wireRankingsControls(el);
+      return;
+    }
+
+    const players = filteredPlayers();
+
+    const signI = n => (n > 0 ? '+' : '') + n;
+    const sign1 = n => (n > 0 ? '+' : '') + n.toFixed(1);
+    const diffCls = n => n > 0 ? 'val-pos' : n < 0 ? 'val-neg' : 'val-zero';
+    const mvCell = d => {
+      if (d == null) return '<span class="rank-change rank-change--same">—</span>';
+      if (d > 0) return `<span class="rank-change rank-change--up">▲${d}</span>`;
+      if (d < 0) return `<span class="rank-change rank-change--down">▼${Math.abs(d)}</span>`;
+      return '<span class="rank-change rank-change--same">—</span>';
+    };
+
+    const rankById = dsrRankMap();
+    const rows = players.map((p, i) => {
+      // The player's DSR rank — stable across search/filter/sort. Unranked → "—".
+      const rankDisp = rankById.get(p.playerId) ?? '—';
+      const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
+      const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
+      return `<tr>
+        <td><span class="rank-num">${rankDisp}</span></td>
+        <td class="col-opt">${mvCell(p.rankDelta)}</td>
+        <td class="r"><span class="${p._dsr != null ? 'val-dsr' : 'val-zero'}">${dsr}</span></td>
+        <td>
+          <div class="player-cell">
+            <div class="player-avatar ${avCls}">${esc(initials(p.name))}</div>
+            <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
+          </div>
+        </td>
+        <td><span class="player-team" style="font-size:11px">${teamLinkHtml(p.teamName, p.teamId)}</span></td>
+        <td class="r">${p._played}</td>
+        <td class="r"><span class="val-pos">${p._won}</span></td>
+        <td class="r"><span class="val-neg">${p._lost}</span></td>
+        <td class="r col-opt"><span class="val-ps">${p._ps}</span></td>
+        <td class="r col-opt"><span class="val-zero">${p._pa}</span></td>
+        <td class="r"><span class="${diffCls(p._diff)}">${signI(p._diff)}</span></td>
+        <td class="r col-opt"><span class="val-acc">${p._aps.toFixed(1)}</span></td>
+        <td class="r col-opt"><span class="val-zero">${p._apa.toFixed(1)}</span></td>
+        <td class="r"><span class="${diffCls(p._avgDiff)}">${sign1(p._avgDiff)}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Sortable header cell
+    const th = (key, label, opt) => {
+      const on = state.sort === key;
+      const ar = on ? `<span class="sort-ar">${state.sortDir === 'asc' ? '▲' : '▼'}</span>` : '';
+      return `<th class="r sortable ${on ? 'is-sorted' : ''} ${opt ? 'col-opt' : ''}" data-sort="${key}">${label}${ar}</th>`;
+    };
+
+    el.innerHTML = `<div class="lb-card">
+      <div class="lb-search-row">
+        <div class="lb-search-wrap">
+          <input class="lb-search" id="rank-search" placeholder="Search player name…" value="${esc(state.search)}" />
+        </div>
+      </div>
+      <div class="lb-filter-row">${fbtns}</div>
+      <div style="overflow-x:auto">
+        <table class="rank-table">
+          <thead><tr>
+            <th style="width:34px">Rank</th>
+            <th class="col-opt" style="width:30px">+/−</th>
+            ${th('dsr','DSR')}
+            <th>Player</th>
+            <th>Team</th>
+            ${th('gp','GP')}
+            ${th('won','Won')}
+            ${th('loss','Loss')}
+            ${th('ps','PS', true)}
+            ${th('pa','PA', true)}
+            ${th('diff','Diff +/−')}
+            ${th('aps','APS', true)}
+            ${th('apa','APA', true)}
+            ${th('avgdiff','Avg Diff')}
+          </tr></thead>
+          <tbody>${rows || '<tr><td colspan="14">' + noData('No players match this filter.') + '</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+    wireRankingsControls(el);
+  }
+
+  function wireRankingsControls(el) {
+    el.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
+      state.filter = b.dataset.filter;
+      renderRankings();
+    }));
+    el.querySelectorAll('th[data-sort]').forEach(thEl => thEl.addEventListener('click', () => {
+      const key = thEl.dataset.sort;
+      if (state.sort === key) {
+        state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
+      } else {
+        state.sort = key;
+        state.sortDir = 'desc';
+      }
+      renderRankings();
+    }));
+    const s = $('rank-search');
+    if (s) {
+      s.addEventListener('input', e => {
+        const pos = e.target.selectionStart;
+        state.search = e.target.value;
+        renderRankings();
+        const ns = $('rank-search');
+        if (ns) { ns.focus(); try { ns.setSelectionRange(pos, pos); } catch {} }
+      });
+    }
+  }
+
+  // ── K'CHN TOP CHEFS ───────────────────────────────────────────────
+  function renderTopChefs() {
+    const el = $('topchefs-content');
+    let html = '';
+
+    // K'CHN header
+    html += `<div class="lb-card">
+      <div class="kchn-header">
+        <div class="kchn-logo"><span>K'CHN</span></div>
+        <div>
+          <h2 class="kchn-title">Top Chefs</h2>
+          <p class="kchn-sub">Top performers each week · Presented by K'CHN</p>
+        </div>
+      </div>`;
+
+    // Weekly Top Chefs — gender-split winners, newest week first, collapsible
+    const wtp = state.standings?.weeklyTopPerformers || [];
+    if (wtp.length) {
+      const openMap = getChefOpen(wtp);
+      wtp.forEach(week => { html += renderWeekPodium(week, !!openMap[week.week]); });
+    } else {
+      html += `<div style="background:var(--color-surface-2);border-radius:var(--radius-md);padding:var(--space-4);margin-bottom:var(--space-4);">
+        <p style="font-size:12px;color:var(--color-text-faint);margin:0;">
+          ⏳ Weekly top performers appear here after each match night. Check back after Week 1 (June 8).
+        </p>
+      </div>`;
+    }
+    html += `</div>`;
+
+    // Season top chefs split by gender
+    if (!state.playerStats || state.playerStats.empty) {
+      html += `<div class="lb-card">${noData()}</div>`;
+      el.innerHTML = html; return;
+    }
+
+    const byWinRate = (a, b) => (b._rate - a._rate) || (b._won - a._won);
+    const allChefs = filteredPlayers('all');
+    const malePlayers   = allChefs.filter(p => /^m/i.test(p.gender || '')).sort(byWinRate);
+    const femalePlayers = allChefs.filter(p => /^f/i.test(p.gender || '')).sort(byWinRate);
+
+    const chefRows = (list, limit) => list.slice(0, limit).map((p, i) => {
+      const pct = Math.round(p._rate * 100);
+      return `<tr class="${i===0?'rank-row--leader':''}">
+        <td><span class="rank-num ${i===0?'rank-num--1':i===1?'rank-num--2':i===2?'rank-num--3':''}">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</span></td>
+        <td>
+          <div class="player-cell">
+            <div class="player-avatar ${/^f/i.test(p.gender||'')?'player-avatar--f':''}">${esc(initials(p.name))}</div>
+            <div>
+              <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
+              <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
+            </div>
+          </div>
+        </td>
+        <td class="r"><strong>${p._won}–${p._played-p._won}</strong></td>
+        <td class="r"><span class="${pct>=65?'win-pct':'win-pct--low'}">${pct}%</span></td>
+      </tr>`;
+    }).join('');
+
+    html += `<div class="chefs-grid">
+      <div class="lb-card">
+        <h2 class="lb-card__title">🔥 Top Male Chefs</h2>
+        <p class="lb-card__sub">Season leaders · win rate</p>
+        <table class="rank-table">
+          <thead><tr><th>#</th><th>Player</th><th class="r">W–L</th><th class="r">Win%</th></tr></thead>
+          <tbody>${chefRows(malePlayers,8)||'<tr><td colspan="4">'+noData()+'</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="lb-card">
+        <h2 class="lb-card__title">🔥 Top Female Chefs</h2>
+        <p class="lb-card__sub">Season leaders · win rate</p>
+        <table class="rank-table">
+          <thead><tr><th>#</th><th>Player</th><th class="r">W–L</th><th class="r">Win%</th></tr></thead>
+          <tbody>${chefRows(femalePlayers,8)||'<tr><td colspan="4">'+noData()+'</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+
+    el.innerHTML = html;
+    wireChefs(el);
+  }
+
+  function renderWeekPodium(week, open) {
+    // week: { week, label, date, men:[top3], women:[top3] } — each: {name, teamName, teamId, gender, dsr, w, l, diff}
+    const LIME = 'var(--color-lime)', TEAL = 'var(--color-teal)';
+    const fmtDate = iso => { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); } catch { return esc(iso); } };
+
+    const winnerCard = (p, accent, ghost) => {
+      if (!p) return `<div class="pow-winner"><span style="color:var(--color-text-faint);font-size:12px">—</span></div>`;
+      return `<div class="pow-winner" style="border-color:${accent};background:${ghost}">
+        <div class="pow-winner__top">
+          <div class="player-avatar" style="color:${accent};border-color:${accent}">${esc(initials(p.name))}</div>
+          <div style="min-width:0">
+            <div class="pow-winner__name">👑 ${playerLinkHtml(p.name, p.teamName)}</div>
+            <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
+          </div>
+        </div>
+        <div class="pow-winner__stats">
+          <span class="pow-winner__dsr" style="color:${accent}">${Number(p.dsr).toFixed(1)}<span style="font-size:9px;color:var(--color-text-faint);font-weight:600"> DSR</span></span>
+          <span class="pow-winner__rec">${p.w}W–${p.l}L · ${p.diff>=0?'+':''}${p.diff}</span>
+        </div>
+      </div>`;
+    };
+    const mention = (p, place) => p ? `<div class="pow-mention">
+      <span>${place===2?'🥈':'🥉'}</span>
+      <span class="pow-mention__name">${playerLinkHtml(p.name, p.teamName)}</span>
+      <span class="pow-mention__team">· ${esc(p.teamName||'')}</span>
+      <span class="pow-mention__dsr">${Number(p.dsr).toFixed(1)} DSR</span>
+    </div>` : '';
+    const column = (list, label, accent, ghost) => {
+      if (!list || !list.length) return '';
+      return `<div>
+        <div class="pow-col-label" style="color:${accent}">${label}</div>
+        ${winnerCard(list[0], accent, ghost)}
+        <div class="pow-mentions">${mention(list[1],2)}${mention(list[2],3)}</div>
+      </div>`;
+    };
+    const chip = (p, accent) => p ? `<div class="pow-chip">
+      <div class="player-avatar" style="width:26px;height:26px;font-size:9px;color:${accent};border-color:${accent}">${esc(initials(p.name))}</div>
+      <div style="min-width:0">
+        <div class="pow-chip__name">👑 ${playerLinkHtml(p.name, p.teamName)}</div>
+        <div class="player-team">${esc(p.teamName||'')}</div>
+      </div>
+      <span class="pow-chip__dsr" style="color:${accent}">${Number(p.dsr).toFixed(1)}</span>
+    </div>` : '<div class="pow-chip"><span style="color:var(--color-text-faint);font-size:12px">—</span></div>';
+
+    const body = open
+      ? `<div class="pow-cols">
+           ${column(week.men, "Men's chef", LIME, 'var(--color-lime-ghost)')}
+           ${column(week.women, "Women's chef", TEAL, 'var(--color-teal-dim)')}
+         </div>`
+      : `<div class="pow-collapsed">${chip(week.men && week.men[0], LIME)}${chip(week.women && week.women[0], TEAL)}</div>`;
+
+    return `<div class="week-block">
+      <div class="chef-week-head" data-chef-week="${week.week}">
+        <span class="chef-week-caret" style="transform:rotate(${open ? '90' : '0'}deg)">▶</span>
+        <span class="chef-week-label">📅 ${esc(week.label)}${week.date ? ' · ' + esc(fmtDate(week.date)) : ''}</span>
+      </div>
+      ${body}
+    </div>`;
+  }
+
+  // Collapse state for weekly Top Chefs — persisted; newest week open by default.
+  function getChefOpen(weeks) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('ds-chef-open') || '{}'); } catch {}
+    const newest = Math.max(...weeks.map(w => w.week));
+    const out = {};
+    for (const w of weeks) out[w.week] = (String(w.week) in saved) ? !!saved[w.week] : (w.week === newest);
+    return out;
+  }
+  function setChefOpen(week, open) {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem('ds-chef-open') || '{}'); } catch {}
+    saved[week] = open;
+    try { localStorage.setItem('ds-chef-open', JSON.stringify(saved)); } catch {}
+  }
+  function wireChefs(el) {
+    const weeks = state.standings?.weeklyTopPerformers || [];
+    const openMap = getChefOpen(weeks);
+    el.querySelectorAll('[data-chef-week]').forEach(h => h.addEventListener('click', () => {
+      const wk = Number(h.dataset.chefWeek);
+      setChefOpen(wk, !openMap[wk]);
+      renderTopChefs();
+    }));
+  }
+
+  // ── TEAM LEADERS ─────────────────────────────────────────────────
+  function renderTeamLeaders() {
+    const el = $('leaders-content');
+    const players = playerList();
+    if (!players.length) { el.innerHTML = `<div class="lb-card">${noData()}</div>`; return; }
+
+    // Group by team
+    const teamMap = new Map();
+    players.forEach(p => {
+      const key = p.teamId || p.teamName || 'Unknown';
+      if (!teamMap.has(key)) teamMap.set(key, { name: p.teamName||'Unknown', id: key, players: [] });
+      teamMap.get(key).players.push(p);
+    });
+
+    // Build team cards sorted by team name
+    const cards = [...teamMap.values()]
+      .sort((a,b) => a.name.localeCompare(b.name))
+      .map(team => {
+        const sorted = team.players
+          .filter(p => p.gamesPlayed > 0)
+          .sort((a,b) => {
+            const ra = a.gamesPlayed ? a.gamesWon/a.gamesPlayed : 0;
+            const rb = b.gamesPlayed ? b.gamesWon/b.gamesPlayed : 0;
+            return rb !== ra ? rb - ra : b.gamesWon - a.gamesWon;
+          });
+
+        const playerRows = sorted.slice(0, 3).map((p, i) => {
+          const rate = p.gamesPlayed ? Math.round(100*p.gamesWon/p.gamesPlayed) : 0;
+          const avCls = p.gender==='female' ? 'team-player__av--f' : 'team-player__av--m';
+          const pctBadgeCls = 'team-player__pct ' + pctClass(p.gamesPlayed ? p.gamesWon/p.gamesPlayed : 0);
+          return `<div class="team-player">
+            <span class="team-player__rank ${i===0?'team-player__rank--1':''}">${i===0?'🥇':i+1}</span>
+            <div class="team-player__av ${avCls}">${esc(initials(p.name))}</div>
+            <div style="flex:1">
+              <div class="team-player__name">${playerLinkHtml(p.name, team.name)}</div>
+              <div class="team-player__stats">${p.gamesWon}W–${p.gamesPlayed-p.gamesWon}L · ${p.gamesPlayed} GP</div>
+            </div>
+            <span class="${pctBadgeCls}">${rate}% Win</span>
+          </div>`;
+        }).join('') || `<div class="team-player"><span style="font-size:12px;color:var(--color-text-faint)">No stats yet</span></div>`;
+
+        return `<div class="team-card">
+          <div class="team-card__hd">
+            <span class="team-card__name">${teamLinkHtml(team.name, team.id)}</span>
+          </div>
+          <div class="team-card__body">${playerRows}</div>
+        </div>`;
+      }).join('');
+
+    el.innerHTML = cards.length
+      ? `<div class="teams-grid">${cards}</div>`
+      : `<div class="lb-card">${noData()}</div>`;
+  }
+
+  // ── HOT STREAKS ──────────────────────────────────────────────────
+  function renderStreaks() {
+    const el = $('streaks-content');
+    const players = playerList().filter(p => p.gamesPlayed > 0);
+
+    const stub = `<div class="coming-soon">
+      <div class="coming-soon__icon">🔥</div>
+      <div>
+        <p class="coming-soon__title">Match-by-match form tracking coming after Week 1</p>
+        <p class="coming-soon__body">
+          Last-10-games W/L dots and active win streaks will appear here once match data is recorded.
+          Until then, season-to-date totals are shown below.
+        </p>
+      </div>
+    </div>`;
+
+    if (!players.length) {
+      el.innerHTML = stub + `<div class="lb-card">${noData()}</div>`;
+      return;
+    }
+
+    // Derive current form proxy: sort by win rate among players with 5+ games
+    const ranked = [...players]
+      .filter(p => p.gamesPlayed >= 3)
+      .sort((a,b) => {
+        const ra = a.gamesWon/a.gamesPlayed, rb = b.gamesWon/b.gamesPlayed;
+        return rb !== ra ? rb - ra : b.gamesWon - a.gamesWon;
+      });
+
+    const streakRows = ranked.slice(0, 15).map((p, i) => {
+      const rate = Math.round(100*p.gamesWon/p.gamesPlayed);
+      const isHot = rate >= 70 && p.gamesWon >= 5;
+      const badge = isHot ? '<span class="streak-badge streak-badge--hot">Hot</span>' : '';
+      const avCls = p.gender==='female' ? 'player-avatar--f' : '';
+
+      // Simulate form dots from win rate (proxy until real game-order data)
+      const approxWins = Math.round(Math.min(p.gamesWon, 10) * (rate/100));
+      const dots = Array.from({length:Math.min(p.gamesPlayed,10)}, (_,j) =>
+        `<div class="form-dot form-dot--${j < Math.round(Math.min(p.gamesPlayed,10)*p.gamesWon/p.gamesPlayed) ? 'w':'l'}">${j < Math.round(Math.min(p.gamesPlayed,10)*p.gamesWon/p.gamesPlayed)?'W':'L'}</div>`
+      ).join('');
+      const score = `${Math.round(Math.min(p.gamesPlayed,10)*p.gamesWon/p.gamesPlayed)}/${Math.min(p.gamesPlayed,10)}`;
+
+      return `<tr>
+        <td>
+          <div class="player-cell">
+            <div class="player-avatar ${avCls}">${esc(initials(p.name))}</div>
+            <div>
+              <div class="player-name">${playerLinkHtml(p.name, p.teamName)} ${badge}</div>
+              <div class="player-team">${teamLinkHtml(p.teamName, p.teamId)}</div>
+            </div>
+          </div>
+        </td>
+        <td><div class="form-dots">${dots}</div></td>
+        <td class="r"><span class="form-score">${score}</span></td>
+      </tr>`;
+    }).join('');
+
+    el.innerHTML = stub + `<div class="lb-card">
+      <h2 class="lb-card__title">Season Form</h2>
+      <p class="lb-card__sub">Approximated from season totals · Exact last-10 form unlocks after Week 1</p>
+      <div style="overflow-x:auto">
+        <table class="streak-table">
+          <thead><tr>
+            <th>Player</th>
+            <th>Last 10 Games (approx)</th>
+            <th style="text-align:right">Form</th>
+          </tr></thead>
+          <tbody>${streakRows || '<tr><td colspan="3">'+noData()+'</td></tr>'}</tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+
+  // ── ANALYTICS ────────────────────────────────────────────────────
+  function renderAnalytics() {
+    $('analytics-content').innerHTML = `<div class="lb-card">
+      <h2 class="lb-card__title">League Analytics</h2>
+      <div class="empty-state" style="padding:var(--space-10)">
+        Analytics will appear here once enough match data has been collected.
+        Track scoring averages, team momentum, point differentials, and head-to-head records.
+      </div>
+    </div>`;
+  }
+
+  // ── Tab activation ───────────────────────────────────────────────
+  function activateTab(name, skipWrite) {
+    state.tab = name;
+    document.querySelectorAll('.lb-tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab===name));
+    document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section===name));
+    if (!skipWrite) writeUrl();
+    if (name === 'analytics') { renderAnalytics(); return; }
+    if (!state.playerStats && !state._loading) {
+      state._loading = true;
+      Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
+        state._loading = false;
+        renderHero();
+        renderAll();
+      });
+    } else if (state.playerStats) {
+      renderHero();
+      renderAll();
+    }
+  }
+
+  function renderAll() {
+    renderRankings();
+    renderTopChefs();
+    renderTeamLeaders();
+    renderStreaks();
+  }
+
+  // ── Utilities ────────────────────────────────────────────────────
+  function esc(s) {
+    return String(s??'').replace(/[&<>"']/g, c =>
+      ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'})
+           + ' ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.lb-tab').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
+  $('circuit-select').addEventListener('change', e => {
+    state.circuit = e.target.value;
+    state.playerStats = state.standings = null;
+    writeUrl(); activateTab(state.tab, true); activateTab(state.tab);
+  });
+  $('division-select').addEventListener('change', e => {
+    state.division = e.target.value;
+    writeUrl(); renderAll();
+  });
+
+  readUrl();
+  Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
+    renderHero(); renderAll();
+  });
+  </script>
+  <script src="/js/partials.js"></script>
+</body>
+</html>
