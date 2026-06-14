@@ -164,6 +164,20 @@
     .lineup-game__type-num { font-weight: 800; color: var(--color-text-muted); margin-right: 6px; }
     .lineup-game select { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 11px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
     .lineup-game select:focus { outline: none; border-color: var(--color-lime); }
+    /* availability strip above the lineup builder */
+    .av-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
+    .av-head__t { font-size:11px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-muted); }
+    .av-head__h { font-size:11px; color:var(--color-text-faint); }
+    .av-chips { display:flex; flex-wrap:wrap; gap:8px; }
+    .av-chip { display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:var(--radius-full); border:1px solid var(--color-border-strong); background:var(--color-surface-2); color:var(--color-text); font-family:inherit; font-size:12px; cursor:pointer; }
+    .av-chip__st { font-size:10px; font-weight:800; text-transform:uppercase; padding:2px 7px; border-radius:var(--radius-full); }
+    .av-chip.is-in .av-chip__st { background:var(--color-lime-dim); color:var(--color-lime); }
+    .av-chip.is-out { opacity:0.85; border-style:dashed; }
+    .av-chip.is-out .av-chip__nm { text-decoration:line-through; color:var(--color-text-faint); }
+    .av-chip.is-out .av-chip__st { background:var(--color-red-dim); color:var(--color-red); }
+    .av-banner { margin-top:10px; font-size:12px; line-height:1.5; color:var(--color-text-muted); background:var(--color-red-dim); border:1px solid rgba(255,90,90,0.3); border-radius:var(--radius-sm); padding:9px 11px; }
+    .av-banner b { color:var(--color-red); }
+    #avail-panel { margin: 6px 0 18px; padding:14px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); }
 
     /* ── Reveal box ──────────────────────────────────────────── */
     .reveal-box { background: var(--color-lime-ghost, rgba(184,255,44,0.04)); border: 1px solid rgba(184,255,44,0.12); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 16px; }
@@ -626,6 +640,8 @@
 
         <div id="match-reveal-area"></div>
 
+        <div id="avail-panel" style="display:none;"></div>
+
         <div id="lineup-builder"></div>
 
         <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; flex-wrap: wrap;" id="lineup-actions">
@@ -1063,6 +1079,7 @@
       currentMatch: null,
       currentLineup: null,
       lineupDraft: {},
+      lineupAvail: {},   // playerId -> {status:'in'|'out', reason, byRole} for the current match
       oppLineup: null,
       pollTimer: null,
       scoreDirty: false, // true while the captain has unsaved score entry
@@ -1914,7 +1931,7 @@
     //   'lineup' → lineup work only (no scoresheet)
     function applyMatchViewMode() {
       const mode = state.matchViewMode || 'lineup';
-      const lineupIds = ['match-reveal-area', 'lineup-builder', 'lineup-actions', 'lineup-status'];
+      const lineupIds = ['match-reveal-area', 'avail-panel', 'lineup-builder', 'lineup-actions', 'lineup-status'];
       const ss = $id('scoresheet-area');
       if (mode === 'score') {
         lineupIds.forEach(id => { const el = $id(id); if (el) el.style.display = 'none'; });
@@ -1933,6 +1950,8 @@
         //  renderMatchDetail, which runs before this.)
         const ra = $id('match-reveal-area'); if (ra) ra.style.display = '';
         const lst = $id('lineup-status'); if (lst) lst.style.display = '';
+        // Restore the availability strip (hidden in score mode).
+        renderAvailPanel(state.lastLineupStatus?.myLocked, state.lastLineupStatus?.revealed);
         // Post-reveal there's no lineup work left — offer a jump to scoring.
         const st = state.lastLineupStatus;
         if (ra && st?.revealed && !$id('goto-scoresheet-btn')) {
@@ -1977,6 +1996,14 @@
         state.currentLineup = data.myLineup;
         state.oppLineup = data.oppLineup;
         state.lineupDraft = (data.myLineup?.games) || {};
+        state.lineupAvail = data.availability || {};
+        // If a player went unavailable after being drafted, pull them out of the
+        // working draft so the builder reflects the hard block (server rejects on
+        // lock anyway). Never touch an already-locked lineup.
+        if (!data.status?.myLocked) {
+          const out = availOutSet();
+          if (out.size) out.forEach(id => removePlayerFromDraft(id));
+        }
         state.lastLineupStatus = data.status || null;
         // Roster must be loaded before we can judge lineup eligibility (the gate).
         if (!(state.roster || []).length) { await loadRoster(true); }
@@ -2132,6 +2159,7 @@
         const shortfall = lineupRosterShortfall();
         if (shortfall) {
           $id('lineup-actions').style.display = 'none';
+          const ap = $id('avail-panel'); if (ap) { ap.style.display = 'none'; ap.innerHTML = ''; }
           const builder = $id('lineup-builder');
           builder.style.display = '';
           builder.innerHTML = renderLineupGate(shortfall);
@@ -2146,6 +2174,7 @@
         $id('lineup-actions').style.display = '';
       }
 
+      renderAvailPanel(data.status.myLocked, data.status.revealed);
       renderLineupBuilder(data.status.myLocked, data.status.revealed);
     }
 
@@ -2199,7 +2228,7 @@
       // Phones get the tap-to-assign builder; desktop keeps the dropdown grid.
       if (typeof isMobileCap === 'function' && isMobileCap() && !locked && !revealed) { renderMobileLineup(); return; }
 
-      const roster = activeRoster();
+      const roster = availableRoster();
       const container = $id('lineup-builder');
 
       const renderGame = (slotKey) => {
@@ -3257,6 +3286,70 @@
     // Active = everyone not archived. Archived players keep their record + past
     // games but leave the active roster, lineups, and capacity counts.
     function activeRoster() { return (state.roster || []).filter(p => !p.archived); }
+    // Players marked unavailable for the current match — excluded from the lineup
+    // builder (hard block). Default is available, so only explicit 'out' counts.
+    function availOutSet() {
+      const s = new Set();
+      const a = state.lineupAvail || {};
+      for (const id in a) { if (a[id] && a[id].status === 'out') s.add(id); }
+      return s;
+    }
+    function availableRoster() { const out = availOutSet(); return activeRoster().filter(p => !out.has(p.id)); }
+    function removePlayerFromDraft(playerId) {
+      for (const k of Object.keys(state.lineupDraft || {})) {
+        const g = state.lineupDraft[k]; if (!g) continue;
+        if (g.p1 === playerId) { g.p1 = null; delete g.p1Name; }
+        if (g.p2 === playerId) { g.p2 = null; delete g.p2Name; }
+      }
+    }
+    // Availability strip above the lineup builder. Captains can flip a player out
+    // (e.g. they texted "can't make it") and that player drops from the picker.
+    function renderAvailPanel(locked, revealed) {
+      const el = $id('avail-panel');
+      if (!el) return;
+      const roster = activeRoster();
+      if (locked || revealed || !roster.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
+      const avail = state.lineupAvail || {};
+      const outList = roster.filter(p => avail[p.id]?.status === 'out');
+      const chips = roster.map(p => {
+        const st = avail[p.id]?.status;
+        const out = st === 'out';
+        return `<button type="button" class="av-chip ${out ? 'is-out' : 'is-in'}" onclick="toggleAvail('${p.id}')">
+          <span class="av-chip__nm">${escapeHtml(p.name)}</span>
+          <span class="av-chip__st">${out ? 'Out' : 'In'}</span>
+        </button>`;
+      }).join('');
+      const banner = outList.length
+        ? `<div class="av-banner"><b>${outList.length} unavailable</b> — removed from the picker: ${outList.map(p => {
+            const r = avail[p.id]?.reason; const cap = avail[p.id]?.byRole === 'captain';
+            return escapeHtml(p.name) + (r ? ` (${escapeHtml(r)})` : '') + (cap ? '' : ' — said so');
+          }).join(', ')}</div>`
+        : '';
+      el.style.display = '';
+      el.innerHTML = `
+        <div class="av-head"><span class="av-head__t">Availability</span><span class="av-head__h">Tap a player to toggle. Players marked out are removed from the lineup below.</span></div>
+        <div class="av-chips">${chips}</div>
+        ${banner}`;
+    }
+    async function toggleAvail(playerId) {
+      if (!state.currentMatch) return;
+      const cur = state.lineupAvail?.[playerId]?.status;
+      const next = cur === 'out' ? 'in' : 'out';
+      let reason = '';
+      if (next === 'out') reason = window.prompt('Reason (optional) — e.g. "away", "injured":', state.lineupAvail?.[playerId]?.reason || '') || '';
+      try {
+        const res = await fetch(`/.netlify/functions/captain-availability?match=${encodeURIComponent(state.currentMatch.id)}`, {
+          method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId, status: next, reason }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(d.error || 'Could not update availability.'); return; }
+        state.lineupAvail = d.players || {};
+        if (next === 'out') removePlayerFromDraft(playerId);
+        renderAvailPanel(false, false);
+        renderLineupBuilder(false, false);
+      } catch { alert('Could not update availability.'); }
+    }
     function archivedRoster() { return (state.roster || []).filter(p => p.archived); }
     function rosterSorted() {
       const rank = (p) => isCap(p) ? 0 : p.isCoCaptain ? 1 : 2;
@@ -3886,7 +3979,7 @@
     function renderMobileLineup() {
       const counts = lineupCounts();
       const setCount = SLOT_KEYS.filter(k => state.lineupDraft[k]?.p1 && state.lineupDraft[k]?.p2).length;
-      const chips = activeRoster().map(p => {
+      const chips = availableRoster().map(p => {
         const atCap = (counts[p.id] || 0) >= LINEUP_MAX_GAMES;
         return `<span class="lmob-chip ${atCap ? 'is-cap' : ''}"><span class="lmob-dot ${p.gender === 'F' ? 'is-f' : 'is-m'}"></span>${escapeHtml(p.name)} <b>${counts[p.id] || 0}/${LINEUP_MAX_GAMES}</b></span>`;
       }).join('');
@@ -3939,7 +4032,7 @@
       capSheetCtx = { slotKey, pos };
       $id('cap-sheet-title').textContent = `${slot.label} · ${allow === 'F' ? 'Woman' : 'Man'}`;
       $id('cap-sheet-sub').textContent = `Round ${slot.round}, Game ${slot.game} · same time as G${pairedGame.game} · max ${LINEUP_MAX_GAMES} games/night`;
-      const elig = activeRoster().filter(p => p.gender === allow);
+      const elig = availableRoster().filter(p => p.gender === allow);
       let rows;
       if (!elig.length) {
         rows = `<div class="empty-state">No ${allow === 'F' ? 'women' : 'men'} on your roster with a gender set. Add them in the Roster tab.</div>`;

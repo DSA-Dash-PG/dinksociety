@@ -11,6 +11,7 @@ import { isRevealTime } from './lib/lineup-helpers.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
 import { getActiveWaivers, getSignature, isWaiverSatisfied } from './lib/waiver.js';
 import { isAdminEmail } from './lib/admin-auth.js';
+import { getTeamAvailability } from './lib/availability.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -133,6 +134,21 @@ export default async (req) => {
       let result = null;
       if (final && myMp != null && oppMp != null) result = myMp > oppMp ? 'W' : myMp < oppMp ? 'L' : 'T';
 
+      // My availability for this match (default = available, so null until I act
+      // or a captain sets it). Only meaningful for upcoming matches.
+      let availability = null;
+      if (!final) {
+        const ar = await getTeamAvailability(mt.id, teamId);
+        const a = ar.players?.[playerId] || null;
+        const started = mt.scheduledAt ? Date.now() >= new Date(mt.scheduledAt).getTime() : false;
+        availability = {
+          status: a?.status || null,
+          reason: a?.reason || '',
+          byRole: a?.byRole || null,
+          editable: !started,
+        };
+      }
+
       // My lineup membership (which games I'm slotted in), if my lineup is locked
       let myGames = [];
       let myLocked = false, revealed = false;
@@ -210,7 +226,7 @@ export default async (req) => {
         home, court: mt.court || null, venue: mt.venue || null, scheduledAt: mt.scheduledAt || null, startTime: mt.startTime || null,
         championship: !!mt.championship,
         final, myMp, oppMp, result,
-        myLocked, revealed, myGames, lineup, scores,
+        myLocked, revealed, myGames, lineup, scores, availability,
         status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
       });
       }

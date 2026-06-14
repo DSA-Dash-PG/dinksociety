@@ -21,6 +21,7 @@ import {
   DEFAULT_LOCK_OFFSET_MIN, DEFAULT_REVEAL_OFFSET_MIN,
 } from './lib/lineup-helpers.js';
 import { logActivity } from './lib/activity-log.js';
+import { getTeamAvailability, unavailableIds } from './lib/availability.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -77,6 +78,10 @@ export default async (req) => {
     const unlockable = myLocked && !revealed && (cutoff === null || Date.now() < cutoff);
     const revealAt = revealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
 
+    // My team's availability for this match — drives the hard-block in the
+    // lineup builder (unavailable players are removed from the slot pickers).
+    const avail = await getTeamAvailability(matchId, myTeamId);
+
     return json({
       matchId,
       myRole: match.teamA.id === myTeamId ? 'home' : 'away',
@@ -89,6 +94,7 @@ export default async (req) => {
       scheduledAt: match.scheduledAt || null,
       myLineup: mine || null,
       oppLineup: revealed ? sanitizeRevealedLineup(opp) : null,
+      availability: avail.players || {},
       status: {
         myLocked, oppLocked, revealed, unlockable,
         hardLockAt: cutoff ? new Date(cutoff).toISOString() : null,
@@ -164,6 +170,13 @@ export default async (req) => {
     const roster = ctx.team.roster || [];
     const rosterById = new Map(roster.map(p => [p.id, p]));
 
+    // Availability hard-block: a player who's marked unavailable for THIS match
+    // can't be placed in any slot. Server-side guarantee behind the UI, which
+    // already hides them from the pickers. A captain who wants them in must first
+    // flip them back to available (captain-availability.js).
+    const avail = await getTeamAvailability(matchId, myTeamId);
+    const outIds = unavailableIds(avail);
+
     // Before a lock, make sure the roster can physically fill a legal lineup —
     // a clear up-front message beats twelve per-slot "missing players" errors.
     if (action === 'lock') {
@@ -201,6 +214,14 @@ export default async (req) => {
       const p2 = rosterById.get(p2Id);
       if (!p1 || !p2) {
         return json({ error: `${prettySlot(slot)} has a player not on the roster` }, 400);
+      }
+
+      // Unavailable players can't be slotted (default is available).
+      if (outIds.has(p1Id)) {
+        return json({ error: `${p1.name} is marked unavailable for this match. Set them available first to use them.` }, 400);
+      }
+      if (outIds.has(p2Id)) {
+        return json({ error: `${p2.name} is marked unavailable for this match. Set them available first to use them.` }, 400);
       }
 
       // Gender enforcement — block lock if either player has no gender set
