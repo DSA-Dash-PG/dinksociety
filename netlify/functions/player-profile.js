@@ -12,7 +12,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, verifyCaptainSession, verifyPlayerSession } from './lib/auth.js';
-import { cleanProfileInput } from './lib/profile.js';
+import { cleanProfileInput, notifyAdminsPendingProfile } from './lib/profile.js';
 
 const VALID_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -90,6 +90,13 @@ export default async (req) => {
 
     team.updatedAt = now;
     await teamsStore.setJSON(teamKey, team);
+
+    // Notify admins when something now needs approval.
+    if (!isAdmin) {
+      await notifyAdminsPendingProfile({
+        playerName: entry.name, teamName: team.name, submittedBy, what: 'bio update',
+      });
+    }
 
     return new Response(JSON.stringify({
       ok: true,

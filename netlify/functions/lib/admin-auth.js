@@ -39,6 +39,19 @@ export function isAdminEmail(email) {
 }
 
 /**
+ * The full list of admin emails (from ADMIN_EMAILS), normalized + de-duped.
+ * Used by notification senders that need to reach every league admin.
+ */
+export function adminEmailList() {
+  return [...new Set(
+    (process.env.ADMIN_EMAILS || '')
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  )];
+}
+
+/**
  * Standard 401 response used by admin endpoints.
  */
 export function unauthResponse(msg = 'Unauthorized') {

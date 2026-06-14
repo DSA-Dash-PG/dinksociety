@@ -571,6 +571,7 @@
         <section class="admin-section is-active" data-section="overview">
           <div class="am-head"><h1 class="am-title">Overview</h1><span class="ov-circuit-label" style="font-size:10px;color:var(--color-text-faint);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;" id="ov-circuit-label"></span></div>
           <div id="ov-actions"><div class="loading">Loading…</div></div>
+          <div id="ov-appr"></div>
           <div id="ov-tonight"></div>
           <div class="stats-row" id="ov-stats"><div class="loading">Loading overview…</div></div>
           <div class="gd__lbl" style="margin:0 0 8px;">Quick actions</div>
@@ -2326,8 +2327,21 @@
   window.renderApprovals = renderApprovals;
 
   function updateApprBadge(n) {
-    const b = $id('sb-appr-ct'); if (!b) return;
-    if (n > 0) { b.textContent = n; b.style.display = ''; } else { b.style.display = 'none'; }
+    const b = $id('sb-appr-ct');
+    if (b) { if (n > 0) { b.textContent = n; b.style.display = ''; } else { b.style.display = 'none'; } }
+    // Overview banner
+    const ov = $id('ov-appr');
+    if (ov) {
+      ov.innerHTML = n > 0
+        ? `<div class="ova" style="margin-top:10px;"><div class="ova__item ova__item--warn">
+             <span class="ova__ico">🖼️</span>
+             <div class="ova__body"><div class="ova__t">${n} profile change${n === 1 ? '' : 's'} awaiting approval</div>
+             <div class="ova__s">Player/captain photo &amp; bio edits waiting for review</div></div>
+             <button class="ab ab--outline ab--sm" id="ov-appr-go">Review</button></div></div>`
+        : '';
+      const go = $id('ov-appr-go');
+      if (go) go.addEventListener('click', () => gotoTab('approvals'));
+    }
   }
   // Surface the pending count on load (best-effort; ignores auth errors).
   (function loadApprBadge() {

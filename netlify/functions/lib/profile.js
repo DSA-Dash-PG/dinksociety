@@ -14,7 +14,41 @@
 // profile/photo and clears pendingProfile. An admin's own edit writes profile
 // directly (admins are the approvers).
 
+import { sendEmail } from './email.js';
+import { adminEmailList } from './admin-auth.js';
+
 export const PROFILE_FIELDS = ['height', 'dob', 'plays', 'city', 'homeCourt'];
+
+// Email every league admin that a profile change is waiting for approval.
+// Best-effort: never throws (callers await inside try/catch and ignore errors)
+// so a mail hiccup can't fail the player's/captain's save.
+export async function notifyAdminsPendingProfile({ playerName, teamName, submittedBy, what }) {
+  try {
+    const to = adminEmailList();
+    if (!to.length) return;
+    const who = submittedBy === 'captain' ? 'their captain' : 'the player';
+    const adminUrl = 'https://dinksociety.app/admin.html';
+    const html = `<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;color:#1a1a1a;">
+      <h2 style="font-size:18px;margin:0 0 12px;">Profile change awaiting approval</h2>
+      <p style="font-size:14px;line-height:1.6;margin:0 0 8px;">
+        <b>${escAttr(playerName)}</b> (${escAttr(teamName)}) has a ${escAttr(what)} submitted by ${who} and waiting for review.
+      </p>
+      <p style="font-size:14px;line-height:1.6;margin:0 0 18px;">Approve or reject it in the <b>Profile Approvals</b> tab.</p>
+      <p style="margin:0;"><a href="${adminUrl}" style="background:#b8ff2c;color:#0a0f08;text-decoration:none;font-weight:700;padding:10px 18px;border-radius:8px;display:inline-block;font-size:14px;">Open admin panel</a></p>
+    </div>`;
+    await sendEmail({
+      to,
+      subject: `Profile approval needed — ${playerName} (${teamName})`,
+      html,
+    });
+  } catch (err) {
+    console.error('notifyAdminsPendingProfile failed (non-fatal):', err?.message || err);
+  }
+}
+
+function escAttr(s) {
+  return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+}
 
 const PLAYS_VALUES = new Set(['Right', 'Left', 'Both']);
 

@@ -14,6 +14,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, verifyCaptainSession, verifyPlayerSession } from './lib/auth.js';
+import { notifyAdminsPendingProfile } from './lib/profile.js';
 
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB — Lambda payload ceiling (client compresses first)
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -109,6 +110,12 @@ export default async (req) => {
 
     team.updatedAt = updatedAt;
     await teamsStore.setJSON(teamKey, team);
+
+    if (!isAdmin) {
+      await notifyAdminsPendingProfile({
+        playerName: entry.name, teamName: team.name, submittedBy: entry.pendingProfile?.submittedBy || 'player', what: 'new photo',
+      });
+    }
 
     return new Response(JSON.stringify({ ok: true, playerId, status: isAdmin ? 'live' : 'pending', updatedAt }), { status: 200, headers });
   } catch (err) {
