@@ -78,7 +78,7 @@ export default async (req) => {
     // Load team + locate the roster entry to stamp.
     const teamsStore = getStore('teams');
     const teamKey = `team/${teamId}.json`;
-    const team = await teamsStore.get(teamKey, { type: 'json' }).catch(() => null);
+    const team = await teamsStore.get(teamKey, { type: 'json', consistency: 'strong' }).catch(() => null);
     if (!team) {
       return new Response(JSON.stringify({ error: 'Team not found' }), { status: 404, headers });
     }

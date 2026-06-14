@@ -68,7 +68,7 @@ export default async (req) => {
     // ── Load team + roster entry ──
     const teamsStore = getStore('teams');
     const teamKey = `team/${teamId}.json`;
-    const team = await teamsStore.get(teamKey, { type: 'json' }).catch(() => null);
+    const team = await teamsStore.get(teamKey, { type: 'json', consistency: 'strong' }).catch(() => null);
     if (!team) return new Response(JSON.stringify({ error: 'Team not found' }), { status: 404, headers });
     const entry = (team.roster || []).find(p => p.id === playerId);
     if (!entry) return new Response(JSON.stringify({ error: 'Player not on this team' }), { status: 404, headers });

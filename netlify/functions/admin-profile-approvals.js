@@ -28,7 +28,9 @@ export default async (req) => {
       const { blobs } = await teamsStore.list();
       const pending = [];
       for (const blob of blobs) {
-        const raw = await teamsStore.get(blob.key);
+        // Strong consistency: a pending edit may have been written seconds ago;
+        // an eventual read can miss it and the queue would look empty.
+        const raw = await teamsStore.get(blob.key, { consistency: 'strong' });
         if (!raw) continue;
         let team;
         try { team = JSON.parse(raw); } catch { continue; }
@@ -87,7 +89,7 @@ export default async (req) => {
       }
 
       const teamKey = `team/${teamId}.json`;
-      const team = await teamsStore.get(teamKey, { type: 'json' }).catch(() => null);
+      const team = await teamsStore.get(teamKey, { type: 'json', consistency: 'strong' }).catch(() => null);
       if (!team) return new Response(JSON.stringify({ error: 'Team not found' }), { status: 404, headers });
       const entry = (team.roster || []).find(p => p.id === playerId);
       if (!entry) return new Response(JSON.stringify({ error: 'Player not found' }), { status: 404, headers });

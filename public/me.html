@@ -448,7 +448,12 @@
   .pf-status { font-size:11.5px; font-weight:600; min-height:14px; color:var(--color-text-faint); }
   .pf-status--main { text-align:center; }
   .ph-hero { display:flex; flex-direction:column; align-items:center; text-align:center; gap:8px; padding:8px 0 18px; }
-  .ph-av { width:64px; height:64px; border-radius:50%; background:var(--color-surface-3); border:1px solid var(--color-border-strong); display:grid; place-items:center; font-size:24px; font-weight:800; color:var(--color-text-muted); }
+  .ph-av { width:64px; height:64px; border-radius:50%; background:var(--color-surface-3); border:1px solid var(--color-border-strong); display:grid; place-items:center; font-size:24px; font-weight:800; color:var(--color-text-muted); overflow:hidden; }
+  .ph-av__img { width:100%; height:100%; object-fit:cover; }
+  .ph-vitals { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:2px 0 16px; }
+  .ph-vital { background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:9px 8px; text-align:center; }
+  .ph-vital__l { font-size:8.5px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-text-faint); margin-bottom:3px; }
+  .ph-vital__v { font-size:13px; font-weight:800; }
   .ph-emoji { font-size:48px; line-height:1; }
   .ph-name { font-size:20px; font-weight:800; }
   .ph-sub { font-size:12px; color:var(--color-text-muted); }
@@ -1051,6 +1056,35 @@
     if (!html) html = '<div class="ph-empty">No partner data yet.</div>';
     return html;
   }
+  // Look up a player's approved bio fields + photo from the teams cache.
+  async function _phBio(playerId, name, teamName) {
+    try {
+      const teams = await _teamsData();
+      const key = String(name || '').trim().toLowerCase();
+      let entry = null;
+      if (playerId) { for (const t of teams) { const f = (t.roster || []).find(p => p.id === playerId); if (f) { entry = f; break; } } }
+      if (!entry) {
+        const tk = String(teamName || '').trim().toLowerCase();
+        const t = tk ? teams.find(t => String(t.name || '').trim().toLowerCase() === tk) : null;
+        entry = (t?.roster || []).find(p => String(p.name || '').trim().toLowerCase() === key) || null;
+        if (!entry) { for (const t of teams) { const f = (t.roster || []).find(p => String(p.name || '').trim().toLowerCase() === key); if (f) { entry = f; break; } } }
+      }
+      return entry;
+    } catch { return null; }
+  }
+  function _phVitals(bio, g) {
+    if (!bio) return '';
+    const items = [];
+    const gt = g === 'F' ? 'Female' : g === 'M' ? 'Male' : null;
+    if (gt) items.push(['Gender', gt]);
+    if (bio.height) items.push(['Height', bio.height]);
+    if (bio.age != null) items.push(['Age', bio.age]);
+    if (bio.plays) items.push(['Plays', bio.plays]);
+    if (bio.city) items.push(['City', bio.city]);
+    if (bio.homeCourt) items.push(['Home court', bio.homeCourt]);
+    if (!items.length) return '';
+    return `<div class="ph-vitals">` + items.map(([l, v]) => `<div class="ph-vital"><div class="ph-vital__l">${l}</div><div class="ph-vital__v">${esc(String(v))}</div></div>`).join('') + `</div>`;
+  }
   async function renderPlayerProfile({ name, teamName }) {
     $('psheet-title').textContent = shortName(name) || 'Player';
     const lb = (DATA?.leaderboard || []);
@@ -1061,9 +1095,13 @@
     const gChip = g === 'F' ? '<span class="ph-g f">Woman</span>' : g === 'M' ? '<span class="ph-g m">Man</span>' : '';
     const teamLine = (row?.teamName || teamName)
       ? `<div class="ph-sub">${teamLink(null, row?.teamName || teamName, esc(row?.teamName || teamName))}${gChip ? ' · ' + gChip : ''}</div>` : (gChip ? `<div class="ph-sub">${gChip}</div>` : '');
-    const hero = `<div class="ph-hero"><div class="ph-av">${esc(initials(name))}</div><div class="ph-name">${esc(name)}</div>${teamLine}</div>`;
+    // Approved bio + photo (from teams cache).
+    const bio = await _phBio(row?.playerId, name, row?.teamName || teamName);
+    const avInner = bio && bio.photoUrl ? `<img src="${esc(bio.photoUrl)}" alt="" class="ph-av__img">` : esc(initials(name));
+    const vitals = _phVitals(bio, g || norm(bio?.gender));
+    const hero = `<div class="ph-hero"><div class="ph-av">${avInner}</div><div class="ph-name">${esc(name)}</div>${teamLine}</div>`;
     if (!row) {
-      $('psheet-body').innerHTML = hero + '<div class="ph-empty">No ranked stats yet — this player hasn’t logged a game this season.</div>';
+      $('psheet-body').innerHTML = hero + vitals + '<div class="ph-empty">No ranked stats yet — this player hasn’t logged a game this season.</div>';
       return;
     }
     const wl = `${row.w || 0}–${row.l || 0}`;
@@ -1071,7 +1109,7 @@
       <div class="ph-tile"><div class="ph-tile__n">${row.rank != null ? '#' + row.rank : '—'}</div><div class="ph-tile__l">League rank</div></div>
       <div class="ph-tile"><div class="ph-tile__n lime">${row.dsr != null ? row.dsr : '—'}</div><div class="ph-tile__l">DSR</div></div>
       <div class="ph-tile"><div class="ph-tile__n">${wl}</div><div class="ph-tile__l">Game W–L</div></div>
-    </div>`;
+    </div>` + vitals;
     const shell = `<div class="ph-tabs">
         <button class="ph-tab is-on" data-pt="ov" onclick="phTab('ov')">Overview</button>
         <button class="ph-tab" data-pt="pt" onclick="phTab('pt')">Partners</button>
