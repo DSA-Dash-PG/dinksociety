@@ -3986,6 +3986,10 @@
       p.email  = g('email')  || null;
       p.gender = g('gender') || '';
       p.phone  = g('phone')  || null;
+      // Profile bio fields (data-pf) → p.profile (sent live on Save Changes).
+      const pf = {};
+      el.querySelectorAll('[data-pf]').forEach(inp => { pf[inp.dataset.pf] = inp.value.trim(); });
+      if (Object.keys(pf).length) p.profile = { ...(p.profile || {}), ...pf };
     });
   }
 
@@ -3997,6 +4001,11 @@
     const activeHtml = active.map(([p, i]) => {
       const roleClass = p.isCaptain ? 'ri--captain' : p.isCoCaptain ? 'ri--cocaptain' : '';
       const color = riColor(p.name);
+      const prof = p.profile || {};
+      const playsOpt = v => '<option value="' + v + '"' + ((prof.plays||'') === v ? ' selected' : '') + '>' + (v || '—') + '</option>';
+      const photoThumb = (p.photo && p.photo.updatedAt)
+        ? '<img src="/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(p.id) + '&v=' + encodeURIComponent(p.photo.updatedAt) + '" style="width:100%;height:100%;object-fit:cover;">'
+        : riInit(p.name);
       return '<div class="ri ' + roleClass + '" data-idx="' + i + '">' +
         '<div class="ri__head">' +
           '<div class="ri__avatar" style="background:' + color + '">' + riInit(p.name) + '</div>' +
@@ -4021,6 +4030,18 @@
             '<span class="ri__label">Phone</span>' +
             '<input type="tel" class="ri__input" data-field="phone" value="' + h(p.phone||'') + '" placeholder="(555) 123-4567">' +
           '</div>' +
+          // ── Player profile (admin edits apply live) ──
+          '<div class="ri__field"><span class="ri__label">Height</span><input class="ri__input" data-pf="height" value="' + h(prof.height||'') + '" placeholder="5&#39;8&quot;"></div>' +
+          '<div class="ri__field"><span class="ri__label">DOB <em>— age shown, DOB private</em></span><input type="date" class="ri__input" data-pf="dob" value="' + h(prof.dob||'') + '"></div>' +
+          '<div class="ri__field"><span class="ri__label">Plays</span><select class="ri__input" data-pf="plays">' + playsOpt('') + playsOpt('Right Handed') + playsOpt('Left Handed') + playsOpt('Both') + '</select></div>' +
+          '<div class="ri__field"><span class="ri__label">City</span><input class="ri__input" data-pf="city" value="' + h(prof.city||'') + '" placeholder="City"></div>' +
+          '<div class="ri__field ri__field--full"><span class="ri__label">Home court</span><input class="ri__input" data-pf="homeCourt" value="' + h(prof.homeCourt||'') + '" placeholder="Home court"></div>' +
+          (p.id ? (
+          '<div class="ri__field ri__field--full" style="flex-direction:row;align-items:center;gap:10px;">' +
+            '<div class="ri__avatar" style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:' + color + '">' + photoThumb + '</div>' +
+            '<input type="file" accept="image/jpeg,image/png,image/webp" data-photo-idx="' + i + '" style="font-size:11px;flex:1;min-width:0;">' +
+            '<button class="ab ab--ghost ab--sm" data-action="upload-photo" data-idx="' + i + '" style="font-size:10px;">Upload photo</button>' +
+          '</div>') : '') +
           '<div class="ri__roles">' +
             '<button class="ri__role ri__role--captain' + (p.isCaptain ? ' is-active' : '') + '" data-action="set-captain" data-idx="' + i + '">Captain</button>' +
             '<button class="ri__role ri__role--cocaptain' + (p.isCoCaptain ? ' is-active' : '') + '" data-action="set-cocaptain" data-idx="' + i + '">⭐ Co-Captain</button>' +
@@ -4049,12 +4070,36 @@
     return (active.length ? activeHtml : '<div class="empty" style="padding:12px;">No active players.</div>') + archivedHtml;
   }
 
+  async function uploadPlayerPhotoAdmin(idx, btn) {
+    const p = currentPanelTeam.roster?.[idx];
+    if (!p || !p.id) { alert('Save the player first, then add a photo.'); return; }
+    const fileInput = document.querySelector('[data-photo-idx="' + idx + '"]');
+    const f = fileInput && fileInput.files && fileInput.files[0];
+    if (!f) { alert('Pick an image first.'); return; }
+    const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Uploading…';
+    try {
+      const compressed = await compressImage(f);
+      const fd = new FormData();
+      fd.append('file', compressed); fd.append('playerId', p.id); fd.append('teamId', currentPanelTeam.id);
+      const r = await fetch('/.netlify/functions/player-photo-upload', { method: 'POST', body: fd, credentials: 'include' });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Upload failed');
+      p.photo = { updatedAt: d.updatedAt };
+      const thumb = btn.parentElement.querySelector('.ri__avatar');
+      if (thumb) thumb.innerHTML = '<img src="/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(p.id) + '&v=' + encodeURIComponent(d.updatedAt) + '" style="width:100%;height:100%;object-fit:cover;">';
+      btn.textContent = '✓ Live';
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
+    } catch (e) { alert('Photo upload failed: ' + e.message); btn.textContent = orig; btn.disabled = false; }
+  }
+
   function wireRosterActions() {
     $id('tdp-roster').querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         e.stopPropagation();
         const idx = parseInt(btn.dataset.idx);
         const action = btn.dataset.action;
+        // Photo upload is self-contained — must NOT flush/re-render (that drops the picked file).
+        if (action === 'upload-photo') { await uploadPlayerPhotoAdmin(idx, btn); return; }
         // Preserve any typed values before re-render
         flushRosterFromDOM();
         const roster = currentPanelTeam.roster || [];

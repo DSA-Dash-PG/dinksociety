@@ -89,6 +89,12 @@ export default async (req) => {
       const prevById = new Map((team.roster || []).map(x => [x.id, x]));
       team.roster = body.roster.map(p => {
         const prev = prevById.get(p.id) || null;
+        // Bio profile: merge any admin-supplied fields onto the stored profile
+        // (admin edits apply live). When the payload omits profile, keep prev's.
+        const incomingProfile = p.profile && typeof p.profile === 'object' ? p.profile : null;
+        const mergedProfile = (incomingProfile || prev?.profile)
+          ? { ...(prev?.profile || {}), ...(incomingProfile || {}) }
+          : null;
         return {
           id: p.id || generatePlayerId(),
           name: (p.name || '').trim(),
@@ -101,6 +107,11 @@ export default async (req) => {
           dupr: p.dupr || null,
           isCaptain: !!p.isCaptain,
           isCoCaptain: !!p.isCoCaptain,
+          // Profile bio / pending edits / photo stamp are owned by the profile
+          // endpoints — preserve (or live-merge) them so a team save can't wipe them.
+          ...(mergedProfile ? { profile: mergedProfile } : {}),
+          ...(prev?.pendingProfile ? { pendingProfile: prev.pendingProfile } : {}),
+          ...(prev?.photo ? { photo: prev.photo } : {}),
           ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),
         };
       }).filter(p => p.name);
