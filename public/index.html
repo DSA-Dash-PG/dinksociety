@@ -327,6 +327,23 @@
     function rec(w,l){return (w==null?0:w)+'–'+(l==null?0:l);}
     function signed(n){if(n==null)return '—';return n>0?'+'+n:String(n);}
 
+    // Link helpers — the schedule IIFE below defines its own copies, but the
+    // recap renderers in THIS block (POTW/DSR/standings) call them too. Without
+    // them in scope, the first name rendered throws ReferenceError and POTW,
+    // DSR, standings AND the Drop teaser all silently stay hidden.
+    var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
+    var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
+    function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
+    function teamLink(name, id, cls){
+      if (!name || name === 'TBD') return '<span class="'+cls+'">'+esc(name||'TBD')+'</span>';
+      var ref = id || slug(name);
+      return '<a class="'+cls+'" href="/team?id='+encodeURIComponent(ref)+LINK_SUFFIX+'">'+esc(name)+'</a>';
+    }
+    function playerLink(name, teamName, cls, label){
+      if (!name) return '<span class="'+cls+'">'+esc(label||'—')+'</span>';
+      return '<a class="'+cls+'" href="/player?team='+encodeURIComponent(slug(teamName||''))+'&name='+encodeURIComponent(name)+LINK_SUFFIX+'">'+esc(label!=null?label:name)+'</a>';
+    }
+
     var TOTAL_WEEKS = 8;
 
     function renderWeeknav(currentWeek){
