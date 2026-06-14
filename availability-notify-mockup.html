@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Availability notification — email + captain page (mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12);
+    --color-red:#ff5c47; --color-red-dim:rgba(255,92,71,0.12);
+    --color-gold:#f0c040; --color-gold-dim:rgba(240,192,64,0.12);
+    --radius-sm:10px; --radius-md:14px; --radius-lg:20px; --radius-full:9999px;
+    --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#070707;color:var(--color-text);font-family:var(--font);padding:28px 16px 60px;}
+  .wrap{max-width:1080px;margin:0 auto;}
+  .intro{max-width:780px;margin:0 auto 26px;}
+  .intro h1{font-size:22px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:0.02em;margin:0 0 8px;}
+  .intro p{font-size:13.5px;line-height:1.6;color:var(--color-text-muted);margin:0 0 6px;}
+  .intro b{color:var(--color-lime);}
+  .flow{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;align-items:center;margin:0 auto 26px;max-width:820px;}
+  .step{flex:1;min-width:150px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:13px;font-size:12px;color:var(--color-text-muted);line-height:1.45;}
+  .step b{color:var(--color-text);display:block;font-size:12px;margin-bottom:3px;}
+  .step .n{display:inline-block;width:18px;height:18px;border-radius:50%;background:var(--color-lime);color:#0e0e0e;font-weight:800;font-size:11px;text-align:center;line-height:18px;margin-right:6px;}
+  .arrow{color:var(--color-text-faint);font-size:18px;flex:0 0 auto;}
+
+  .cols{display:flex;flex-wrap:wrap;gap:30px;justify-content:center;align-items:flex-start;}
+  .col{flex:0 0 auto;}
+  .col__cap{font-size:11px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);text-align:center;margin-bottom:11px;}
+
+  /* ===== EMAIL (matches lib/email.js: dark bg, lime accent, Inter) ===== */
+  .inbox{width:440px;background:#1a1a1a;border:1px solid var(--color-border-strong);border-radius:14px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6);}
+  .inbox__bar{background:#202020;padding:11px 16px;border-bottom:1px solid var(--color-border);}
+  .inbox__from{display:flex;align-items:center;gap:9px;}
+  .inbox__avatar{width:30px;height:30px;border-radius:50%;background:var(--color-lime);color:#0e0e0e;font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center;}
+  .inbox__fromname{font-size:12px;font-weight:700;}
+  .inbox__fromaddr{font-size:10px;color:var(--color-text-faint);}
+  .inbox__subject{font-size:14px;font-weight:800;margin-top:9px;}
+  .inbox__to{font-size:10px;color:var(--color-text-faint);margin-top:2px;}
+  /* the rendered email body, copied from the real email design system */
+  .email{font-family:'Inter',sans-serif;padding:36px 22px;background:#0e0e0e;color:#f5f5f5;}
+  .email__wm{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:28px;}
+  .email__h1{font-size:22px;font-weight:800;color:#f5f5f5;margin:0 0 14px;line-height:1.25;}
+  .email__p{font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;}
+  .email__p b{color:#fff;}
+  .email__matchcard{background:#161616;border-radius:8px;padding:14px 16px;margin:0 0 18px;}
+  .email__mc-row{display:flex;align-items:center;gap:10px;}
+  .email__mc-emoji{font-size:22px;}
+  .email__mc-team{font-size:14px;font-weight:700;color:#f5f5f5;}
+  .email__mc-vs{font-size:11px;color:#666;font-weight:700;margin:0 4px;}
+  .email__mc-meta{font-size:12px;color:#8a8a8a;margin-top:9px;padding-top:9px;border-top:1px solid #2a2a2a;}
+  .email__reason{font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;padding:12px 14px;background:#161616;border-left:3px solid #ff5c47;border-radius:6px;}
+  .email__reason span{color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;}
+  .email__btn{display:inline-block;padding:14px 32px;background:#b8ff2c;color:#0e0e0e;font-size:14px;font-weight:700;text-decoration:none;border-radius:9999px;}
+  .email__note{font-size:13px;color:#777;margin-top:22px;line-height:1.5;}
+  .email__foot{margin-top:36px;padding-top:18px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;}
+
+  /* ===== CAPTAIN PHONE ===== */
+  .device{width:390px;background:var(--color-bg);border:1px solid var(--color-border-strong);border-radius:30px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,0.6);}
+  .chdr{background:var(--color-surface);border-bottom:1px solid var(--color-border);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;}
+  .chdr__brand{font-size:8px;letter-spacing:0.2em;text-transform:uppercase;color:#17d7b0;font-weight:700;}
+  .chdr__title{font-size:13px;font-weight:800;font-style:italic;text-transform:uppercase;margin-top:2px;}
+  .chdr__av{width:32px;height:32px;border-radius:50%;background:var(--color-lime);color:#0e0e0e;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+  .ctabs{display:flex;gap:6px;padding:10px 12px;overflow-x:auto;border-bottom:1px solid var(--color-border);}
+  .ctab{font-size:11px;font-weight:700;padding:7px 12px;border-radius:var(--radius-full);background:var(--color-surface-2);color:var(--color-text-muted);white-space:nowrap;}
+  .ctab.on{background:var(--color-lime);color:#0e0e0e;}
+  .cbody{padding:14px;}
+  .chead{display:flex;align-items:center;gap:11px;margin-bottom:16px;}
+  .chead__av{width:40px;height:40px;border-radius:50%;background:var(--color-surface-3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;}
+  .chead__hi{font-size:11px;color:var(--color-text-faint);}
+  .chead__name{font-size:17px;font-weight:900;font-style:italic;text-transform:uppercase;}
+  .clabel{font-size:10px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--color-text-faint);margin:16px 0 9px;}
+
+  /* the availability alert card on captain Home */
+  .alert{background:var(--color-surface);border:1px solid rgba(255,92,71,0.35);border-left:3px solid var(--color-red);border-radius:var(--radius-md);padding:13px;margin-bottom:10px;}
+  .alert__top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+  .alert__ic{font-size:15px;}
+  .alert__t{font-size:12px;font-weight:800;}
+  .alert__time{margin-left:auto;font-size:10px;color:var(--color-text-faint);}
+  .alert__body{font-size:13px;line-height:1.5;color:var(--color-text-muted);}
+  .alert__body b{color:var(--color-text);}
+  .alert__reason{display:inline-block;margin-top:7px;font-size:11px;color:var(--color-red);background:var(--color-red-dim);border-radius:var(--radius-full);padding:3px 9px;}
+  .alert__foot{margin-top:10px;padding-top:9px;border-top:1px solid var(--color-border);display:flex;align-items:center;justify-content:space-between;}
+  .alert__note{font-size:10px;color:var(--color-text-faint);}
+  .alert__cta{font-size:11px;font-weight:800;color:var(--color-lime);}
+
+  /* roster-health summary line */
+  .rh{display:flex;align-items:center;gap:10px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:12px 13px;margin-bottom:10px;}
+  .rh__big{font-size:20px;font-weight:900;color:var(--color-red);}
+  .rh__t{font-size:12px;font-weight:700;}
+  .rh__s{font-size:10px;color:var(--color-text-faint);margin-top:1px;}
+  .rh__chev{margin-left:auto;color:var(--color-text-faint);}
+
+  /* availability strip inside the lineup builder (already built) */
+  .panel{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-md);padding:14px;margin-top:8px;}
+  .av-head__t{font-size:11px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-text-muted);}
+  .av-head__h{font-size:11px;color:var(--color-text-faint);display:block;margin-top:3px;margin-bottom:11px;}
+  .av-chips{display:flex;flex-wrap:wrap;gap:8px;}
+  .av-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border-radius:var(--radius-full);border:1px solid var(--color-border-strong);background:var(--color-surface-2);font-size:12px;}
+  .av-chip__st{font-size:10px;font-weight:800;text-transform:uppercase;padding:2px 7px;border-radius:var(--radius-full);background:var(--color-lime-dim);color:var(--color-lime);}
+  .av-chip.out{opacity:0.9;border-style:dashed;}
+  .av-chip.out .av-chip__nm{text-decoration:line-through;color:var(--color-text-faint);}
+  .av-chip.out .av-chip__st{background:var(--color-red-dim);color:var(--color-red);}
+  .av-banner{margin-top:11px;font-size:12px;line-height:1.5;color:var(--color-text-muted);background:var(--color-red-dim);border:1px solid rgba(255,92,71,0.3);border-radius:var(--radius-sm);padding:9px 11px;}
+  .av-banner b{color:var(--color-red);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="intro">
+    <h1>Player marks "can't make it" → captain gets notified</h1>
+    <p>When a player taps <b>Can't make it</b> in their portal, the captain (and co-captains) get an <b>email</b> and it surfaces on the <b>captain Home</b>. The player is already pulled from the lineup picker — this just tells the captain why.</p>
+  </div>
+
+  <div class="flow">
+    <div class="step"><b><span class="n">1</span>Player opts out</b>Taps "Can't make it" on the Week 2 card, optionally adds a note.</div>
+    <span class="arrow">→</span>
+    <div class="step"><b><span class="n">2</span>Email fires</b>Resend sends the captain + co-captains a notification (uses the verified dinksociety.app sender).</div>
+    <span class="arrow">→</span>
+    <div class="step"><b><span class="n">3</span>Shows on Home</b>An alert card appears on the captain Home + the player drops from the lineup picker.</div>
+  </div>
+
+  <div class="cols">
+    <!-- ============ EMAIL ============ -->
+    <div class="col">
+      <div class="col__cap">The notification email</div>
+      <div class="inbox">
+        <div class="inbox__bar">
+          <div class="inbox__from">
+            <div class="inbox__avatar">DS</div>
+            <div>
+              <div class="inbox__fromname">The Dink Society</div>
+              <div class="inbox__fromaddr">no-reply@dinksociety.app</div>
+            </div>
+          </div>
+          <div class="inbox__subject">Marcus T. can't make Week 2</div>
+          <div class="inbox__to">to you (captain, Big Dink Energy)</div>
+        </div>
+        <div class="email">
+          <div class="email__wm">THE DINK SOCIETY</div>
+          <h1 class="email__h1">Marcus T. is out for Week 2</h1>
+          <p class="email__p"><b>Marcus Thompson</b> just marked themselves <b>unavailable</b> for your upcoming match. They won't show up in your lineup picker for this game.</p>
+
+          <div class="email__matchcard">
+            <div class="email__mc-row">
+              <span class="email__mc-emoji">🥹</span><span class="email__mc-team">Big Dink Energy</span>
+              <span class="email__mc-vs">vs</span>
+              <span class="email__mc-emoji">😡</span><span class="email__mc-team">What the Dink?!</span>
+            </div>
+            <div class="email__mc-meta">Week 2 · Mon, Jun 22 · 7:00 PM · Courts 5 &amp; 7</div>
+          </div>
+
+          <div class="email__reason"><span>Their note</span>"Out of town for a wedding that weekend — sorry!"</div>
+
+          <p class="email__p">Set or adjust your lineup so you're covered:</p>
+          <a class="email__btn" href="#">Set your lineup</a>
+
+          <p class="email__note">Heads-up only — you don't have to reply. You can also mark players in or out yourself from the lineup builder.</p>
+          <div class="email__foot">Sent to Big Dink Energy · The Dink Society · Southern California Pickleball League</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ CAPTAIN PAGE ============ -->
+    <div class="col">
+      <div class="col__cap">On the captain page</div>
+      <div class="device">
+        <div class="chdr">
+          <div>
+            <div class="chdr__brand">The Dink Society</div>
+            <div class="chdr__title">Big Dink Energy</div>
+          </div>
+          <div class="chdr__av">RH</div>
+        </div>
+        <div class="ctabs">
+          <span class="ctab on">Home</span><span class="ctab">Next match</span><span class="ctab">Scoresheet</span><span class="ctab">Roster</span><span class="ctab">Games</span>
+        </div>
+        <div class="cbody">
+          <div class="chead">
+            <div class="chead__av">RH</div>
+            <div><div class="chead__hi">Captain · Good evening</div><div class="chead__name">Richard</div></div>
+          </div>
+
+          <div class="clabel">Needs your attention</div>
+
+          <!-- the availability alert card -->
+          <div class="alert">
+            <div class="alert__top"><span class="alert__ic">🚫</span><span class="alert__t">Player unavailable</span><span class="alert__time">2h ago</span></div>
+            <div class="alert__body"><b>Marcus T.</b> can't make <b>Week 2</b> vs What the Dink?! (Mon, Jun 22).
+              <div class="alert__reason">"Out of town for a wedding"</div>
+            </div>
+            <div class="alert__foot"><span class="alert__note">Removed from your lineup picker</span><span class="alert__cta">Set lineup →</span></div>
+          </div>
+
+          <!-- roster health summary -->
+          <div class="rh">
+            <div class="rh__big">1</div>
+            <div><div class="rh__t">out for Week 2</div><div class="rh__s">7 of 8 available · enough to field a lineup</div></div>
+            <div class="rh__chev">›</div>
+          </div>
+
+          <div class="clabel">Availability · in the lineup builder</div>
+
+          <!-- the availability strip (already built into the lineup builder) -->
+          <div class="panel">
+            <div class="av-head__t">Availability</div>
+            <span class="av-head__h">Tap a player to toggle. Players marked out are removed from the lineup below.</span>
+            <div class="av-chips">
+              <span class="av-chip"><span class="av-chip__nm">Priya N.</span><span class="av-chip__st">In</span></span>
+              <span class="av-chip"><span class="av-chip__nm">Alex M.</span><span class="av-chip__st">In</span></span>
+              <span class="av-chip out"><span class="av-chip__nm">Marcus T.</span><span class="av-chip__st">Out</span></span>
+              <span class="av-chip"><span class="av-chip__nm">Sam K.</span><span class="av-chip__st">In</span></span>
+              <span class="av-chip"><span class="av-chip__nm">Jess D.</span><span class="av-chip__st">In</span></span>
+            </div>
+            <div class="av-banner"><b>1 unavailable</b> — removed from the picker: Marcus T. (Out of town for a wedding)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

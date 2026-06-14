@@ -14,6 +14,12 @@ import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { getTeamAvailability, setPlayerAvailability } from './lib/availability.js';
 import { logActivity } from './lib/activity-log.js';
+import { sendEmail, renderAvailabilityNotify } from './lib/email.js';
+
+function siteUrl() {
+  return (typeof Netlify !== 'undefined' && Netlify.env.get('SITE_URL'))
+    || process.env.SITE_URL || 'https://dinksociety.netlify.app';
+}
 
 export default async (req) => {
   const verified = await verifyPlayerSession(req);
@@ -45,10 +51,16 @@ export default async (req) => {
     const status = body.status === 'out' ? 'out' : body.status === 'in' ? 'in' : null;
     if (!status) return json({ error: "status must be 'in' or 'out'" }, 400);
 
+    // Previous status (null = no response = effectively available) — used to
+    // decide whether this is a notify-worthy CHANGE.
+    const before = await getTeamAvailability(matchId, teamId);
+    const prev = before.players?.[playerId]?.status || null;
+
     const updated = await setPlayerAvailability({
       matchId, teamId, playerId, status, reason: body.reason,
       byEmail: ctx.session?.email || player.email || null, byRole: 'player',
     });
+    const mine = updated.players[playerId];
 
     await logActivity({
       type: 'availability.set',
@@ -57,12 +69,70 @@ export default async (req) => {
       details: `${player.name} marked ${status === 'out' ? 'UNAVAILABLE' : 'available'} for Week ${match.week}`,
     }).catch(() => {});
 
-    const mine = updated.players[playerId];
+    // Notify captain + co-captains on a real change: going OUT, or coming BACK in.
+    // (No email for no-op re-saves, or first-time "available".) Awaited so the
+    // send actually completes before the function returns, but never fatal.
+    const goingOut = status === 'out' && prev !== 'out';
+    const comingBack = status === 'in' && prev === 'out';
+    if (goingOut || comingBack) {
+      try { await notifyCaptains({ team, player, acting: ctx.session?.email || player.email, match, status, reason: mine.reason }); }
+      catch (e) { console.warn('availability notify failed:', e?.message || e); }
+    }
+
     return json({ ok: true, status: mine.status, reason: mine.reason });
   }
 
   return new Response('Method not allowed', { status: 405 });
 };
+
+// Email the captain + co-captains that a player's availability changed.
+// Recipients exclude the person who just acted (a captain marking themselves
+// out doesn't need their own email; co-captains still get it).
+async function notifyCaptains({ team, player, acting, match, status, reason }) {
+  // Recipients: primary captain + any roster co-captains/captains with an email.
+  const recips = new Set();
+  const add = (e) => { const x = (e || '').trim().toLowerCase(); if (x) recips.add(x); };
+  add(team.captainEmail);
+  for (const p of (team.roster || [])) {
+    if ((p.isCaptain || p.isCoCaptain) && p.email) add(p.email);
+  }
+  recips.delete((acting || '').trim().toLowerCase());
+  if (!recips.size) return;
+
+  // Opponent + emojis for the match card.
+  const isA = match.teamA?.id === team.id;
+  const opponent = isA ? match.teamB : match.teamA;
+  let oppEmoji = '';
+  if (opponent?.id) {
+    const oppTeam = await getStore('teams').get(`team/${opponent.id}.json`, { type: 'json' }).catch(() => null);
+    oppEmoji = oppTeam?.emoji || '';
+  }
+
+  // Date line: "Week N · Mon, Jun 22 · 7:00 PM · Courts 5 & 7"
+  const parts = [`Week ${match.week}`];
+  if (match.scheduledAt) {
+    const d = new Date(match.scheduledAt);
+    if (!isNaN(d)) parts.push(d.toLocaleString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+      timeZone: 'America/Los_Angeles',
+    }));
+  }
+  if (match.court) parts.push(match.court);
+  const dateLine = parts.join(' · ');
+
+  const html = renderAvailabilityNotify({
+    playerName: player.name, status, teamName: team.name, teamEmoji: team.emoji || '',
+    opponentName: opponent?.name || 'your opponent', oppEmoji,
+    week: match.week, dateLine, reason,
+    portalUrl: `${siteUrl()}/captain.html`,
+  });
+  const subject = status === 'out'
+    ? `${player.name} can't make Week ${match.week}`
+    : `${player.name} is back in for Week ${match.week}`;
+
+  // Send individually so one bad address can't sink the rest.
+  await Promise.allSettled([...recips].map(to => sendEmail({ to, subject, html })));
+}
 
 async function findMatch(team, matchId) {
   const scheduleStore = getStore('schedule');

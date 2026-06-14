@@ -1182,8 +1182,9 @@
       initTeamPhoto();
       // Load roster + schedule, then dispatch to the right state
       refreshCapMsgBadge();
-      Promise.all([loadRoster(true), loadMatches(true)]).then(() => {
+      Promise.all([loadRoster(true), loadMatches(true)]).then(async () => {
         updateGenderWarning();
+        await loadCapHomeAvailability();  // best-effort; powers the Home availability alert
         // Returning from a successful balance payment? Land on Billing.
         if (new URLSearchParams(location.search).get('paid') === '1') {
           history.replaceState(null, '', location.pathname);
@@ -4280,6 +4281,20 @@
       return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
     }
 
+    // Fetch availability for the next unplayed match so the Home action list can
+    // surface players who've marked themselves out. Best-effort, cached in state.
+    async function loadCapHomeAvailability() {
+      try {
+        const matches = (state.matches || []).slice().sort(matchOrder);
+        const next = matches.find(m => !m.finalizedAt);
+        if (!next) { state.availByMatch = {}; return; }
+        const res = await fetch(`/.netlify/functions/captain-availability?match=${encodeURIComponent(next.id)}`, { credentials: 'include' });
+        if (!res.ok) return;
+        const data = await res.json();
+        state.availByMatch = { [next.id]: data.players || {} };
+      } catch { /* non-fatal */ }
+    }
+
     function renderCaptainHome() {
       const area = $id('cap-home-area');
       if (!area) return;
@@ -4316,6 +4331,27 @@
             due: lockAt ? { cls: urgent ? 'red' : 'gold', txt: cd ? 'Locks in ' + cd : 'Locks soon' } : { cls: 'gold', txt: 'Set before match' },
             go: () => capTonightOpen(m.id),
             sort: lockAt || (now + 9e12),
+          });
+        }
+      }
+
+      // 1b) Availability — players who marked themselves out for the next match.
+      if (nextUnplayed) {
+        const av = (state.availByMatch && state.availByMatch[nextUnplayed.id]) || {};
+        const shortNm = n => { const p = String(n || '').trim().split(/\s+/); return p[0] + (p[1] ? ' ' + p[1][0] + '.' : ''); };
+        const outs = Object.entries(av)
+          .filter(([, v]) => v && v.status === 'out')
+          .map(([pid, v]) => { const rp = roster.find(p => p.id === pid); return { name: rp ? rp.name : 'A player', reason: v.reason || '' }; });
+        if (outs.length) {
+          const names = outs.map(o => shortNm(o.name)).join(', ');
+          const firstReason = outs.find(o => o.reason)?.reason;
+          tasks.push({
+            cls: 'urgent', ic: '🚫',
+            t: `${outs.length} ${outs.length === 1 ? 'player is' : 'players are'} out for Week ${nextUnplayed.week}`,
+            d: `${names}${firstReason ? ' · “' + escapeHtml(firstReason) + '”' : ''} · removed from your lineup picker`,
+            due: { cls: 'red', txt: 'Heads up' },
+            go: () => capTonightOpen(nextUnplayed.id),
+            sort: now - 2e6,
           });
         }
       }

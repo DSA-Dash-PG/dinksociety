@@ -244,6 +244,58 @@ export function renderTeamChatNotify({ teamName, authorName, body, portalUrl }) 
 }
 
 /**
+ * Render the player-availability notification — sent to the captain + co-captains
+ * when a player marks themselves out (or back in) for an upcoming match.
+ * @param {{ playerName:string, status:'out'|'in', teamName:string, teamEmoji?:string,
+ *           opponentName:string, oppEmoji?:string, week:(number|string),
+ *           dateLine?:string, reason?:string, portalUrl:string }} opts
+ */
+export function renderAvailabilityNotify({ playerName, status, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, reason, portalUrl }) {
+  const accent = '#b8ff2c';
+  const out = status === 'out';
+  const h1 = out ? `${escapeBody(playerName)} is out for Week ${escapeBody(String(week))}`
+                 : `${escapeBody(playerName)} is back in for Week ${escapeBody(String(week))}`;
+  const lead = out
+    ? `<b>${escapeBody(playerName)}</b> just marked themselves <b>unavailable</b> for your upcoming match. They won't show up in your lineup picker for this game.`
+    : `<b>${escapeBody(playerName)}</b> is <b>available again</b> for your upcoming match — they're back in your lineup picker.`;
+
+  const matchCard = `
+      <div style="background: #161616; border-radius: 8px; padding: 14px 16px; margin: 0 0 18px;">
+        <div style="font-size: 14px; font-weight: 700; color: #f5f5f5;">
+          ${teamEmoji ? escapeBody(teamEmoji) + ' ' : ''}${escapeBody(teamName)}
+          <span style="color:#666;font-weight:700;margin:0 6px;">vs</span>
+          ${oppEmoji ? escapeBody(oppEmoji) + ' ' : ''}${escapeBody(opponentName)}
+        </div>
+        ${dateLine ? `<div style="font-size: 12px; color: #8a8a8a; margin-top: 9px; padding-top: 9px; border-top: 1px solid #2a2a2a;">${escapeBody(dateLine)}</div>` : ''}
+      </div>`;
+
+  const reasonBlock = (out && reason)
+    ? `<div style="font-size: 14px; color: #cfcfcf; line-height: 1.6; margin: 0 0 18px; padding: 12px 14px; background: #161616; border-left: 3px solid #ff5c47; border-radius: 6px;">
+         <span style="color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;">Their note</span>${escapeBody(reason)}</div>`
+    : '';
+
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">${h1}</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">${lead}</p>
+      ${matchCard}
+      ${reasonBlock}
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">${out ? 'Set or adjust your lineup so you’re covered:' : 'Review your lineup if you want to use them:'}</p>
+      <a href="${portalUrl}" style="display: inline-block; padding: 14px 32px; background: ${accent}; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
+        Set your lineup
+      </a>
+      <p style="font-size: 13px; color: #777; margin-top: 22px; line-height: 1.5;">
+        Heads-up only — you don't have to reply. You can also mark players in or out yourself from the lineup builder.
+      </p>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        ${teamName ? 'Sent to ' + escapeBody(teamName) + ' · ' : ''}The Dink Society · Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Render the PLAYER magic-link sign-in email.
  * @param {string} magicUrl - The full magic link URL
  * @param {string} playerName - The player's name
