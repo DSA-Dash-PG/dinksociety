@@ -50,7 +50,7 @@ function escAttr(s) {
   return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 }
 
-const PLAYS_VALUES = new Set(['Right', 'Left', 'Both']);
+const PLAYS_VALUES = new Set(['Right Handed', 'Left Handed', 'Both']);
 
 // Compute current age in whole years from a YYYY-MM-DD date of birth.
 // Returns null for missing/invalid input. Never returns the DOB itself.
@@ -96,7 +96,7 @@ export function cleanProfileInput(input) {
     const raw = String(input.plays ?? '').trim();
     if (raw === '') out.plays = '';
     else if (PLAYS_VALUES.has(raw)) out.plays = raw;
-    else return { profile: {}, error: 'Plays must be Right, Left, or Both.' };
+    else return { profile: {}, error: 'Plays must be Right Handed, Left Handed, or Both.' };
   }
   if ('city' in input) {
     out.city = String(input.city ?? '').trim().slice(0, 60);
