@@ -318,6 +318,8 @@ export async function rebuildStandings(circuit) {
     p.composite   = (winPct * 60) + (clutchPct * 10) + ((avgDiff / 11) * 15) + (consistency * 5) + (volume * 10);
     p.clutchPct   = clutchPct;
     p.consistency = consistency;
+    // True per-game Avg Points %: mean of each game's (points won / points played).
+    p.avgPointsPct = p.gamesScored ? Math.round((p.sumGamePct / p.gamesScored) * 1000) / 10 : null;
   }
 
   // ── Weekly Player of the Week (gender-split, by that week's DSR) + rank movement ──
@@ -506,6 +508,8 @@ function ensurePlayer(map, pid, player, team) {
       ps: 0,         // points scored
       pa: 0,         // points allowed
       diff: 0,       // cumulative point differential
+      sumGamePct: 0, // Σ per-game (myScore / total) — for true Avg Points %
+      gamesScored: 0,// games that had a final score (denominator for the above)
       gameDiffs: [], // per-game diffs (for consistency calc)
       clutchW: 0,    // wins in close games (margin ≤ 3)
       clutchG: 0,    // close games played
@@ -530,6 +534,8 @@ function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = n
     p.ps   += myScore;
     p.pa   += oppScore;
     p.diff += d;
+    const tot = myScore + oppScore;
+    if (tot > 0) { p.sumGamePct += myScore / tot; p.gamesScored++; }
     p.gameDiffs.push(d);
     if (Math.abs(d) <= 3) {
       p.clutchG++;
