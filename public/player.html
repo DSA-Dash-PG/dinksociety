@@ -135,7 +135,9 @@
     .mlp-hero__eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--color-text-faint); margin-bottom: 8px; }
     .mlp-hero__eyebrow a { color: var(--color-teal); text-decoration: none; font-weight: 700; }
     .mlp-hero__eyebrow a:hover { text-decoration: underline; }
-    .mlp-hero__name { font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 800; text-transform: uppercase; line-height: 0.95; margin: 0; }
+    .mlp-hero__name { font-size: clamp(1.6rem, 4.6vw, 3.2rem); font-weight: 800; text-transform: uppercase; line-height: 0.98; margin: 0; overflow-wrap: anywhere; }
+    .mlp-hero__name.is-long  { font-size: clamp(1.4rem, 3.8vw, 2.5rem); }
+    .mlp-hero__name.is-xlong { font-size: clamp(1.15rem, 3vw, 2rem); }
     .mlp-hero__dsr { flex-shrink: 0; text-align: center; padding: 0 6px; }
     .mlp-hero__dsr-lbl { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); }
     .mlp-hero__dsr-n { font-size: 3rem; font-weight: 800; color: var(--color-lime); line-height: 1; margin: 4px 0; }
@@ -169,7 +171,9 @@
     @media (max-width: 640px) {
       .mlp-hero__top { gap: 14px; padding: 20px; }
       .mlp-photo { width: 76px; height: 76px; font-size: 26px; border-radius: 12px; }
-      .mlp-hero__name { font-size: 1.7rem; }
+      .mlp-hero__name { font-size: 1.6rem; }
+      .mlp-hero__name.is-long  { font-size: 1.35rem; }
+      .mlp-hero__name.is-xlong { font-size: 1.1rem; }
       .mlp-hero__dsr-n { font-size: 2.2rem; }
       .mlp-hero__dsr-rk { display: none; }
       .mlp-vitals { grid-template-columns: repeat(3, 1fr); }
@@ -208,6 +212,15 @@
     const slug = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
     const fmtDate = iso => { if (!iso) return ''; const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); };
     const pct  = (won, played) => played ? Math.round(won / played * 100) : 0;
+    // Shrink the hero name for long names / long single words so it never
+    // crowds the DSR or wraps awkwardly on mobile.
+    const nameSizeClass = (name) => {
+      const n = String(name || '');
+      const longestWord = n.split(/\s+/).reduce((m, w) => Math.max(m, w.length), 0);
+      if (n.length > 18 || longestWord > 11) return 'is-xlong';
+      if (n.length > 12 || longestWord > 8)  return 'is-long';
+      return '';
+    };
 
     const PALETTE = ['#ef4444','#f97316','#eab308','#22c55e','#06b6d4','#3b82f6','#8b5cf6','#ec4899','#14b8a6','#84cc16'];
     const avatarColor = name => { let h = 0; for (const c of String(name||'')) h = (h*31+c.charCodeAt(0))&0xffff; return PALETTE[h%PALETTE.length]; };
@@ -372,7 +385,7 @@
           <div class="mlp-photo" style="--ph:${color}">${avatarInner}</div>
           <div class="mlp-hero__id">
             <div class="mlp-hero__eyebrow"><a href="/team?id=${teamSlug}${LINK_SUFFIX}">${esc(team.name)}</a>${team.emoji ? ' ' + team.emoji : ''}</div>
-            <h1 class="mlp-hero__name">${esc(rp.name)}</h1>
+            <h1 class="mlp-hero__name ${nameSizeClass(rp.name)}">${esc(rp.name)}</h1>
             ${pills.length ? `<div class="pp-hero__pills" style="margin-top:12px">${pills.join('')}</div>` : ''}
           </div>
           <div class="mlp-hero__dsr">
