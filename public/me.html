@@ -192,6 +192,14 @@
   .mlp-table th { text-align:left; font-size:9px; color:var(--color-text-faint); text-transform:uppercase; letter-spacing:0.05em; padding:7px 8px; border-bottom:1px solid var(--color-border); }
   .mlp-table td { padding:9px 8px; border-bottom:1px solid var(--color-border); }
 
+  /* team schedule rows (Team tab → Schedule) */
+  .trow { display:flex; align-items:center; gap:10px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:11px 13px; margin-bottom:8px; }
+  .trow__wk { font-size:9px; font-weight:800; color:var(--color-text-faint); letter-spacing:0.05em; flex-shrink:0; width:38px; }
+  .trow__opp { font-size:13px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .trow__dt { font-size:11px; color:var(--color-text-muted); flex-shrink:0; }
+  .trow__res { font-size:12px; font-weight:800; flex-shrink:0; }
+  .trow__res.w { color:var(--color-lime); } .trow__res.l { color:var(--color-red); } .trow__res.t { color:var(--color-text-muted); }
+
   /* ── Game-by-game scores toggle (Results) ───────── */
   .m__toggle { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin-top:10px; padding:8px 0;
     background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-sm);
@@ -1934,7 +1942,7 @@
       <div class="m hcard-tap home-team" data-go="team">
         <div style="font-size:26px;">${emo({emoji:me.teamEmoji})}</div>
         <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">${esc(me.teamName)}</div>
-          <div style="font-size:10px;color:var(--color-text-faint);margin-top:2px;">${esc(me.divisionLabel || me.division || '')}${stnd ? ' · ' + stnd.wins + '–' + stnd.losses + (stnd.ties ? '–' + stnd.ties : '') : ''} · ${(DATA.team?.roster || []).length} players</div></div>
+          <div style="font-size:10px;color:var(--color-text-faint);margin-top:2px;">${stnd ? stnd.wins + '–' + stnd.losses + (stnd.ties ? '–' + stnd.ties : '') + ' · ' : ''}${(DATA.team?.roster || []).length} players</div></div>
         <div class="home-team__chev">›</div>
       </div>`;
 
@@ -2437,7 +2445,7 @@
       </div>`;
     }).join('');
     $('st-body').innerHTML =
-      `<div class="label">Standings <span class="sub">${esc(div.divisionLabel || myDiv)}</span></div>
+      `<div class="label">Standings</div>
        <div class="st-head"><div class="st-rank">#</div><div class="st-team">Team</div><div class="st-dsr">DSR</div><div class="st-wl">W–L</div><div class="st-pts">PTS</div><div class="st-diff">DIFF</div></div>
        <div class="st-list">${rows}</div>
        <div class="st-legend">DSR = total team DSR (sum of player ratings) · PTS = match points (win ×2 + tie ×1) · DIFF = point differential</div>`;
@@ -2546,7 +2554,7 @@
       <div class="mlp-hero__top">
         <div class="mlp-photo">${avatarInner}</div>
         <div class="mlp-hero__id">
-          <div class="mlp-hero__eye">${esc(me.teamName || '')}${me.teamEmoji ? ' ' + me.teamEmoji : ''}${me.divisionLabel ? ' · ' + esc(me.divisionLabel) : ''}</div>
+          <div class="mlp-hero__eye">${esc(me.teamName || '')}${me.teamEmoji ? ' ' + me.teamEmoji : ''}</div>
           <div class="mlp-hero__name">${esc(me.name)}</div>
           ${chefPill}
         </div>
@@ -2646,7 +2654,7 @@
     const powHtml = pow ? `<div class="label">Player of the Week${pow.week ? ' <span class="sub">Week ' + pow.week + '</span>' : ''}</div><div class="potw">
       ${powCard('♀ Woman', pow.woman)}${powCard('♂ Man', pow.man)}</div>` : '';
     $('st-body').innerHTML = powHtml + chefsHtml() +
-      `<div class="label">Leaderboard <span class="sub">${esc(me.divisionLabel || me.division || '')}</span></div>
+      `<div class="label">Leaderboard</div>
       <div class="seg">
         <div class="seg__b ${lbFilter==='all'?'is-active':''}" data-f="all">All</div>
         <div class="seg__b ${lbFilter==='F'?'is-active':''}" data-f="F">Women</div>
@@ -2700,6 +2708,7 @@
   }
 
   // ---- team ----
+  let teamSeg = 'overview';
   function renderTeam() {
     const t = DATA.team || {}, me = DATA.profile, st = t.standing;
     const ros = t.roster || [];
@@ -2708,11 +2717,15 @@
 
     const diff = st ? (st.pointDiff || 0) : 0;
     const heroStats = st ? `<div class="teamhero__stats teamhero__stats--4">
-      <div><div class="ths__n gold">${ordinal(st.rank)}</div><div class="ths__l">Division</div></div>
+      <div><div class="ths__n gold">${ordinal(st.rank)}</div><div class="ths__l">Rank</div></div>
       <div><div class="ths__n">${st.wins}–${st.losses}${st.ties?'–'+st.ties:''}</div><div class="ths__l">Record</div></div>
       <div><div class="ths__n">${st.matchPointsFor ?? 0}</div><div class="ths__l">Match pts</div></div>
       <div><div class="ths__n ${diff>0?'lime':diff<0?'red':''}">${diff>0?'+':''}${diff}</div><div class="ths__l">Pt diff</div></div>
     </div>` : '';
+
+    const hero = `<div class="teamhero"><div class="teamhero__emoji">${emo({emoji:me.teamEmoji})}</div>
+      <div class="teamhero__name">${teamLink(me.teamId, me.teamName, esc(me.teamName))}</div>
+      <div class="teamhero__div">Season 1</div>${heroStats}</div>`;
 
     // Recent form, oldest → newest (finalized matches only)
     const results = (DATA.schedule || []).filter(m => m.final && m.result);
@@ -2741,13 +2754,42 @@
       </div>`;
     }).join('');
 
-    $('v-team').innerHTML =
-      `<div class="teamhero"><div class="teamhero__emoji">${emo({emoji:me.teamEmoji})}</div>
-        <div class="teamhero__name">${teamLink(me.teamId, me.teamName, esc(me.teamName))}</div>
-        <div class="teamhero__div">${esc(me.divisionLabel || me.division || '')} · Season</div>${heroStats}</div>
-      ${form}
-      ${leaders}
-      <div class="label">Roster <span class="sub">by DSR · ${ros.length} players</span></div>${roster || '<div class="muted">Roster coming soon.</div>'}`;
+    // Team schedule — compact rows (no availability control; that's on Home/Games)
+    const sched = DATA.schedule || [];
+    const teamRow = (m) => {
+      const opp = m.opponent?.name || 'TBD';
+      const dt = m.scheduledAt ? new Date(m.scheduledAt).toLocaleDateString([], { month:'short', day:'numeric' }) : '';
+      if (m.final) {
+        const cls = m.result === 'W' ? 'w' : m.result === 'L' ? 'l' : 't';
+        const sc = (m.myMp != null && m.oppMp != null) ? `${m.myMp}–${m.oppMp}` : '';
+        return `<div class="trow"><span class="trow__wk">WK ${m.week}</span><span class="trow__opp">${m.home ? 'vs' : '@'} ${esc(opp)}</span><span class="trow__res ${cls}">${m.result || '—'}${sc ? ' ' + sc : ''}</span></div>`;
+      }
+      return `<div class="trow"><span class="trow__wk">WK ${m.week}</span><span class="trow__opp">${m.home ? 'vs' : '@'} ${esc(opp)}</span><span class="trow__dt">${esc(dt || 'TBD')}</span></div>`;
+    };
+    const upc = sched.filter(m => !m.final), fin = sched.filter(m => m.final);
+    let scheduleBody = '';
+    if (upc.length) scheduleBody += `<div class="label">Upcoming</div>` + upc.map(teamRow).join('');
+    if (fin.length) scheduleBody += `<div class="label">Results</div>` + fin.map(teamRow).join('');
+    if (!sched.length) scheduleBody = '<div class="muted">No matches scheduled yet.</div>';
+
+    const seg = `<div class="seg">
+      <div class="seg__b ${teamSeg === 'overview' ? 'is-active' : ''}" data-tm="overview">Overview</div>
+      <div class="seg__b ${teamSeg === 'roster' ? 'is-active' : ''}" data-tm="roster">Roster</div>
+      <div class="seg__b ${teamSeg === 'schedule' ? 'is-active' : ''}" data-tm="schedule">Schedule</div>
+    </div>`;
+    const overviewBody = (form + leaders) || '<div class="muted" style="padding:16px 4px;">Team overview fills in as the season plays out.</div>';
+    const rosterBody = `<div class="label">Roster <span class="sub">by DSR · ${ros.length} players</span></div>${roster || '<div class="muted">Roster coming soon.</div>'}`;
+
+    $('v-team').innerHTML = hero + seg
+      + `<div id="tm-overview" class="${teamSeg === 'overview' ? '' : 'hidden'}">${overviewBody}</div>`
+      + `<div id="tm-roster" class="${teamSeg === 'roster' ? '' : 'hidden'}">${rosterBody}</div>`
+      + `<div id="tm-schedule" class="${teamSeg === 'schedule' ? '' : 'hidden'}">${scheduleBody}</div>`;
+    $('v-team').querySelectorAll('.seg__b[data-tm]').forEach(b => b.addEventListener('click', () => {
+      teamSeg = b.dataset.tm;
+      $('v-team').querySelectorAll('.seg__b[data-tm]').forEach(x => x.classList.toggle('is-active', x === b));
+      ['overview', 'roster', 'schedule'].forEach(k => $('tm-' + k).classList.toggle('hidden', teamSeg !== k));
+      window.scrollTo(0, 0);
+    }));
   }
   function ordinal(n) { if (n == null) return '—'; const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
 
