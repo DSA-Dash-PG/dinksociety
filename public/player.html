@@ -153,6 +153,9 @@
     .mlp-panel { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-6); margin-bottom: var(--space-4); }
     .mlp-panel__h { font-size: 1.3rem; font-weight: 800; text-transform: uppercase; margin-bottom: var(--space-5); }
     .mlp-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .mlp-cards--4 { grid-template-columns: repeat(4, 1fr); }
+    .mlp-cards--3 { grid-template-columns: repeat(3, 1fr); }
+    .mlp-cards + .mlp-cards { margin-top: 10px; }
     .mlp-card { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 18px 12px; text-align: center; position: relative; }
     .mlp-card__val { font-size: 1.9rem; font-weight: 800; line-height: 1; }
     .mlp-card__lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--color-text-faint); margin-top: 8px; }
@@ -179,7 +182,7 @@
       .mlp-vitals { grid-template-columns: repeat(3, 1fr); }
       .mlp-vital:nth-child(3n) { border-right: none; }
       .mlp-vital:nth-child(-n+3) { border-bottom: 1px solid var(--color-border); }
-      .mlp-cards { grid-template-columns: repeat(2, 1fr); }
+      .mlp-cards, .mlp-cards--4, .mlp-cards--3 { grid-template-columns: repeat(2, 1fr); }
       .mlp-panel { padding: var(--space-4); }
     }
 
@@ -407,12 +410,16 @@
 
         html += `<div class="mlp-panel">
           <div class="mlp-panel__h">Current Season Stats</div>
-          <div class="mlp-cards">
+          <div class="mlp-cards mlp-cards--4">
             ${card(`<span class="val--green">${gwPct}%</span>`, 'Games Won %', `${stat.gamesWon} W – ${stat.gamesLost} L`)}
             ${card(`<span class="val--teal">${ptPct != null ? ptPct + '%' : '—'}</span>`, 'Points Won %', `${stat.ps} – ${stat.pa}`)}
-            ${card(`<span class="val--teal">${stat.avgPointsPct != null ? stat.avgPointsPct + '%' : '—'}</span>`, 'Avg Points %', 'per game')}
             ${card(`<span class="val--lime">${apd != null ? apd.toFixed(1) : '—'}</span>`, 'Avg Partner DSR', `${Object.keys(stat.partners || {}).length} partners`)}
             ${card(`<span class="${aod != null ? 'val--lime' : 'is-na'}">${aod != null ? aod.toFixed(1) : 'N/A'}</span>`, 'Avg Opponent DSR', aod != null ? `${metrics.opponentCount} opponents` : 'needs match data')}
+          </div>
+          <div class="mlp-cards mlp-cards--3">
+            ${card(`<span>${stat.ps}</span>`, 'Points Scored', 'all games')}
+            ${card(`<span>${stat.pa}</span>`, 'Points Against', 'all games')}
+            ${card(`<span class="${stat.diff >= 0 ? 'val--green' : 'val--red'}">${stat.diff >= 0 ? '+' : ''}${stat.diff}</span>`, 'Point Diff', 'scored − against')}
           </div>`;
 
         // Discipline breakdown.
@@ -432,7 +439,7 @@
             }).join('')}
           </tbody></table>`;
         }
-        html += `<div class="mlp-note"><b>Avg Points %</b> is the average of each game's points-won rate; <b>Points Won %</b> pools all points across the season.${aod == null ? ' <b>Avg Opponent DSR</b> appears once opponents are recorded for your games.' : ''}</div>`;
+        html += `<div class="mlp-note"><b>Points Scored / Against / Diff</b> are this player's own rally points across every game.${aod == null ? ' <b>Avg Opponent DSR</b> appears once opponents are recorded for your games.' : ''}</div>`;
         html += `</div>`;
       }
 
