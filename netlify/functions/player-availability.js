@@ -120,10 +120,19 @@ async function notifyCaptains({ team, player, acting, match, status, reason }) {
   if (match.court) parts.push(match.court);
   const dateLine = parts.join(' · ');
 
+  // Teammates who still haven't responded (no record) — assumed available, but
+  // surfaced so the captain can nudge them. Archived players excluded.
+  const rec = await getTeamAvailability(match.id, team.id);
+  const recPlayers = rec.players || {};
+  const shortNm = (n) => { const p = String(n || '').trim().split(/\s+/); return p[0] + (p[1] ? ' ' + p[1][0] + '.' : ''); };
+  const unconfirmed = (team.roster || [])
+    .filter(p => !p.archived && !recPlayers[p.id])
+    .map(p => shortNm(p.name));
+
   const html = renderAvailabilityNotify({
     playerName: player.name, status, teamName: team.name, teamEmoji: team.emoji || '',
     opponentName: opponent?.name || 'your opponent', oppEmoji,
-    week: match.week, dateLine, reason,
+    week: match.week, dateLine, reason, unconfirmed,
     portalUrl: `${siteUrl()}/captain.html`,
   });
   const subject = status === 'out'

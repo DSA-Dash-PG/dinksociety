@@ -248,9 +248,9 @@ export function renderTeamChatNotify({ teamName, authorName, body, portalUrl }) 
  * when a player marks themselves out (or back in) for an upcoming match.
  * @param {{ playerName:string, status:'out'|'in', teamName:string, teamEmoji?:string,
  *           opponentName:string, oppEmoji?:string, week:(number|string),
- *           dateLine?:string, reason?:string, portalUrl:string }} opts
+ *           dateLine?:string, reason?:string, unconfirmed?:string[], portalUrl:string }} opts
  */
-export function renderAvailabilityNotify({ playerName, status, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, reason, portalUrl }) {
+export function renderAvailabilityNotify({ playerName, status, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, reason, unconfirmed, portalUrl }) {
   const accent = '#b8ff2c';
   const out = status === 'out';
   const h1 = out ? `${escapeBody(playerName)} is out for Week ${escapeBody(String(week))}`
@@ -274,6 +274,12 @@ export function renderAvailabilityNotify({ playerName, status, teamName, teamEmo
          <span style="color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;">Their note</span>${escapeBody(reason)}</div>`
     : '';
 
+  const unc = Array.isArray(unconfirmed) ? unconfirmed.filter(Boolean) : [];
+  const unconfirmedBlock = unc.length
+    ? `<div style="font-size: 14px; color: #cfcfcf; line-height: 1.6; margin: 0 0 18px; padding: 12px 14px; background: #161616; border-left: 3px solid #f0c040; border-radius: 6px;">
+         <span style="color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;">Still no response (${unc.length}) — assumed available</span>${escapeBody(unc.join(', '))}<div style="font-size:12px;color:#777;margin-top:6px;">A quick nudge helps you lock your lineup with confidence.</div></div>`
+    : '';
+
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
       <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
@@ -281,6 +287,7 @@ export function renderAvailabilityNotify({ playerName, status, teamName, teamEmo
       <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">${lead}</p>
       ${matchCard}
       ${reasonBlock}
+      ${unconfirmedBlock}
       <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">${out ? 'Set or adjust your lineup so you’re covered:' : 'Review your lineup if you want to use them:'}</p>
       <a href="${portalUrl}" style="display: inline-block; padding: 14px 32px; background: ${accent}; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
         Set your lineup
