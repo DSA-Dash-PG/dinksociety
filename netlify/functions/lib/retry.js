@@ -35,9 +35,11 @@ export function getJSON(store, key) {
   return withRetry(() => store.get(key, { type: 'json' }), { label: `get ${key}` });
 }
 
-/** store.get(key) (raw string) with retry. */
-export function getRaw(store, key) {
-  return withRetry(() => store.get(key), { label: `get ${key}` });
+/** store.get(key, opts) (raw string) with retry.
+ * Pass opts like { consistency: 'strong' } for reads that must never see a
+ * stale/eventually-consistent value (e.g. session lookups right after login). */
+export function getRaw(store, key, opts) {
+  return withRetry(() => store.get(key, opts), { label: `get ${key}` });
 }
 
 /** store.list(opts) with retry. */

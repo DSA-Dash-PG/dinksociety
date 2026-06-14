@@ -71,7 +71,10 @@ export async function requireAdmin(req) {
   }
 
   const store = getStore('admin-sessions');
-  const raw = await getRaw(store, token); // retries transient store hiccups
+  // Strong consistency: a session written moments ago at login must be readable
+  // immediately on any edge node. Eventual reads can return null intermittently
+  // and 401 a valid admin (same class of bug fixed for score reads).
+  const raw = await getRaw(store, token, { consistency: 'strong' }); // retries transient store hiccups
   if (!raw) {
     throw new Error('Invalid session');
   }

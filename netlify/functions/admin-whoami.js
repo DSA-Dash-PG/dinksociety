@@ -19,6 +19,6 @@ export default async (req) => {
 
   return new Response(JSON.stringify({ admin: true, email: result.payload.email }), {
     status: 200,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
   });
 };
