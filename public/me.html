@@ -152,6 +152,34 @@
   .m__foot { font-size:10px; color:var(--color-text-faint); margin-top:9px; padding-top:8px; border-top:1px solid var(--color-border); }
   .m__foot b { color:var(--color-lime); }
 
+  /* ── Availability (can you make it?) ───────── */
+  .m__avail { margin-top:10px; padding-top:10px; border-top:1px solid var(--color-border); }
+  .m__avail-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .m__avail-q { font-size:11px; font-weight:700; color:var(--color-text-muted); margin-right:auto; }
+  .av-btn { font-family:inherit; font-size:11px; font-weight:700; padding:6px 12px; border-radius:var(--radius-full); border:1px solid var(--color-border-strong); background:var(--color-surface-2); color:var(--color-text-muted); cursor:pointer; }
+  .av-btn:disabled { opacity:0.5; cursor:default; }
+  .av-in.is-on { background:var(--color-lime-dim); color:var(--color-lime); border-color:rgba(184,255,44,0.4); }
+  .av-out.is-on { background:var(--color-red-dim); color:var(--color-red); border-color:rgba(255,90,90,0.4); }
+  .m__avail-reason { margin-top:8px; width:100%; box-sizing:border-box; font-family:inherit; font-size:11px; padding:7px 9px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); }
+  .m__avail-note { font-size:10px; color:var(--color-text-faint); margin-top:6px; }
+  .m__avail-note.is-out { color:var(--color-red); }
+
+  /* ── Availability prompt on Home (prominent, next match) ───────── */
+  .avh { margin-bottom:14px; padding:14px; border-radius:var(--radius-md); border:1px solid var(--color-border); background:var(--color-surface); }
+  .avh.is-ask { border-color:var(--color-gold); background:var(--color-gold-dim); }
+  .avh.is-out { border-color:rgba(255,90,90,0.45); background:var(--color-red-dim); }
+  .avh.is-in { border-color:rgba(184,255,44,0.35); }
+  .avh__top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; flex-wrap:wrap; margin-bottom:11px; }
+  .avh__q { font-size:14px; font-weight:800; }
+  .avh__ctx { font-size:11px; color:var(--color-text-faint); }
+  .avh__btns { display:flex; gap:8px; }
+  .avh__b { flex:1; font-family:inherit; font-size:13px; font-weight:800; padding:11px 0; border-radius:var(--radius-sm); border:1px solid var(--color-border-strong); background:var(--color-surface-2); color:var(--color-text); cursor:pointer; }
+  .avh__b:disabled { opacity:0.5; cursor:default; }
+  .avh__in.is-on { background:var(--color-lime-dim); color:var(--color-lime); border-color:rgba(184,255,44,0.5); }
+  .avh__out.is-on { background:var(--color-red); color:#fff; border-color:var(--color-red); }
+  .avh__reason { margin-top:10px; width:100%; box-sizing:border-box; font-family:inherit; font-size:12px; padding:8px 10px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-surface); color:var(--color-text); }
+  .avh__note { font-size:10px; color:var(--color-text-faint); margin-top:8px; }
+
   /* ── Game-by-game scores toggle (Results) ───────── */
   .m__toggle { display:flex; align-items:center; justify-content:center; gap:6px; width:100%; margin-top:10px; padding:8px 0;
     background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-sm);
@@ -1897,11 +1925,41 @@
         <div class="home-team__chev">›</div>
       </div>`;
 
-    const blocks = { mehead, announce, hero, night, live, lulist, recap, tiles, potw, movers, coming, team };
-    // The "you" header always leads; a league announcement sits right under it.
+    // ★ Availability prompt for the NEXT match — sits high so players act on it.
+    // Loud when they haven't answered (or are out); quiet confirmation when in.
+    let avail = '';
+    if (next && !next.final && next.status !== 'live' && next.availability) {
+      const av = next.availability;
+      const editable = av.editable !== false;
+      const isOut = av.status === 'out', isIn = av.status === 'in';
+      const byCap = av.byRole === 'captain';
+      const whenD = next.scheduledAt ? new Date(next.scheduledAt).toLocaleDateString([], { weekday:'short', month:'short', day:'numeric' }) : '';
+      const ctx = `Week ${next.week} vs ${esc(next.opponent.name)}${whenD ? ' · ' + esc(whenD) : ''}`;
+      const dis = editable ? '' : 'disabled';
+      const stateCls = isOut ? 'is-out' : isIn ? 'is-in' : 'is-ask';
+      const head = isOut ? `You're <b>out</b> for this match${byCap ? ' (set by your captain)' : ''}`
+        : isIn ? `You're <b>in</b> for this match ✓`
+        : `Can you make it?`;
+      const reasonRow = isOut
+        ? `<input class="avh__reason" type="text" maxlength="200" placeholder="Add a note for your captain (optional)" value="${esc(av.reason || '')}" ${dis} onchange="setAvailReason('${esc(next.matchId)}', this.value)">`
+        : '';
+      const lockedNote = !editable ? `<div class="avh__note">This match has started — availability is locked.</div>` : '';
+      avail = `<div class="avh ${stateCls}">
+        <div class="avh__top"><span class="avh__q">${head}</span><span class="avh__ctx">${ctx}</span></div>
+        <div class="avh__btns">
+          <button class="avh__b avh__in ${isIn ? 'is-on' : ''}" ${dis} onclick="setAvail('${esc(next.matchId)}','in')">I'm in</button>
+          <button class="avh__b avh__out ${isOut ? 'is-on' : ''}" ${dis} onclick="setAvail('${esc(next.matchId)}','out')">Can't make it</button>
+        </div>
+        ${reasonRow}${lockedNote}
+      </div>`;
+    }
+
+    const blocks = { mehead, announce, avail, hero, night, live, lulist, recap, tiles, potw, movers, coming, team };
+    // The "you" header always leads; the availability prompt + announcement sit
+    // right under it so players see "can you make it?" before anything else.
     const order = isMatchDay
-      ? ['mehead', 'announce', 'hero', 'night', 'live', 'lulist', 'recap', 'tiles', 'potw', 'movers', 'coming', 'team']
-      : ['mehead', 'announce', 'tiles', 'recap', 'hero', 'night', 'lulist', 'potw', 'movers', 'coming', 'team'];
+      ? ['mehead', 'avail', 'announce', 'hero', 'night', 'live', 'lulist', 'recap', 'tiles', 'potw', 'movers', 'coming', 'team']
+      : ['mehead', 'avail', 'announce', 'tiles', 'recap', 'hero', 'night', 'lulist', 'potw', 'movers', 'coming', 'team'];
     const html = order.map(k => blocks[k] || '').join('');
     $('v-home').innerHTML = html || '<div class="muted">No matches scheduled yet. Your season will show up here.</div>';
     $('v-home').querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => {
@@ -2081,7 +2139,56 @@
         <div class="m__team">${teamLink(homeId, homeName, `<div class="m__emoji">${emo({emoji:homeEmoji})}</div><div class="m__tn">${esc(homeName)}</div>`)}</div>
         ${center}
         <div class="m__team">${teamLink(awayId, awayName, `<div class="m__emoji">${emo({emoji:awayEmoji})}</div><div class="m__tn">${esc(awayName)}</div>`)}</div>
-      </div>${foot}</div>`;
+      </div>${foot}${isResult ? '' : availControl(m)}</div>`;
+  }
+
+  // ── Availability control: "Can you make it?" on upcoming match cards ──
+  // Players are available by default; this only needs touching to opt out (or to
+  // opt back in). Marking out removes the player from the captain's lineup picker.
+  function availControl(m) {
+    if (!m || m.final || m.status === 'live') return '';
+    const av = m.availability || {};
+    const editable = av.editable !== false;
+    const status = av.status;            // 'in' | 'out' | null
+    const isOut = status === 'out', isIn = status === 'in';
+    const byCap = av.byRole === 'captain';
+    const dis = editable ? '' : 'disabled';
+    const reasonRow = isOut
+      ? `<input class="m__avail-reason" type="text" maxlength="200" placeholder="Add a note for your captain (optional)" value="${esc(av.reason || '')}" ${editable ? '' : 'disabled'} onchange="setAvailReason('${esc(m.matchId)}', this.value)">`
+      : '';
+    let note = '';
+    if (isOut) note = `<div class="m__avail-note is-out">You're marked out for this match${byCap ? ' (set by your captain)' : ''} — you won't be put in the lineup.</div>`;
+    else if (!status) note = `<div class="m__avail-note">No response yet — you'll be treated as available.</div>`;
+    const lockedNote = !editable ? `<div class="m__avail-note">This match has started — availability is locked.</div>` : '';
+    return `<div class="m__avail" data-match="${esc(m.matchId)}">
+      <div class="m__avail-row">
+        <span class="m__avail-q">Can you make it?</span>
+        <button class="av-btn av-in ${isIn ? 'is-on' : ''}" ${dis} onclick="setAvail('${esc(m.matchId)}','in')">I'm in</button>
+        <button class="av-btn av-out ${isOut ? 'is-on' : ''}" ${dis} onclick="setAvail('${esc(m.matchId)}','out')">Can't make it</button>
+      </div>
+      ${reasonRow}${note}${lockedNote}
+    </div>`;
+  }
+  async function setAvail(matchId, status) {
+    const item = (DATA.schedule || []).find(m => m.matchId === matchId);
+    const reason = status === 'out' ? (item?.availability?.reason || '') : '';
+    await postAvail(matchId, status, reason);
+  }
+  async function setAvailReason(matchId, reason) { await postAvail(matchId, 'out', reason); }
+  async function postAvail(matchId, status, reason) {
+    try {
+      const r = await fetch(API + '/player-availability?match=' + encodeURIComponent(matchId), {
+        method: 'PUT', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) { alert(d.error || 'Could not update availability.'); return; }
+      const item = (DATA.schedule || []).find(m => m.matchId === matchId);
+      if (item) item.availability = { ...(item.availability || {}), status: d.status, reason: d.reason, byRole: 'player', editable: true };
+      renderSchedule();
+      try { renderHome(); } catch {}
+    } catch { alert('Could not update availability.'); }
   }
 
   // ── Game-by-game scores (Results toggle) ─────────────────────────
