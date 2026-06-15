@@ -371,6 +371,14 @@
     }
 
     /* ---- POTW + DSR from weeklyTopPerformers (latest week) ---- */
+    // Avatar: show the player's photo when they have one, else initials.
+    // player-photo-serve returns 404 for players with no photo, so the onerror
+    // handler swaps back to initials cleanly.
+    function avatarHtml(p, cls){
+      var ini = esc(initials(p.name));
+      if (!p.playerId) return '<div class="'+cls+'">'+ini+'</div>';
+      return '<div class="'+cls+'" data-ini="'+ini+'"><img src="/.netlify/functions/player-photo-serve?id='+encodeURIComponent(p.playerId)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.remove();this.parentNode.textContent=this.parentNode.dataset.ini;"></div>';
+    }
     function potwCard(p,gender){
       var isM=gender==='m';
       var cls=isM?'m':'f';
@@ -378,7 +386,7 @@
       return '<div class="pcard '+cls+'"><div class="pcard__badge">K\'CHN</div>'
         +'<div class="pcard__cat">'+(isM?'Male':'Female')+' · POTW</div>'
         +'<div class="pcard__row">'
-          +'<div class="pav">'+esc(initials(p.name))+'</div>'
+          +avatarHtml(p,'pav')
           +'<div class="pcard__name">'+playerLink(p.name,p.teamName,'pname',SN(p.name))+'</div>'
           +(p.teamName?'<div class="pcard__team">'+teamLink(p.teamName,p.teamId,'ptm')+'</div>':'')
         +'</div>'
@@ -401,10 +409,18 @@
       var key=metric==='diff'?'diff':metric==='pts'?'ps':'dsr';
       return arr.slice().sort(function(a,b){var av=a[key],bv=b[key];if(av==null)av=-Infinity;if(bv==null)bv=-Infinity;return bv-av;});
     }
-    function perfListPanel(men,women,metric,on){
+    // Use the precomputed top-per-metric leaders (top 6 each) when present, so
+    // Best Diff / Most Pts aren't constrained to the DSR top 3; fall back to
+    // sorting the topN arrays for older data without `leaders`.
+    function perfMetricList(latest, g, metric){
+      var L = latest.leaders && latest.leaders[g];
+      if (L && Array.isArray(L[metric])) return L[metric].slice(0, 5);
+      return perfSort(latest[g] || [], metric).slice(0, 5);
+    }
+    function perfListPanel(latest,metric,on){
       return '<div class="perfpanel'+(on?' on':'')+'" data-tab="'+metric+'">'
-        +'<div class="perf-col m"><h4>Men · Top 5</h4>'+perfSort(men,metric).slice(0,5).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div>'
-        +'<div class="perf-col f"><h4>Women · Top 5</h4>'+perfSort(women,metric).slice(0,5).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div></div>';
+        +'<div class="perf-col m"><h4>Men · Top 5</h4>'+perfMetricList(latest,'men',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div>'
+        +'<div class="perf-col f"><h4>Women · Top 5</h4>'+perfMetricList(latest,'women',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div></div>';
     }
     function potwPanel(men,women,on){
       var html='<div class="perfpanel'+(on?' on':'')+'" data-tab="potw">';
@@ -418,9 +434,9 @@
       if(men.length||women.length){
         document.getElementById('rc-perfpanels').innerHTML =
           potwPanel(men,women,true)
-          +perfListPanel(men,women,'dsr',false)
-          +perfListPanel(men,women,'diff',false)
-          +perfListPanel(men,women,'pts',false);
+          +perfListPanel(latest,'dsr',false)
+          +perfListPanel(latest,'diff',false)
+          +perfListPanel(latest,'pts',false);
         document.getElementById('rc-perf').style.display='';
       }
       // header week
