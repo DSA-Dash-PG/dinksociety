@@ -74,7 +74,7 @@ export default async (req) => {
   if (req.method === 'PUT') {
     const body = await req.json();
     const oldName = team.name;
-    const allowed = ['name', 'emoji', 'color', 'secondaryColor', 'notes', 'division', 'divisionLabel'];
+    const allowed = ['name', 'emoji', 'color', 'secondaryColor', 'notes', 'division', 'divisionLabel', 'bio'];
 
     for (const field of allowed) {
       if (field in body) {

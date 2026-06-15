@@ -51,6 +51,7 @@ export default async (req) => {
           name: team.name,
           emoji: team.emoji || '',
           color: team.color || null,
+          bio: team.bio || '',
           division: team.division,
           divisionLabel: team.divisionLabel || null,
           captain: captainName,

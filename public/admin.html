@@ -701,12 +701,15 @@
           </div>
 
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+            <input id="teams-search" type="search" placeholder="Search team or player…" style="flex:1;min-width:170px;max-width:280px;background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-family:inherit;">
             <label style="font-size:12px;color:var(--color-text-faint);">Division</label>
-            <select id="teams-div-filter" style="max-width:260px;"><option value="">All divisions</option></select>
+            <select id="teams-div-filter" style="max-width:220px;"><option value="">All divisions</option></select>
+            <label style="font-size:12px;color:var(--color-text-faint);">Sort</label>
+            <select id="teams-sort" style="max-width:150px;"><option value="name">Name A–Z</option><option value="division">Division</option><option value="roster">Roster size</option></select>
             <span id="teams-count" style="font-size:11px;color:var(--color-text-faint);"></span>
           </div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col" id="teams-grid">
+          <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px;" id="teams-grid">
             <div class="loading" style="grid-column:1/-1;">Loading teams…</div>
           </div>
 
@@ -3650,10 +3653,29 @@
         divs.map(d => '<option value="' + h(d.id) + '"' + (d.id === current ? ' selected' : '') + '>' + h(d.label) + '</option>').join('');
       sel.onchange = showTeamCards;
     }
+    // Search + sort controls (bound once via direct assignment — safe across re-renders)
+    const searchEl = $id('teams-search'), sortEl = $id('teams-sort');
+    if (searchEl) searchEl.oninput = showTeamCards;
+    if (sortEl) sortEl.onchange = showTeamCards;
+
     const filterVal = sel ? sel.value : '';
-    const shown = filterVal ? allTeams.filter(t => t.division === filterVal) : allTeams;
+    const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
+    const sortBy = sortEl ? sortEl.value : 'name';
+
+    let shown = filterVal ? allTeams.filter(t => t.division === filterVal) : allTeams.slice();
+    if (q) shown = shown.filter(t =>
+      (t.name || '').toLowerCase().includes(q) ||
+      (t.roster || []).some(p => (p.name || '').toLowerCase().includes(q)));
+    shown.sort((a, b) => {
+      if (sortBy === 'roster') return (b.roster || []).length - (a.roster || []).length || (a.name || '').localeCompare(b.name || '');
+      if (sortBy === 'division') return (a.divisionLabel || a.division || '').localeCompare(b.divisionLabel || b.division || '') || (a.name || '').localeCompare(b.name || '');
+      return (a.name || '').localeCompare(b.name || '');
+    });
+
     const cnt = $id('teams-count');
-    if (cnt) cnt.textContent = shown.length + (filterVal ? ' of ' + allTeams.length : '') + ' team' + (shown.length === 1 ? '' : 's');
+    if (cnt) cnt.textContent = shown.length + ((filterVal || q) ? ' of ' + allTeams.length : '') + ' team' + (shown.length === 1 ? '' : 's');
+
+    if (!shown.length) { grid.innerHTML = '<div class="empty" style="grid-column:1/-1;">No teams match your search.</div>'; return; }
 
     grid.innerHTML = shown.map(t => {
       const capEmail = (t.captainEmail || '').toLowerCase();
@@ -3842,7 +3864,8 @@
       '</div>';
 
     body.innerHTML =
-      viewAsBlock +
+      /* ── IDENTITY ── */
+      '<div class="ac__h" style="margin:0 0 12px;"><span class="ac__t">Identity</span></div>' +
       '<div class="arow">' +
         '<div class="af"><label>Team Name</label><input type="text" id="tdp-name" value="' + h(t.name || '') + '"></div>' +
         '<div class="af" style="max-width:120px;"><label>Logo</label><input type="text" id="tdp-emoji" maxlength="4" placeholder="🏓 or DSD" value="' + h(t.emoji || '') + '" style="text-align:center;font-size:18px;"><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Emoji or 2-3 letters</span></div>' +
@@ -3863,18 +3886,21 @@
         '</div>' +
       '</div>' +
       '<div class="arow">' +
-        '<div class="af"><label>Division</label><select id="tdp-division">' + DIVISIONS.map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
-        '<div class="af"><label>Notes</label><input type="text" id="tdp-notes" value="' + h(t.notes || '') + '"></div>' +
-      '</div>' +
-      '<div class="arow">' +
         '<div class="af"><label>Primary Color</label><div class="color-input-row"><input type="color" id="tdp-color" value="' + (t.color || '#b8ff2c') + '"><input type="text" id="tdp-color-hex" value="' + h(t.color || '') + '" placeholder="#hex"></div></div>' +
         '<div class="af"><label>Secondary Color</label><div class="color-input-row"><input type="color" id="tdp-color2" value="' + (t.secondaryColor || '#17d7b0') + '"><input type="text" id="tdp-color2-hex" value="' + h(t.secondaryColor || '') + '" placeholder="#hex"></div></div>' +
       '</div>' +
+      '<div class="arow"><div class="af"><label>Bio</label><textarea id="tdp-bio" rows="4" placeholder="Short team bio shown on the public team page…" style="width:100%;box-sizing:border-box;background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px 12px;font-family:inherit;font-size:13px;line-height:1.5;resize:vertical;min-height:84px;">' + h(t.bio || '') + '</textarea><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Shown publicly on the team page.</span></div></div>' +
 
-      '<div style="margin:20px 0 10px;"><div class="ac__h"><span class="ac__t">Roster (' + (t.roster || []).length + '/10)</span></div></div>' +
+      /* ── DETAILS ── */
+      '<div class="ac__h" style="margin:22px 0 12px;"><span class="ac__t">Details</span></div>' +
+      '<div class="arow">' +
+        '<div class="af"><label>Division</label><select id="tdp-division">' + DIVISIONS.map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
+        '<div class="af"><label>Notes</label><input type="text" id="tdp-notes" value="' + h(t.notes || '') + '"><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Admin-only — never shown publicly.</span></div>' +
+      '</div>' +
 
+      /* ── ROSTER ── */
+      '<div class="ac__h" style="margin:22px 0 10px;"><span class="ac__t">Roster (' + (t.roster || []).length + '/10)</span></div>' +
       '<div id="tdp-roster">' + renderRosterItems(t.roster || []) + '</div>' +
-
       '<div style="margin-top:12px;padding:14px;background:var(--color-surface-2);border-radius:var(--radius-sm);border:1px solid var(--color-border);">' +
         '<div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Add Player</div>' +
         '<div class="arow">' +
@@ -3886,7 +3912,11 @@
           '<div class="af"><label>Phone</label><input type="tel" id="tdp-add-phone" placeholder="(555) 123-4567"></div>' +
         '</div>' +
         '<div style="text-align:right;"><button class="ab ab--teal ab--sm" id="tdp-add-btn">Add to roster</button></div>' +
-      '</div>';
+      '</div>' +
+
+      /* ── ADMIN TOOLS ── */
+      '<div class="ac__h" style="margin:24px 0 10px;"><span class="ac__t">Admin tools</span></div>' +
+      viewAsBlock;
 
     // Wire up "View as" impersonation
     const viewAsGo = async (payload, srcBtn) => {
@@ -4164,6 +4194,7 @@
     const payload = {
       name: $id('tdp-name').value.trim(),
       emoji: ($id('tdp-emoji') ? $id('tdp-emoji').value.trim() : (currentPanelTeam.emoji || '')),
+      bio: ($id('tdp-bio') ? $id('tdp-bio').value.trim() : (currentPanelTeam.bio || '')),
       division: $id('tdp-division').value,
       divisionLabel: DIVISIONS.find(d => d.id === $id('tdp-division').value)?.name || $id('tdp-division').value,
       notes: $id('tdp-notes').value.trim(),
