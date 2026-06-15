@@ -54,6 +54,7 @@ function highlightNav() {
   let key = null;
 
   if (path.includes('drop'))             key = 'drop';
+  else if (path.includes('nvz'))         key = 'nvz';
   else if (path.includes('schedule'))    key = 'schedule';
   else if (path.includes('standing'))    key = 'standings';
   else if (path.includes('leaderboard')) key = 'leaderboard';
