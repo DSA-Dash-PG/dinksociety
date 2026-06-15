@@ -4066,6 +4066,11 @@
           '<div class="ri__field"><span class="ri__label">Plays</span><select class="ri__input" data-pf="plays">' + playsOpt('') + playsOpt('Right Handed') + playsOpt('Left Handed') + playsOpt('Both') + '</select></div>' +
           '<div class="ri__field"><span class="ri__label">City</span><input class="ri__input" data-pf="city" value="' + h(prof.city||'') + '" placeholder="City"></div>' +
           '<div class="ri__field ri__field--full"><span class="ri__label">Home court</span><input class="ri__input" data-pf="homeCourt" value="' + h(prof.homeCourt||'') + '" placeholder="Home court"></div>' +
+          '<div class="ri__field ri__field--full" style="flex-direction:row;align-items:center;justify-content:flex-end;gap:10px;">' +
+            '<span class="ri__label" style="margin:0;flex:1;">Saves Height/DOB/Plays/City/Court live</span>' +
+            '<span data-pf-status="' + i + '" style="font-size:10px;color:var(--color-text-faint);"></span>' +
+            '<button class="ab ab--teal ab--sm" data-action="save-profile" data-idx="' + i + '" style="font-size:10px;">Save profile</button>' +
+          '</div>' +
           (p.id ? (
           '<div class="ri__field ri__field--full" style="flex-direction:row;align-items:center;gap:10px;">' +
             '<div class="ri__avatar" style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:' + color + '">' + photoThumb + '</div>' +
@@ -4122,6 +4127,35 @@
     } catch (e) { alert('Photo upload failed: ' + e.message); btn.textContent = orig; btn.disabled = false; }
   }
 
+  // Save a single roster row's bio fields immediately (admin session → live),
+  // so the bio doesn't depend on the panel-wide "Save Changes". Self-contained:
+  // reads the row's own [data-pf] inputs, no flush/re-render.
+  async function savePlayerProfileAdmin(idx, btn) {
+    const p = currentPanelTeam.roster?.[idx];
+    if (!p || !p.id) { alert('Save the player first (Save Changes), then save their profile.'); return; }
+    const row = btn.closest('.ri');
+    const statusEl = row ? row.querySelector('[data-pf-status]') : null;
+    const profile = {};
+    (row ? row.querySelectorAll('[data-pf]') : []).forEach(inp => { profile[inp.dataset.pf] = inp.value.trim(); });
+    const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Saving…';
+    if (statusEl) { statusEl.textContent = ''; statusEl.style.color = 'var(--color-text-faint)'; }
+    try {
+      const r = await fetch('/.netlify/functions/player-profile', {
+        method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId: p.id, teamId: currentPanelTeam.id, profile }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Save failed');
+      p.profile = { ...(p.profile || {}), ...profile }; // keep in-memory copy in sync
+      btn.textContent = '✓ Saved';
+      if (statusEl) { statusEl.textContent = d.status === 'live' ? 'Live ✓' : 'Sent for approval'; statusEl.style.color = 'var(--color-teal)'; }
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2200);
+    } catch (e) {
+      if (statusEl) { statusEl.textContent = e.message || 'Save failed'; statusEl.style.color = 'var(--color-red)'; }
+      btn.textContent = orig; btn.disabled = false;
+    }
+  }
+
   function wireRosterActions() {
     $id('tdp-roster').querySelectorAll('[data-action]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
@@ -4130,6 +4164,8 @@
         const action = btn.dataset.action;
         // Photo upload is self-contained — must NOT flush/re-render (that drops the picked file).
         if (action === 'upload-photo') { await uploadPlayerPhotoAdmin(idx, btn); return; }
+        // Save profile is self-contained — saves the row's bio fields live, no re-render.
+        if (action === 'save-profile') { await savePlayerProfileAdmin(idx, btn); return; }
         // Preserve any typed values before re-render
         flushRosterFromDOM();
         const roster = currentPanelTeam.roster || [];
