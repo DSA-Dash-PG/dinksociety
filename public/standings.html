@@ -184,6 +184,17 @@
     }
     .section-card__title { font-size: 14px; font-weight: 800; font-style: italic; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 4px; }
     .section-card__sub   { font-size: 12px; color: var(--color-text-faint); margin: 0 0 var(--space-4); }
+
+    /* More-views links-out tiles */
+    .more-views { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+    .more-view { display: flex; align-items: center; gap: 12px; padding: 14px; border: 1px solid var(--color-border); border-radius: var(--radius-md); text-decoration: none; color: var(--color-text); transition: border-color var(--transition), background var(--transition); }
+    .more-view:hover { border-color: var(--color-lime); background: var(--color-surface-2); }
+    .more-view__ic { width: 36px; height: 36px; flex-shrink: 0; border-radius: 9px; background: var(--color-surface-2); border: 1px solid var(--color-border); display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .more-view__txt { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+    .more-view__title { font-weight: 800; font-style: italic; text-transform: uppercase; font-size: 13px; letter-spacing: 0.02em; }
+    .more-view__desc { font-size: 11px; color: var(--color-text-faint); margin-top: 2px; }
+    .more-view__arr { color: var(--color-text-faint); font-weight: 800; }
+    .more-view:hover .more-view__arr { color: var(--color-lime); }
     .h2h-wrap { overflow-x: auto; }
     .h2h-table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
     .h2h-table th {
@@ -354,7 +365,7 @@
     }));
     // Use divisionLabel from the first team, fall back to DIV_LABELS map, then raw code
     const divLabel = divTeams[0]?.divisionLabel || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
-    el.innerHTML = standingsCardHtml(teams, true, '', divLabel) + legendCardHtml();
+    el.innerHTML = standingsCardHtml(teams, true, '', divLabel) + legendCardHtml() + moreViewsCardHtml();
   }
 
   // ── Week snapshots ───────────────────────────────────────────────
@@ -508,7 +519,7 @@
     el.innerHTML = weekChipsHtml() + preTable
       + standingsCardHtml(teams, false, updated, divLabel, hunt)
       + legendCardHtml(hunt)
-      + (selectedWeek === 'current' ? h2hCardHtml(teams) + trajectoryCardHtml(teams, divData.weeklyData) : '');
+      + moreViewsCardHtml();
     wireWeekChips(el);
   }
 
@@ -668,70 +679,26 @@
       + '</div>';
   }
 
-  // ── H2H card ─────────────────────────────────────────────────────
-  function h2hCardHtml(teams) {
-    const hasData = teams.some(t => t.h2h && Object.keys(t.h2h).length > 0);
-    if (!hasData) {
-      return '<div class="section-card">'
-        + '<h3 class="section-card__title">🤺 Head-to-Head Matrix</h3>'
-        + '<p class="section-card__sub">Who owns who — match points in every matchup</p>'
-        + '<div class="empty-state" style="padding:28px 20px">Head-to-head results will appear after Week 1.</div>'
-        + '</div>';
-    }
-
-    const hdCols = teams.map(t =>
-      '<th title="' + esc(t.teamName) + '">' + esc(t.teamEmoji || t.teamName.split(' ')[0]) + '</th>'
-    ).join('');
-
-    const bodyRows = teams.map(rt => {
-      const cells = teams.map(ct => {
-        if (rt.teamId === ct.teamId) return '<td class="h2h-self">—</td>';
-        const e = rt.h2h?.[ct.teamId];
-        if (!e) return '<td class="col-muted">—</td>';
-        const cls = e.for > e.against ? 'h2h-win' : e.for < e.against ? 'h2h-loss' : 'h2h-tie';
-        return '<td class="' + cls + '">' + e.for + '–' + e.against + '</td>';
-      }).join('');
-      const tf = Object.values(rt.h2h||{}).reduce((s,v) => s+(v.for||0), 0);
-      const ta = Object.values(rt.h2h||{}).reduce((s,v) => s+(v.against||0), 0);
-      const tc = tf>ta ? 'h2h-win' : tf<ta ? 'h2h-loss' : 'h2h-tie';
-      return '<tr><td class="h2h-team">' + esc(rt.teamEmoji) + ' <a class="team-name-link" href="' + teamHref(rt) + '">' + esc(rt.teamName) + '</a></td>'
-           + cells
-           + '<td class="h2h-total ' + tc + '">' + tf + '–' + ta + '</td></tr>';
-    }).join('');
-
+  // ── More views card ──────────────────────────────────────────────
+  // Head-to-Head, Strength of Schedule and Team Ranking Trajectory each live
+  // on their own page now (and in the Standings nav dropdown). This card links
+  // out to them from the bottom of the table.
+  function moreViewsCardHtml() {
+    const q = SEASON.id === 'circuit-i' ? '' : '?season=' + encodeURIComponent(SEASON.id);
+    const tiles = [
+      { href: '/head-to-head.html',         icon: '🤺', title: 'Head-to-Head',            desc: 'Who owns who — match points in every matchup' },
+      { href: '/strength-of-schedule.html', icon: '🗓️', title: 'Strength of Schedule',    desc: 'How tough each team’s slate is, by opponent DSR' },
+      { href: '/ranking-trajectory.html',   icon: '📈', title: 'Team Ranking Trajectory', desc: 'How each team’s rank has moved week by week' },
+    ];
     return '<div class="section-card">'
-      + '<h3 class="section-card__title">🤺 Head-to-Head Matrix</h3>'
-      + '<p class="section-card__sub">Who owns who — match points in every matchup</p>'
-      + '<div class="h2h-wrap"><table class="h2h-table">'
-      + '<thead><tr><th class="h2h-lbl">TEAM ↓ VS →</th>' + hdCols + '<th class="h2h-tot">TOTAL</th></tr></thead>'
-      + '<tbody>' + bodyRows + '</tbody>'
-      + '</table></div>'
-      + '<p class="h2h-note">Each cell = match pts (your score – opponent score). 🟢 = win &nbsp; 🔴 = loss &nbsp; Row = your results vs each opponent.</p>'
-      + '</div>';
-  }
-
-  // ── Trajectory card ──────────────────────────────────────────────
-  function trajectoryCardHtml(teams, weeklyData) {
-    if (!weeklyData || Object.keys(weeklyData).length < 2) {
-      return '<div class="section-card">'
-        + '<h3 class="section-card__title">📈 Team Ranking Trajectory</h3>'
-        + '<p class="section-card__sub">How each team’s rank has moved week by week</p>'
-        + '<div class="empty-state" style="padding:28px 20px">Trajectory chart appears after Week 2.</div>'
-        + '</div>';
-    }
-    const legendHtml = teams.map((t, i) =>
-      '<div class="traj-legend-item">'
-      + '<div class="traj-dot" style="background:' + TEAM_COLORS[i % TEAM_COLORS.length] + '"></div>'
-      + '<span>' + esc(t.teamName) + '</span>'
-      + '</div>'
-    ).join('');
-    return '<div class="section-card">'
-      + '<h3 class="section-card__title">📈 Team Ranking Trajectory</h3>'
-      + '<p class="section-card__sub">How each team’s rank has moved week by week</p>'
-      + '<div class="traj-legend">' + legendHtml + '</div>'
-      + '<canvas id="traj-canvas"></canvas>'
-      + '</div>';
-    // TODO: draw chart on canvas after rendering using weeklyData rank history
+      + '<h3 class="section-card__title">📂 More Standings Views</h3>'
+      + '<div class="more-views">'
+      + tiles.map(t => '<a class="more-view" href="' + t.href + q + '">'
+          + '<span class="more-view__ic">' + t.icon + '</span>'
+          + '<span class="more-view__txt"><span class="more-view__title">' + t.title + '</span>'
+          + '<span class="more-view__desc">' + t.desc + '</span></span>'
+          + '<span class="more-view__arr">&rarr;</span></a>').join('')
+      + '</div></div>';
   }
 
   // ── Status computation ───────────────────────────────────────────

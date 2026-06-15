@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strength of Schedule &middot; The Dink Society</title>
+  <meta name="description" content="How tough each team's schedule is, rated by opponent DSR — The Dink Society." />
+  <meta property="og:title" content="Strength of Schedule · The Dink Society" />
+  <meta property="og:description" content="How tough each team's schedule is, rated by opponent DSR." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="The Dink Society" />
+  <meta property="og:url" content="https://dinksociety.netlify.app/strength-of-schedule" />
+  <meta property="og:image" content="https://dinksociety.netlify.app/img/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .sos-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+
+    .sos-card {
+      background: var(--color-surface); border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4);
+    }
+    .sos-card__title { font-size: 15px; font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.02em; margin: 0; display: flex; align-items: center; gap: 9px; }
+    .sos-card__sub { font-size: 12px; color: var(--color-text-faint); margin: 3px 0 0; }
+
+    /* Contextual note */
+    .sos-note { display: flex; gap: 10px; align-items: flex-start; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 16px; margin-bottom: var(--space-4); font-size: 12.5px; color: var(--color-text-muted); line-height: 1.5; }
+    .sos-note b { color: var(--color-text); }
+
+    /* Sub-nav pills (sibling views) */
+    .sos-subnav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-4); }
+    .sos-subnav a { padding: 7px 14px; border-radius: var(--radius-full); font-size: 12px; font-weight: 700; border: 1px solid var(--color-border); color: var(--color-text-muted); text-decoration: none; transition: all var(--transition); }
+    .sos-subnav a:hover { color: var(--color-text); background: var(--color-surface-2); }
+    .sos-subnav a.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+
+    /* Legend */
+    .sos-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; }
+    .legend { display: flex; align-items: center; gap: 10px; font-size: 11px; color: var(--color-text-faint); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+    .legend-bar { height: 9px; width: 150px; border-radius: 9999px; background: linear-gradient(90deg, #b8ff2c, #f0c040, #ff5c47); }
+
+    /* Heat-strip */
+    .strip-grid { display: grid; grid-template-columns: minmax(150px,1.3fr) 1fr auto; gap: 9px 14px; align-items: center; }
+    .strip-hdr { font-size: 9px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); }
+    .wk-col-hdr { display: grid; gap: 5px; }
+    .wk-col-hdr span { text-align: center; font-size: 8.5px; font-weight: 800; color: var(--color-text-faint); }
+    .team-cell { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .team-emoji { width: 30px; height: 30px; flex-shrink: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; background: var(--color-surface-2); border: 1px solid var(--color-border); }
+    .team-meta { display: flex; flex-direction: column; min-width: 0; }
+    .team-nm { font-weight: 800; font-size: 13px; font-style: italic; text-transform: uppercase; letter-spacing: 0.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-nm a { color: inherit; text-decoration: none; }
+    .team-nm a:hover { color: var(--color-lime); }
+    .team-dsr { font-size: 10px; color: var(--color-text-faint); font-weight: 700; }
+    .strip-weeks { display: grid; gap: 5px; }
+    .wk { position: relative; aspect-ratio: 1/1; min-height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; cursor: default; transition: transform .12s ease; }
+    .wk:hover { transform: scale(1.12); z-index: 3; }
+    .wk.future::after { content: ''; position: absolute; inset: 0; border-radius: 8px; border: 1.5px dashed rgba(255,255,255,0.22); }
+    [data-theme="light"] .wk.future::after { border-color: rgba(0,0,0,0.18); }
+    .wk.bye { background: var(--color-surface-2) !important; color: var(--color-text-faint); font-size: 10px; }
+    .strip-sos { text-align: right; }
+    .strip-sos .v { font-size: 18px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .strip-sos .l { font-size: 8.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); }
+
+    .tip { position: fixed; z-index: 300; pointer-events: none; opacity: 0; background: #000; color: #fff; border: 1px solid var(--color-border-strong); border-radius: 9px; padding: 8px 11px; font-size: 11.5px; line-height: 1.4; max-width: 230px; box-shadow: 0 12px 30px rgba(0,0,0,0.5); transition: opacity .12s ease; }
+    .tip b { color: var(--color-lime); }
+
+    /* SOS table */
+    .sos-table { width: 100%; border-collapse: collapse; margin-top: 14px; }
+    .sos-table thead th { font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-faint); text-align: right; padding: 0 10px 12px; border-bottom: 1px solid var(--color-border-strong); cursor: pointer; user-select: none; white-space: nowrap; }
+    .sos-table thead th.l { text-align: left; }
+    .sos-table thead th:hover { color: var(--color-text); }
+    .sos-table thead th .arr { opacity: 0; font-size: 9px; }
+    .sos-table thead th.sorted .arr { opacity: 1; color: var(--color-lime); }
+    .sos-table tbody td { padding: 13px 10px; text-align: right; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--color-border); font-size: 13.5px; }
+    .sos-table tbody tr:last-child td { border-bottom: none; }
+    .sos-table tbody tr:hover td { background: var(--color-surface-2); }
+    .sos-table td.team { text-align: left; }
+    .td-team { display: flex; align-items: center; gap: 10px; }
+    .td-team a { color: inherit; text-decoration: none; font-weight: 800; font-style: italic; text-transform: uppercase; font-size: 13px; }
+    .td-team a:hover { color: var(--color-lime); }
+    .rk { width: 20px; color: var(--color-text-faint); font-weight: 800; font-size: 12px; }
+    .sos-pill { display: inline-block; min-width: 56px; padding: 5px 10px; border-radius: 9999px; font-weight: 900; font-size: 13px; }
+    .trend { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 800; padding: 4px 9px; border-radius: 9999px; white-space: nowrap; }
+    .trend.up { color: var(--color-red); background: var(--color-red-dim); }
+    .trend.down { color: var(--color-teal); background: var(--color-teal-dim); }
+    .trend.flat { color: var(--color-text-muted); background: var(--color-surface-2); }
+    .muted { color: var(--color-text-faint); }
+
+    /* Column key */
+    .key-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 10px 26px; margin-top: 6px; }
+    .key-grid div { font-size: 12px; color: var(--color-text-muted); }
+    .key-grid b { color: var(--color-text); font-weight: 800; }
+
+    .empty-state { text-align: center; padding: 56px 20px; font-size: 14px; color: var(--color-text-faint); }
+
+    @media (max-width: 720px) {
+      .strip-grid { grid-template-columns: 1fr; }
+      .strip-grid > .strip-hdr { display: none; }
+      .strip-sos { text-align: left; }
+      .wk-col-hdr { display: none; }
+      .sos-table { font-size: 12px; }
+      .hide-sm { display: none; }
+    }
+  </style>
+</head>
+<body data-page="standings">
+  <div data-partial="nav"></div>
+
+  <div class="page-hero">
+    <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="standings"></div>
+    <div class="page-hero__gradient"></div>
+    <div class="page-hero__content">
+      <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · Contextual stat</div>
+      <h1 class="page-hero__title">Strength of Schedule</h1>
+    </div>
+  </div>
+
+  <div class="sos-shell">
+
+    <nav class="sos-subnav">
+      <a href="/standings.html">Standings</a>
+      <a href="/head-to-head.html">Head-to-Head</a>
+      <a href="/strength-of-schedule.html" class="is-active">Strength of Schedule</a>
+      <a href="/ranking-trajectory.html">Team Ranking Trajectory</a>
+    </nav>
+
+    <div class="sos-note">
+      <span>ℹ️</span>
+      <span><b>Read this as context, not a verdict.</b> With a small field over a short season the schedule mostly evens out by the finish — SOS is most telling mid-season, when it explains <em>how</em> a record was earned. Opponents are rated by <b>DSR</b>, so it's stable from the first week of play.</span>
+    </div>
+
+    <div id="sos-content"><div class="empty-state">Loading&hellip;</div></div>
+
+  </div>
+
+  <div class="tip" id="tip"></div>
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+  <script src="/js/live-poll.js"></script>
+  <script>
+  // ── Config ───────────────────────────────────────────────────────
+  const SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i') };
+  const CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
+  const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
+  const TREND_THRESHOLD = 25; // DSR points of difference to call a run-in harder/easier
+
+  let dsrByTeam = {};
+  let sort = { k: 'sos', dir: -1 };
+  let computed = [];      // last computed rows (for re-sort without refetch)
+  let weekNums = [];
+
+  // ── Helpers ──────────────────────────────────────────────────────
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
+  function teamHref(t){ return '/team?id=' + encodeURIComponent(t.id || slug(t.name)) + LINK_SUFFIX; }
+  function mean(a){ return a.length ? a.reduce((s,x)=>s+x,0)/a.length : null; }
+  function fmt(v){ return v == null ? '—' : v.toFixed(0); }
+
+  // Team DSR = sum of each rated player's DSR (composite, gamesPlayed>0).
+  function buildDsrByTeam(pstats) {
+    const map = {};
+    if (!pstats || pstats.empty) return map;
+    Object.values(pstats.players || {}).forEach(p => {
+      if (!(p.gamesPlayed > 0) || p.composite == null) return;
+      const d = Math.round(p.composite * 10) / 10;
+      [p.teamId, (p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { map[k] = (map[k] || 0) + d; });
+    });
+    Object.keys(map).forEach(k => { map[k] = Math.round(map[k] * 10) / 10; });
+    return map;
+  }
+  function dsrFor(id, name) {
+    const v = dsrByTeam[id] ?? dsrByTeam[String(name || '').toLowerCase()];
+    return v != null ? v : null;
+  }
+
+  // ── Colour scale (difficulty: easy → hard) ───────────────────────
+  let MIN_DSR = 0, MAX_DSR = 1;
+  function norm(dsr){ return Math.max(0, Math.min(1, (dsr - MIN_DSR) / ((MAX_DSR - MIN_DSR) || 1))); }
+  function lerp(a,b,t){ return Math.round(a + (b - a) * t); }
+  function diffColor(dsr){
+    const t = norm(dsr), lime=[184,255,44], gold=[240,192,64], red=[255,92,71];
+    let c;
+    if (t < 0.5){ const u=t/0.5; c=[lerp(lime[0],gold[0],u),lerp(lime[1],gold[1],u),lerp(lime[2],gold[2],u)]; }
+    else { const u=(t-0.5)/0.5; c=[lerp(gold[0],red[0],u),lerp(gold[1],red[1],u),lerp(gold[2],red[2],u)]; }
+    return c;
+  }
+  function diffLabel(dsr){ const t = norm(dsr); return t > 0.66 ? 'Hard' : t > 0.33 ? 'Medium' : 'Easy'; }
+
+  // ── Bootstrap ────────────────────────────────────────────────────
+  async function load() {
+    let sr, tr, sc, pr;
+    try {
+      [sr, tr, sc, pr] = await Promise.all([
+        fetch('/.netlify/functions/public-standings?season=' + SEASON.id).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-teams?season='    + SEASON.id).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-schedule?season=' + SEASON.id).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+    } catch { /* fall through to empty */ }
+
+    dsrByTeam = buildDsrByTeam(pr);
+    build(sr, tr, sc);
+  }
+
+  function renderEmpty(msg) {
+    document.getElementById('sos-content').innerHTML =
+      '<div class="sos-card"><div class="empty-state">' + esc(msg) + '</div></div>';
+  }
+
+  function build(sr, tr, sc) {
+    // 1) Team set — merge all divisions (teams only play within division, so
+    //    cross-division matches never exist; merging is division-agnostic).
+    let raw = [];
+    if (sr && sr.divisions) {
+      Object.values(sr.divisions).forEach(d => (d.teams || []).forEach(t => raw.push(t)));
+    }
+    const emojiBy = {}, colorBy = {};
+    (tr && tr.teams || []).forEach(t => { emojiBy[t.id] = t.emoji; colorBy[t.id] = t.color; });
+    if (!raw.length && tr && tr.teams) {
+      raw = tr.teams.map(t => ({ teamId: t.id, teamName: t.name, teamEmoji: t.emoji }));
+    }
+
+    const teams = raw.map(t => {
+      const g = (t.wins || 0) + (t.losses || 0) + (t.ties || 0);
+      return {
+        id: t.teamId, name: t.teamName,
+        emoji: t.teamEmoji || emojiBy[t.teamId] || '🏓',
+        dsr: dsrFor(t.teamId, t.teamName),
+        winpct: g ? ((t.wins || 0) + 0.5 * (t.ties || 0)) / g : null,
+        rank: t.rank || null,
+      };
+    });
+
+    const rated = teams.filter(t => t.dsr != null);
+    if (rated.length < 2) {
+      renderEmpty('Strength of Schedule appears once team ratings are set — after Week 1, when DSR is established.');
+      return;
+    }
+
+    MIN_DSR = Math.min(...rated.map(t => t.dsr));
+    MAX_DSR = Math.max(...rated.map(t => t.dsr));
+    const dsrById = Object.fromEntries(teams.map(t => [t.id, t.dsr]));
+    const winById = Object.fromEntries(teams.map(t => [t.id, t.winpct]));
+    const teamById = Object.fromEntries(teams.map(t => [t.id, t]));
+
+    // 2) Schedule among our teams, grouped by week.
+    const idset = new Set(teams.map(t => t.id));
+    const weeksMap = {};
+    (sc && sc.weeks || []).forEach(w => {
+      (w.matches || []).forEach(m => {
+        if (!m.teamAId || !m.teamBId) return;
+        if (!idset.has(m.teamAId) || !idset.has(m.teamBId)) return;
+        (weeksMap[w.week] = weeksMap[w.week] || []).push({
+          a: m.teamAId, b: m.teamBId, played: !!m.finalizedAt || m.status === 'final',
+        });
+      });
+    });
+    weekNums = Object.keys(weeksMap).map(Number).sort((a, b) => a - b);
+
+    if (!weekNums.length) {
+      renderEmpty('No schedule is published yet, so there are no opponents to rate.');
+      return;
+    }
+
+    function oppsOf(id) {
+      return weekNums.map(wn => {
+        const match = (weeksMap[wn] || []).find(m => m.a === id || m.b === id);
+        if (!match) return null; // bye
+        return { week: wn, oppId: match.a === id ? match.b : match.a, played: match.played };
+      });
+    }
+
+    // 3) Compute per-team SOS.
+    computed = teams.map(t => {
+      const opps = oppsOf(t.id);
+      const oppDsr = opps.filter(Boolean).map(o => dsrById[o.oppId]).filter(v => v != null);
+      const playedDsr = opps.filter(o => o && o.played).map(o => dsrById[o.oppId]).filter(v => v != null);
+      const remDsr = opps.filter(o => o && !o.played).map(o => dsrById[o.oppId]).filter(v => v != null);
+      const oppWin = opps.filter(Boolean).map(o => winById[o.oppId]).filter(v => v != null);
+
+      const sos = mean(oppDsr), played = mean(playedDsr), remaining = mean(remDsr);
+      let trend = 'flat', trendTxt = 'Steady';
+      if (played != null && remaining != null) {
+        const d = remaining - played;
+        if (d > TREND_THRESHOLD) { trend = 'up'; trendTxt = 'Ramps up'; }
+        else if (d < -TREND_THRESHOLD) { trend = 'down'; trendTxt = 'Eases off'; }
+      } else { trendTxt = '—'; }
+
+      return { ...t, opps, sos, played, remaining, oppwin: mean(oppWin), trend, trendTxt, dsrById, teamById };
+    });
+
+    render();
+  }
+
+  function render() {
+    const html =
+      '<div class="sos-card">' + stripHtml() + '</div>' +
+      '<div class="sos-card">' + tableHtml() + '</div>' +
+      keyHtml();
+    document.getElementById('sos-content').innerHTML = html;
+    wireTable();
+    wireTips();
+  }
+
+  // ── Heat-strip ───────────────────────────────────────────────────
+  function stripHtml() {
+    const nCols = weekNums.length;
+    const colTmpl = 'grid-template-columns:repeat(' + nCols + ',1fr);';
+    const ordered = computed.slice().sort((a, b) =>
+      (a.rank || 99) - (b.rank || 99) || (b.sos || 0) - (a.sos || 0));
+
+    const rows = ordered.map(r => {
+      const cells = r.opps.map((o, i) => {
+        if (!o) return '<div class="wk bye" title="Bye / no match">—</div>';
+        const od = r.dsrById[o.oppId];
+        const ot = r.teamById[o.oppId];
+        if (od == null) {
+          return '<div class="wk" style="background:var(--color-surface-2);color:var(--color-text-faint);" data-tip="Wk ' + o.week + '|vs ' + esc(ot ? ot.name : '?') + '|DSR n/a">' + esc(ot ? ot.emoji : '?') + '</div>';
+        }
+        const c = diffColor(od);
+        const bg = (!o.played) ? 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0.16)' : 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+        const tip = 'Wk ' + o.week + ' ' + (o.played ? '(played)' : '(upcoming)') + '|vs ' + esc(ot ? ot.name : '?') + '|DSR ' + od.toFixed(0) + ' · ' + diffLabel(od);
+        return '<div class="wk ' + (o.played ? '' : 'future') + '" style="background:' + bg + '" data-tip="' + tip + '">' + esc(ot ? ot.emoji : '') + '</div>';
+      }).join('');
+      const c = r.sos != null ? diffColor(r.sos) : [120,120,120];
+      return ''
+        + '<div class="team-cell"><div class="team-emoji">' + esc(r.emoji) + '</div>'
+        + '<div class="team-meta"><span class="team-nm"><a href="' + teamHref(r) + '">' + esc(r.name) + '</a></span>'
+        + '<span class="team-dsr">DSR ' + (r.dsr != null ? r.dsr.toFixed(0) : '—') + (r.rank ? ' · #' + r.rank : '') + '</span></div></div>'
+        + '<div class="strip-weeks" style="' + colTmpl + '">' + cells + '</div>'
+        + '<div class="strip-sos"><div class="v" style="color:rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')">' + fmt(r.sos) + '</div><div class="l">avg opp</div></div>';
+    }).join('');
+
+    return ''
+      + '<div class="sos-head"><div>'
+      + '<h2 class="sos-card__title">🗓️ Schedule Difficulty</h2>'
+      + '<p class="sos-card__sub">Each cell = that week\'s opponent, colored by their DSR. Solid = played · dashed = upcoming. Hover for detail.</p>'
+      + '</div><div class="legend">Easy <span class="legend-bar"></span> Hard</div></div>'
+      + '<div class="strip-grid">'
+      + '<div class="strip-hdr">Team</div>'
+      + '<div class="strip-hdr"><div class="wk-col-hdr" style="' + colTmpl + '">' + weekNums.map(w => '<span>' + w + '</span>').join('') + '</div></div>'
+      + '<div class="strip-hdr" style="text-align:right;">SOS</div>'
+      + rows
+      + '</div>';
+  }
+
+  // ── SOS table ────────────────────────────────────────────────────
+  function tableHtml() {
+    const dir = sort.dir;
+    const sorted = computed.slice().sort((a, b) => {
+      if (sort.k === 'name') return dir * String(a.name).localeCompare(String(b.name));
+      let av, bv;
+      if (sort.k === 'trend') { const ord = { up:2, flat:1, down:0 }; av = ord[a.trend]; bv = ord[b.trend]; }
+      else { av = a[sort.k]; bv = b[sort.k]; }
+      if (av == null) av = -Infinity; if (bv == null) bv = -Infinity;
+      return dir * (av - bv);
+    });
+    const rankMap = {};
+    computed.slice().sort((a, b) => (b.sos || -1) - (a.sos || -1)).forEach((r, i) => rankMap[r.id] = i + 1);
+
+    const body = sorted.map(r => {
+      const c = r.sos != null ? diffColor(r.sos) : [120,120,120];
+      const pill = 'background:rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0.16);color:rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+      const arrow = r.trend === 'up' ? '↑' : r.trend === 'down' ? '↓' : '→';
+      const ow = r.oppwin != null ? (r.oppwin * 100).toFixed(0) + '%' : '—';
+      return '<tr>'
+        + '<td class="team"><span class="rk">' + rankMap[r.id] + '</span></td>'
+        + '<td class="team"><span class="td-team"><span class="team-emoji" style="width:26px;height:26px;font-size:14px;">' + esc(r.emoji) + '</span><a href="' + teamHref(r) + '">' + esc(r.name) + '</a></span></td>'
+        + '<td><span class="sos-pill" style="' + pill + '">' + fmt(r.sos) + '</span></td>'
+        + '<td class="hide-sm">' + fmt(r.played) + '</td>'
+        + '<td class="hide-sm">' + fmt(r.remaining) + '</td>'
+        + '<td><span class="trend ' + r.trend + '">' + arrow + ' ' + r.trendTxt + '</span></td>'
+        + '<td class="hide-sm muted">' + ow + '</td>'
+        + '</tr>';
+    }).join('');
+
+    const th = (k, label, cls) => '<th data-k="' + k + '" class="' + (cls || '') + (sort.k === k ? ' sorted' : '') + '">' + label + '<span class="arr">' + (sort.dir < 0 ? '▼' : '▲') + '</span></th>';
+
+    return ''
+      + '<h2 class="sos-card__title">📊 Strength of Schedule Ranking</h2>'
+      + '<p class="sos-card__sub">Ranked toughest slate first. Click any column to sort.</p>'
+      + '<table class="sos-table"><thead><tr>'
+      + th('rank', '#', 'l') + th('name', 'Team', 'l') + th('sos', 'SOS')
+      + th('played', 'Played', 'hide-sm') + th('remaining', 'Remaining', 'hide-sm')
+      + th('trend', 'Run-in') + th('oppwin', 'Opp W%', 'hide-sm')
+      + '</tr></thead><tbody>' + body + '</tbody></table>';
+  }
+
+  function keyHtml() {
+    return '<div class="sos-card">'
+      + '<h2 class="sos-card__title" style="font-size:13px;color:var(--color-text-faint);">— Column Key</h2>'
+      + '<div class="key-grid">'
+      + '<div><b>SOS</b> = Average DSR of all scheduled opponents. Higher = tougher schedule.</div>'
+      + '<div><b>Played</b> = Avg DSR of opponents already faced — contextualizes the record.</div>'
+      + '<div><b>Remaining</b> = Avg DSR of opponents still to come.</div>'
+      + '<div><b>Run-in</b> = Whether it gets harder (↑) or easier (↓) from here vs what\'s been played.</div>'
+      + '<div><b>Opp W%</b> = Avg win rate of scheduled opponents — the record-based cross-check.</div>'
+      + '</div></div>';
+  }
+
+  // ── Interactions ─────────────────────────────────────────────────
+  function wireTable() {
+    document.querySelectorAll('.sos-table thead th').forEach(th => {
+      th.addEventListener('click', () => {
+        const k = th.dataset.k;
+        if (sort.k === k) sort.dir *= -1;
+        else { sort.k = k; sort.dir = (k === 'name') ? 1 : -1; }
+        render();
+      });
+    });
+  }
+  const tip = document.getElementById('tip');
+  function wireTips() {
+    document.querySelectorAll('.wk[data-tip]').forEach(el => {
+      el.addEventListener('mousemove', e => {
+        const parts = el.dataset.tip.split('|');
+        tip.innerHTML = '<b>' + parts[0] + '</b><br>' + parts[1] + '<br>' + parts[2];
+        tip.style.opacity = '1';
+        tip.style.left = Math.min(e.clientX + 14, window.innerWidth - 240) + 'px';
+        tip.style.top = (e.clientY + 14) + 'px';
+      });
+      el.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
+    });
+  }
+
+  load();
+
+  // ── Live refresh: re-pull when matches finalize (30s, cheap with ETag) ──
+  if (window.DSLivePoll) {
+    DSLivePoll.create({
+      url: '/.netlify/functions/public-standings?season=' + SEASON.id,
+      interval: 30000,
+      onUpdate() { load(); },
+    }).start();
+  }
+  </script>
+</body>
+</html>

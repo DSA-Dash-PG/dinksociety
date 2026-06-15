@@ -64,11 +64,18 @@
     { href: '/',                 nav: 'home',        label: 'Home' },
     { href: '/drop.html',        nav: 'drop',        label: 'The Drop' },
     { href: '/schedule.html',    nav: 'schedule',    label: 'Schedule' },
-    { href: '/standings.html',   nav: 'standings',   label: 'Standings' },
+    // Standings is a dropdown: the trigger links to the main table and the
+    // panel lists the standings family of views (static submenu).
+    { href: '/standings.html',   nav: 'standings',   label: 'Standings', mega: true, submenu: [
+      { href: '/standings.html',            icon: '📊', label: 'Standings',              desc: 'The league table' },
+      { href: '/head-to-head.html',         icon: '🤺', label: 'Head-to-Head',           desc: 'Who owns who' },
+      { href: '/strength-of-schedule.html', icon: '🗓️', label: 'Strength of Schedule',   desc: 'How tough each slate is' },
+      { href: '/ranking-trajectory.html',   icon: '📈', label: 'Team Ranking Trajectory', desc: 'Rank moves week by week' },
+    ] },
     { href: '/leaderboard.html', nav: 'leaderboard', label: 'Leaderboard' },
     // Teams is a mega-menu: the trigger links to /teams.html and a hover/tap
-    // panel lists every team (populated from public-teams below).
-    { href: '/teams.html',       nav: 'teams',       label: 'Teams', mega: true },
+    // panel lists every team (populated dynamically from public-teams below).
+    { href: '/teams.html',       nav: 'teams',       label: 'Teams', mega: true, dynamic: 'teams' },
     // Gallery is hidden until there are photos to show. To re-enable, just
     // un-comment this line — no other change needed.
     // { href: '/gallery.html',     nav: 'gallery',     label: 'Gallery' },
@@ -77,40 +84,62 @@
 
   /* SVG chevron used by the mega trigger / drawer accordion. */
   var CHEV = '<svg class="ds-mega-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
+  var ARROW = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
 
-  // Build the desktop Teams mega-menu wrapper.
+  // A static submenu item (Standings family).
+  function submenuItemHtml(s) {
+    return '<a class="ds-mega-item" href="' + s.href + '">' +
+      '<span class="ds-mega-item-ic">' + (s.icon || '') + '</span>' +
+      '<span class="ds-mega-txt"><span class="ds-mega-nm">' + s.label + '</span>' +
+        (s.desc ? '<span class="ds-mega-sub">' + s.desc + '</span>' : '') +
+      '</span></a>';
+  }
+
+  // Desktop dropdown wrapper. Two flavours:
+  //  · item.submenu  → static list of links (Standings)
+  //  · item.dynamic  → grid populated from an API (Teams)
   function buildDesktopMega(item) {
     var wrap = document.createElement('div');
-    wrap.className = 'ds-mega has-mega';
+    wrap.className = 'ds-mega has-mega' + (item.submenu ? ' ds-mega--menu' : '');
     wrap.setAttribute('data-mega', item.nav);
+    wrap.setAttribute('data-mega-href', item.href);
+    var body, headLink;
+    if (item.submenu) {
+      body = '<div class="ds-mega-menu">' + item.submenu.map(submenuItemHtml).join('') + '</div>';
+      headLink = '';
+    } else {
+      body = '<div class="ds-mega-grid" data-mega-grid><div class="ds-mega-msg">Loading teams&hellip;</div></div>';
+      headLink = '<a href="' + item.href + '">All Teams' + ARROW + '</a>';
+    }
     wrap.innerHTML =
       '<button class="ds-mega-trigger" data-nav="' + item.nav + '" aria-expanded="false" aria-haspopup="true">' +
         item.label + CHEV +
       '</button>' +
       '<div class="ds-mega-panel" role="menu">' +
-        '<div class="ds-mega-head">' +
-          '<span class="ds-mega-lbl">' + item.label + '</span>' +
-          '<a href="' + item.href + '">All Teams' +
-            '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>' +
-          '</a>' +
-        '</div>' +
-        '<div class="ds-mega-grid" data-mega-grid><div class="ds-mega-msg">Loading teams&hellip;</div></div>' +
+        '<div class="ds-mega-head"><span class="ds-mega-lbl">' + item.label + '</span>' + headLink + '</div>' +
+        body +
       '</div>';
     return wrap;
   }
 
-  // Build the drawer (mobile) Teams accordion.
+  // Drawer (mobile) accordion. Same two flavours.
   function buildDrawerAcc(item) {
     var wrap = document.createElement('div');
     wrap.className = 'ds-drawer-acc';
     wrap.setAttribute('data-drawer-acc', item.nav);
+    var body;
+    if (item.submenu) {
+      body = item.submenu.map(function (s) {
+        return '<a href="' + s.href + '"><span class="ds-mega-item-ic">' + (s.icon || '') + '</span>' + s.label + '</a>';
+      }).join('');
+    } else {
+      body = '<a href="' + item.href + '" class="ds-drawer-acc-all">All Teams &rarr;</a>';
+    }
     wrap.innerHTML =
       '<button class="ds-drawer-acc-btn" data-nav="' + item.nav + '" aria-expanded="false">' +
         item.label + CHEV +
       '</button>' +
-      '<div class="ds-drawer-acc-body" data-drawer-acc-body>' +
-        '<a href="' + item.href + '" class="ds-drawer-acc-all">All Teams &rarr;</a>' +
-      '</div>';
+      '<div class="ds-drawer-acc-body" data-drawer-acc-body>' + body + '</div>';
     return wrap;
   }
 
@@ -134,41 +163,55 @@
   buildNavLinks(desktopLinks, desktopLinks ? desktopLinks.querySelector('.ds-nav-login') : null, 'desktop');
   buildNavLinks(document.querySelector('.ds-nav-drawer-links'), null, 'drawer');
 
-  /* ── Teams mega-menu: open on click (hover handled by CSS), populate from API ── */
-  (function wireTeamsMega() {
-    var mega = document.querySelector('.ds-mega[data-mega="teams"]');
-    if (mega) {
+  /* ── Dropdown wiring (Standings + Teams) ──
+     Hover-capable pointers: panel opens on hover (CSS), clicking the trigger
+     navigates to the parent page. Touch / no-hover: tap toggles the panel
+     (the parent page is reachable as the first item inside it). */
+  (function wireMegas() {
+    var canHover = window.matchMedia && window.matchMedia('(hover: hover)').matches;
+    var megas = [].slice.call(document.querySelectorAll('.ds-mega'));
+
+    megas.forEach(function (mega) {
       var trigger = mega.querySelector('.ds-mega-trigger');
-      // Click the trigger toggles the panel (touch / trackpad friendly).
-      // Cmd/Ctrl-click or a second click on an open menu still navigates.
+      var href = mega.getAttribute('data-mega-href') || '/';
+      if (!trigger) return;
       trigger.addEventListener('click', function (e) {
-        if (e.metaKey || e.ctrlKey) { location.href = '/teams.html'; return; }
+        if (canHover && !(e.metaKey || e.ctrlKey)) { location.href = href; return; }
+        if (e.metaKey || e.ctrlKey) { location.href = href; return; }
         e.preventDefault();
-        var isOpen = mega.classList.toggle('is-open');
-        trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        var willOpen = !mega.classList.contains('is-open');
+        megas.forEach(function (m) { m.classList.remove('is-open'); var t = m.querySelector('.ds-mega-trigger'); if (t) t.setAttribute('aria-expanded', 'false'); });
+        mega.classList.toggle('is-open', willOpen);
+        trigger.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
       });
-      document.addEventListener('click', function (e) {
+    });
+
+    document.addEventListener('click', function (e) {
+      megas.forEach(function (mega) {
         if (!mega.contains(e.target)) {
           mega.classList.remove('is-open');
-          trigger.setAttribute('aria-expanded', 'false');
+          var t = mega.querySelector('.ds-mega-trigger'); if (t) t.setAttribute('aria-expanded', 'false');
         }
       });
-      document.addEventListener('keydown', function (e) {
-        if (e.key === 'Escape') { mega.classList.remove('is-open'); trigger.setAttribute('aria-expanded', 'false'); }
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') megas.forEach(function (mega) {
+        mega.classList.remove('is-open');
+        var t = mega.querySelector('.ds-mega-trigger'); if (t) t.setAttribute('aria-expanded', 'false');
       });
-    }
+    });
 
-    // Drawer accordion expand/collapse.
-    var acc = document.querySelector('.ds-drawer-acc[data-drawer-acc="teams"]');
-    if (acc) {
+    // Drawer accordions (all of them — Standings + Teams).
+    document.querySelectorAll('.ds-drawer-acc').forEach(function (acc) {
       var accBtn = acc.querySelector('.ds-drawer-acc-btn');
+      if (!accBtn) return;
       accBtn.addEventListener('click', function () {
         var isOpen = acc.classList.toggle('is-open');
         accBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
       });
-    }
+    });
 
-    // ── Populate both surfaces from public-teams ──
+    // ── Populate the Teams dropdown from public-teams ──
     var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
     var SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }

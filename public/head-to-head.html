@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Head-to-Head &middot; The Dink Society</title>
+  <meta name="description" content="Head-to-head matrix — who owns who across The Dink Society." />
+  <meta property="og:title" content="Head-to-Head · The Dink Society" />
+  <meta property="og:description" content="Who owns who — match points in every matchup." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="The Dink Society" />
+  <meta property="og:url" content="https://dinksociety.netlify.app/head-to-head" />
+  <meta property="og:image" content="https://dinksociety.netlify.app/img/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .h2h-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+
+    .sos-subnav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-4); }
+    .sos-subnav a { padding: 7px 14px; border-radius: var(--radius-full); font-size: 12px; font-weight: 700; border: 1px solid var(--color-border); color: var(--color-text-muted); text-decoration: none; transition: all var(--transition); }
+    .sos-subnav a:hover { color: var(--color-text); background: var(--color-surface-2); }
+    .sos-subnav a.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+
+    .section-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4); }
+    .section-card__title { font-size: 15px; font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4px; display: flex; align-items: center; gap: 9px; }
+    .section-card__sub { font-size: 12px; color: var(--color-text-faint); margin: 0 0 var(--space-4); }
+
+    .h2h-wrap { overflow-x: auto; }
+    .h2h-table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+    .h2h-table th { padding: 6px 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); border-bottom: 1px solid var(--color-border-strong); text-align: center; white-space: nowrap; }
+    .h2h-table th.h2h-lbl { text-align: left; min-width: 120px; }
+    .h2h-table th.h2h-tot { color: var(--color-text); }
+    .h2h-table td { padding: 9px 10px; border-bottom: 1px solid var(--color-border); text-align: center; font-variant-numeric: tabular-nums; }
+    .h2h-table tr:last-child td { border-bottom: none; }
+    .h2h-table td.h2h-team { text-align: left; font-weight: 700; white-space: nowrap; }
+    .h2h-table td.h2h-self { background: var(--color-surface-2); color: var(--color-text-faint); }
+    .h2h-win { color: var(--color-lime); font-weight: 700; }
+    .h2h-loss { color: var(--color-red); }
+    .h2h-tie { color: var(--color-text-muted); }
+    .h2h-total { font-weight: 700; }
+    .h2h-note { margin-top: var(--space-3); font-size: 11px; color: var(--color-text-faint); }
+    .col-muted { color: var(--color-text-faint); }
+    a.team-name-link { color: inherit; text-decoration: none; }
+    a.team-name-link:hover { color: var(--color-lime); text-decoration: underline; }
+
+    .empty-state { text-align: center; padding: 56px 20px; font-size: 14px; color: var(--color-text-faint); }
+  </style>
+</head>
+<body data-page="standings">
+  <div data-partial="nav"></div>
+
+  <div class="page-hero">
+    <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="standings"></div>
+    <div class="page-hero__gradient"></div>
+    <div class="page-hero__content">
+      <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
+      <h1 class="page-hero__title">Head-to-Head</h1>
+    </div>
+  </div>
+
+  <div class="h2h-shell">
+    <nav class="sos-subnav">
+      <a href="/standings.html">Standings</a>
+      <a href="/head-to-head.html" class="is-active">Head-to-Head</a>
+      <a href="/strength-of-schedule.html">Strength of Schedule</a>
+      <a href="/ranking-trajectory.html">Team Ranking Trajectory</a>
+    </nav>
+
+    <div id="h2h-content"><div class="empty-state">Loading&hellip;</div></div>
+  </div>
+
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+  <script src="/js/live-poll.js"></script>
+  <script>
+  const SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i') };
+  const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+  function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
+  function teamHref(t){ return '/team?id=' + encodeURIComponent(t.teamId || slug(t.teamName)) + LINK_SUFFIX; }
+
+  async function load() {
+    let sr = null;
+    try { sr = await fetch('/.netlify/functions/public-standings?season=' + SEASON.id).then(r => r.ok ? r.json() : null); }
+    catch { /* empty */ }
+    render(sr);
+  }
+
+  function render(sr) {
+    const el = document.getElementById('h2h-content');
+    if (!sr || !sr.divisions) {
+      el.innerHTML = '<div class="section-card"><h3 class="section-card__title">🤺 Head-to-Head Matrix</h3>'
+        + '<p class="section-card__sub">Who owns who — match points in every matchup</p>'
+        + '<div class="empty-state">Head-to-head results will appear after Week 1.</div></div>';
+      return;
+    }
+    // One matrix per division (teams only play within their division).
+    const divs = Object.keys(sr.divisions).sort();
+    el.innerHTML = divs.map(d => h2hCardHtml(sr.divisions[d].teams || [], divs.length > 1 ? (sr.divisions[d].divisionLabel || d) : '')).join('');
+  }
+
+  function h2hCardHtml(teams, divLabel) {
+    const titleSuffix = divLabel ? ' · ' + esc(divLabel) : '';
+    const hasData = teams.some(t => t.h2h && Object.keys(t.h2h).length > 0);
+    if (!hasData) {
+      return '<div class="section-card">'
+        + '<h3 class="section-card__title">🤺 Head-to-Head Matrix' + titleSuffix + '</h3>'
+        + '<p class="section-card__sub">Who owns who — match points in every matchup</p>'
+        + '<div class="empty-state">Head-to-head results will appear after Week 1.</div></div>';
+    }
+    const hdCols = teams.map(t => '<th title="' + esc(t.teamName) + '">' + esc(t.teamEmoji || String(t.teamName).split(' ')[0]) + '</th>').join('');
+    const bodyRows = teams.map(rt => {
+      const cells = teams.map(ct => {
+        if (rt.teamId === ct.teamId) return '<td class="h2h-self">—</td>';
+        const e = rt.h2h && rt.h2h[ct.teamId];
+        if (!e) return '<td class="col-muted">—</td>';
+        const cls = e.for > e.against ? 'h2h-win' : e.for < e.against ? 'h2h-loss' : 'h2h-tie';
+        return '<td class="' + cls + '">' + e.for + '–' + e.against + '</td>';
+      }).join('');
+      const tf = Object.values(rt.h2h || {}).reduce((s, v) => s + (v.for || 0), 0);
+      const ta = Object.values(rt.h2h || {}).reduce((s, v) => s + (v.against || 0), 0);
+      const tc = tf > ta ? 'h2h-win' : tf < ta ? 'h2h-loss' : 'h2h-tie';
+      return '<tr><td class="h2h-team">' + esc(rt.teamEmoji) + ' <a class="team-name-link" href="' + teamHref(rt) + '">' + esc(rt.teamName) + '</a></td>'
+        + cells + '<td class="h2h-total ' + tc + '">' + tf + '–' + ta + '</td></tr>';
+    }).join('');
+
+    return '<div class="section-card">'
+      + '<h3 class="section-card__title">🤺 Head-to-Head Matrix' + titleSuffix + '</h3>'
+      + '<p class="section-card__sub">Who owns who — match points in every matchup</p>'
+      + '<div class="h2h-wrap"><table class="h2h-table">'
+      + '<thead><tr><th class="h2h-lbl">TEAM ↓ VS →</th>' + hdCols + '<th class="h2h-tot">TOTAL</th></tr></thead>'
+      + '<tbody>' + bodyRows + '</tbody></table></div>'
+      + '<p class="h2h-note">Each cell = match pts (your score – opponent score). 🟢 = win &nbsp; 🔴 = loss &nbsp; Row = your results vs each opponent.</p>'
+      + '</div>';
+  }
+
+  load();
+  if (window.DSLivePoll) {
+    DSLivePoll.create({
+      url: '/.netlify/functions/public-standings?season=' + SEASON.id,
+      interval: 30000,
+      onUpdate(data) { render(data); },
+    }).start();
+  }
+  </script>
+</body>
+</html>

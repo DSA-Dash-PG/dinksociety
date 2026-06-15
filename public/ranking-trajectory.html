@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Team Ranking Trajectory &middot; The Dink Society</title>
+  <meta name="description" content="How each team's rank has moved week by week — The Dink Society." />
+  <meta property="og:title" content="Team Ranking Trajectory · The Dink Society" />
+  <meta property="og:description" content="How each team's rank has moved week by week." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="The Dink Society" />
+  <meta property="og:url" content="https://dinksociety.netlify.app/ranking-trajectory" />
+  <meta property="og:image" content="https://dinksociety.netlify.app/img/og-image.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .traj-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+
+    .sos-subnav { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-4); }
+    .sos-subnav a { padding: 7px 14px; border-radius: var(--radius-full); font-size: 12px; font-weight: 700; border: 1px solid var(--color-border); color: var(--color-text-muted); text-decoration: none; transition: all var(--transition); }
+    .sos-subnav a:hover { color: var(--color-text); background: var(--color-surface-2); }
+    .sos-subnav a.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+
+    .section-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: var(--space-5); margin-bottom: var(--space-4); }
+    .section-card__title { font-size: 15px; font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: 0.02em; margin: 0 0 4px; display: flex; align-items: center; gap: 9px; }
+    .section-card__sub { font-size: 12px; color: var(--color-text-faint); margin: 0 0 var(--space-4); }
+
+    .traj-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-bottom: var(--space-4); }
+    .traj-legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--color-text-muted); }
+    .traj-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .traj-chart-wrap { overflow-x: auto; }
+    .traj-svg { width: 100%; min-width: 560px; height: auto; display: block; }
+    .traj-svg text { font-family: 'Inter', sans-serif; }
+    .traj-line { fill: none; stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+    .traj-node { stroke: var(--color-surface); stroke-width: 2; }
+    .traj-axis { stroke: var(--color-border); stroke-width: 1; }
+    .traj-axis-lbl { fill: var(--color-text-faint); font-size: 11px; font-weight: 700; }
+    .traj-week-lbl { fill: var(--color-text-faint); font-size: 11px; font-weight: 800; }
+    .traj-end-lbl { fill: var(--color-text); font-size: 12px; font-weight: 800; }
+
+    .empty-state { text-align: center; padding: 56px 20px; font-size: 14px; color: var(--color-text-faint); }
+  </style>
+</head>
+<body data-page="standings">
+  <div data-partial="nav"></div>
+
+  <div class="page-hero">
+    <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="standings"></div>
+    <div class="page-hero__gradient"></div>
+    <div class="page-hero__content">
+      <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
+      <h1 class="page-hero__title">Team Ranking Trajectory</h1>
+    </div>
+  </div>
+
+  <div class="traj-shell">
+    <nav class="sos-subnav">
+      <a href="/standings.html">Standings</a>
+      <a href="/head-to-head.html">Head-to-Head</a>
+      <a href="/strength-of-schedule.html">Strength of Schedule</a>
+      <a href="/ranking-trajectory.html" class="is-active">Team Ranking Trajectory</a>
+    </nav>
+
+    <div id="traj-content"><div class="empty-state">Loading&hellip;</div></div>
+  </div>
+
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+  <script src="/js/live-poll.js"></script>
+  <script>
+  const SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i'), totalMatches: 6 };
+  const PALETTE = ['#b8ff2c','#17d7b0','#f0c040','#ff7b54','#a78bfa','#f472b6','#60a5fa','#34d399'];
+
+  let standingsData = null, scheduleData = null;
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
+
+  async function load() {
+    try {
+      [standingsData, scheduleData] = await Promise.all([
+        fetch('/.netlify/functions/public-standings?season=' + SEASON.id).then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-schedule?season=' + SEASON.id).then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+    } catch { /* empty */ }
+    render();
+  }
+
+  // ── Snapshot: rebuild a division's ranking through a given week ──
+  // Mirrors the standings page's week-snapshot tiebreakers: PTS → GW → H2H → DIFF.
+  function h2hCmp(a, b) {
+    const ab = a.h2h[b.teamId], ba = b.h2h[a.teamId];
+    if (ab && ba && ab.for !== ba.for) return ba.for - ab.for;
+    return 0;
+  }
+  function snapshot(div, throughWeek) {
+    const base = standingsData.divisions[div].teams || [];
+    const rows = new Map(base.map(t => [t.teamId, {
+      teamId: t.teamId, teamName: t.teamName, teamEmoji: t.teamEmoji || '🏓',
+      matchPointsFor: 0, totalGamesWon: 0, pointsScored: 0, pointsAgainst: 0, pointDiff: 0, h2h: {},
+    }]));
+    for (const w of (scheduleData.weeks || [])) {
+      if (w.week > throughWeek) continue;
+      for (const m of (w.matches || [])) {
+        if (m.division && m.division !== div) continue;
+        if (!m.finalizedAt || m.scoreA == null || m.scoreB == null) continue;
+        const A = rows.get(m.teamAId), B = rows.get(m.teamBId);
+        if (!A || !B) continue;
+        A.matchPointsFor += m.scoreA; B.matchPointsFor += m.scoreB;
+        A.totalGamesWon += m.gamesA || 0; B.totalGamesWon += m.gamesB || 0;
+        A.pointsScored += m.pointsA || 0; A.pointsAgainst += m.pointsB || 0;
+        B.pointsScored += m.pointsB || 0; B.pointsAgainst += m.pointsA || 0;
+        (A.h2h[m.teamBId] = A.h2h[m.teamBId] || { for: 0, against: 0 }); A.h2h[m.teamBId].for += m.scoreA; A.h2h[m.teamBId].against += m.scoreB;
+        (B.h2h[m.teamAId] = B.h2h[m.teamAId] || { for: 0, against: 0 }); B.h2h[m.teamAId].for += m.scoreB; B.h2h[m.teamAId].against += m.scoreA;
+      }
+    }
+    const teams = [...rows.values()].map(t => { t.pointDiff = t.pointsScored - t.pointsAgainst; return t; });
+    teams.sort((a, b) =>
+      (b.matchPointsFor - a.matchPointsFor) ||
+      (b.totalGamesWon - a.totalGamesWon) ||
+      h2hCmp(a, b) ||
+      (b.pointDiff - a.pointDiff) ||
+      String(a.teamName).localeCompare(String(b.teamName)));
+    teams.forEach((t, i) => { t.rank = i + 1; });
+    return teams;
+  }
+
+  function playedWeeks(div) {
+    const set = new Set();
+    for (const w of (scheduleData && scheduleData.weeks || [])) {
+      if ((w.matches || []).some(m => (!m.division || m.division === div) && m.finalizedAt)) set.add(w.week);
+    }
+    return [...set].sort((a, b) => a - b);
+  }
+
+  function render() {
+    const el = document.getElementById('traj-content');
+    const card = inner => '<div class="section-card"><h3 class="section-card__title">📈 Team Ranking Trajectory</h3>'
+      + '<p class="section-card__sub">How each team\'s rank has moved week by week</p>' + inner + '</div>';
+
+    if (!standingsData || !standingsData.divisions || !scheduleData) {
+      el.innerHTML = card('<div class="empty-state">Trajectory appears once matches have been played.</div>');
+      return;
+    }
+    const div = Object.keys(standingsData.divisions).sort()[0];
+    const weeks = playedWeeks(div);
+    if (weeks.length < 2) {
+      el.innerHTML = card('<div class="empty-state">Trajectory chart appears after Week 2 — once there are two weeks of results to connect.</div>');
+      return;
+    }
+
+    // rankByTeam[id] = [{week, rank}] over played weeks
+    const teamInfo = {}; // id -> {name, emoji}
+    const rankByTeam = {};
+    weeks.forEach(wk => {
+      const snap = snapshot(div, wk);
+      snap.forEach(t => {
+        teamInfo[t.teamId] = { name: t.teamName, emoji: t.teamEmoji };
+        (rankByTeam[t.teamId] = rankByTeam[t.teamId] || []).push({ week: wk, rank: t.rank });
+      });
+    });
+
+    const ids = Object.keys(rankByTeam);
+    const N = ids.length;
+    // Colour assignment by latest rank (most recent week), so the leader is first colour.
+    const latest = {};
+    const lastSnap = snapshot(div, weeks[weeks.length - 1]);
+    lastSnap.forEach((t, i) => { latest[t.teamId] = i; });
+    ids.sort((a, b) => (latest[a] ?? 99) - (latest[b] ?? 99));
+    const colorOf = {}; ids.forEach((id, i) => { colorOf[id] = PALETTE[i % PALETTE.length]; });
+
+    el.innerHTML = card(legendHtml(ids, teamInfo, colorOf) + '<div class="traj-chart-wrap">' + svgHtml(weeks, ids, rankByTeam, teamInfo, colorOf, N) + '</div>');
+  }
+
+  function legendHtml(ids, teamInfo, colorOf) {
+    return '<div class="traj-legend">' + ids.map(id =>
+      '<div class="traj-legend-item"><span class="traj-dot" style="background:' + colorOf[id] + '"></span><span>' + esc(teamInfo[id].name) + '</span></div>'
+    ).join('') + '</div>';
+  }
+
+  function svgHtml(weeks, ids, rankByTeam, teamInfo, colorOf, N) {
+    const W = weeks.length;
+    const padT = 30, padB = 34, padL = 46, padR = 196;
+    const rowGap = 44;
+    const plotH = (N - 1) * rowGap;
+    const H = padT + plotH + padB;
+    const VBW = 880;
+    const plotW = VBW - padL - padR;
+    const xFor = i => padL + (W === 1 ? plotW / 2 : (plotW * i) / (W - 1));
+    const yFor = rank => padT + (rank - 1) * rowGap;
+
+    let svg = '<svg class="traj-svg" viewBox="0 0 ' + VBW + ' ' + H + '" preserveAspectRatio="xMinYMin meet" role="img" aria-label="Team ranking trajectory by week">';
+
+    // Rank gridlines + labels (1 = top)
+    for (let r = 1; r <= N; r++) {
+      const y = yFor(r);
+      svg += '<line class="traj-axis" x1="' + padL + '" y1="' + y + '" x2="' + (padL + plotW) + '" y2="' + y + '"/>';
+      svg += '<text class="traj-axis-lbl" x="' + (padL - 12) + '" y="' + (y + 4) + '" text-anchor="end">' + r + '</text>';
+    }
+    // Week labels
+    weeks.forEach((wk, i) => {
+      svg += '<text class="traj-week-lbl" x="' + xFor(i) + '" y="' + (padT + plotH + 22) + '" text-anchor="middle">Wk ' + wk + '</text>';
+    });
+
+    // One line per team
+    ids.forEach(id => {
+      const pts = (rankByTeam[id] || []).slice().sort((a, b) => a.week - b.week);
+      if (!pts.length) return;
+      const coords = pts.map(p => {
+        const i = weeks.indexOf(p.week);
+        return { x: xFor(i), y: yFor(p.rank), week: p.week, rank: p.rank };
+      });
+      const d = coords.map(c => c.x.toFixed(1) + ',' + c.y.toFixed(1)).join(' ');
+      svg += '<polyline class="traj-line" stroke="' + colorOf[id] + '" points="' + d + '"/>';
+      coords.forEach(c => {
+        svg += '<circle class="traj-node" cx="' + c.x.toFixed(1) + '" cy="' + c.y.toFixed(1) + '" r="4.5" fill="' + colorOf[id] + '">'
+          + '<title>' + esc(teamInfo[id].name) + ' · Wk ' + c.week + ' · Rank ' + c.rank + '</title></circle>';
+      });
+      // End label
+      const last = coords[coords.length - 1];
+      svg += '<text class="traj-end-lbl" x="' + (last.x + 12) + '" y="' + (last.y + 4) + '">' + esc(teamInfo[id].emoji) + ' ' + esc(teamInfo[id].name) + '</text>';
+    });
+
+    svg += '</svg>';
+    return svg;
+  }
+
+  load();
+  if (window.DSLivePoll) {
+    DSLivePoll.create({
+      url: '/.netlify/functions/public-standings?season=' + SEASON.id,
+      interval: 30000,
+      onUpdate(data) {
+        standingsData = data;
+        fetch('/.netlify/functions/public-schedule?season=' + SEASON.id)
+          .then(r => r.ok ? r.json() : null).then(sc => { if (sc) scheduleData = sc; render(); }).catch(() => render());
+      },
+    }).start();
+  }
+  </script>
+</body>
+</html>
