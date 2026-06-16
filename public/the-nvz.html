@@ -21,7 +21,8 @@
   <link rel="stylesheet" href="/css/shared-nav.css" />
   <style>
     .nvz-shell { max-width: 1080px; margin: 0 auto; padding: 0 var(--gutter) 80px; }
-    .nvz-hero { text-align:center; padding: 30px var(--gutter) 8px; }
+    .nvz-hero { text-align:center; padding: 92px var(--gutter) 8px; }
+    @media (max-width: 900px) { .nvz-hero { padding-top: 84px; } }
     .nvz-hero h1 { font-size:clamp(2rem,1.3rem+2.4vw,3rem); font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:-.02em; margin:0; }
     .nvz-hero h1 .lime { color:var(--color-lime); }
     .nvz-hero p { color:var(--color-text-muted); font-size:14px; margin-top:8px; }
@@ -53,7 +54,7 @@
     .pvp-side { font-weight:900; font-style:italic; text-transform:uppercase; }
     .pvp-side small { display:block; font-weight:600; font-style:normal; text-transform:none; font-size:11px; color:var(--color-text-faint); }
     .pvp-side.r { text-align:right; }
-    .pvp-side.a { color:var(--color-red); } .pvp-side.b { color:var(--color-purple); }
+    .pvp-side.a { color:var(--color-lime); } .pvp-side.b { color:var(--color-teal); }
     .radar-wrap { display:flex; justify-content:center; padding:8px 0 4px; }
     .legend { display:flex; gap:18px; justify-content:center; margin:6px 0 10px; font-size:12px; font-weight:700; }
     .legend .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle; }
@@ -252,7 +253,7 @@
       var grid=''; [0.25,0.5,0.75,1].forEach(function(g){ var pts=[]; for(var i=0;i<N;i++){var c=pt(i,g);pts.push(c[0].toFixed(1)+','+c[1].toFixed(1));} grid+='<polygon points="'+pts.join(' ')+'" fill="none" stroke="var(--color-border)" stroke-width="1"/>'; });
       var lab=''; for(var i=0;i<N;i++){var c=pt(i,1.2);lab+='<text x="'+c[0].toFixed(1)+'" y="'+c[1].toFixed(1)+'" text-anchor="middle" dominant-baseline="middle" font-size="10" fill="var(--color-text-faint)" font-weight="700">'+axes[i]+'</text>';}
       function poly(v,color){ var pts=[]; for(var i=0;i<N;i++){var c=pt(i,Math.max(0.04,Math.min(1,v[i]||0)));pts.push(c[0].toFixed(1)+','+c[1].toFixed(1));} return '<polygon points="'+pts.join(' ')+'" fill="'+color+'22" stroke="'+color+'" stroke-width="2"/>'; }
-      return '<svg viewBox="0 0 260 260" width="280" height="280" class="spark">'+grid+lab+poly(na,'var(--color-red)')+poly(nb,'var(--color-purple)')+'</svg>';
+      return '<svg viewBox="0 0 260 260" width="280" height="280" class="spark">'+grid+lab+poly(na,'var(--color-lime)')+poly(nb,'var(--color-teal)')+'</svg>';
     }
     function renderPVP(root){
       if(PLAYERS.length<2){ root.innerHTML='<div class="card"><div class="empty">Not enough player data yet.</div></div>'; return; }
@@ -267,7 +268,7 @@
         document.getElementById('pvpOut').innerHTML=
           '<div class="pvp-head"><div class="pvp-side a"><a href="'+pHref(a)+'" style="color:inherit;text-decoration:none;">'+esc(a.n)+'</a><small>'+esc(a.t)+'</small></div><div class="pvp-side b r"><a href="'+pHref(b)+'" style="color:inherit;text-decoration:none;">'+esc(b.n)+'</a><small>'+esc(b.t)+'</small></div></div>'
           +'<div class="radar-wrap">'+radar(a,b)+'</div>'
-          +'<div class="legend"><span><span class="dot" style="background:var(--color-red)"></span>'+esc(a.n)+'</span><span><span class="dot" style="background:var(--color-purple)"></span>'+esc(b.n)+'</span></div>'
+          +'<div class="legend"><span><span class="dot" style="background:var(--color-lime)"></span>'+esc(a.n)+'</span><span><span class="dot" style="background:var(--color-teal)"></span>'+esc(b.n)+'</span></div>'
           +row('Win %',a.win,b.win,function(x){return x+'%';})
           +row('Record',a.w+'–'+a.l,b.w+'–'+b.l)
           +row('Clutch',a.clutch,b.clutch,function(x){return x+'%';})
@@ -289,18 +290,33 @@
         +'<div class="selrow"><select id="tvtA" class="bl">'+opts(TEAMS[0].teamId)+'</select><span class="vs">vs</span><select id="tvtB" class="or">'+opts(TEAMS[1].teamId)+'</select></div><div class="card" id="tvtOut"></div>';
       var sa=root.querySelector('#tvtA'), sb=root.querySelector('#tvtB');
       function rec(t){ return (t.wins||0)+'–'+(t.losses||0)+(t.ties?'–'+t.ties:''); }
+      function ext(t){
+        var gw=t.totalGamesWon||0, gl=t.totalGamesLost||0, tg=gw+gl, dsr=0, top=null, cnt=0;
+        PLAYERS.forEach(function(p){ if(p.t===t.teamName){ if(p.dsr!=null)dsr+=p.dsr; if(!top||(p.dsr||0)>(top.dsr||0))top=p; cnt++; } });
+        return { tg:tg, gwin:pct(gw,tg), avgPS:tg?r1((t.pointsScored||0)/tg):0, avgPA:tg?r1((t.pointsAgainst||0)/tg):0, avgMargin:tg?r1((t.pointDiff||0)/tg):0, dsr:r1(dsr), top:top, cnt:cnt };
+      }
       function draw(){
         var a=TBYID[sa.value], b=TBYID[sb.value]; if(!a||!b) return;
-        var r=function(lbl,av,bv,inv){ var aw=inv?av<bv:av>bv, bw=inv?bv<av:bv>av; return '<div class="tvt-row"><div class="v l '+(aw?'win':'')+'">'+av+'</div><div class="lbl">'+lbl+'</div><div class="v r '+(bw?'win':'')+'">'+bv+'</div></div>'; };
+        var ea=ext(a), eb=ext(b);
+        var r=function(lbl,an,bn,fmt,inv){ fmt=fmt||function(x){return x;}; var aw=inv?an<bn:an>bn, bw=inv?bn<an:bn>an; return '<div class="tvt-row"><div class="v l '+(aw?'win':'')+'">'+fmt(an)+'</div><div class="lbl">'+lbl+'</div><div class="v r '+(bw?'win':'')+'">'+fmt(bn)+'</div></div>'; };
+        var pctf=function(x){return x+'%';};
         var hA=(a.h2h&&a.h2h[b.teamId])||null, hB=(b.h2h&&b.h2h[a.teamId])||null;
         var h2h = (hA||hB)? ('<b style="color:var(--color-lime)">'+esc(a.teamName)+' '+(hA?hA.for:0)+'</b> · <b style="color:var(--color-teal)">'+esc(b.teamName)+' '+(hB?hB.for:0)+'</b> <span style="color:var(--color-text-faint)">(match pts)</span>') : 'Haven\'t played yet.';
+        var topRow = (ea.top||eb.top)
+          ? '<div class="tvt-row"><div class="v l '+((ea.top&&eb.top&&(ea.top.dsr||0)>(eb.top.dsr||0))?'win':'')+'" style="font-size:13px;font-style:italic;text-transform:uppercase;">'+(ea.top?esc(ea.top.n)+' · '+(ea.top.dsr!=null?ea.top.dsr:'—'):'—')+'</div><div class="lbl">Top Player</div><div class="v r '+((ea.top&&eb.top&&(eb.top.dsr||0)>(ea.top.dsr||0))?'win':'')+'" style="font-size:13px;font-style:italic;text-transform:uppercase;">'+(eb.top?esc(eb.top.n)+' · '+(eb.top.dsr!=null?eb.top.dsr:'—'):'—')+'</div></div>'
+          : '';
         document.getElementById('tvtOut').innerHTML=
           '<div class="tvt"><div class="tvt-h a">'+esc(a.teamName)+'<small>'+rec(a)+'</small></div><div style="color:var(--color-text-faint);font-weight:900;font-style:italic;">vs</div><div class="tvt-h b">'+esc(b.teamName)+'<small>'+rec(b)+'</small></div></div>'
-          +r('PTS',a.matchPointsFor||0,b.matchPointsFor||0)
-          +r('GW',a.totalGamesWon||0,b.totalGamesWon||0)
-          +r('PS',a.pointsScored||0,b.pointsScored||0)
-          +r('PA',a.pointsAgainst||0,b.pointsAgainst||0,true)
-          +r('DIFF',sgn(a.pointDiff||0),sgn(b.pointDiff||0))
+          +r('Match Pts',a.matchPointsFor||0,b.matchPointsFor||0)
+          +r('Team DSR',ea.dsr,eb.dsr)
+          +r('Game Win %',ea.gwin,eb.gwin,pctf)
+          +r('Games Won',a.totalGamesWon||0,b.totalGamesWon||0)
+          +r('Avg Scored / game',ea.avgPS,eb.avgPS)
+          +r('Avg Allowed / game',ea.avgPA,eb.avgPA,null,true)
+          +r('Avg Margin / game',ea.avgMargin,eb.avgMargin,function(x){return sgn(x);})
+          +r('Total Diff',a.pointDiff||0,b.pointDiff||0,function(x){return sgn(x);})
+          +r('Rated Players',ea.cnt,eb.cnt)
+          +topRow
           +'<div class="tvt-h2h"><div class="lab">Head-to-Head</div>'+h2h+'</div>';
       }
       sa.onchange=draw; sb.onchange=draw; draw();
@@ -308,12 +324,25 @@
 
     // ════════ Game Type Splits ════════
     function renderSplits(root){
-      var rows=PLAYERS.filter(function(p){return p.gp>=2;}).sort(function(a,b){return (b.dsr||0)-(a.dsr||0);}).slice(0,30).map(function(p){
-        var cell=function(cls,lab,t){ if(!t||!t.played) return '<div class="gcell empty2">—</div>'; return '<div class="gcell '+cls+'"><div class="lab">'+lab+'</div><div class="pct">'+pct(t.won,t.played)+'%</div><div class="rec">'+t.won+'–'+(t.played-t.won)+'</div></div>'; };
-        return '<div class="grow"><div class="gname"><b>'+esc(p.n)+'</b><small>'+esc(p.t)+'</small></div>'+cell('wd','WD',p.byType.womens)+cell('md','MD',p.byType.mens)+cell('mx','MX',p.byType.mixed)+'</div>';
-      }).join('');
       root.innerHTML='<div class="ptitle">🎯 Game Type Splits</div><div class="psub">Win % in Women\'s vs Men\'s vs Mixed</div>'
-        +'<div class="card"><div class="grow hd"><div></div><div>Women\'s</div><div>Men\'s</div><div>Mixed</div></div><div class="gtbl">'+(rows||'<div class="empty">No data yet.</div>')+'</div></div>';
+        +'<div class="selrow"><input id="splitSearch" type="search" placeholder="Search any player…" style="font:inherit;font-size:13px;padding:11px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text);min-width:260px;max-width:90vw;"></div>'
+        +'<div id="splitsBody"></div>';
+      var search=root.querySelector('#splitSearch');
+      function cell(cls,lab,t){ if(!t||!t.played) return '<div class="gcell empty2">—</div>'; return '<div class="gcell '+cls+'"><div class="lab">'+lab+'</div><div class="pct">'+pct(t.won,t.played)+'%</div><div class="rec">'+t.won+'–'+(t.played-t.won)+'</div></div>'; }
+      function rowFor(p){ return '<div class="grow"><div class="gname"><b>'+esc(p.n)+'</b><small>'+esc(p.t)+'</small></div>'+cell('wd','WD',p.byType.womens)+cell('md','MD',p.byType.mens)+cell('mx','MX',p.byType.mixed)+'</div>'; }
+      function section(title,list){ if(!list.length) return ''; return '<div class="card"><div class="os-sec-h">'+title+'</div><div class="grow hd"><div></div><div>Women\'s</div><div>Men\'s</div><div>Mixed</div></div><div class="gtbl">'+list.map(rowFor).join('')+'</div></div>'; }
+      function draw(){
+        var q=(search.value||'').trim().toLowerCase(); var body=document.getElementById('splitsBody');
+        if(q){
+          var hits=PLAYERS.filter(function(p){return p.n.toLowerCase().indexOf(q)>=0;}).sort(function(a,b){return (b.dsr||0)-(a.dsr||0);});
+          body.innerHTML = hits.length ? section('🔍 Search · '+hits.length+' player'+(hits.length===1?'':'s'),hits) : '<div class="card"><div class="empty">No players match &ldquo;'+esc(search.value)+'&rdquo;.</div></div>';
+          return;
+        }
+        var men=PLAYERS.filter(function(p){return p.g&&p.g.toLowerCase()[0]==='m'&&p.gp>=2;}).sort(function(a,b){return (b.dsr||0)-(a.dsr||0);}).slice(0,10);
+        var women=PLAYERS.filter(function(p){return p.g&&p.g.toLowerCase()[0]==='f'&&p.gp>=2;}).sort(function(a,b){return (b.dsr||0)-(a.dsr||0);}).slice(0,10);
+        body.innerHTML = (section('👨 Men\'s · Top 10',men)+section('👩 Women\'s · Top 10',women)) || '<div class="card"><div class="empty">No data yet.</div></div>';
+      }
+      search.oninput=draw; draw();
     }
 
     // ════════ Win Margins ════════
