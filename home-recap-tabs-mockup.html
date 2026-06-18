@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Home Recap — POTW-in-Tabs Mockup · The Dink Society</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
+<style>
+:root, [data-theme="dark"] {
+  --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+  --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14); --color-divider:rgba(255,255,255,0.06);
+  --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+  --color-lime:#b8ff2c; --color-lime-active:#94d10b; --color-lime-dim:rgba(184,255,44,0.12);
+  --color-teal:#17d7b0; --color-red:#ff5c47; --color-gold:#f0c040; --kchn-gold:#f0d020;
+  --radius-full:9999px; --radius-lg:20px; --radius-md:14px; --max-w:1200px; --gutter:20px; --transition:.18s ease;
+}
+[data-theme="light"] {
+  --color-bg:#f5f6f2; --color-surface:#ffffff; --color-surface-2:#eef0ea; --color-surface-3:#e2e5dd;
+  --color-border:rgba(12,18,14,0.10); --color-border-strong:rgba(12,18,14,0.16); --color-divider:rgba(12,18,14,0.07);
+  --color-text:#111410; --color-text-muted:#5e665d; --color-text-faint:#8b948a; --color-text-inverse:#f4f5f1;
+  --color-lime:#7acc00; --color-lime-active:#5a9900; --color-lime-dim:rgba(122,204,0,0.10);
+  --color-teal:#0ea88d; --color-red:#d84b3a; --color-gold:#c9972e; --kchn-gold:#b8950a;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Inter',system-ui,sans-serif; background:var(--color-bg); color:var(--color-text); -webkit-font-smoothing:antialiased; padding-bottom:84px; }
+
+.fauxhead { max-width:var(--max-w); margin:0 auto; padding:34px var(--gutter) 4px; display:flex; align-items:center; gap:14px; }
+.fauxhead h1 { font-size:clamp(1.8rem,1.1rem+2.4vw,2.6rem); font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:-.02em; }
+.fauxhead h1 .lime { color:var(--color-lime); }
+.weekbadge { margin-left:auto; width:34px; height:34px; border-radius:9px; background:var(--color-lime); color:var(--color-text-inverse); font-weight:900; display:flex; align-items:center; justify-content:center; font-size:15px; }
+
+#recap .recap-top{max-width:var(--max-w);margin:0 auto;padding:18px var(--gutter) 8px;display:grid;grid-template-columns:.82fr 1.18fr;gap:18px;align-items:start;}
+@media(max-width:1024px){#recap .recap-top{grid-template-columns:1fr;}}
+#recap .recap-left{display:flex;flex-direction:column;min-width:0;}
+#recap .standings-panel{display:flex;flex-direction:column;min-width:0;}
+#recap .panel-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;min-height:30px;}
+.rc-h2{font-size:16px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.01em;}
+.rc-h2 .lime{color:var(--color-lime);}
+.rc-more{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--color-lime);text-decoration:none;}
+.rc-more:hover{text-decoration:underline;}
+
+/* Tabbed performers */
+#recap .perftabs{display:flex;gap:4px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:11px;padding:3px;margin-bottom:12px;}
+#recap .perftabs button{flex:1;font-family:inherit;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--color-text-muted);background:none;border:0;padding:8px 4px;border-radius:8px;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;}
+#recap .perftabs button:hover{color:var(--color-text);}
+#recap .perftabs button.on{background:var(--color-lime);color:var(--color-text-inverse);}
+/* panel area shares a min-height so switching tabs (and the column overall) stays
+   balanced with the standings on the right */
+#recap .perfwrap{min-height:392px;}
+#recap .perfpanel{display:none;}
+#recap .perfpanel.on{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;}
+@media(max-width:560px){#recap .perfpanel.on{grid-template-columns:1fr;}}
+#recap .perf-col{display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface-2);padding:12px 12px 6px;}
+#recap .perf-col h4{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 4px;}
+#recap .prow{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid var(--color-divider);}
+#recap .prow:first-of-type{border-top:none;}
+#recap .prk{font-size:12px;font-weight:900;color:var(--color-text-faint);width:14px;flex-shrink:0;}
+#recap .prow.lead .prk{color:var(--color-gold);}
+#recap .pinfo{min-width:0;flex:1;}
+#recap .pnm{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--color-text);}
+#recap .ptm{font-size:10px;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#recap .pval{margin-left:auto;font-size:15px;font-weight:900;flex-shrink:0;}
+#recap .perf-col.m .pval{color:var(--color-lime);}
+#recap .perf-col.f .pval{color:var(--color-teal);}
+
+/* POTW cards (now inside the POTW tab) */
+#recap .pcard{position:relative;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:linear-gradient(160deg,var(--color-surface),var(--color-bg));padding:15px 15px 14px;overflow:hidden;}
+#recap .pcard::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;}
+#recap .pcard.m::before{background:var(--color-lime);}
+#recap .pcard.f::before{background:var(--color-teal);}
+#recap .pcard__badge{position:absolute;top:12px;right:12px;font-size:9px;font-weight:900;font-style:italic;color:var(--kchn-gold);background:#000;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:3px 7px;}
+[data-theme="light"] #recap .pcard__badge{background:#1a1a1a;}
+#recap .pcard__cat{font-size:8.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);}
+#recap .pcard__row{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:9px;flex:1;margin:8px 0 14px;}
+#recap .pav{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;flex-shrink:0;background:var(--color-surface-2);}
+#recap .pcard.m .pav{border:2.5px solid var(--color-lime);color:var(--color-lime);box-shadow:0 0 0 4px var(--color-lime-dim);}
+#recap .pcard.f .pav{border:2.5px solid var(--color-teal);color:var(--color-teal);box-shadow:0 0 0 4px rgba(23,215,176,.13);}
+#recap .pcard__name{font-size:22px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.015em;line-height:1.0;color:var(--color-text);}
+#recap .pcard__team{font-size:12px;color:var(--color-text-muted);}
+#recap .pcard__stats{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+#recap .pcard__stats > div{background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:11px;padding:12px 8px;text-align:center;}
+#recap .pcard__stats .l{font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:6px;}
+#recap .pcard__stats .v{font-size:24px;font-weight:900;line-height:1;color:var(--color-text);}
+#recap .pcard.m .v.hot{color:var(--color-lime);}
+#recap .pcard.f .v.hot{color:var(--color-teal);}
+
+/* STANDINGS */
+#recap .stand-wrap{border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;}
+#recap table.stand{width:100%;border-collapse:collapse;font-size:13.5px;}
+#recap table.stand th{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-faint);text-align:center;padding:11px 8px;background:var(--color-surface);white-space:nowrap;}
+#recap table.stand th.l,#recap table.stand td.l{text-align:left;}
+#recap table.stand td{padding:13px 8px;border-top:1px solid var(--color-divider);text-align:center;white-space:nowrap;color:var(--color-text);}
+#recap table.stand tr.leader td{background:rgba(240,192,64,.05);}
+#recap .c-rank{font-weight:900;color:var(--color-text-faint);width:28px;}
+#recap tr.medal .c-rank{color:var(--color-gold);}
+#recap .c-delta{color:var(--color-text-faint);font-weight:700;}
+#recap .c-team{font-weight:800;font-style:italic;}
+#recap .c-team .e{margin-right:7px;font-size:17px;font-style:normal;}
+#recap .c-pts{font-weight:900;color:var(--color-lime);}
+#recap .c-pts.zero{color:var(--color-text-faint);}
+#recap .dsr-chip{display:inline-block;background:var(--color-teal);color:var(--color-text-inverse);font-weight:800;font-size:11.5px;padding:3px 9px;border-radius:var(--radius-full);font-variant-numeric:tabular-nums;}
+#recap .c-muted{color:var(--color-text-muted);}
+#recap .c-diff-pos{color:var(--color-lime);font-weight:800;}
+#recap .c-diff-neg{color:var(--color-red);font-weight:800;}
+#recap .wpill{display:inline-block;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#06140a;background:var(--color-lime);border-radius:var(--radius-full);padding:2px 6px;margin-left:7px;vertical-align:middle;}
+#recap .stand-note{font-size:11px;color:var(--color-text-faint);margin-top:10px;line-height:1.6;}
+#recap .stand-note b{color:var(--color-text-muted);}
+@media(max-width:760px){#recap .col-opt{display:none;}#recap table.stand th,#recap table.stand td{padding:12px 7px;}#recap .c-team .e{font-size:15px;margin-right:5px;}#recap .wpill{display:none;}}
+
+.mock-bar{position:fixed;bottom:0;left:0;right:0;z-index:500;display:flex;flex-wrap:wrap;align-items:center;gap:14px;padding:10px 16px;background:#000;border-top:2px solid var(--color-lime);font-size:12px;color:#cfcfcf;}
+.mock-bar strong{color:var(--color-lime);}
+.mock-bar button{font:inherit;font-weight:700;font-size:11px;padding:6px 12px;border-radius:999px;border:1px solid #444;background:#1a1a1a;color:#eee;cursor:pointer;}
+.mock-bar .spacer{flex:1;}
+</style>
+</head>
+<body data-page="home">
+
+<div class="fauxhead">
+  <h1>Week One Is In The <span class="lime">Books.</span></h1>
+  <span class="weekbadge">1</span>
+</div>
+
+<main id="recap">
+  <div class="recap-top">
+
+    <!-- LEFT: single tabbed card (POTW folded in) -->
+    <div class="recap-left">
+      <div class="panel-head">
+        <div class="rc-h2"><span class="lime">K'CHN</span> Performers</div>
+        <a class="rc-more" href="#">Leaderboard →</a>
+      </div>
+      <div class="perftabs" id="perftabs">
+        <button class="on" data-k="potw">POTW</button>
+        <button data-k="dsr">DSR</button>
+        <button data-k="diff">Best Diff</button>
+        <button data-k="pts">Most Pts</button>
+      </div>
+      <div class="perfwrap" id="perfPanels"></div>
+    </div>
+
+    <!-- RIGHT: slimmed standings -->
+    <div class="standings-panel">
+      <div class="panel-head">
+        <div class="rc-h2"><span class="lime">Latest</span> Standings</div>
+        <a class="rc-more" href="#">Full standings →</a>
+      </div>
+      <div class="stand-wrap">
+        <table class="stand">
+          <thead><tr>
+            <th>#</th>
+            <th class="col-opt">+/−</th>
+            <th class="l">Team</th>
+            <th>DSR</th>
+            <th>W</th>
+            <th>T</th>
+            <th>L</th>
+            <th>PTS</th>
+            <th class="col-opt">GW</th>
+            <th class="col-opt">PS</th>
+            <th>DIFF</th>
+          </tr></thead>
+          <tbody id="standBody"></tbody>
+        </table>
+      </div>
+      <div class="stand-note"><b>Pts:</b> Win 2 · Tie 1 · Loss 0 (max 4/match). &nbsp; <b>PS</b> = points scored · <b>DIFF</b> = match-point differential.</div>
+    </div>
+
+  </div>
+</main>
+
+<div class="mock-bar">
+  <strong>MOCKUP</strong>
+  <span>POTW folded into the Top Performers card as its own tab. Click POTW / DSR / Best Diff / Most Pts.</span>
+  <span class="spacer"></span>
+  <button id="tglTheme">Theme: Dark</button>
+  <span style="color:#777;">Non-DSR tabs + PS = illustrative</span>
+</div>
+
+<script>
+const STANDINGS = [
+  { e:'🥇', name:'Smash Society',   dsr:441.9, w:2, t:0, l:0, pts:4, gw:11, ps:132, diff:86,  top:true },
+  { e:'🍗', name:"K'CHN",           dsr:400.6, w:2, t:0, l:0, pts:4, gw:9,  ps:121, diff:37,  top:true },
+  { e:'🎯', name:'Zero Zero Two',   dsr:407.0, w:1, t:1, l:0, pts:3, gw:9,  ps:128, diff:53,  top:false },
+  { e:'⚡', name:'Big Dink Energy', dsr:182.3, w:0, t:1, l:1, pts:1, gw:3,  ps:79,  diff:-53, top:false },
+  { e:'😵', name:'What the Dink?!', dsr:192.1, w:0, t:0, l:2, pts:0, gw:3,  ps:88,  diff:-37, top:false },
+  { e:'🌴', name:'Timog Cal',       dsr:61.4,  w:0, t:0, l:2, pts:0, gw:1,  ps:51,  diff:-86, top:false },
+];
+
+const POTW = {
+  m: { name:'Devin C.', team:'Smash Society', rec:'4-0', ps:44, diff:31, dsr:93.1 },
+  f: { name:'Annie K.', team:'Smash Society', rec:'4-0', ps:44, diff:35, dsr:96.4 },
+};
+
+const PERF = {
+  dsr: {
+    m: [['Devin C.','Smash Society','4-0',93.1],['Ryan H.','Smash Society','4-0',92.9],['Philip C.',"K'CHN",'3-1',68.8],['Patrick',"K'CHN",'3-1',68.6],['Kai P.','Smash Society','3-1',66.6],['Guilbert B.',"K'CHN",'3-1',66.1]],
+    f: [['Annie K.','Smash Society','4-0',96.4],['Shay C.','Zero Zero Two','4-0',95.7],['Phoebe B.','Smash Society','4-0',92.9],['Maria L.',"K'CHN",'3-1',71.2],['Jen W.','Big Dink Energy','2-2',64.8],['Dana R.','What the Dink?!','1-3',58.3]],
+  },
+  diff: {
+    m: [['Devin C.','Smash Society','4-0',31],['Ryan H.','Smash Society','4-0',29],['Kai P.','Smash Society','3-1',22],['Philip C.',"K'CHN",'3-1',14],['Patrick',"K'CHN",'3-1',12],['Guilbert B.',"K'CHN",'3-1',9]],
+    f: [['Annie K.','Smash Society','4-0',35],['Phoebe B.','Smash Society','4-0',30],['Shay C.','Zero Zero Two','4-0',24],['Maria L.',"K'CHN",'3-1',12],['Jen W.','Big Dink Energy','2-2',-4],['Dana R.','What the Dink?!','1-3',-9]],
+  },
+  pts: {
+    m: [['Devin C.','Smash Society','4-0',44],['Ryan H.','Smash Society','4-0',42],['Kai P.','Smash Society','3-1',38],['Philip C.',"K'CHN",'3-1',35],['Patrick',"K'CHN",'3-1',33],['Guilbert B.',"K'CHN",'3-1',31]],
+    f: [['Annie K.','Smash Society','4-0',44],['Phoebe B.','Smash Society','4-0',41],['Shay C.','Zero Zero Two','4-0',39],['Maria L.',"K'CHN",'3-1',30],['Jen W.','Big Dink Energy','2-2',28],['Dana R.','What the Dink?!','1-3',24]],
+  },
+};
+
+function initials(n){ const p=String(n).trim().split(/\s+/); return ((p[0][0]||'')+(p.length>1?p[p.length-1][0]:'')).toUpperCase(); }
+function signed(n){ return (n>0?'+':n<0?'−':'')+Math.abs(n); }
+
+function pcard(p, cls, cat){
+  return '<div class="pcard '+cls+'"><div class="pcard__badge">K\'CHN</div>'
+    + '<div class="pcard__cat">'+cat+'</div>'
+    + '<div class="pcard__row">'
+    +   '<div class="pav">'+initials(p.name)+'</div>'
+    +   '<div class="pcard__name">'+p.name+'</div>'
+    +   '<div class="pcard__team">'+p.team+'</div>'
+    + '</div>'
+    + '<div class="pcard__stats">'
+    + '<div><div class="l">Record</div><div class="v hot">'+p.rec+'</div></div>'
+    + '<div><div class="l">DSR</div><div class="v">'+p.dsr+'</div></div>'
+    + '<div><div class="l">Pts Scored</div><div class="v">'+p.ps+'</div></div>'
+    + '<div><div class="l">Diff</div><div class="v">'+signed(p.diff)+'</div></div>'
+    + '</div></div>';
+}
+function perfRows(arr, metric){
+  return arr.map(function(r,i){
+    const [name,team,rec,val] = r;
+    const v = metric==='diff' ? signed(val) : val;
+    return '<div class="prow'+(i===0?' lead':'')+'"><span class="prk">'+(i+1)+'</span>'
+      + '<div class="pinfo"><div class="pnm">'+name+'</div><div class="ptm">'+team+' · '+rec+'</div></div>'
+      + '<span class="pval">'+v+'</span></div>';
+  }).join('');
+}
+function listPanel(metric, on){
+  return '<div class="perfpanel'+(on?' on':'')+'" data-tab="'+metric+'">'
+    + '<div class="perf-col m"><h4>Men · Top 6</h4>'+perfRows(PERF[metric].m,metric)+'</div>'
+    + '<div class="perf-col f"><h4>Women · Top 6</h4>'+perfRows(PERF[metric].f,metric)+'</div></div>';
+}
+function potwPanel(on){
+  return '<div class="perfpanel'+(on?' on':'')+'" data-tab="potw">'
+    + pcard(POTW.m,'m','Male · POTW') + pcard(POTW.f,'f','Female · POTW') + '</div>';
+}
+
+document.getElementById('perfPanels').innerHTML =
+  potwPanel(true) + listPanel('dsr',false) + listPanel('diff',false) + listPanel('pts',false);
+
+document.getElementById('perftabs').addEventListener('click', function(e){
+  const b = e.target.closest('button'); if(!b) return;
+  const k = b.dataset.k;
+  this.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===b));
+  document.querySelectorAll('#perfPanels .perfpanel').forEach(p=>p.classList.toggle('on', p.dataset.tab===k));
+});
+
+const medals = ['🥇','🥈','🥉'];
+function diffCell(d){
+  if(d>0) return '<td class="c-diff-pos">+'+d+'</td>';
+  if(d<0) return '<td class="c-diff-neg">−'+Math.abs(d)+'</td>';
+  return '<td class="c-muted">0</td>';
+}
+document.getElementById('standBody').innerHTML = STANDINGS.map(function(t,i){
+  return '<tr class="'+(i===0?'leader medal':(i<3?'medal':''))+'">'
+    + '<td class="c-rank">'+(i<3?medals[i]:(i+1))+'</td>'
+    + '<td class="col-opt c-delta">–</td>'
+    + '<td class="l c-team"><span class="e">'+t.e+'</span>'+t.name+(t.top?'<span class="wpill">Top Wk</span>':'')+'</td>'
+    + '<td><span class="dsr-chip">'+t.dsr+'</span></td>'
+    + '<td>'+t.w+'</td>'
+    + '<td class="c-muted">'+t.t+'</td>'
+    + '<td class="c-muted">'+t.l+'</td>'
+    + '<td class="c-pts'+(t.pts===0?' zero':'')+'">'+t.pts+'</td>'
+    + '<td class="col-opt">'+t.gw+'</td>'
+    + '<td class="col-opt c-muted">'+t.ps+'</td>'
+    + diffCell(t.diff)
+    + '</tr>';
+}).join('');
+
+document.getElementById('tglTheme').addEventListener('click', function(){
+  const t = document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  this.textContent = 'Theme: ' + (t==='dark'?'Dark':'Light');
+});
+</script>
+</body>
+</html>

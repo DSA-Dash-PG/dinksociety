@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Strength of Schedule — Mockup · The Dink Society</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
+<style>
+:root, [data-theme="dark"] {
+  --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+  --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+  --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c; --color-text-inverse:#0e0e0e;
+  --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12);
+  --color-teal:#17d7b0; --color-red:#ff5c47; --color-gold:#f0c040;
+  --max-w:1180px; --gutter:20px; --radius-lg:20px; --radius:14px; --radius-sm:10px; --radius-full:9999px;
+}
+[data-theme="light"] {
+  --color-bg:#f5f6f2; --color-surface:#ffffff; --color-surface-2:#eef0ea; --color-surface-3:#e2e5dd;
+  --color-border:rgba(12,18,14,0.10); --color-border-strong:rgba(12,18,14,0.16);
+  --color-text:#111410; --color-text-muted:#5e665d; --color-text-faint:#8b948a; --color-text-inverse:#f4f5f1;
+  --color-lime:#7acc00; --color-lime-dim:rgba(122,204,0,0.10);
+  --color-teal:#0ea88d; --color-red:#d84b3a; --color-gold:#c9972e;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Inter',system-ui,sans-serif; background:var(--color-bg); color:var(--color-text); -webkit-font-smoothing:antialiased; padding-bottom:80px; }
+.wrap { width:min(calc(100% - 2rem),var(--max-w)); margin:0 auto; padding:0 var(--gutter); }
+
+/* Header */
+.pg-head { padding:54px var(--gutter) 8px; }
+.pg-eyebrow { font-size:12px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; color:var(--color-lime); display:inline-flex; gap:8px; align-items:center; }
+.pg-eyebrow::before { content:''; width:8px; height:8px; border-radius:50%; background:var(--color-lime); }
+.pg-title { font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:-0.01em; font-size:clamp(2rem,1.2rem + 2vw,2.8rem); margin:10px 0 6px; }
+.pg-sub { color:var(--color-text-muted); font-size:14px; max-width:620px; }
+
+/* Card */
+.card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:22px; margin-top:18px; }
+.card-title { font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:0.01em; font-size:17px; display:flex; align-items:center; gap:9px; }
+.card-sub { color:var(--color-text-muted); font-size:12.5px; margin-top:3px; }
+
+/* Note banner */
+.note { display:flex; gap:10px; align-items:flex-start; background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius); padding:13px 16px; margin-top:16px; font-size:12.5px; color:var(--color-text-muted); line-height:1.5; }
+.note b { color:var(--color-text); }
+
+/* Legend */
+.legend { display:flex; align-items:center; gap:10px; font-size:11px; color:var(--color-text-faint); font-weight:700; letter-spacing:0.04em; text-transform:uppercase; }
+.legend-bar { height:9px; width:170px; border-radius:9999px; background:linear-gradient(90deg, var(--color-lime), var(--color-gold), var(--color-red)); }
+
+/* Heat-strip */
+.strip-head { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:16px; }
+.strip-grid { display:grid; grid-template-columns:minmax(150px,1.4fr) 1fr auto; gap:9px 14px; align-items:center; }
+.strip-grid-hdr { font-size:9px; font-weight:800; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-text-faint); }
+.strip-weeks { display:grid; grid-template-columns:repeat(8,1fr); gap:5px; }
+.wk-col-hdr { display:grid; grid-template-columns:repeat(8,1fr); gap:5px; }
+.wk-col-hdr span { text-align:center; font-size:8.5px; font-weight:800; letter-spacing:0.06em; color:var(--color-text-faint); }
+.team-cell { display:flex; align-items:center; gap:10px; min-width:0; }
+.team-emoji { width:30px; height:30px; flex-shrink:0; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:16px; background:var(--color-surface-2); border:1px solid var(--color-border); }
+.team-meta { display:flex; flex-direction:column; min-width:0; }
+.team-nm { font-weight:800; font-size:13.5px; font-style:italic; text-transform:uppercase; letter-spacing:0.01em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.team-dsr { font-size:10px; color:var(--color-text-faint); font-weight:700; }
+.wk {
+  position:relative; aspect-ratio:1/1; min-height:30px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center; font-size:14px; cursor:default;
+  transition:transform .12s ease;
+}
+.wk:hover { transform:scale(1.12); z-index:3; }
+.wk.future { } /* outlined via inline style */
+.wk.future::after { content:''; position:absolute; inset:0; border-radius:8px; border:1.5px dashed rgba(255,255,255,0.22); }
+[data-theme="light"] .wk.future::after { border-color:rgba(0,0,0,0.18); }
+.strip-sos { text-align:right; }
+.strip-sos .v { font-size:18px; font-weight:900; font-variant-numeric:tabular-nums; }
+.strip-sos .l { font-size:8.5px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); }
+.tip {
+  position:fixed; z-index:50; pointer-events:none; opacity:0;
+  background:#000; color:#fff; border:1px solid var(--color-border-strong);
+  border-radius:9px; padding:8px 11px; font-size:11.5px; line-height:1.4; max-width:220px;
+  box-shadow:0 12px 30px rgba(0,0,0,0.5); transition:opacity .12s ease;
+}
+.tip b { color:var(--color-lime); }
+
+/* SOS table */
+table { width:100%; border-collapse:collapse; }
+thead th {
+  font-size:9px; font-weight:800; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint);
+  text-align:right; padding:0 10px 12px; border-bottom:1px solid var(--color-border); cursor:pointer; user-select:none; white-space:nowrap;
+}
+thead th.l { text-align:left; }
+thead th:hover { color:var(--color-text); }
+thead th .arr { opacity:0; font-size:9px; }
+thead th.sorted .arr { opacity:1; color:var(--color-lime); }
+tbody td { padding:13px 10px; text-align:right; font-variant-numeric:tabular-nums; border-bottom:1px solid var(--color-border); font-size:13.5px; }
+tbody tr:last-child td { border-bottom:none; }
+tbody tr:hover td { background:var(--color-surface-2); }
+td.team { text-align:left; }
+.td-team { display:flex; align-items:center; gap:10px; }
+.rk { width:20px; color:var(--color-text-faint); font-weight:800; font-size:12px; }
+.sos-pill { display:inline-block; min-width:58px; padding:5px 10px; border-radius:9999px; font-weight:900; font-size:13px; }
+.trend { display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:800; letter-spacing:0.03em; padding:4px 9px; border-radius:9999px; }
+.trend.up { color:var(--color-red); background:rgba(255,92,71,0.12); }
+.trend.down { color:var(--color-teal); background:rgba(23,215,176,0.12); }
+.trend.flat { color:var(--color-text-muted); background:var(--color-surface-2); }
+.muted { color:var(--color-text-faint); }
+
+/* Column key */
+.key-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px 26px; margin-top:14px; }
+.key-grid div { font-size:12px; color:var(--color-text-muted); }
+.key-grid b { color:var(--color-text); font-weight:800; }
+
+/* Mock control bar */
+.mock-bar { position:fixed; bottom:0; left:0; right:0; z-index:500; display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:10px 16px; background:#000; border-top:2px solid var(--color-lime); font-size:12px; color:#cfcfcf; }
+.mock-bar strong { color:var(--color-lime); }
+.mock-bar button { font:inherit; font-weight:700; font-size:11px; padding:6px 12px; border-radius:999px; border:1px solid #444; background:#1a1a1a; color:#eee; cursor:pointer; }
+.mock-bar input[type=range] { accent-color:var(--color-lime); width:200px; }
+.mock-bar .spacer { flex:1; }
+.mock-bar label { display:flex; align-items:center; gap:8px; }
+.wk-readout { font-weight:800; color:#fff; min-width:120px; }
+
+@media (max-width:720px) {
+  .strip-grid { grid-template-columns:1fr; }
+  .strip-grid > .strip-grid-hdr { display:none; }
+  .strip-sos { text-align:left; }
+  .wk-col-hdr { display:none; }
+  table { font-size:12px; }
+  .hide-sm { display:none; }
+}
+</style>
+</head>
+<body>
+
+<div class="pg-head wrap">
+  <div class="pg-eyebrow">Season 1 · Contextual stat</div>
+  <h1 class="pg-title">Strength of Schedule</h1>
+  <p class="pg-sub">How tough each team's slate is, rated by opponent DSR. Split into who you've already played and who's still to come.</p>
+</div>
+
+<div class="wrap">
+
+  <div class="note">
+    <span>ℹ️</span>
+    <span><b>Read this as early-season context, not a verdict.</b> With six teams over eight weeks the schedule mostly evens out by the finish — SOS is most telling in the middle of the season, when it explains <em>how</em> a record was earned. Opponents are rated by <b>DSR</b>, so it's stable from Week 1.</span>
+  </div>
+
+  <!-- HERO: heat-strip -->
+  <div class="card">
+    <div class="strip-head">
+      <div>
+        <div class="card-title">🗓️ Schedule Difficulty</div>
+        <div class="card-sub">Each cell = that week's opponent, colored by their DSR. Solid = played · dashed = upcoming. Hover a cell for detail.</div>
+      </div>
+      <div class="legend">Easy <span class="legend-bar"></span> Hard</div>
+    </div>
+
+    <div class="strip-grid">
+      <div class="strip-grid-hdr">Team</div>
+      <div class="strip-grid-hdr"><div class="wk-col-hdr" id="wkHdr"></div></div>
+      <div class="strip-grid-hdr" style="text-align:right;">SOS</div>
+      <!-- rows injected -->
+      <div id="stripRows" style="display:contents;"></div>
+    </div>
+  </div>
+
+  <!-- SOS table -->
+  <div class="card">
+    <div class="card-title">📊 Strength of Schedule Ranking</div>
+    <div class="card-sub">Ranked toughest slate first. Click any column to sort.</div>
+    <table id="sosTable" style="margin-top:14px;">
+      <thead>
+        <tr>
+          <th class="l" data-k="rank">#<span class="arr">▼</span></th>
+          <th class="l" data-k="name">Team<span class="arr">▼</span></th>
+          <th data-k="sos">SOS<span class="arr">▼</span></th>
+          <th data-k="played" class="hide-sm">Played<span class="arr">▼</span></th>
+          <th data-k="remaining" class="hide-sm">Remaining<span class="arr">▼</span></th>
+          <th data-k="trend">Run-in<span class="arr">▼</span></th>
+          <th data-k="oppwin" class="hide-sm">Opp W%<span class="arr">▼</span></th>
+        </tr>
+      </thead>
+      <tbody id="sosBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Column key -->
+  <div class="card">
+    <div class="card-title">— Column Key</div>
+    <div class="key-grid">
+      <div><b>SOS</b> = Average DSR of all 8 scheduled opponents. Higher = tougher schedule.</div>
+      <div><b>Played</b> = Avg DSR of opponents already faced — contextualizes the current record.</div>
+      <div><b>Remaining</b> = Avg DSR of opponents still to come.</div>
+      <div><b>Run-in</b> = Does it get harder (↑) or easier (↓) from here vs what's been played.</div>
+      <div><b>Opp W%</b> = Average win rate of scheduled opponents — the familiar record-based cross-check.</div>
+    </div>
+  </div>
+
+</div>
+
+<div class="tip" id="tip"></div>
+
+<div class="mock-bar">
+  <strong>MOCKUP</strong>
+  <label>Played through:
+    <input type="range" id="wkSlider" min="0" max="8" value="2" />
+    <span class="wk-readout" id="wkReadout">Week 2 (of 8)</span>
+  </label>
+  <span class="spacer"></span>
+  <button id="tglTheme">Theme: Dark</button>
+  <span style="color:#777;">Scrub the season to watch Played / Remaining shift.</span>
+</div>
+
+<script>
+// ── Real teams + DSR (the green pills from your Standings page) ──
+const TEAMS = [
+  { id:'S', name:'Smash Society',   emoji:'🥇', dsr:441.9, winpct:1.00, place:1 },
+  { id:'K', name:"K'CHN",           emoji:'🍳', dsr:400.6, winpct:1.00, place:2 },
+  { id:'Z', name:'Zero Zero Two',   emoji:'🎯', dsr:407.0, winpct:0.75, place:3 },
+  { id:'B', name:'Big Dink Energy', emoji:'⚡', dsr:182.3, winpct:0.25, place:4 },
+  { id:'W', name:'What the Dink?!', emoji:'😵', dsr:192.1, winpct:0.00, place:5 },
+  { id:'T', name:'Timog Cal',       emoji:'🌴', dsr:61.4,  winpct:0.00, place:6 },
+];
+const T = Object.fromEntries(TEAMS.map(t => [t.id, t]));
+
+// 8-week schedule (double round-robin start). Each week = 3 matches.
+const SCHEDULE = [
+  [['S','T'],['K','W'],['Z','B']],
+  [['S','W'],['T','B'],['K','Z']],
+  [['S','B'],['W','Z'],['T','K']],
+  [['S','Z'],['B','K'],['W','T']],
+  [['S','K'],['Z','T'],['B','W']],
+  [['S','T'],['K','W'],['Z','B']],
+  [['S','W'],['T','B'],['K','Z']],
+  [['S','B'],['T','K'],['W','Z']],
+];
+
+const minDSR = Math.min(...TEAMS.map(t=>t.dsr));
+const maxDSR = Math.max(...TEAMS.map(t=>t.dsr));
+
+function oppsOf(id){
+  return SCHEDULE.map(week => {
+    for (const [a,b] of week){ if(a===id) return b; if(b===id) return a; }
+    return null;
+  });
+}
+function mean(arr){ return arr.length ? arr.reduce((s,x)=>s+x,0)/arr.length : null; }
+
+// difficulty 0..1 from DSR, then lime→gold→red
+function norm(dsr){ return (dsr - minDSR) / (maxDSR - minDSR || 1); }
+function lerp(a,b,t){ return Math.round(a + (b-a)*t); }
+function diffColor(dsr){
+  const t = norm(dsr);
+  const lime=[184,255,44], gold=[240,192,64], red=[255,92,71];
+  let c;
+  if (t < 0.5){ const u=t/0.5; c=[lerp(lime[0],gold[0],u),lerp(lime[1],gold[1],u),lerp(lime[2],gold[2],u)]; }
+  else { const u=(t-0.5)/0.5; c=[lerp(gold[0],red[0],u),lerp(gold[1],red[1],u),lerp(gold[2],red[2],u)]; }
+  return c;
+}
+function diffLabel(dsr){ const t=norm(dsr); return t>0.66?'Hard':t>0.33?'Medium':'Easy'; }
+
+let playedThrough = 2;
+let sort = { k:'sos', dir:-1 };
+
+function compute(){
+  return TEAMS.map(t => {
+    const opps = oppsOf(t.id);
+    const all = opps.map(o => T[o].dsr);
+    const played = opps.slice(0, playedThrough).map(o => T[o].dsr);
+    const rem = opps.slice(playedThrough).map(o => T[o].dsr);
+    const oppwin = mean(opps.map(o => T[o].winpct)) * 100;
+    const sosPlayed = mean(played), sosRem = mean(rem);
+    let trend = 'flat', trendTxt = 'Steady';
+    if (sosPlayed != null && sosRem != null){
+      const d = sosRem - sosPlayed;
+      if (d > 25){ trend='up'; trendTxt='Ramps up'; }
+      else if (d < -25){ trend='down'; trendTxt='Eases off'; }
+    } else if (sosRem != null && sosPlayed == null){ trendTxt='—'; }
+    return { ...t, opps, sos:mean(all), played:sosPlayed, remaining:sosRem, oppwin, trend, trendTxt };
+  });
+}
+
+function fmt(v){ return v==null ? '—' : v.toFixed(0); }
+
+function renderStrip(rows){
+  // week header
+  document.getElementById('wkHdr').innerHTML =
+    SCHEDULE.map((_,i)=>`<span>${i+1}</span>`).join('');
+
+  const ordered = rows.slice().sort((a,b)=>a.place-b.place);
+  document.getElementById('stripRows').innerHTML = ordered.map(r => {
+    const cells = r.opps.map((oId,i) => {
+      const o = T[oId];
+      const c = diffColor(o.dsr);
+      const future = i >= playedThrough;
+      const bg = future ? `rgba(${c[0]},${c[1]},${c[2]},0.16)` : `rgb(${c[0]},${c[1]},${c[2]})`;
+      const tipData = `Wk ${i+1} ${future?'(upcoming)':'(played)'}|vs ${o.name}|DSR ${o.dsr.toFixed(0)} · ${diffLabel(o.dsr)}`;
+      return `<div class="wk ${future?'future':''}" style="background:${bg};" data-tip="${tipData}">${o.emoji}</div>`;
+    }).join('');
+    const c = diffColor(r.sos);
+    return `
+      <div class="team-cell">
+        <div class="team-emoji">${r.emoji}</div>
+        <div class="team-meta"><span class="team-nm">${r.name}</span><span class="team-dsr">DSR ${r.dsr.toFixed(0)} · #${r.place}</span></div>
+      </div>
+      <div class="strip-weeks">${cells}</div>
+      <div class="strip-sos"><div class="v" style="color:rgb(${c[0]},${c[1]},${c[2]})">${fmt(r.sos)}</div><div class="l">avg opp</div></div>
+    `;
+  }).join('');
+  wireTips();
+}
+
+function renderTable(rows){
+  const dir = sort.dir;
+  const sorted = rows.slice().sort((a,b)=>{
+    let av=a[sort.k], bv=b[sort.k];
+    if (sort.k==='rank') { av=a.sos; bv=b.sos; } // rank follows SOS
+    if (sort.k==='name'){ return dir * String(a.name).localeCompare(String(b.name)); }
+    if (sort.k==='trend'){ const ord={up:2,flat:1,down:0}; av=ord[a.trend]; bv=ord[b.trend]; }
+    if (av==null) av=-1; if (bv==null) bv=-1;
+    return dir * (av - bv);
+  });
+  // rank is always by SOS desc regardless of table sort
+  const rankMap = {};
+  rows.slice().sort((a,b)=>b.sos-a.sos).forEach((r,i)=> rankMap[r.id]=i+1);
+
+  document.getElementById('sosBody').innerHTML = sorted.map(r => {
+    const c = diffColor(r.sos);
+    const pill = `background:rgba(${c[0]},${c[1]},${c[2]},0.16);color:rgb(${c[0]},${c[1]},${c[2]})`;
+    const arrow = r.trend==='up'?'↑':r.trend==='down'?'↓':'→';
+    return `<tr>
+      <td class="team"><span class="rk">${rankMap[r.id]}</span></td>
+      <td class="team"><span class="td-team"><span class="team-emoji" style="width:26px;height:26px;font-size:14px;">${r.emoji}</span><span class="team-nm" style="font-size:13px;">${r.name}</span></span></td>
+      <td><span class="sos-pill" style="${pill}">${fmt(r.sos)}</span></td>
+      <td class="hide-sm">${fmt(r.played)}</td>
+      <td class="hide-sm">${fmt(r.remaining)}</td>
+      <td><span class="trend ${r.trend}">${arrow} ${r.trendTxt}</span></td>
+      <td class="hide-sm muted">${r.oppwin.toFixed(0)}%</td>
+    </tr>`;
+  }).join('');
+
+  document.querySelectorAll('thead th').forEach(th=>{
+    th.classList.toggle('sorted', th.dataset.k===sort.k);
+  });
+}
+
+function render(){
+  const rows = compute();
+  renderStrip(rows);
+  renderTable(rows);
+}
+
+// Tooltips
+const tip = document.getElementById('tip');
+function wireTips(){
+  document.querySelectorAll('.wk[data-tip]').forEach(el=>{
+    el.addEventListener('mousemove', e=>{
+      const [a,b,c] = el.dataset.tip.split('|');
+      tip.innerHTML = `<b>${a}</b><br>${b}<br>${c}`;
+      tip.style.opacity='1';
+      tip.style.left = Math.min(e.clientX+14, window.innerWidth-230)+'px';
+      tip.style.top = (e.clientY+14)+'px';
+    });
+    el.addEventListener('mouseleave', ()=> tip.style.opacity='0');
+  });
+}
+
+// Slider
+const slider = document.getElementById('wkSlider');
+slider.addEventListener('input', ()=>{
+  playedThrough = +slider.value;
+  document.getElementById('wkReadout').textContent =
+    playedThrough===0 ? 'Preseason (0 played)' :
+    playedThrough===8 ? 'Season complete' :
+    `Week ${playedThrough} (of 8)`;
+  render();
+});
+
+// Sort
+document.querySelectorAll('thead th').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const k = th.dataset.k;
+    if (sort.k===k) sort.dir *= -1;
+    else { sort.k=k; sort.dir = (k==='name')?1:-1; }
+    render();
+  });
+});
+
+// Theme
+document.getElementById('tglTheme').addEventListener('click', ()=>{
+  const t = document.documentElement.getAttribute('data-theme')==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('tglTheme').textContent = 'Theme: ' + (t==='dark'?'Dark':'Light');
+});
+
+render();
+</script>
+</body>
+</html>
