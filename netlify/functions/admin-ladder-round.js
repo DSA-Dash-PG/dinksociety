@@ -15,9 +15,10 @@
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { checkLadderPin } from './lib/ladder-pin.js';
-import { getEvent, setEvent, getSignups } from './lib/ladder.js';
+import { getEvent, setEvent, getSignups, setSignups } from './lib/ladder.js';
 import { getPlay, setPlay, listPlay, toSession } from './lib/ladder-play.js';
 import { genR1, genNR, buildStrengthFn } from './lib/ladder-scoring.js';
+import { findPlayerByEmail } from './lib/player-auth.js';
 
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
 
@@ -53,13 +54,34 @@ export default async (req) => {
   const signups = await getSignups(eventId);
   let play = await getPlay(eventId);
 
+  if (action === 'set-email') {
+    // Set/clear the email on a player's signup entry so their ladder profile
+    // links to their league profile (same email). Independent of play state;
+    // creates a manual roster entry if this player isn't on the signup roster.
+    const playerId = body.playerId;
+    if (!playerId) return json({ error: 'playerId required' }, 400);
+    const email = String(body.email || '').trim().toLowerCase();
+    let entry = (signups.roster || []).find(p => p.playerId === playerId);
+    if (!entry) {
+      entry = { playerId, name: String(body.name || '').trim() || 'Player', email: '', gender: body.gender === 'F' ? 'F' : 'M', paymentStatus: 'paid', manual: true, signedUpAt: new Date().toISOString() };
+      signups.roster.push(entry);
+    }
+    entry.email = email;
+    signups.eventId = eventId;
+    await setSignups(signups);
+    let linked = false;
+    if (email) { try { linked = !!(await findPlayerByEmail(email)); } catch { linked = false; } }
+    return json({ ok: true, email, linked });
+  }
+
   if (action === 'start') {
     const players = participants(signups);
     if (players.length < 4) return json({ error: 'Need at least 4 players on the roster to start.' }, 400);
     const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || 6));
     const strength = await strengthFor(eventId, players);
     const r1 = genR1(players, event.courts || 1, strength);
-    play = { eventId, date: event.date || null, config: { courts: event.courts || 1, rounds, scoreMode: 'points' }, rounds: [r1], currentRound: 0, started: true, finished: false };
+    const roundMin = Math.max(1, Math.min(60, parseInt(body.roundMin) || 12));
+    play = { eventId, date: event.date || null, config: { courts: event.courts || 1, rounds, roundMin, scoreMode: 'points' }, rounds: [r1], currentRound: 0, started: true, finished: false };
     await setPlay(eventId, play);
     if (event.status === 'open') { event.status = 'live'; await setEvent(event); }
     return json({ ok: true, play });
@@ -92,6 +114,43 @@ export default async (req) => {
   if (action === 'finish') {
     play.finished = true; await setPlay(eventId, play);
     event.status = 'final'; await setEvent(event);
+    return json({ ok: true, play });
+  }
+
+  if (action === 'reopen') {
+    // Un-finalize a completed night so scores/lineups can be edited, then re-finished.
+    play.finished = false; await setPlay(eventId, play);
+    if (event.status === 'final') { event.status = 'live'; await setEvent(event); }
+    return json({ ok: true, play });
+  }
+
+  if (action === 'swap') {
+    // Swap two player slots within a round (MOVE). body: { round, a:{ci,ti,pi}, b:{ci,ti,pi} }
+    const ri = parseInt(body.round);
+    const rnd = play.rounds?.[ri]; if (!rnd) return json({ error: 'round not found' }, 404);
+    const slot = s => { const c = rnd.courts?.[s?.ci]; if (!c) return null; return { team: (parseInt(s.ti) === 0 ? c.team1 : c.team2), pi: parseInt(s.pi) }; };
+    const A = slot(body.a), B = slot(body.b);
+    if (!A || !B || !A.team || !B.team) return json({ error: 'invalid slots' }, 400);
+    const tmp = A.team[A.pi] || null; A.team[A.pi] = B.team[B.pi] || null; B.team[B.pi] = tmp;
+    await setPlay(eventId, play);
+    return json({ ok: true, play });
+  }
+
+  if (action === 'sub') {
+    // Replace a player slot (SUB). body: { round, ci, ti, pi, player:{id?,name,gender,temp?}|null }
+    const ri = parseInt(body.round);
+    const rnd = play.rounds?.[ri]; if (!rnd) return json({ error: 'round not found' }, 404);
+    const c = rnd.courts?.[parseInt(body.ci)]; if (!c) return json({ error: 'court not found' }, 404);
+    const team = parseInt(body.ti) === 0 ? c.team1 : c.team2;
+    const pi = parseInt(body.pi);
+    if (body.player === null) { team[pi] = null; }
+    else {
+      const p = body.player || {};
+      const name = String(p.name || '').trim();
+      if (!name) return json({ error: 'name required' }, 400);
+      team[pi] = { id: p.id || ('p_' + Math.random().toString(36).slice(2, 10)), name, gender: p.gender === 'F' ? 'F' : 'M', ...(p.temp ? { temp: true } : {}) };
+    }
+    await setPlay(eventId, play);
     return json({ ok: true, play });
   }
 

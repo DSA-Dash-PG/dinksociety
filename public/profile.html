@@ -55,6 +55,8 @@
 
 <script>
 const API='/.netlify/functions';
+const ICON_LADDER='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 20h5v-5h5v-5h5V5"/></svg>';
+const ICON_TROPHY='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 5H5v2a2 2 0 0 0 2 2M17 5h2v2a2 2 0 0 1-2 2"/></svg>';
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 const qp=new URLSearchParams(location.search);
 const initials=n=>String(n||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
@@ -84,13 +86,13 @@ function render(j){
     </div>`;
 
   if(lg){
-    h+=`<div class="lane"><div class="lane-top"><div class="lane-ttl" style="color:var(--teal)">🏆 League play</div><div class="lane-r">${esc(lg.teamName||'')}</div></div>
+    h+=`<div class="lane"><div class="lane-top"><div class="lane-ttl" style="color:var(--teal)">${ICON_TROPHY} League play</div><div class="lane-r">${esc(lg.teamName||'')}</div></div>
       <div class="grid4">${g(lg.w+'-'+lg.l,'Record')}${g(lg.winPct+'%','Win%','var(--teal)')}${g(lg.matchesPlayed,'Matches')}${g((lg.diff>0?'+':'')+lg.diff,'Diff',lg.diff>=0?'var(--teal)':'var(--red)')}</div>
-      <a class="cta teal" href="/player.html?id=${encodeURIComponent(lg.id)}&circuit=${encodeURIComponent(lg.circuit||'I')}">View league profile →</a></div>`;
+      <a class="cta teal" href="${leagueHref(lg)}">View league profile →</a></div>`;
   }
   if(ld){
     const recent=(ld.perLadder||[]).slice(0,2).map(L=>`<div class="rrow"><span>${esc(L.name)} · ${shortDate(L.date)}</span><span style="color:var(--lime);font-weight:700">${L.placeRank?ord(L.placeRank):''} ${L.w}-${L.l}</span></div>`).join('');
-    h+=`<div class="lane ld"><div class="lane-top"><div class="lane-ttl" style="color:var(--lime)">🪜 Ladder play</div><div class="lane-r">Season pts ${ld.seasonPts}</div></div>
+    h+=`<div class="lane ld"><div class="lane-top"><div class="lane-ttl" style="color:var(--lime)">${ICON_LADDER} Ladder play</div><div class="lane-r">Season pts ${ld.seasonPts}</div></div>
       <div class="grid4">${g(ld.w+'-'+ld.l,'Record')}${g(ld.winPct+'%','Win%','var(--lime)')}${g((ld.diff>0?'+':'')+ld.diff,'Diff',ld.diff>=0?'var(--lime)':'var(--red)')}${g(ld.podiums,'Podiums','var(--gold)')}</div>
       ${recent?`<div class="recent">${recent}</div>`:''}
       <a class="cta lime" onclick="openLadder()">View full ladder card →</a></div>`;
@@ -104,6 +106,8 @@ function render(j){
 function openLadder(){ if(!window.__ld)return; document.getElementById('ldBody').innerHTML=renderLadderCard(window.__ld); document.getElementById('ldOv').classList.add('on'); }
 
 function ord(n){ const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+function slugify(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,''); }
+function leagueHref(lg){ let h=`/player?team=${encodeURIComponent(slugify(lg.teamName||''))}&name=${encodeURIComponent(lg.name||'')}`; if(lg.circuit&&lg.circuit!=='I')h+=`&season=circuit-${String(lg.circuit).toLowerCase()}`; return h; }
 function shortDate(s){ if(!s)return''; const d=new Date(s+'T12:00:00'); return isNaN(d)?'':d.toLocaleDateString('en-US',{month:'numeric',day:'numeric'}); }
 function courtSvg(mv,peak){
   const W=480,H=120,pad=18,n=mv.length; if(!n)return'';
