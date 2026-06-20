@@ -70,6 +70,7 @@
       <div><label class="l">Start time</label><input class="i" id="f-time" placeholder="8:30 AM"></div>
       <div><label class="l">End time</label><input class="i" id="f-end" placeholder="11:30 AM"></div>
     </div>
+    <div class="frow"><label class="l">Type</label><div class="seg" id="seg-type"><button class="on" data-v="mixed">Mixed</button><button data-v="mens">Men's</button><button data-v="womens">Women's</button></div></div>
     <div class="frow"><label class="l">Location</label><input class="i" id="f-place" placeholder="SBTC"></div>
     <div class="frow row2">
       <div><label class="l">Courts</label><input class="i" id="f-courts" type="number" value="3" oninput="recalc()"></div>
@@ -113,6 +114,7 @@
     <div><label class="l">End time</label><input class="i" id="m-end"></div>
   </div>
   <div class="frow"><label class="l">Location</label><input class="i" id="m-place"></div>
+  <div class="frow"><label class="l">Type</label><select class="i" id="m-type"><option value="mixed">Mixed</option><option value="mens">Men's</option><option value="womens">Women's</option></select></div>
   <div class="frow row2">
     <div><label class="l">Courts</label><input class="i" id="m-courts" type="number"></div>
     <div><label class="l">Total players</label><input class="i" id="m-cap" type="number"></div>
@@ -178,6 +180,7 @@ async function createLadder(){
     organizers:document.getElementById('f-org').value.split(',').map(s=>s.trim()).filter(Boolean),
     spotOpenPolicy:seg('seg-spot'),
     cancelPolicy:seg('seg-cancel'),
+    type:seg('seg-type'),
   };
   if(!body.name||!body.date){ msg('createMsg','err','Name and date are required.'); return; }
   const {status,d}=await api('/admin-ladder-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -194,7 +197,7 @@ async function openManage(id){
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
   document.querySelectorAll('#seg-status button').forEach(b=>b.classList.toggle('on',b.dataset.v===(d.event.status||'open')));
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
-  setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place);
+  setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-type',d.event.type||'mixed');
   setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
   document.getElementById('mEditMsg').innerHTML='';
   let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
@@ -219,7 +222,7 @@ async function saveEdit(){
     id:CURRENT.id, circuit:CURRENT.circuit,
     name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(),
     courts:parseInt(g('m-courts'))||0, capacity:parseInt(g('m-cap'))||0,
-    feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(),
+    feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(), type:g('m-type'),
     paymentMethods:CURRENT.paymentMethods, organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
     spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,
     fcfsWindowHours:CURRENT.fcfsWindowHours, status:CURRENT.status,

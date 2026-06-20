@@ -46,6 +46,15 @@
   .btn{ display:flex;align-items:center;justify-content:center;gap:6px;min-height:42px;border-radius:9999px;border:1px solid transparent;font:inherit;font-size:.8rem;font-weight:800;cursor:pointer;flex:1;text-decoration:none; }
   .btn-lime{ background:var(--lime);color:#000; } .btn-out{ border-color:rgba(255,255,255,.18);color:#f0f2ec;background:transparent; } .btn-ghost{ background:#1c1f18;color:#9aa094; }
   .empty{ text-align:center;color:#5e655a;padding:48px 16px;font-size:.9rem; }
+  .evc.mens{ border-left-color:#4aa3e0; } .evc.womens{ border-left-color:#ff7bb0; }
+  .ttag{ display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:9999px;font-size:.54rem;font-weight:900;text-transform:uppercase;letter-spacing:.04em; }
+  .ttag.mixed{ background:rgba(184,255,44,.14);color:var(--lime); } .ttag.mens{ background:rgba(74,163,224,.16);color:#4aa3e0; } .ttag.womens{ background:rgba(255,123,176,.16);color:#ff7bb0; }
+  .fseg{ display:flex;gap:5px;background:#161914;border:1px solid rgba(255,255,255,.08);border-radius:9999px;padding:5px;margin-bottom:10px; }
+  .fseg button{ flex:1;padding:9px 4px;border:0;border-radius:9999px;background:none;color:#9aa094;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;white-space:nowrap; }
+  .fseg button.on{ background:#f0f2ec;color:#000; } .fseg button.on.t-mixed{ background:var(--lime); } .fseg button.on.t-mens{ background:#4aa3e0; } .fseg button.on.t-womens{ background:#ff7bb0; }
+  .fchips{ display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:14px; }
+  .fchips button{ flex:0 0 auto;padding:7px 13px;border-radius:9999px;border:1px solid rgba(255,255,255,.08);background:#161914;color:#9aa094;font:inherit;font-size:.74rem;font-weight:700;cursor:pointer; }
+  .fchips button.on{ background:#f0f2ec;color:#000;border-color:#f0f2ec; }
   .note{ background:#161914;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px;color:#9aa094;font-size:.85rem;line-height:1.6; }
   .kpis{ display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px; }
   .kpi{ background:#161914;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 6px;text-align:center; }
@@ -87,6 +96,7 @@
   </div>
 
   <div class="pane on" id="p-avail">
+    <div id="filters"></div>
     <div id="list" class="grid"><div class="empty">Loading ladders…</div></div>
     <div class="demoflag" id="demoFlag"></div>
   </div>
@@ -169,8 +179,9 @@ function card(l){
     ? `<button class="btn btn-out" onclick="joinWaitlist('${l.id}')">Join waitlist</button>`
     : `<button class="btn btn-lime" onclick="openSignup('${l.id}')">Sign up · ${fmt(l.feeCents)}</button>`;
   const ros = (l.roster && l.roster.length) ? l.roster.map(p=>esc(p.name)+(p.paid?'':' ⏳')).join(', ') : 'No one signed up yet.';
-  return `<div class="evc">
-    <div class="evc-top"><div><div class="evc-nm">${esc(l.name)}</div><div class="evc-meta">${dateLine(l)}</div></div>${statusChip}</div>
+  const TT={mixed:'Mixed',mens:"Men's",womens:"Women's"}; const tt=l.type||'mixed';
+  return `<div class="evc ${tt}">
+    <div class="evc-top"><div><div class="evc-nm">${esc(l.name)}</div><div class="evc-meta">${dateLine(l)}</div></div><div style="display:flex;flex-direction:column;gap:5px;align-items:flex-end">${statusChip}<span class="ttag ${tt}">${TT[tt]||'Mixed'}</span></div></div>
     <div class="evc-meta" style="margin-top:5px">${cap} players · ${l.courts||'—'} courts · ${fmt(l.feeCents)}</div>
     <div class="bar ${barCls}"><i style="width:${pct}%"></i></div>
     <div class="spot"><span style="color:#9aa094">${filled} / ${cap}</span><span class="left ${full?'f':''}">${leftTxt}</span></div>
@@ -190,8 +201,28 @@ async function load(){
     LADDERS = (j.ladders||[]);
   }catch(e){ LADDERS=[]; }
   if(!LADDERS.length && isDemo){ LADDERS = DEMO; document.getElementById('demoFlag').textContent='Showing sample data (?demo=1)'; }
-  if(!LADDERS.length){ el.innerHTML = '<div class="empty">No ladders open right now. Check back soon — or ask an organizer to post one.</div>'; return; }
-  el.innerHTML = LADDERS.map(card).join('');
+  if(!LADDERS.length){ document.getElementById('filters').innerHTML=''; el.innerHTML = '<div class="empty">No ladders open right now. Check back soon — or ask an organizer to post one.</div>'; return; }
+  renderFilters();
+  applyFilters();
+}
+let FT='all', FD='all';
+function weekday(s){ if(!s) return ''; const d=new Date(s+'T12:00:00'); return isNaN(d)?'':d.toLocaleDateString('en-US',{weekday:'short'}); }
+function renderFilters(){
+  const f=document.getElementById('filters');
+  const types=[...new Set(LADDERS.map(l=>l.type||'mixed'))];
+  const days=[...new Set(LADDERS.map(l=>weekday(l.date)).filter(Boolean))];
+  const TL={mixed:'Mixed',mens:"Men's",womens:"Women's"};
+  let h='';
+  if(types.length>1) h+='<div class="fseg">'+['all',...types].map(t=>`<button class="${FT===t?'on t-'+t:''}" onclick="setFT('${t}')">${t==='all'?'All':(TL[t]||t)}</button>`).join('')+'</div>';
+  if(days.length>1) h+='<div class="fchips">'+['all',...days].map(d=>`<button class="${FD===d?'on':''}" onclick="setFD('${d}')">${d==='all'?'All days':d}</button>`).join('')+'</div>';
+  f.innerHTML=h;
+}
+function setFT(t){ FT=t; renderFilters(); applyFilters(); }
+function setFD(d){ FD=d; renderFilters(); applyFilters(); }
+function applyFilters(){
+  const el=document.getElementById('list');
+  const els=LADDERS.filter(l=>(FT==='all'||(l.type||'mixed')===FT)&&(FD==='all'||weekday(l.date)===FD));
+  el.innerHTML = els.length ? els.map(card).join('') : '<div class="empty">No ladders match these filters.</div>';
 }
 
 const get = id => LADDERS.find(l=>l.id===id);

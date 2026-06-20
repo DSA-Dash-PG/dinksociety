@@ -47,6 +47,7 @@ export default async (req) => {
     waitlist: b.waitlist !== false,
     spotOpenPolicy: b.spotOpenPolicy === 'auto' ? 'auto' : 'hold',
     cancelPolicy: ['auto_credit', 'credit_if_refilled', 'no_credit'].includes(b.cancelPolicy) ? b.cancelPolicy : 'auto_credit',
+    type: ['mixed', 'mens', 'womens'].includes(b.type) ? b.type : (existing?.type || 'mixed'),
     fcfsWindowHours: Number.isFinite(+b.fcfsWindowHours) ? +b.fcfsWindowHours : (existing?.fcfsWindowHours ?? 24),
     organizers: Array.isArray(b.organizers) ? b.organizers.filter(Boolean) : (existing?.organizers || []),
     status: b.status || existing?.status || 'open',
