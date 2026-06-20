@@ -14,6 +14,7 @@
 //      'finish'                → finalize the night
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { checkLadderPin } from './lib/ladder-pin.js';
 import { getEvent, setEvent, getSignups } from './lib/ladder.js';
 import { getPlay, setPlay, listPlay, toSession } from './lib/ladder-play.js';
 import { genR1, genNR, buildStrengthFn } from './lib/ladder-scoring.js';
@@ -34,7 +35,7 @@ async function strengthFor(eventId, players) {
 
 export default async (req) => {
   const v = await verifyAdminSession(req);
-  if (!v.valid) return unauthResponse(v.error);
+  if (!v.valid && !checkLadderPin(req)) return unauthResponse('Unauthorized');
 
   const eventId = new URL(req.url).searchParams.get('event');
   if (!eventId) return json({ error: 'event id required' }, 400);

@@ -129,6 +129,7 @@
     <input class="i" id="ap-name" placeholder="Player name">
     <select class="i" id="ap-gender" style="max-width:90px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select>
   </div>
+  <input class="i" id="ap-email" placeholder="Email (optional — links their stats &amp; profile)" style="width:100%;margin-top:10px">
   <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#9aa094;margin:10px 0"><input type="checkbox" id="ap-paid" checked> Paid (cash)</label>
   <button class="btn btn-out" onclick="addPlayer()">Add to roster</button>
   <div id="apMsg"></div>
@@ -251,10 +252,11 @@ async function addPlayer(){
   const name=document.getElementById('ap-name').value.trim();
   if(!name){ msg('apMsg','err','Enter a name.'); return; }
   const gender=document.getElementById('ap-gender').value;
+  const email=document.getElementById('ap-email').value.trim();
   const paid=document.getElementById('ap-paid').checked;
-  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,gender,paid})});
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,gender,email,paid})});
   if(status===401){ msg('apMsg','err','Sign in as admin first.'); return; }
-  if(d.ok){ document.getElementById('ap-name').value=''; const cur=CURRENT.id; openManage(cur); loadList(); }
+  if(d.ok){ document.getElementById('ap-name').value=''; document.getElementById('ap-email').value=''; const cur=CURRENT.id; openManage(cur); loadList(); }
   else msg('apMsg','err',d.error||'Could not add.');
 }
 async function importOld(){

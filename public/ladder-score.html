@@ -58,13 +58,25 @@ let STATE=null, EID=null;
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 const nm=p=>p?esc(p.name):'<span style="color:#5e655a">—</span>';
 function msg(c,t){ document.getElementById('msg').innerHTML=t?`<div class="msg ${c}">${t}</div>`:''; }
-async function api(path,opts){ const r=await fetch(API+path,{credentials:'include',...opts}); let d={}; try{d=await r.json();}catch{} return {status:r.status,d}; }
+let PIN=sessionStorage.getItem('ds_ladder_pin')||'';
+async function ensurePin(){
+  const p=prompt('Enter the scoring PIN:'); if(!p) return false;
+  try{ const r=await fetch(`${API}/ladder-pin-verify?pin=${encodeURIComponent(p)}`); const j=await r.json(); if(j.valid){ PIN=p; sessionStorage.setItem('ds_ladder_pin',p); return true; } }catch(e){}
+  alert('That PIN didn\'t work.'); return false;
+}
+async function api(path,opts={}){
+  opts.headers={...(opts.headers||{}),'X-Ladder-Pin':PIN};
+  opts.credentials='include';
+  let r=await fetch(API+path,opts);
+  if(r.status===401){ if(await ensurePin()){ opts.headers['X-Ladder-Pin']=PIN; r=await fetch(API+path,opts); } }
+  let d={}; try{d=await r.json();}catch{} return {status:r.status,d};
+}
 
 async function loadPicker(){
-  const {status,d}=await api('/admin-ladders');
-  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  let d={};
+  try{ const r=await fetch(API+'/public-ladders'); d=await r.json(); }catch(e){}
   const sel=document.getElementById('picker');
-  (d.ladders||[]).filter(l=>l.status!=='cancelled').forEach(l=>{
+  (d.ladders||[]).forEach(l=>{
     const o=document.createElement('option'); o.value=l.id; o.textContent=`${l.name} · ${l.date||''} (${l.status})`; sel.appendChild(o);
   });
   const q=new URLSearchParams(location.search).get('event');
