@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player nav — League/Ladder toggle per page (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d0a;--surf:#14161300;--surf2:#1a1d17;--surf3:#23271f;
+  --bd:rgba(255,255,255,0.08);--bds:rgba(255,255,255,0.14);--dv:rgba(255,255,255,0.06);
+  --tx:#f0f2ec;--mut:#9aa094;--fnt:#5e655a;--inv:#0b0d0a;
+  --lime:#b8ff2c;--lime-d:rgba(184,255,44,0.12);--lime-g:rgba(184,255,44,0.06);
+  --teal:#17d7b0;--teal-d:rgba(23,215,176,0.14);--teal-g:rgba(23,215,176,0.06);
+  --gold:#f0c040;--gold-d:rgba(240,192,64,0.14);--red:#ff5c47;--red-d:rgba(255,92,71,0.12);
+  --r-sm:10px;--r-md:14px;--r-lg:18px;--r-full:9999px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#070806;color:var(--tx);line-height:1.5;-webkit-font-smoothing:antialiased;padding:22px 14px 50px}
+.mute{color:var(--mut)}.fnt{color:var(--fnt)}
+.intro{max-width:420px;margin:0 auto 14px;text-align:center;color:var(--mut);font-size:.82rem}
+.intro b{color:var(--tx)}
+
+.phone{max-width:400px;height:760px;margin:0 auto;background:var(--bg);border:1px solid var(--bds);border-radius:30px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6);display:flex;flex-direction:column}
+
+/* header */
+.hdr{padding:13px 15px 11px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.hdr-row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.hbrand small{font-size:.6rem;font-weight:800;letter-spacing:.18em;color:var(--teal);text-transform:uppercase}
+.hbrand b{display:block;font-size:.98rem;font-weight:900;font-style:italic;letter-spacing:-.01em;text-transform:uppercase;margin-top:1px}
+.hr-right{display:flex;align-items:center;gap:8px}
+.roles{display:flex;background:var(--surf2);border:1px solid var(--bd);border-radius:var(--r-full);padding:2px}
+.roles span{font-size:.6rem;font-weight:800;color:var(--mut);padding:4px 8px;border-radius:var(--r-full)}
+.roles span.on{background:var(--lime);color:#000}
+.iconbtn{width:30px;height:30px;border-radius:8px;background:var(--surf2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:.85rem;color:var(--mut)}
+.av{width:30px;height:30px;border-radius:50%;background:var(--surf3);border:1.5px solid var(--lime);display:flex;align-items:center;justify-content:center;font-size:.66rem;font-weight:800}
+
+/* lane toggle (the key element — on every page) */
+.lanetog{display:flex;gap:6px;padding:10px 14px 4px;flex-shrink:0}
+.lanetog button{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;padding:11px;border-radius:var(--r-full);font-size:.82rem;font-weight:800;color:var(--mut);background:var(--surf2);border:1px solid var(--bd)}
+.lanetog button.on[data-lane="league"]{background:var(--teal);color:#000;border-color:var(--teal)}
+.lanetog button.on[data-lane="ladder"]{background:var(--lime);color:#000;border-color:var(--lime)}
+
+/* content */
+.content{flex:1;overflow-y:auto;padding:8px 14px 16px}
+.page{display:none}.page.on{display:block}
+.lc{display:none}
+.sec{font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:16px 3px 8px}
+.h1{font-size:1.35rem;font-weight:900;letter-spacing:-.01em;margin:4px 0 2px}
+
+/* hero */
+.hero{border-radius:var(--r-lg);padding:15px;margin-bottom:11px;display:flex;align-items:center;gap:13px;border:1px solid transparent}
+.hero.league{background:linear-gradient(135deg,var(--teal-d),transparent);border-color:rgba(23,215,176,.3)}
+.hero.ladder{background:linear-gradient(135deg,var(--lime-d),transparent);border-color:rgba(184,255,44,.3)}
+.hero-av{width:52px;height:52px;border-radius:50%;background:var(--surf3);border:2px solid var(--lime);display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0}
+.hero.league .hero-av{border-color:var(--teal)}
+.hero-greet{font-size:.6rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+.hero-nm{font-size:1.25rem;font-weight:900;line-height:1.1}
+.hero-pill{display:inline-block;font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;padding:2px 8px;border-radius:var(--r-full);margin-top:4px}
+.hero-pill.league{background:var(--teal-d);color:var(--teal)}.hero-pill.ladder{background:var(--lime-d);color:var(--lime)}
+.hero-rt{margin-left:auto;text-align:right}
+.hero-rt .n{font-size:1.7rem;font-weight:900}
+.hero.league .hero-rt .n{color:var(--teal)}.hero.ladder .hero-rt .n{color:var(--lime)}
+.hero-rt .l{font-size:.56rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-top:1px}
+
+/* announcement */
+.ann{display:flex;align-items:center;gap:10px;background:var(--gold-d);border:1px solid rgba(240,192,64,.25);border-radius:var(--r-md);padding:11px 13px;margin-bottom:11px}
+.ann .ic{font-size:1rem}
+.ann small{font-size:.58rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--gold)}
+.ann b{font-size:.82rem;font-weight:800}
+
+/* match / event card */
+.mc{border:1px solid rgba(184,255,44,.25);border-radius:var(--r-lg);background:linear-gradient(160deg,var(--lime-g),transparent);padding:14px;margin-bottom:11px}
+.mc.tealc{border-color:rgba(23,215,176,.25);background:linear-gradient(160deg,var(--teal-g),transparent)}
+.mc-top{font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.mc.tealc .mc-top{color:var(--teal)}
+.dotlive{width:7px;height:7px;border-radius:50%;background:currentColor}
+.vs{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:6px;text-align:center}
+.vs .em{font-size:1.7rem}
+.vs .tn{font-size:.82rem;font-weight:800;margin-top:4px}
+.vs .rec{font-size:.62rem;color:var(--mut)}
+.vs .mid{font-size:.7rem;color:var(--fnt);font-weight:700}
+.vtag{font-size:.55rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:var(--r-full);background:var(--surf3);color:var(--mut);margin-top:6px;display:inline-block}
+.vtag.home{background:var(--lime-d);color:var(--lime)}
+.mc-meta{text-align:center;font-size:.72rem;color:var(--mut);margin:12px 0}
+.mc-info{display:flex;gap:8px;align-items:center;background:var(--surf2);border:1px solid var(--bd);border-radius:var(--r-sm);padding:9px 11px;font-size:.74rem}
+.mc-info b{color:var(--lime)}
+.mc-div{border:none;border-top:1px solid var(--dv);margin:12px 0}
+.avail{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.avail-q{font-size:.8rem;font-weight:700}
+.avail-b{display:flex;gap:7px}
+.bpill{padding:8px 14px;border-radius:var(--r-full);font-size:.74rem;font-weight:800;border:1px solid var(--bds);color:var(--tx);background:transparent}
+.bpill.yes{border-color:var(--lime);color:var(--lime);background:var(--lime-g)}
+
+/* generic cards/rows */
+.card{background:var(--surf2);border:1px solid var(--bd);border-radius:var(--r-md);padding:13px}
+.evc{border:1px solid var(--bd);border-radius:var(--r-md);padding:12px 13px;margin-bottom:9px;border-left:3px solid var(--lime);background:var(--surf2)}
+.evc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.evc-nm{font-size:.9rem;font-weight:800}.evc-meta{font-size:.68rem;color:var(--mut);margin-top:2px}
+.chip{display:inline-flex;align-items:center;height:21px;padding:0 9px;border-radius:var(--r-full);font-size:.58rem;font-weight:800;text-transform:uppercase}
+.chip-lime{background:var(--lime-d);color:var(--lime)}.chip-red{background:var(--red-d);color:var(--red)}.chip-teal{background:var(--teal-d);color:var(--teal)}
+.bar{height:6px;border-radius:var(--r-full);background:var(--surf3);overflow:hidden;margin:10px 0 6px}
+.bar i{display:block;height:100%;border-radius:var(--r-full)}
+.spot{display:flex;justify-content:space-between;font-size:.68rem;font-weight:700}
+.btn{display:flex;align-items:center;justify-content:center;min-height:40px;border-radius:var(--r-full);font-size:.78rem;font-weight:800;width:100%;margin-top:9px}
+.btn-lime{background:var(--lime);color:#000}.btn-teal{background:var(--teal);color:#000}
+.row{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--dv);font-size:.82rem}
+.row:last-child{border-bottom:none}
+.rk{width:18px;font-weight:800}.rk.t{color:var(--teal)}.rk.l{color:var(--lime)}
+.rnm{flex:1;font-weight:600}.rrec{color:var(--mut);font-size:.72rem}
+.wk{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid var(--dv)}
+.wk:last-child{border-bottom:none}
+.wk-d{font-size:.7rem;font-weight:800;color:var(--mut);width:54px}
+.wk-m{flex:1;font-size:.8rem;font-weight:700}
+.note-s{font-size:.72rem;color:var(--mut);line-height:1.55;text-align:center;padding:14px;background:var(--surf2);border:1px dashed var(--bd);border-radius:var(--r-md)}
+.credit{display:flex;align-items:center;justify-content:space-between;background:var(--lime-g);border:1px solid var(--lime-d);border-radius:var(--r-md);padding:11px 13px;margin-bottom:10px}
+.credit .b{font-size:1.15rem;font-weight:900;color:var(--lime)}
+
+/* bottom nav (their real 5 tabs) */
+.tabbar{display:flex;border-top:1px solid var(--bd);background:rgba(11,13,10,.97);flex-shrink:0;padding:7px 2px 9px}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;background:none;color:var(--fnt)}
+.tab .ic{font-size:1.15rem;filter:grayscale(1) opacity(.55)}
+.tab .lb{font-size:.58rem;font-weight:700}
+.tab.on{color:var(--lime)}.tab.on .ic{filter:none}.tab.on .lb{font-weight:800}
+
+.note{max-width:400px;margin:15px auto 0;background:var(--surf2);border:1px solid var(--bd);border-radius:var(--r-md);padding:14px 16px;font-size:.79rem;color:var(--mut);line-height:1.6}
+.note b{color:var(--tx)}
+.kt{color:var(--teal);font-weight:700}.kl{color:var(--lime);font-weight:700}
+</style>
+</head>
+<body>
+
+<div class="intro">Your real 5-tab nav, unchanged. New: a <b class="kt">League</b> / <b class="kl">Ladder</b> toggle at the top of every page. Tap the bottom tabs <i>and</i> the toggle.</div>
+
+<div class="phone">
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-row">
+      <div class="hbrand"><small>The Dink Society</small><b>Big Dink Energy</b></div>
+      <div class="hr-right">
+        <div class="roles"><span>Admin</span><span>Capt</span><span class="on">Player</span></div>
+        <div class="iconbtn">💬</div>
+        <div class="av">RH</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LANE TOGGLE (on every page) -->
+  <div class="lanetog">
+    <button class="on" data-lane="league" onclick="setLane('league')">🏆 League</button>
+    <button data-lane="ladder" onclick="setLane('ladder')">🪜 Ladder</button>
+  </div>
+
+  <div class="content" id="content">
+
+    <!-- ───────── HOME ───────── -->
+    <div class="page on" id="pg-home">
+      <!-- league -->
+      <div class="lc" data-lane="league">
+        <div class="hero league"><div class="hero-av">RH</div>
+          <div><div class="hero-greet">Good evening</div><div class="hero-nm">Richard</div><span class="hero-pill league">Captain</span></div>
+          <div class="hero-rt"><div class="n">26.7</div><div class="l">Your DSR</div></div>
+        </div>
+        <div class="ann"><span class="ic">📣</span><div><small>League announcement</small><br><b>The Drop · Week 1</b></div></div>
+        <div class="mc tealc">
+          <div class="mc-top"><span class="dotlive"></span>Next match · Week 2</div>
+          <div class="vs">
+            <div><div class="em">🥵</div><div class="tn">Big Dink Energy</div><div class="rec">0–1–1</div><span class="vtag home">Home</span></div>
+            <div class="mid">VS</div>
+            <div><div class="em">😡</div><div class="tn">What the Dink?!</div><div class="rec">0–0–2</div><span class="vtag">Away</span></div>
+          </div>
+          <div class="mc-meta">Courts 5 & 7 · Mon, Jun 22 · 7:00 PM</div>
+          <div class="mc-info">🏠 <span><b>You enter the scores.</b> Opponent verifies each game.</span></div>
+          <hr class="mc-div">
+          <div class="avail"><span class="avail-q">Can you make it?</span><div class="avail-b"><span class="bpill yes">I'm in</span><span class="bpill">Can't</span></div></div>
+        </div>
+      </div>
+      <!-- ladder -->
+      <div class="lc" data-lane="ladder">
+        <div class="hero ladder"><div class="hero-av">RH</div>
+          <div><div class="hero-greet">Good evening</div><div class="hero-nm">Richard</div><span class="hero-pill ladder">🎟️ $7 credit</span></div>
+          <div class="hero-rt"><div class="n">22.4</div><div class="l">Your DR</div></div>
+        </div>
+        <div class="sec">Open to you this week</div>
+        <div class="evc">
+          <div class="evc-top"><div><div class="evc-nm">Saturday Morning Ladder</div><div class="evc-meta">Sat Jun 20 · 8:30 AM · $7</div></div><span class="chip chip-lime">Open</span></div>
+          <div class="bar"><i style="width:75%;background:var(--gold)"></i></div>
+          <div class="spot"><span class="mute">9 / 12</span><span style="color:var(--lime)">3 spots left</span></div>
+          <button class="btn btn-lime">Sign up · $7</button>
+        </div>
+        <div class="evc">
+          <div class="evc-top"><div><div class="evc-nm">Thursday Night Ladder</div><div class="evc-meta">Thu Jun 25 · 6:30 PM · $10</div></div><span class="chip chip-red">Full</span></div>
+          <div class="bar"><i style="width:100%;background:var(--red)"></i></div>
+          <div class="spot"><span class="mute">12 / 12</span><span style="color:var(--red)">Join waitlist</span></div>
+        </div>
+        <div class="fnt" style="font-size:.66rem;text-align:center;margin-top:6px">In a league but new to ladders? This is where you discover them.</div>
+      </div>
+    </div>
+
+    <!-- ───────── GAMES ───────── -->
+    <div class="page" id="pg-games">
+      <div class="lc" data-lane="league">
+        <div class="h1">Matches</div>
+        <div class="sec">Circuit I · Big Dink Energy</div>
+        <div class="card">
+          <div class="wk"><span class="wk-d">Wk 1</span><span class="wk-m">vs Net Gains</span><span class="chip chip-lime">W 3–1</span></div>
+          <div class="wk"><span class="wk-d">Wk 2</span><span class="wk-m">vs What the Dink?!</span><span class="chip chip-teal">Mon</span></div>
+          <div class="wk"><span class="wk-d">Wk 3</span><span class="wk-m">@ Smash Bros</span><span class="chip">Upcoming</span></div>
+        </div>
+      </div>
+      <div class="lc" data-lane="ladder">
+        <div class="h1">Ladder nights</div>
+        <div class="sec">Sign up</div>
+        <div class="evc">
+          <div class="evc-top"><div><div class="evc-nm">Saturday Morning Ladder</div><div class="evc-meta">Sat Jun 20 · 8:30 AM · $7</div></div><span class="chip chip-lime">Open</span></div>
+          <div class="bar"><i style="width:75%;background:var(--gold)"></i></div>
+          <div class="spot"><span class="mute">9 / 12</span><span style="color:var(--lime)">3 spots left</span></div>
+          <button class="btn btn-lime">Sign up · $7</button>
+        </div>
+        <div class="sec">You're signed up for</div>
+        <div class="evc"><div class="evc-top"><div><div class="evc-nm">Sunday Dinks & Drinks</div><div class="evc-meta">Sun Jun 28 · 4:00 PM · paid ✓</div></div><span class="chip chip-lime">In</span></div></div>
+      </div>
+    </div>
+
+    <!-- ───────── STANDINGS ───────── -->
+    <div class="page" id="pg-stand">
+      <div class="lc" data-lane="league">
+        <div class="h1">Standings</div>
+        <div class="sec">3.5 Mixed · by team (DSR)</div>
+        <div class="card">
+          <div class="row"><span class="rk t">1</span><span class="rnm">Big Dink Energy</span><span class="rrec">6–1</span></div>
+          <div class="row"><span class="rk t">2</span><span class="rnm">Net Gains</span><span class="rrec">5–2</span></div>
+          <div class="row"><span class="rk t">3</span><span class="rnm">Smash Bros</span><span class="rrec">4–3</span></div>
+        </div>
+      </div>
+      <div class="lc" data-lane="ladder">
+        <div class="h1">Leaderboard</div>
+        <div class="sec">Ladder · by player (DR)</div>
+        <div class="card">
+          <div class="row"><span class="rk l">1</span><span class="rnm">Marcus Tran</span><span class="rrec">DR 24.1</span></div>
+          <div class="row"><span class="rk l">2</span><span class="rnm">Dana Ruiz</span><span class="rrec">DR 23.6</span></div>
+          <div class="row"><span class="rk l">7</span><span class="rnm">Richard H.</span><span class="rrec">DR 22.4</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ───────── TEAM ───────── -->
+    <div class="page" id="pg-team">
+      <div class="lc" data-lane="league">
+        <div class="h1">Big Dink Energy</div>
+        <div class="sec">Roster · 3.5 Mixed</div>
+        <div class="card">
+          <div class="row"><span class="rnm">Richard H. <span class="chip chip-lime" style="margin-left:4px">Capt</span></span><span class="rrec">DSR 26.7</span></div>
+          <div class="row"><span class="rnm">Marcus Tran</span><span class="rrec">DSR 31.2</span></div>
+          <div class="row"><span class="rnm">Dana Ruiz</span><span class="rrec">DSR 28.9</span></div>
+        </div>
+        <button class="btn btn-teal">Set lineup · Week 2</button>
+      </div>
+      <div class="lc" data-lane="ladder">
+        <div class="note-s">🪜 <b style="color:var(--tx)">Ladders are individual</b> — there's no team here.<br>Your ladder play lives under <b style="color:var(--lime)">Games</b> &amp; <b style="color:var(--lime)">Me</b>.</div>
+      </div>
+    </div>
+
+    <!-- ───────── ME ───────── -->
+    <div class="page" id="pg-me">
+      <div class="hero" style="background:var(--surf2);border-color:var(--bd);margin-top:6px">
+        <div class="hero-av" style="border-color:var(--bds)">RH</div>
+        <div><div class="hero-nm">Richard H.</div><div class="fnt" style="font-size:.68rem">One profile · plays both lanes</div></div>
+      </div>
+      <div class="lc" data-lane="league">
+        <div class="sec">League · DSR 26.7</div>
+        <div class="card">
+          <div class="row"><span class="rnm">Wk 1 · vs Net Gains</span><span class="rrec" style="color:var(--teal)">W</span></div>
+          <div class="row"><span class="rnm">Preseason · vs Smash Bros</span><span class="rrec">L</span></div>
+        </div>
+      </div>
+      <div class="lc" data-lane="ladder">
+        <div class="credit"><div><div class="fnt" style="font-size:.56rem;text-transform:uppercase;letter-spacing:.08em;font-weight:800">Ladder credit</div><div class="b">$7.00</div></div><span class="chip chip-lime">DR 22.4</span></div>
+        <div class="sec">Ladder · recent</div>
+        <div class="card">
+          <div class="row"><span class="rnm">Thu Jun 18 · Thursday Night</span><span class="rrec" style="color:var(--lime)">🥇 1st</span></div>
+          <div class="row"><span class="rnm">Sat Jun 13 · Saturday Morning</span><span class="rrec">4th</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- BOTTOM NAV (unchanged: 5 tabs) -->
+  <div class="tabbar">
+    <button class="tab on" data-pane="home" data-sub="Home" onclick="nav(this)"><span class="ic">🏠</span><span class="lb">Home</span></button>
+    <button class="tab" data-pane="games" data-sub="Games" onclick="nav(this)"><span class="ic">📅</span><span class="lb">Games</span></button>
+    <button class="tab" data-pane="stand" data-sub="Standings" onclick="nav(this)"><span class="ic">🏆</span><span class="lb">Standings</span></button>
+    <button class="tab" data-pane="team" data-sub="Team" onclick="nav(this)"><span class="ic">👥</span><span class="lb">Team</span></button>
+    <button class="tab" data-pane="me" data-sub="Me" onclick="nav(this)"><span class="ic">👤</span><span class="lb">Me</span></button>
+  </div>
+</div>
+
+<div class="note">
+  <b>How it reads</b><br>
+  The bottom bar stays exactly as it is today. The <b class="kt">League</b> / <b class="kl">Ladder</b> toggle sits on top of <i>every</i> page and sets your lane — League turns teal, Ladder turns lime, and the whole page (including your rating: <b class="kt">DSR</b> vs <b class="kl">DR</b>) follows. A league-only player flips to <b class="kl">🪜 Ladder</b> and instantly sees what's open to sign up for — that's your discovery path.<br><br>
+  <b>Edge cases handled:</b> <b>Team</b> is league-only, so its Ladder side just points you onward (ladders are individual). <b>Me</b> keeps one shared identity on top, then shows that lane's rating + results below.<br><br>
+  <b>One choice for you:</b> the lane is <b>global</b> here (pick once, every tab remembers). The alternative is per-tab memory (Games on Ladder while Standings stays League). Global is simpler; say the word if you'd rather it be per-tab.
+</div>
+
+<script>
+var page='home', lane='league';
+var subs={home:'Home',games:'Games',stand:'Standings',team:'Team',me:'Me'};
+function apply(){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.pane===page));
+  document.querySelectorAll('.page').forEach(p=>p.classList.toggle('on',p.id==='pg-'+page));
+  document.querySelectorAll('.lanetog button').forEach(b=>b.classList.toggle('on',b.dataset.lane===lane));
+  document.querySelectorAll('.lc').forEach(el=>{el.style.display=(el.dataset.lane===lane)?'':'none';});
+  document.getElementById('content').scrollTo({top:0,behavior:'smooth'});
+}
+function nav(btn){page=btn.dataset.pane;apply();}
+function setLane(l){lane=l;apply();}
+apply();
+</script>
+</body>
+</html>

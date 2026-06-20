@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ladders · The Dink Society</title>
+<meta name="theme-color" content="#0b0d0a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/shared.css">
+<style>
+  /* Ladders page — lime lane. Uses shared.css tokens where present, with fallbacks. */
+  :root{ --lime:#b8ff2c; --teal:#17d7b0; --gold:#f0c040; --red:#ff5c47; }
+  body{ background:#0b0d0a; color:#f0f2ec; font-family:'Inter',system-ui,sans-serif; margin:0; }
+  .wrap{ max-width:760px; margin:0 auto; padding:0 16px 60px; }
+  .topbar{ display:flex; align-items:center; justify-content:space-between; padding:16px 0 12px; }
+  .brand{ display:flex; align-items:center; gap:10px; }
+  .brand .mk{ width:32px;height:32px;border-radius:9px;background:var(--lime);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px; }
+  .brand small{ display:block;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:#17d7b0;font-weight:800; }
+  .brand b{ font-size:.92rem;font-weight:900;font-style:italic;text-transform:uppercase; }
+  .backlink{ font-size:.78rem;color:#9aa094;text-decoration:none;font-weight:600; }
+  .title{ display:flex;align-items:center;gap:10px;margin:8px 0 4px; }
+  .title .ic{ width:36px;height:36px;border-radius:10px;background:rgba(184,255,44,.12);display:flex;align-items:center;justify-content:center;font-size:1.2rem; }
+  .title h1{ font-size:1.6rem;font-weight:900;letter-spacing:-.01em;margin:0; }
+  .title .dr{ margin-left:auto;text-align:right; }
+  .title .dr .n{ font-size:1.15rem;font-weight:900;color:var(--lime);line-height:1; }
+  .title .dr .l{ font-size:.52rem;font-weight:800;text-transform:uppercase;color:#9aa094; }
+  .tabs{ display:flex;gap:4px;border-bottom:1px solid rgba(255,255,255,.08);margin:14px 0 18px; }
+  .tabs button{ flex:1;max-width:160px;padding:11px 0;background:none;border:0;border-bottom:2px solid transparent;color:#9aa094;font:inherit;font-size:.86rem;font-weight:800;cursor:pointer;margin-bottom:-1px; }
+  .tabs button.on{ color:var(--lime);border-bottom-color:var(--lime); }
+  .pane{ display:none; } .pane.on{ display:block; }
+  .grid{ display:grid;grid-template-columns:1fr;gap:12px; }
+  @media(min-width:620px){ .grid{ grid-template-columns:1fr 1fr; } }
+  .evc{ background:#161914;border:1px solid rgba(255,255,255,.08);border-left:3px solid var(--lime);border-radius:14px;padding:16px; }
+  .evc-top{ display:flex;justify-content:space-between;align-items:flex-start;gap:8px; }
+  .evc-nm{ font-size:1rem;font-weight:800; }
+  .evc-meta{ font-size:.72rem;color:#9aa094;margin-top:3px; }
+  .chip{ display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:9999px;font-size:.58rem;font-weight:800;text-transform:uppercase; }
+  .chip-lime{ background:rgba(184,255,44,.14);color:var(--lime); } .chip-red{ background:rgba(255,92,71,.14);color:var(--red); } .chip-teal{ background:rgba(23,215,176,.16);color:var(--teal); }
+  .bar{ height:7px;border-radius:9999px;background:#262a20;overflow:hidden;margin:13px 0 7px; }
+  .bar i{ display:block;height:100%;border-radius:9999px;background:var(--lime); }
+  .bar.warn i{ background:var(--gold); } .bar.full i{ background:var(--red); }
+  .spot{ display:flex;justify-content:space-between;font-size:.7rem;font-weight:700; }
+  .left{ color:var(--lime); } .left.f{ color:var(--red); }
+  .btnrow{ display:flex;gap:8px;margin-top:13px; }
+  .btn{ display:flex;align-items:center;justify-content:center;gap:6px;min-height:42px;border-radius:9999px;border:1px solid transparent;font:inherit;font-size:.8rem;font-weight:800;cursor:pointer;flex:1;text-decoration:none; }
+  .btn-lime{ background:var(--lime);color:#000; } .btn-out{ border-color:rgba(255,255,255,.18);color:#f0f2ec;background:transparent; } .btn-ghost{ background:#1c1f18;color:#9aa094; }
+  .empty{ text-align:center;color:#5e655a;padding:48px 16px;font-size:.9rem; }
+  .note{ background:#161914;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:18px;color:#9aa094;font-size:.85rem;line-height:1.6; }
+  .kpis{ display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px; }
+  .kpi{ background:#161914;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:14px 6px;text-align:center; }
+  .kpi .n{ font-size:1.3rem;font-weight:900;color:var(--lime); } .kpi .l{ font-size:.54rem;text-transform:uppercase;letter-spacing:.06em;color:#5e655a;margin-top:2px; }
+  /* modal */
+  .ov{ position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:flex-end;justify-content:center;z-index:50; }
+  .ov.on{ display:flex; }
+  .sheet{ background:#161914;border:1px solid rgba(255,255,255,.14);border-radius:18px 18px 0 0;width:100%;max-width:520px;padding:18px 18px 26px; }
+  @media(min-width:560px){ .ov{ align-items:center; } .sheet{ border-radius:18px; } }
+  .sheet h3{ margin:0 0 3px;font-size:1.05rem;font-weight:800; } .sheet .sub{ font-size:.76rem;color:#9aa094;margin-bottom:14px; }
+  .payopt{ display:flex;align-items:center;gap:11px;padding:13px;border:1px solid rgba(255,255,255,.14);border-radius:12px;margin-bottom:9px;cursor:pointer;background:none;width:100%;text-align:left;color:inherit;font:inherit; }
+  .payopt:hover{ border-color:var(--lime); }
+  .payic{ width:38px;height:38px;border-radius:10px;background:#262a20;display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:900;flex-shrink:0; }
+  .payt{ font-size:.86rem;font-weight:800; } .pays{ font-size:.66rem;color:#5e655a;margin-top:1px; } .payamt{ margin-left:auto;font-size:.95rem;font-weight:900; }
+  .msg{ padding:11px 14px;border-radius:10px;font-size:.8rem;font-weight:600;margin-top:10px; }
+  .msg.info{ background:rgba(23,215,176,.14);color:var(--teal); } .msg.ok{ background:rgba(184,255,44,.14);color:var(--lime); } .msg.warn{ background:rgba(240,192,64,.14);color:var(--gold); } .msg.err{ background:rgba(255,92,71,.14);color:var(--red); }
+  .x{ position:absolute;top:14px;right:16px;color:#9aa094;background:none;border:0;font-size:1.4rem;cursor:pointer; }
+  .demoflag{ font-size:.6rem;color:#5e655a;text-align:center;margin-top:10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand"><div class="mk">DS</div><div><small>The Dink Society</small><b>Ladders</b></div></div>
+    <a class="backlink" href="/">← Dink Society</a>
+  </div>
+
+  <div class="title">
+    <div class="ic">🪜</div><h1>Ladders</h1>
+    <div class="dr" id="drBox" style="display:none"><div class="n" id="drVal">—</div><div class="l">Your DR</div></div>
+  </div>
+
+  <div class="tabs">
+    <button class="on" data-t="avail" onclick="tab(this)">Available</button>
+    <button data-t="stats" onclick="tab(this)">Stats</button>
+  </div>
+
+  <div class="pane on" id="p-avail">
+    <div id="list" class="grid"><div class="empty">Loading ladders…</div></div>
+    <div class="demoflag" id="demoFlag"></div>
+  </div>
+
+  <div class="pane" id="p-stats">
+    <div class="kpis">
+      <div class="kpi"><div class="n" id="sDr">—</div><div class="l">DR</div></div>
+      <div class="kpi"><div class="n" id="sNights">—</div><div class="l">Nights</div></div>
+      <div class="kpi"><div class="n" id="sPod">—</div><div class="l">Podiums</div></div>
+    </div>
+    <div class="note">Your ladder stats, the DR leaderboard, and recent results will appear here once you've played a night. (Scoring &amp; DR engine wiring is the next build step.)</div>
+  </div>
+</div>
+
+<!-- signup sheet -->
+<div class="ov" id="ov">
+  <div class="sheet" style="position:relative">
+    <button class="x" onclick="closeSheet()">×</button>
+    <h3 id="shTitle">Sign up</h3>
+    <div class="sub" id="shSub"></div>
+    <div id="shBody"></div>
+    <div id="shMsg"></div>
+  </div>
+</div>
+
+<script>
+const API = '/.netlify/functions';
+const fmt = c => '$' + ((Number(c)||0)/100 % 1 === 0 ? (Number(c)||0)/100 : ((Number(c)||0)/100).toFixed(2));
+const cardTotal = c => (Number(c)||0) + Math.round((Number(c)||0)*0.10);
+const isDemo = new URLSearchParams(location.search).get('demo') === '1';
+let LADDERS = [];
+
+const DEMO = [
+  { id:'demo-sat', name:'Saturday Morning Ladder', date:'2026-06-20', startTime:'8:30 AM', place:'SBTC', feeCents:700, capacity:12, rosterCount:9, waitlistCount:0, spotsLeft:3, status:'open', paymentMethods:['card','venmo'], venmoHandle:'@DinkSociety' },
+  { id:'demo-sun', name:'Sunday Dinks & Drinks', date:'2026-06-28', startTime:'4:00 PM', place:'The D(r)ink', feeCents:700, capacity:8, rosterCount:2, waitlistCount:0, spotsLeft:6, status:'open', paymentMethods:['card','venmo'], venmoHandle:'@DinkSociety' },
+  { id:'demo-thu', name:'Thursday Night Ladder', date:'2026-06-25', startTime:'6:30 PM', place:'SBTC', feeCents:1000, capacity:12, rosterCount:12, waitlistCount:2, spotsLeft:0, status:'full', paymentMethods:['card','venmo'], venmoHandle:'@DinkSociety' },
+];
+
+function tab(btn){
+  document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b===btn));
+  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on', p.id==='p-'+btn.dataset.t));
+}
+
+function dateLine(l){
+  let d='';
+  if(l.date){ const dt=new Date(l.date+'T12:00:00'); if(!isNaN(dt)) d=dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
+  return [d, l.startTime, l.place, fmt(l.feeCents)].filter(Boolean).join(' · ');
+}
+
+function card(l){
+  const cap=l.capacity||0, filled=cap - l.spotsLeft;
+  const pct = cap? Math.round(filled/cap*100):0;
+  const full = l.spotsLeft<=0;
+  const barCls = full?'full':(pct>=66?'warn':'');
+  const statusChip = full? '<span class="chip chip-red">Full</span>' : '<span class="chip chip-lime">Open</span>';
+  const leftTxt = full? (l.waitlistCount? l.waitlistCount+' on waitlist':'Waitlist open') : l.spotsLeft+' spots left';
+  const action = full
+    ? `<button class="btn btn-out" onclick="joinWaitlist('${l.id}')">Join waitlist</button>`
+    : `<button class="btn btn-lime" onclick="openSignup('${l.id}')">Sign up · ${fmt(l.feeCents)}</button>`;
+  return `<div class="evc">
+    <div class="evc-top"><div><div class="evc-nm">${esc(l.name)}</div><div class="evc-meta">${dateLine(l)}</div></div>${statusChip}</div>
+    <div class="bar ${barCls}"><i style="width:${pct}%"></i></div>
+    <div class="spot"><span style="color:#9aa094">${filled} / ${cap}</span><span class="left ${full?'f':''}">${leftTxt}</span></div>
+    <div class="btnrow">${action}<button class="btn btn-ghost" onclick="invite('${l.id}')">＋ Invite</button></div>
+  </div>`;
+}
+
+function esc(s){ return String(s||'').replace(/[<>&]/g,m=>({ '<':'&lt;','>':'&gt;','&':'&amp;' }[m])); }
+
+async function load(){
+  const el=document.getElementById('list');
+  try{
+    const r = await fetch(`${API}/public-ladders`, { credentials:'include' });
+    const j = await r.json();
+    LADDERS = (j.ladders||[]);
+  }catch(e){ LADDERS=[]; }
+  if(!LADDERS.length && isDemo){ LADDERS = DEMO; document.getElementById('demoFlag').textContent='Showing sample data (?demo=1)'; }
+  if(!LADDERS.length){ el.innerHTML = '<div class="empty">No ladders open right now. Check back soon — or ask an organizer to post one.</div>'; return; }
+  el.innerHTML = LADDERS.map(card).join('');
+}
+
+const get = id => LADDERS.find(l=>l.id===id);
+
+function openSignup(id){
+  const l=get(id); if(!l) return;
+  document.getElementById('shTitle').textContent = 'Sign up · '+l.name;
+  document.getElementById('shSub').textContent = dateLine(l);
+  document.getElementById('shMsg').innerHTML='';
+  const methods = l.paymentMethods||['card','venmo'];
+  let html='';
+  html += `<button class="payopt" onclick="payCredit('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎟️</div><div><div class="payt">Use ladder credit</div><div class="pays">If you have a balance, it covers this</div></div><div class="payamt" style="color:var(--lime)">${fmt(l.feeCents)}</div></button>`;
+  if(methods.includes('card')) html += `<button class="payopt" onclick="payCard('${id}')"><div class="payic">💳</div><div><div class="payt">Card / Apple Pay</div><div class="pays">Instant — +10% service fee</div></div><div class="payamt">${fmt(cardTotal(l.feeCents))}</div></button>`;
+  if(methods.includes('venmo')) html += `<button class="payopt" onclick="payVenmo('${id}')"><div class="payic" style="background:rgba(61,149,206,.16);color:#4aa3e0">V</div><div><div class="payt">Venmo</div><div class="pays">No fee · confirmed by an organizer</div></div><div class="payamt">${fmt(l.feeCents)}</div></button>`;
+  document.getElementById('shBody').innerHTML = html;
+  document.getElementById('ov').classList.add('on');
+}
+function closeSheet(){ document.getElementById('ov').classList.remove('on'); }
+function shMsg(cls,txt){ document.getElementById('shMsg').innerHTML = `<div class="msg ${cls}">${txt}</div>`; }
+
+async function post(path, body){
+  const r = await fetch(`${API}${path}`, { method:'POST', credentials:'include', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body||{}) });
+  return { status:r.status, data: await r.json().catch(()=>({})) };
+}
+function needSignIn(){ shMsg('warn', `Please <a href="/me.html" style="color:var(--lime);font-weight:700">sign in</a> to grab your spot, then come back.`); }
+
+async function payCredit(id){
+  if(isDemo){ shMsg('ok',"Demo: covered by ladder credit — you're in!"); return; }
+  document.getElementById('shBody').style.opacity=.5;
+  const { status, data } = await post(`/ladder-signup?event=${id}`, { paymentMethod:'credit' });
+  document.getElementById('shBody').style.opacity=1;
+  if(status===401) return needSignIn();
+  if(status===402) return shMsg('err','Not enough ladder credit — pick card or Venmo.');
+  if(data.ok) return shMsg('ok',"You're in — covered by ladder credit. 🎾");
+  shMsg('err', data.error||'Something went wrong.');
+}
+async function payCard(id){
+  if(isDemo){ shMsg('info','Demo: this would redirect to Stripe Checkout.'); return; }
+  document.getElementById('shBody').style.opacity=.5;
+  const { status, data } = await post(`/ladder-checkout?event=${id}`, {});
+  document.getElementById('shBody').style.opacity=1;
+  if(status===401) return needSignIn();
+  if(status===409) return shMsg('err', data.error||'This ladder is full.');
+  if(data.checkoutUrl){ location.href = data.checkoutUrl; return; }
+  shMsg('err', data.error||'Could not start checkout.');
+}
+async function payVenmo(id){
+  const l=get(id);
+  if(isDemo){ shMsg('info', venmoCopy(l)); return; }
+  document.getElementById('shBody').style.opacity=.5;
+  const { status, data } = await post(`/ladder-signup?event=${id}`, { paymentMethod:'venmo' });
+  document.getElementById('shBody').style.opacity=1;
+  if(status===401) return needSignIn();
+  if(data.ok) return shMsg('ok', venmoCopy(l) + ' Your spot is held — an organizer confirms it and you\'ll get a "you\'re in" email.');
+  shMsg('err', data.error||'Something went wrong.');
+}
+function venmoCopy(l){
+  const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,'');
+  const amount=((l.feeCents||0)/100).toFixed(2);
+  const note=encodeURIComponent(l.name);
+  const link=`https://venmo.com/${handle}?txn=pay&amount=${amount}&note=${note}`;
+  return `Send <b>${fmt(l.feeCents)}</b> to <b>@${handle}</b> — <a href="${link}" target="_blank" style="color:var(--lime);font-weight:700">Open Venmo</a>.`;
+}
+
+async function joinWaitlist(id){
+  if(isDemo){ alert("Demo: you'd be added to the waitlist and emailed when a spot opens."); return; }
+  const { status, data } = await post(`/ladder-signup?event=${id}`, {});
+  if(status===401){ alert('Please sign in first (/me.html).'); location.href='/me.html'; return; }
+  if(data.status==='waitlist'){ alert("You're on the waitlist — we'll email you the moment a spot opens."); }
+  else { alert(data.message || 'Done.'); }
+  load();
+}
+
+function invite(id){
+  const l=get(id); if(!l) return;
+  const url = `${location.origin}/ladders?event=${encodeURIComponent(id)}`;
+  const text = `🎾 Come play ${l.name} — ${dateLine(l)}. ${l.spotsLeft>0? l.spotsLeft+' spots left.':''} Grab one:`;
+  if(navigator.share){ navigator.share({ title:l.name, text, url }).catch(()=>{}); }
+  else { navigator.clipboard?.writeText(`${text} ${url}`); alert('Invite link copied!'); }
+}
+
+load();
+</script>
+</body>
+</html>

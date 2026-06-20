@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin — create a ladder & manage signups (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d0a;--surf:#161914;--surf2:#1c1f18;--surf3:#262a20;
+  --bd:rgba(255,255,255,0.08);--bds:rgba(255,255,255,0.14);--dv:rgba(255,255,255,0.06);
+  --tx:#f0f2ec;--mut:#9aa094;--fnt:#5e655a;--inv:#0b0d0a;
+  --lime:#b8ff2c;--lime-d:rgba(184,255,44,0.12);--lime-g:rgba(184,255,44,0.06);
+  --teal:#17d7b0;--teal-d:rgba(23,215,176,0.14);--gold:#f0c040;--gold-d:rgba(240,192,64,0.14);--red:#ff5c47;--red-d:rgba(255,92,71,0.12);
+  --r-sm:10px;--r-md:14px;--r-lg:18px;--r-full:9999px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#070806;color:var(--tx);line-height:1.5;-webkit-font-smoothing:antialiased;padding:20px 16px 50px}
+.mute{color:var(--mut)}.fnt{color:var(--fnt)}
+.intro{max-width:980px;margin:0 auto 12px;color:var(--mut);font-size:.84rem}.intro b{color:var(--tx)}
+
+.app{max-width:980px;margin:0 auto;background:var(--bg);border:1px solid var(--bds);border-radius:16px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.55);position:relative}
+.top{display:flex;align-items:center;gap:16px;padding:14px 22px;border-bottom:1px solid var(--bd)}
+.brand small{font-size:.58rem;font-weight:800;letter-spacing:.18em;color:var(--teal);text-transform:uppercase}
+.brand b{display:block;font-size:.95rem;font-weight:900;font-style:italic;text-transform:uppercase;margin-top:1px}
+.adminbadge{font-size:.6rem;font-weight:800;padding:4px 10px;border-radius:var(--r-full);background:var(--red-d);color:var(--red);text-transform:uppercase;letter-spacing:.06em}
+.vswitch{display:flex;gap:5px;margin-left:auto;background:var(--surf2);border:1px solid var(--bd);border-radius:var(--r-full);padding:4px}
+.vswitch button{padding:8px 16px;border-radius:var(--r-full);font-size:.8rem;font-weight:800;color:var(--mut);background:transparent}
+.vswitch button.on{background:var(--lime);color:#000}
+
+.view{display:none;padding:22px}.view.on{display:block}
+.h1{font-size:1.4rem;font-weight:900;letter-spacing:-.01em;margin-bottom:2px}
+.sub{font-size:.82rem;color:var(--mut);margin-bottom:18px}
+.sec{font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:18px 2px 10px}
+
+/* form */
+.cols{display:grid;grid-template-columns:1.5fr 1fr;gap:20px}
+@media(max-width:760px){.cols{grid-template-columns:1fr}}
+.card{background:var(--surf);border:1px solid var(--bd);border-radius:var(--r-lg);padding:18px}
+.frow{margin-bottom:14px}
+.frow2{display:flex;gap:12px}.frow2>*{flex:1}
+.lbl{display:block;font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+.inp{width:100%;min-height:42px;padding:0 13px;border-radius:var(--r-sm);border:1px solid var(--bd);background:var(--surf2);color:var(--tx);font:inherit;font-size:.86rem}
+.inp:focus{outline:none;border-color:var(--lime)}
+.help{font-size:.66rem;color:var(--fnt);margin-top:5px}
+.seg{display:flex;gap:5px;background:var(--surf2);border:1px solid var(--bd);border-radius:var(--r-sm);padding:4px}
+.seg button{flex:1;padding:8px 6px;border-radius:7px;font-size:.72rem;font-weight:700;color:var(--mut);background:transparent}
+.seg button.on{background:var(--lime);color:#000}
+hr.dv{border:none;border-top:1px solid var(--dv);margin:16px 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:0 20px;border-radius:var(--r-full);font-size:.82rem;font-weight:800;border:1px solid transparent;cursor:pointer}
+.btn-lime{background:var(--lime);color:#000;width:100%}
+.btn-out{border-color:var(--bds);color:var(--tx);background:transparent}
+.btn-sm{min-height:34px;font-size:.72rem;padding:0 13px}
+.btn-danger{border:1px solid var(--red-d);color:var(--red);background:transparent;min-height:32px;font-size:.7rem;padding:0 12px;border-radius:var(--r-full)}
+
+/* preview card */
+.prev-wrap{position:sticky;top:14px}
+.prev-lbl{font-size:.6rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--fnt);margin-bottom:8px}
+.evc{border:1px solid var(--bd);border-radius:var(--r-md);padding:15px;border-left:3px solid var(--lime);background:var(--surf2)}
+.evc-nm{font-size:1rem;font-weight:800}.evc-meta{font-size:.72rem;color:var(--mut);margin-top:3px}
+.chip{display:inline-flex;align-items:center;height:22px;padding:0 10px;border-radius:var(--r-full);font-size:.58rem;font-weight:800;text-transform:uppercase}
+.chip-lime{background:var(--lime-d);color:var(--lime)}.chip-red{background:var(--red-d);color:var(--red)}.chip-teal{background:var(--teal-d);color:var(--teal)}.chip-gold{background:var(--gold-d);color:var(--gold)}.chip-gray{background:var(--surf3);color:var(--mut)}
+.bar{height:7px;border-radius:var(--r-full);background:var(--surf3);overflow:hidden;margin:13px 0 7px}
+.bar i{display:block;height:100%;border-radius:var(--r-full);background:var(--surf3)}
+.spot{display:flex;justify-content:space-between;font-size:.7rem;font-weight:700}
+.prev-set{margin-top:14px;font-size:.72rem;color:var(--mut);line-height:1.9}
+.prev-set b{color:var(--tx)}
+.prev-set .k{display:inline-block;width:15px}
+
+/* manage */
+.cap{display:flex;align-items:center;gap:14px;margin-bottom:6px}
+.cap .big{font-size:1.6rem;font-weight:900}
+.capbar{flex:1;height:9px;border-radius:var(--r-full);background:var(--surf3);overflow:hidden}
+.capbar i{display:block;height:100%;background:var(--gold);border-radius:var(--r-full)}
+.tbl{width:100%;border-collapse:collapse;font-size:.84rem}
+.tbl th{text-align:left;font-size:.58rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--fnt);padding:8px 10px;border-bottom:1px solid var(--bds)}
+.tbl td{padding:10px;border-bottom:1px solid var(--dv);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:none}
+.pnum{width:26px;height:26px;border-radius:7px;background:var(--surf3);display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800}
+.gt{font-size:.55rem;font-weight:800;padding:2px 6px;border-radius:5px}
+.gt.m{background:rgba(59,130,246,.16);color:#7db1ff}.gt.f{background:rgba(255,45,120,.14);color:#ff7bb0}
+.pend{display:flex;align-items:center;gap:12px;background:var(--gold-d);border:1px solid rgba(240,192,64,.3);border-radius:var(--r-md);padding:13px 15px;margin-bottom:14px}
+.pend .gist{flex:1;font-size:.82rem}.pend .gist b{font-weight:800}
+.note{background:var(--surf2);border:1px solid var(--bd);border-radius:var(--r-md);padding:12px 14px;font-size:.76rem;color:var(--mut);line-height:1.6;margin-top:14px}
+.note b{color:var(--tx)}
+.q{width:24px;height:24px;border-radius:50%;background:var(--surf3);display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:800;color:var(--mut)}
+.sel{min-height:40px;padding:0 13px;border-radius:var(--r-sm);border:1px solid var(--bds);background:var(--surf2);color:var(--tx);font:inherit;font-size:.84rem;font-weight:700}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%);background:var(--lime);color:#000;font-size:.8rem;font-weight:800;padding:11px 20px;border-radius:var(--r-full);opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="intro">Admin side. Two jobs: <b>Create a ladder</b> and <b>Manage signups</b>. Toggle top-right; in Manage, try Confirm / Remove / Promote.</div>
+
+<div class="app">
+  <div class="top">
+    <div class="brand"><small>The Dink Society</small><b>Ladders · Admin</b></div>
+    <span class="adminbadge">Admin</span>
+    <div class="vswitch">
+      <button class="on" data-v="create" onclick="view(this)">＋ Create ladder</button>
+      <button data-v="manage" onclick="view(this)">Manage signups</button>
+    </div>
+  </div>
+
+  <!-- ════ CREATE ════ -->
+  <div class="view on" id="v-create">
+    <div class="h1">New ladder</div>
+    <div class="sub">Set it up once — players self-serve sign up and pay.</div>
+    <div class="cols">
+      <!-- form -->
+      <div class="card">
+        <div class="frow"><label class="lbl">Ladder name</label><input class="inp" value="Saturday Morning Ladder"></div>
+        <div class="frow frow2">
+          <div><label class="lbl">Date</label><input class="inp" type="date" value="2026-06-20"></div>
+          <div><label class="lbl">Start time</label><input class="inp" value="8:30 AM"></div>
+        </div>
+        <div class="frow"><label class="lbl">Location</label><input class="inp" value="SBTC"></div>
+        <div class="frow frow2">
+          <div><label class="lbl">Courts</label><input class="inp" id="courts" value="3" oninput="recalc()"></div>
+          <div><label class="lbl">Capacity</label><input class="inp" id="cap" value="12" oninput="syncPrev()"></div>
+        </div>
+        <div class="help">Capacity auto-fills to courts × 4 — override for byes or a smaller night.</div>
+        <hr class="dv">
+        <div class="frow frow2">
+          <div><label class="lbl">Entry fee ($)</label><input class="inp" id="fee" value="7" oninput="syncPrev()"></div>
+          <div><label class="lbl">League Venmo</label><input class="inp" value="@DinkSociety"></div>
+        </div>
+        <div class="frow"><label class="lbl">Accepted payment</label>
+          <div class="seg"><button class="on">Card + Venmo</button><button>Card only</button><button>Venmo only</button></div>
+          <div class="help">Card adds a 10% service fee (covers Stripe). Venmo is fee-free, confirmed with one tap from an email.</div>
+        </div>
+        <hr class="dv">
+        <div class="frow"><label class="lbl">Waitlist when full</label><div class="seg"><button class="on">On</button><button>Off</button></div></div>
+        <div class="frow"><label class="lbl">When a spot opens</label><div class="seg"><button class="on">Hold &amp; confirm (30 min)</button><button>Auto-claim</button></div></div>
+        <div class="frow"><label class="lbl">When a player cancels</label>
+          <div class="seg"><button class="on">Auto credit</button><button>Credit if refilled</button><button>No credit</button></div>
+          <div class="help">Credit, not refunds — no money moves. Auto-issued to the player's account for a future ladder.</div>
+        </div>
+        <hr class="dv">
+        <button class="btn btn-lime">Create &amp; open signups</button>
+      </div>
+      <!-- preview -->
+      <div>
+        <div class="prev-wrap">
+          <div class="prev-lbl">Players will see</div>
+          <div class="evc">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px"><div><div class="evc-nm" id="pvNm">Saturday Morning Ladder</div><div class="evc-meta" id="pvMeta">Sat Jun 20 · 8:30 AM · SBTC · $7</div></div><span class="chip chip-lime">Open</span></div>
+            <div class="bar"><i style="width:0%"></i></div>
+            <div class="spot"><span class="mute" id="pvCnt">0 / 12</span><span style="color:var(--lime)" id="pvLeft">12 spots left</span></div>
+            <button class="btn btn-lime btn-sm" style="margin-top:11px">Sign up · $<span id="pvFee">7</span></button>
+          </div>
+          <div class="prev-set">
+            <div><span class="k">✓</span> Waitlist <b>on</b> when full</div>
+            <div><span class="k">✓</span> Spot opens → <b>hold &amp; confirm (30 min)</b></div>
+            <div><span class="k">✓</span> Cancel → <b>auto ladder credit</b></div>
+            <div><span class="k">✓</span> Pay by <b>card (+10%)</b> or <b>Venmo</b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════ MANAGE ════ -->
+  <div class="view" id="v-manage">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div><div class="h1" style="margin:0">Manage signups</div></div>
+      <select class="sel" style="margin-left:auto"><option>Saturday Morning Ladder · Jun 20</option><option>Thursday Night Ladder · Jun 25</option></select>
+    </div>
+    <div class="sub" style="margin-top:6px">Sat Jun 20 · 8:30 AM · SBTC · 3 courts · $7</div>
+
+    <div class="card" style="margin-bottom:16px">
+      <div class="cap"><div class="big"><span id="mFilled">10</span> <span class="mute" style="font-size:1rem">/ 12</span></div><div class="capbar"><i id="capFill" style="width:83%"></i></div><span class="chip chip-gold" id="capChip">2 spots left</span></div>
+    </div>
+
+    <!-- pending venmo -->
+    <div class="pend" id="pendCard">
+      <span style="font-size:1.3rem">⏳</span>
+      <div class="gist"><b>Chris Oduya</b> says they paid <b>$7 by Venmo</b> · note "Sat Ladder 6/20 — Chris O". Spot held 22 min.</div>
+      <button class="btn btn-out btn-sm" onclick="confirmVenmo()">✓ Confirm received</button>
+      <button class="btn btn-danger" onclick="declineVenmo()">Decline</button>
+    </div>
+    <div class="note" style="margin:-6px 0 16px;background:transparent;border:none;padding:0;font-size:.72rem">Same as the one-tap email — confirming here marks paid &amp; locks the spot; declining releases it to the waitlist.</div>
+
+    <div class="sec">Roster · <span id="rosterN">10</span></div>
+    <div class="card" style="padding:6px 10px">
+      <table class="tbl">
+        <thead><tr><th>#</th><th>Player</th><th>Signed up</th><th>Payment</th><th></th></tr></thead>
+        <tbody id="roster">
+          <tr><td><span class="pnum">1</span></td><td>Marcus Tran <span class="gt m">M</span></td><td class="mute">2d ago</td><td><span class="chip chip-lime">Paid · card</span></td><td><button class="btn btn-danger" onclick="removeRow(this)">Remove</button></td></tr>
+          <tr><td><span class="pnum">2</span></td><td>Dana Ruiz <span class="gt f">F</span></td><td class="mute">2d ago</td><td><span class="chip chip-teal">Paid · Venmo</span></td><td><button class="btn btn-danger" onclick="removeRow(this)">Remove</button></td></tr>
+          <tr><td><span class="pnum">3</span></td><td>Jon Lee <span class="gt m">M</span></td><td class="mute">1d ago</td><td><span class="chip chip-lime">Paid · card</span></td><td><button class="btn btn-danger" onclick="removeRow(this)">Remove</button></td></tr>
+          <tr><td><span class="pnum">4</span></td><td>Kim Walsh <span class="gt f">F</span></td><td class="mute">22h ago</td><td><span class="chip chip-lime">Paid · card</span></td><td><button class="btn btn-danger" onclick="removeRow(this)">Remove</button></td></tr>
+          <tr id="pendRow"><td><span class="pnum">10</span></td><td>Chris Oduya <span class="gt m">M</span></td><td class="mute">22 min ago</td><td><span class="chip chip-gold" id="chrisPay">⏳ Venmo pending</span></td><td><button class="btn btn-danger" onclick="removeRow(this)">Remove</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="sec">Waitlist · <span id="wlN">2</span> waiting</div>
+    <div class="card" style="padding:6px 10px">
+      <table class="tbl"><tbody id="waitlist">
+        <tr><td><span class="q">1</span></td><td>Sam Cole <span class="gt m">M</span></td><td class="mute">3h ago</td><td><button class="btn btn-out btn-sm" onclick="promote(this)">Promote</button></td></tr>
+        <tr><td><span class="q">2</span></td><td>Lena Diaz <span class="gt f">F</span></td><td class="mute">1h ago</td><td><button class="btn btn-out btn-sm" onclick="promote(this)">Promote</button></td></tr>
+      </tbody></table>
+    </div>
+
+    <div class="note"><b>What's automatic:</b> removing a player or a cancellation instantly promotes waitlist #1 and emails them the open spot; the canceller gets <b>ladder credit</b> (no refund to process). You only ever step in for a Venmo confirm or a manual fix.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+function view(btn){
+  document.querySelectorAll('.vswitch button').forEach(b=>b.classList.toggle('on',b===btn));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+btn.dataset.v));
+}
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000);}
+
+/* create preview */
+function recalc(){document.getElementById('cap').value=(parseInt(document.getElementById('courts').value)||0)*4;syncPrev();}
+function syncPrev(){
+  var cap=document.getElementById('cap').value||0, fee=document.getElementById('fee').value||0;
+  document.getElementById('pvCnt').textContent='0 / '+cap;
+  document.getElementById('pvLeft').textContent=cap+' spots left';
+  document.getElementById('pvFee').textContent=fee;
+  document.getElementById('pvMeta').textContent='Sat Jun 20 · 8:30 AM · SBTC · $'+fee;
+}
+
+/* manage */
+function setCap(n){
+  document.getElementById('mFilled').textContent=n;
+  document.getElementById('rosterN').textContent=n;
+  document.getElementById('capFill').style.width=Math.round(n/12*100)+'%';
+  var left=12-n;
+  document.getElementById('capChip').textContent=left<=0?'Full':left+' spots left';
+}
+function rosterCount(){return document.querySelectorAll('#roster tr').length;}
+function confirmVenmo(){
+  document.getElementById('chrisPay').outerHTML='<span class="chip chip-teal" id="chrisPay">Paid · Venmo</span>';
+  document.getElementById('pendCard').style.display='none';
+  toast('✓ Confirmed — Chris is in, emailed "you\'re in"');
+}
+function declineVenmo(){
+  document.getElementById('pendRow').remove();
+  document.getElementById('pendCard').style.display='none';
+  setCap(9);
+  toast('Declined — spot released to waitlist');
+}
+function removeRow(btn){
+  btn.closest('tr').remove();
+  setCap(rosterCount());
+  // auto-promote #1 if waitlist has people
+  var first=document.querySelector('#waitlist tr');
+  if(first){var nm=first.children[1].textContent.trim();first.remove();renumWait();
+    document.getElementById('wlN').textContent=document.querySelectorAll('#waitlist tr').length;
+    toast('Removed · '+nm.split(' ')[0]+' auto-promoted + emailed');
+  } else { toast('Player removed'); }
+}
+function promote(btn){
+  var row=btn.closest('tr');var nm=row.children[1].textContent.trim();row.remove();renumWait();
+  document.getElementById('wlN').textContent=document.querySelectorAll('#waitlist tr').length;
+  toast(nm.split(' ')[0]+' promoted + emailed the open spot');
+}
+function renumWait(){document.querySelectorAll('#waitlist tr .q').forEach((q,i)=>q.textContent=i+1);}
+</script>
+</body>
+</html>

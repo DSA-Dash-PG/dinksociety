@@ -379,3 +379,98 @@ export function renderWaiverCopy({ title, text, playerName, signedName, signedAt
     </div>
   `;
 }
+
+// ═══════════════════════════════════════════════════════════════
+// LADDER emails — spot opened, last-chance nudge, confirmed, Venmo claim
+// ═══════════════════════════════════════════════════════════════
+
+const _ladderShell = (inner) => `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
+      ${inner}
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        The Dink Society · You're getting this about a ladder you're on the waitlist for.
+      </div>
+    </div>`;
+
+const _ladderEventCard = (eventName, dateLine) => `
+      <div style="background: #161616; border-radius: 8px; padding: 14px 16px; margin: 0 0 18px;">
+        <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 5px;">🪜 Your spot</div>
+        <div style="font-size: 15px; font-weight: 800; color: #f5f5f5;">${escapeBody(eventName)}</div>
+        ${dateLine ? `<div style="font-size: 12px; color: #8a8a8a; margin-top: 9px; padding-top: 9px; border-top: 1px solid #2a2a2a;">${escapeBody(dateLine)}</div>` : ''}
+      </div>`;
+
+const _btn = (url, label, bg = '#b8ff2c') =>
+  `<a href="${url}" style="display:inline-block; width:100%; box-sizing:border-box; text-align:center; padding: 14px 28px; background: ${bg}; color: #0e0e0e; font-size: 14px; font-weight: 800; text-decoration: none; border-radius: 9999px;">${escapeBody(label)}</a>`;
+
+/** A spot opened — the next waitlister is up. 30-minute claim window. */
+export function renderLadderSpotOpened({ playerName, eventName, dateLine, minutesLeft = 30, claimUrl }) {
+  return _ladderShell(`
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">A spot just opened — you're up 🎉</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Hey ${escapeBody(playerName || 'there')}, a spot opened on <b style="color:#fff;">${escapeBody(eventName)}</b> and you're first on the waitlist. It's <b style="color:#fff;">held for you for ${escapeBody(String(minutesLeft))} minutes</b> — claim it to lock it in.</p>
+      ${_ladderEventCard(eventName, dateLine)}
+      ${_btn(claimUrl, 'Claim my spot →')}
+      <p style="font-size: 13px; color: #777; margin-top: 18px; line-height: 1.5;">If you don't claim within ${escapeBody(String(minutesLeft))} minutes, the spot rolls to the next person automatically.</p>
+  `);
+}
+
+/** Last-chance nudge — fires ~5 minutes before the claim expires. */
+export function renderLadderNudge({ playerName, eventName, minutesLeft = 5, claimUrl }) {
+  return _ladderShell(`
+      <h1 style="font-size: 22px; font-weight: 800; color: #f0c040; margin: 0 0 14px; line-height: 1.25;">⏳ Last chance — ${escapeBody(String(minutesLeft))} min left</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Your held spot on <b style="color:#fff;">${escapeBody(eventName)}</b> is about to roll to the next person. Claim it now to keep it.</p>
+      ${_btn(claimUrl, 'Claim it now →')}
+      <p style="font-size: 13px; color: #777; margin-top: 18px; line-height: 1.5;">No worries if you can't make it — doing nothing just passes the spot along.</p>
+  `);
+}
+
+/** Confirmation once a spot is claimed / paid. */
+export function renderLadderConfirmed({ playerName, eventName, dateLine }) {
+  return _ladderShell(`
+      <h1 style="font-size: 22px; font-weight: 800; color: #b8ff2c; margin: 0 0 14px; line-height: 1.25;">You're in! 🎾</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">See you at <b style="color:#fff;">${escapeBody(eventName)}</b>${playerName ? ', ' + escapeBody(playerName) : ''}.</p>
+      ${_ladderEventCard(eventName, dateLine)}
+      <p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">It's on your profile now. Need to cancel? Open the ladder and tap cancel — you'll get ladder credit for a future night.</p>
+  `);
+}
+
+/**
+ * To the ORGANIZER: a player claims they paid by Venmo. One tap confirms or
+ * declines — both are signed, single-use links (no login). Mirrors the
+ * captain availability-notify pattern.
+ */
+export function renderVenmoClaimToAdmin({ playerName, amountLabel, eventName, note, confirmUrl, declineUrl }) {
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">Confirm a Venmo payment</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;"><b style="color:#fff;">${escapeBody(playerName)}</b> says they paid for <b style="color:#fff;">${escapeBody(eventName)}</b>. Check Venmo, then tap below.</p>
+      <div style="background: #161616; border-radius: 8px; padding: 14px 16px; margin: 0 0 18px;">
+        <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 5px;">Look for this in Venmo</div>
+        <div style="font-size: 15px; font-weight: 800; color: #f5f5f5;">${escapeBody(amountLabel)} from ${escapeBody(playerName)}</div>
+        ${note ? `<div style="font-size: 12px; color: #8a8a8a; margin-top: 9px; padding-top: 9px; border-top: 1px solid #2a2a2a;">Note: ${escapeBody(note)}</div>` : ''}
+      </div>
+      ${_btn(confirmUrl, '✅ Payment received — confirm spot')}
+      <div style="height:10px"></div>
+      <a href="${declineUrl}" style="display:inline-block; width:100%; box-sizing:border-box; text-align:center; padding: 12px 28px; background: transparent; color: #ff5c47; font-size: 13px; font-weight: 700; text-decoration: none; border: 1px solid rgba(255,92,71,0.3); border-radius: 9999px;">Didn't receive it — decline</a>
+      <p style="font-size: 13px; color: #777; margin-top: 18px; line-height: 1.5;">These are signed, single-use links — same as your sign-in link. One tap does everything; there's nothing else to log into.</p>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        The Dink Society · You're an organizer for this ladder.
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Final-24h: a spot opened and it's first-come-first-serve (no priority hold).
+ * Blasted to the whole waitlist — first to grab it wins.
+ */
+export function renderLadderFcfsOpen({ eventName, dateLine, openUrl }) {
+  return _ladderShell(`
+      <h1 style="font-size: 22px; font-weight: 800; color: #b8ff2c; margin: 0 0 14px; line-height: 1.25;">A spot just opened — grab it 🏃</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">It's game day for <b style="color:#fff;">${escapeBody(eventName)}</b>, so this one's <b style="color:#fff;">first come, first served</b> — no holds. First person to claim and pay gets the spot.</p>
+      ${_ladderEventCard(eventName, dateLine)}
+      ${_btn(openUrl, 'Grab the spot →')}
+      <p style="font-size: 13px; color: #777; margin-top: 18px; line-height: 1.5;">You're getting this because you're on the waitlist. Be quick — it's open to everyone waiting.</p>
+  `);
+}
