@@ -37,6 +37,7 @@ export default async (req) => {
     name: String(b.name).slice(0, 120),
     date: b.date,
     startTime: b.startTime || existing?.startTime || '',
+    endTime: b.endTime || existing?.endTime || '',
     place: b.place || existing?.place || '',
     courts,
     capacity,

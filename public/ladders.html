@@ -150,8 +150,10 @@ async function loadStats(){
 function dateLine(l){
   let d='';
   if(l.date){ const dt=new Date(l.date+'T12:00:00'); if(!isNaN(dt)) d=dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); }
-  return [d, l.startTime, l.place, fmt(l.feeCents)].filter(Boolean).join(' · ');
+  const t = l.startTime ? (l.endTime ? `${l.startTime}–${l.endTime}` : l.startTime) : '';
+  return [d, t, l.place].filter(Boolean).join(' · ');
 }
+function toggleRoster(id){ const el=document.getElementById('ros-'+id); if(el) el.style.display = el.style.display==='none'?'block':'none'; }
 
 function card(l){
   const cap=l.capacity||0, filled=cap - l.spotsLeft;
@@ -163,10 +165,14 @@ function card(l){
   const action = full
     ? `<button class="btn btn-out" onclick="joinWaitlist('${l.id}')">Join waitlist</button>`
     : `<button class="btn btn-lime" onclick="openSignup('${l.id}')">Sign up · ${fmt(l.feeCents)}</button>`;
+  const ros = (l.roster && l.roster.length) ? l.roster.map(p=>esc(p.name)+(p.paid?'':' ⏳')).join(', ') : 'No one signed up yet.';
   return `<div class="evc">
     <div class="evc-top"><div><div class="evc-nm">${esc(l.name)}</div><div class="evc-meta">${dateLine(l)}</div></div>${statusChip}</div>
+    <div class="evc-meta" style="margin-top:5px">${cap} players · ${l.courts||'—'} courts · ${fmt(l.feeCents)}</div>
     <div class="bar ${barCls}"><i style="width:${pct}%"></i></div>
     <div class="spot"><span style="color:#9aa094">${filled} / ${cap}</span><span class="left ${full?'f':''}">${leftTxt}</span></div>
+    <button onclick="toggleRoster('${l.id}')" style="background:none;border:0;color:var(--lime);font:inherit;font-size:.74rem;font-weight:700;cursor:pointer;margin-top:10px;padding:0">👥 Who's playing (${l.rosterCount})</button>
+    <div id="ros-${l.id}" style="display:none;font-size:.74rem;color:#9aa094;margin-top:8px;line-height:1.6">${ros}</div>
     <div class="btnrow">${action}<button class="btn btn-ghost" onclick="invite('${l.id}')">＋ Invite</button></div>
   </div>`;
 }

@@ -68,11 +68,12 @@
     <div class="frow row2">
       <div><label class="l">Date</label><input class="i" id="f-date" type="date"></div>
       <div><label class="l">Start time</label><input class="i" id="f-time" placeholder="8:30 AM"></div>
+      <div><label class="l">End time</label><input class="i" id="f-end" placeholder="11:30 AM"></div>
     </div>
     <div class="frow"><label class="l">Location</label><input class="i" id="f-place" placeholder="SBTC"></div>
     <div class="frow row2">
       <div><label class="l">Courts</label><input class="i" id="f-courts" type="number" value="3" oninput="recalc()"></div>
-      <div><label class="l">Capacity</label><input class="i" id="f-cap" type="number" value="12"></div>
+      <div><label class="l">Total players</label><input class="i" id="f-cap" type="number" value="12"></div>
       <div><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" value="7"></div>
     </div>
     <div class="help" style="margin:-6px 0 13px">Capacity auto-fills to courts × 4. Card adds a 10% service fee; Venmo is fee-free.</div>
@@ -107,11 +108,12 @@
   <div class="frow row2">
     <div><label class="l">Date</label><input class="i" id="m-date" type="date"></div>
     <div><label class="l">Start time</label><input class="i" id="m-time"></div>
+    <div><label class="l">End time</label><input class="i" id="m-end"></div>
   </div>
   <div class="frow"><label class="l">Location</label><input class="i" id="m-place"></div>
   <div class="frow row2">
     <div><label class="l">Courts</label><input class="i" id="m-courts" type="number"></div>
-    <div><label class="l">Capacity</label><input class="i" id="m-cap" type="number"></div>
+    <div><label class="l">Total players</label><input class="i" id="m-cap" type="number"></div>
     <div><label class="l">Entry fee ($)</label><input class="i" id="m-fee" type="number" step="0.01"></div>
   </div>
   <div class="frow"><label class="l">League Venmo</label><input class="i" id="m-venmo"></div>
@@ -164,6 +166,7 @@ async function createLadder(){
     name:document.getElementById('f-name').value.trim(),
     date:document.getElementById('f-date').value,
     startTime:document.getElementById('f-time').value.trim(),
+    endTime:document.getElementById('f-end').value.trim(),
     place:document.getElementById('f-place').value.trim(),
     courts:parseInt(document.getElementById('f-courts').value)||0,
     capacity:parseInt(document.getElementById('f-cap').value)||0,
@@ -188,7 +191,7 @@ async function openManage(id){
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
   document.querySelectorAll('#seg-status button').forEach(b=>b.classList.toggle('on',b.dataset.v===(d.event.status||'open')));
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
-  setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-place',d.event.place);
+  setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place);
   setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
   document.getElementById('mEditMsg').innerHTML='';
   let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
@@ -211,7 +214,7 @@ async function saveEdit(){
   const g=id=>document.getElementById(id).value;
   const body={
     id:CURRENT.id, circuit:CURRENT.circuit,
-    name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), place:g('m-place').trim(),
+    name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(),
     courts:parseInt(g('m-courts'))||0, capacity:parseInt(g('m-cap'))||0,
     feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(),
     paymentMethods:CURRENT.paymentMethods, organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,

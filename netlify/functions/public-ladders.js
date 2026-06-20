@@ -8,8 +8,8 @@ import { listEvents, getEvent, getSignups, toPublicSignups, effectiveCapacity } 
 function pub(e, s) {
   const p = toPublicSignups(e, s);
   return {
-    id: e.id, name: e.name, date: e.date, startTime: e.startTime, place: e.place,
-    feeCents: e.feeCents, status: e.status || 'open',
+    id: e.id, name: e.name, date: e.date, startTime: e.startTime, endTime: e.endTime, place: e.place,
+    courts: e.courts, feeCents: e.feeCents, status: e.status || 'open',
     capacity: effectiveCapacity(e), spotsLeft: p.spotsLeft,
     rosterCount: p.rosterCount, waitlistCount: p.waitlistCount,
     paymentMethods: e.paymentMethods || ['card', 'venmo'],
