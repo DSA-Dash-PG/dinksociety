@@ -172,8 +172,8 @@ export function calcStats(sessions, players) {
           });
         });
       });
-      played.forEach(id => { if (s[id]) s[id].attended++; });
     });
+    played.forEach(id => { if (s[id]) s[id].attended++; });
   });
   return Object.values(s).sort((a, b) => b.pf !== a.pf ? b.pf - a.pf : (b.pf - b.pa) - (a.pf - a.pa));
 }

@@ -94,7 +94,9 @@
       <div class="kpi"><div class="n" id="sNights">—</div><div class="l">Nights</div></div>
       <div class="kpi"><div class="n" id="sPod">—</div><div class="l">Podiums</div></div>
     </div>
-    <div class="note">Your ladder stats, the DR leaderboard, and recent results will appear here once you've played a night. (Scoring &amp; DR engine wiring is the next build step.)</div>
+    <div id="recentWin"></div>
+    <div style="font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9aa094;margin:18px 2px 10px">DR leaderboard</div>
+    <div id="lbBox" class="note">Loading…</div>
   </div>
 </div>
 
@@ -125,6 +127,24 @@ const DEMO = [
 function tab(btn){
   document.querySelectorAll('.tabs button').forEach(b=>b.classList.toggle('on', b===btn));
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on', p.id==='p-'+btn.dataset.t));
+  if(btn.dataset.t==='stats') loadStats();
+}
+async function loadStats(){
+  let j={};
+  try{ const r=await fetch(`${API}/public-ladder-stats`,{credentials:'include'}); j=await r.json(); }catch(e){}
+  if(j.you){ document.getElementById('drBox').style.display='block'; document.getElementById('drVal').textContent=j.you.dr??'—';
+    document.getElementById('sDr').textContent=j.you.dr??'—'; document.getElementById('sNights').textContent=j.you.nights??0; document.getElementById('sPod').textContent=j.you.podiums??0; }
+  const rw=document.getElementById('recentWin');
+  if(j.recent&&j.recent.winners&&j.recent.winners.length){
+    const m=['🥇','🥈','🥉'];
+    rw.innerHTML=`<div style="font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#9aa094;margin:4px 2px 10px">Last night${j.recent.eventName?' · '+esc(j.recent.eventName):''}</div><div class="evc">`+
+      j.recent.winners.map((w,i)=>`<div class="spot" style="padding:5px 0"><span>${m[i]||''} ${esc(w.name)}</span><span class="left">${w.pf} pts</span></div>`).join('')+`</div>`;
+  } else rw.innerHTML='';
+  const lb=document.getElementById('lbBox');
+  if(j.leaderboard&&j.leaderboard.length){
+    lb.className='evc';
+    lb.innerHTML=j.leaderboard.slice(0,25).map((p,i)=>`<div class="spot" style="padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)"><span>${i+1}. ${esc(p.name)} <span style="color:#5e655a">${p.w}-${p.l}</span></span><span class="left">${p.dr==null?'—':'DR '+p.dr}</span></div>`).join('');
+  } else { lb.className='note'; lb.innerHTML='No results yet — stats appear after the first scored night (or import your history).'; }
 }
 
 function dateLine(l){

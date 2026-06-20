@@ -86,6 +86,13 @@
     <div id="createMsg"></div>
   </div>
 
+  <div class="sec">Migrate history</div>
+  <div class="card">
+    <div style="font-size:.82rem;color:#9aa094;margin-bottom:10px">Pull every past ladder night from the old Pickleladder site into Dink Society — finalized, with stats &amp; DR. Safe to re-run (already-imported nights are skipped).</div>
+    <button class="btn btn-out" onclick="importOld()">Import previous matches</button>
+    <div id="importMsg"></div>
+  </div>
+
   <div class="sec">Your ladders</div>
   <div class="card" id="list"><div class="empty">Loading…</div></div>
 </div>
@@ -244,6 +251,14 @@ async function addPlayer(){
   if(status===401){ msg('apMsg','err','Sign in as admin first.'); return; }
   if(d.ok){ document.getElementById('ap-name').value=''; const cur=CURRENT.id; openManage(cur); loadList(); }
   else msg('apMsg','err',d.error||'Could not add.');
+}
+async function importOld(){
+  if(!confirm('Import all past ladders from the old Pickleladder site?'))return;
+  msg('importMsg','ok','Importing… this can take a moment.');
+  const {status,d}=await api('/admin-ladder-import',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  if(status===401){ msg('importMsg','err','Sign in as admin first.'); return; }
+  if(d.ok){ msg('importMsg','ok',`Imported ${d.imported} night(s); skipped ${d.skipped} already-imported; ${d.playersTouched} player slots.`); loadList(); }
+  else msg('importMsg','err',d.error||'Import failed.');
 }
 function msg(id,cls,t){ document.getElementById(id).innerHTML=`<div class="msg ${cls}">${t}</div>`; }
 

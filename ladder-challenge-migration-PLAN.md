@@ -15,10 +15,15 @@
 > `lib/ladder-promote.js`, `tests/ladder.test.js`. Player frontend wired:
 > `public-ladders.js` (public list) + `public/ladders.html` (live Available/Stats
 > page calling the real APIs — signup via credit/card/Venmo, waitlist, invite/share,
-> `?demo=1` fallback). **Next:** the run-night **scoring/stats/DR engine** (port the
-> pure functions from Pickleladder `app.js` into `lib/ladder-scoring.js` for identical
-> behavior; then fill the Stats tab) and the admin UI HTML (mockups → live, calling
-> `admin-ladder-*`).
+> `?demo=1` fallback). Scoring + migration done:
+> `lib/ladder-scoring.js` (verbatim engine port; parity tests caught + fixed an
+> `attended` bug), `lib/ladder-play.js` (rounds/scores store), `public-ladder-stats.js`
+> (DR leaderboard, podium winners, "you"), `admin-ladder-import.js` (pulls live from
+> the old Pickleladder site → finalized events + play + stats), Stats tab + admin
+> Import button wired, `tests/ladder-scoring.test.js`. **Next:** the run-night
+> **score-entry UI** (admin scoreboard: generate rounds via `genR1`/`genNR`, enter
+> scores → writes `ladder-play` → live DR/standings) so NEW nights populate stats the
+> way imported ones already do.
 
 
 
