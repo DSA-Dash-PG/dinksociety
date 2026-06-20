@@ -78,7 +78,7 @@
     <div class="brand"><div class="mk">DS</div><div><small>The Dink Society</small><b>Ladder scoring</b></div></div>
     <span class="badge">Admin</span>
   </div>
-  <div id="authBanner" class="banner" style="display:none">Not signed in. <a href="/admin.html">Sign in</a> or enter the scoring PIN when prompted.</div>
+  <div id="authBanner" class="banner" style="display:none">You need to be signed in as admin to score. <a href="/admin.html">Sign in here</a> (one login covers everything), then reopen this page.</div>
   <select class="i" id="picker" onchange="pick()"><option value="">Choose a ladder…</option></select>
   <div id="msg"></div>
   <div id="board"></div>
@@ -107,16 +107,10 @@ const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp
 const fmtT=s=>`${Math.floor(s/60)}:${(s%60).toString().padStart(2,'0')}`;
 function msg(c,t){ document.getElementById('msg').innerHTML=t?`<div class="msg ${c}">${t}</div>`:''; }
 
-let PIN=sessionStorage.getItem('ds_ladder_pin')||'';
-async function ensurePin(){
-  const p=prompt('Enter the scoring PIN:'); if(!p) return false;
-  try{ const r=await fetch(`${API}/ladder-pin-verify?pin=${encodeURIComponent(p)}`); const j=await r.json(); if(j.valid){ PIN=p; sessionStorage.setItem('ds_ladder_pin',p); return true; } }catch(e){}
-  alert("That PIN didn't work."); return false;
-}
 async function api(path,opts={}){
-  opts.headers={...(opts.headers||{}),'X-Ladder-Pin':PIN}; opts.credentials='include';
-  let r=await fetch(API+path,opts);
-  if(r.status===401){ if(await ensurePin()){ opts.headers['X-Ladder-Pin']=PIN; r=await fetch(API+path,opts); } }
+  opts.credentials='include';
+  const r=await fetch(API+path,opts);
+  if(r.status===401) document.getElementById('authBanner').style.display='block';
   let d={}; try{d=await r.json();}catch{} return {status:r.status,d};
 }
 
