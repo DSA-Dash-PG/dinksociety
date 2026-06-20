@@ -20,10 +20,13 @@
 > `attended` bug), `lib/ladder-play.js` (rounds/scores store), `public-ladder-stats.js`
 > (DR leaderboard, podium winners, "you"), `admin-ladder-import.js` (pulls live from
 > the old Pickleladder site → finalized events + play + stats), Stats tab + admin
-> Import button wired, `tests/ladder-scoring.test.js`. **Next:** the run-night
-> **score-entry UI** (admin scoreboard: generate rounds via `genR1`/`genNR`, enter
-> scores → writes `ladder-play` → live DR/standings) so NEW nights populate stats the
-> way imported ones already do.
+> Import button wired, `tests/ladder-scoring.test.js`. Run-night scoring DONE:
+> `admin-ladder-round.js` (start/next/wave2/reshuffle/restart/finish via `genR1`/`genNR`,
+> Pickleladder-exact movement + wave-2 gate + finish-at-rounds), `admin-ladder-score.js`
+> (court score, winner = higher / tie = manual pick), `public/ladder-score.html`
+> (courtside scoreboard, linked from admin Manage). Writes `ladder-play` → DR/standings/
+> Stats tab populate identically. **v1 is feature-complete.** Optional polish left:
+> win/loss score mode, round timer, baking a Ladders link into the main `admin.html`/nav.
 
 
 

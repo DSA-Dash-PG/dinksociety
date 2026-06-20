@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Score a ladder · Admin · Dink Society</title>
+<meta name="theme-color" content="#0b0d0a">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/shared.css">
+<style>
+  :root{ --lime:#b8ff2c; --teal:#17d7b0; --gold:#f0c040; --red:#ff5c47; }
+  body{ background:#0b0d0a; color:#f0f2ec; font-family:'Inter',system-ui,sans-serif; margin:0; }
+  .wrap{ max-width:640px; margin:0 auto; padding:0 14px 70px; }
+  .top{ display:flex;align-items:center;justify-content:space-between;padding:15px 0 10px; }
+  .brand{ display:flex;align-items:center;gap:9px; } .mk{ width:30px;height:30px;border-radius:8px;background:var(--lime);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px; }
+  .brand b{ font-size:.9rem;font-weight:900;font-style:italic;text-transform:uppercase; } .brand small{ display:block;font-size:.56rem;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);font-weight:800; }
+  .badge{ font-size:.6rem;font-weight:800;padding:4px 10px;border-radius:9999px;background:rgba(255,92,71,.14);color:var(--red);text-transform:uppercase; }
+  select.i,input.i{ min-height:44px;padding:0 12px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:#1c1f18;color:#f0f2ec;font:inherit;font-size:.9rem;box-sizing:border-box; }
+  .banner{ background:rgba(240,192,64,.12);border:1px solid rgba(240,192,64,.3);color:var(--gold);border-radius:12px;padding:12px 14px;font-size:.82rem;margin:12px 0; } .banner a{ color:var(--lime);font-weight:700; }
+  .rhdr{ display:flex;align-items:center;justify-content:space-between;margin:14px 2px 10px; }
+  .rhdr .t{ font-size:1.1rem;font-weight:900; } .rhdr .s{ font-size:.74rem;color:#9aa094; }
+  .court{ background:#161914;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:13px;margin-bottom:11px; }
+  .court.king{ border-color:rgba(240,192,64,.35); }
+  .clabel{ font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9aa094;margin-bottom:9px;display:flex;align-items:center;gap:6px; }
+  .vs{ display:grid;grid-template-columns:1fr 58px 14px 58px 1fr;align-items:center;gap:6px; }
+  .team{ font-size:.84rem;font-weight:700;line-height:1.25; } .team.r{ text-align:right; }
+  .team.win{ color:var(--lime); } .team.lose{ opacity:.5; }
+  .sc{ width:100%;height:52px;text-align:center;font-size:1.4rem;font-weight:900;border-radius:10px;border:1px solid rgba(255,255,255,.14);background:#0f120d;color:#f0f2ec; }
+  .sc:focus{ outline:none;border-color:var(--lime); } .sc.win{ border-color:var(--lime);color:var(--lime); }
+  .mid{ text-align:center;color:#5e655a;font-weight:800;font-size:.7rem; }
+  .tie{ margin-top:10px;display:flex;gap:8px;align-items:center;justify-content:center;font-size:.72rem;color:var(--gold); }
+  .tie button{ border:1px solid var(--gold);color:var(--gold);background:transparent;border-radius:9999px;padding:6px 12px;font:inherit;font-size:.72rem;font-weight:700;cursor:pointer; }
+  .btn{ display:flex;align-items:center;justify-content:center;gap:6px;min-height:46px;border-radius:9999px;border:1px solid transparent;font:inherit;font-size:.84rem;font-weight:800;cursor:pointer;width:100%; }
+  .btn-lime{ background:var(--lime);color:#000; } .btn-out{ border-color:rgba(255,255,255,.18);color:#f0f2ec;background:transparent; } .btn-ghost{ background:#1c1f18;color:#9aa094; }
+  .btnrow{ display:flex;gap:9px;margin-top:6px; }
+  .small{ font-size:.7rem;min-height:34px;padding:0 12px;width:auto; }
+  .msg{ padding:10px 13px;border-radius:9px;font-size:.78rem;font-weight:600;margin:10px 0; } .msg.err{ background:rgba(255,92,71,.14);color:var(--red); } .msg.ok{ background:rgba(184,255,44,.14);color:var(--lime); }
+  .done{ text-align:center;padding:30px 14px; } .done .big{ font-size:1.4rem;font-weight:900;color:var(--lime);margin-bottom:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand"><div class="mk">DS</div><div><small>The Dink Society</small><b>Score a ladder</b></div></div>
+    <span class="badge">Admin</span>
+  </div>
+  <div id="authBanner" class="banner" style="display:none">Not signed in as admin. <a href="/admin.html">Sign in</a>, then reload.</div>
+
+  <select class="i" id="picker" style="width:100%" onchange="pick()"><option value="">Choose a ladder…</option></select>
+  <div id="msg"></div>
+  <div id="board"></div>
+</div>
+
+<script>
+const API='/.netlify/functions';
+let STATE=null, EID=null;
+const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
+const nm=p=>p?esc(p.name):'<span style="color:#5e655a">—</span>';
+function msg(c,t){ document.getElementById('msg').innerHTML=t?`<div class="msg ${c}">${t}</div>`:''; }
+async function api(path,opts){ const r=await fetch(API+path,{credentials:'include',...opts}); let d={}; try{d=await r.json();}catch{} return {status:r.status,d}; }
+
+async function loadPicker(){
+  const {status,d}=await api('/admin-ladders');
+  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  const sel=document.getElementById('picker');
+  (d.ladders||[]).filter(l=>l.status!=='cancelled').forEach(l=>{
+    const o=document.createElement('option'); o.value=l.id; o.textContent=`${l.name} · ${l.date||''} (${l.status})`; sel.appendChild(o);
+  });
+  const q=new URLSearchParams(location.search).get('event');
+  if(q){ sel.value=q; pick(); }
+}
+async function pick(){ EID=document.getElementById('picker').value; if(!EID){ document.getElementById('board').innerHTML=''; return; } await load(); }
+async function load(){
+  const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID));
+  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  STATE=d; render();
+}
+
+function render(){
+  const b=document.getElementById('board');
+  const play=STATE.play;
+  if(!play||!play.started){
+    const n=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled').length;
+    b.innerHTML=`<div class="banner" style="background:#161914;border-color:rgba(255,255,255,.08);color:#9aa094">${n} players on the roster${n<4?' — need at least 4 to start.':''}</div>
+      <label style="font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9aa094">Rounds</label>
+      <input class="i" id="nrounds" type="number" value="6" style="width:100%;margin:6px 0 12px">
+      <button class="btn btn-lime" ${n<4?'disabled':''} onclick="act('start')">Start night</button>`;
+    return;
+  }
+  if(play.finished){
+    b.innerHTML=`<div class="done"><div class="big">Night finalized 🎾</div><div style="color:#9aa094;font-size:.88rem">Stats &amp; DR are live on the <a href="/ladders" style="color:var(--lime)">Ladders</a> page.</div>
+      <button class="btn btn-ghost small" style="margin:16px auto 0" onclick="act('restart',true)">Restart night</button></div>`;
+    return;
+  }
+  const ri=play.currentRound, round=play.rounds[ri], tC=round.courts.length;
+  const waveGate = round.wave2started===false;
+  let h=`<div class="rhdr"><div><div class="t">Round ${ri+1} <span class="s">of ${play.config.rounds}</span></div></div><div class="s">${tC} court${tC>1?'s':''}</div></div>`;
+  if(waveGate) h+=`<div class="banner">Wave 1 in progress. <a href="#" onclick="act('wave2');return false">Start Wave 2</a> when the first wave finishes.</div>`;
+  round.courts.forEach((c,ci)=>{
+    const sc=c.score||{t1:null,t2:null,winner:null};
+    const aWin=sc.winner==='A', bWin=sc.winner==='B';
+    const tie = sc.t1!=null && sc.t2!=null && sc.t1===sc.t2 && !sc.winner;
+    const king = c.court===tC;
+    h+=`<div class="court ${king?'king':''}">
+      <div class="clabel">${king?'👑 ':''}Court ${c.court}${king?' · King':(c.court===1?' · Kitchen':'')}</div>
+      <div class="vs">
+        <div class="team ${aWin?'win':''} ${bWin?'lose':''}">${nm(c.team1[0])}<br>${nm(c.team1[1])}</div>
+        <input class="sc ${aWin?'win':''}" inputmode="numeric" value="${sc.t1??''}" id="t1-${ci}" onchange="save(${ci})">
+        <div class="mid">vs</div>
+        <input class="sc ${bWin?'win':''}" inputmode="numeric" value="${sc.t2??''}" id="t2-${ci}" onchange="save(${ci})">
+        <div class="team r ${bWin?'win':''} ${aWin?'lose':''}">${nm(c.team2[0])}<br>${nm(c.team2[1])}</div>
+      </div>
+      ${tie?`<div class="tie">Tie — who moves up? <button onclick="pickWin(${ci},'A')">Left</button><button onclick="pickWin(${ci},'B')">Right</button></div>`:''}
+    </div>`;
+  });
+  h+=`<button class="btn btn-lime" style="margin-top:6px" onclick="act('next')">${ri>=play.config.rounds-1?'Finish night':'Next round →'}</button>
+    <div class="btnrow"><button class="btn btn-out small" style="flex:1;width:auto" onclick="act('reshuffle',true)">Reshuffle</button><button class="btn btn-ghost small" style="flex:1;width:auto" onclick="act('finish',true)">Finish now</button></div>`;
+  b.innerHTML=h;
+}
+
+async function save(ci){
+  const t1=document.getElementById('t1-'+ci).value, t2=document.getElementById('t2-'+ci).value;
+  const {d}=await api('/admin-ladder-score?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({round:STATE.play.currentRound,court:ci,t1,t2})});
+  if(d.ok){ STATE.play.rounds[STATE.play.currentRound].courts[ci].score=d.score; render(); }
+}
+async function pickWin(ci,side){
+  const t1=document.getElementById('t1-'+ci).value, t2=document.getElementById('t2-'+ci).value;
+  const {d}=await api('/admin-ladder-score?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({round:STATE.play.currentRound,court:ci,t1,t2,winner:side})});
+  if(d.ok){ STATE.play.rounds[STATE.play.currentRound].courts[ci].score=d.score; render(); }
+}
+async function act(action,confirmFirst){
+  if(confirmFirst && !confirm('Are you sure?')) return;
+  const body={action}; if(action==='start') body.rounds=parseInt(document.getElementById('nrounds').value)||6;
+  const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  if(d.ok){ msg(''); STATE.play=d.play; render(); } else msg('err',d.error||'Action failed.');
+}
+loadPicker();
+</script>
+</body>
+</html>
