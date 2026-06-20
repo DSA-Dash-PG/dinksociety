@@ -78,6 +78,32 @@ export default async (req) => {
     return json({ ok: true, opened: r.opened });
   }
 
+  // Admin manually adds a player (e.g. paid cash, no email). `paid` marks them
+  // paid-by-cash; `force` adds to the roster even if it's at capacity.
+  if (action === 'add') {
+    const name = String(body.name || '').trim();
+    if (!name) return json({ error: 'name required' }, 400);
+    const gender = body.gender === 'F' ? 'F' : body.gender === 'M' ? 'M' : null;
+    const email = String(body.email || '').trim().toLowerCase();
+    const paid = !!body.paid;
+    const pid = 'manual_' + Math.random().toString(36).slice(2, 10);
+    if (spotsLeft(event, signups) > 0 || body.force) {
+      signups.roster.push({
+        playerId: pid, name, email, gender,
+        signedUpAt: new Date().toISOString(),
+        paymentMethod: paid ? 'cash' : null,
+        paymentStatus: paid ? 'paid' : 'pending',
+        amountCents: paid ? feeCents : null,
+        checkoutSessionId: null, invitedBy: null, heldUntil: null, addedByAdmin: true,
+      });
+      await setSignups(signups);
+      return json({ ok: true, added: name, list: 'roster', paid });
+    }
+    signups.waitlist.push({ playerId: pid, name, email, gender, joinedAt: new Date().toISOString(), addedByAdmin: true });
+    await setSignups(signups);
+    return json({ ok: true, added: name, list: 'waitlist' });
+  }
+
   if (action === 'confirm-venmo') {
     const entry = findRosterEntry(signups, body.playerId, body.email);
     if (!entry) return json({ error: 'Player not on the roster' }, 404);
