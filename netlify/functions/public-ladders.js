@@ -35,7 +35,10 @@ export default async (req) => {
   const events = await listEvents();
   const visible = events.filter(e => ['open', 'full', 'live'].includes(e.status || 'open'));
   const ladders = await Promise.all(visible.map(async e => pub(e, await getSignups(e.id))));
-  return json({ ladders });
+  const completed = events.filter(e => (e.status || 'open') === 'final')
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
+    .map(e => ({ id: e.id, name: e.name, date: e.date, place: e.place, type: e.type || 'mixed' }));
+  return json({ ladders, completed });
 };
 
 export const config = { path: '/.netlify/functions/public-ladders' };

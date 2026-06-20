@@ -572,6 +572,23 @@
       html += `</div>`;
 
       document.getElementById('page-root').innerHTML = html;
+
+      // Cross-product: if this league player also plays in the Ladder, surface a
+      // banner linking to their combined League + Ladder profile.
+      try {
+        const up = await fetch(`/.netlify/functions/public-profile?leagueId=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}`);
+        if (up.ok) {
+          const u = await up.json();
+          if (u.found && u.ladder) {
+            const b = document.createElement('a');
+            b.href = `/profile.html?leagueId=${encodeURIComponent(resolvedId)}`;
+            b.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:11px 14px;background:#b8ff2c;color:#06210f;border-radius:10px;text-decoration:none;font-weight:700;font-size:13px;';
+            b.innerHTML = `<span>🪜 Also plays Ladder — DR ${u.ladder.dr == null ? '–' : u.ladder.dr} · ${u.ladder.w}-${u.ladder.l}</span><span>Combined profile →</span>`;
+            const root = document.getElementById('page-root');
+            root.insertBefore(b, root.firstChild);
+          }
+        }
+      } catch {}
     }
 
     load();
