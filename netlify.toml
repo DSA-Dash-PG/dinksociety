@@ -2,6 +2,13 @@
   publish = "public"
   functions = "netlify/functions"
 
+[build.environment]
+  # LADDER_PIN / ADMIN_PIN are read ONLY inside server-side Netlify Functions
+  # (lib/ladder-pin.js, lib/auth.js) and are never emitted into the client bundle,
+  # so Netlify's secret scanner flags them as a false positive and blocks the build.
+  # Exclude just these two keys from scanning; all other secrets stay scanned.
+  SECRETS_SCAN_OMIT_KEYS = "LADDER_PIN,ADMIN_PIN"
+
 [functions]
   node_bundler = "esbuild"
 

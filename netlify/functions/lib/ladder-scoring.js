@@ -204,6 +204,66 @@ export function calcMvpCount(sessions, players) {
   return cnt;
 }
 
+// ── XP — participation/engagement score (cumulative across ALL ladders) ──
+// Per night: played 25; place 1st 25 / 2nd 20 / 3rd 17 then −2 per place to 0;
+// round MVP (top male + top female each round) 5 each; most wins that night
+// (top 4) 5; best point diff that night (top 4) 5; comeback (a win in the round
+// right after a loss) 2 each. Night place order = wins → diff → DR (drMap).
+// Returns { xp:{id:total}, detail:{id:{played,place,mvp,mostWins,bestDiff,comebacks}} }.
+export const XP_DEFAULTS = { played: 25, gameWin: 5, place1: 25, place2: 20, place3: 17, placeStep: 2, mvp: 5, mostWins: 5, mostWinsTop: 4, bestDiff: 5, bestDiffTop: 4, comeback: 2 };
+
+export function calcXP(sessions, players, drMap = {}, amounts) {
+  const A = { ...XP_DEFAULTS, ...(amounts || {}) };
+  const xp = {}, detail = {};
+  players.forEach(p => { xp[p.id] = 0; detail[p.id] = { played: 0, gameWins: 0, place: 0, mvp: 0, mostWins: 0, bestDiff: 0, comebacks: 0, nights: 0, firsts: 0 }; });
+  const placePts = r => r === 1 ? A.place1 : r === 2 ? A.place2 : Math.max(0, A.place3 - A.placeStep * (r - 3));
+
+  (sessions || []).forEach(sess => {
+    if (!sess || !Array.isArray(sess.rounds) || !sess.rounds.length) return;
+    const nW = {}, nDiff = {}, seq = {}, played = new Set();
+    sess.rounds.forEach(round => {
+      round.courts.forEach(c => {
+        if (!c.score || c.score.t1 == null || c.score.t2 == null || !c.score.winner) return;
+        const { t1, t2, winner } = c.score;
+        [[c.team1, t1, t2, winner === 'A'], [c.team2, t2, t1, winner === 'B']].forEach(([team, sc, al, won]) => {
+          team.filter(Boolean).forEach(p => {
+            if (!(p.id in xp)) return;
+            played.add(p.id);
+            nW[p.id] = (nW[p.id] || 0) + (won ? 1 : 0);
+            nDiff[p.id] = (nDiff[p.id] || 0) + (sc - al);
+            (seq[p.id] = seq[p.id] || []).push(won);
+          });
+        });
+      });
+      const { male, female } = getRoundMVPs(round, players);
+      [male[0], female[0]].forEach(x => { const id = x && x.p && x.p.id; if (id && id in xp) { xp[id] += A.mvp; detail[id].mvp += A.mvp; } });
+    });
+
+    const parts = [...played];
+    if (!parts.length) return;
+    parts.forEach(id => { xp[id] += A.played; detail[id].played += A.played; detail[id].nights++; });
+    parts.forEach(id => { const gw = (nW[id] || 0) * A.gameWin; if (gw) { xp[id] += gw; detail[id].gameWins += gw; } });
+
+    const ranked = parts.slice().sort((a, b) => (nW[b] - nW[a]) || (nDiff[b] - nDiff[a]) || ((drMap[b] ?? -1) - (drMap[a] ?? -1)));
+    ranked.forEach((id, i) => { const pp = placePts(i + 1); if (pp) { xp[id] += pp; detail[id].place += pp; } if (i === 0) detail[id].firsts++; });
+
+    parts.slice().sort((a, b) => (nW[b] - nW[a]) || (nDiff[b] - nDiff[a])).slice(0, A.mostWinsTop).forEach(id => { if ((nW[id] || 0) > 0) { xp[id] += A.mostWins; detail[id].mostWins += A.mostWins; } });
+    parts.slice().sort((a, b) => (nDiff[b] - nDiff[a]) || (nW[b] - nW[a])).slice(0, A.bestDiffTop).forEach(id => { xp[id] += A.bestDiff; detail[id].bestDiff += A.bestDiff; });
+
+    parts.forEach(id => { const r = seq[id] || []; let cb = 0; for (let i = 1; i < r.length; i++) { if (r[i] && !r[i - 1]) cb++; } if (cb) { xp[id] += cb * A.comeback; detail[id].comebacks += cb * A.comeback; } });
+  });
+  return { xp, detail };
+}
+
+// XP tier label/threshold for display.
+export function xpTier(xp) {
+  if (xp >= 800) return 'Elite';
+  if (xp >= 450) return 'Pro';
+  if (xp >= 200) return 'Contender';
+  if (xp >= 100) return 'Challenger';
+  return 'Rookie';
+}
+
 export function calcPartners(sessions, players) {
   const pairs = {};
   sessions.forEach(sess => {

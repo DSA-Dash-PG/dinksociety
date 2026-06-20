@@ -73,7 +73,7 @@
 <body>
 <div class="wrap">
   <div class="hdr">
-    <div class="brand"><div class="mk">DS</div><div><small>The Dink Society</small><b><span style="color:var(--lime)"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 20h5v-5h5v-5h5V5"/></svg></span> Ladders</b></div></div>
+    <div class="brand"><div class="mk">DS</div><div><small>The Dink Society</small><b>Ladder Challengers</b></div></div>
     <div class="hr"><a class="scorelink" href="/ladder-score.html">🔒 Ladder scoring</a></div>
   </div>
   <div class="tabs" id="tabs">
@@ -160,9 +160,8 @@ async function init(){
 function renderWinners(){
   const w=document.getElementById('winners'); const rw=(STATS&&STATS.recentWinners)||[];
   if(!rw.length){ w.innerHTML='<div class="note">No results yet — winners show up after the first scored ladder.</div>'; return; }
-  const m=['🥇','🥈','🥉'];
-  w.innerHTML=rw.map(g=>`<div class="seclbl"><span style="color:var(--lime)"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 20h5v-5h5v-5h5V5"/></svg></span> ${esc(g.eventName||'Ladder')} · ${wd(g.date)}</div><div class="card" style="padding:4px 14px">`+
-    (g.winners||[]).map((p,i)=>`<div class="wrow" onclick="profile('${p.id}')"><span class="wm">${m[i]}</span><div style="flex:1"><div class="wn">${esc(p.name)}</div><div class="ws">${p.w} W · ${p.pf} pts · ${p.diff>0?'+':''}${p.diff} · DR ${p.dr==null?'–':p.dr}</div></div></div>`).join('')+`</div>`).join('');
+  w.innerHTML=rw.map(g=>`<div class="seclbl">${esc(g.eventName||'Ladder')} · ${wd(g.date)}</div><div class="card" style="padding:4px 14px">`+
+    (g.winners||[]).map((p,i)=>`<div class="wrow" onclick="profile('${p.id}')"><span class="wm">${i+1}</span><div style="flex:1"><div class="wn">${esc(p.name)}</div><div class="ws">${p.w} W · ${p.pf} pts · ${p.diff>0?'+':''}${p.diff} · DR ${p.dr==null?'–':p.dr}</div></div></div>`).join('')+`</div>`).join('');
 }
 function renderHomeWeek(){
   const el=document.getElementById('homeWeek');
@@ -202,15 +201,41 @@ function renderPast(){
 }
 
 /* ---- LEADERBOARD ---- */
+let lbMode='standings', lbDiv='all';
+const DIVLABEL={all:'All',mixed:'Mixed',mens:"Men's",womens:"Women's"};
+function tierColor(t){ return t==='Elite'||t==='Pro'?['#ffcc00','rgba(240,204,0,.14)']:t==='Contender'?['#b8ff2c','rgba(184,255,44,.14)']:t==='Challenger'?['#17d7b0','rgba(23,215,176,.14)']:['#9aa094','rgba(255,255,255,.06)']; }
+function lbSetMode(m){ lbMode=m; renderStats(); }
+function lbSetDiv(d,en){ if(!en)return; lbDiv=d; renderStats(); }
+function segBtn(label,on,onclick,disabled){ return `<button ${disabled?'disabled':''} onclick="${disabled?'':onclick}" style="flex:1;padding:8px 4px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:${disabled?'not-allowed':'pointer'};background:${on?'var(--lime)':'transparent'};color:${on?'#06210f':disabled?'#43463f':'var(--mut)'}">${label}</button>`; }
 function renderStats(){
   const body=document.getElementById('statsBody'); const j=STATS||{};
   if(!j.leaderboard||!j.leaderboard.length){ body.innerHTML='<div class="note">No results yet — stats appear after the first scored night (or import your history).</div>'; return; }
-  let h='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th style="text-align:left">Player</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th><th>DR</th></tr></thead><tbody>';
-  j.leaderboard.forEach((p,i)=>{ h+=`<tr${i===0?' class="lead"':''}><td>${i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}${p.wins>0?(p.wins===1?' 👑':' 👑×'+p.wins):''}</td><td>${p.w}</td><td>${p.l}</td><td class="hl">${p.pf}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td class="dr">${p.dr==null?'–':p.dr}</td></tr>`; });
+  const active=j.activeDivisions||['all'];
+  let h=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:10px">`
+    +segBtn('Standings',lbMode==='standings',"lbSetMode('standings')")
+    +segBtn('⚡ XP',lbMode==='xp',"lbSetMode('xp')")+`</div>`;
+
+  if(lbMode==='xp'){
+    const xp=j.xp||[];
+    h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">XP is cumulative across every ladder and division — play more to climb.</div>`;
+    if(!xp.length){ body.innerHTML=h+'<div class="note">No XP yet.</div>'; return; }
+    h+='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th style="text-align:left">Player</th><th style="text-align:left">Tier</th><th>Ladders</th><th>XP</th></tr></thead><tbody>';
+    xp.forEach((p,i)=>{ const [tc,tb]=tierColor(p.tier); h+=`<tr${i===0?' class="lead"':''}><td>${i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td style="text-align:left"><span style="font-size:.56rem;font-weight:800;padding:2px 7px;border-radius:9999px;color:${tc};background:${tb}">${p.tier}</span></td><td style="color:var(--teal);font-weight:800">${p.nights}</td><td class="hl" style="font-weight:900">${p.xp}</td></tr>`; });
+    body.innerHTML=h+'</tbody></table></div>'; return;
+  }
+
+  h+='<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:8px">'
+    +['all','mixed','mens','womens'].map(d=>{ const en=active.includes(d); return segBtn((en?'':'🔒 ')+DIVLABEL[d], d===lbDiv, `lbSetDiv('${d}',true)`, !en); }).join('')+'</div>';
+  h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">Ladders = nights played${(active.includes('mens')||active.includes('womens'))?'':" · Men's / Women's unlock once played"}.</div>`;
+  const rows=(j.divisions&&j.divisions[lbDiv])||j.leaderboard;
+  h+='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th style="text-align:left">Player</th><th>Lad</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th><th>DR</th></tr></thead><tbody>';
+  rows.forEach((p,i)=>{ h+=`<tr${i===0?' class="lead"':''}><td>${i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td style="color:var(--teal);font-weight:800">${p.nights}</td><td>${p.w}</td><td>${p.l}</td><td class="hl">${p.pf}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td class="dr">${p.dr==null?'–':p.dr}</td></tr>`; });
   h+='</tbody></table></div>';
-  if(j.mvpLeaders&&j.mvpLeaders.length) h+=sec('🏅 Top performers', j.mvpLeaders.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:#9aa094">${x.count}×</span>`));
-  if(j.hotStreaks&&j.hotStreaks.length) h+=sec('🔥 Hot streaks', j.hotStreaks.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:var(--lime)">W${x.streak}</span>`));
-  if(j.partnerships&&j.partnerships.length) h+=sec('🤝 Best partnerships', j.partnerships.map(p=>`${esc(p.a)} &amp; ${esc(p.b)} <span style="color:#9aa094">${p.w}-${p.l} · ${p.pct}%</span>`));
+  if(lbDiv==='all'){
+    if(j.mvpLeaders&&j.mvpLeaders.length) h+=sec('🏅 Top performers', j.mvpLeaders.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:#9aa094">${x.count}×</span>`));
+    if(j.hotStreaks&&j.hotStreaks.length) h+=sec('🔥 Hot streaks', j.hotStreaks.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:var(--lime)">W${x.streak}</span>`));
+    if(j.partnerships&&j.partnerships.length) h+=sec('🤝 Best partnerships', j.partnerships.map(p=>`${esc(p.a)} &amp; ${esc(p.b)} <span style="color:#9aa094">${p.w}-${p.l} · ${p.pct}%</span>`));
+  }
   body.innerHTML=h;
 }
 function sec(t,items){ return `<div class="seclbl">${t}</div><div class="card" style="font-size:.84rem;line-height:1.95">${items.join('<br>')}</div>`; }
@@ -223,10 +248,10 @@ async function night(id){
   document.getElementById('nightBody').innerHTML='<div class="empty">Loading…</div>';
   document.getElementById('nightOv').classList.add('on');
   let j={}; try{ j=await (await fetch(`${API}/public-ladder-stats?event=${encodeURIComponent(id)}`)).json(); }catch(e){}
-  const s=j.standings||[], m=['🥇','🥈','🥉'];
+  const s=j.standings||[];
   if(!s.length){ document.getElementById('nightBody').innerHTML='<div class="note">No scores recorded for this night.</div>'; return; }
   let h='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th style="text-align:left">Player</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th><th>DR</th></tr></thead><tbody>';
-  s.forEach((p,i)=>{ h+=`<tr${i===0?' class="lead"':''}><td>${i<3?m[i]:i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td>${p.w}</td><td>${p.l}</td><td class="hl">${p.pf}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td class="dr">${p.dr==null?'–':p.dr}</td></tr>`; });
+  s.forEach((p,i)=>{ h+=`<tr${i===0?' class="lead"':''}><td>${i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td>${p.w}</td><td>${p.l}</td><td class="hl">${p.pf}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td class="dr">${p.dr==null?'–':p.dr}</td></tr>`; });
   document.getElementById('nightBody').innerHTML=h+'</tbody></table></div>';
 }
 
@@ -263,9 +288,9 @@ function renderProfile(p,inLeague){
   }).join('');
   return `
     <div class="pf-head"><div class="pf-av">${init}</div><div style="flex:1">
-      <div class="pf-nm">${esc(p.name)}${p.podiums?' 👑':''}</div>
+      <div class="pf-nm">${esc(p.name)}</div>
       <div style="font-size:.7rem;color:#9aa094;margin:3px 0">${p.gender||''} · Rank #${p.rank||'–'} ${p.mvp?`<span class="pf-badge" style="background:rgba(167,139,250,.16);color:var(--purp)">🏅 ${p.mvp}× Top</span>`:''}</div>
-      ${badge}
+      <div style="margin:4px 0">${badge}${p.xp!=null?` <span class="pf-badge" style="background:rgba(184,255,44,.14);color:var(--lime)">⚡ ${p.xp} XP · ${p.xpTier||''}</span>`:''}</div>
     </div><div style="text-align:right"><div style="font-size:1.7rem;font-weight:900;color:var(--lime);line-height:1">${p.seasonPts}</div><div style="font-size:.5rem;letter-spacing:.08em;text-transform:uppercase;color:#9aa094;margin-top:2px">Season pts</div></div></div>
     <div class="pf-kpis">${g(p.w,'W','var(--lime)')}${g(p.l,'L','var(--red)')}${g(p.avg,'Avg')}${g(p.winPct+'%','Win%')}</div>
     <div class="pf-kpis">${g(p.pf,'PS')}${g(p.pa,'PA')}${g((p.diff>0?'+':'')+p.diff,'Diff',p.diff>=0?'var(--lime)':'var(--red)')}${g(skStr,'Streak',sk>0?'var(--lime)':sk<0?'var(--red)':'var(--mut)')}</div>

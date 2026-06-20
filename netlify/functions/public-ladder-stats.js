@@ -11,7 +11,10 @@
 import { verifyPlayerSession } from './lib/auth.js';
 import { getEvent } from './lib/ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './lib/ladder-play.js';
-import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners } from './lib/ladder-scoring.js';
+import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier } from './lib/ladder-scoring.js';
+import { getXpConfig, getXpGrants, grantTotals } from './lib/xp-config.js';
+import { getMergeMap, applyMerges } from './lib/player-merge.js';
+import { getDirectory, applyDirectory } from './lib/player-directory.js';
 
 function json(body) {
   return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=20' } });
@@ -62,10 +65,38 @@ export default async (req) => {
   }
 
   // ── season-wide ──
-  const plays = await listPlay();
+  const plays = applyDirectory(applyMerges(await listPlay(), await getMergeMap()), await getDirectory());
   const sessions = plays.map(toSession);
   const players = playersFromPlay(plays);
   const { rows } = buildRows(sessions, players);
+
+  // ── Divisions: group standings by each ladder's type. Men's/Women's are only
+  // "active" once such a ladder has been played (i.e. it has standings rows). ──
+  const typeByEvent = {};
+  await Promise.all(plays.map(async p => { const ev = await getEvent(p.eventId).catch(() => null); typeByEvent[p.eventId] = ev?.type || 'mixed'; }));
+  const divisions = { all: rows };
+  const activeDivisions = ['all'];
+  for (const d of ['mixed', 'mens', 'womens']) {
+    const dPlays = plays.filter(p => (typeByEvent[p.eventId] || 'mixed') === d);
+    const dRows = dPlays.length ? buildRows(dPlays.map(toSession), playersFromPlay(dPlays)).rows : [];
+    divisions[d] = dRows;
+    if (dRows.length) activeDivisions.push(d);
+  }
+
+  // ── XP: one cumulative engagement score across ALL ladders (place tiebreak = DR). ──
+  const allStats = calcStats(sessions, players);
+  const allDr = calcDinkRating(allStats, sessions, players);
+  const xpCfg = await getXpConfig();
+  const gTot = grantTotals(await getXpGrants());
+  const { xp, detail } = calcXP(sessions, players, allDr, xpCfg.amounts);
+  Object.keys(gTot).forEach(id => { if (id in xp) xp[id] += gTot[id]; });
+  const pById = {}; players.forEach(p => { pById[p.id] = p; });
+  const xpLeaderboard = Object.keys(xp)
+    .filter(id => detail[id] && detail[id].nights > 0)
+    .map(id => ({ id, name: pById[id]?.name, gender: pById[id]?.gender, xp: xp[id], nights: detail[id].nights, firsts: detail[id].firsts, tier: xpTier(xp[id]) }))
+    .sort((a, b) => (b.xp - a.xp) || (b.nights - a.nights));
+  const attachXP = arr => arr.forEach(r => { r.xp = xp[r.id] || 0; });
+  attachXP(rows); Object.values(divisions).forEach(attachXP);
 
   const mvpLeaders = rows.filter(r => r.mvp > 0).sort((a, b) => b.mvp - a.mvp).slice(0, 6).map(r => ({ id: r.id, name: r.name, count: r.mvp }));
   const hotStreaks = rows.filter(r => r.maxStreak > 0).sort((a, b) => b.maxStreak - a.maxStreak).slice(0, 6).map(r => ({ id: r.id, name: r.name, streak: r.maxStreak }));
@@ -83,7 +114,7 @@ export default async (req) => {
   const v = await verifyPlayerSession(req);
   if (v.valid) { const me = rows.find(r => r.id === v.payload.playerId); if (me) you = me; }
 
-  return json({ leaderboard: rows, mvpLeaders, hotStreaks, partnerships, recentWinners, you, hasData: rows.length > 0 });
+  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, hotStreaks, partnerships, recentWinners, you, hasData: rows.length > 0 });
 };
 
 export const config = { path: '/.netlify/functions/public-ladder-stats' };

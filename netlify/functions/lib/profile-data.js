@@ -16,14 +16,20 @@ import { normalizeEmail } from './identity.js';
 import { findPlayerByEmail } from './player-auth.js';
 import { listEvents, getSignups, getEvent } from './ladder.js';
 import { listPlay, toSession, playersFromPlay } from './ladder-play.js';
-import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount } from './ladder-scoring.js';
+import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcXP, xpTier } from './ladder-scoring.js';
+import { getXpConfig, getXpGrants, grantTotals } from './xp-config.js';
+import { getMergeMap, applyMerges, resolve as resolveMerge } from './player-merge.js';
+import { getDirectory, applyDirectory } from './player-directory.js';
 
 const nm = p => (p ? p.name : null);
 
 // ─────────────────────────── LADDER ───────────────────────────
 
-// Email a ladder player signed up with (first match wins), or null.
+// Email for a ladder player — master directory wins, else the email they signed up
+// with on any event (first match).
 export async function ladderEmailById(id) {
+  const dir = await getDirectory();
+  if (dir[id] && dir[id].email) return normalizeEmail(dir[id].email);
   for (const ev of await listEvents()) {
     const su = await getSignups(ev.id);
     const hit = [...(su.roster || []), ...(su.waitlist || [])].find(p => p.playerId === id && p.email);
@@ -32,10 +38,12 @@ export async function ladderEmailById(id) {
   return null;
 }
 
-// Ladder player id for an email (scans signups), or null.
+// Ladder player id for an email — checks the master directory, then signups.
 export async function ladderIdByEmail(rawEmail) {
   const norm = normalizeEmail(rawEmail);
   if (!norm) return null;
+  const dir = await getDirectory();
+  for (const [pid, info] of Object.entries(dir)) { if (info.email && normalizeEmail(info.email) === norm) return pid; }
   for (const ev of await listEvents()) {
     const su = await getSignups(ev.id);
     const hit = [...(su.roster || []), ...(su.waitlist || [])].find(p => p.email && normalizeEmail(p.email) === norm && p.playerId);
@@ -72,7 +80,9 @@ function walk(plays, id) {
 
 // Full ladder profile (the Pickleladder player card). Returns { found, email, player }.
 export async function buildLadderProfile(id) {
-  const plays = await listPlay();
+  const _mm = await getMergeMap();
+  id = resolveMerge(_mm, id);
+  const plays = applyDirectory(applyMerges(await listPlay(), _mm), await getDirectory());
   const sessions = plays.map(toSession);
   const players = playersFromPlay(plays);
   const stats = calcStats(sessions, players);
@@ -82,6 +92,8 @@ export async function buildLadderProfile(id) {
   const dr = calcDinkRating(stats, sessions, players);
   const bonus = calcBonusPts(sessions, players)[id] || {};
   const mvp = calcMvpCount(sessions, players)[id] || 0;
+  const _xpCfg = await getXpConfig();
+  const myXp = ((calcXP(sessions, players, dr, _xpCfg.amounts).xp[id]) || 0) + (grantTotals(await getXpGrants())[id] || 0);
   const gp = me.w + me.l;
 
   const ranked = stats.filter(s => s.w + s.l > 0)
@@ -112,7 +124,8 @@ export async function buildLadderProfile(id) {
       avg: me.roundPts.length ? Math.round(me.pf / me.roundPts.length * 10) / 10 : 0,
       winPct: gp ? Math.round(100 * me.w / gp) : 0,
       streak: me.streak, maxStreak: me.maxStreak,
-      seasonPts: me.pf + (bonus.bonus || 0), nights: me.attended,
+      seasonPts: me.pf + (bonus.bonus || 0), nights: me.attended, ladders: me.attended,
+      xp: myXp, xpTier: xpTier(myXp),
       podiums: (bonus.ladderResults || []).filter(r => r.rank <= 3).length, mvp,
       peakCourt: Math.max(0, ...movement.map(m => m.court)), totalRounds: movement.length,
       last10: movement.slice(-10), movement, perLadder,

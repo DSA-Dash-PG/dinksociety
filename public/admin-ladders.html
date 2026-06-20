@@ -70,7 +70,7 @@
       <div><label class="l">Start time</label><input class="i" id="f-time" placeholder="8:30 AM"></div>
       <div><label class="l">End time</label><input class="i" id="f-end" placeholder="11:30 AM"></div>
     </div>
-    <div class="frow"><label class="l">Type</label><div class="seg" id="seg-type"><button class="on" data-v="mixed">Mixed</button><button data-v="mens">Men's</button><button data-v="womens">Women's</button></div></div>
+    <div class="frow"><label class="l">Division</label><div class="seg" id="seg-type"><button class="on" data-v="mixed">Mixed</button><button data-v="mens">Men's</button><button data-v="womens">Women's</button></div></div>
     <div class="frow"><label class="l">Location</label><input class="i" id="f-place" placeholder="SBTC"></div>
     <div class="frow row2">
       <div><label class="l">Courts</label><input class="i" id="f-courts" type="number" value="3" oninput="recalc()"></div>
@@ -95,6 +95,12 @@
     <div id="importMsg"></div>
   </div>
 
+  <div class="sec">XP rules</div>
+  <div class="card" id="xpCard"><div class="empty">Loading…</div></div>
+
+  <div class="sec">Players &amp; duplicates</div>
+  <div class="card" id="playersCard"><div class="empty">Loading…</div></div>
+
   <div class="sec">Your ladders</div>
   <div class="card" id="list"><div class="empty">Loading…</div></div>
 </div>
@@ -114,7 +120,7 @@
     <div><label class="l">End time</label><input class="i" id="m-end"></div>
   </div>
   <div class="frow"><label class="l">Location</label><input class="i" id="m-place"></div>
-  <div class="frow"><label class="l">Type</label><select class="i" id="m-type"><option value="mixed">Mixed</option><option value="mens">Men's</option><option value="womens">Women's</option></select></div>
+  <div class="frow"><label class="l">Division</label><select class="i" id="m-type"><option value="mixed">Mixed</option><option value="mens">Men's</option><option value="womens">Women's</option></select></div>
   <div class="frow row2">
     <div><label class="l">Courts</label><input class="i" id="m-courts" type="number"></div>
     <div><label class="l">Total players</label><input class="i" id="m-cap" type="number"></div>
@@ -149,6 +155,70 @@ document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(
 function recalc(){ const c=parseInt(document.getElementById('f-courts').value)||0; document.getElementById('f-cap').value=c*4; }
 
 async function api(path,opts){ const r=await fetch(API+path,{credentials:'include',...opts}); let d={}; try{ d=await r.json(); }catch{} return {status:r.status,d}; }
+
+/* ---- XP rules ---- */
+let XPDATA=null;
+const AMT=[['played','Played a ladder'],['gameWin','Game win'],['place1','1st place'],['place2','2nd place'],['place3','3rd place'],['placeStep','Drop / place after 3rd'],['mvp','Round MVP'],['mostWins','Most wins (top 4)'],['bestDiff','Best diff (top 4)'],['comeback','Comeback']];
+async function loadXp(){ const {d}=await api('/admin-ladder-xp'); XPDATA=d; renderXp(); }
+function xpPost(body){ return api('/admin-ladder-xp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+function renderXp(){
+  const el=document.getElementById('xpCard'); const d=XPDATA;
+  if(!d||!d.amounts){ el.innerHTML='<div class="empty">Sign in as admin (or use the scoring PIN) to manage XP.</div>'; return; }
+  let h='<div style="font-size:.78rem;font-weight:800;color:#b8ff2c;margin-bottom:8px">Built-in XP amounts</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 10px">';
+  AMT.forEach(([k,lab])=>{ h+=`<div><label class="l">${lab}</label><input class="i" type="number" id="xp-${k}" value="${d.amounts[k]??0}"></div>`; });
+  h+='</div><button class="btn btn-lime" style="margin-top:10px" onclick="saveAmounts()">Save amounts</button><div id="xpAmtMsg"></div>';
+  h+='<div class="sec" style="margin:16px 0 8px">Custom awards</div>';
+  h+=(d.awards||[]).map(a=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06)"><span style="font-size:.84rem">${esc(a.label)} <span style="color:#b8ff2c;font-weight:800">+${a.xp}</span></span><button class="btn-danger" style="font-size:.7rem;padding:3px 8px" onclick="rmAward('${a.id}')">Remove</button></div>`).join('')||'<div style="font-size:.78rem;color:#5e655a">No custom awards yet.</div>';
+  h+='<div class="row2" style="margin-top:10px"><input class="i" id="aw-label" placeholder="Award name (e.g. Volunteer)"><input class="i" id="aw-xp" type="number" placeholder="XP" style="max-width:90px"></div><button class="btn btn-out" style="margin-top:8px" onclick="addAward()">Add award</button>';
+  h+='<div class="sec" style="margin:16px 0 8px">Grant XP to a player</div>';
+  h+='<select class="i" id="gr-player"><option value="">Choose player…</option>'+(d.players||[]).map(p=>`<option value="${p.id}">${esc(p.name)}</option>`).join('')+'</select>';
+  h+='<select class="i" id="gr-award" style="margin-top:8px"><option value="">— custom reason —</option>'+(d.awards||[]).map(a=>`<option value="${a.id}">${esc(a.label)} (+${a.xp})</option>`).join('')+'</select>';
+  h+='<div class="row2" style="margin-top:8px"><input class="i" id="gr-label" placeholder="Reason (if custom)"><input class="i" id="gr-xp" type="number" placeholder="XP" style="max-width:90px"></div>';
+  h+='<button class="btn btn-lime" style="margin-top:8px" onclick="grantXp()">Grant XP</button><div id="grMsg"></div>';
+  const g=(d.grants||[]).slice().reverse().slice(0,12);
+  if(g.length){ const nm={}; (d.players||[]).forEach(p=>nm[p.id]=p.name);
+    h+='<div class="sec" style="margin:16px 0 8px">Recent grants</div>';
+    h+=g.map(x=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.78rem"><span>${esc(nm[x.playerId]||x.playerId)} · ${esc(x.label)} <span style="color:#b8ff2c;font-weight:800">+${x.xp}</span></span><button class="btn-danger" style="font-size:.68rem;padding:3px 8px" onclick="ungrant('${x.id}')">↩</button></div>`).join('');
+  }
+  el.innerHTML=h;
+}
+async function saveAmounts(){ const amounts={}; AMT.forEach(([k])=>amounts[k]=parseInt(document.getElementById('xp-'+k).value)||0); const {d}=await xpPost({action:'save-amounts',amounts}); document.getElementById('xpAmtMsg').innerHTML=d.ok?'<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Saved.</div>':'<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
+async function addAward(){ const label=(document.getElementById('aw-label').value||'').trim(); const xp=parseInt(document.getElementById('aw-xp').value)||0; if(!label)return; const {d}=await xpPost({action:'upsert-award',label,xp}); if(d.ok){ XPDATA.awards=d.awards; renderXp(); } }
+async function rmAward(id){ const {d}=await xpPost({action:'remove-award',id}); if(d.ok) loadXp(); }
+async function grantXp(){ const playerId=document.getElementById('gr-player').value; if(!playerId){ document.getElementById('grMsg').innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick a player.</div>'; return; } const awardId=document.getElementById('gr-award').value; let label,xp; if(awardId){ const a=(XPDATA.awards||[]).find(a=>a.id===awardId); label=a?a.label:'Award'; xp=a?a.xp:0; } else { label=(document.getElementById('gr-label').value||'').trim()||'Bonus'; xp=parseInt(document.getElementById('gr-xp').value)||0; } const {d}=await xpPost({action:'grant',playerId,label,xp,awardId:awardId||null}); if(d.ok){ loadXp(); document.getElementById('grMsg').innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Granted.</div>'; } else document.getElementById('grMsg').innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
+async function ungrant(id){ const {d}=await xpPost({action:'ungrant',id}); if(d.ok) loadXp(); }
+loadXp();
+
+/* ---- Players & duplicate merge ---- */
+let PLDATA=null;
+function plPost(b){ return api('/admin-ladder-players',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b)}); }
+async function loadPlayers(){ const {d}=await api('/admin-ladder-players'); PLDATA=d; renderPlayers(); }
+function renderPlayers(){
+  const el=document.getElementById('playersCard'); const d=PLDATA;
+  if(!d||!d.players){ el.innerHTML='<div class="empty">Sign in as admin (or use the scoring PIN) to manage players.</div>'; return; }
+  const opts=d.players.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.gender||'—'} · ${p.nights} ladders)</option>`).join('');
+  let h='<div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">Master roster — set a player\'s email (links their league profile), fix name/gender, or merge duplicates. Changes apply across every ladder.</div>';
+  h+='<label class="l">Edit a player</label><select class="i" id="ed-player" onchange="edFill()"><option value="">Choose…</option>'+opts+'</select>';
+  h+='<input class="i" id="ed-email" type="email" placeholder="Email (links league profile)" style="margin-top:8px"><div class="row2" style="margin-top:8px"><input class="i" id="ed-name" placeholder="Name"><select class="i" id="ed-gender" style="max-width:90px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select></div>';
+  h+='<button class="btn btn-lime" style="margin-top:8px" onclick="savePlayer()">Save player</button><div id="edMsg"></div>';
+  h+='<div class="sec" style="margin:16px 0 8px">Merge duplicates</div>';
+  h+='<label class="l">Merge this duplicate</label><select class="i" id="mg-from"><option value="">Choose…</option>'+opts+'</select>';
+  h+='<label class="l" style="margin-top:8px;display:block">…into this player (keep)</label><select class="i" id="mg-to"><option value="">Choose…</option>'+opts+'</select>';
+  h+='<input class="i" id="mg-name" placeholder="Name to keep (optional)" style="margin-top:8px">';
+  h+='<button class="btn btn-lime" style="margin-top:8px" onclick="doMerge()">Merge players</button><div id="mgMsg"></div>';
+  if(d.merges&&d.merges.length){ const nm={}; d.players.forEach(p=>nm[p.id]=p.name);
+    h+='<div class="sec" style="margin:16px 0 8px">Current merges</div>';
+    h+=d.merges.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.78rem"><span>${esc(nm[m.from]||m.from)} → ${esc(m.name||nm[m.to]||m.to)}</span><button class="btn-danger" style="font-size:.68rem;padding:3px 8px" onclick="undoMerge('${m.from}')">Unmerge</button></div>`).join('');
+  }
+  h+='<div class="sec" style="margin:16px 0 8px">All players ('+d.players.length+')</div>';
+  h+='<div style="max-height:240px;overflow:auto">'+d.players.map(p=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.78rem;${p.mergedInto?'opacity:.5':''}"><span>${esc(p.name)} <span style="color:#5e655a">${p.gender||''}</span></span><span style="color:#9aa094">${p.nights} ladders${p.email?' · ✉':''}${p.mergedInto?' · merged':''}</span></div>`).join('')+'</div>';
+  el.innerHTML=h;
+}
+async function doMerge(){ const from=document.getElementById('mg-from').value,to=document.getElementById('mg-to').value,name=(document.getElementById('mg-name').value||'').trim(); const M=document.getElementById('mgMsg'); if(!from||!to||from===to){ M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick two different players.</div>'; return; } const {d}=await plPost({action:'merge',from,to,name:name||null}); if(d.ok){ loadPlayers(); loadXp(); M.innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Merged.</div>'; } else M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
+async function undoMerge(from){ const {d}=await plPost({action:'unmerge',from}); if(d.ok) loadPlayers(); }
+function edFill(){ const id=document.getElementById('ed-player').value; const p=(PLDATA.players||[]).find(x=>x.id===id)||{}; document.getElementById('ed-email').value=p.email||''; document.getElementById('ed-name').value=p.name||''; document.getElementById('ed-gender').value=p.gender||''; }
+async function savePlayer(){ const id=document.getElementById('ed-player').value; const M=document.getElementById('edMsg'); if(!id){ M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick a player.</div>'; return; } const email=(document.getElementById('ed-email').value||'').trim(); const name=(document.getElementById('ed-name').value||'').trim(); const gender=document.getElementById('ed-gender').value; const {d}=await plPost({action:'update',id,email,name,gender}); if(d.ok){ loadPlayers(); M.innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Saved.</div>'; } else M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
+loadPlayers();
 
 async function loadList(){
   const el=document.getElementById('list');
