@@ -50,62 +50,122 @@
   .msg{ padding:10px 13px;border-radius:9px;font-size:.78rem;font-weight:600;margin:10px 0; }
   .msg.ok{ background:rgba(184,255,44,.14);color:var(--lime); } .msg.err{ background:rgba(255,92,71,.14);color:var(--red); }
   .empty{ color:#5e655a;font-size:.88rem;padding:18px 0; }
+  .topbar2{ display:none;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.08);background:#0a0b09;position:sticky;top:0;z-index:40; }
+  .ham{ background:none;border:0;color:#f0f2ec;font-size:1.5rem;line-height:1;cursor:pointer;padding:0 2px; }
+  .shell{ display:flex;align-items:flex-start;min-height:100vh; }
+  .side{ width:208px;flex-shrink:0;align-self:stretch;background:#0a0b09;border-right:1px solid rgba(255,255,255,.07);padding:14px 0; }
+  .side-top{ display:flex;align-items:center;justify-content:space-between;padding:0 14px 12px; }
+  .side .close{ display:none;background:none;border:0;color:#9aa094;font-size:1.2rem;cursor:pointer; }
+  .navi{ display:flex;align-items:center;gap:10px;padding:11px 16px;cursor:pointer;font-size:.84rem;font-weight:600;color:#cdd2c6;border-left:2px solid transparent; }
+  .navi.on{ color:var(--lime);font-weight:800;border-left-color:var(--lime);background:rgba(184,255,44,.08); }
+  .main{ flex:1;min-width:0;max-width:880px;padding:20px 22px 70px; }
+  .ssec{ display:none; } .ssec.on{ display:block; }
+  .scrim{ display:none; }
+  .kpis{ display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px; } .kpi{ background:#161914;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:13px 15px;flex:1;min-width:110px; } .kpi .n{ font-size:1.4rem;font-weight:900; } .kpi .l{ font-size:.58rem;text-transform:uppercase;letter-spacing:.05em;color:#9aa094;margin-top:2px; }
+  @media(max-width:760px){
+    .topbar2{ display:flex; }
+    .side{ position:fixed;top:0;left:0;bottom:0;transform:translateX(-100%);transition:transform .22s ease;z-index:60;width:236px; }
+    .side.open{ transform:none; }
+    .side .close{ display:block; }
+    .scrim.on{ display:block;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:55; }
+    .main{ padding:16px 14px 70px; }
+  }
 </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="topbar">
-    <div class="brand"><div class="mk">DS</div><div><small>The Dink Society</small><b>Ladders · Admin</b></div></div>
-    <span class="badge">Admin</span>
-  </div>
-  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">
-    <h1 style="margin:0">Ladder Challengers · Admin</h1>
-    <a class="btn btn-lime" href="/ladder-score.html" style="width:auto;text-decoration:none;padding:9px 16px">🎾 Ladder scoring →</a>
-  </div>
+<div class="topbar2">
+  <button class="ham" onclick="openDrawer()" aria-label="Menu">☰</button>
+  <div class="brand" style="flex:1"><div class="mk">DS</div><div><small>The Dink Society</small><b>Ladder Challengers</b></div></div>
+  <a class="btn btn-lime btn-sm" href="/ladder-score.html" style="text-decoration:none">Score</a>
+</div>
 
-  <div id="authBanner" class="banner" style="display:none">You're not signed in as admin. <a href="/admin.html">Sign in at /admin.html</a>, then reload this page.</div>
-
-  <div class="sec">Create a ladder</div>
-  <div class="card">
-    <div class="frow"><label class="l">Name</label><input class="i" id="f-name" placeholder="Saturday Morning Ladder"></div>
-    <div class="frow row2">
-      <div><label class="l">Date</label><input class="i" id="f-date" type="date"></div>
-      <div><label class="l">Start time</label><input class="i" id="f-time" placeholder="8:30 AM"></div>
-      <div><label class="l">End time</label><input class="i" id="f-end" placeholder="11:30 AM"></div>
+<div class="shell">
+  <aside class="side" id="side">
+    <div class="side-top">
+      <div class="brand"><div class="mk">DS</div><div><small>Ladder</small><b>Admin</b></div></div>
+      <button class="close" onclick="closeDrawer()" aria-label="Close">✕</button>
     </div>
-    <div class="frow"><label class="l">Division</label><div class="seg" id="seg-type"><button class="on" data-v="mixed">Mixed</button><button data-v="mens">Men's</button><button data-v="womens">Women's</button></div></div>
-    <div class="frow"><label class="l">Location</label><input class="i" id="f-place" placeholder="SBTC"></div>
-    <div class="frow row2">
-      <div><label class="l">Courts</label><input class="i" id="f-courts" type="number" value="3" oninput="recalc()"></div>
-      <div><label class="l">Total players</label><input class="i" id="f-cap" type="number" value="12"></div>
-      <div><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" value="7"></div>
-    </div>
-    <div class="help" style="margin:-6px 0 13px">Capacity auto-fills to courts × 4. Card adds a 10% service fee; Venmo is fee-free.</div>
-    <div class="frow row2">
-      <div><label class="l">League Venmo</label><input class="i" id="f-venmo" value="@DinkSociety"></div>
-      <div><label class="l">Organizer emails (Venmo confirm)</label><input class="i" id="f-org" placeholder="you@email.com, treasurer@…"></div>
-    </div>
-    <div class="frow"><label class="l">When a spot opens</label><div class="seg" id="seg-spot"><button class="on" data-v="hold">Hold &amp; confirm (30m)</button><button data-v="auto">Auto-claim</button></div></div>
-    <div class="frow"><label class="l">When a player cancels</label><div class="seg" id="seg-cancel"><button class="on" data-v="auto_credit">Auto credit</button><button data-v="credit_if_refilled">If refilled</button><button data-v="no_credit">No credit</button></div></div>
-    <button class="btn btn-lime" onclick="createLadder()">Create &amp; open signups</button>
-    <div id="createMsg"></div>
-  </div>
+    <div id="nav"></div>
+    <div style="padding:14px 16px 4px;margin-top:8px;border-top:1px solid rgba(255,255,255,.07)"><a class="btn btn-lime btn-sm" href="/ladder-score.html" style="text-decoration:none;width:100%">🎾 Ladder scoring</a></div>
+  </aside>
+  <div class="scrim" id="scrim" onclick="closeDrawer()"></div>
 
-  <div class="sec">Migrate history</div>
-  <div class="card">
-    <div style="font-size:.82rem;color:#9aa094;margin-bottom:10px">Pull every past ladder night from the old Pickleladder site into Dink Society — finalized, with stats &amp; DR. Safe to re-run (already-imported nights are skipped).</div>
-    <button class="btn btn-out" onclick="importOld()">Import previous matches</button>
-    <div id="importMsg"></div>
-  </div>
+  <main class="main">
+    <div id="authBanner" class="banner" style="display:none">You're not signed in as admin. <a href="/admin.html">Sign in at /admin.html</a>, then reload this page.</div>
 
-  <div class="sec">XP rules</div>
-  <div class="card" id="xpCard"><div class="empty">Loading…</div></div>
+    <section class="ssec on" id="s-dash">
+      <h1 style="margin:0 0 4px">Dashboard</h1>
+      <div class="sec" style="margin-top:14px">At a glance</div>
+      <div class="kpis" id="dashKpis"></div>
+      <div class="sec">Quick actions</div>
+      <div class="card"><div class="row2">
+        <button class="btn btn-lime" onclick="showSec('ladders')">+ Create / manage ladders</button>
+        <a class="btn btn-out" href="/ladder-score.html" style="text-decoration:none">🎾 Score a night</a>
+        <button class="btn btn-out" onclick="showSec('players')">Edit players</button>
+      </div></div>
+    </section>
 
-  <div class="sec">Players &amp; duplicates</div>
-  <div class="card" id="playersCard"><div class="empty">Loading…</div></div>
+    <section class="ssec" id="s-ladders">
+      <h1 style="margin:0 0 4px">Ladders</h1>
+      <div class="sec">Create a ladder</div>
+      <div class="card">
+        <div class="frow"><label class="l">Name</label><input class="i" id="f-name" placeholder="Saturday Morning Ladder"></div>
+        <div class="frow row2">
+          <div><label class="l">Date</label><input class="i" id="f-date" type="date"></div>
+          <div><label class="l">Start time</label><input class="i" id="f-time" placeholder="8:30 AM"></div>
+          <div><label class="l">End time</label><input class="i" id="f-end" placeholder="11:30 AM"></div>
+        </div>
+        <div class="frow"><label class="l">Division</label><div class="seg" id="seg-type"><button class="on" data-v="mixed">Mixed</button><button data-v="mens">Men's</button><button data-v="womens">Women's</button></div></div>
+        <div class="frow"><label class="l">Location</label><input class="i" id="f-place" placeholder="SBTC"></div>
+        <div class="frow row2">
+          <div><label class="l">Courts</label><input class="i" id="f-courts" type="number" value="3" oninput="recalc()"></div>
+          <div><label class="l">Total players</label><input class="i" id="f-cap" type="number" value="12"></div>
+          <div><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" value="7"></div>
+        </div>
+        <div class="help" style="margin:-6px 0 13px">Capacity auto-fills to courts × 4. Card adds a 10% service fee; Venmo is fee-free.</div>
+        <div class="frow row2">
+          <div><label class="l">League Venmo</label><input class="i" id="f-venmo" value="@DinkSociety"></div>
+          <div><label class="l">Organizer emails (Venmo confirm)</label><input class="i" id="f-org" placeholder="you@email.com, treasurer@…"></div>
+        </div>
+        <div class="frow"><label class="l">When a spot opens</label><div class="seg" id="seg-spot"><button class="on" data-v="hold">Hold &amp; confirm (30m)</button><button data-v="auto">Auto-claim</button></div></div>
+        <div class="frow"><label class="l">When a player cancels</label><div class="seg" id="seg-cancel"><button class="on" data-v="auto_credit">Auto credit</button><button data-v="credit_if_refilled">If refilled</button><button data-v="no_credit">No credit</button></div></div>
+        <button class="btn btn-lime" onclick="createLadder()">Create &amp; open signups</button>
+        <div id="createMsg"></div>
+      </div>
+      <div class="sec">Your ladders</div>
+      <div class="card" id="list"><div class="empty">Loading…</div></div>
+    </section>
 
-  <div class="sec">Your ladders</div>
-  <div class="card" id="list"><div class="empty">Loading…</div></div>
+    <section class="ssec" id="s-players">
+      <h1 style="margin:0 0 4px">Players</h1>
+      <div class="sec">Master roster &amp; duplicates</div>
+      <div class="card" id="playersCard"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section class="ssec" id="s-scoring">
+      <h1 style="margin:0 0 4px">Scoring</h1>
+      <div class="card"><div style="font-size:.84rem;color:#9aa094;margin-bottom:13px">Run rounds &amp; enter scores — same admin login, no PIN. Open a current night, or reopen a past one to re-score.</div><a class="btn btn-lime" href="/ladder-score.html" style="text-decoration:none">🎾 Open ladder scoring →</a></div>
+    </section>
+
+    <section class="ssec" id="s-xp">
+      <h1 style="margin:0 0 4px">XP &amp; rewards</h1>
+      <div class="card" id="xpCard"><div class="empty">Loading…</div></div>
+    </section>
+
+    <section class="ssec" id="s-import">
+      <h1 style="margin:0 0 4px">Import history</h1>
+      <div class="card">
+        <div style="font-size:.82rem;color:#9aa094;margin-bottom:12px">Pull past Pickleladder nights into Dink Society — finalized, with scores, stats &amp; DR. <b>Import</b> adds new nights; <b>Re-sync</b> refreshes scores on nights that were already imported.</div>
+        <div class="row2"><button class="btn btn-out" onclick="importOld()">Import previous matches</button><button class="btn btn-out" onclick="importResync()">Re-sync (refresh scores)</button></div>
+        <div id="importMsg"></div>
+      </div>
+    </section>
+
+    <section class="ssec" id="s-settings">
+      <h1 style="margin:0 0 4px">Settings</h1>
+      <div class="card"><div style="font-size:.84rem;color:#9aa094;line-height:1.6">Divisions (Mixed / Men's / Women's) are set per ladder when you create one, and a division only appears on the public leaderboard once it's been played. Default fee, Venmo handle, and organizer emails are also set per ladder.</div></div>
+    </section>
+  </main>
 </div>
 
 <!-- manage modal -->
@@ -158,6 +218,17 @@ document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(
 function recalc(){ const c=parseInt(document.getElementById('f-courts').value)||0; document.getElementById('f-cap').value=c*4; }
 
 async function api(path,opts){ const r=await fetch(API+path,{credentials:'include',...opts}); let d={}; try{ d=await r.json(); }catch{} return {status:r.status,d}; }
+
+/* ---- admin shell: sidebar nav + mobile drawer ---- */
+const SECS=[['dash','Dashboard'],['ladders','Ladders'],['players','Players'],['scoring','Scoring'],['xp','XP & rewards'],['import','Import'],['settings','Settings']];
+let CURSEC='dash';
+function renderNav(){ const n=document.getElementById('nav'); if(n) n.innerHTML=SECS.map(([k,l])=>`<div class="navi${k===CURSEC?' on':''}" onclick="showSec('${k}')">${l}</div>`).join(''); }
+function showSec(k){ CURSEC=k; document.querySelectorAll('.ssec').forEach(s=>s.classList.toggle('on',s.id==='s-'+k)); renderNav(); if(k==='dash') renderDash(); closeDrawer(); window.scrollTo({top:0}); }
+function openDrawer(){ document.getElementById('side').classList.add('open'); document.getElementById('scrim').classList.add('on'); }
+function closeDrawer(){ const s=document.getElementById('side'); if(s) s.classList.remove('open'); const sc=document.getElementById('scrim'); if(sc) sc.classList.remove('on'); }
+function renderDash(){ const el=document.getElementById('dashKpis'); if(!el) return; const lad=document.querySelectorAll('#list .lad').length; let pl=0; try{ pl=(PLDATA&&PLDATA.players)?PLDATA.players.length:0; }catch(e){} el.innerHTML=`<div class="kpi"><div class="n" style="color:var(--lime)">${lad||'—'}</div><div class="l">Ladders</div></div><div class="kpi"><div class="n" style="color:var(--teal)">${pl||'—'}</div><div class="l">Players</div></div>`; }
+async function importResync(){ const M=document.getElementById('importMsg'); M.innerHTML='<div class="msg">Re-syncing — refreshing scores from the old site…</div>'; const {status,d}=await api('/admin-ladder-import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({resync:true})}); if(status===401){ M.innerHTML='<div class="msg err">Sign in as admin first.</div>'; return; } M.innerHTML=d.ok?`<div class="msg ok">Re-synced ${d.resynced||0} night(s) · imported ${d.imported||0} new · skipped ${d.skipped||0}. Scores refreshed.</div>`:`<div class="msg err">${d.error||'Failed'}</div>`; }
+renderNav();
 
 /* ---- XP rules ---- */
 let XPDATA=null;

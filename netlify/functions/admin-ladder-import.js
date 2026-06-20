@@ -37,7 +37,8 @@ export default async (req) => {
   }
 
   const ladders = data.ladders || [];
-  let imported = 0, skipped = 0, playersTouched = 0;
+  const resync = !!body.resync;   // when true, refresh play/roster for already-imported nights
+  let imported = 0, resynced = 0, skipped = 0, playersTouched = 0;
   const log = [];
 
   for (const lg of ladders) {
@@ -49,7 +50,8 @@ export default async (req) => {
         if (!hasScore) continue;
 
         const eid = 'imp_' + sess.id;
-        if (await getEvent(eid)) { skipped++; continue; }
+        const existing = await getEvent(eid);
+        if (existing && !resync) { skipped++; continue; }
 
         const event = {
           id: eid, circuit: 'legacy',
@@ -62,7 +64,8 @@ export default async (req) => {
           importLeague: lg.name, importSeason: season.name,
           createdAt: new Date().toISOString(), createdBy: 'import',
         };
-        await setEvent(event);
+        if (!existing) await setEvent(event);   // keep existing event metadata on re-sync
+        // Always (re)write the play record — THIS backfills scores onto already-imported nights.
         await setPlay(eid, { eventId: eid, date: sess.date || null, rounds: sess.rounds, finished: true, source: 'pickleladder' });
 
         // Roster: from participants if present, else everyone who appears in rounds.
@@ -85,13 +88,14 @@ export default async (req) => {
           waitlist: [], pendingClaim: null,
         });
 
-        imported++; playersTouched += entries.length;
-        log.push({ event: event.name, players: entries.length });
+        if (existing) resynced++; else imported++;
+        playersTouched += entries.length;
+        log.push({ event: event.name, players: entries.length, resynced: !!existing });
       }
     }
   }
 
-  return json({ ok: true, imported, skipped, playersTouched, log });
+  return json({ ok: true, imported, resynced, skipped, playersTouched, log });
 };
 
 export const config = { path: '/.netlify/functions/admin-ladder-import' };
