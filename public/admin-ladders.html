@@ -94,7 +94,24 @@
 <div class="ov" id="ov"><div class="sheet"><button class="x" onclick="closeManage()">×</button>
   <h2 id="mTitle" style="font-size:1.1rem;margin:0 0 2px">Manage</h2>
   <div id="mMeta" style="font-size:.74rem;color:#9aa094;margin-bottom:6px"></div>
-  <div class="frow"><label class="l">Status</label><div class="seg" id="seg-status"><button data-v="open">Open</button><button data-v="live">Live</button><button data-v="final">Final</button><button data-v="cancelled">Cancelled</button></div></div>
+
+  <div class="sec" style="margin:8px 0 8px">Edit details</div>
+  <div class="frow"><label class="l">Name</label><input class="i" id="m-name"></div>
+  <div class="frow row2">
+    <div><label class="l">Date</label><input class="i" id="m-date" type="date"></div>
+    <div><label class="l">Start time</label><input class="i" id="m-time"></div>
+  </div>
+  <div class="frow"><label class="l">Location</label><input class="i" id="m-place"></div>
+  <div class="frow row2">
+    <div><label class="l">Courts</label><input class="i" id="m-courts" type="number"></div>
+    <div><label class="l">Capacity</label><input class="i" id="m-cap" type="number"></div>
+    <div><label class="l">Entry fee ($)</label><input class="i" id="m-fee" type="number" step="0.01"></div>
+  </div>
+  <div class="frow"><label class="l">League Venmo</label><input class="i" id="m-venmo"></div>
+  <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
+  <div id="mEditMsg"></div>
+
+  <div class="frow" style="margin-top:18px"><label class="l">Status</label><div class="seg" id="seg-status"><button data-v="open">Open</button><button data-v="live">Live</button><button data-v="final">Final</button><button data-v="cancelled">Cancelled</button></div></div>
   <div id="mBody"></div>
   <div id="mMsg"></div>
   <div style="margin-top:16px;text-align:right"><button class="btn-danger" onclick="delLadder()">Delete ladder</button></div>
@@ -155,6 +172,10 @@ async function openManage(id){
   document.getElementById('mTitle').textContent=d.event.name;
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
   document.querySelectorAll('#seg-status button').forEach(b=>b.classList.toggle('on',b.dataset.v===(d.event.status||'open')));
+  const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
+  setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-place',d.event.place);
+  setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
+  document.getElementById('mEditMsg').innerHTML='';
   let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
   h+= d.roster.length? d.roster.map(p=>{
     const pay=p.paymentStatus==='paid'?`<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${p.paymentMethod||'?'}</span>`
@@ -169,6 +190,25 @@ async function openManage(id){
   document.getElementById('ov').classList.add('on');
 }
 function closeManage(){ document.getElementById('ov').classList.remove('on'); CURRENT=null; }
+
+async function saveEdit(){
+  if(!CURRENT)return;
+  const g=id=>document.getElementById(id).value;
+  const body={
+    id:CURRENT.id, circuit:CURRENT.circuit,
+    name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), place:g('m-place').trim(),
+    courts:parseInt(g('m-courts'))||0, capacity:parseInt(g('m-cap'))||0,
+    feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(),
+    paymentMethods:CURRENT.paymentMethods, organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
+    spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,
+    fcfsWindowHours:CURRENT.fcfsWindowHours, status:CURRENT.status,
+  };
+  if(!body.name||!body.date){ msg('mEditMsg','err','Name and date are required.'); return; }
+  const {status,d}=await api('/admin-ladder-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(status===401){ msg('mEditMsg','err','Sign in as admin first.'); return; }
+  if(d.ok){ CURRENT=d.event; msg('mEditMsg','ok','Saved.'); document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · ${d.event.courts} courts · ${fmt(d.event.feeCents)}`; loadList(); }
+  else msg('mEditMsg','err',d.error||'Save failed.');
+}
 
 async function act(action,email){
   if(!CURRENT)return;
