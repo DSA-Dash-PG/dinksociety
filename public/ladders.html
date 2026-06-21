@@ -283,7 +283,7 @@ async function night(id){
   document.getElementById('nightBody').innerHTML='<div class="empty">Loading…</div>';
   document.getElementById('nightOv').classList.add('on');
   let j={}; try{ j=await (await fetch(`${API}/public-ladder-stats?event=${encodeURIComponent(id)}`)).json(); }catch(e){}
-  NIGHT=j; const hist=j.history||[]; nMode=hist.length?'rounds':'final'; nVR=Math.max(0,hist.length-1); renderNight();
+  NIGHT=j; const hist=j.history||[]; nMode='final'; nVR=Math.max(0,hist.length-1); renderNight();
 }
 function nSet(m){ nMode=m; renderNight(); }
 function nMove(n,tC){ if(n===tC)return{w:'Stay & split',l:'↓ Court '+(tC-1)}; if(n===1)return{w:'↑ Court 2',l:'Stay & split'}; return{w:'↑ Court '+(n+1),l:'↓ Court '+(n-1)}; }
@@ -300,11 +300,11 @@ function renderNight(){
   const body=document.getElementById('nightBody');
   if(!s.length&&!hist.length){ body.innerHTML='<div class="note">No scores recorded for this night.</div>'; return; }
   let h='';
-  if(hist.length) h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px">'+hist.map((r,i)=>`<button onclick="nVR=${i};nMode='rounds';renderNight()" style="padding:6px 11px;border-radius:9px;border:1.5px solid ${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.4)':'var(--bd)'};background:${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.12)':'var(--surf)'};color:${(nMode==='rounds'&&i===nVR)?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">Rd ${r.round} ✓</button>`).join('')+'</div>';
-  if(hist.length) h+=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px"><button onclick="nSet('rounds')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='rounds'?'var(--lime)':'transparent'};color:${nMode==='rounds'?'#06210f':'var(--mut)'}">Round history</button><button onclick="nSet('final')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='final'?'var(--lime)':'transparent'};color:${nMode==='final'?'#06210f':'var(--mut)'}">Final stats</button></div>`;
+  if(hist.length) h+=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px"><button onclick="nSet('final')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='final'?'var(--lime)':'transparent'};color:${nMode==='final'?'#06210f':'var(--mut)'}">Leaderboard</button><button onclick="nSet('rounds')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='rounds'?'var(--lime)':'transparent'};color:${nMode==='rounds'?'#06210f':'var(--mut)'}">Rounds</button></div>`;
   if(nMode==='final'||!hist.length){ body.innerHTML=h+lbBoard(s,'total'); return;
   }
   nVR=Math.max(0,Math.min(nVR,hist.length-1));
+  h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px">'+hist.map((r,i)=>`<button onclick="nVR=${i};nMode='rounds';renderNight()" style="padding:6px 11px;border-radius:9px;border:1.5px solid ${(i===nVR)?'rgba(184,255,44,.4)':'var(--bd)'};background:${(i===nVR)?'rgba(184,255,44,.12)':'var(--surf)'};color:${(i===nVR)?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">Rd ${r.round} ✓</button>`).join('')+'</div>';
   const rd=hist[nVR];
   h+=`<div class="seclbl" style="margin:2px 2px 9px">Round ${rd.round} — all courts</div>`;
   rd.courts.forEach(c=>{ h+=nightCourt(c, rd.tC); });
@@ -314,7 +314,7 @@ function renderNight(){
   if(M.female&&M.female[0])cards.push(mvc(M.female[0],'Womens MVP','#ff7bb0'));
   if(M.male&&M.male[1])cards.push(mvc(M.male[1],'Mens #2','#5b9fff'));
   if(M.female&&M.female[1])cards.push(mvc(M.female[1],'Womens #2','#ff7bb0'));
-  if(cards.length) h+=`<div class="seclbl" style="margin:14px 2px 9px">Round ${rd.round} MVPs</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${cards.join('')}</div>`;
+  if(cards.length) h+=`<div class="seclbl" style="margin:14px 2px 9px">Round ${rd.round} Top Performers</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${cards.join('')}</div>`;
   body.innerHTML=h;
 }
 
