@@ -121,12 +121,13 @@ export default async (req) => {
   const hotStreaks = rows.filter(r => r.maxStreak > 0).sort((a, b) => b.maxStreak - a.maxStreak).slice(0, 6).map(r => ({ id: r.id, name: r.name, streak: r.maxStreak }));
   const partnerships = calcPartners(sessions, players).slice(0, 8).map(p => ({ a: p.p1.name, b: p.p2.name, w: p.w, l: p.l, pct: (p.w + p.l) ? Math.round(100 * p.w / (p.w + p.l)) : 0 }));
 
-  // recent nights' winners (newest first, up to 3 nights)
-  const recent = plays.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 3);
+  // recent events' results (newest first, up to 4). Includes the FULL field so the
+  // Home tab can show the top-3 podium plus an expandable full standings.
+  const recent = plays.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 4);
   const recentWinners = await Promise.all(recent.map(async p => {
     const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
     const ev = await getEvent(p.eventId).catch(() => null);
-    return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', winners: winnersFrom(nr) };
+    return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', winners: winnersFrom(nr), standings: nr };
   }));
 
   let you = null;
