@@ -94,10 +94,13 @@
 
     <div class="pane" id="p-ladders">
       <div class="h1">Ladders</div>
-      <div class="sub">Open ladders — register and pay</div>
-      <div id="filters"></div>
-      <div id="availList"><div class="empty">Loading…</div></div>
-      <div id="pastWrap"></div>
+      <div class="sub" id="ladSub">Open ladders — register and pay</div>
+      <div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px">
+        <button id="lt-register" onclick="ladTab('register')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--lime);color:#06210f">Register</button>
+        <button id="lt-past" onclick="ladTab('past')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Past ladders</button>
+      </div>
+      <div id="regWrap"><div id="filters"></div><div id="availList"><div class="empty">Loading…</div></div></div>
+      <div id="pastWrap" style="display:none"></div>
     </div>
 
     <div class="pane" id="p-leaderboard">
@@ -196,11 +199,24 @@ function renderAvail(){
 }
 function renderPast(){
   const w=document.getElementById('pastWrap');
-  if(!COMPLETED.length){ w.innerHTML=''; return; }
-  w.innerHTML='<div class="seclbl">Past ladders</div>'+COMPLETED.map(l=>`<div class="citem ${l.type||'mixed'}" onclick="night('${l.id}')"><div><div class="nm">${esc(l.name)}</div><div class="mt">${wd(l.date)}${l.place?' · '+esc(l.place):''}</div></div><div class="go">Results →</div></div>`).join('');
+  w.innerHTML=COMPLETED.length?COMPLETED.map(l=>`<div class="citem ${l.type||'mixed'}" onclick="night('${l.id}')"><div><div class="nm">${esc(l.name)}</div><div class="mt">${wd(l.date)}${l.place?' · '+esc(l.place):''}</div></div><div class="go">Results →</div></div>`).join(''):'<div class="empty">No past ladders yet.</div>';
+}
+function ladTab(t){
+  const reg=t==='register';
+  document.getElementById('regWrap').style.display=reg?'':'none';
+  document.getElementById('pastWrap').style.display=reg?'none':'';
+  const r=document.getElementById('lt-register'), p=document.getElementById('lt-past');
+  r.style.background=reg?'var(--lime)':'transparent'; r.style.color=reg?'#06210f':'var(--mut)';
+  p.style.background=reg?'transparent':'var(--lime)'; p.style.color=reg?'var(--mut)':'#06210f';
+  document.getElementById('ladSub').textContent=reg?'Open ladders — register and pay':'Completed nights — tap for full results';
 }
 
 /* ---- LEADERBOARD ---- */
+const POD3={1:'#f0c040',2:'#cfd3c8',3:'#d88a3a'};
+const lbOrd=r=>r===1?'1st':r===2?'2nd':r===3?'3rd':r;
+function lbCell(p,r,useTotal){ const c=POD3[r]; const big=useTotal?(p.seasonPts!=null?p.seasonPts:p.pf):p.pf; return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:6px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer"><span style="width:15px;text-align:center;font-weight:800;color:${c||'var(--mut)'};font-size:.72rem">${r}</span><span style="flex:1;min-width:0;font-weight:700;color:var(--lime);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</span><span style="font-size:.56rem;color:var(--fnt)">${p.w}-${p.l}</span><span style="font-size:.62rem;color:${p.diff>=0?'var(--lime)':'var(--red)'};min-width:24px;text-align:right">${p.diff>0?'+':''}${p.diff}</span><span style="font-size:.76rem;font-weight:800;min-width:22px;text-align:right">${big}</span><span style="font-size:.72rem;font-weight:700;color:var(--purp);min-width:26px;text-align:right">${p.dr==null?'–':p.dr}</span></div>`; }
+function lbPodium(p,r,useTotal){ const c=POD3[r], tall=r===1, big=useTotal?(p.seasonPts!=null?p.seasonPts:p.pf):p.pf; return `<div onclick="profile('${p.id}')" style="flex:1;min-width:0;background:var(--surf);border:1px solid ${c}55;border-top:3px solid ${c};border-radius:12px;padding:${tall?'13px 8px 11px':'9px 8px'};text-align:center;cursor:pointer"><div style="font-size:.55rem;font-weight:900;color:${c};letter-spacing:.05em">${String(lbOrd(r)).toUpperCase()}</div><div style="font-size:${tall?'1rem':'.9rem'};font-weight:900;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div><div style="font-size:.62rem;color:var(--mut)">${p.w}-${p.l} · ${big} pts</div><div style="font-size:${tall?'1.3rem':'1.15rem'};font-weight:900;color:var(--purp);margin-top:3px;line-height:1">${p.dr==null?'–':p.dr}</div><div style="font-size:.46rem;color:var(--fnt);text-transform:uppercase;letter-spacing:.08em">DR</div></div>`; }
+function lbBoard(rows,useTotal){ if(!rows||!rows.length) return '<div class="note">No results yet.</div>'; const top=rows.slice(0,3), rest=rows.slice(3); let h=''; if(top.length>=3) h+=`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">${lbPodium(top[1],2,useTotal)}${lbPodium(top[0],1,useTotal)}${lbPodium(top[2],3,useTotal)}</div>`; else h+=top.map((p,i)=>lbCell(p,i+1,useTotal)).join(''); if(rest.length){ const half=Math.ceil(rest.length/2); const col=(arr,start)=>`<div style="display:flex;flex-direction:column;gap:7px">${arr.map((p,i)=>lbCell(p,start+i,useTotal)).join('')}</div>`; h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; } return h; }
 let lbMode='standings', lbDiv='all';
 const DIVLABEL={all:'All',mixed:'Mixed',mens:"Men's",womens:"Women's"};
 function tierColor(t){ return t==='Elite'||t==='Pro'?['#ffcc00','rgba(240,204,0,.14)']:t==='Contender'?['#b8ff2c','rgba(184,255,44,.14)']:t==='Challenger'?['#17d7b0','rgba(23,215,176,.14)']:['#9aa094','rgba(255,255,255,.06)']; }
@@ -226,11 +242,9 @@ function renderStats(){
 
   h+='<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:8px">'
     +['all','mixed','mens','womens'].map(d=>{ const en=active.includes(d); return segBtn((en?'':'🔒 ')+DIVLABEL[d], d===lbDiv, `lbSetDiv('${d}',true)`, !en); }).join('')+'</div>';
-  h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">Ladders = nights played${(active.includes('mens')||active.includes('womens'))?'':" · Men's / Women's unlock once played"}.</div>`;
+  h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">Tap a player for their card${(active.includes('mens')||active.includes('womens'))?'':" · Men's / Women's unlock once played"}.</div>`;
   const rows=(j.divisions&&j.divisions[lbDiv])||j.leaderboard;
-  h+='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th style="text-align:left">Player</th><th>Lad</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th><th>DR</th></tr></thead><tbody>';
-  rows.forEach((p,i)=>{ h+=`<tr${i===0?' class="lead"':''}><td>${i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td style="color:var(--teal);font-weight:800">${p.nights}</td><td>${p.w}</td><td>${p.l}</td><td class="hl">${p.pf}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td class="dr">${p.dr==null?'–':p.dr}</td></tr>`; });
-  h+='</tbody></table></div>';
+  h+=lbBoard(rows,false);
   if(lbDiv==='all'){
     if(j.mvpLeaders&&j.mvpLeaders.length) h+=sec('🏅 Top performers', j.mvpLeaders.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:#9aa094">${x.count}×</span>`));
     if(j.hotStreaks&&j.hotStreaks.length) h+=sec('🔥 Hot streaks', j.hotStreaks.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:var(--lime)">W${x.streak}</span>`));
@@ -268,12 +282,7 @@ function renderNight(){
   let h='';
   if(hist.length) h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px">'+hist.map((r,i)=>`<button onclick="nVR=${i};nMode='rounds';renderNight()" style="padding:6px 11px;border-radius:9px;border:1.5px solid ${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.4)':'var(--bd)'};background:${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.12)':'var(--surf)'};color:${(nMode==='rounds'&&i===nVR)?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">Rd ${r.round} ✓</button>`).join('')+'</div>';
   if(hist.length) h+=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px"><button onclick="nSet('rounds')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='rounds'?'var(--lime)':'transparent'};color:${nMode==='rounds'?'#06210f':'var(--mut)'}">Round history</button><button onclick="nSet('final')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='final'?'var(--lime)':'transparent'};color:${nMode==='final'?'#06210f':'var(--mut)'}">Final stats</button></div>`;
-  if(nMode==='final'||!hist.length){
-    const ord=n=>n===1?'1st':n===2?'2nd':n===3?'3rd':n;
-    const pcol=n=>n===1?'#f0c040':n===2?'#cfd3c8':n===3?'#d88a3a':'var(--mut)';
-    h+='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th>Δ</th><th style="text-align:left">Player</th><th>W</th><th>L</th><th>+/-</th><th>Bonus</th><th>Total</th></tr></thead><tbody>';
-    s.forEach((p,i)=>{ const r=i+1; h+=`<tr${i===0?' class="lead"':''}><td style="color:${pcol(r)};font-weight:800">${ord(r)}</td><td style="color:var(--fnt)">—</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td>${p.w}</td><td style="color:var(--mut)">${p.l}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td style="color:var(--teal)">${p.bonus?'+'+p.bonus:'—'}</td><td class="hl" style="font-weight:900">${p.seasonPts}</td></tr>`; });
-    body.innerHTML=h+'</tbody></table></div>'; return;
+  if(nMode==='final'||!hist.length){ body.innerHTML=h+lbBoard(s,true); return;
   }
   nVR=Math.max(0,Math.min(nVR,hist.length-1));
   const rd=hist[nVR];
