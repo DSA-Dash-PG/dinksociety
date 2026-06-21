@@ -243,38 +243,29 @@ function ladTab(t){
 /* ---- LEADERBOARD ---- */
 const POD3={1:'#f0c040',2:'#cfd3c8',3:'#d88a3a'};
 const lbOrd=r=>r===1?'1st':r===2?'2nd':r===3?'3rd':r;
-function lbCell(p,r,useTotal){ const c=POD3[r]; const big=useTotal?(p.seasonPts!=null?p.seasonPts:p.pf):p.pf; return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:6px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer"><span style="width:15px;text-align:center;font-weight:800;color:${c||'var(--mut)'};font-size:.72rem">${r}</span><span style="flex:1;min-width:0;font-weight:700;color:var(--lime);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</span><span style="font-size:.56rem;color:var(--fnt)">${p.w}-${p.l}</span><span style="font-size:.62rem;color:${p.diff>=0?'var(--lime)':'var(--red)'};min-width:24px;text-align:right">${p.diff>0?'+':''}${p.diff}</span><span style="font-size:.76rem;font-weight:800;min-width:22px;text-align:right">${big}</span><span style="font-size:.72rem;font-weight:700;color:var(--purp);min-width:26px;text-align:right">${p.dr==null?'–':p.dr}</span></div>`; }
-function lbPodium(p,r,useTotal){ const c=POD3[r], big=useTotal?(p.seasonPts!=null?p.seasonPts:p.pf):p.pf; return `<div onclick="profile('${p.id}')" style="flex:1;min-width:0;background:var(--surf);border:1px solid ${c}55;border-top:3px solid ${c};border-radius:12px;padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:.55rem;font-weight:900;color:${c};letter-spacing:.05em">${String(lbOrd(r)).toUpperCase()}</div><div style="font-size:.92rem;font-weight:900;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div><div style="font-size:.62rem;color:var(--mut)">${p.w}-${p.l} · ${big} pts</div><div style="font-size:1.18rem;font-weight:900;color:var(--purp);margin-top:3px;line-height:1">${p.dr==null?'–':p.dr}</div><div style="font-size:.46rem;color:var(--fnt);text-transform:uppercase;letter-spacing:.08em">DR</div></div>`; }
-function lbBoard(rows,useTotal){ if(!rows||!rows.length) return '<div class="note">No results yet.</div>'; const top=rows.slice(0,3), rest=rows.slice(3); let h=''; if(top.length>=3) h+=`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">${lbPodium(top[0],1,useTotal)}${lbPodium(top[1],2,useTotal)}${lbPodium(top[2],3,useTotal)}</div>`; else h+=top.map((p,i)=>lbCell(p,i+1,useTotal)).join(''); if(rest.length){ const half=Math.ceil(rest.length/2); const col=(arr,start)=>`<div style="display:flex;flex-direction:column;gap:7px">${arr.map((p,i)=>lbCell(p,start+i,useTotal)).join('')}</div>`; h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; } return h; }
-let lbMode='standings', lbDiv='all';
-const DIVLABEL={all:'All',mixed:'Mixed',mens:"Men's",womens:"Women's"};
-function tierColor(t){ return t==='Elite'||t==='Pro'?['#ffcc00','rgba(240,204,0,.14)']:t==='Contender'?['#b8ff2c','rgba(184,255,44,.14)']:t==='Challenger'?['#17d7b0','rgba(23,215,176,.14)']:['#9aa094','rgba(255,255,255,.06)']; }
-function lbSetMode(m){ lbMode=m; renderStats(); }
-function lbSetDiv(d,en){ if(!en)return; lbDiv=d; renderStats(); }
-function segBtn(label,on,onclick,disabled){ return `<button ${disabled?'disabled':''} onclick="${disabled?'':onclick}" style="flex:1;padding:8px 4px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:${disabled?'not-allowed':'pointer'};background:${on?'var(--lime)':'transparent'};color:${on?'#06210f':disabled?'#43463f':'var(--mut)'}">${label}</button>`; }
+function lbVal(p,m){ return m==='xp'?(p.xp||0):m==='dr'?(p.dr==null?'–':p.dr):m==='total'?(p.seasonPts!=null?p.seasonPts:p.pf):p.pf; }
+function lbCell(p,r,m){ m=m||'pts'; const c=POD3[r]; const big=lbVal(p,m); const bigCol=m==='dr'?'var(--purp)':(m==='xp'?'var(--lime)':'var(--tx)'); const drCol=m==='dr'?'':`<span style="font-size:.72rem;font-weight:700;color:var(--purp);min-width:26px;text-align:right">${p.dr==null?'–':p.dr}</span>`; return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:6px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer"><span style="width:15px;text-align:center;font-weight:800;color:${c||'var(--mut)'};font-size:.72rem">${r}</span><span style="flex:1;min-width:0;font-weight:700;color:var(--lime);font-size:.78rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</span><span style="font-size:.56rem;color:var(--fnt)">${p.w}-${p.l}</span><span style="font-size:.62rem;color:${p.diff>=0?'var(--lime)':'var(--red)'};min-width:24px;text-align:right">${p.diff>0?'+':''}${p.diff}</span><span style="font-size:.78rem;font-weight:800;min-width:24px;text-align:right;color:${bigCol}">${big}</span>${drCol}</div>`; }
+function lbPodium(p,r,m){ m=m||'pts'; const c=POD3[r]; const big=lbVal(p,m); const lab=m==='xp'?'XP':(m==='dr'?'DR':(m==='total'?'TOTAL':'PTS')); const bigCol=m==='dr'?'var(--purp)':'var(--lime)'; const sub=m==='dr'?`${p.w}-${p.l} · ${p.pf} pts`:`${p.w}-${p.l} · DR ${p.dr==null?'–':p.dr}`; return `<div onclick="profile('${p.id}')" style="flex:1;min-width:0;background:var(--surf);border:1px solid ${c}55;border-top:3px solid ${c};border-radius:12px;padding:10px 8px;text-align:center;cursor:pointer"><div style="font-size:.55rem;font-weight:900;color:${c};letter-spacing:.05em">${String(lbOrd(r)).toUpperCase()}</div><div style="font-size:.92rem;font-weight:900;margin:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(p.name)}</div><div style="font-size:.62rem;color:var(--mut)">${sub}</div><div style="font-size:1.18rem;font-weight:900;color:${bigCol};margin-top:3px;line-height:1">${big}</div><div style="font-size:.46rem;color:var(--fnt);text-transform:uppercase;letter-spacing:.08em">${lab}</div></div>`; }
+function lbBoard(rows,m){ if(!rows||!rows.length) return '<div class="note">No results yet.</div>'; const top=rows.slice(0,3), rest=rows.slice(3); let h=''; if(top.length>=3) h+=`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">${lbPodium(top[0],1,m)}${lbPodium(top[1],2,m)}${lbPodium(top[2],3,m)}</div>`; else h+=top.map((p,i)=>lbCell(p,i+1,m)).join(''); if(rest.length){ const half=Math.ceil(rest.length/2); const col=(arr,start)=>`<div style="display:flex;flex-direction:column;gap:7px">${arr.map((p,i)=>lbCell(p,start+i,m)).join('')}</div>`; h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; } return h; }
+let lbTab='points', lbInfo=null;
+const LBINFO={points:'<b>Points</b> — the official season standings, ranked by wins → point differential → DR. The big number is total points scored.',xp:'<b>XP</b> — an engagement score. Earn it every event you play: showing up, game wins, placing, round MVP, and comebacks. Rewards playing more, not just winning.',dr:'<b>DR (Dink Rating)</b> — a 0–100 skill rating from your results. Ranks players by rating; also used to balance teams.'};
+const LBSUB={points:'Season standings · ranked by wins → diff → DR',xp:'Engagement · most XP earned',dr:'Skill rating · ranked by DR'};
+function lbSetTab(t){ lbTab=t; renderStats(); }
+function lbToggleInfo(t){ lbInfo=(lbInfo===t)?null:t; renderStats(); }
 function renderStats(){
   const body=document.getElementById('statsBody'); const j=STATS||{};
-  if(!j.leaderboard||!j.leaderboard.length){ body.innerHTML='<div class="note">No results yet — stats appear after the first scored night (or import your history).</div>'; return; }
-  const active=j.activeDivisions||['all'];
-  let h=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:10px">`
-    +segBtn('Standings',lbMode==='standings',"lbSetMode('standings')")
-    +segBtn('⚡ XP',lbMode==='xp',"lbSetMode('xp')")+`</div>`;
-
-  if(lbMode==='xp'){
-    const xp=j.xp||[];
-    h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">XP is cumulative across every ladder and division — play more to climb.</div>`;
-    if(!xp.length){ body.innerHTML=h+'<div class="note">No XP yet.</div>'; return; }
-    h+='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th style="text-align:left">Player</th><th style="text-align:left">Tier</th><th>Ladders</th><th>XP</th></tr></thead><tbody>';
-    xp.forEach((p,i)=>{ const [tc,tb]=tierColor(p.tier); h+=`<tr${i===0?' class="lead"':''}><td>${i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td style="text-align:left"><span style="font-size:.56rem;font-weight:800;padding:2px 7px;border-radius:9999px;color:${tc};background:${tb}">${p.tier}</span></td><td style="color:var(--teal);font-weight:800">${p.nights}</td><td class="hl" style="font-weight:900">${p.xp}</td></tr>`; });
-    body.innerHTML=h+'</tbody></table></div>'; return;
-  }
-
-  h+='<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:8px">'
-    +['all','mixed','mens','womens'].map(d=>{ const en=active.includes(d); return segBtn((en?'':'🔒 ')+DIVLABEL[d], d===lbDiv, `lbSetDiv('${d}',true)`, !en); }).join('')+'</div>';
-  h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">Tap a player for their card${(active.includes('mens')||active.includes('womens'))?'':" · Men's / Women's unlock once played"}.</div>`;
-  const rows=(j.divisions&&j.divisions[lbDiv])||j.leaderboard;
-  h+=lbBoard(rows,false);
-  if(lbDiv==='all'){
+  if(!j.leaderboard||!j.leaderboard.length){ body.innerHTML='<div class="note">No results yet — stats appear after the first scored event (or import your history).</div>'; return; }
+  const rowsAll=(j.divisions&&j.divisions.all)||j.leaderboard;
+  const tabBtn=(k,label)=>`<button onclick="lbSetTab('${k}')" style="flex:1;padding:8px 4px;border:0;border-radius:9999px;font:inherit;font-size:.76rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:${lbTab===k?'var(--lime)':'transparent'};color:${lbTab===k?'#06210f':'var(--mut)'}">${label} <span onclick="event.stopPropagation();lbToggleInfo('${k}')" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid currentColor;font-size:.56rem;opacity:.7">i</span></button>`;
+  let h=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:6px">${tabBtn('points','Points')}${tabBtn('xp','XP')}${tabBtn('dr','DR')}</div>`;
+  if(lbInfo) h+=`<div style="font-size:.72rem;color:#cdd2c6;background:var(--surf);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:10px;line-height:1.5">${LBINFO[lbInfo]}</div>`;
+  h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">${LBSUB[lbTab]} · tap a player for their card</div>`;
+  let rows;
+  if(lbTab==='xp') rows=[...rowsAll].sort((a,b)=>(b.xp||0)-(a.xp||0));
+  else if(lbTab==='dr') rows=[...rowsAll].sort((a,b)=>((b.dr??-1)-(a.dr??-1)));
+  else rows=rowsAll;
+  h+=lbBoard(rows, lbTab);
+  if(lbTab==='points'){
     if(j.mvpLeaders&&j.mvpLeaders.length) h+=sec('🏅 Top performers', j.mvpLeaders.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:#9aa094">${x.count}×</span>`));
     if(j.hotStreaks&&j.hotStreaks.length) h+=sec('🔥 Hot streaks', j.hotStreaks.map(x=>`<span class="pname" onclick="profile('${x.id}')">${esc(x.name)}</span> <span style="color:var(--lime)">W${x.streak}</span>`));
     if(j.partnerships&&j.partnerships.length) h+=sec('🤝 Best partnerships', j.partnerships.map(p=>`${esc(p.a)} &amp; ${esc(p.b)} <span style="color:#9aa094">${p.w}-${p.l} · ${p.pct}%</span>`));
@@ -311,7 +302,7 @@ function renderNight(){
   let h='';
   if(hist.length) h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px">'+hist.map((r,i)=>`<button onclick="nVR=${i};nMode='rounds';renderNight()" style="padding:6px 11px;border-radius:9px;border:1.5px solid ${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.4)':'var(--bd)'};background:${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.12)':'var(--surf)'};color:${(nMode==='rounds'&&i===nVR)?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">Rd ${r.round} ✓</button>`).join('')+'</div>';
   if(hist.length) h+=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px"><button onclick="nSet('rounds')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='rounds'?'var(--lime)':'transparent'};color:${nMode==='rounds'?'#06210f':'var(--mut)'}">Round history</button><button onclick="nSet('final')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='final'?'var(--lime)':'transparent'};color:${nMode==='final'?'#06210f':'var(--mut)'}">Final stats</button></div>`;
-  if(nMode==='final'||!hist.length){ body.innerHTML=h+lbBoard(s,true); return;
+  if(nMode==='final'||!hist.length){ body.innerHTML=h+lbBoard(s,'total'); return;
   }
   nVR=Math.max(0,Math.min(nVR,hist.length-1));
   const rd=hist[nVR];

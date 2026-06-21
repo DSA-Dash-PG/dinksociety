@@ -462,6 +462,41 @@ export function renderVenmoClaimToAdmin({ playerName, amountLabel, eventName, no
 }
 
 /**
+ * Admin → player: "you're on the roster, here's how to pay your spot."
+ * Sent when an organizer manually adds a player (with an email) to a ladder.
+ * Shows whichever methods the ladder accepts: a one-tap card checkout button
+ * and/or Venmo instructions. Self-contained shell (not the waitlist shell).
+ * @param {{ playerName:string, eventName:string, dateLine?:string,
+ *           cardUrl?:string, cardAmountLabel?:string,
+ *           venmoHandle?:string, venmoUrl?:string, venmoAmountLabel?:string, venmoNote?:string }} opts
+ */
+export function renderLadderPayRequest({ playerName, eventName, dateLine, cardUrl, cardAmountLabel, venmoHandle, venmoUrl, venmoAmountLabel, venmoNote }) {
+  const card = cardUrl ? `
+      <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin: 0 0 8px;">Pay by card</div>
+      ${_btn(cardUrl, `Pay ${cardAmountLabel || 'now'} by card →`)}
+      <div style="height:22px"></div>` : '';
+  const venmo = venmoHandle ? `
+      <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin: 0 0 8px;">Pay by Venmo</div>
+      <div style="background:#161616; border-radius:8px; padding:14px 16px; margin:0 0 12px;">
+        <div style="font-size:14px; color:#cfcfcf; line-height:1.6;">Send <b style="color:#fff;">${escapeBody(venmoAmountLabel || '')}</b> to <b style="color:#fff;">@${escapeBody(String(venmoHandle).replace(/^@/, ''))}</b>${venmoNote ? ` with note <b style="color:#fff;">${escapeBody(venmoNote)}</b>` : ''}.</div>
+      </div>
+      ${venmoUrl ? _btn(venmoUrl, 'Open Venmo →', '#3d95ce') : ''}
+      <div style="height:22px"></div>` : '';
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">You're on the roster — just pay your spot 🎾</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Hey ${escapeBody(playerName || 'there')}, you've been added to <b style="color:#fff;">${escapeBody(eventName)}</b>. Lock in your spot by paying below.</p>
+      ${_ladderEventCard(eventName, dateLine)}
+      ${card}${venmo}
+      <p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">Once your payment clears you'll get a confirmation. Questions? Just reply to this email.</p>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        The Dink Society · Southern California Pickleball
+      </div>
+    </div>`;
+}
+
+/**
  * Final-24h: a spot opened and it's first-come-first-serve (no priority hold).
  * Blasted to the whole waitlist — first to grab it wins.
  */

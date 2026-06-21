@@ -204,7 +204,8 @@
     <select class="i" id="ap-gender" style="max-width:90px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select>
   </div>
   <input class="i" id="ap-email" placeholder="Email (optional — links their stats &amp; profile)" style="width:100%;margin-top:10px">
-  <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#9aa094;margin:10px 0"><input type="checkbox" id="ap-paid" checked> Paid (cash)</label>
+  <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#9aa094;margin:10px 0"><input type="checkbox" id="ap-paid" checked onchange="if(this.checked)document.getElementById('ap-paylink').checked=false"> Paid (cash)</label>
+  <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#9aa094;margin:0 0 10px"><input type="checkbox" id="ap-paylink" onchange="if(this.checked)document.getElementById('ap-paid').checked=false"> ✉ Email a payment link (card / Venmo) — needs an email</label>
   <button class="btn btn-out" onclick="addPlayer()">Add to roster</button>
   <div id="apMsg"></div>
   <div id="mMsg"></div>
@@ -364,12 +365,14 @@ async function openManage(id){
     const pay=p.paymentStatus==='paid'?`<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${p.paymentMethod||'?'}</span>`
       :p.paymentStatus==='venmo_pending'?'<span class="chip chip-gold">Venmo pending</span>':'<span class="chip chip-gray">pending</span>';
     const venmoBtns=p.paymentStatus==='venmo_pending'?`<button class="btn-out btn-sm" onclick="act('confirm-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Confirm</button> <button class="btn-danger" onclick="act('decline-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Decline</button>`:'';
-    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
+    const linkBtn=(p.paymentStatus!=='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="sendPaylink('${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send link</button>`:'';
+    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} ${linkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
   }).join(''):'<div class="empty">No signups yet.</div>';
   h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(d.pendingClaim?` · held: ${esc(d.pendingClaim.name)}`:'')+'</div>';
   h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="act('promote','${esc(p.email)}','${esc(p.playerId||'')}')">Promote</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
   document.getElementById('mBody').innerHTML=h;
   document.getElementById('mMsg').innerHTML='';
+  { const pl=document.getElementById('ap-paylink'), pd=document.getElementById('ap-paid'); if(pl)pl.checked=false; if(pd)pd.checked=true; }
   document.getElementById('ov').classList.add('on');
 }
 function closeManage(){ document.getElementById('ov').classList.remove('on'); CURRENT=null; }
@@ -385,20 +388,29 @@ function rosterSearch(){
   h+=`<div class="prow" style="cursor:pointer" onclick="addNewFromSearch()"><span class="pn" style="color:#9aa094">Add new player “${esc(q)}” <span style="color:#5e655a;font-weight:500;font-size:.7rem">— uses the gender/email fields below</span></span><span class="chip chip-gray">New</span></div>`;
   el.innerHTML=h;
 }
+function wantPaylink(){ const el=document.getElementById('ap-paylink'); return el?el.checked:false; }
 async function addExisting(i){
   const p=(window.__ROS||[])[i]; if(!p||!CURRENT) return;
-  const paidEl=document.getElementById('ap-paid'); const paid=paidEl?paidEl.checked:true;
+  const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:true);
+  if(link&&!p.email){ alert('That player has no email on file — add one first or untick the email-link option.'); return; }
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',playerId:p.id,name:p.name,gender:p.gender||null,email:p.email||'',paid})});
-  if(d.ok){ openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
+  if(d.ok){ if(link) await sendPaylink(p.id,p.email); openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
 }
 async function addNewFromSearch(){
   if(!CURRENT) return;
   const name=(document.getElementById('ros-search').value||'').trim(); if(!name) return;
   const gender=(document.getElementById('ap-gender')||{}).value||'';
   const email=(document.getElementById('ap-email')||{}).value||'';
-  const paidEl=document.getElementById('ap-paid'); const paid=paidEl?paidEl.checked:true;
+  const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:true);
+  if(link&&!email){ alert('Enter an email above to send a payment link.'); return; }
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,gender,email,paid})});
-  if(d.ok){ openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
+  if(d.ok){ if(link) await sendPaylink('',email); openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
+}
+async function sendPaylink(playerId,email){
+  if(!CURRENT) return;
+  const {status,d}=await api('/admin-ladder-paylink?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({playerId:playerId||'',email:email||''})});
+  if(d.ok){ msg('mMsg','ok','Payment link emailed to '+(d.sent||email)+' ('+(d.methods||[]).join(' + ')+').'); }
+  else { msg('mMsg','err',d.error||'Could not email link ('+status+').'); }
 }
 
 async function saveEdit(){
@@ -442,10 +454,11 @@ async function addPlayer(){
   if(!name){ msg('apMsg','err','Enter a name.'); return; }
   const gender=document.getElementById('ap-gender').value;
   const email=document.getElementById('ap-email').value.trim();
-  const paid=document.getElementById('ap-paid').checked;
+  const link=wantPaylink(); const paid=link?false:document.getElementById('ap-paid').checked;
+  if(link&&!email){ msg('apMsg','err','Enter an email to send a payment link.'); return; }
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,gender,email,paid})});
   if(status===401){ msg('apMsg','err','Sign in as admin first.'); return; }
-  if(d.ok){ document.getElementById('ap-name').value=''; document.getElementById('ap-email').value=''; const cur=CURRENT.id; openManage(cur); loadList(); }
+  if(d.ok){ if(link) await sendPaylink('',email); document.getElementById('ap-name').value=''; document.getElementById('ap-email').value=''; const cur=CURRENT.id; openManage(cur); loadList(); }
   else msg('apMsg','err',d.error||'Could not add.');
 }
 async function importOld(){
