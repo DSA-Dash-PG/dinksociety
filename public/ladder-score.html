@@ -128,8 +128,23 @@ async function load(){
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID));
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   STATE=d; VR=(d.play&&d.play.currentRound!=null&&d.play.currentRound>=0)?d.play.currentRound:0;
+  if(SC_MASTER===null){ try{ const r=await api('/admin-ladder-players'); SC_MASTER=(r.d&&r.d.players)||[]; }catch(e){ SC_MASTER=[]; } }
   resetTimer(); render();
 }
+let SC_MASTER=null;
+function scInRoster(){ const ids=new Set(); (STATE.roster||[]).forEach(p=>{ if(p.playerId)ids.add(p.playerId); }); return ids; }
+function scSearch(){
+  const q=(document.getElementById('sc-search').value||'').trim(); const ql=q.toLowerCase(); const el=document.getElementById('sc-res');
+  if(!q){ el.innerHTML=''; window.__SCR=[]; return; }
+  const used=scInRoster();
+  const pool=(SC_MASTER||[]).filter(p=>!used.has(p.id)&&String(p.name).toLowerCase().includes(ql)).slice(0,8);
+  window.__SCR=pool;
+  el.innerHTML=pool.length?pool.map((p,i)=>`<div onclick="scAddExisting(${i})" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:9px;margin-bottom:6px;cursor:pointer"><span style="font-size:.82rem;font-weight:700">${esc(p.name)} <span style="color:#5e655a;font-weight:500;font-size:.68rem">${p.gender||''}${p.email?' · ✉':''}</span></span><span style="font-size:.6rem;font-weight:800;color:var(--lime)">+ Add</span></div>`).join(''):'<div style="font-size:.72rem;color:var(--fnt);padding:4px 2px">No match — add as new below.</div>';
+}
+async function scAddExisting(i){ const p=(window.__SCR||[])[i]; if(p) await scAdd({playerId:p.id,name:p.name,gender:p.gender||null,email:p.email||''}); }
+function scAddNew(){ const name=(document.getElementById('sc-name').value||'').trim(); if(!name) return; scAdd({name,gender:document.getElementById('sc-gender').value,email:(document.getElementById('sc-email').value||'').trim()}); }
+async function scAdd(body){ const {d}=await api('/admin-ladder-manage?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',paid:false,force:true,...body})}); if(d.ok){ await load(); } else msg('err',d.error||'Could not add.'); }
+async function scRemove(playerId,email){ const {d}=await api('/admin-ladder-manage?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',playerId,email})}); if(d.ok){ await load(); } else msg('err',d.error||'Could not remove.'); }
 
 /* ---------- timer (client only) ---------- */
 function roundSecs(){ return ((STATE&&STATE.play&&STATE.play.config&&STATE.play.config.roundMin)||12)*60; }
@@ -169,12 +184,13 @@ function render(){
   const b=document.getElementById('board'); if(!STATE){ b.innerHTML=''; return; }
   const play=STATE.play;
   if(!play||!play.started){
-    const n=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled').length;
-    b.innerHTML=`<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">${n} players on the roster${n<4?' — need at least 4 to start.':''}</div>
-      <div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="6"></div>
-      <div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="12"></div></div>
-      <button class="btn b-lime" ${n<4?'disabled':''} onclick="act('start')">Start night</button>`;
-    return;
+    const roster=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled'); const n=roster.length;
+    let bh=`<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">Build the roster, then start rounds. ${n} player${n===1?'':'s'} in${n<4?' — need at least 4.':''}</div>`;
+    bh+=roster.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:9px;margin-bottom:6px"><span style="font-size:.84rem;font-weight:700">${esc(p.name)}</span><button onclick="scRemove('${esc(p.playerId||'')}','${esc(p.email||'')}')" style="font-size:.62rem;font-weight:800;color:var(--red);background:none;border:1px solid rgba(255,92,71,.3);border-radius:9999px;padding:4px 10px;cursor:pointer">Remove</button></div>`).join('');
+    bh+='<label class="seclbl" style="margin-top:6px;display:block">Add from master roster</label><input class="i" id="sc-search" placeholder="Search players…" autocomplete="off" oninput="scSearch()"><div id="sc-res" style="margin-top:6px"></div>';
+    bh+='<label class="seclbl" style="margin-top:12px;display:block">Or add a new player</label><div class="brow" style="gap:6px"><input class="i" id="sc-name" placeholder="Name" style="flex:2"><select class="i" id="sc-gender" style="flex:1;max-width:78px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select></div><div class="brow" style="gap:6px;margin-top:6px"><input class="i" id="sc-email" placeholder="Email (optional)" style="flex:1"><button class="btn b-out" style="flex:0 0 auto;width:auto;padding:0 14px" onclick="scAddNew()">Add</button></div>';
+    bh+='<div style="border-top:1px solid var(--bd);margin:14px 0 10px"></div><div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="6"></div><div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="12"></div></div><button class="btn b-lime" ${n<4?'disabled':''} onclick="act('start')">Start rounds →</button>';
+    b.innerHTML=bh; return;
   }
   const finished=!!play.finished;
   VR=Math.max(0,Math.min(VR, play.rounds.length-1));

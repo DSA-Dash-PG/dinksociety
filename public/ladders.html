@@ -198,6 +198,10 @@ function renderHomeWeek(){
 function gotab(name){ document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===name)); show(name); }
 
 /* ---- LADDERS ---- */
+const LEXP={};
+function initialsOf(n){ return String(n||'?').split(' ').filter(Boolean).map(x=>x[0]).join('').slice(0,2).toUpperCase(); }
+function initialDot(p){ return `<span title="${esc(p.name)}" style="width:24px;height:24px;border-radius:50%;background:var(--surf2);border:1px solid var(--bd);display:inline-flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:800;color:var(--lime)">${initialsOf(p.name)}</span>`; }
+function ladToggle(id){ LEXP[id]=!LEXP[id]; renderAvail(); renderHomeWeek(); }
 function ladderCard(l){
   const cap=l.capacity||0, full=l.spotsLeft<=0, pct=cap?Math.round((cap-l.spotsLeft)/cap*100):0, tt=l.type||'mixed';
   const time=l.startTime?(l.endTime?`${l.startTime}–${l.endTime}`:l.startTime):'';
@@ -206,6 +210,7 @@ function ladderCard(l){
     <div class="evc-meta" style="margin-top:5px">${cap} players · ${l.courts||'—'} courts · ${fmt(l.feeCents)}</div>
     <div class="bar ${full?'full':''}"><i style="width:${pct}%"></i></div>
     <div class="spot"><span style="color:#9aa094">${cap-l.spotsLeft} / ${cap}</span><span class="left" style="${full?'color:var(--red)':''}">${full?(l.waitlistCount?l.waitlistCount+' waiting':'Waitlist'):(l.spotsLeft+' spots left')}</span></div>
+    ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${l.roster.map(initialDot).join('')}<button onclick="ladToggle('${l.id}')" style="margin-left:4px;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="margin-top:8px;font-size:.74rem;color:#cdd2c6;line-height:1.7">${l.roster.map((p,i)=>`${i+1}. ${esc(p.name)}${p.paid?'':' <span style="color:var(--fnt)">· unpaid</span>'}`).join('<br>')}</div>`:''}</div>`:''}
     <button class="btn ${full?'btn-out':'btn-lime'}" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fmt(l.feeCents)}</button>
   </div>`;
 }
