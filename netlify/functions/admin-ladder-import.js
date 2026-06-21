@@ -66,7 +66,13 @@ export default async (req) => {
         };
         if (!existing) await setEvent(event);   // keep existing event metadata on re-sync
         // Always (re)write the play record — THIS backfills scores onto already-imported nights.
-        await setPlay(eid, { eventId: eid, date: sess.date || null, rounds: sess.rounds, finished: true, source: 'pickleladder' });
+        // Include config + currentRound so the scoring screen can open imported nights too.
+        await setPlay(eid, {
+          eventId: eid, date: sess.date || null, rounds: sess.rounds,
+          config: { courts: sess.config?.courts || event.courts || 0, rounds: (sess.rounds || []).length, roundMin: sess.config?.roundMin || 12, scoreMode: 'points' },
+          currentRound: Math.max(0, (sess.rounds || []).length - 1),
+          started: true, finished: true, source: 'pickleladder',
+        });
 
         // Roster: from participants if present, else everyone who appears in rounds.
         let entries;

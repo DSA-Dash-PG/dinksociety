@@ -284,12 +284,23 @@ function renderPlayers(){
     h+='<div class="sec" style="margin:16px 0 8px">Current merges</div>';
     h+=d.merges.map(m=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.78rem"><span>${esc(nm[m.from]||m.from)} → ${esc(m.name||nm[m.to]||m.to)}</span><button class="btn-danger" style="font-size:.68rem;padding:3px 8px" onclick="undoMerge('${m.from}')">Unmerge</button></div>`).join('');
   }
+  const dnorm=s=>String(s||'').trim().toLowerCase();
+  const dgroups={}; d.players.filter(p=>!p.mergedInto).forEach(p=>{ (dgroups[dnorm(p.name)]=dgroups[dnorm(p.name)]||[]).push(p); });
+  const dups=Object.values(dgroups).filter(g=>g.length>1); window.__DUPS=dups;
+  if(dups.length){
+    h+='<div class="sec" style="margin:16px 0 8px">Possible duplicates ('+dups.length+')</div>';
+    dups.forEach((g,idx)=>{ const keeper=g.slice().sort((a,b)=>b.nights-a.nights)[0];
+      h+=`<div style="background:#161914;border:1px solid rgba(255,92,71,.25);border-radius:10px;padding:10px 12px;margin-bottom:8px"><div style="font-size:.82rem;font-weight:700;margin-bottom:3px">${esc(g[0].name)} <span style="color:#9aa094;font-weight:500">· ${g.length} profiles</span></div><div style="font-size:.7rem;color:#9aa094;margin-bottom:8px">${g.map(p=>(p.gender||'?')+' · '+p.nights+'L'+(p.email?' ✉':'')).join('  ·  ')}</div><button class="btn btn-out btn-sm" onclick="mergeGroup(${idx})">Merge all → ${esc(keeper.name)} (${keeper.nights}L)</button></div>`; });
+  } else {
+    h+='<div class="sec" style="margin:16px 0 8px">Duplicates</div><div style="font-size:.78rem;color:#5e655a">No same-name duplicates — roster is clean. ✓</div>';
+  }
   h+='<div class="sec" style="margin:16px 0 8px">All players ('+d.players.length+')</div>';
   h+='<div style="max-height:240px;overflow:auto">'+d.players.map(p=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.78rem;${p.mergedInto?'opacity:.5':''}"><span>${esc(p.name)} <span style="color:#5e655a">${p.gender||''}</span></span><span style="color:#9aa094">${p.nights} ladders${p.email?' · ✉':''}${p.mergedInto?' · merged':''}</span></div>`).join('')+'</div>';
   el.innerHTML=h;
 }
 async function doMerge(){ const from=document.getElementById('mg-from').value,to=document.getElementById('mg-to').value,name=(document.getElementById('mg-name').value||'').trim(); const M=document.getElementById('mgMsg'); if(!from||!to||from===to){ M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick two different players.</div>'; return; } const {d}=await plPost({action:'merge',from,to,name:name||null}); if(d.ok){ loadPlayers(); loadXp(); M.innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Merged.</div>'; } else M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
 async function undoMerge(from){ const {d}=await plPost({action:'unmerge',from}); if(d.ok) loadPlayers(); }
+async function mergeGroup(i){ const g=(window.__DUPS||[])[i]; if(!g||g.length<2) return; const keeper=g.slice().sort((a,b)=>b.nights-a.nights)[0]; for(const p of g){ if(p.id===keeper.id) continue; await plPost({action:'merge',from:p.id,to:keeper.id,name:keeper.name}); } loadPlayers(); }
 function edFill(){ const id=document.getElementById('ed-player').value; const p=(PLDATA.players||[]).find(x=>x.id===id)||{}; document.getElementById('ed-email').value=p.email||''; document.getElementById('ed-name').value=p.name||''; document.getElementById('ed-gender').value=p.gender||''; }
 async function savePlayer(){ const id=document.getElementById('ed-player').value; const M=document.getElementById('edMsg'); if(!id){ M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick a player.</div>'; return; } const email=(document.getElementById('ed-email').value||'').trim(); const name=(document.getElementById('ed-name').value||'').trim(); const gender=document.getElementById('ed-gender').value; const {d}=await plPost({action:'update',id,email,name,gender}); if(d.ok){ loadPlayers(); M.innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Saved.</div>'; } else M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
 loadPlayers();

@@ -11,7 +11,7 @@
 import { verifyPlayerSession } from './lib/auth.js';
 import { getEvent } from './lib/ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './lib/ladder-play.js';
-import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier } from './lib/ladder-scoring.js';
+import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier, getRoundMVPs } from './lib/ladder-scoring.js';
 import { getXpConfig, getXpGrants, grantTotals } from './lib/xp-config.js';
 import { getMergeMap, applyMerges } from './lib/player-merge.js';
 import { getDirectory, applyDirectory } from './lib/player-directory.js';
@@ -29,6 +29,7 @@ function rowFor(s, dr, bonus, mvp) {
     w: s.w, l: s.l, pf: s.pf, pa: s.pa, diff: s.pf - s.pa,
     avg: avgOf(s), topCt: s.best || 0, streak: s.streak, maxStreak: s.maxStreak,
     seasonPts: s.pf + (b.bonus || 0),
+    bonus: b.bonus || 0,
     wins: b.wins || 0,
     podiums: (b.ladderResults || []).filter(r => r.rank <= 3).length,
     mvp: (mvp && mvp[s.id]) || 0,
@@ -58,10 +59,28 @@ export default async (req) => {
   // ── one night ──
   if (eventId) {
     const event = await getEvent(eventId);
-    const play = await getPlay(eventId);
-    if (!play) return json({ event: event ? { id: event.id, name: event.name } : null, standings: [], winners: [] });
-    const { rows } = buildRows([toSession(play)], playersFromPlay([play]));
-    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type } : null, standings: rows, winners: winnersFrom(rows) });
+    const raw = await getPlay(eventId);
+    if (!raw) return json({ event: event ? { id: event.id, name: event.name } : null, standings: [], winners: [], history: [] });
+    const play = applyDirectory(applyMerges([raw], await getMergeMap()), await getDirectory())[0];
+    const players = playersFromPlay([play]);
+    const { rows } = buildRows([toSession(play)], players);
+    // Round-by-round history: pairings, scores, movement context + round MVPs.
+    const history = (play.rounds || []).map((rd, ri) => {
+      const tC = Math.max(1, ...(rd.courts || []).map(c => c.court));
+      const courts = [...(rd.courts || [])].sort((a, b) => b.court - a.court).map(c => {
+        const sc = c.score || {};
+        return {
+          court: c.court, top: c.court === tC, bottom: c.court === 1,
+          teamA: (c.team1 || []).filter(Boolean).map(p => p.name),
+          teamB: (c.team2 || []).filter(Boolean).map(p => p.name),
+          t1: sc.t1 ?? null, t2: sc.t2 ?? null, winner: sc.winner || null,
+        };
+      });
+      const mv = getRoundMVPs(rd, players);
+      const mp = x => x ? { name: x.p.name, diff: x.diff, court: x.court } : null;
+      return { round: ri + 1, tC, courts, mvps: { male: mv.male.map(mp), female: mv.female.map(mp) } };
+    });
+    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type } : null, standings: rows, winners: winnersFrom(rows), history });
   }
 
   // ── season-wide ──

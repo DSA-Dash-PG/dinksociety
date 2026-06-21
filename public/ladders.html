@@ -241,6 +241,7 @@ function renderStats(){
 function sec(t,items){ return `<div class="seclbl">${t}</div><div class="card" style="font-size:.84rem;line-height:1.95">${items.join('<br>')}</div>`; }
 
 /* ---- NIGHT RESULTS ---- */
+let NIGHT=null, nMode='rounds', nVR=0;
 async function night(id){
   const c=COMPLETED.find(x=>x.id===id)||{};
   document.getElementById('nightTitle').textContent=c.name||'Night results';
@@ -248,11 +249,44 @@ async function night(id){
   document.getElementById('nightBody').innerHTML='<div class="empty">Loading…</div>';
   document.getElementById('nightOv').classList.add('on');
   let j={}; try{ j=await (await fetch(`${API}/public-ladder-stats?event=${encodeURIComponent(id)}`)).json(); }catch(e){}
-  const s=j.standings||[];
-  if(!s.length){ document.getElementById('nightBody').innerHTML='<div class="note">No scores recorded for this night.</div>'; return; }
-  let h='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th style="text-align:left">Player</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th><th>DR</th></tr></thead><tbody>';
-  s.forEach((p,i)=>{ h+=`<tr${i===0?' class="lead"':''}><td>${i+1}</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td>${p.w}</td><td>${p.l}</td><td class="hl">${p.pf}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td class="dr">${p.dr==null?'–':p.dr}</td></tr>`; });
-  document.getElementById('nightBody').innerHTML=h+'</tbody></table></div>';
+  NIGHT=j; const hist=j.history||[]; nMode=hist.length?'rounds':'final'; nVR=Math.max(0,hist.length-1); renderNight();
+}
+function nSet(m){ nMode=m; renderNight(); }
+function nMove(n,tC){ if(n===tC)return{w:'Stay & split',l:'↓ Court '+(tC-1)}; if(n===1)return{w:'↑ Court 2',l:'Stay & split'}; return{w:'↑ Court '+(n+1),l:'↓ Court '+(n-1)}; }
+function nightCourt(c,tC){
+  const king=c.top, acc=king?'#ffcc00':(c.court===tC-1?'#00e5ff':(c.court===tC-2?'#3b82f6':'#a78bfa'));
+  const hb=c.t1!=null&&c.t2!=null, aWin=c.winner==='A', bWin=c.winner==='B';
+  const ml=nMove(c.court,tC);
+  const pan=(names,win,lose,score,mv)=>`<div style="padding:9px 11px;text-align:center;${win?(king?'background:rgba(240,204,0,.06)':'background:rgba(184,255,44,.05)'):''}${lose?'opacity:.55':''}"><div style="font-size:.52rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin-bottom:5px">${hb?(win?'Winner':'Loser'):'&nbsp;'}</div><div style="font-size:.82rem;font-weight:700;line-height:1.3">${names.length?names.map(esc).join(' + '):'—'}</div><div style="font-size:1.6rem;font-weight:900;margin-top:4px;color:${win?(king?'var(--gold)':'var(--lime)'):(lose?'rgba(184,255,44,.3)':'var(--tx)')}">${score==null?'–':score}</div>${hb&&c.winner?`<div style="display:inline-block;margin-top:5px;padding:2px 9px;border-radius:9999px;font-size:.54rem;font-weight:800;text-transform:uppercase;color:${mv.indexOf('Stay')>=0?'var(--gold)':(win?'var(--lime)':'var(--red)')};background:${mv.indexOf('Stay')>=0?'rgba(240,204,0,.12)':(win?'rgba(184,255,44,.12)':'rgba(255,92,71,.12)')}">${mv}</div>`:''}</div>`;
+  const foot=hb&&c.winner?`<div style="padding:5px 11px;font-size:.58rem;color:var(--fnt);background:rgba(0,0,0,.25);border-top:1px solid var(--bd);text-align:center">${esc((aWin?c.teamA:c.teamB).join(' + '))} ${ml.w} · ${esc((aWin?c.teamB:c.teamA).join(' + '))} ${ml.l}</div>`:'';
+  return `<div style="border:1.5px solid ${king?'rgba(240,204,0,.4)':'var(--bd)'};border-radius:13px;overflow:hidden;margin-bottom:9px"><div style="display:flex;align-items:center;gap:8px;padding:7px 11px;background:rgba(0,0,0,.35);border-bottom:1px solid var(--bd)"><div style="width:26px;height:26px;border-radius:7px;background:${acc};color:#0a0a0a;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:.78rem">${c.court}</div><div style="font-size:.7rem;font-weight:900;text-transform:uppercase;color:${acc}">${king?'👑 Owns the Kitchen':'Court '+c.court}</div>${hb?`<div style="margin-left:auto;font-size:.78rem;font-weight:900;color:${acc}">${c.t1} – ${c.t2}</div>`:''}</div><div style="display:grid;grid-template-columns:1fr 1fr">${pan(c.teamA,aWin,hb&&bWin,c.t1,aWin?ml.w:ml.l)}<div style="border-left:1px solid var(--bd)">${pan(c.teamB,bWin,hb&&aWin,c.t2,bWin?ml.w:ml.l)}</div></div>${foot}</div>`;
+}
+function renderNight(){
+  const j=NIGHT||{}, hist=j.history||[], s=j.standings||[];
+  const body=document.getElementById('nightBody');
+  if(!s.length&&!hist.length){ body.innerHTML='<div class="note">No scores recorded for this night.</div>'; return; }
+  let h='';
+  if(hist.length) h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px">'+hist.map((r,i)=>`<button onclick="nVR=${i};nMode='rounds';renderNight()" style="padding:6px 11px;border-radius:9px;border:1.5px solid ${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.4)':'var(--bd)'};background:${(nMode==='rounds'&&i===nVR)?'rgba(184,255,44,.12)':'var(--surf)'};color:${(nMode==='rounds'&&i===nVR)?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">Rd ${r.round} ✓</button>`).join('')+'</div>';
+  if(hist.length) h+=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px"><button onclick="nSet('rounds')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='rounds'?'var(--lime)':'transparent'};color:${nMode==='rounds'?'#06210f':'var(--mut)'}">Round history</button><button onclick="nSet('final')" style="flex:1;padding:7px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;background:${nMode==='final'?'var(--lime)':'transparent'};color:${nMode==='final'?'#06210f':'var(--mut)'}">Final stats</button></div>`;
+  if(nMode==='final'||!hist.length){
+    const ord=n=>n===1?'1st':n===2?'2nd':n===3?'3rd':n;
+    const pcol=n=>n===1?'#f0c040':n===2?'#cfd3c8':n===3?'#d88a3a':'var(--mut)';
+    h+='<div style="overflow-x:auto"><table class="lbt"><thead><tr><th>#</th><th>Δ</th><th style="text-align:left">Player</th><th>W</th><th>L</th><th>+/-</th><th>Bonus</th><th>Total</th></tr></thead><tbody>';
+    s.forEach((p,i)=>{ const r=i+1; h+=`<tr${i===0?' class="lead"':''}><td style="color:${pcol(r)};font-weight:800">${ord(r)}</td><td style="color:var(--fnt)">—</td><td class="nm" onclick="profile('${p.id}')">${esc(p.name)}</td><td>${p.w}</td><td style="color:var(--mut)">${p.l}</td><td style="color:${p.diff>=0?'var(--lime)':'var(--red)'}">${p.diff>0?'+':''}${p.diff}</td><td style="color:var(--teal)">${p.bonus?'+'+p.bonus:'—'}</td><td class="hl" style="font-weight:900">${p.seasonPts}</td></tr>`; });
+    body.innerHTML=h+'</tbody></table></div>'; return;
+  }
+  nVR=Math.max(0,Math.min(nVR,hist.length-1));
+  const rd=hist[nVR];
+  h+=`<div class="seclbl" style="margin:2px 2px 9px">Round ${rd.round} — all courts</div>`;
+  rd.courts.forEach(c=>{ h+=nightCourt(c, rd.tC); });
+  const M=rd.mvps||{}, cards=[];
+  const mvc=(x,lab,col)=>`<div style="background:var(--surf);border:1px solid var(--bd);border-radius:11px;padding:9px 11px"><div style="font-size:.56rem;font-weight:800;color:${col}">🏅 ${lab}</div><div style="font-size:.86rem;font-weight:800;margin-top:3px">${esc(x.name)}</div><div style="font-size:.64rem;color:var(--lime)">${x.diff>=0?'+':''}${x.diff} diff · Court ${x.court}</div></div>`;
+  if(M.male&&M.male[0])cards.push(mvc(M.male[0],'Mens MVP','#5b9fff'));
+  if(M.female&&M.female[0])cards.push(mvc(M.female[0],'Womens MVP','#ff7bb0'));
+  if(M.male&&M.male[1])cards.push(mvc(M.male[1],'Mens #2','#5b9fff'));
+  if(M.female&&M.female[1])cards.push(mvc(M.female[1],'Womens #2','#ff7bb0'));
+  if(cards.length) h+=`<div class="seclbl" style="margin:14px 2px 9px">Round ${rd.round} MVPs</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${cards.join('')}</div>`;
+  body.innerHTML=h;
 }
 
 /* ---- PROFILE ---- */
