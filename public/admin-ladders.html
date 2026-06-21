@@ -195,7 +195,10 @@
 
   <div class="frow" style="margin-top:18px"><label class="l">Status</label><div class="seg" id="seg-status"><button data-v="open">Open</button><button data-v="live">Live</button><button data-v="final">Final</button><button data-v="cancelled">Cancelled</button></div></div>
   <div id="mBody"></div>
-  <div class="sec" style="margin:14px 0 8px">Add a player (cash / no email)</div>
+  <div class="sec" style="margin:14px 0 8px">Add from master roster</div>
+  <input class="i" id="ros-search" placeholder="Search existing players…" autocomplete="off" oninput="rosterSearch()">
+  <div id="rosResults" style="margin-top:6px"></div>
+  <div class="sec" style="margin:14px 0 8px">Or add a new player (cash / no email)</div>
   <div class="row2">
     <input class="i" id="ap-name" placeholder="Player name">
     <select class="i" id="ap-gender" style="max-width:90px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select>
@@ -347,7 +350,8 @@ async function createLadder(){
 async function openManage(id){
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(id));
   if(status!==200){ alert('Could not load ('+status+').'); return; }
-  CURRENT=d.event;
+  CURRENT=d.event; MROSTER=(d.roster||[]).map(p=>p.playerId);
+  const rs=document.getElementById('ros-search'); if(rs)rs.value=''; const rr=document.getElementById('rosResults'); if(rr)rr.innerHTML='';
   document.getElementById('mTitle').textContent=d.event.name;
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
   document.querySelectorAll('#seg-status button').forEach(b=>b.classList.toggle('on',b.dataset.v===(d.event.status||'open')));
@@ -369,6 +373,33 @@ async function openManage(id){
   document.getElementById('ov').classList.add('on');
 }
 function closeManage(){ document.getElementById('ov').classList.remove('on'); CURRENT=null; }
+let MROSTER=[];
+function rosterSearch(){
+  const q=(document.getElementById('ros-search').value||'').trim();
+  const ql=q.toLowerCase();
+  const el=document.getElementById('rosResults');
+  if(!q){ el.innerHTML=''; window.__ROS=[]; return; }
+  const pool=((PLDATA&&PLDATA.players)||[]).filter(p=>!p.mergedInto&&!MROSTER.includes(p.id)&&String(p.name).toLowerCase().includes(ql)).slice(0,8);
+  window.__ROS=pool;
+  let h=pool.map((p,i)=>`<div class="prow" style="cursor:pointer" onclick="addExisting(${i})"><span class="pn">${esc(p.name)} <span style="color:#5e655a;font-weight:500;font-size:.7rem">${p.gender||''} · ${p.nights}L${p.email?' · ✉':''}</span></span><span class="chip chip-lime">+ Add</span></div>`).join('');
+  h+=`<div class="prow" style="cursor:pointer" onclick="addNewFromSearch()"><span class="pn" style="color:#9aa094">Add new player “${esc(q)}” <span style="color:#5e655a;font-weight:500;font-size:.7rem">— uses the gender/email fields below</span></span><span class="chip chip-gray">New</span></div>`;
+  el.innerHTML=h;
+}
+async function addExisting(i){
+  const p=(window.__ROS||[])[i]; if(!p||!CURRENT) return;
+  const paidEl=document.getElementById('ap-paid'); const paid=paidEl?paidEl.checked:true;
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',playerId:p.id,name:p.name,gender:p.gender||null,email:p.email||'',paid})});
+  if(d.ok){ openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
+}
+async function addNewFromSearch(){
+  if(!CURRENT) return;
+  const name=(document.getElementById('ros-search').value||'').trim(); if(!name) return;
+  const gender=(document.getElementById('ap-gender')||{}).value||'';
+  const email=(document.getElementById('ap-email')||{}).value||'';
+  const paidEl=document.getElementById('ap-paid'); const paid=paidEl?paidEl.checked:true;
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,gender,email,paid})});
+  if(d.ok){ openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
+}
 
 async function saveEdit(){
   if(!CURRENT)return;

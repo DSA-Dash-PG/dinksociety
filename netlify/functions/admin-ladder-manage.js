@@ -86,7 +86,10 @@ export default async (req) => {
     const gender = body.gender === 'F' ? 'F' : body.gender === 'M' ? 'M' : null;
     const email = String(body.email || '').trim().toLowerCase();
     const paid = !!body.paid;
-    const pid = 'manual_' + Math.random().toString(36).slice(2, 10);
+    // Use an existing master-roster id when provided (links their stats/profile);
+    // otherwise mint a fresh manual id.
+    const pid = body.playerId ? String(body.playerId) : ('manual_' + Math.random().toString(36).slice(2, 10));
+    if (body.playerId && (signups.roster || []).some(p => p.playerId === pid)) return json({ error: 'Already on the roster' }, 409);
     if (spotsLeft(event, signups) > 0 || body.force) {
       signups.roster.push({
         playerId: pid, name, email, gender,
