@@ -353,18 +353,35 @@
 
       render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics);
 
-      // Cross-product: link to combined League + Ladder profile if they also play Ladder.
+      // Combined profile: if this player also plays Ladder, add a dual-rating hero
+      // at the top and a Ladder-play lane at the bottom (league stays primary).
       try {
         const up = await fetch(`/.netlify/functions/public-profile?leagueId=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}`);
         if (up.ok) {
           const u = await up.json();
           if (u.found && u.ladder) {
-            const b = document.createElement('a');
-            b.href = `/profile?leagueId=${encodeURIComponent(resolvedId)}`;
-            b.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px;padding:11px 14px;background:#b8ff2c;color:#06210f;border-radius:10px;text-decoration:none;font-weight:700;font-size:13px;';
-            b.innerHTML = `<span><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 20h5v-5h5v-5h5V5"/></svg> Also plays Ladder — DR ${u.ladder.dr == null ? '–' : u.ladder.dr} · ${u.ladder.w}-${u.ladder.l}</span><span>Combined profile →</span>`;
-            const root = document.getElementById('page-root');
-            root.insertBefore(b, root.firstChild);
+            const L = u.ladder, root = document.getElementById('page-root');
+            const dsrV = (u.league && u.league.dsr != null) ? Number(u.league.dsr).toFixed(1) : (ranks && ranks.dsr != null ? Number(ranks.dsr).toFixed(1) : '—');
+            const drV = (L.dr == null ? '–' : L.dr);
+            const ordN = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); };
+            const dual = document.createElement('div');
+            dual.style.cssText = 'display:flex;gap:8px;margin:0 0 16px';
+            dual.innerHTML =
+              '<div style="flex:1;border:1px solid rgba(23,215,176,.4);border-radius:12px;padding:11px 10px;text-align:center;background:var(--color-surface-2)"><div style="font-size:23px;font-weight:900;color:#17d7b0;text-shadow:0 0 12px rgba(23,215,176,.45);line-height:1">' + dsrV + '</div><div style="font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--color-text-faint);text-transform:uppercase;margin-top:4px">League · DSR</div></div>' +
+              '<div style="flex:1;border:1px solid rgba(184,255,44,.4);border-radius:12px;padding:11px 10px;text-align:center;background:var(--color-surface-2)"><div style="font-size:23px;font-weight:900;color:#b8ff2c;text-shadow:0 0 12px rgba(184,255,44,.5);line-height:1">' + drV + '</div><div style="font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--color-text-faint);text-transform:uppercase;margin-top:4px">Ladder · DR · #' + (L.rank || '–') + '</div></div>';
+            root.insertBefore(dual, root.firstChild);
+            const perL = (L.perLadder || []).slice(0, 5).map(p =>
+              '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13px"><span>' + esc(p.name || 'Ladder') + ' <span style="color:var(--color-text-faint)">' + esc(p.date || '') + '</span></span><span style="font-weight:800;color:#b8ff2c;white-space:nowrap">' + (p.placeRank ? ordN(p.placeRank) + ' ' : '') + p.w + '-' + p.l + '</span></div>'
+            ).join('');
+            const kc = (n, l, c) => '<div style="background:var(--color-surface-2);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:17px;font-weight:900' + (c ? ';color:' + c : '') + '">' + n + '</div><div style="font-size:8px;font-weight:800;letter-spacing:.06em;color:var(--color-text-faint);text-transform:uppercase;margin-top:2px">' + l + '</div></div>';
+            const sec = document.createElement('div');
+            sec.style.cssText = 'border:1px solid rgba(184,255,44,.3);border-left:3px solid #b8ff2c;border-radius:12px;padding:14px;margin-top:18px;background:var(--color-surface)';
+            sec.innerHTML =
+              '<div style="display:flex;align-items:center;gap:7px;margin-bottom:11px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#b8ff2c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 20h5v-5h5v-5h5V5"/></svg><b style="color:#b8ff2c;font-size:15px">Ladder play</b><span style="margin-left:auto;font-size:11px;color:var(--color-text-faint)">Season pts ' + (L.seasonPts != null ? L.seasonPts : '—') + '</span></div>' +
+              '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px">' + kc(L.w + '-' + L.l, 'Record') + kc((L.winPct != null ? L.winPct : 0) + '%', 'Win%', '#b8ff2c') + kc((L.diff > 0 ? '+' : '') + L.diff, 'Diff', L.diff >= 0 ? '#b8ff2c' : '#ff5c47') + kc(L.podiums || 0, 'Podiums') + '</div>' +
+              (perL ? '<div style="margin-top:6px">' + perL + '</div>' : '') +
+              '<a href="/profile?leagueId=' + encodeURIComponent(resolvedId) + '" style="display:block;text-align:center;margin-top:12px;padding:10px;border-radius:9px;background:rgba(184,255,44,.1);color:#b8ff2c;text-decoration:none;font-weight:800;font-size:13px">View full ladder card →</a>';
+            root.appendChild(sec);
           }
         }
       } catch {}
