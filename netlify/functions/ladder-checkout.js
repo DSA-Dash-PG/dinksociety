@@ -62,7 +62,7 @@ export default async (req) => {
   const base = siteUrl();
   const sessionParams = {
     mode: 'payment',
-    success_url: `${base}/ladders?event=${encodeURIComponent(eventId)}&paid=1`,
+    success_url: `${base}/ladders?event=${encodeURIComponent(eventId)}&paid=1&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${base}/ladders?event=${encodeURIComponent(eventId)}`,
     customer_email: email || undefined,
     metadata: { ladder: '1', eventId, playerId: playerId || '', email },

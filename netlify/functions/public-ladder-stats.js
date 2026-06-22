@@ -15,9 +15,10 @@ import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, ca
 import { getXpConfig, getXpGrants, grantTotals } from './lib/xp-config.js';
 import { getMergeMap, applyMerges } from './lib/player-merge.js';
 import { getDirectory, applyDirectory } from './lib/player-directory.js';
+import { getBalanceCents } from './lib/credits.js';
 
-function json(body) {
-  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=20' } });
+function json(body, cache = 'public, max-age=20') {
+  return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': cache } });
 }
 
 const avgOf = s => s.roundPts && s.roundPts.length ? Math.round(s.pf / s.roundPts.length * 10) / 10 : 0;
@@ -154,11 +155,16 @@ export default async (req) => {
     return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', winners: winnersFrom(nr), standings: nr };
   });
 
-  let you = null;
+  let you = null, youCreditCents = 0;
   const v = await verifyPlayerSession(req);
-  if (v.valid) { const me = rows.find(r => r.id === v.payload.playerId); if (me) you = me; }
+  if (v.valid) {
+    const me = rows.find(r => r.id === v.payload.playerId); if (me) you = me;
+    const myEmail = v.payload.email || v.payload.session?.email || v.payload.player?.email || '';
+    if (myEmail) youCreditCents = await getBalanceCents(myEmail).catch(() => 0);
+  }
 
-  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, hotStreaks, partnerships, recentWinners, you, hasData: rows.length > 0 });
+  // Per-user fields (you / youCreditCents) → keep this response browser-private.
+  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, hotStreaks, partnerships, recentWinners, you, youCreditCents, hasData: rows.length > 0 }, 'private, max-age=10');
 };
 
 export const config = { path: '/.netlify/functions/public-ladder-stats' };

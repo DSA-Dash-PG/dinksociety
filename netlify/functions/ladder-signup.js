@@ -130,6 +130,8 @@ export default async (req) => {
       entry.paymentMethod = 'credit'; entry.paymentStatus = 'paid'; entry.amountCents = 0; entry.heldUntil = null;
       await setSignups(signups);
       await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: person.name, eventName: event.name, dateLine: dateLineOf(event) }) }).catch(() => {});
+      const cOrgs = organizerEmails(event);
+      await Promise.allSettled(cOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup — paid</h2><p style="margin:0 0 4px"><b>${person.name}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Paid by ladder credit${email ? ' · ' + email : ''}</p></div>` })));
       return json({ ok: true, status: 'in', paid: 'credit' });
     }
 

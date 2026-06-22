@@ -12,8 +12,19 @@
 import Stripe from 'stripe';
 import { normalizeEmail } from './lib/identity.js';
 import { getEvent, getSignups, setSignups } from './lib/ladder.js';
-import { dateLineOf } from './lib/ladder-notify.js';
+import { dateLineOf, organizerEmails, fmtCents } from './lib/ladder-notify.js';
 import { sendEmail, renderLadderConfirmed } from './lib/email.js';
+
+// Plain notification to organizers that someone registered + paid.
+export function notifyOrganizersPaid(ladderEvent, entry) {
+  const orgs = organizerEmails(ladderEvent || {});
+  if (!orgs.length) return Promise.resolve();
+  const html = `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup — paid</h2>
+    <p style="margin:0 0 4px"><b>${entry.name || 'Player'}</b> registered for <b>${ladderEvent?.name || 'your ladder'}</b>.</p>
+    <p style="margin:0 0 4px">${dateLineOf(ladderEvent || {})}</p>
+    <p style="margin:0 0 4px">Paid by ${entry.paymentMethod || 'card'} · ${fmtCents(entry.amountCents || 0)}${entry.email ? ' · ' + entry.email : ''}</p></div>`;
+  return Promise.allSettled(orgs.map(to => sendEmail({ to, subject: `New signup: ${(entry.name || 'Player').split(' ')[0]} · ${ladderEvent?.name || 'ladder'}`, html })));
+}
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -70,6 +81,7 @@ export default async (req) => {
             html: renderLadderConfirmed({ playerName: entry.name, eventName: ladderEvent?.name || 'your ladder', dateLine: dateLineOf(ladderEvent || {}) }),
           }).catch(() => {});
         }
+        await notifyOrganizersPaid(ladderEvent, entry).catch(() => {});
         console.log(`[ladder-webhook] ${entry.email} paid for ${eventId} ($${(entry.amountCents || 0) / 100})`);
       }
     } catch (err) {

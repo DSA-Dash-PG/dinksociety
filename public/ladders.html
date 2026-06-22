@@ -142,7 +142,7 @@
 
 <script>
 const API='/.netlify/functions';
-let ACTIVE=[], COMPLETED=[], STATS=null, FT='all', FD='all';
+let ACTIVE=[], COMPLETED=[], STATS=null, MYCREDIT=0, FT='all', FD='all';
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 const fmt=c=>'$'+((Number(c)||0)/100%1===0?(Number(c)||0)/100:((Number(c)||0)/100).toFixed(2));
 const cardTotal=c=>(Number(c)||0)+Math.round((Number(c)||0)*0.10);
@@ -172,9 +172,16 @@ window.addEventListener('hashchange', route);
 
 async function init(){
   let pl={}, st={};
+  // Returning from Stripe card / Apple Pay checkout → reconcile the payment so the
+  // roster shows "paid" even if the webhook hasn't landed yet.
+  const _q=new URLSearchParams(location.search);
+  if(_q.get('paid')==='1' && _q.get('session_id')){
+    try{ await fetch(`${API}/ladder-checkout-confirm?session_id=${encodeURIComponent(_q.get('session_id'))}`,{method:'POST',credentials:'include'}); }catch(e){}
+    history.replaceState(null,'',location.pathname+location.hash);
+  }
   try{ pl=await (await fetch(`${API}/public-ladders`,{credentials:'include'})).json(); }catch(e){}
   try{ st=await (await fetch(`${API}/public-ladder-stats`,{credentials:'include'})).json(); }catch(e){}
-  ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st;
+  ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st; MYCREDIT=(st&&st.youCreditCents)||0;
   renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats();
   route();
 }
@@ -486,7 +493,9 @@ function openSignup(id){
   document.getElementById('payMsg').innerHTML='';
   if(l.spotsLeft<=0){ document.getElementById('payBody').innerHTML='<button class="btn btn-out" onclick="joinWaitlist(\''+id+'\')">Join the waitlist</button><div class="pays" style="margin-top:8px;color:#9aa094">No charge now — we\'ll email you to pay &amp; claim when a spot opens.</div>'; document.getElementById('payOv').classList.add('on'); return; }
   const methods=l.paymentMethods||['card','venmo'];
-  let h=`<button class="payopt" onclick="payCredit('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎟️</div><div><div class="payt">Use ladder credit</div><div class="pays">If you have a balance</div></div><div class="payamt" style="color:var(--lime)">${fmt(l.feeCents)}</div></button>`;
+  let h='';
+  // Ladder credit only appears once a player actually has a balance (e.g. after a cancellation).
+  if(MYCREDIT>0) h+=`<button class="payopt" onclick="payCredit('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎟️</div><div><div class="payt">Use ladder credit</div><div class="pays">Balance ${fmt(MYCREDIT)}</div></div><div class="payamt" style="color:var(--lime)">${fmt(l.feeCents)}</div></button>`;
   if(methods.includes('card')) h+=`<button class="payopt" onclick="payCard('${id}')"><div class="payic">💳</div><div><div class="payt">Card / Apple Pay</div><div class="pays">Instant · +10% fee</div></div><div class="payamt">${fmt(cardTotal(l.feeCents))}</div></button>`;
   if(methods.includes('venmo')) h+=`<button class="payopt" onclick="payVenmo('${id}')"><div class="payic" style="background:rgba(74,163,224,.16);color:var(--blue)">V</div><div><div class="payt">Venmo</div><div class="pays">Fee-free · organizer confirms</div></div><div class="payamt">${fmt(l.feeCents)}</div></button>`;
   document.getElementById('payBody').innerHTML=h;
