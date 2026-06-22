@@ -328,19 +328,24 @@
         +'<div class="selrow"><input id="splitSearch" type="search" placeholder="Search any player…" style="font:inherit;font-size:13px;padding:11px 14px;border-radius:var(--radius-md);border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text);min-width:260px;max-width:90vw;"></div>'
         +'<div id="splitsBody"></div>';
       var search=root.querySelector('#splitSearch');
+      var COL_W={cls:'wd',lab:'WD',hdr:"Women's",key:'womens'};
+      var COL_M={cls:'md',lab:'MD',hdr:"Men's",key:'mens'};
+      var COL_X={cls:'mx',lab:'MX',hdr:'Mixed',key:'mixed'};
+      var COLS_MEN=[COL_M,COL_X], COLS_WOMEN=[COL_W,COL_X], COLS_ALL=[COL_W,COL_M,COL_X];
       function cell(cls,lab,t){ if(!t||!t.played) return '<div class="gcell empty2">—</div>'; return '<div class="gcell '+cls+'"><div class="lab">'+lab+'</div><div class="pct">'+pct(t.won,t.played)+'%</div><div class="rec">'+t.won+'–'+(t.played-t.won)+'</div></div>'; }
-      function rowFor(p){ return '<div class="grow"><div class="gname"><b>'+esc(p.n)+'</b><small>'+esc(p.t)+'</small></div>'+cell('wd','WD',p.byType.womens)+cell('md','MD',p.byType.mens)+cell('mx','MX',p.byType.mixed)+'</div>'; }
-      function section(title,list){ if(!list.length) return ''; return '<div class="card"><div class="os-sec-h">'+title+'</div><div class="grow hd"><div></div><div>Women\'s</div><div>Men\'s</div><div>Mixed</div></div><div class="gtbl">'+list.map(rowFor).join('')+'</div></div>'; }
+      function gt(cols){ return 'grid-template-columns:minmax(140px,1.2fr) '+cols.map(function(){return '1fr';}).join(' '); }
+      function rowFor(p,cols){ return '<div class="grow" style="'+gt(cols)+'"><div class="gname"><b>'+esc(p.n)+'</b><small>'+esc(p.t)+'</small></div>'+cols.map(function(c){return cell(c.cls,c.lab,p.byType[c.key]);}).join('')+'</div>'; }
+      function section(title,list,cols){ if(!list.length) return ''; return '<div class="card"><div class="os-sec-h">'+title+'</div><div class="grow hd" style="'+gt(cols)+'"><div></div>'+cols.map(function(c){return '<div>'+c.hdr+'</div>';}).join('')+'</div><div class="gtbl">'+list.map(function(p){return rowFor(p,cols);}).join('')+'</div></div>'; }
       function draw(){
         var q=(search.value||'').trim().toLowerCase(); var body=document.getElementById('splitsBody');
         if(q){
           var hits=PLAYERS.filter(function(p){return p.n.toLowerCase().indexOf(q)>=0;}).sort(function(a,b){return (b.dsr||0)-(a.dsr||0);});
-          body.innerHTML = hits.length ? section('🔍 Search · '+hits.length+' player'+(hits.length===1?'':'s'),hits) : '<div class="card"><div class="empty">No players match &ldquo;'+esc(search.value)+'&rdquo;.</div></div>';
+          body.innerHTML = hits.length ? section('🔍 Search · '+hits.length+' player'+(hits.length===1?'':'s'),hits,COLS_ALL) : '<div class="card"><div class="empty">No players match &ldquo;'+esc(search.value)+'&rdquo;.</div></div>';
           return;
         }
         var men=PLAYERS.filter(function(p){return p.g&&p.g.toLowerCase()[0]==='m'&&p.gp>=2;}).sort(function(a,b){return (b.dsr||0)-(a.dsr||0);}).slice(0,10);
         var women=PLAYERS.filter(function(p){return p.g&&p.g.toLowerCase()[0]==='f'&&p.gp>=2;}).sort(function(a,b){return (b.dsr||0)-(a.dsr||0);}).slice(0,10);
-        body.innerHTML = (section('👨 Men\'s · Top 10',men)+section('👩 Women\'s · Top 10',women)) || '<div class="card"><div class="empty">No data yet.</div></div>';
+        body.innerHTML = (section('👨 Men\'s · Top 10',men,COLS_MEN)+section('👩 Women\'s · Top 10',women,COLS_WOMEN)) || '<div class="card"><div class="empty">No data yet.</div></div>';
       }
       search.oninput=draw; draw();
     }

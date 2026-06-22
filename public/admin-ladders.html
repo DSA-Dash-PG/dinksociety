@@ -228,7 +228,7 @@
   <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
   <div id="mEditMsg"></div>
 
-  <div class="frow" style="margin-top:18px"><label class="l">Status</label><div class="seg" id="seg-status"><button data-v="open">Open</button><button data-v="live">Live</button><button data-v="final">Final</button><button data-v="cancelled">Cancelled</button></div></div>
+  <div class="frow" style="margin-top:16px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div><div class="help" style="margin-top:4px">Automatic: <b>Open</b> until the start date · <b>Live</b> while scoring · <b>Final</b> when you finish the ladder.</div></div>
 
   <div style="margin-top:20px;text-align:right"><button class="btn-danger" onclick="delLadder()">Delete ladder</button></div>
   </div>
@@ -383,7 +383,7 @@ async function openManage(id){
   const rs=document.getElementById('ros-search'); if(rs)rs.value=''; const rr=document.getElementById('rosResults'); if(rr)rr.innerHTML='';
   document.getElementById('mTitle').textContent=d.event.name;
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
-  document.querySelectorAll('#seg-status button').forEach(b=>b.classList.toggle('on',b.dataset.v===(d.event.status||'open')));
+  { const st=(d.event.status||'open'); const SC={open:'var(--lime)',live:'var(--gold)',final:'var(--teal)',cancelled:'var(--red)'}; const el=document.getElementById('statusLine'); if(el){ el.textContent=st.charAt(0).toUpperCase()+st.slice(1); el.style.color=SC[st]||'#9aa094'; } }
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
   setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-type',d.event.type||'mixed');
   setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
@@ -466,11 +466,6 @@ async function act(action,email,playerId){
   if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
 }
 // status segment → set-status
-document.getElementById('seg-status').addEventListener('click',async e=>{
-  if(e.target.tagName!=='BUTTON'||!CURRENT)return;
-  const {d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-status',status:e.target.dataset.v})});
-  if(d.ok) loadList();
-});
 async function delLadder(){
   if(!CURRENT||!confirm('Delete this ladder and its signups?'))return;
   const {d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'DELETE'});
