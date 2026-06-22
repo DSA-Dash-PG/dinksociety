@@ -10,6 +10,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { publicProfile } from './lib/profile.js';
+import { shouldHideTestRecord } from './lib/test-data.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -30,6 +31,8 @@ export default async (req) => {
       if (!raw) continue;
       try {
         const team = JSON.parse(raw);
+        // Hide test/demo teams unless this request explicitly targets that season.
+        if (shouldHideTestRecord(team, seasonId)) continue;
         // Filter by season if present
         if (team.seasonId && team.seasonId !== seasonId) continue;
         // Don't leak untagged (legacy) teams into non-default seasons like the test season.

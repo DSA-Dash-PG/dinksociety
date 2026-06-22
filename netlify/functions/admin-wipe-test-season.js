@@ -11,11 +11,18 @@
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { wipeTestSeason } from './lib/test-season.js';
+import { guardSeedRun } from './lib/seed-lock.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   const result = await verifyAdminSession(req);
   if (!result.valid) return unauthResponse(result.error);
+
+  const guard = await guardSeedRun('test-wipe', 15000);
+  if (!guard.ok) {
+    return new Response(JSON.stringify({ error: 'Wiped too recently — please wait a moment.', retryInMs: guard.retryInMs }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } });
+  }
 
   try {
     const deleted = await wipeTestSeason();

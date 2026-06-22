@@ -16,6 +16,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { etagJson } from './lib/http-cache.js';
+import { isTestSeasonId } from './lib/test-data.js';
 
 // Map internal division codes → display labels
 const DIVISION_LABELS = {
@@ -105,6 +106,8 @@ export default async (req) => {
         if (!raw) continue;
         try {
           const data = JSON.parse(raw);
+          // Hide test/demo standings unless explicitly targeting that season.
+          if (data.isTest === true && !isTestSeasonId(seasonId)) continue;
           // Old format uses seasonId; skip if mismatch
           if (data.seasonId && data.seasonId !== seasonId) continue;
           // Skip new-format blobs (no per-division seasonId field)

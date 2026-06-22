@@ -9,6 +9,7 @@
 //   → { weeks: [ { week, matches: [...] } ] }
 
 import { getStore } from '@netlify/blobs';
+import { shouldHideTestRecord } from './lib/test-data.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -104,6 +105,8 @@ export default async (req) => {
       if (!raw) continue;
       try {
         const m = JSON.parse(raw);
+        // Hide test/demo matches unless this request explicitly targets that season.
+        if (shouldHideTestRecord(m, seasonId)) continue;
         if (m.seasonId && m.seasonId !== seasonId) continue;
         if (divisionFilter && m.division !== divisionFilter) continue;
 
@@ -166,6 +169,7 @@ async function loadTeamEmojis(seasonId) {
       if (!raw) continue;
       try {
         const team = JSON.parse(raw);
+        if (shouldHideTestRecord(team, seasonId)) continue;
         if (team.seasonId && team.seasonId !== seasonId) continue;
         if (!team.seasonId && seasonId !== 'circuit-i') continue;
         if (!team.emoji) continue;

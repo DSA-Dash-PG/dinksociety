@@ -34,6 +34,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { wipeTestSeason } from './lib/test-season.js';
 import { assignCourtSets } from './lib/courts.js';
+import { guardSeedRun } from './lib/seed-lock.js';
 
 // ---- Test season identity (keep in sync with lib/test-season.js) ----
 const SEASON_ID = 'circuit-test';
@@ -74,6 +75,12 @@ export default async (req) => {
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
   const admin = verified.payload;
+
+  const guard = await guardSeedRun('test-seed', 15000);
+  if (!guard.ok) {
+    return new Response(JSON.stringify({ error: 'Seeded too recently — please wait a moment.', retryInMs: guard.retryInMs }),
+      { status: 429, headers: { 'Content-Type': 'application/json' } });
+  }
 
   let body = {};
   try { body = await req.json(); } catch { /* empty body ok */ }
@@ -669,9 +676,8 @@ function attachAwards(playerMap, weeklyTopPerformers) {
 
 export const config = { path: '/.netlify/functions/admin-seed-test-season' };
 
-// Exported for unit testing only (not used by the Netlify handler path).
-export const __test = {
-  roundRobin, buildLineup, simulateMatch, buildScoreBlob, makePlayer,
-  accumulateTeams, accumulatePlayers, writeAggregates,
-  SLOT_KEYS, SLOT_TYPE, DIVISION, CIRCUIT,
-};
+// NOTE: the former `__test` export was removed so this production handler file
+// exposes only the Netlify handler + config. The generator helpers above
+// (roundRobin, buildLineup, simulateMatch, …) remain module-private. If unit
+// tests need them later, extract them into a dedicated lib/test-season-gen.js
+// module and import from both here and the tests.

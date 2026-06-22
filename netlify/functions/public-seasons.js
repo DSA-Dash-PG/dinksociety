@@ -26,6 +26,8 @@ export default async (req) => {
       if (!raw) continue;
       try {
         const season = JSON.parse(raw);
+        // Never surface test/demo seasons on the public registration page.
+        if (season.isTest === true) continue;
         // Only return seasons with open or paused registration
         if (season.registration === 'closed' || season.status === 'archived') continue;
 
