@@ -100,7 +100,7 @@
       <div class="sub" id="ladSub">Open ladders — register and pay</div>
       <div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px">
         <button id="lt-register" onclick="ladTab('register')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--lime);color:#06210f">Register</button>
-        <button id="lt-past" onclick="ladTab('past')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Past ladders</button>
+        <button id="lt-past" onclick="ladTab('completed')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Completed</button>
       </div>
       <div id="regWrap"><div id="filters"></div><div id="availList"><div class="empty">Loading…</div></div></div>
       <div id="pastWrap" style="display:none"></div>
@@ -150,9 +150,25 @@ const TL={mixed:'Mixed',mens:"Men's",womens:"Women's"};
 const wd=s=>{ if(!s)return''; const d=new Date(s+'T12:00:00'); return isNaN(d)?'':d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); };
 const wdShort=s=>{ if(!s)return''; const d=new Date(s+'T12:00:00'); return isNaN(d)?'':d.toLocaleDateString('en-US',{weekday:'short'}); };
 
-function tab(btn){ document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b===btn)); show(btn.dataset.t); }
+const RT={main:'home',home:'win',ladders:'register'};
+function tab(btn){ RT.main=btn.dataset.t; document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b===btn)); show(btn.dataset.t); writeHash(); }
 function show(name){ document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+name)); window.scrollTo({top:0}); }
 function closeOv(id){ document.getElementById(id).classList.remove('on'); }
+function writeHash(){ const m=RT.main; let sub=''; if(m==='home')sub=RT.home; else if(m==='ladders')sub=RT.ladders; else if(m==='leaderboard')sub=(typeof lbTab!=='undefined'?lbTab:'points'); const h=sub?`${m}/${sub}`:m; if(location.hash.replace(/^#/,'')!==h) history.replaceState(null,'',`#${h}`); }
+function route(){
+  const parts=(location.hash||'').replace(/^#/,'').split('/');
+  const m=['home','ladders','leaderboard','rules'].includes(parts[0])?parts[0]:'home';
+  const sub=parts[1]||'';
+  RT.main=m;
+  const btn=document.querySelector('#tabs button[data-t="'+m+'"]');
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b===btn));
+  show(m);
+  if(m==='home') hSub(sub==='up'?'up':'win');
+  else if(m==='ladders') ladTab((sub==='completed'||sub==='past')?'completed':'register');
+  else if(m==='leaderboard'){ if(['points','xp','dr'].includes(sub)) lbSetTab(sub); else writeHash(); }
+  else writeHash();
+}
+window.addEventListener('hashchange', route);
 
 async function init(){
   let pl={}, st={};
@@ -160,27 +176,22 @@ async function init(){
   try{ st=await (await fetch(`${API}/public-ladder-stats`,{credentials:'include'})).json(); }catch(e){}
   ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st;
   renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats();
+  route();
 }
 
 /* ---- HOME ---- */
 const HEXP={};
+const PAL=['#b8ff2c','#17d7b0','#a78bfa','#f0c040','#5b9fff','#ff7bb0','#ff8c5a'];
+const hexA=(c,a)=>{const n=parseInt(c.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;};
+const RANKC={1:'#f0c040',2:'#cfd3c8',3:'#d88a3a'};
+function t3chips(s){ return s.slice(0,3).map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;color:#dfe3d8"><b style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;font-size:.5rem;font-weight:900;color:#0b0d0a;background:${RANKC[i+1]}">${i+1}</b>${esc(p.name)} <span style="color:var(--mut);font-size:.62rem">${p.w}–${p.l}</span></span>`).join(''); }
+function evField(s){ const rest=s.slice(3); if(!rest.length) return ''; const half=Math.ceil(rest.length/2); const col=(a,st)=>`<div style="display:flex;flex-direction:column;gap:6px">${a.map((p,k)=>lbCell(p,st+k,'pts')).join('')}</div>`; return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:start;margin-bottom:9px">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; }
+function evBody(s,id,ac){ let h='<div style="display:flex;gap:7px;align-items:stretch;margin-bottom:8px">'; if(s.length>=3) h+=lbPodium(s[0],1,'pts')+lbPodium(s[1],2,'pts')+lbPodium(s[2],3,'pts'); else h+=s.map((p,i)=>lbCell(p,i+1,'pts')).join(''); h+='</div>'+evField(s)+`<button onclick="event.stopPropagation();night('${id}')" style="display:block;width:100%;padding:8px;border:1px solid ${hexA(ac,.32)};background:transparent;color:${ac};font:inherit;font-size:.72rem;font-weight:800;border-radius:8px;cursor:pointer">Full results &amp; rounds →</button>`; return h; }
+function evCard(o){ const ac=o.ac,open=o.open; return `<div style="border:1px solid ${hexA(ac,.32)};border-radius:13px;overflow:hidden;background:#111410;margin-bottom:10px"><div onclick="${o.toggle}" style="cursor:pointer;padding:9px 12px;border-left:3px solid ${ac};background-color:${hexA(ac,.08)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.10)} 0 9px,transparent 9px 20px)"><div style="display:flex;align-items:center;gap:9px"><span style="color:${ac};font-size:1rem">🏆</span><div style="flex:1;min-width:0"><div style="font-size:.8rem;font-weight:900;color:${ac};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(o.name)}</div><div style="font-size:.64rem;color:var(--mut);font-weight:700">${o.date}</div></div><span style="color:${ac};font-size:1.15rem;line-height:1;display:inline-block;${open?'transform:rotate(90deg)':''}">›</span></div>${(!open&&o.chips)?`<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:7px;padding-left:24px">${o.chips}</div>`:''}</div>${open?`<div style="padding:11px">${o.body}</div>`:''}</div>`; }
 function renderWinners(){
   const w=document.getElementById('homeWin'); const rw=(STATS&&STATS.recentWinners)||[];
-  w.innerHTML=rw.length?rw.map(homeEvent).join(''):'<div class="note">No results yet — winners show up after the first scored event.</div>';
-}
-function homeEvent(ev){
-  const s=ev.standings||[]; if(!s.length) return '';
-  const open=HEXP[ev.eventId], rest=s.slice(3);
-  let h=`<div style="margin-bottom:14px;border:1.5px solid #f0c04055;border-radius:14px;overflow:hidden;background:#121511">`;
-  h+=`<div onclick="night('${ev.eventId}')" style="display:flex;align-items:center;gap:10px;padding:11px 12px;cursor:pointer;border-bottom:1px solid #f0c04055;background-color:rgba(240,192,64,.10);background-image:repeating-linear-gradient(135deg,rgba(240,192,64,.16) 0 7px,transparent 7px 15px)"><span style="width:30px;height:30px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--gold);color:#0a0a0a;font-size:.95rem">🏆</span><div style="flex:1;min-width:0"><div style="font-size:.82rem;font-weight:900;text-transform:uppercase;letter-spacing:.03em;color:var(--gold);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(ev.eventName||'Ladder')}</div><div style="font-size:.66rem;color:#c7cdbf;font-weight:700">${wd(ev.date)}</div></div><span style="color:var(--gold);font-size:1.2rem;line-height:1">›</span></div>`;
-  h+=`<div style="padding:11px">`;
-  if(s.length>=3) h+=`<div style="display:flex;gap:7px;align-items:stretch;margin-bottom:8px">${lbPodium(s[0],1,'pts')}${lbPodium(s[1],2,'pts')}${lbPodium(s[2],3,'pts')}</div>`;
-  else h+=s.map((p,i)=>lbCell(p,i+1,'pts')).join('');
-  if(rest.length){
-    h+=`<button onclick="hToggle('${ev.eventId}')" style="width:100%;padding:8px;border:1px solid var(--bd);background:var(--surf);border-radius:9px;color:var(--mut);font:inherit;font-size:.72rem;font-weight:800;cursor:pointer">${open?'Hide field ▴':'Show all '+s.length+' players ▾'}</button>`;
-    if(open){ const half=Math.ceil(rest.length/2); const col=(a,st)=>`<div style="display:flex;flex-direction:column;gap:7px">${a.map((p,k)=>lbCell(p,st+k,'pts')).join('')}</div>`; h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start;margin-top:8px">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; }
-  }
-  return h+'</div></div>';
+  const have=rw.filter(ev=>(ev.standings||[]).length);
+  w.innerHTML=have.length?have.map((ev,i)=>{const ac=PAL[i%PAL.length],s=ev.standings||[],open=!!HEXP[ev.eventId];return evCard({ac,open,name:ev.eventName||'Ladder',date:wd(ev.date),toggle:`hToggle('${ev.eventId}')`,chips:t3chips(s),body:open?evBody(s,ev.eventId,ac):''});}).join(''):'<div class="note">No results yet — winners show up after the first scored event.</div>';
 }
 function hToggle(id){ HEXP[id]=!HEXP[id]; renderWinners(); }
 function hSub(t){
@@ -192,12 +203,13 @@ function hSub(t){
   b.style.background=win?'transparent':'var(--lime)'; b.style.color=win?'var(--mut)':'#06210f';
   document.getElementById('homeH1').textContent=win?'Latest winners':'Upcoming ladders';
   document.getElementById('homeSub').textContent=win?'Ranked by wins · tap an event to open the full ladder':'Open for registration';
+  RT.home=t; writeHash();
 }
 function renderHomeWeek(){
   const el=document.getElementById('homeUp');
   el.innerHTML=ACTIVE.length?ACTIVE.map(ladderCard).join('')+`<button class="btn btn-out" onclick="gotab('ladders')">See all ladders →</button>`:'<div class="note">No ladders open right now.</div>';
 }
-function gotab(name){ document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===name)); show(name); }
+function gotab(name){ RT.main=name; document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===name)); show(name); writeHash(); }
 
 /* ---- LADDERS ---- */
 const LEXP={};
@@ -228,9 +240,31 @@ function renderAvail(){
   const els=ACTIVE.filter(l=>(FT==='all'||(l.type||'mixed')===FT)&&(FD==='all'||wdShort(l.date)===FD));
   document.getElementById('availList').innerHTML=els.length?els.map(ladderCard).join(''):'<div class="empty">No ladders match these filters.</div>';
 }
+const PEXP={}, PCACHE={};
+async function pToggle(id){
+  PEXP[id]=!PEXP[id];
+  if(PEXP[id] && PCACHE[id]===undefined){
+    PCACHE[id]='loading'; renderPast();
+    let j={}; try{ j=await (await fetch(`${API}/public-ladder-stats?event=${encodeURIComponent(id)}`)).json(); }catch(e){}
+    PCACHE[id]=j.standings||[];
+  }
+  renderPast();
+}
+function pastCard(l,i){
+  const ac=PAL[i%PAL.length], open=!!PEXP[l.id];
+  let body='';
+  if(open){
+    const s=PCACHE[l.id];
+    if(s===undefined||s==='loading') body='<div class="note">Loading results…</div>';
+    else if(!s.length) body='<div class="note">No scores recorded for this ladder.</div>';
+    else body=evBody(s,l.id,ac);
+  }
+  const dateline=`${wd(l.date)}${l.place?' · '+esc(l.place):''}`;
+  return evCard({ac,open,name:l.name,date:dateline,toggle:`pToggle('${l.id}')`,chips:'',body});
+}
 function renderPast(){
   const w=document.getElementById('pastWrap');
-  w.innerHTML=COMPLETED.length?COMPLETED.map(l=>`<div class="citem ${l.type||'mixed'}" onclick="night('${l.id}')"><div><div class="nm">${esc(l.name)}</div><div class="mt">${wd(l.date)}${l.place?' · '+esc(l.place):''}</div></div><div class="go">Results →</div></div>`).join(''):'<div class="empty">No past ladders yet.</div>';
+  w.innerHTML=COMPLETED.length?COMPLETED.map(pastCard).join(''):'<div class="empty">No past ladders yet.</div>';
 }
 function ladTab(t){
   const reg=t==='register';
@@ -240,6 +274,7 @@ function ladTab(t){
   r.style.background=reg?'var(--lime)':'transparent'; r.style.color=reg?'#06210f':'var(--mut)';
   p.style.background=reg?'transparent':'var(--lime)'; p.style.color=reg?'var(--mut)':'#06210f';
   document.getElementById('ladSub').textContent=reg?'Open ladders — register and pay':'Completed nights — tap for full results';
+  RT.ladders=t; writeHash();
 }
 
 /* ---- LEADERBOARD ---- */
@@ -270,7 +305,7 @@ function lbBoard(rows,m){ if(!rows||!rows.length) return '<div class="note">No r
 let lbTab='points', lbInfo=null;
 const LBINFO={points:'<b>Points</b> — the official season standings, ranked by wins → point differential → DR. The big number is total points scored.',xp:'<b>XP</b> — an engagement score. Earn it every event you play: showing up, game wins, placing, round MVP, and comebacks. Rewards playing more, not just winning.',dr:'<b>DR (Dink Rating)</b> — a 0–100 skill rating from your results. Ranks players by rating; also used to balance teams.'};
 const LBSUB={points:'Season standings · ranked by wins → diff → DR',xp:'Engagement · most XP earned',dr:'Skill rating · ranked by DR'};
-function lbSetTab(t){ lbTab=t; renderStats(); }
+function lbSetTab(t){ lbTab=t; renderStats(); writeHash(); }
 function lbToggleInfo(t){ lbInfo=(lbInfo===t)?null:t; renderStats(); }
 function renderStats(){
   const body=document.getElementById('statsBody'); const j=STATS||{};
@@ -367,6 +402,20 @@ function courtSvg(mv,peak){
   const dots=mv.map((m,i)=>`${m.newLadder&&i>0?`<line x1="${x(i).toFixed(1)}" y1="6" x2="${x(i).toFixed(1)}" y2="${H-6}" stroke="rgba(255,255,255,.12)" stroke-dasharray="3 3"/>`:''}<circle cx="${x(i).toFixed(1)}" cy="${y(m.court).toFixed(1)}" r="3" fill="${m.won?'#b8ff2c':'#ff5c47'}"/>`).join('');
   return `<div style="background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:8px;overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:300px;height:118px"><polyline points="${line}" fill="none" stroke="#17d7b0" stroke-width="2"/>${dots}</svg><div style="font-size:.64rem;color:#9aa094;text-align:right">peak court ${peak} · ${n} rounds</div></div>`;
 }
+function courtChart(rounds){
+  const r=(rounds||[]).filter(x=>x&&x.court!=null); if(r.length<2) return '';
+  const courts=[...new Set(r.map(x=>x.court))].sort((a,b)=>b-a);
+  const rows=courts.length, padL=14,padR=14,padT=18,padB=24;
+  const W=Math.max(300,r.length*54+padL+padR), H=padT+padB+Math.max(60,rows*40);
+  const plotH=H-padT-padB, rowY={};
+  courts.forEach((c,i)=>{ rowY[c]= rows<=1? padT+plotH/2 : padT+plotH*i/(rows-1); });
+  const x=i=> padL+(r.length<=1?0:(W-padL-padR)*i/(r.length-1));
+  const grid=courts.map(c=>`<line x1="${padL}" y1="${rowY[c].toFixed(1)}" x2="${(W-padR).toFixed(1)}" y2="${rowY[c].toFixed(1)}" stroke="rgba(255,255,255,.08)" stroke-dasharray="3 4"/>`).join('');
+  const line=r.map((m,i)=>`${x(i).toFixed(1)},${rowY[m.court].toFixed(1)}`).join(' ');
+  const pts=r.map((m,i)=>{const cx=x(i),cy=rowY[m.court];return `<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="4" fill="${m.won?'#b8ff2c':'#ff5c47'}"/><text x="${cx.toFixed(1)}" y="${(cy-9).toFixed(1)}" text-anchor="middle" font-size="9" fill="${m.won?'#b8ff2c':'#ff5c47'}" font-weight="800">${m.pf}–${m.pa}</text>`;}).join('');
+  const xl=r.map((m,i)=>`<text x="${x(i).toFixed(1)}" y="${(H-7)}" text-anchor="middle" font-size="9" fill="#5e655a" font-weight="700">R${i+1}</text>`).join('');
+  return `<div style="background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:8px;margin-top:8px;overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" style="width:100%;min-width:${W}px;height:${H}px">${grid}<polyline points="${line}" fill="none" stroke="#17d7b0" stroke-width="2"/>${pts}${xl}</svg><div style="display:flex;gap:14px;justify-content:center;font-size:.62rem;color:#9aa094;margin-top:3px"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#b8ff2c;margin-right:4px"></span>Won</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#ff5c47;margin-right:4px"></span>Lost</span></div></div>`;
+}
 function renderProfile(p,inLeague){
   const init=p.name.split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
   const badge=inLeague?'<span class="pf-badge pf-league">League + Ladder</span>':'<span class="pf-badge pf-only">Ladder-only</span>';
@@ -376,9 +425,12 @@ function renderProfile(p,inLeague){
   const lw=last.filter(r=>r.won).length, ll=last.length-lw, lnet=last.reduce((a,r)=>a+(r.margin||0),0);
   const bars=last.map(r=>`<div title="${r.margin>0?'+':''}${r.margin}" style="flex:1;height:${Math.round(18+58*Math.abs(r.margin||0)/mx)}px;border-radius:3px;align-self:flex-end;background:${r.won?'var(--lime)':'var(--red)'}"></div>`).join('');
   const pl=(p.perLadder||[]).map(L=>{
-    const place=L.placeRank?' · '+ord(L.placeRank):'', bn=L.bonus?' · +'+L.bonus:'';
-    const rounds=L.rounds.map(r=>`<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:.76rem"><div><span style="color:#17d7b0;font-weight:700">Ct ${r.court}</span> w/ ${esc(r.partner||'—')} <span style="color:#5e655a">vs ${esc(r.opp.join(' + '))}</span></div><div style="font-weight:800;color:${r.won?'var(--lime)':'var(--red)'};white-space:nowrap">${r.pf}<span style="color:#5e655a">–${r.pa}</span></div></div>`).join('');
-    return `<details style="background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:8px"><summary style="cursor:pointer;font-size:.84rem;list-style:none"><b>${esc(L.name)}</b> <span style="color:#9aa094;font-weight:600;font-size:.74rem">${shortDate(L.date)} · ${L.w}-${L.l}${place}${bn}</span></summary><div style="margin-top:6px">${rounds}</div></details>`;
+    const d=L.courtDelta||0, an=Math.abs(d);
+    const note=d>0?`<span style="color:var(--lime)">↑ ${an} court${an>1?'s':''}</span>`:d<0?`<span style="color:var(--red)">↓ ${an} court${an>1?'s':''}</span>`:'<span style="color:#9aa094">Same court</span>';
+    const drTxt=L.dr==null?'–':L.dr;
+    const stats=`${L.w}W–${L.l}L · ${L.pts} pts · DR ${drTxt}${L.xp!=null?' · '+L.xp+' XP':''}`;
+    const rounds=L.rounds.map((r,ri)=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:.76rem"><span style="width:20px;text-align:center;color:#5e655a;font-weight:800;font-size:.62rem">R${ri+1}</span><div style="flex:1;min-width:0">w/ ${esc(r.partner||'—')} <span style="color:#5e655a">vs ${esc(r.opp.join(' + '))}</span></div><div style="font-weight:800;color:${r.won?'var(--lime)':'var(--red)'};white-space:nowrap">${r.pf}<span style="color:#5e655a">–${r.pa}</span></div></div>`).join('');
+    return `<details style="background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:8px"><summary style="cursor:pointer;list-style:none"><div style="font-size:.86rem;font-weight:800">${esc(L.name)} <span style="color:#9aa094;font-weight:600;font-size:.72rem">${shortDate(L.date)}</span></div><div style="font-size:.72rem;color:#cdd2c6;font-weight:700;margin-top:2px">${stats} · ${note}</div></summary><div style="margin-top:8px">${rounds}${courtChart(L.rounds)}</div></details>`;
   }).join('');
   return `
     <div class="pf-head"><div class="pf-av">${init}</div><div style="flex:1">
@@ -390,7 +442,7 @@ function renderProfile(p,inLeague){
     <div class="pf-kpis">${g(p.pf,'PS')}${g(p.pa,'PA')}${g((p.diff>0?'+':'')+p.diff,'Diff',p.diff>=0?'var(--lime)':'var(--red)')}${g(skStr,'Streak',sk>0?'var(--lime)':sk<0?'var(--red)':'var(--mut)')}</div>
     ${last.length?`<div class="seclbl">Last ${last.length} rounds</div><div style="display:flex;gap:4px;align-items:flex-end;height:82px;background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:10px">${bars}</div><div style="font-size:.66rem;color:#9aa094;text-align:right;margin-top:4px">${lw}W · ${ll}L · ${lnet>0?'+':''}${lnet} net</div>`:''}
     ${(p.movement||[]).length?`<div class="seclbl">Court movement</div>${courtSvg(p.movement,p.peakCourt)}`:''}
-    ${pl?`<div class="seclbl">Per ladder</div>${pl}`:''}
+    ${pl?`<div class="seclbl">Court movement — per ladder</div>${pl}`:''}
     <a href="/profile?ladderId=${p.id}" style="display:block;text-align:center;margin-top:12px;padding:10px;border-radius:9px;text-decoration:none;font-size:.76rem;font-weight:800;color:${inLeague?'var(--teal)':'var(--lime)'};background:${inLeague?'rgba(23,215,176,.1)':'rgba(184,255,44,.1)'}">${inLeague?'View combined League + Ladder profile →':'View full profile →'}</a>
     ${!inLeague?'<div class="note" style="margin-top:10px;font-size:.74rem">Ladder-only profile. Links to their league profile automatically if they join with the same email.</div>':''}`;
 }

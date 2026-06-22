@@ -105,6 +105,7 @@ export async function buildLadderProfile(id) {
 
   const { perLadder, movement } = walk(plays, id);
   const resByEvent = {}; (bonus.ladderResults || []).forEach(r => { if (r.sessId) resByEvent[r.sessId] = r; });
+  const playById = {}; for (const pp of plays) playById[pp.eventId] = pp;
   const evCache = {};
   for (const pl of perLadder) {
     if (!(pl.eventId in evCache)) evCache[pl.eventId] = await getEvent(pl.eventId).catch(() => null);
@@ -115,6 +116,14 @@ export async function buildLadderProfile(id) {
     pl.placeRank = rr ? rr.rank : null;
     pl.bonus = rr ? rr.bonus : 0;
     pl.courtDelta = pl.lastCourt - pl.firstCourt;
+    // Per-ladder DR + XP earned that event (compute from that single play).
+    const pp = playById[pl.eventId];
+    if (pp) {
+      const ess = [toSession(pp)], epl = playersFromPlay([pp]);
+      const edr = calcDinkRating(calcStats(ess, epl), ess, epl);
+      pl.dr = (edr[id] != null) ? edr[id] : null;
+      pl.xp = (calcXP(ess, epl, edr, _xpCfg.amounts).xp[id]) || 0;
+    } else { pl.dr = null; pl.xp = 0; }
   }
   perLadder.reverse();
 
