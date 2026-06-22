@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="/js/short-name.js"></script>
 <script src="/js/live-poll.js"></script>
+<script src="/ladder-profile-view.js"></script>
 <style>
   :root {
     --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626; --color-surface-4:#2e2e2e;
@@ -2666,41 +2667,7 @@
     }
 
     // Combined: this player also plays Ladder → League/Ladder tabs + dual-rating hero.
-    const kc = (n, l, c) => `<div style="background:var(--color-surface-2);border-radius:9px;padding:10px 6px;text-align:center"><div style="font-size:17px;font-weight:900${c ? ';color:' + c : ''}">${n}</div><div style="font-size:8px;font-weight:800;letter-spacing:.05em;color:var(--color-text-faint);text-transform:uppercase;margin-top:2px">${l}</div></div>`;
-    const lab = t => `<div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:16px 2px 8px">${t}</div>`;
-    const ladDate = sd => { if (!sd) return ''; const d = new Date(sd + 'T12:00:00'); return isNaN(d) ? '' : (d.getMonth() + 1) + '/' + d.getDate(); };
-    const courtLine = (mv, pk) => {
-      const n = mv.length; if (!n) return '';
-      const W = 680, H = 130, pad = 16, maxC = Math.max(pk || 1, ...mv.map(m => m.court || 1), 1);
-      const x = i => pad + (n <= 1 ? 0 : (W - 2 * pad) * i / (n - 1));
-      const y = c => H - pad - (H - 2 * pad) * ((c - 1) / Math.max(1, maxC - 1));
-      const poly = mv.map((m, i) => `${x(i).toFixed(1)},${y(m.court || 1).toFixed(1)}`).join(' ');
-      const dots = mv.map((m, i) => `${m.newLadder && i > 0 ? `<line x1="${x(i).toFixed(1)}" y1="6" x2="${x(i).toFixed(1)}" y2="${H - 6}" stroke="rgba(255,255,255,.12)" stroke-dasharray="3 3"/>` : ''}<circle cx="${x(i).toFixed(1)}" cy="${y(m.court || 1).toFixed(1)}" r="3" fill="${m.won ? '#b8ff2c' : '#ff5c47'}"/>`).join('');
-      return `<div style="background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:10px;padding:8px"><svg viewBox="0 0 ${W} ${H}" style="display:block;width:100%;height:auto"><polyline points="${poly}" fill="none" stroke="#17d7b0" stroke-width="2" vector-effect="non-scaling-stroke"/>${dots}</svg><div style="font-size:10px;color:var(--color-text-faint);text-align:right;margin-top:2px">peak court ${pk || maxC} · ${n} rounds</div></div>`;
-    };
-    const last = L.last10 || [], lmax = Math.max(1, ...last.map(r => Math.abs(r.margin || 0)));
-    const lbars = last.map(r => `<div title="${r.margin > 0 ? '+' : ''}${r.margin}" style="flex:1;align-self:flex-end;border-radius:3px;height:${Math.round(18 + 58 * Math.abs(r.margin || 0) / lmax)}px;background:${r.won ? '#b8ff2c' : '#ff5c47'}"></div>`).join('');
-    const lw = last.filter(r => r.won).length, ll = last.length - lw, lnet = last.reduce((a, r) => a + (r.margin || 0), 0);
-    const lastBlock = last.length ? lab(`Last ${last.length} rounds`) + `<div style="display:flex;gap:4px;align-items:flex-end;height:82px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:10px;padding:10px">${lbars}</div><div style="font-size:11px;color:var(--color-text-faint);text-align:right;margin-top:4px">${lw}W · ${ll}L · ${lnet > 0 ? '+' : ''}${lnet} net</div>` : '';
-    const perL = (L.perLadder || []).map(p => {
-      const d = p.courtDelta || 0, an = Math.abs(d);
-      const note = d > 0 ? `<span style="color:#b8ff2c">↑ ${an} court${an > 1 ? 's' : ''}</span>` : d < 0 ? `<span style="color:#ff5c47">↓ ${an} court${an > 1 ? 's' : ''}</span>` : `<span style="color:var(--color-text-faint)">Same court</span>`;
-      const drTxt = p.dr == null ? '–' : p.dr;
-      const stat = `${p.w}W–${p.l}L${p.pts != null ? ' · ' + p.pts + ' pts' : ''} · DR ${drTxt}${p.xp != null ? ' · ' + p.xp + ' XP' : ''}`;
-      const rounds = (p.rounds || []).map((r, ri) => `<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px"><span style="width:22px;text-align:center;color:var(--color-text-faint);font-weight:800;font-size:10px">R${r.r || ri + 1}</span><div style="flex:1;min-width:0">w/ ${esc(r.partner || '—')} <span style="color:var(--color-text-faint)">vs ${esc((r.opp || []).join(' + '))}</span></div><div style="font-weight:800;white-space:nowrap;color:${r.won ? '#b8ff2c' : '#ff5c47'}">${r.pf}<span style="color:var(--color-text-faint)">–${r.pa}</span></div></div>`).join('');
-      return `<details style="background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:10px;padding:10px 12px;margin-bottom:8px"><summary style="cursor:pointer;list-style:none"><div style="font-weight:800;font-size:14px">${esc(p.name || 'Ladder')} <span style="color:var(--color-text-faint);font-weight:600;font-size:12px">${ladDate(p.date)}</span></div><div style="font-size:12px;color:var(--color-text-muted);font-weight:700;margin-top:3px">${stat} · ${note}</div></summary><div style="margin-top:8px">${rounds}</div></details>`;
-    }).join('');
-    const ladderPane = `<div id="lane-ladder" class="hidden">`
-      + `<div style="display:flex;align-items:center;gap:11px;background:rgba(184,255,44,.08);border:1px solid rgba(184,255,44,.3);border-radius:11px;padding:11px 13px;margin:16px 0 4px"><div style="font-size:22px;font-weight:900;color:#b8ff2c;text-shadow:0 0 12px rgba(184,255,44,.5)">${L.xp != null ? L.xp : '—'}</div><div><div style="font-weight:800;font-size:13px;color:#b8ff2c">XP · ${L.xpTier || '—'}</div><div style="font-size:11px;color:var(--color-text-faint)">earned across ${L.ladders != null ? L.ladders : (L.nights != null ? L.nights : '—')} ladders</div></div></div>`
-      + lab('Ladder season')
-      + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px">${kc(L.w + '-' + L.l, 'Record')}${kc((L.winPct != null ? L.winPct : 0) + '%', 'Win%', '#b8ff2c')}${kc((L.diff > 0 ? '+' : '') + L.diff, 'Diff', L.diff >= 0 ? '#b8ff2c' : '#ff5c47')}${kc(L.seasonPts != null ? L.seasonPts : '—', 'Season pts')}</div>`
-      + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-top:7px">${kc('#' + (L.rank || '–'), 'Rank')}${kc(L.podiums || 0, 'Podiums')}${kc((L.mvp || 0) + '×', 'Top perf', '#a78bfa')}${kc(L.streak > 0 ? 'W' + L.streak : L.streak < 0 ? 'L' + (-L.streak) : '–', 'Streak', L.streak > 0 ? '#b8ff2c' : L.streak < 0 ? '#ff5c47' : '')}</div>`
-      + `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px">${kc(L.avg != null ? L.avg : '—', 'Avg pts/rd')}${kc(L.peakCourt || '—', 'Peak court')}${kc(L.ladders != null ? L.ladders : (L.nights || '—'), 'Ladders')}</div>`
-      + lastBlock
-      + (L.movement && L.movement.length ? lab('Court movement') + courtLine(L.movement, L.peakCourt) : '')
-      + (perL ? lab('Per ladder') + perL : '')
-      + `<a href="/profile?leagueId=${encodeURIComponent(me.playerId)}" style="display:block;text-align:center;margin-top:8px;padding:10px;border-radius:9px;background:rgba(184,255,44,.1);color:#b8ff2c;text-decoration:none;font-weight:800;font-size:13px">Full ladder card →</a>`
-      + `</div>`;
+    const ladderPane = `<div id="lane-ladder" class="hidden">` + (window.ladderProfileBody ? window.ladderProfileBody(L) : '') + `</div>`;
     const tabs = `<div id="lane-tabs" style="display:flex;gap:6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:9999px;padding:4px;margin:14px 0">`
       + `<button id="tabL" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">League</button>`
       + `<button id="tabD" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">Ladder</button></div>`;
