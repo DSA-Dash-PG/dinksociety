@@ -7,22 +7,25 @@
 
 import { buildLadderProfile } from './lib/profile-data.js';
 import { findPlayerByEmail } from './lib/player-auth.js';
+import { etagJson } from './lib/http-cache.js';
 
-function json(b, s = 200) {
-  return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=20' } });
-}
+// Ladder stats only change on score entry, so this can cache for a while.
+// ETag lets repeat opens short-circuit with a 304.
+const CACHE = 'public, max-age=120, stale-while-revalidate=300';
 
 export default async (req) => {
   const id = new URL(req.url).searchParams.get('id');
-  if (!id) return json({ error: 'id required' }, 400);
+  if (!id) return etagJson(req, { error: 'id required' }, { status: 400, cacheControl: 'no-store' });
 
   const r = await buildLadderProfile(id);
-  if (!r.found) return json({ found: false });
+  if (!r.found) return etagJson(req, { found: false }, { cacheControl: CACHE });
 
   let inLeague = false;
+  // r.email is used server-side only (to detect a matching league profile);
+  // it is intentionally NOT returned to the client.
   if (r.email) { try { inLeague = !!(await findPlayerByEmail(r.email)); } catch { inLeague = false; } }
 
-  return json({ found: true, inLeague, email: r.email, player: r.player });
+  return etagJson(req, { found: true, inLeague, player: r.player }, { cacheControl: CACHE });
 };
 
 export const config = { path: '/.netlify/functions/public-ladder-profile' };

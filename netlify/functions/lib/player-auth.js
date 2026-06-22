@@ -80,8 +80,10 @@ export async function findPlayerByEmail(rawEmail) {
   if (!norm) return null;
   const store = getStore('teams');
   const { blobs } = await store.list({ prefix: 'team/' });
-  for (const b of blobs) {
-    const team = await store.get(b.key, { type: 'json' }).catch(() => null);
+  // Parallelize the blob reads — each get is an independent network call, so a
+  // serial for-loop was paying N round-trips. Preserve first-match order.
+  const teams = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null)));
+  for (const team of teams) {
     if (!team?.roster) continue;
     const entry = team.roster.find(p =>
       (p.normalizedEmail && p.normalizedEmail === norm) ||
@@ -99,9 +101,9 @@ export async function findAllPlayerTeamsByEmail(rawEmail, { includeTest = false 
   if (!norm) return [];
   const store = getStore('teams');
   const { blobs } = await store.list({ prefix: 'team/' });
+  const teams = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null)));
   const out = [];
-  for (const b of blobs) {
-    const team = await store.get(b.key, { type: 'json' }).catch(() => null);
+  for (const team of teams) {
     if (!team?.roster) continue;
     if (!includeTest && isTestTeam(team)) continue;
     const entry = team.roster.find(p =>

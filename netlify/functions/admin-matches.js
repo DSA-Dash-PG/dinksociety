@@ -67,7 +67,8 @@ export default async (req) => {
   // ========== POST (add one match to a week) ==========
   if (req.method === 'POST') {
     const circuit = url.searchParams.get('circuit') || 'I';
-    const body = await req.json();
+    let body;
+    try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
     const division = body.division;
     const week = parseInt(body.week, 10);
     const teamA = body.teamA, teamB = body.teamB;
@@ -116,7 +117,8 @@ export default async (req) => {
     const matchId = url.searchParams.get('matchId');
     if (!matchId) return json({ error: 'matchId required' }, 400);
 
-    const body = await req.json();
+    let body;
+    try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
     const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'venue', 'notes', 'teamA', 'teamB'];
     const updates = {};
     for (const f of allowedFields) {

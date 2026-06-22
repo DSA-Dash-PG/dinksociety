@@ -80,7 +80,9 @@ export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
-  const body = await req.json();
+  let body;
+  try { body = await req.json(); }
+  catch { return new Response(JSON.stringify({ error: 'Invalid JSON body' }), { status: 400, headers: { 'Content-Type': 'application/json' } }); }
   return run(body, verified.payload);
 };
 

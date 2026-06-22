@@ -39,7 +39,9 @@ export default async (req) => {
   }
 
   const stripe = new Stripe(stripeKey);
-  const { seasonId } = await req.json();
+  let body = {};
+  try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  const { seasonId } = body;
 
   if (!seasonId) return json({ error: 'seasonId is required' }, 400);
 
@@ -47,9 +49,10 @@ export default async (req) => {
   const raw = await store.get(seasonId);
   if (!raw) return json({ error: 'Season not found' }, 404);
 
-  const season = JSON.parse(raw);
+  let season;
+  try { season = JSON.parse(raw); } catch { return json({ error: 'Season record is corrupt' }, 500); }
 
-  if (!season.divisions.length) {
+  if (!(season.divisions || []).length) {
     return json({ error: 'Season has no divisions. Add divisions first.' }, 400);
   }
 

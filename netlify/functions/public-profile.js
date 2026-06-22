@@ -7,23 +7,22 @@
 // can show both lanes. Either side may be absent (ladder-only or league-only).
 
 import { buildUnifiedProfile } from './lib/profile-data.js';
+import { etagJson } from './lib/http-cache.js';
 
-function json(b, s = 200) {
-  return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=20' } });
-}
+const CACHE = 'public, max-age=120, stale-while-revalidate=300';
 
 export default async (req) => {
   const u = new URL(req.url).searchParams;
   const email = u.get('email'), ladderId = u.get('ladderId'), leagueId = u.get('leagueId');
   const circuit = (u.get('circuit') || 'I').trim();
-  if (!email && !ladderId && !leagueId) return json({ error: 'email, ladderId, or leagueId required' }, 400);
+  if (!email && !ladderId && !leagueId) return etagJson(req, { error: 'email, ladderId, or leagueId required' }, { status: 400, cacheControl: 'no-store' });
 
   try {
     const out = await buildUnifiedProfile({ email, ladderId, leagueId, circuit });
-    return json(out);
+    return etagJson(req, out, { cacheControl: CACHE });
   } catch (err) {
     console.error('public-profile error:', err);
-    return json({ error: 'Profile unavailable' }, 500);
+    return etagJson(req, { error: 'Profile unavailable' }, { status: 500, cacheControl: 'no-store' });
   }
 };
 

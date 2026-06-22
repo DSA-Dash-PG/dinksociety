@@ -30,8 +30,10 @@ const nm = p => (p ? p.name : null);
 export async function ladderEmailById(id) {
   const dir = await getDirectory();
   if (dir[id] && dir[id].email) return normalizeEmail(dir[id].email);
-  for (const ev of await listEvents()) {
-    const su = await getSignups(ev.id);
+  // Fallback: scan signups. Parallelize the per-event reads (independent gets).
+  const events = await listEvents();
+  const sus = await Promise.all(events.map(ev => getSignups(ev.id).catch(() => ({}))));
+  for (const su of sus) {
     const hit = [...(su.roster || []), ...(su.waitlist || [])].find(p => p.playerId === id && p.email);
     if (hit) return normalizeEmail(hit.email);
   }
@@ -44,8 +46,9 @@ export async function ladderIdByEmail(rawEmail) {
   if (!norm) return null;
   const dir = await getDirectory();
   for (const [pid, info] of Object.entries(dir)) { if (info.email && normalizeEmail(info.email) === norm) return pid; }
-  for (const ev of await listEvents()) {
-    const su = await getSignups(ev.id);
+  const events = await listEvents();
+  const sus = await Promise.all(events.map(ev => getSignups(ev.id).catch(() => ({}))));
+  for (const su of sus) {
     const hit = [...(su.roster || []), ...(su.waitlist || [])].find(p => p.email && normalizeEmail(p.email) === norm && p.playerId);
     if (hit) return hit.playerId;
   }
@@ -139,8 +142,8 @@ export async function buildLadderProfile(id) {
 export async function leagueEmailById(leagueId) {
   const store = getStore('teams');
   const { blobs } = await store.list({ prefix: 'team/' }).catch(() => ({ blobs: [] }));
-  for (const b of blobs) {
-    const team = await store.get(b.key, { type: 'json' }).catch(() => null);
+  const teams = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null)));
+  for (const team of teams) {
     const entry = (team?.roster || []).find(p => p.id === leagueId);
     if (entry) return normalizeEmail(entry.email);
   }
@@ -199,7 +202,10 @@ export async function buildUnifiedProfile({ email, ladderId, leagueId, circuit =
 
   return {
     found: true,
-    identity: { name, email: canonEmail || null, hasLeague: league.found, hasLadder: ladder.found },
+    // NOTE: email is intentionally NOT exposed in this public payload (privacy).
+    // It's used server-side to link the two products, but the client only needs
+    // presence flags.
+    identity: { name, hasLeague: league.found, hasLadder: ladder.found },
     league: league.found ? league.player : null,
     ladder: ladder.found ? ladder.player : null,
   };
