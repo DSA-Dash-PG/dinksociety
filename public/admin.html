@@ -288,13 +288,16 @@
     /* ── Slide-out Team Detail Panel ──────────────────────────── */
     .tdp-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 900; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
     .tdp-overlay.is-open { opacity: 1; pointer-events: auto; }
-    .tdp-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; max-width: 95vw; background: var(--color-surface); border-left: 1px solid var(--color-border); z-index: 901; transform: translateX(100%); transition: transform 0.25s ease; overflow-y: auto; display: flex; flex-direction: column; }
+    .tdp-panel { position: fixed; top: 0; right: 0; bottom: 0; width: 520px; max-width: 95vw; background: var(--color-surface); border-left: 1px solid var(--color-border); z-index: 901; transform: translateX(100%); transition: transform 0.25s ease; overflow: hidden; display: flex; flex-direction: column; }
     .tdp-panel.is-open { transform: translateX(0); }
-    .tdp-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--color-border); position: sticky; top: 0; background: var(--color-surface); z-index: 1; }
+    .tdp-head { display: flex; justify-content: space-between; align-items: center; padding: 18px 20px; border-bottom: 1px solid var(--color-border); background: var(--color-surface); flex-shrink: 0; }
     .tdp-close { background: none; border: none; color: var(--color-text-faint); cursor: pointer; font-size: 18px; padding: 4px 8px; border-radius: var(--radius-sm); transition: all 0.15s; }
     .tdp-close:hover { background: var(--color-surface-2); color: var(--color-text); }
-    .tdp-body { padding: 20px; flex: 1; }
-    .tdp-foot { padding: 14px 20px; border-top: 1px solid var(--color-border); display: flex; gap: 8px; justify-content: flex-end; position: sticky; bottom: 0; background: var(--color-surface); }
+    .tdp-body { padding: 20px; flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .tdp-foot { padding: 14px 20px; border-top: 1px solid var(--color-border); display: flex; gap: 8px; justify-content: flex-end; align-items: center; flex-wrap: wrap; background: var(--color-surface); flex-shrink: 0; }
+    /* In-panel section jump nav — phones only (see media query). */
+    .tdp-jump { display: none; }
+    .tdp-anchor { scroll-margin-top: 54px; }
 
     /* Roster list in panel */
     .roster-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 6px; background: var(--color-surface-2); }
@@ -422,10 +425,15 @@
       /* Team panel is a modal — it must sit ABOVE the bottom nav (z 1000),
          and its sticky footer needs clearance for the iOS home indicator,
          otherwise "Save Changes" is buried behind the nav. */
-      .tdp-panel { width: 100vw; max-width: 100vw; z-index: 1002; }
+      .tdp-panel { width: 100vw; max-width: 100vw; height: 100dvh; z-index: 1002; }
       .tdp-overlay { z-index: 1001; }
       .tdp-foot { padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
+      .tdp-foot .a-status { flex-basis: 100%; order: -1; margin: 0 0 6px; }
       .pm-overlay { z-index: 1001; } /* payment modal above bottom nav too */
+      /* Sticky jump nav so the roster is one tap away, no scrolling past identity */
+      .tdp-jump { display: flex; gap: 6px; position: sticky; top: -20px; margin: -20px -20px 14px; padding: 10px 14px; background: var(--color-surface); border-bottom: 1px solid var(--color-border); z-index: 3; overflow-x: auto; }
+      .tdp-jump button { flex: 0 0 auto; background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); font-family: inherit; font-size: 12px; font-weight: 700; padding: 7px 13px; border-radius: var(--radius-full); cursor: pointer; white-space: nowrap; }
+      .tdp-jump button:active { background: var(--color-lime); color: var(--color-text-inverse); }
     }
   </style>
 </head>
@@ -3864,8 +3872,15 @@
       '</div>';
 
     body.innerHTML =
+      /* ── MOBILE JUMP NAV (roster first) ── */
+      '<div class="tdp-jump">' +
+        '<button type="button" data-jump="sec-roster">👥 Roster</button>' +
+        '<button type="button" data-jump="sec-identity">Identity</button>' +
+        '<button type="button" data-jump="sec-details">Details</button>' +
+        '<button type="button" data-jump="sec-tools">Tools</button>' +
+      '</div>' +
       /* ── IDENTITY ── */
-      '<div class="ac__h" style="margin:0 0 12px;"><span class="ac__t">Identity</span></div>' +
+      '<div class="ac__h tdp-anchor" id="sec-identity" style="margin:0 0 12px;"><span class="ac__t">Identity</span></div>' +
       '<div class="arow">' +
         '<div class="af"><label>Team Name</label><input type="text" id="tdp-name" value="' + h(t.name || '') + '"></div>' +
         '<div class="af" style="max-width:120px;"><label>Logo</label><input type="text" id="tdp-emoji" maxlength="4" placeholder="🏓 or DSD" value="' + h(t.emoji || '') + '" style="text-align:center;font-size:18px;"><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Emoji or 2-3 letters</span></div>' +
@@ -3892,14 +3907,14 @@
       '<div class="arow"><div class="af"><label>Bio</label><textarea id="tdp-bio" rows="4" placeholder="Short team bio shown on the public team page…" style="width:100%;box-sizing:border-box;background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px 12px;font-family:inherit;font-size:13px;line-height:1.5;resize:vertical;min-height:84px;">' + h(t.bio || '') + '</textarea><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Shown publicly on the team page.</span></div></div>' +
 
       /* ── DETAILS ── */
-      '<div class="ac__h" style="margin:22px 0 12px;"><span class="ac__t">Details</span></div>' +
+      '<div class="ac__h tdp-anchor" id="sec-details" style="margin:22px 0 12px;"><span class="ac__t">Details</span></div>' +
       '<div class="arow">' +
         '<div class="af"><label>Division</label><select id="tdp-division">' + DIVISIONS.map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
         '<div class="af"><label>Notes</label><input type="text" id="tdp-notes" value="' + h(t.notes || '') + '"><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Admin-only — never shown publicly.</span></div>' +
       '</div>' +
 
       /* ── ROSTER ── */
-      '<div class="ac__h" style="margin:22px 0 10px;"><span class="ac__t">Roster (' + (t.roster || []).length + '/10)</span></div>' +
+      '<div class="ac__h tdp-anchor" id="sec-roster" style="margin:22px 0 10px;"><span class="ac__t">Roster (' + (t.roster || []).length + '/10)</span></div>' +
       '<div id="tdp-roster">' + renderRosterItems(t.roster || []) + '</div>' +
       '<div style="margin-top:12px;padding:14px;background:var(--color-surface-2);border-radius:var(--radius-sm);border:1px solid var(--color-border);">' +
         '<div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Add Player</div>' +
@@ -3915,8 +3930,14 @@
       '</div>' +
 
       /* ── ADMIN TOOLS ── */
-      '<div class="ac__h" style="margin:24px 0 10px;"><span class="ac__t">Admin tools</span></div>' +
+      '<div class="ac__h tdp-anchor" id="sec-tools" style="margin:24px 0 10px;"><span class="ac__t">Admin tools</span></div>' +
       viewAsBlock;
+
+    // Jump nav (mobile): scroll the panel body to a section.
+    body.querySelectorAll('.tdp-jump button').forEach(b => b.addEventListener('click', () => {
+      const el = $id(b.dataset.jump);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
 
     // Wire up "View as" impersonation
     const viewAsGo = async (payload, srcBtn) => {
