@@ -34,6 +34,16 @@ export function organizerEmails(ev) {
   for (const e of (ev?.organizers || [])) add(e);
   const env = (typeof Netlify !== 'undefined' && Netlify.env.get('LADDER_ORGANIZER_EMAILS')) || process.env.LADDER_ORGANIZER_EMAILS || '';
   for (const e of env.split(',')) add(e);
+
+  // Fallback so a Venmo-confirm email is NEVER sent to nobody: if no organizer
+  // was configured on the ladder, route it to whoever created the ladder, then
+  // to a league-wide admin address. Without this, a ladder created with the
+  // organizer field left blank would silently drop the confirm email.
+  if (set.size === 0) {
+    add(ev?.createdBy);
+    const admin = (typeof Netlify !== 'undefined' && (Netlify.env.get('EMAIL_ADMIN_BCC') || Netlify.env.get('EMAIL_REPLY_TO'))) || process.env.EMAIL_ADMIN_BCC || process.env.EMAIL_REPLY_TO || '';
+    for (const e of admin.split(',')) add(e);
+  }
   return [...set];
 }
 

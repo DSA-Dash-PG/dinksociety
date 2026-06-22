@@ -141,6 +141,7 @@ export default async (req) => {
       const confirmTok = await createLadderToken({ type: 'venmo-confirm', eventId, playerId, email, ttlMs: 7 * 24 * 3600 * 1000 });
       const declineTok = await createLadderToken({ type: 'venmo-decline', eventId, playerId, email, ttlMs: 7 * 24 * 3600 * 1000 });
       const orgs = organizerEmails(event);
+      if (!orgs.length) console.warn(`[ladder-signup] Venmo claim for ${event.name} (${eventId}) has NO organizer recipient — set organizers on the ladder or LADDER_ORGANIZER_EMAILS/EMAIL_ADMIN_BCC. Admin can still confirm in the manage panel.`);
       const html = renderVenmoClaimToAdmin({
         playerName: person.name, amountLabel: fmtCents(feeCents), eventName: event.name, note,
         confirmUrl: venmoConfirmUrl(confirmTok), declineUrl: venmoDeclineUrl(declineTok),
