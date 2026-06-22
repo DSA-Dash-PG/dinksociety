@@ -55,6 +55,8 @@ export default async (req) => {
   if (req.method === 'DELETE') {
     await getStore({ name: 'ladder-events', consistency: 'strong' }).delete(`event/${eventId}.json`).catch(() => {});
     await getStore({ name: 'ladder-signups', consistency: 'strong' }).delete(`signup/${eventId}.json`).catch(() => {});
+    // Also remove the scored night so it doesn't linger in winners/standings.
+    await getStore({ name: 'ladder-play', consistency: 'strong' }).delete(`play/${eventId}.json`).catch(() => {});
     return json({ ok: true, deleted: eventId });
   }
 

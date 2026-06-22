@@ -9,7 +9,7 @@
 // (lib/ladder-scoring.js) over play data so the math matches Pickleladder.
 
 import { verifyPlayerSession } from './lib/auth.js';
-import { getEvent } from './lib/ladder.js';
+import { getEvent, listEvents } from './lib/ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './lib/ladder-play.js';
 import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier, getRoundMVPs } from './lib/ladder-scoring.js';
 import { getXpConfig, getXpGrants, grantTotals } from './lib/xp-config.js';
@@ -98,7 +98,11 @@ export default async (req) => {
   }
 
   // ── season-wide ──
-  const plays = applyDirectory(applyMerges(await listPlay(), await getMergeMap()), await getDirectory());
+  // Drop plays whose event has been deleted — otherwise a removed ladder's scored
+  // night lingers as a nameless "Ladder" in winners and still counts in standings.
+  const existingIds = new Set((await listEvents().catch(() => [])).map(e => e.id));
+  const plays = applyDirectory(applyMerges(await listPlay(), await getMergeMap()), await getDirectory())
+    .filter(p => existingIds.has(p.eventId));
   const sessions = plays.map(toSession);
   const players = playersFromPlay(plays);
   const { rows, stats: allStats, dr: allDr, bonus: allBonus, mvp: allMvp } = buildRows(sessions, players);
@@ -155,6 +159,14 @@ export default async (req) => {
     return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', winners: winnersFrom(nr), standings: nr };
   });
 
+  // Top-3 finishers for EVERY event with a play, so the Completed tab can show the
+  // same 1-2-3 chips as the Home "Latest winners" cards. Keyed by eventId.
+  const winnersByEvent = {};
+  for (const p of plays) {
+    const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
+    winnersByEvent[p.eventId] = nr.slice(0, 3).map(r => ({ id: r.id, name: r.name, w: r.w, l: r.l }));
+  }
+
   let you = null, youCreditCents = 0;
   const v = await verifyPlayerSession(req);
   if (v.valid) {
@@ -164,7 +176,7 @@ export default async (req) => {
   }
 
   // Per-user fields (you / youCreditCents) → keep this response browser-private.
-  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, hotStreaks, partnerships, recentWinners, you, youCreditCents, hasData: rows.length > 0 }, 'private, max-age=10');
+  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, hotStreaks, partnerships, recentWinners, winnersByEvent, you, youCreditCents, hasData: rows.length > 0 }, 'private, max-age=10');
 };
 
 export const config = { path: '/.netlify/functions/public-ladder-stats' };
