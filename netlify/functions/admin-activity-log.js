@@ -116,9 +116,10 @@ async function analytics(store) {
     for (const p of (t.roster || [])) {
       const email = (p.normalizedEmail || p.email || '').toLowerCase();
       rostered.push({ name: p.name, email: email || null, teamId: t.id, teamName: t.name });
-      // enrich seen records with current team if missing
+      // Roster is source of truth: always sync seen records to the live team
+      // (players who change teams keep a stale teamName otherwise).
       const seen = email && seenByEmail.get(email);
-      if (seen && !seen.teamName) { seen.teamName = t.name; seen.teamId = t.id; }
+      if (seen) { seen.teamName = t.name; seen.teamId = t.id; }
       if (seen && !seen.name) seen.name = p.name;
     }
   }

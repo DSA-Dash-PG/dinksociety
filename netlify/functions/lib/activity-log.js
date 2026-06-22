@@ -156,7 +156,7 @@ export async function recordSeen({ email, tab = null, name = null, team = null }
     const stale = !rec.lastSeenAt || (now - new Date(rec.lastSeenAt).getTime()) > 5 * 60 * 1000;
     if (!tab && !stale) return; // nothing worth a write
     if (name && !rec.name) rec.name = name;
-    if (team) { rec.teamId = rec.teamId || team.id || null; rec.teamName = rec.teamName || team.name || null; }
+    if (team) { rec.teamId = team.id || rec.teamId || null; rec.teamName = team.name || rec.teamName || null; }
     if (tab) {
       rec.tabs = rec.tabs || {};
       const t = String(tab).slice(0, 24).replace(/[^a-z0-9_-]/gi, '');
@@ -192,7 +192,7 @@ export async function recordVisit({ email, role = 'player', tab = null, name = n
 
     if (role) rec.role = role || rec.role || null;
     if (name && !rec.name) rec.name = name;
-    if (team) { rec.teamId = rec.teamId || team.id || null; rec.teamName = rec.teamName || team.name || null; }
+    if (team) { rec.teamId = team.id || rec.teamId || null; rec.teamName = team.name || rec.teamName || null; }
     if (tab) {
       rec.tabs = rec.tabs || {};
       const t = String(tab).slice(0, 24).replace(/[^a-z0-9_-]/gi, '');
