@@ -176,6 +176,12 @@
     <section class="ssec" id="s-settings">
       <h1 style="margin:0 0 4px">Settings</h1>
       <div class="card"><div style="font-size:.84rem;color:#9aa094;line-height:1.6">Divisions (Mixed / Men's / Women's) are set per ladder when you create one, and a division only appears on the public leaderboard once it's been played. Default fee, Venmo handle, and organizer emails are also set per ladder.</div></div>
+      <div class="card" style="margin-top:12px">
+        <div style="font-weight:800;margin-bottom:4px">Payment &amp; email setup</div>
+        <div style="font-size:.82rem;color:#9aa094;line-height:1.55;margin-bottom:10px">Checks the server (Netlify) side — which Stripe/email environment variables are present. Secret values are never shown. Run this after any redeploy. It does <b>not</b> check the Stripe dashboard webhook itself (do that with a test event in Stripe).</div>
+        <button class="btn btn-out" onclick="checkPayCfg()">Check payment config</button>
+        <div id="payCfg" style="margin-top:10px"></div>
+      </div>
     </section>
   </main>
 </div>
@@ -244,6 +250,14 @@ document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(
 function recalc(){ const c=parseInt(document.getElementById('f-courts').value)||0; document.getElementById('f-cap').value=c*4; }
 
 async function api(path,opts){ const r=await fetch(API+path,{credentials:'include',...opts}); let d={}; try{ d=await r.json(); }catch{} return {status:r.status,d}; }
+async function checkPayCfg(){
+  const el=document.getElementById('payCfg'); el.innerHTML='<span style="color:#9aa094;font-size:.82rem">Checking…</span>';
+  const {status,d}=await api('/admin-payment-config');
+  if(status===401){ el.innerHTML='<span style="color:#ff5c47;font-size:.82rem">Sign in as admin first.</span>'; return; }
+  if(!d||!Array.isArray(d.checks)){ el.innerHTML='<span style="color:#ff5c47;font-size:.82rem">Could not check ('+status+').</span>'; return; }
+  el.innerHTML=d.checks.map(c=>`<div style="display:flex;gap:9px;align-items:center;padding:5px 0;border-top:1px solid rgba(255,255,255,.06)"><span style="font-weight:900;color:${c.ok?'#b8ff2c':'#ff5c47'}">${c.ok?'✓':'✕'}</span><span style="flex:1;font-size:.84rem">${c.label}</span><span style="color:#9aa094;font-size:.76rem;text-align:right">${c.note}</span></div>`).join('')
+    +`<div style="margin-top:8px;font-size:.8rem;font-weight:700;color:${d.ok?'#b8ff2c':'#ff5c47'}">${d.ok?'All set on the Netlify side — '+d.mode+' mode.':'Some items need attention (see above).'}</div>`;
+}
 
 /* ---- admin shell: sidebar nav + mobile drawer ---- */
 const SECS=[['dash','Dashboard'],['ladders','Ladders'],['players','Players'],['scoring','Scoring'],['xp','XP & rewards'],['import','Import'],['settings','Settings']];
