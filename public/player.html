@@ -353,35 +353,58 @@
 
       render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics);
 
-      // Combined profile: if this player also plays Ladder, add a dual-rating hero
-      // at the top and a Ladder-play lane at the bottom (league stays primary).
+      // Combined profile: if this player also plays Ladder, wrap the league content
+      // under League/Ladder tabs and make the hero rating follow the active tab.
       try {
         const up = await fetch(`/.netlify/functions/public-profile?leagueId=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}`);
         if (up.ok) {
           const u = await up.json();
           if (u.found && u.ladder) {
-            const L = u.ladder, root = document.getElementById('page-root');
-            const dsrV = (u.league && u.league.dsr != null) ? Number(u.league.dsr).toFixed(1) : (ranks && ranks.dsr != null ? Number(ranks.dsr).toFixed(1) : '—');
-            const drV = (L.dr == null ? '–' : L.dr);
-            const ordN = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); };
-            const dual = document.createElement('div');
-            dual.style.cssText = 'display:flex;gap:8px;margin:0 0 16px';
-            dual.innerHTML =
-              '<div style="flex:1;border:1px solid rgba(23,215,176,.4);border-radius:12px;padding:11px 10px;text-align:center;background:var(--color-surface-2)"><div style="font-size:23px;font-weight:900;color:#17d7b0;text-shadow:0 0 12px rgba(23,215,176,.45);line-height:1">' + dsrV + '</div><div style="font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--color-text-faint);text-transform:uppercase;margin-top:4px">League · DSR</div></div>' +
-              '<div style="flex:1;border:1px solid rgba(184,255,44,.4);border-radius:12px;padding:11px 10px;text-align:center;background:var(--color-surface-2)"><div style="font-size:23px;font-weight:900;color:#b8ff2c;text-shadow:0 0 12px rgba(184,255,44,.5);line-height:1">' + drV + '</div><div style="font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--color-text-faint);text-transform:uppercase;margin-top:4px">Ladder · DR · #' + (L.rank || '–') + '</div></div>';
-            root.insertBefore(dual, root.firstChild);
-            const perL = (L.perLadder || []).slice(0, 5).map(p =>
-              '<div style="display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.06);font-size:13px"><span>' + esc(p.name || 'Ladder') + ' <span style="color:var(--color-text-faint)">' + esc(p.date || '') + '</span></span><span style="font-weight:800;color:#b8ff2c;white-space:nowrap">' + (p.placeRank ? ordN(p.placeRank) + ' ' : '') + p.w + '-' + p.l + '</span></div>'
-            ).join('');
-            const kc = (n, l, c) => '<div style="background:var(--color-surface-2);border-radius:9px;padding:9px 6px;text-align:center"><div style="font-size:17px;font-weight:900' + (c ? ';color:' + c : '') + '">' + n + '</div><div style="font-size:8px;font-weight:800;letter-spacing:.06em;color:var(--color-text-faint);text-transform:uppercase;margin-top:2px">' + l + '</div></div>';
-            const sec = document.createElement('div');
-            sec.style.cssText = 'border:1px solid rgba(184,255,44,.3);border-left:3px solid #b8ff2c;border-radius:12px;padding:14px;margin-top:18px;background:var(--color-surface)';
-            sec.innerHTML =
-              '<div style="display:flex;align-items:center;gap:7px;margin-bottom:11px"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#b8ff2c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 20h5v-5h5v-5h5V5"/></svg><b style="color:#b8ff2c;font-size:15px">Ladder play</b><span style="margin-left:auto;font-size:11px;color:var(--color-text-faint)">Season pts ' + (L.seasonPts != null ? L.seasonPts : '—') + '</span></div>' +
-              '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px">' + kc(L.w + '-' + L.l, 'Record') + kc((L.winPct != null ? L.winPct : 0) + '%', 'Win%', '#b8ff2c') + kc((L.diff > 0 ? '+' : '') + L.diff, 'Diff', L.diff >= 0 ? '#b8ff2c' : '#ff5c47') + kc(L.podiums || 0, 'Podiums') + '</div>' +
-              (perL ? '<div style="margin-top:6px">' + perL + '</div>' : '') +
-              '<a href="/profile?leagueId=' + encodeURIComponent(resolvedId) + '" style="display:block;text-align:center;margin-top:12px;padding:10px;border-radius:9px;background:rgba(184,255,44,.1);color:#b8ff2c;text-decoration:none;font-weight:800;font-size:13px">View full ladder card →</a>';
-            root.appendChild(sec);
+            const L = u.ladder, root = document.getElementById('page-root'), hero = root.querySelector('.mlp-hero');
+            if (hero) {
+              const ordN = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); };
+              const dsrV = (ranks && ranks.dsr != null) ? Number(ranks.dsr).toFixed(1) : '—';
+              const dsrRank = [ranks && ranks.genderRank != null ? ('#' + ranks.genderRank + ' ' + (ranks.genderLabel || '').replace(' Ranking','')) : null, ranks && ranks.overallRank != null ? ('#' + ranks.overallRank + ' Overall') : null].filter(Boolean).join(' · ');
+              const drV = (L.dr == null ? '–' : L.dr), drRank = '#' + (L.rank || '–') + (L.mvp ? ' · ' + L.mvp + '× top' : '');
+              // Move existing league content (everything after the hero) into a League pane.
+              const leaguePane = document.createElement('div'); leaguePane.id = 'lane-league';
+              let nn = hero.nextSibling; while (nn) { const nx = nn.nextSibling; leaguePane.appendChild(nn); nn = nx; }
+              // Build the Ladder pane from u.ladder.
+              const kc = (n, l, c) => '<div style="background:var(--color-surface-2);border-radius:9px;padding:10px 6px;text-align:center"><div style="font-size:17px;font-weight:900' + (c ? ';color:' + c : '') + '">' + n + '</div><div style="font-size:8px;font-weight:800;letter-spacing:.05em;color:var(--color-text-faint);text-transform:uppercase;margin-top:2px">' + l + '</div></div>';
+              const perL = (L.perLadder || []).slice(0, 8).map(p => '<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 2px;border-top:1px solid rgba(255,255,255,.06);font-size:13px"><span>' + esc(p.name || 'Ladder') + ' <span style="color:var(--color-text-faint)">' + esc(p.date || '') + '</span></span><span style="font-weight:800;color:#b8ff2c;white-space:nowrap">' + (p.placeRank ? ordN(p.placeRank) + ' ' : '') + p.w + '-' + p.l + '</span></div>').join('');
+              const mv = L.movement || [], peak = L.peakCourt || Math.max(1, ...mv.map(m => m.court || 1));
+              const chart = mv.length > 1 ? '<div style="background:var(--color-surface-2);border-radius:10px;padding:8px;height:90px;display:flex;align-items:flex-end;gap:3px">' + mv.map(m => '<i style="flex:1;border-radius:2px 2px 0 0;background:' + (m.won ? '#b8ff2c' : '#ff5c47') + ';height:' + Math.round(20 + ((m.court || 1) / peak) * 70) + '%"></i>').join('') + '</div>' : '';
+              const lab = t => '<div style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:16px 2px 8px">' + t + '</div>';
+              const ladderPane = document.createElement('div'); ladderPane.id = 'lane-ladder'; ladderPane.style.display = 'none';
+              ladderPane.innerHTML =
+                '<div style="display:flex;align-items:center;gap:11px;background:rgba(184,255,44,.08);border:1px solid rgba(184,255,44,.3);border-radius:11px;padding:11px 13px;margin:16px 0 4px"><div style="font-size:22px;font-weight:900;color:#b8ff2c;text-shadow:0 0 12px rgba(184,255,44,.5)">' + (L.xp != null ? L.xp : '—') + '</div><div><div style="font-weight:800;font-size:13px;color:#b8ff2c">XP · ' + (L.xpTier || '—') + '</div><div style="font-size:11px;color:var(--color-text-faint)">earned across ' + (L.ladders != null ? L.ladders : (L.nights != null ? L.nights : '—')) + ' ladders</div></div></div>' +
+                lab('Ladder season') +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px">' + kc(L.w + '-' + L.l, 'Record') + kc((L.winPct != null ? L.winPct : 0) + '%', 'Win%', '#b8ff2c') + kc((L.diff > 0 ? '+' : '') + L.diff, 'Diff', L.diff >= 0 ? '#b8ff2c' : '#ff5c47') + kc(L.seasonPts != null ? L.seasonPts : '—', 'Season pts') + '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-top:7px">' + kc('#' + (L.rank || '–'), 'Rank') + kc(L.podiums || 0, 'Podiums') + kc((L.mvp || 0) + '×', 'Top perf', '#a78bfa') + kc(L.streak > 0 ? 'W' + L.streak : L.streak < 0 ? 'L' + (-L.streak) : '–', 'Streak', L.streak > 0 ? '#b8ff2c' : L.streak < 0 ? '#ff5c47' : '') + '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;margin-top:7px">' + kc(L.avg != null ? L.avg : '—', 'Avg pts/rd') + kc(L.peakCourt || '—', 'Peak court') + kc(L.ladders != null ? L.ladders : (L.nights || '—'), 'Ladders') + '</div>' +
+                (chart ? lab('Court movement') + chart : '') +
+                (perL ? lab('Per ladder') + perL + '<a href="/profile?leagueId=' + encodeURIComponent(resolvedId) + '" style="display:block;text-align:center;margin-top:12px;padding:10px;border-radius:9px;background:rgba(184,255,44,.1);color:#b8ff2c;text-decoration:none;font-weight:800;font-size:13px">Full ladder card →</a>' : '');
+              // Tab bar.
+              const tabs = document.createElement('div');
+              tabs.style.cssText = 'display:flex;gap:6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:9999px;padding:4px;margin:14px 0';
+              tabs.innerHTML = '<button id="tabL" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">League</button><button id="tabD" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">Ladder</button>';
+              root.appendChild(tabs); root.appendChild(leaguePane); root.appendChild(ladderPane);
+              const heroN = hero.querySelector('.mlp-hero__dsr-n'), heroLbl = hero.querySelector('.mlp-hero__dsr-lbl'), heroRk = hero.querySelector('.mlp-hero__dsr-rk');
+              const setTab = t => {
+                const lg = t === 'league';
+                document.getElementById('lane-league').style.display = lg ? '' : 'none';
+                document.getElementById('lane-ladder').style.display = lg ? 'none' : '';
+                const bL = document.getElementById('tabL'), bD = document.getElementById('tabD');
+                bL.style.background = lg ? '#17d7b0' : 'transparent'; bL.style.color = lg ? '#06231d' : 'var(--color-text-faint)';
+                bD.style.background = lg ? 'transparent' : '#b8ff2c'; bD.style.color = lg ? 'var(--color-text-faint)' : '#06210f';
+                if (heroN) { heroN.textContent = lg ? dsrV : drV; heroN.style.color = lg ? '#17d7b0' : '#b8ff2c'; }
+                if (heroLbl) heroLbl.textContent = lg ? 'League · DSR' : 'Ladder · DR';
+                if (heroRk) heroRk.textContent = lg ? dsrRank : drRank;
+              };
+              document.getElementById('tabL').onclick = () => setTab('league');
+              document.getElementById('tabD').onclick = () => setTab('ladder');
+              setTab('league');
+            }
           }
         }
       } catch {}
