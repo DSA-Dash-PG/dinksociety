@@ -18,6 +18,7 @@ import {
   effectiveCapacity, spotsLeft,
 } from './lib/ladder.js';
 import { promoteAndNotify } from './lib/ladder-promote.js';
+import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js';
 import { earn } from './lib/credits.js';
 import { dateLineOf } from './lib/ladder-notify.js';
 import { sendEmail, renderLadderConfirmed } from './lib/email.js';
@@ -41,7 +42,7 @@ export default async (req) => {
 
   // ── admin view (full detail) ──
   if (req.method === 'GET') {
-    const s = await getSignups(eventId);
+    const s = applyDirectoryToSignups(await getSignups(eventId), await getDirectory());
     return json({
       event,
       capacity: effectiveCapacity(event),

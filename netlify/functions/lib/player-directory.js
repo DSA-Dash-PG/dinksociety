@@ -29,6 +29,17 @@ export async function setPlayerInfo(id, info = {}) {
   return next;
 }
 
+// Overlay live directory name/gender onto a signups record's roster/waitlist/claim
+// (keyed by playerId), so editing a player in the directory updates every ladder.
+export function applyDirectoryToSignups(rec, dir) {
+  if (!rec || !dir || !Object.keys(dir).length) return rec;
+  const fix = p => { if (!p) return; const o = dir[p.playerId]; if (o) { if (o.name) p.name = o.name; if (o.gender) p.gender = o.gender; } };
+  (rec.roster || []).forEach(fix);
+  (rec.waitlist || []).forEach(fix);
+  fix(rec.pendingClaim);
+  return rec;
+}
+
 // Override display name/gender on play records from the directory (run AFTER merges
 // so the keys are canonical ids).
 export function applyDirectory(plays, dir) {

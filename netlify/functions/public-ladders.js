@@ -4,6 +4,7 @@
 // ?event=<id> returns just that ladder.
 
 import { listEvents, getEvent, getSignups, toPublicSignups, effectiveCapacity } from './lib/ladder.js';
+import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js';
 
 function pub(e, s) {
   const p = toPublicSignups(e, s);
@@ -26,15 +27,16 @@ function json(body) {
 }
 
 export default async (req) => {
+  const dir = await getDirectory();
   const id = new URL(req.url).searchParams.get('event');
   if (id) {
     const e = await getEvent(id);
     if (!e) return new Response(JSON.stringify({ error: 'not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    return json({ ladder: pub(e, await getSignups(id)) });
+    return json({ ladder: pub(e, applyDirectoryToSignups(await getSignups(id), dir)) });
   }
   const events = await listEvents();
   const visible = events.filter(e => ['open', 'full', 'live'].includes(e.status || 'open'));
-  const ladders = (await Promise.all(visible.map(async e => pub(e, await getSignups(e.id)))))
+  const ladders = (await Promise.all(visible.map(async e => pub(e, applyDirectoryToSignups(await getSignups(e.id), dir)))))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   const completed = events.filter(e => (e.status || 'open') === 'final')
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
