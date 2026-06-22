@@ -85,7 +85,11 @@ function walk(plays, id) {
 export async function buildLadderProfile(id) {
   const _mm = await getMergeMap();
   id = resolveMerge(_mm, id);
-  const plays = applyDirectory(applyMerges(await listPlay(), _mm), await getDirectory());
+  // Ignore scored nights whose ladder has been deleted (otherwise a removed
+  // ladder lingers in the player's profile as a nameless "Ladder").
+  const _existing = new Set((await listEvents().catch(() => [])).map(e => e.id));
+  const plays = applyDirectory(applyMerges(await listPlay(), _mm), await getDirectory())
+    .filter(p => _existing.has(p.eventId));
   const sessions = plays.map(toSession);
   const players = playersFromPlay(plays);
   const stats = calcStats(sessions, players);
