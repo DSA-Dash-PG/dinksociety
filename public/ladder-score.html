@@ -146,8 +146,10 @@ function renderPicker(){
 function clearPick(){ EID=null; SEL=null; document.getElementById('board').innerHTML=''; document.getElementById('msg').innerHTML=''; renderPicker(); window.scrollTo({top:0}); }
 async function pick(id){ EID=id; SEL=id; swapMode=null; renderPicker(); window.scrollTo({top:0}); if(!EID){ document.getElementById('board').innerHTML=''; return; } await load(); }
 async function load(){
+  document.getElementById('board').innerHTML='<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">Loading…</div>';
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID));
-  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  if(status===401){ document.getElementById('authBanner').style.display='block'; document.getElementById('board').innerHTML='<div class="banner">You need to sign in as admin to score. <a href="/admin.html">Sign in →</a></div>'; return; }
+  if(status!==200||!d||d.error){ document.getElementById('board').innerHTML='<div class="banner">Couldn’t load this ladder ('+((d&&d.error)||status)+'). <a href="#" onclick="pick(EID);return false">Retry</a></div>'; return; }
   STATE=d; VR=(d.play&&d.play.currentRound!=null&&d.play.currentRound>=0)?d.play.currentRound:0;
   if(SC_MASTER===null){ try{ const r=await api('/admin-ladder-players'); SC_MASTER=(r.d&&r.d.players)||[]; }catch(e){ SC_MASTER=[]; } }
   resetTimer(); render();
@@ -253,11 +255,11 @@ function render(){
   const mv=roundMVPs(round);
   if(round.courts.every(c=>c.score&&c.score.winner) && (mv.male.length||mv.female.length)){
     const card=(x,lab,col)=>`<div class="mvpc"><div class="lab" style="color:${col}">🏆 ${lab}</div><div class="nm">${esc(x.p.name)}</div><div class="vl">${x.diff>=0?'+':''}${x.diff} diff</div><div class="sb">Court ${x.court}</div></div>`;
-    h+=`<div class="seclbl">Round ${VR+1} MVPs</div><div class="mvpg">`;
-    if(mv.male[0]) h+=card(mv.male[0],'Mens MVP','#5b9fff');
-    if(mv.female[0]) h+=card(mv.female[0],'Womens MVP','#ff7bb0');
-    if(mv.male[1]) h+=card(mv.male[1],'Mens #2','#5b9fff');
-    if(mv.female[1]) h+=card(mv.female[1],'Womens #2','#ff7bb0');
+    h+=`<div class="seclbl">Round ${VR+1} Top Performers</div><div class="mvpg">`;
+    if(mv.male[0]) h+=card(mv.male[0],'Top Man','#5b9fff');
+    if(mv.female[0]) h+=card(mv.female[0],'Top Woman','#ff7bb0');
+    if(mv.male[1]) h+=card(mv.male[1],'Men’s #2','#5b9fff');
+    if(mv.female[1]) h+=card(mv.female[1],'Women’s #2','#ff7bb0');
     h+=`</div>`;
   }
 

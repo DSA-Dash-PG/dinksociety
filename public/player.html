@@ -246,11 +246,16 @@
     async function load() {
       // Always fetch teams to find the player's roster entry + team info
       const [teamsRes, psRes] = await Promise.allSettled([
-        fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json() : null),
+        fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json().catch(() => null) : null),
+        fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(CIRCUIT) + '&view=players').then(r => r.ok ? r.json().catch(() => null) : null),
       ]);
 
-      const teams = teamsRes.value?.teams || [];
+      const teamsData = teamsRes.status === 'fulfilled' ? teamsRes.value : null;
+      if (!teamsData) {
+        document.getElementById('page-root').innerHTML = '<div class="pp-loading">Couldn’t load right now. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>';
+        return;
+      }
+      const teams = teamsData.teams || [];
 
       // Find the team by slug or raw id
       let team = teams.find(t => slug(t.name) === teamParam) || teams.find(t => t.id === teamParam);
@@ -591,7 +596,7 @@
       } catch {}
     }
 
-    load();
+    load().catch(e => { console.error('player load failed', e); const pr = document.getElementById('page-root'); if (pr) pr.innerHTML = '<div class="pp-loading">Couldn’t load this player. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>'; });
   })();
   </script>
 </body>
