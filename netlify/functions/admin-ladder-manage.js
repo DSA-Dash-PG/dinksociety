@@ -137,7 +137,11 @@ export default async (req) => {
       entry.heldUntil = null;
     }
     await setSignups(signups);
-    return json({ ok: true, paid: action === 'mark-paid', method: entry.paymentMethod, name: entry.name });
+    // Marking paid sends the player the same "you're in" confirmation as Confirm.
+    if (action === 'mark-paid' && entry.email) {
+      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event) }) }).catch(() => {});
+    }
+    return json({ ok: true, paid: action === 'mark-paid', method: entry.paymentMethod, name: entry.name, emailed: action === 'mark-paid' && !!entry.email });
   }
 
   // Change the recorded payment method on an already-paid player.
