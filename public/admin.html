@@ -523,6 +523,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
             Teams
           </button>
+          <button class="sb__link" data-tab="players">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+            Players
+          </button>
           <button class="sb__link" data-tab="approvals">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
             Profile Approvals <span class="sb__badge" id="sb-appr-ct" style="display:none;">0</span>
@@ -748,6 +752,39 @@
           .appr-card__act { display: flex; gap: 8px; justify-content: flex-end; }
           @media (max-width: 560px) { .appr-diff { grid-template-columns: 88px 1fr; } .appr-diff__a { grid-column: 2; } }
         </style>
+        <!-- PLAYERS — master roster with contact info -->
+        <section class="admin-section" data-section="players">
+          <div class="am-head"><h1 class="am-title">Players</h1>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="ab ab--ghost ab--sm" onclick="renderPlayers()" style="font-size:10px;">Refresh</button>
+              <button class="ab ab--lime ab--sm" id="pl-export" style="font-size:10px;">Export CSV</button>
+            </div>
+          </div>
+          <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;">Every rostered league player with contact details. Includes archived &amp; removed players; excludes the test/demo season. Admin only.</p>
+          <div id="pl-stats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;"></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <input id="pl-q" type="text" placeholder="Search name, team, email, phone…" style="flex:1;min-width:180px;" aria-label="Search players">
+            <select id="pl-team" aria-label="Filter by team" style="max-width:180px;"></select>
+            <select id="pl-login" aria-label="Filter by login" style="max-width:150px;">
+              <option value="">Any login</option><option value="never">Never logged in</option><option value="active">Has logged in</option>
+            </select>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);white-space:nowrap;"><input type="checkbox" id="pl-arch" checked style="width:auto;min-height:0;"> Show archived</label>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="pl-table" style="width:100%;border-collapse:collapse;font-size:13px;">
+              <thead><tr>
+                <th data-k="name" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">NAME</th>
+                <th data-k="teamName" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">TEAM</th>
+                <th data-k="email" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">EMAIL</th>
+                <th data-k="phone" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">PHONE</th>
+                <th data-k="lastLoginAt" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">LAST LOGIN</th>
+              </tr></thead>
+              <tbody id="pl-body"></tbody>
+            </table>
+          </div>
+          <p id="pl-foot" style="font-size:12px;color:var(--color-text-faint);margin:12px 2px 0;"></p>
+        </section>
+
         <!-- PROFILE APPROVALS -->
         <section class="admin-section" data-section="approvals">
           <div class="am-head"><h1 class="am-title">Profile Approvals</h1>
@@ -2226,6 +2263,81 @@
   }
 
   // ─── Tab navigation ───────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════
+  // PLAYERS — master roster with contact info (admin-players)
+  // ═══════════════════════════════════════════════════════════
+  let PL_DATA = [], PL_SORT = 'name', PL_DIR = 1, PL_WIRED = false;
+  function plFmtLogin(s) {
+    if (!s) return '<span style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--color-amber-dim,rgba(245,158,11,.15));color:#f0c040;">Never</span>';
+    const d = new Date(s);
+    if (isNaN(d)) return '—';
+    return '<span title="' + aEsc(s) + '">' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '</span>';
+  }
+  function plRows() {
+    const q = ($id('pl-q').value || '').trim().toLowerCase();
+    const tf = $id('pl-team').value, lf = $id('pl-login').value, showArch = $id('pl-arch').checked;
+    let r = PL_DATA.filter(p => {
+      if (!showArch && p.archived) return false;
+      if (tf && p.teamName !== tf) return false;
+      if (lf === 'never' && p.lastLoginAt) return false;
+      if (lf === 'active' && !p.lastLoginAt) return false;
+      if (q && !((p.name + ' ' + p.teamName + ' ' + (p.email || '') + ' ' + (p.phone || '')).toLowerCase().includes(q))) return false;
+      return true;
+    });
+    r.sort((a, b) => { const x = (a[PL_SORT] || ''), y = (b[PL_SORT] || ''); return x < y ? -PL_DIR : x > y ? PL_DIR : 0; });
+    return r;
+  }
+  function plRender() {
+    const r = plRows();
+    $id('pl-body').innerHTML = r.map(p => {
+      const init = (p.name || '?').split(' ').map(x => x[0]).join('').slice(0, 2).toUpperCase();
+      const cap = p.isCaptain ? '<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--color-lime-dim);color:var(--color-lime);margin-left:5px;">CAP</span>' : (p.isCoCaptain ? '<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--color-teal-dim);color:var(--color-teal);margin-left:5px;">CO</span>' : '');
+      const arch = p.archived ? '<span style="font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;background:var(--color-surface-3);color:var(--color-text-faint);margin-left:5px;">ARCHIVED</span>' : '';
+      const cp = (v, lbl) => v ? ' <button class="pl-copy" data-c="' + aEsc(v) + '" title="Copy ' + lbl + '" style="background:none;border:none;color:var(--color-text-faint);cursor:pointer;padding:1px 3px;">⧉</button>' : '';
+      return '<tr style="' + (p.archived ? 'opacity:.6;' : '') + '">' +
+        '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);"><span style="display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--color-lime-dim);color:var(--color-lime);font-size:10px;font-weight:700;margin-right:8px;">' + aEsc(init) + '</span>' + aEsc(p.name) + cap + arch + '</td>' +
+        '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + aEsc(p.teamName) + '<div style="font-size:10px;color:var(--color-text-faint);">' + aEsc(p.divisionLabel || '') + '</div></td>' +
+        '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + (p.email ? '<a href="mailto:' + aEsc(p.email) + '" style="color:var(--color-teal);text-decoration:none;">' + aEsc(p.email) + '</a>' + cp(p.email, 'email') : '<span style="color:var(--color-text-faint);">—</span>') + '</td>' +
+        '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + (p.phone ? aEsc(p.phone) + cp(p.phone, 'phone') : '<span style="color:var(--color-text-faint);">—</span>') + '</td>' +
+        '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + plFmtLogin(p.lastLoginAt) + '</td>' +
+      '</tr>';
+    }).join('') || '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-faint);">No players match.</td></tr>';
+    const never = r.filter(p => !p.lastLoginAt).length;
+    $id('pl-foot').textContent = 'Showing ' + r.length + ' of ' + PL_DATA.length + ' players' + (never ? ' · ' + never + ' never logged in' : '');
+    $$('#pl-body .pl-copy').forEach(b => b.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(b.dataset.c); const o = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = o, 1000); });
+  }
+  function plExport() {
+    const r = plRows(), head = ['Name', 'Team', 'Division', 'Captain', 'Archived', 'Email', 'Phone', 'Last logged in'];
+    const lines = [head.join(',')].concat(r.map(p => [p.name, p.teamName, p.divisionLabel || '', p.isCaptain ? 'Yes' : '', p.archived ? 'Yes' : '', p.email || '', p.phone || '', p.lastLoginAt || 'Never'].map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')));
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv' }), u = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = u; a.download = 'dink-society-players.csv'; a.click(); URL.revokeObjectURL(u);
+  }
+  async function renderPlayers() {
+    const body = $id('pl-body');
+    body.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-faint);">Loading…</td></tr>';
+    if (!PL_WIRED) {
+      PL_WIRED = true;
+      ['pl-q', 'pl-team', 'pl-login', 'pl-arch'].forEach(id => { const el = $id(id); el && el.addEventListener(id === 'pl-q' ? 'input' : 'change', plRender); });
+      $id('pl-export') && ($id('pl-export').onclick = plExport);
+      $$('#pl-table th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; if (PL_SORT === k) PL_DIR = -PL_DIR; else { PL_SORT = k; PL_DIR = 1; } plRender(); });
+    }
+    try {
+      const res = await api('/.netlify/functions/admin-players');
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'Failed');
+      PL_DATA = d.players || [];
+      const teams = Array.from(new Set(PL_DATA.map(p => p.teamName))).sort();
+      $id('pl-team').innerHTML = '<option value="">All teams (' + teams.length + ')</option>' + teams.map(t => '<option>' + aEsc(t) + '</option>').join('');
+      const s = d.stats || {};
+      const card = (n, l) => '<div style="background:var(--color-surface-2);border-radius:8px;padding:10px 14px;min-width:90px;"><div style="font-size:20px;font-weight:700;">' + n + '</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-faint);">' + l + '</div></div>';
+      $id('pl-stats').innerHTML = card(s.total || 0, 'Players') + card(s.withPhone || 0, 'With phone') + card(s.neverLoggedIn || 0, 'Never logged in') + card(s.archived || 0, 'Archived');
+      plRender();
+    } catch (e) {
+      body.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-red);">Couldn’t load players. <a href="#" onclick="renderPlayers();return false" style="color:var(--color-lime);">Retry</a></td></tr>';
+    }
+  }
+  window.renderPlayers = renderPlayers;
+
   $$('.sb__link[data-tab]').forEach(b => {
     b.addEventListener('click', () => {
       $$('.sb__link').forEach(x => x.classList.remove('is-active'));
@@ -2236,6 +2348,7 @@
       if (t === 'seasons') loadAndRenderSeasons();
       if (t === 'registrations') renderReg();
       if (t === 'teams') renderTeams();
+      if (t === 'players') renderPlayers();
       if (t === 'approvals') renderApprovals();
       if (t === 'schedule') { renderGameday(); renderAllGames(); renderSched(); }
       if (t === 'scores') {}
