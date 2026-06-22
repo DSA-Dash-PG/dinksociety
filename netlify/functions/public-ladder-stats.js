@@ -53,6 +53,19 @@ function buildRows(sessions, players) {
   return { rows, stats, dr, bonus, mvp };
 }
 
+// Build division rows by filtering already-computed season data rather than
+// re-running all four calc functions from scratch for each division.
+function buildDivisionRows(dPlays, allDr, allBonus, allMvp) {
+  if (!dPlays.length) return [];
+  const dPlayers = playersFromPlay(dPlays);
+  const dSessions = dPlays.map(toSession);
+  // Re-compute stats scoped to division plays only (needed for accurate W/L/pf within division).
+  const dStats = calcStats(dSessions, dPlayers);
+  // Reuse season-wide DR, bonus, and MVP — these are cumulative cross-division scores.
+  const rows = rankRows(dStats.filter(s => s.w + s.l > 0).map(s => rowFor(s, allDr, allBonus, allMvp)));
+  return rows;
+}
+
 export default async (req) => {
   const eventId = new URL(req.url).searchParams.get('event');
 
@@ -87,24 +100,34 @@ export default async (req) => {
   const plays = applyDirectory(applyMerges(await listPlay(), await getMergeMap()), await getDirectory());
   const sessions = plays.map(toSession);
   const players = playersFromPlay(plays);
-  const { rows } = buildRows(sessions, players);
+  const { rows, stats: allStats, dr: allDr, bonus: allBonus, mvp: allMvp } = buildRows(sessions, players);
+
+  // ── Event cache: fetch each unique event ONCE and reuse for both typeByEvent
+  // and recentWinners — previously fired one getEvent() call per play record
+  // in each of those two loops (O(2n) DB calls → O(unique events)). ──
+  const uniqueEventIds = [...new Set(plays.map(p => p.eventId))];
+  const eventCache = new Map();
+  await Promise.all(uniqueEventIds.map(async id => {
+    const ev = await getEvent(id).catch(() => null);
+    eventCache.set(id, ev);
+  }));
 
   // ── Divisions: group standings by each ladder's type. Men's/Women's are only
   // "active" once such a ladder has been played (i.e. it has standings rows). ──
   const typeByEvent = {};
-  await Promise.all(plays.map(async p => { const ev = await getEvent(p.eventId).catch(() => null); typeByEvent[p.eventId] = ev?.type || 'mixed'; }));
+  uniqueEventIds.forEach(id => { typeByEvent[id] = eventCache.get(id)?.type || 'mixed'; });
+
   const divisions = { all: rows };
   const activeDivisions = ['all'];
   for (const d of ['mixed', 'mens', 'womens']) {
     const dPlays = plays.filter(p => (typeByEvent[p.eventId] || 'mixed') === d);
-    const dRows = dPlays.length ? buildRows(dPlays.map(toSession), playersFromPlay(dPlays)).rows : [];
+    const dRows = buildDivisionRows(dPlays, allDr, allBonus, allMvp);
     divisions[d] = dRows;
     if (dRows.length) activeDivisions.push(d);
   }
 
-  // ── XP: one cumulative engagement score across ALL ladders (place tiebreak = DR). ──
-  const allStats = calcStats(sessions, players);
-  const allDr = calcDinkRating(allStats, sessions, players);
+  // ── XP: one cumulative engagement score across ALL ladders (place tiebreak = DR).
+  // Reuse the season-wide stats + DR already computed above — no second pass needed. ──
   const xpCfg = await getXpConfig();
   const gTot = grantTotals(await getXpGrants());
   const { xp, detail } = calcXP(sessions, players, allDr, xpCfg.amounts);
@@ -123,12 +146,13 @@ export default async (req) => {
 
   // recent events' results (newest first, up to 4). Includes the FULL field so the
   // Home tab can show the top-3 podium plus an expandable full standings.
+  // Event metadata now comes from the cache — no extra DB calls here.
   const recent = plays.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 4);
-  const recentWinners = await Promise.all(recent.map(async p => {
+  const recentWinners = recent.map(p => {
     const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
-    const ev = await getEvent(p.eventId).catch(() => null);
+    const ev = eventCache.get(p.eventId) || null;
     return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', winners: winnersFrom(nr), standings: nr };
-  }));
+  });
 
   let you = null;
   const v = await verifyPlayerSession(req);
