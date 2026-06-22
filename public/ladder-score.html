@@ -79,7 +79,7 @@
     <div style="display:flex;align-items:center;gap:11px"><a href="/admin-ladders" style="font-size:.76rem;font-weight:800;color:#9aa094;text-decoration:none">← Admin</a><span class="badge">Admin</span></div>
   </div>
   <div id="authBanner" class="banner" style="display:none">You need to be signed in as admin to score. <a href="/admin.html">Sign in here</a> (one login covers everything), then reopen this page.</div>
-  <select class="i" id="picker" onchange="pick()"><option value="">Choose a ladder…</option></select>
+  <div id="picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
   <div id="msg"></div>
   <div id="board"></div>
 </div>
@@ -114,16 +114,30 @@ async function api(path,opts={}){
   let d={}; try{d=await r.json();}catch{} return {status:r.status,d};
 }
 
+let PICK_DATA=null, SEL=null;
 async function loadPicker(){
-  let d={}; try{ const r=await fetch(API+'/public-ladders'); d=await r.json(); }catch(e){}
-  const sel=document.getElementById('picker');
-  const add=(list,label)=>{ if(!list||!list.length)return; const g=document.createElement('optgroup'); g.label=label;
-    list.forEach(l=>{ const o=document.createElement('option'); o.value=l.id; o.textContent=`${l.name} · ${l.date||''}`; g.appendChild(o); }); sel.appendChild(g); };
-  add(d.ladders,'Active'); add(d.completed,'Past ladders (edit)');
+  const box=document.getElementById('picker');
+  box.innerHTML='<div style="color:#9aa094;font-size:.85rem;padding:8px 2px">Loading ladders…</div>';
+  let d=null, err=false;
+  try{ const r=await fetch(API+'/public-ladders'); if(!r.ok) throw 0; d=await r.json(); }catch(e){ err=true; }
+  if(err||!d){ box.innerHTML='<div style="color:var(--red);font-size:.85rem;padding:8px 2px">Couldn’t load ladders. <a href="#" onclick="loadPicker();return false" style="color:var(--lime);font-weight:700">Retry</a></div>'; return; }
+  PICK_DATA=d;
   const q=new URLSearchParams(location.search).get('event');
-  if(q){ sel.value=q; if(sel.value===q) pick(); }
+  if(q){ SEL=q; renderPicker(); pick(q); } else renderPicker();
 }
-async function pick(){ EID=document.getElementById('picker').value; swapMode=null; if(!EID){ document.getElementById('board').innerHTML=''; return; } await load(); }
+function pickRow(l,active){
+  const ac=active?'var(--lime)':'#9aa094', on=l.id===SEL;
+  const tag=active?(l.status==='live'?'Live':'Open'):'Final';
+  return `<div onclick="pick('${l.id}')" style="display:flex;align-items:center;gap:10px;padding:11px 13px;background:${on?'rgba(184,255,44,.08)':'var(--surf)'};border:1px solid ${on?'rgba(184,255,44,.4)':'var(--bd)'};border-left:3px solid ${ac};border-radius:11px;cursor:pointer"><div style="flex:1;min-width:0"><div style="font-weight:800;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div><div style="font-size:.7rem;color:#9aa094">${[l.date||'',l.place||''].filter(Boolean).join(' · ')}</div></div><span style="font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:${ac}">${tag}</span><span style="color:${ac};font-size:1.05rem;line-height:1">›</span></div>`;
+}
+function renderPicker(){
+  const box=document.getElementById('picker'); if(!PICK_DATA){ return; }
+  const A=PICK_DATA.ladders||[], C=PICK_DATA.completed||[]; let h='';
+  if(A.length) h+='<div class="seclbl" style="margin:2px 2px 2px">Active</div>'+A.map(l=>pickRow(l,true)).join('');
+  if(C.length) h+='<div class="seclbl" style="margin:12px 2px 2px">Completed — tap to edit</div>'+C.map(l=>pickRow(l,false)).join('');
+  box.innerHTML=h||'<div style="color:#9aa094;font-size:.85rem;padding:8px 2px">No ladders yet. Create one in the admin panel.</div>';
+}
+async function pick(id){ EID=id; SEL=id; swapMode=null; renderPicker(); if(!EID){ document.getElementById('board').innerHTML=''; return; } await load(); }
 async function load(){
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID));
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
@@ -189,7 +203,7 @@ function render(){
     bh+=roster.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:9px;margin-bottom:6px"><span style="font-size:.84rem;font-weight:700">${esc(p.name)}</span><button onclick="scRemove('${esc(p.playerId||'')}','${esc(p.email||'')}')" style="font-size:.62rem;font-weight:800;color:var(--red);background:none;border:1px solid rgba(255,92,71,.3);border-radius:9999px;padding:4px 10px;cursor:pointer">Remove</button></div>`).join('');
     bh+='<label class="seclbl" style="margin-top:6px;display:block">Add from master roster</label><input class="i" id="sc-search" placeholder="Search players…" autocomplete="off" oninput="scSearch()"><div id="sc-res" style="margin-top:6px"></div>';
     bh+='<label class="seclbl" style="margin-top:12px;display:block">Or add a new player</label><div class="brow" style="gap:6px"><input class="i" id="sc-name" placeholder="Name" style="flex:2"><select class="i" id="sc-gender" style="flex:1;max-width:78px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select></div><div class="brow" style="gap:6px;margin-top:6px"><input class="i" id="sc-email" placeholder="Email (optional)" style="flex:1"><button class="btn b-out" style="flex:0 0 auto;width:auto;padding:0 14px" onclick="scAddNew()">Add</button></div>';
-    bh+='<div style="border-top:1px solid var(--bd);margin:14px 0 10px"></div><div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="6"></div><div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="12"></div></div><button class="btn b-lime" ${n<4?'disabled':''} onclick="act('start')">Enter event</button>';
+    bh+='<div style="border-top:1px solid var(--bd);margin:14px 0 10px"></div><div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="6"></div><div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="12"></div></div><button class="btn b-lime" '+(n<4?'disabled':'')+' onclick="act(\'start\')">Enter event</button>';
     b.innerHTML=bh; return;
   }
   const finished=!!play.finished;
