@@ -199,7 +199,7 @@
       <select class="i" id="ap-gender" style="max-width:90px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select>
     </div>
     <input class="i" id="ap-email" placeholder="Email (optional — links their stats &amp; profile)" style="width:100%;margin-top:10px">
-    <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#9aa094;margin:10px 0"><input type="checkbox" id="ap-paid" checked onchange="if(this.checked)document.getElementById('ap-paylink').checked=false"> Paid (cash)</label>
+    <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#9aa094;margin:10px 0"><input type="checkbox" id="ap-paid" onchange="if(this.checked)document.getElementById('ap-paylink').checked=false"> Paid (cash)</label>
     <label style="display:flex;align-items:center;gap:8px;font-size:.78rem;color:#9aa094;margin:0 0 10px"><input type="checkbox" id="ap-paylink" onchange="if(this.checked)document.getElementById('ap-paid').checked=false"> ✉ Email a payment link (card / Venmo) — needs an email</label>
     <button class="btn btn-out" onclick="addPlayer()">Add to roster</button>
     <div id="apMsg"></div>
@@ -393,17 +393,15 @@ async function openManage(id){
     const pay=p.paymentStatus==='paid'?`<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${p.paymentMethod||'?'}</span>`
       :p.paymentStatus==='venmo_pending'?'<span class="chip chip-gold">Venmo pending</span>':'<span class="chip chip-gray">pending</span>';
     const venmoBtns=p.paymentStatus==='venmo_pending'?`<button class="btn-out btn-sm" onclick="act('confirm-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Confirm</button> <button class="btn-danger" onclick="act('decline-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Decline</button>`:'';
-    const paidBtn=p.paymentStatus==='paid'
-      ?`<button class="btn-out btn-sm" onclick="act('mark-unpaid','${esc(p.email)}','${esc(p.playerId||'')}')">Mark unpaid</button>`
-      :`<button class="btn-out btn-sm" onclick="act('mark-paid','${esc(p.email)}','${esc(p.playerId||'')}')">✓ Mark paid</button>`;
+    const payEdit=p.paymentStatus==='venmo_pending'?'':payCtl(p);
     const linkBtn=(p.paymentStatus!=='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="sendPaylink('${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send link</button>`:'';
-    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} ${paidBtn} ${linkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
+    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} ${payEdit} ${linkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
   }).join(''):'<div class="empty">No signups yet.</div>';
   h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(d.pendingClaim?` · held: ${esc(d.pendingClaim.name)}`:'')+'</div>';
   h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="act('promote','${esc(p.email)}','${esc(p.playerId||'')}')">Promote</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
   document.getElementById('mBody').innerHTML=h;
   document.getElementById('mMsg').innerHTML='';
-  { const pl=document.getElementById('ap-paylink'), pd=document.getElementById('ap-paid'); if(pl)pl.checked=false; if(pd)pd.checked=true; }
+  { const pl=document.getElementById('ap-paylink'), pd=document.getElementById('ap-paid'); if(pl)pl.checked=false; if(pd)pd.checked=false; }
   document.getElementById('ov').classList.add('on');
 }
 function closeManage(){ document.getElementById('ov').classList.remove('on'); CURRENT=null; }
@@ -422,7 +420,7 @@ function rosterSearch(){
 function wantPaylink(){ const el=document.getElementById('ap-paylink'); return el?el.checked:false; }
 async function addExisting(i){
   const p=(window.__ROS||[])[i]; if(!p||!CURRENT) return;
-  const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:true);
+  const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:false);
   if(link&&!p.email){ alert('That player has no email on file — add one first or untick the email-link option.'); return; }
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',playerId:p.id,name:p.name,gender:p.gender||null,email:p.email||'',paid})});
   if(d.ok){ if(link) await sendPaylink(p.id,p.email); openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
@@ -432,7 +430,7 @@ async function addNewFromSearch(){
   const name=(document.getElementById('ros-search').value||'').trim(); if(!name) return;
   const gender=(document.getElementById('ap-gender')||{}).value||'';
   const email=(document.getElementById('ap-email')||{}).value||'';
-  const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:true);
+  const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:false);
   if(link&&!email){ alert('Enter an email above to send a payment link.'); return; }
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,gender,email,paid})});
   if(d.ok){ if(link) await sendPaylink('',email); openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
@@ -463,10 +461,19 @@ async function saveEdit(){
   else msg('mEditMsg','err',d.error||'Save failed.');
 }
 
-async function act(action,email,playerId){
+async function act(action,email,playerId,method){
   if(!CURRENT)return;
-  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,email,playerId})});
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,email,playerId,method})});
   if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
+}
+const PAY_METHODS=['cash','venmo','zelle','card','other'];
+function payCtl(p){
+  const em=esc(p.email), pid=esc(p.playerId||'');
+  const opt=sel=>PAY_METHODS.map(m=>`<option value="${m}" ${sel===m?'selected':''}>${m[0].toUpperCase()+m.slice(1)}</option>`).join('');
+  const selStyle='font:inherit;font-size:.72rem;font-weight:700;background:var(--surf2);color:var(--tx);border:1px solid var(--bd);border-radius:7px;padding:4px 6px;cursor:pointer';
+  if(p.paymentStatus==='paid')
+    return `<select title="Edit payment method" style="${selStyle}" onchange="act('set-method','${em}','${pid}',this.value)">${opt(p.paymentMethod||'cash')}</select> <button class="btn-out btn-sm" onclick="act('mark-unpaid','${em}','${pid}')">Mark unpaid</button>`;
+  return `<select title="Mark paid" style="${selStyle}" onchange="if(this.value)act('mark-paid','${em}','${pid}',this.value)"><option value="">✓ Mark paid…</option>${opt('')}</select>`;
 }
 // status segment → set-status
 async function delLadder(){

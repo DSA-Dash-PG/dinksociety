@@ -123,12 +123,13 @@ export default async (req) => {
 
   // Admin manually marks a roster player paid (cash/venmo received in person) or
   // reverses it. Works for any roster entry, including manually-added pending ones.
+  const PAY_METHODS = ['cash', 'venmo', 'zelle', 'card', 'other'];
   if (action === 'mark-paid' || action === 'mark-unpaid') {
     const entry = findRosterEntry(signups, body.playerId, body.email);
     if (!entry) return json({ error: 'Player not on the roster' }, 404);
     if (action === 'mark-paid') {
       entry.paymentStatus = 'paid';
-      entry.paymentMethod = body.method || (entry.paymentMethod && entry.paymentMethod !== 'card' ? entry.paymentMethod : 'cash');
+      entry.paymentMethod = PAY_METHODS.includes(body.method) ? body.method : (entry.paymentMethod && entry.paymentMethod !== 'card' ? entry.paymentMethod : 'cash');
       entry.amountCents = entry.amountCents != null ? entry.amountCents : feeCents;
       entry.heldUntil = null;
     } else {
@@ -136,7 +137,18 @@ export default async (req) => {
       entry.heldUntil = null;
     }
     await setSignups(signups);
-    return json({ ok: true, paid: action === 'mark-paid', name: entry.name });
+    return json({ ok: true, paid: action === 'mark-paid', method: entry.paymentMethod, name: entry.name });
+  }
+
+  // Change the recorded payment method on an already-paid player.
+  if (action === 'set-method') {
+    const entry = findRosterEntry(signups, body.playerId, body.email);
+    if (!entry) return json({ error: 'Player not on the roster' }, 404);
+    if (!PAY_METHODS.includes(body.method)) return json({ error: 'invalid method' }, 400);
+    entry.paymentMethod = body.method;
+    if (entry.paymentStatus !== 'paid') { entry.paymentStatus = 'paid'; entry.amountCents = entry.amountCents != null ? entry.amountCents : feeCents; entry.heldUntil = null; }
+    await setSignups(signups);
+    return json({ ok: true, method: body.method, name: entry.name });
   }
 
   if (action === 'remove' || action === 'decline-venmo') {

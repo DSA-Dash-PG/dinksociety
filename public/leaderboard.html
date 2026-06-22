@@ -280,9 +280,11 @@
 
   const state = {
     circuit:'I', division:'', tab:'rankings',
-    filter:'all', search:'', sort:'dsr', sortDir:'desc',
+    filter:'all', genderFilter:'all', search:'', sort:'dsr', sortDir:'desc',
     playerStats:null, standings:null, potw:null
   };
+  const LB_GENDER_COLOR = { M:'#6aa8ff', F:'#ff8fb3' };
+  const lbGenderOf = p => /^f/i.test(p.gender||'') ? 'F' : /^m/i.test(p.gender||'') ? 'M' : null;
 
   const $ = id => document.getElementById(id);
 
@@ -369,11 +371,24 @@
     ranked.forEach((p, i) => m.set(p.playerId, i + 1));
     return m;
   }
+  // Each player's DSR rank WITHIN their own gender (stable across filters).
+  function genderRankMap() {
+    const m = new Map();
+    ['M','F'].forEach(g => {
+      playerList()
+        .filter(p => p.composite != null && lbGenderOf(p) === g)
+        .sort((a, b) => (b.composite - a.composite) || ((b.gamesWon||0)-(a.gamesWon||0)) || (a.name||'').localeCompare(b.name||''))
+        .forEach((p, i) => m.set(p.playerId, i + 1));
+    });
+    return m;
+  }
   function filteredPlayers(filter, searchQ) {
     filter = filter || state.filter;
     searchQ = (searchQ !== undefined ? searchQ : state.search).toLowerCase();
+    const gf = state.genderFilter || 'all';
     const rows = playerList()
       .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ) || (p.teamName||'').toLowerCase().includes(searchQ))
+      .filter(p => gf === 'all' || lbGenderOf(p) === gf)
       .map(p => {
         // GP / WON / LOSS respect the active game-type filter
         const s = filter === 'all'
@@ -436,6 +451,9 @@
     const fbtns = filters.map(f =>
       `<button class="lb-filter-btn ${state.filter===f?'is-active':''}" data-filter="${f}">${f==='all'?'All games':SLOT_LABELS[f]}</button>`
     ).join('');
+    const gbtns = [['all','All'],['M',"Men's"],['F',"Women's"]].map(([k,l]) =>
+      `<button class="lb-filter-btn ${state.genderFilter===k?'is-active':''}" data-gfilter="${k}">${l}</button>`
+    ).join('');
 
     if (!state.playerStats || state.playerStats.empty) {
       el.innerHTML = `<div class="lb-card">
@@ -443,6 +461,7 @@
           <div class="lb-search-wrap"><input class="lb-search" id="rank-search" placeholder="Search player name…" value="${esc(state.search)}" /></div>
         </div>
         <div class="lb-filter-row">${fbtns}</div>
+        <div class="lb-filter-row">${gbtns}</div>
         ${noData(state.playerStats?.message)}
       </div>`;
       wireRankingsControls(el);
@@ -462,13 +481,24 @@
     };
 
     const rankById = dsrRankMap();
+    const gRankById = genderRankMap();
+    const gf = state.genderFilter || 'all';
     const rows = players.map((p, i) => {
-      // The player's DSR rank — stable across search/filter/sort. Unranked → "—".
-      const rankDisp = rankById.get(p.playerId) ?? '—';
+      // Overall DSR rank + within-gender DSR rank, both stable across filters.
+      const oR = rankById.get(p.playerId) ?? '—';
+      const gOf = lbGenderOf(p);
+      const gR = gRankById.get(p.playerId) ?? '—';
+      let rankCell;
+      if (gf === 'all') {
+        const sec = gOf ? `<span style="font-size:9px;font-weight:800;color:${LB_GENDER_COLOR[gOf]}">${gOf==='M'?'M':'W'}#${gR}</span>` : '';
+        rankCell = `<span class="rank-num">${oR}</span>${sec?'<br>'+sec:''}`;
+      } else {
+        rankCell = `<span class="rank-num">${gR}</span><br><span style="font-size:9px;font-weight:700;color:var(--color-text-faint)">#${oR} ov</span>`;
+      }
       const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
       const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
       return `<tr>
-        <td><span class="rank-num">${rankDisp}</span></td>
+        <td>${rankCell}</td>
         <td class="col-opt">${mvCell(p.rankDelta)}</td>
         <td class="r"><span class="${p._dsr != null ? 'val-dsr' : 'val-zero'}">${dsr}</span></td>
         <td>
@@ -532,6 +562,10 @@
   function wireRankingsControls(el) {
     el.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
       state.filter = b.dataset.filter;
+      renderRankings();
+    }));
+    el.querySelectorAll('[data-gfilter]').forEach(b => b.addEventListener('click', () => {
+      state.genderFilter = b.dataset.gfilter;
       renderRankings();
     }));
     el.querySelectorAll('th[data-sort]').forEach(thEl => thEl.addEventListener('click', () => {
