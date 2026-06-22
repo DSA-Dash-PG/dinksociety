@@ -120,6 +120,24 @@ export default async (req) => {
     return json({ ok: true, paid: entry.name });
   }
 
+  // Admin manually marks a roster player paid (cash/venmo received in person) or
+  // reverses it. Works for any roster entry, including manually-added pending ones.
+  if (action === 'mark-paid' || action === 'mark-unpaid') {
+    const entry = findRosterEntry(signups, body.playerId, body.email);
+    if (!entry) return json({ error: 'Player not on the roster' }, 404);
+    if (action === 'mark-paid') {
+      entry.paymentStatus = 'paid';
+      entry.paymentMethod = body.method || (entry.paymentMethod && entry.paymentMethod !== 'card' ? entry.paymentMethod : 'cash');
+      entry.amountCents = entry.amountCents != null ? entry.amountCents : feeCents;
+      entry.heldUntil = null;
+    } else {
+      entry.paymentStatus = 'pending';
+      entry.heldUntil = null;
+    }
+    await setSignups(signups);
+    return json({ ok: true, paid: action === 'mark-paid', name: entry.name });
+  }
+
   if (action === 'remove' || action === 'decline-venmo') {
     const removed = removeFromRoster(signups, { playerId: body.playerId, email: body.email });
     if (!removed) {

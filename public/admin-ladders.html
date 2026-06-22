@@ -393,8 +393,11 @@ async function openManage(id){
     const pay=p.paymentStatus==='paid'?`<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${p.paymentMethod||'?'}</span>`
       :p.paymentStatus==='venmo_pending'?'<span class="chip chip-gold">Venmo pending</span>':'<span class="chip chip-gray">pending</span>';
     const venmoBtns=p.paymentStatus==='venmo_pending'?`<button class="btn-out btn-sm" onclick="act('confirm-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Confirm</button> <button class="btn-danger" onclick="act('decline-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Decline</button>`:'';
+    const paidBtn=p.paymentStatus==='paid'
+      ?`<button class="btn-out btn-sm" onclick="act('mark-unpaid','${esc(p.email)}','${esc(p.playerId||'')}')">Mark unpaid</button>`
+      :`<button class="btn-out btn-sm" onclick="act('mark-paid','${esc(p.email)}','${esc(p.playerId||'')}')">✓ Mark paid</button>`;
     const linkBtn=(p.paymentStatus!=='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="sendPaylink('${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send link</button>`:'';
-    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} ${linkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
+    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} ${paidBtn} ${linkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
   }).join(''):'<div class="empty">No signups yet.</div>';
   h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(d.pendingClaim?` · held: ${esc(d.pendingClaim.name)}`:'')+'</div>';
   h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="act('promote','${esc(p.email)}','${esc(p.playerId||'')}')">Promote</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
