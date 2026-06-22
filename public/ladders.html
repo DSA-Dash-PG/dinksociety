@@ -221,16 +221,19 @@ const LEXP={};
 function initialsOf(n){ return String(n||'?').split(' ').filter(Boolean).map(x=>x[0]).join('').slice(0,2).toUpperCase(); }
 function initialDot(p){ return `<span title="${esc(p.name)}" style="width:24px;height:24px;border-radius:50%;background:var(--surf2);border:1px solid var(--bd);display:inline-flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:800;color:var(--lime)">${initialsOf(p.name)}</span>`; }
 function ladToggle(id){ LEXP[id]=!LEXP[id]; renderAvail(); renderHomeWeek(); }
-function ladderCard(l){
+function ladderCard(l,i){
   const cap=l.capacity||0, full=l.spotsLeft<=0, pct=cap?Math.round((cap-l.spotsLeft)/cap*100):0, tt=l.type||'mixed';
   const time=l.startTime?(l.endTime?`${l.startTime}–${l.endTime}`:l.startTime):'';
-  return `<div class="evc ${tt}">
-    <div class="evc-top"><div><div class="evc-nm">${esc(l.name)}</div><div class="evc-meta">${[wd(l.date),time,l.place].filter(Boolean).join(' · ')}</div></div><span class="ttag ${tt}">${TL[tt]||'Mixed'}</span></div>
-    <div class="evc-meta" style="margin-top:5px">${cap} players · ${l.courts||'—'} courts · ${fmt(l.feeCents)}</div>
-    <div class="bar ${full?'full':''}"><i style="width:${pct}%"></i></div>
-    <div class="spot"><span style="color:#9aa094">${cap-l.spotsLeft} / ${cap}</span><span class="left" style="${full?'color:var(--red)':''}">${full?(l.waitlistCount?l.waitlistCount+' waiting':'Waitlist'):(l.spotsLeft+' spots left')}</span></div>
-    ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${l.roster.map(initialDot).join('')}<button onclick="ladToggle('${l.id}')" style="margin-left:4px;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="margin-top:8px;font-size:.74rem;color:#cdd2c6;line-height:1.7">${l.roster.map((p,i)=>`${i+1}. ${esc(p.name)}${p.paid?'':' <span style="color:var(--fnt)">· unpaid</span>'}`).join('<br>')}</div>`:''}</div>`:''}
-    <button class="btn ${full?'btn-out':'btn-lime'}" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fmt(l.feeCents)}</button>
+  const ac=PAL[(i||0)%PAL.length], barCol=full?'var(--red)':(pct>=80?'var(--gold)':ac);
+  return `<div style="border:1px solid ${hexA(ac,.32)};border-radius:13px;overflow:hidden;background:#000;margin-bottom:10px">
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-left:3px solid ${ac};background-color:${hexA(ac,.12)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.14)} 0 9px,transparent 9px 20px)"><div style="flex:1;min-width:0"><div style="font-size:.92rem;font-weight:900;color:${ac};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div><div style="font-size:.66rem;color:var(--mut);font-weight:700">${[wd(l.date),time,l.place].filter(Boolean).join(' · ')}</div></div><span class="ttag ${tt}">${TL[tt]||'Mixed'}</span></div>
+    <div style="padding:11px 12px;background:#000">
+      <div class="evc-meta" style="margin-bottom:8px">${cap} players · ${l.courts||'—'} courts · ${fmt(l.feeCents)}</div>
+      <div style="height:6px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:${barCol};border-radius:9999px"></i></div>
+      <div class="spot" style="margin-top:6px"><span style="color:#9aa094">${cap-l.spotsLeft} / ${cap}</span><span class="left" style="color:${full?'var(--red)':ac}">${full?(l.waitlistCount?l.waitlistCount+' waiting':'Waitlist'):(l.spotsLeft+' spots left')}</span></div>
+      ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${l.roster.map(initialDot).join('')}<button onclick="ladToggle('${l.id}')" style="margin-left:4px;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="margin-top:8px;font-size:.74rem;color:#cdd2c6;line-height:1.7">${l.roster.map((p,k)=>`${k+1}. ${esc(p.name)}${p.paid?'':' <span style="color:var(--fnt)">· unpaid</span>'}`).join('<br>')}</div>`:''}</div>`:''}
+      <button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fmt(l.feeCents)}</button>
+    </div>
   </div>`;
 }
 function renderFilters(){

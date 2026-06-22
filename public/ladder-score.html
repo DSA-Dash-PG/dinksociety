@@ -132,12 +132,19 @@ function pickRow(l,active){
 }
 function renderPicker(){
   const box=document.getElementById('picker'); if(!PICK_DATA){ return; }
+  if(EID){
+    const all=(PICK_DATA.ladders||[]).concat(PICK_DATA.completed||[]);
+    const cur=all.find(function(l){return l.id===EID;});
+    box.innerHTML='<button onclick="clearPick()" style="background:none;border:0;cursor:pointer;color:var(--lime);font-weight:800;font-size:.82rem;padding:4px 0">‹ All ladders</button>'+(cur?'<div style="font-size:1.1rem;font-weight:900;margin-top:2px">'+esc(cur.name)+' <span style="font-size:.7rem;color:#9aa094;font-weight:700">'+(cur.date||'')+'</span></div>':'');
+    return;
+  }
   const A=PICK_DATA.ladders||[], C=PICK_DATA.completed||[]; let h='';
-  if(A.length) h+='<div class="seclbl" style="margin:2px 2px 2px">Active</div>'+A.map(l=>pickRow(l,true)).join('');
-  if(C.length) h+='<div class="seclbl" style="margin:12px 2px 2px">Completed — tap to edit</div>'+C.map(l=>pickRow(l,false)).join('');
+  if(A.length) h+='<div class="seclbl" style="margin:2px 2px 2px">Active</div>'+A.map(function(l){return pickRow(l,true);}).join('');
+  if(C.length) h+='<div class="seclbl" style="margin:12px 2px 2px">Completed — tap to edit</div>'+C.map(function(l){return pickRow(l,false);}).join('');
   box.innerHTML=h||'<div style="color:#9aa094;font-size:.85rem;padding:8px 2px">No ladders yet. Create one in the admin panel.</div>';
 }
-async function pick(id){ EID=id; SEL=id; swapMode=null; renderPicker(); if(!EID){ document.getElementById('board').innerHTML=''; return; } await load(); }
+function clearPick(){ EID=null; SEL=null; document.getElementById('board').innerHTML=''; document.getElementById('msg').innerHTML=''; renderPicker(); window.scrollTo({top:0}); }
+async function pick(id){ EID=id; SEL=id; swapMode=null; renderPicker(); window.scrollTo({top:0}); if(!EID){ document.getElementById('board').innerHTML=''; return; } await load(); }
 async function load(){
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID));
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
