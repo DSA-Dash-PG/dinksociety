@@ -35,7 +35,9 @@ function captainEmails(team) {
   const lc = (e) => (e || '').toString().trim().toLowerCase();
   if (team?.captainEmail) out.add(lc(team.captainEmail));
   const cap = (team?.roster || []).find(p => p.isCaptain);
-  if (cap?.email) out.add(lc(cap.email));
+  // Canonical roster email lives in normalizedEmail; raw `email` is often blank.
+  const capEmail = cap && (cap.normalizedEmail || cap.email);
+  if (capEmail) out.add(lc(capEmail));
   return [...out].filter(e => EMAIL_RE.test(e));
 }
 
