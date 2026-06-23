@@ -65,20 +65,23 @@ async function listAllTeams() {
 function recipientEmails(team, audience) {
   const roster = team.roster || [];
   const lc = (e) => (e || '').toString().trim().toLowerCase();
+  // Canonical roster email lives in normalizedEmail (stamped on save); the raw
+  // `email` field is often blank. Read both, matching the rest of the codebase.
+  const emailOf = (p) => p && (p.normalizedEmail || p.email);
   const out = new Set();
   if (audience === 'players') {
-    for (const p of roster) if (p.email) out.add(lc(p.email));
+    for (const p of roster) { const e = emailOf(p); if (e) out.add(lc(e)); }
     if (team.captainEmail) out.add(lc(team.captainEmail));
   } else if (audience === 'cocaptains') {
     const cap = roster.find(p => p.isCaptain);
     const co = roster.find(p => p.isCoCaptain);
     if (team.captainEmail) out.add(lc(team.captainEmail));
-    if (cap?.email) out.add(lc(cap.email));
-    if (co?.email) out.add(lc(co.email));
+    if (emailOf(cap)) out.add(lc(emailOf(cap)));
+    if (emailOf(co)) out.add(lc(emailOf(co)));
   } else { // 'captains'
     if (team.captainEmail) out.add(lc(team.captainEmail));
     const cap = roster.find(p => p.isCaptain);
-    if (cap?.email) out.add(lc(cap.email));
+    if (emailOf(cap)) out.add(lc(emailOf(cap)));
   }
   return [...out].filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
 }
