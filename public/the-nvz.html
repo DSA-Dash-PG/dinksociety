@@ -162,9 +162,11 @@
     function avatar(p, sz){
       var s = sz||34;
       var box = 'width:'+s+'px;height:'+s+'px;border-radius:50%;background:'+colorFor(p.n)+';font-size:'+Math.round(s*0.38)+'px;font-weight:900;color:#fff;';
-      var inner = p.id ? '<img data-ini="'+esc(ini(p.n))+'" src="/.netlify/functions/player-photo-serve?id='+encodeURIComponent(p.id)+'" alt="" loading="lazy" onerror="this.parentNode.textContent=this.getAttribute(\'data-ini\')||\'\';">'.replace('data-ini="'+esc(ini(p.n))+'"','data-ini="'+esc(ini(p.n))+'"') : esc(ini(p.n));
-      // simpler: build img separately
-      return '<span class="av-c" style="'+box+'">'+(p.id?('<img src="/.netlify/functions/player-photo-serve?id='+encodeURIComponent(p.id)+'" alt="" loading="lazy" onerror="this.outerHTML=&quot;'+esc(ini(p.n))+'&quot;">'):esc(ini(p.n)))+'</span>';
+      var ic = esc(ini(p.n));
+      // Prefer server photoUrl; undefined = legacy data → blind id request; null = no photo → initials.
+      var src = p.photoUrl ? p.photoUrl : ((p.photoUrl===undefined && p.id) ? '/.netlify/functions/player-photo-serve?id='+encodeURIComponent(p.id) : null);
+      var inner = src ? ('<img src="'+src+'" alt="" loading="lazy" onerror="this.outerHTML=&quot;'+ic+'&quot;">') : ic;
+      return '<span class="av-c" style="'+box+'">'+inner+'</span>';
     }
 
     var PLAYERS=[], PBYID={}, TEAMS=[], TBYID={}, TBYNAME={}, MAXGP=1, LEAGUE_WIN=50;
@@ -176,7 +178,7 @@
       if(gd.length>=2){ var m=gd.reduce(function(s,d){return s+d;},0)/gd.length; var v=gd.reduce(function(s,d){return s+(d-m)*(d-m);},0)/gd.length; cons=Math.max(0,Math.round((1-Math.sqrt(v)/8)*100)); }
       var gsc=raw.gamesScored||0;
       return {
-        id:raw.playerId, n:raw.name, t:raw.teamName||'', g:(raw.gender||''),
+        id:raw.playerId, photoUrl:raw.photoUrl, n:raw.name, t:raw.teamName||'', g:(raw.gender||''),
         gp:gp, w:raw.gamesWon||0, l:raw.gamesLost||0,
         win: pct(raw.gamesWon||0, gp),
         clutch: raw.clutchG? Math.round((raw.clutchW/raw.clutchG)*100) : pct(raw.gamesWon||0,gp),

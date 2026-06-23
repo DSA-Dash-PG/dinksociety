@@ -324,6 +324,14 @@ export async function rebuildStandings(circuit) {
 
   // ── Weekly Player of the Week (gender-split, by that week's DSR) + rank movement ──
   const weeklyTopPerformers = buildWeeklyTopPerformers(weeklyPlayers, weekMeta);
+  // Stamp each performer/leader with the player's cache-busted photo URL (or
+  // null when they have none) so home + leaderboard render avatars exactly like
+  // team/player pages — server-decided, not blind client-side 404 probes.
+  for (const wk of weeklyTopPerformers) {
+    const enrich = arr => { for (const e of (arr || [])) { const ps = playerStats.get(e.playerId); if (ps) e.photoUrl = ps.photoUrl || null; } };
+    enrich(wk.men); enrich(wk.women);
+    if (wk.leaders) for (const g of ['men', 'women']) { const L = wk.leaders[g]; if (L) for (const k of Object.keys(L)) enrich(L[k]); }
+  }
   const rankDeltas = computeRankDeltas(weeklyPlayers);
   for (const p of playerStats.values()) {
     p.rankDelta = Object.prototype.hasOwnProperty.call(rankDeltas, p.playerId) ? rankDeltas[p.playerId] : null;
@@ -493,6 +501,9 @@ function ensurePlayer(map, pid, player, team) {
       playerId: pid,
       name: player.name,
       gender: player.gender || null,
+      photoUrl: player.photo?.updatedAt
+        ? `/.netlify/functions/player-photo-serve?id=${encodeURIComponent(pid)}&v=${encodeURIComponent(player.photo.updatedAt)}`
+        : null,
       teamId: team?.id || null,
       teamName: team?.name || null,
       gamesPlayed: 0,

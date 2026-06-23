@@ -436,8 +436,13 @@
   // endpoint 404s for players with no photo → onerror swaps back to initials.
   function avInner(p) {
     const ini = esc(initials(p && p.name));
-    if (!p || !p.playerId) return ini;
-    return '<img data-ini="' + ini + '" src="/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(p.playerId) + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="avFallback(this)">';
+    if (!p) return ini;
+    // Prefer server-stamped photoUrl; fall back to blind id request only for
+    // legacy data without the field. null = known no-photo → initials.
+    const src = p.photoUrl ? p.photoUrl
+      : ((!('photoUrl' in p) && p.playerId) ? '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(p.playerId) : null);
+    if (!src) return ini;
+    return '<img data-ini="' + ini + '" src="' + src + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="avFallback(this)">';
   }
   window.avFallback = function (img) { const d = img.getAttribute('data-ini') || ''; if (img.parentNode) img.parentNode.textContent = d; };
   function pctClass(rate) {
