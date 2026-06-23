@@ -46,7 +46,8 @@
   #recap .recap-head h1{font-size:clamp(1.8rem,1rem+3vw,3rem);font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;line-height:1;margin-top:12px;color:var(--color-text);}
   #recap .recap-head h1 .lime{color:var(--color-lime);}
   #recap .weeknav{display:flex;gap:6px;flex-wrap:wrap;}
-  #recap .weeknav span{font-size:12px;font-weight:800;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--color-border);color:var(--color-text-faint);}
+  #recap .weeknav span{font-size:12px;font-weight:800;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--color-border);color:var(--color-text-faint);cursor:pointer;transition:background .12s,color .12s,border-color .12s;}
+  #recap .weeknav span:not(.on):hover{border-color:var(--color-lime);color:var(--color-text);}
   #recap .weeknav span.on{background:var(--color-lime);color:var(--color-text-inverse);border-color:var(--color-lime);}
 
   /* TOP ROW: [POTW + DSR] | STANDINGS */
@@ -364,12 +365,33 @@
 
     var TOTAL_WEEKS = 8;
 
-    function renderWeeknav(currentWeek){
+    var RECAP_PERF = [], RECAP_MAXWEEK = 0;
+    function renderWeeknav(selectedWeek, maxWeek){
       var el=document.getElementById('rc-weeknav');if(!el)return;
       var html='';
-      var maxWeek=Math.min(currentWeek||0,TOTAL_WEEKS);
-      for(var w=1;w<=maxWeek;w++){html+='<span'+(w===currentWeek?' class="on"':'')+'>'+w+'</span>';}
+      var mx=Math.min(maxWeek||selectedWeek||0,TOTAL_WEEKS);
+      for(var w=1;w<=mx;w++){html+='<span data-week="'+w+'"'+(w===selectedWeek?' class="on"':'')+'>'+w+'</span>';}
       el.innerHTML=html;
+    }
+
+    // Week pager: re-render the performers panel for a selected (past) week using
+    // the already-loaded weeklyTopPerformers data. Standings stay 'latest'.
+    function showWeek(w){
+      var entry=null;
+      for(var i=0;i<RECAP_PERF.length;i++){if(RECAP_PERF[i].week===w){entry=RECAP_PERF[i];break;}}
+      if(!entry)return;
+      var men=entry.men||[],women=entry.women||[];
+      var panels=document.getElementById('rc-perfpanels');
+      if(panels){
+        panels.innerHTML=potwPanel(men,women,true)
+          +perfListPanel(entry,'dsr',false)
+          +perfListPanel(entry,'diff',false)
+          +perfListPanel(entry,'pts',false);
+      }
+      document.querySelectorAll('#rc-perftabs button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-k')==='potw');});
+      var t=document.getElementById('rc-title');
+      if(t){var WW=['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'];t.innerHTML='WEEK '+(WW[w]||w)+' IS IN THE <span class="lime">BOOKS.</span>';}
+      renderWeeknav(w, RECAP_MAXWEEK);
     }
 
     /* ---- POTW + DSR from weeklyTopPerformers (latest week) ---- */
@@ -444,7 +466,7 @@
       }
       // header week
       if(latest.week){
-        renderWeeknav(latest.week);
+        renderWeeknav(latest.week, RECAP_MAXWEEK);
         var t=document.getElementById('rc-title');
         if(t){var WW=['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'];t.innerHTML='WEEK '+(WW[latest.week]||latest.week)+' IS IN THE <span class="lime">BOOKS.</span>';}
         var k=document.getElementById('rc-drop-kicker');if(k)k.textContent='The Drop · Week '+latest.week;
@@ -457,6 +479,11 @@
       var k=b.getAttribute('data-k');
       document.querySelectorAll('#rc-perftabs button').forEach(function(x){x.classList.toggle('on',x===b);});
       document.querySelectorAll('#rc-perfpanels .perfpanel').forEach(function(p){p.classList.toggle('on',p.getAttribute('data-tab')===k);});
+    });
+    // Week pager — click a week number to view that week's recap performers.
+    document.addEventListener('click',function(e){
+      var s=e.target.closest('#rc-weeknav span[data-week]'); if(!s)return;
+      showWeek(parseInt(s.getAttribute('data-week'),10));
     });
 
     /* ---- Team DSR (sum of each rated player's DSR), keyed by id + name ---- */
@@ -565,11 +592,12 @@
       // PS fallback: enrich weeklyTopPerformers entries from the players aggregate (season PS) when weekly ps is absent
       var perf=(lb&&lb.weeklyTopPerformers)||[];
       var latest=perf.length?perf[0]:null;
-      if(latest&&pl&&pl.players){
-        ['men','women'].forEach(function(g){(latest[g]||[]).forEach(function(p){
+      if(pl&&pl.players){
+        perf.forEach(function(entry){['men','women'].forEach(function(g){(entry[g]||[]).forEach(function(p){
           if(p.ps==null&&pl.players[p.playerId]&&pl.players[p.playerId].ps!=null)p.ps=pl.players[p.playerId].ps;
-        });});
+        });});});
       }
+      RECAP_PERF=perf; RECAP_MAXWEEK=latest?latest.week:0;
       renderPerformers(latest);
 
       // Standings — first division in the blob
