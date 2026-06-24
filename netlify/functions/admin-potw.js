@@ -15,8 +15,9 @@
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import {
-  prepareWeeklyPotwApproval, sendApprovedPotw,
+  prepareWeeklyPotwApproval, sendApprovedPotw, sendAllPending,
   listPendingForWeek, listPreparedWeeks,
+  getPotwSettings, setPotwAutoSend,
 } from './lib/potw-email.js';
 
 function json(data, status = 200) {
@@ -56,12 +57,24 @@ export default async (req) => {
 
   if (req.method === 'GET') {
     const weeks = await listPreparedWeeks(circuit);
+
+    // Lightweight badge summary: count of the latest week's unsent winners.
+    if (url.searchParams.get('summary')) {
+      const week = weeks[0]?.week ?? null;
+      const recs = week != null ? await listPendingForWeek(circuit, week) : [];
+      const unsent = recs.filter(r => r.status === 'pending' && r.to).length;
+      const settings = await getPotwSettings();
+      return json({ week, unsent, autoSend: !!settings.autoSend });
+    }
+
     const wkParam = url.searchParams.get('week');
     const week = wkParam ? Number(wkParam) : (weeks[0]?.week ?? null);
     const records = week != null ? (await listPendingForWeek(circuit, week)).map(toAdmin) : [];
+    const settings = await getPotwSettings();
     return json({
       circuit,
       week,
+      autoSend: !!settings.autoSend,
       weeks: weeks.map(m => ({ week: m.week, preparedAt: m.preparedAt })),
       records,
     });
@@ -82,6 +95,17 @@ export default async (req) => {
       const out = await sendApprovedPotw(circuit, Number(body.week), body.winnerKey, admin.email);
       const status = out.ok ? 200 : (out.reason === 'already-sent' ? 409 : 400);
       return json(out, status);
+    }
+
+    if (body.action === 'send-all') {
+      if (!body.week) return json({ error: 'week required' }, 400);
+      const out = await sendAllPending(circuit, Number(body.week), admin.email);
+      return json({ ok: true, ...out });
+    }
+
+    if (body.action === 'set-autosend') {
+      const next = await setPotwAutoSend(!!body.enabled);
+      return json({ ok: true, autoSend: !!next.autoSend });
     }
 
     return json({ error: `Unknown action: ${body.action}` }, 400);

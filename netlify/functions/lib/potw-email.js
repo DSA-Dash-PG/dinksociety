@@ -450,5 +450,40 @@ export async function listPreparedWeeks(circuit) {
   return marks;
 }
 
+// ── settings (auto-send toggle) ─────────────────────────────────────────────
+const settingsKey = () => 'config/settings.json';
+
+/** Read the POTW feature settings. Defaults to auto-send OFF. */
+export async function getPotwSettings() {
+  const s = await stateStore().get(settingsKey(), { type: 'json' }).catch(() => null);
+  return { autoSend: false, ...(s || {}) };
+}
+
+/** Flip the Wednesday auto-send on/off. */
+export async function setPotwAutoSend(enabled) {
+  const cur = await getPotwSettings();
+  const next = { ...cur, autoSend: !!enabled, updatedAt: new Date().toISOString() };
+  await stateStore().setJSON(settingsKey(), next);
+  return next;
+}
+
+/**
+ * Send every not-yet-sent winner with a recipient for a week. Used by the
+ * Wednesday cron when auto-send is on, and by the panel "Send all" button.
+ */
+export async function sendAllPending(circuit, week, who = null) {
+  const recs = await listPendingForWeek(circuit, week);
+  let sent = 0, skipped = 0, failed = 0;
+  const errors = [];
+  for (const r of recs) {
+    if (r.status === 'sent' || !r.to) { skipped++; continue; }
+    try {
+      const out = await sendApprovedPotw(circuit, week, r.winnerKey, who);
+      if (out.ok) sent++; else skipped++;
+    } catch (e) { failed++; errors.push(e.message || String(e)); }
+  }
+  return { week, sent, skipped, failed, errors };
+}
+
 // Exposed for tests.
 export const _internal = { templateCopy, highlightOf, teamSlug, profileUrl, firstName };

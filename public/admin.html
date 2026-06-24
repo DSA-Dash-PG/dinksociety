@@ -1080,6 +1080,8 @@
           <div class="am-head">
             <h1 class="am-title">Player of the Week</h1>
             <div class="am-actions">
+              <label class="drop-ck" id="potw-autosend-lbl" title="On: the Wednesday job sends both winners automatically. Off: drafts wait here for your Send."><input type="checkbox" id="potw-autosend"> Auto-send Wednesdays</label>
+              <button class="ab ab--outline ab--sm" id="potw-sendall-btn">Send all ready</button>
               <button class="ab ab--lime ab--sm" id="potw-generate-btn">✨ Draft this week</button>
             </div>
           </div>
@@ -1487,6 +1489,7 @@
     populateWeekDropdowns();
     renderOV();
     refreshMsgBadge();
+    refreshPotwBadge();
   }
 
   $id('login-form').addEventListener('submit', async (e) => {
@@ -5772,9 +5775,13 @@
   // ═══════════════════════════════════════════════════════════
   var POTW = { week:null, wired:false };
   function potwFirst(n){ return String(n||'').trim().split(/\s+/)[0]||n; }
+  function setPotwBadge(n){ var b=$d('sb-potw-ct'); if(b){ if(n>0){ b.textContent=n; b.style.display=''; } else b.style.display='none'; } }
   function updatePotwBadge(records){
-    var n=(records||[]).filter(function(r){ return r.status==='pending' && r.to; }).length;
-    var b=$d('sb-potw-ct'); if(b){ if(n>0){ b.textContent=n; b.style.display=''; } else b.style.display='none'; }
+    setPotwBadge((records||[]).filter(function(r){ return r.status==='pending' && r.to; }).length);
+  }
+  // Lightweight badge refresh — runs at startup without opening the tab.
+  function refreshPotwBadge(){
+    apiJSON('/.netlify/functions/admin-potw?summary=1').then(function(d){ setPotwBadge((d&&d.unsent)||0); }).catch(function(){});
   }
   function renderPotw(){
     if(!POTW.wired) wirePotw();
@@ -5782,6 +5789,7 @@
     if(st) st.textContent='Loading…';
     apiJSON('/.netlify/functions/admin-potw').then(function(d){
       var weeks=(d&&d.weeks)||[];
+      var ts=$d('potw-autosend'); if(ts) ts.checked=!!(d&&d.autoSend);
       if(st) st.textContent = weeks.length? '' : 'No weeks drafted yet';
       if(box){
         if(!weeks.length){ box.innerHTML='<div class="empty">No Player of the Week drafts yet. “✨ Draft this week” builds the latest completed week from the stats.</div>'; }
@@ -5866,7 +5874,32 @@
         else { alert('Nothing to draft: '+((j&&j.result&&j.result.reason)||(j&&j.error)||'no new completed week with winners')); }
       }).catch(function(e){ if(b){ b.disabled=false; b.textContent='✨ Draft this week'; } alert('Draft failed: '+(e.message||e)); });
   }
-  function wirePotw(){ POTW.wired=true; var g=$d('potw-generate-btn'); if(g) g.addEventListener('click',generatePotw); }
+  function sendAllPotw(){
+    if(POTW.week==null){ alert('Open a week first.'); return; }
+    if(!confirm('Send all ready Player of the Week emails for Week '+POTW.week+' now? They go out from dink@dinksociety.app.')) return;
+    var b=$d('potw-sendall-btn'); if(b){ b.disabled=true; b.textContent='Sending…'; }
+    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-all',week:POTW.week})})
+      .then(function(r){ return r.json(); })
+      .then(function(j){
+        if(b){ b.disabled=false; b.textContent='Send all ready'; }
+        if(j&&j.ok){ alert('Sent '+j.sent+(j.failed?(', '+j.failed+' failed'):'')+(j.skipped?(', '+j.skipped+' skipped'):'')+'.'); openPotwWeek(POTW.week); refreshPotwBadge(); }
+        else { alert('Could not send: '+((j&&j.error)||'unknown error')); }
+      }).catch(function(e){ if(b){ b.disabled=false; b.textContent='Send all ready'; } alert('Send failed: '+(e.message||e)); });
+  }
+  function toggleAutoSend(on, el){
+    if(on && !confirm('Turn ON auto-send? Every Wednesday both Player of the Week emails will be sent automatically from dink@dinksociety.app with no review step.')){ el.checked=false; return; }
+    el.disabled=true;
+    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-autosend',enabled:on})})
+      .then(function(r){ return r.json(); })
+      .then(function(j){ el.disabled=false; if(j&&j.ok){ el.checked=!!j.autoSend; } else { alert('Could not save setting.'); el.checked=!on; } })
+      .catch(function(e){ el.disabled=false; el.checked=!on; alert('Could not save: '+(e.message||e)); });
+  }
+  function wirePotw(){
+    POTW.wired=true;
+    var g=$d('potw-generate-btn'); if(g) g.addEventListener('click',generatePotw);
+    var sa=$d('potw-sendall-btn'); if(sa) sa.addEventListener('click',sendAllPotw);
+    var ts=$d('potw-autosend'); if(ts) ts.addEventListener('change',function(){ toggleAutoSend(ts.checked, ts); });
+  }
 
   // ─── Init ─────────────────────────────────────────────────
   checkAuth();
