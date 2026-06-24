@@ -133,9 +133,9 @@ function normPerformers(p = {}) {
       ? p.climbers.slice(0, 6).map(c => ({
           name: String(c.name || '').slice(0, 80),
           teamName: c.teamName ? String(c.teamName).slice(0, 80) : null,
-          delta: Number.isFinite(+c.delta) ? +c.delta : null,
-          rank: Number.isFinite(+c.rank) ? +c.rank : null,
-          fromRank: Number.isFinite(+c.fromRank) ? +c.fromRank : null,
+          delta: (c.delta != null && Number.isFinite(+c.delta)) ? +c.delta : null,
+          rank: (c.rank != null && Number.isFinite(+c.rank)) ? +c.rank : null,
+          fromRank: (c.fromRank != null && Number.isFinite(+c.fromRank)) ? +c.fromRank : null,
         }))
       : [],
     risers: Array.isArray(p?.risers)

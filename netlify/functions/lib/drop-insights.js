@@ -102,8 +102,9 @@ export async function livePerformers(circuit) {
 
     // Top Climbers — players who GAINED the most DSR rank spots this week.
     // Current overall rank from season DSR; fromRank = current + spots gained.
-    const ranked = all.filter(p => Number.isFinite(p.dsr))
-      .sort((a, b) => b.dsr - a.dsr);
+    // Season rating lives on p.composite (p.dsr is only on per-week snapshots).
+    const ranked = all.filter(p => Number.isFinite(p.composite))
+      .sort((a, b) => b.composite - a.composite);
     const rankOf = new Map();
     ranked.forEach((p, i) => rankOf.set(p.playerId ?? p.name, i + 1));
     climbers = all

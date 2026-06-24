@@ -256,6 +256,7 @@
             <button data-k="dsr">DSR</button>
             <button data-k="diff">Best Diff</button>
             <button data-k="pts">Most Pts</button>
+            <button data-k="climbers">Top Climbers</button>
           </div>
           <div class="perfwrap" id="rc-perfpanels"></div>
         </div>
@@ -365,7 +366,7 @@
 
     var TOTAL_WEEKS = 8;
 
-    var RECAP_PERF = [], RECAP_MAXWEEK = 0;
+    var RECAP_PERF = [], RECAP_MAXWEEK = 0, RECAP_PLAYERS = null;
     function renderWeeknav(selectedWeek, maxWeek){
       var el=document.getElementById('rc-weeknav');if(!el)return;
       var html='';
@@ -386,7 +387,8 @@
         panels.innerHTML=potwPanel(men,women,true)
           +perfListPanel(entry,'dsr',false)
           +perfListPanel(entry,'diff',false)
-          +perfListPanel(entry,'pts',false);
+          +perfListPanel(entry,'pts',false)
+          +climbersPanel(false);
       }
       document.querySelectorAll('#rc-perftabs button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-k')==='potw');});
       var t=document.getElementById('rc-title');
@@ -458,6 +460,38 @@
       if(women[0])html+=potwCard(women[0],'f');
       return html+'</div>';
     }
+    // Top Climbers — biggest DSR rank jumps this week, computed fresh from the
+    // players aggregate (composite rating + rankDelta). Rank = position by
+    // composite; fromRank = current rank + spots gained.
+    function computeClimbers(){
+      if(!RECAP_PLAYERS) return [];
+      var all=Object.keys(RECAP_PLAYERS).map(function(k){return RECAP_PLAYERS[k];});
+      var ranked=all.filter(function(p){return p.composite!=null&&isFinite(p.composite);}).slice()
+        .sort(function(a,b){return b.composite-a.composite;});
+      var rankOf={};
+      ranked.forEach(function(p,i){rankOf[p.playerId!=null?p.playerId:p.name]=i+1;});
+      return all.filter(function(p){return p.rankDelta!=null&&isFinite(p.rankDelta)&&p.rankDelta>0;})
+        .sort(function(a,b){return b.rankDelta-a.rankDelta;})
+        .slice(0,6)
+        .map(function(p){var rk=rankOf[p.playerId!=null?p.playerId:p.name]||null;
+          return {name:p.name,teamName:p.teamName,teamId:p.teamId,playerId:p.playerId,photoUrl:p.photoUrl,
+                  delta:p.rankDelta,rank:rk,fromRank:rk!=null?rk+p.rankDelta:null};});
+    }
+    function climberRow(c,i){
+      var jump=(c.rank!=null&&c.fromRank!=null)?' · #'+c.fromRank+' → #'+c.rank:'';
+      return '<div class="prow'+(i===0?' lead':'')+'"><span class="prk">'+(i+1)+'</span>'
+        +avatarHtml(c,'prow-av')
+        +'<div class="pinfo"><div class="pnm">'+playerLink(c.name,c.teamName,'pname',SN(c.name))+'</div>'
+        +'<div class="ptm">'+teamLink(c.teamName,c.teamId,'ptm')+jump+'</div></div>'
+        +'<span class="pval" style="color:var(--color-lime)">▲'+esc(c.delta)+'</span></div>';
+    }
+    function climbersPanel(on){
+      var cl=computeClimbers();
+      var inner=cl.length?cl.map(function(c,i){return climberRow(c,i);}).join('')
+        :'<div style="color:var(--color-text-faint);font-size:12px;padding:12px 4px;">No rank jumps yet — check back after more matches.</div>';
+      return '<div class="perfpanel'+(on?' on':'')+'" data-tab="climbers" style="grid-template-columns:1fr">'
+        +'<div class="perf-col" style="grid-column:1/-1"><h4>DSR Rank Jumps · This Week</h4>'+inner+'</div></div>';
+    }
     function renderPerformers(latest){
       if(!latest){return;}
       var men=latest.men||[],women=latest.women||[];
@@ -466,7 +500,8 @@
           potwPanel(men,women,true)
           +perfListPanel(latest,'dsr',false)
           +perfListPanel(latest,'diff',false)
-          +perfListPanel(latest,'pts',false);
+          +perfListPanel(latest,'pts',false)
+          +climbersPanel(false);
         document.getElementById('rc-perf').style.display='';
       }
       // header week
@@ -603,6 +638,7 @@
         });});});
       }
       RECAP_PERF=perf; RECAP_MAXWEEK=latest?latest.week:0;
+      RECAP_PLAYERS=(pl&&pl.players)?pl.players:null;
       renderPerformers(latest);
 
       // Standings — first division in the blob
