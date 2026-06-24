@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>POTW crown options — Dink Society</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e0e0e;--surf:#161616;--surf2:#1e1e1e;--bd:rgba(255,255,255,.08);--tx:#f0f0ec;--mut:#9a9e97;--fnt:#5e625c;--gold:#f0c040}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;padding:46px 20px 90px}
+  .wrap{width:min(100%,1000px);margin:0 auto}
+  .eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);margin-bottom:10px}
+  h1{font-size:clamp(1.8rem,1.2rem+2.5vw,2.8rem);font-weight:900;font-style:italic;text-transform:uppercase;line-height:1}
+  .sub{color:var(--mut);font-size:15px;margin-top:12px;max-width:60ch}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+  @media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surf);border:1px solid var(--bd);border-radius:18px;padding:26px 18px;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .opt{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin-bottom:16px}
+  .stage{display:flex;align-items:flex-end;gap:18px}
+  .crest{width:118px;height:118px}
+  .crest svg{width:100%;height:100%;display:block}
+  /* avatar preview — crest clipped on a photo bubble */
+  .av{position:relative;width:66px;height:66px;border-radius:50%;background:#17d7b0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#06231d;font-size:20px}
+  .av .clip{position:absolute;bottom:-3px;right:-5px;width:30px;height:30px}
+  .av .clip svg{width:100%;height:100%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55))}
+  .name{font-size:14px;font-weight:800;margin-top:18px}
+  .note{font-size:12px;color:var(--mut);margin-top:6px;line-height:1.5}
+  .foot{margin-top:34px;font-size:13px;color:var(--mut);background:var(--surf);border:1px solid var(--bd);border-left:3px solid var(--gold);border-radius:8px;padding:14px 18px;line-height:1.6}
+  .foot b{color:var(--tx)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Dink Society · Crest art</div>
+  <h1>POTW crown — 6 options</h1>
+  <p class="sub">Same gold medallion, six different crowns. Each card shows the full crest plus how it looks shrunk onto a profile photo (that small version is what matters most). Pick one and I'll lock it into the badge system.</p>
+
+  <div class="grid" id="grid"></div>
+
+  <div class="foot"><b>Note:</b> the Ladder Winner badge is a crown <i>sitting on a ladder</i> (teal), so a standalone crown here still reads as distinct. Tell me a number — or mix elements (e.g. "Option 3 crown but with the POTW label from Option 6").</div>
+</div>
+
+<script>
+function ring(id, inner, label){
+  return `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <defs><radialGradient id="${id}" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ffe08a"/><stop offset="55%" stop-color="#f0c040"/><stop offset="100%" stop-color="#b8841a"/>
+    </radialGradient></defs>
+    <circle cx="60" cy="60" r="56" fill="#1a1a1a" stroke="url(#${id})" stroke-width="3"/>
+    <circle cx="60" cy="60" r="47" fill="none" stroke="rgba(240,192,64,.28)" stroke-width="1.5" stroke-dasharray="2 4"/>
+    ${inner}
+    ${label?`<text x="60" y="98" text-anchor="middle" font-family="Inter" font-weight="900" font-size="11" fill="url(#${id})" letter-spacing="1.4">${label}</text>`:''}
+  </svg>`;
+}
+
+// Each crown is drawn around translate(60,56) area, gold fill via url(#id).
+const CROWNS = {
+  // 1 — Classic 5-point spiked crown with base band + jewels
+  spiked: id => `<g transform="translate(60 54)" fill="url(#${id})">
+    <path d="M-26 12 L-26 -14 L-13 -2 L0 -20 L13 -2 L26 -14 L26 12 Z"/>
+    <rect x="-26" y="13" width="52" height="9" rx="2.5"/>
+    <circle cx="-26" cy="-16" r="3.4"/><circle cx="0" cy="-22" r="3.8"/><circle cx="26" cy="-16" r="3.4"/></g>`,
+
+  // 2 — Three-peak rounded crown (gentler curves)
+  rounded: id => `<g transform="translate(60 56)" fill="url(#${id})">
+    <path d="M-26 12 C-30 -6 -24 -16 -18 -6 C-12 4 -6 -22 0 -22 C6 -22 12 4 18 -6 C24 -16 30 -6 26 12 Z"/>
+    <rect x="-26" y="12" width="52" height="9" rx="2.5"/>
+    <circle cx="-18" cy="-8" r="3"/><circle cx="0" cy="-24" r="3.4"/><circle cx="18" cy="-8" r="3"/></g>`,
+
+  // 3 — Royal arched crown with center cross/orb
+  royal: id => `<g transform="translate(60 54)" fill="url(#${id})">
+    <path d="M-24 14 L-24 -6 L-12 4 L0 -10 L12 4 L24 -6 L24 14 Z"/>
+    <rect x="-24" y="14" width="48" height="9" rx="2.5"/>
+    <rect x="-2" y="-26" width="4" height="10" rx="1"/><rect x="-6" y="-23" width="12" height="4" rx="1"/>
+    <circle cx="-24" cy="-8" r="3"/><circle cx="24" cy="-8" r="3"/></g>`,
+
+  // 4 — Bold chunky crown (heavier, modern)
+  chunky: id => `<g transform="translate(60 55)" fill="url(#${id})">
+    <path d="M-28 14 L-22 -16 L-9 0 L0 -20 L9 0 L22 -16 L28 14 Z"/>
+    <rect x="-28" y="13" width="56" height="11" rx="3"/></g>`,
+
+  // 5 — Crown + laurel sprigs flanking
+  laurel: id => `<g fill="url(#${id})">
+    <g transform="translate(60 50)"><path d="M-20 10 L-20 -10 L-10 0 L0 -14 L10 0 L20 -10 L20 10 Z"/><rect x="-20" y="10" width="40" height="7" rx="2"/></g>
+    <g transform="translate(60 64)" stroke="url(#${id})" stroke-width="2.4" fill="none" stroke-linecap="round">
+      <path d="M-30 8 C-26 0 -20 -3 -14 -3"/><path d="M-27 6 l-4 2 M-23 2 l-4 1 M-18 -1 l-3 1"/>
+      <path d="M30 8 C26 0 20 -3 14 -3"/><path d="M27 6 l4 2 M23 2 l4 1 M18 -1 l3 1"/></g></g>`,
+
+  // 6 — Spiked crown with POTW wordmark
+  spikedLabel: id => `<g transform="translate(60 48)" fill="url(#${id})">
+    <path d="M-24 8 L-24 -16 L-12 -4 L0 -20 L12 -4 L24 -16 L24 8 Z"/>
+    <rect x="-24" y="8" width="48" height="8" rx="2.5"/>
+    <circle cx="-24" cy="-18" r="3"/><circle cx="0" cy="-22" r="3.4"/><circle cx="24" cy="-18" r="3"/></g>`
+};
+
+const OPTS = [
+  {k:'spiked',      label:'',     title:'Classic spiked', note:'5 points, jeweled tips, solid base band.'},
+  {k:'rounded',     label:'',     title:'Rounded peaks',  note:'Softer curves — friendlier, less heraldic.'},
+  {k:'royal',       label:'',     title:'Royal arch',     note:'Center cross/orb. Reads most regal.'},
+  {k:'chunky',      label:'',     title:'Bold & modern',  note:'Heavier strokes, no jewels — clean at small sizes.'},
+  {k:'laurel',      label:'',     title:'Crown + laurel', note:'Victory laurel flanks the crown.'},
+  {k:'spikedLabel', label:'POTW', title:'Crown + wordmark',note:'Spiked crown with the POTW label underneath.'}
+];
+
+const grid = document.getElementById('grid');
+OPTS.forEach((o,i)=>{
+  const id1='c'+i+'a', id2='c'+i+'b';
+  const card=document.createElement('div'); card.className='card';
+  card.innerHTML = `<div class="opt">Option ${i+1} · ${o.title}</div>
+    <div class="stage">
+      <div class="crest">${ring(id1, CROWNS[o.k](id1), o.label)}</div>
+      <div class="av">RH<div class="clip">${ring(id2, CROWNS[o.k](id2), '')}</div></div>
+    </div>
+    <div class="name">${o.title}</div>
+    <div class="note">${o.note}</div>`;
+  grid.appendChild(card);
+});
+</script>
+</body>
+</html>
