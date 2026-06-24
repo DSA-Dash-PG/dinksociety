@@ -472,9 +472,8 @@
       ranked.forEach(function(p,i){rankOf[p.playerId!=null?p.playerId:p.name]=i+1;});
       return all.filter(function(p){return p.rankDelta!=null&&isFinite(p.rankDelta)&&p.rankDelta>0;})
         .sort(function(a,b){return b.rankDelta-a.rankDelta;})
-        .slice(0,6)
         .map(function(p){var rk=rankOf[p.playerId!=null?p.playerId:p.name]||null;
-          return {name:p.name,teamName:p.teamName,teamId:p.teamId,playerId:p.playerId,photoUrl:p.photoUrl,
+          return {name:p.name,teamName:p.teamName,teamId:p.teamId,playerId:p.playerId,photoUrl:p.photoUrl,gender:p.gender,
                   delta:p.rankDelta,rank:rk,fromRank:rk!=null?rk+p.rankDelta:null};});
     }
     function climberRow(c,i){
@@ -485,12 +484,16 @@
         +'<div class="ptm">'+teamLink(c.teamName,c.teamId,'ptm')+jump+'</div></div>'
         +'<span class="pval" style="color:var(--color-lime)">▲'+esc(c.delta)+'</span></div>';
     }
+    function climbersCol(cl, g, label){
+      var rows=cl.filter(function(c){return (c.gender||'').toUpperCase()===g;}).slice(0,5);
+      var inner=rows.length?rows.map(function(c,i){return climberRow(c,i);}).join('')
+        :'<div style="color:var(--color-text-faint);font-size:12px;padding:12px 4px;">No rank jumps yet.</div>';
+      return '<div class="perf-col '+(g==='M'?'m':'f')+'"><h4>'+label+'</h4>'+inner+'</div>';
+    }
     function climbersPanel(on){
       var cl=computeClimbers();
-      var inner=cl.length?cl.map(function(c,i){return climberRow(c,i);}).join('')
-        :'<div style="color:var(--color-text-faint);font-size:12px;padding:12px 4px;">No rank jumps yet — check back after more matches.</div>';
-      return '<div class="perfpanel'+(on?' on':'')+'" data-tab="climbers" style="grid-template-columns:1fr">'
-        +'<div class="perf-col" style="grid-column:1/-1"><h4>DSR Rank Jumps · This Week</h4>'+inner+'</div></div>';
+      return '<div class="perfpanel'+(on?' on':'')+'" data-tab="climbers">'
+        +climbersCol(cl,'M','Men · Top Climbers')+climbersCol(cl,'F','Women · Top Climbers')+'</div>';
     }
     function renderPerformers(latest){
       if(!latest){return;}
