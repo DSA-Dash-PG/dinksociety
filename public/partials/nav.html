@@ -57,26 +57,6 @@
   </div>
 </div>
 
-<!-- Universal search overlay (palette on desktop, bottom sheet on mobile) -->
-<div class="ds-srch" id="ds-srch" aria-hidden="true">
-  <div class="ds-srch-backdrop" data-srch-close></div>
-  <div class="ds-srch-panel" role="dialog" aria-label="Search players and teams" aria-modal="true">
-    <div class="ds-srch-grip"></div>
-    <div class="ds-srch-bar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input id="ds-srch-input" type="text" placeholder="Search players, teams…" autocomplete="off" spellcheck="false" />
-      <button class="ds-srch-cancel" type="button" data-srch-close>Cancel</button>
-    </div>
-    <div class="ds-srch-scopes" id="ds-srch-scopes">
-      <button class="ds-srch-scope is-on" type="button" data-scope="all">All</button>
-      <button class="ds-srch-scope" type="button" data-scope="players">Players</button>
-      <button class="ds-srch-scope" type="button" data-scope="teams">Teams</button>
-    </div>
-    <div class="ds-srch-results" id="ds-srch-results"></div>
-    <div class="ds-srch-foot"><span><kbd>↑</kbd><kbd>↓</kbd> navigate</span><span><kbd>↵</kbd> open</span><span><kbd>esc</kbd> close</span></div>
-  </div>
-</div>
-
 <script>
 (function () {
   /* ── Nav links: single source of truth ──
@@ -455,112 +435,15 @@
       .catch(function () { /* fallback gradient stays */ });
   }
 
-  /* ── Universal search (players + teams) ──
-     Trigger in the nav opens a palette (desktop) / bottom sheet (mobile).
-     Index is built lazily on first open from the public endpoints and cached. */
+  /* ── Universal search: load the shared component (it injects its own overlay,
+     styles + logic). The nav trigger (#ds-srch-open) and ⌘K wire up automatically
+     via event delegation inside the component. ── */
   (function () {
-    var overlay = document.getElementById('ds-srch');
-    if (!overlay) return;
-    var input = document.getElementById('ds-srch-input');
-    var resEl = document.getElementById('ds-srch-results');
-    var scopesEl = document.getElementById('ds-srch-scopes');
-    var SEASON = new URLSearchParams(location.search).get('season') || 'circuit-i';
-    var SUF = SEASON === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON);
-    var idx = null, loading = null, SCOPE = 'all', SEL = 0, FLAT = [];
-
-    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
-    function slugify(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
-    function initials(n) { var p = String(n || '').trim().split(/\s+/); return ((p[0] && p[0][0] || '') + (p[1] && p[1][0] || '')).toUpperCase() || '·'; }
-    function color(n) { var h = 0, s = String(n || ''); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; var c = ['#b8ff2c', '#17d7b0', '#f0c040', '#ff6fb5', '#3b9eff', '#a78bfa']; return c[h % c.length]; }
-    function teamEmoji(n) { return (idx && idx.emojiBy[n]) || '🏓'; }
-
-    function load() {
-      if (idx) return Promise.resolve(idx);
-      if (loading) return loading;
-      loading = Promise.all([
-        fetch('/.netlify/functions/public-leaderboard?view=players' + SUF).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-        fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-      ]).then(function (res) {
-        var pj = res[0], tj = res[1], teams = (tj && tj.teams) || [];
-        var emojiBy = {}, capBy = {};
-        teams.forEach(function (t) { emojiBy[t.name] = t.emoji || '🏓'; capBy[t.name] = t.captain || ((t.roster || []).find(function (r) { return r.isCaptain; }) || {}).name || ''; });
-        var raw = (pj && (pj.players || pj.rows || pj)) || [];
-        var arr = Array.isArray(raw) ? raw : Object.keys(raw || {}).map(function (k) { return raw[k]; });
-        var players = arr.map(function (p) {
-          return { name: p.name, team: p.teamName, gender: p.gender, dsr: (p.composite != null ? Number(p.composite) : (p.dsr != null ? Number(p.dsr) : null)), cap: (capBy[p.teamName] === p.name) };
-        }).filter(function (p) { return p.name && p.team; });
-        players.filter(function (p) { return p.dsr != null; }).sort(function (a, b) { return b.dsr - a.dsr; }).forEach(function (p, i) { p.rank = i + 1; });
-        idx = { players: players, teams: teams.map(function (t) { return { name: t.name, emoji: emojiBy[t.name], cap: capBy[t.name], players: (t.roster || []).length }; }), emojiBy: emojiBy };
-        return idx;
-      });
-      return loading;
-    }
-
-    function score(name, q) { name = name.toLowerCase(); var parts = name.split(/\s+/); if (name === q) return 100; if (name.indexOf(q) === 0) return 80; if (parts.some(function (p) { return p.indexOf(q) === 0; })) return 65; if (name.indexOf(q) >= 0) return 40; return 0; }
-    function hl(name, q) { q = (q || '').trim(); if (!q) return esc(name); var i = name.toLowerCase().indexOf(q.toLowerCase()); if (i < 0) return esc(name); return esc(name.slice(0, i)) + '<mark>' + esc(name.slice(i, i + q.length)) + '</mark>' + esc(name.slice(i + q.length)); }
-    function search(q) {
-      q = (q || '').trim().toLowerCase(); var players = [], teams = [];
-      if (!idx) return { players: [], teams: [] };
-      if (!q) { if (SCOPE !== 'teams') players = idx.players.filter(function (p) { return p.dsr != null; }).slice(0, 6); if (SCOPE !== 'players') teams = idx.teams.slice(0, 6); return { players: players, teams: teams, sug: true }; }
-      if (SCOPE !== 'teams') players = idx.players.map(function (p) { return { p: p, s: score(p.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s || ((b.p.dsr || 0) - (a.p.dsr || 0)); }).slice(0, 8).map(function (x) { return x.p; });
-      if (SCOPE !== 'players') teams = idx.teams.map(function (t) { return { t: t, s: score(t.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 4).map(function (x) { return x.t; });
-      return { players: players, teams: teams, sug: false };
-    }
-
-    function render() {
-      if (!idx) { resEl.innerHTML = '<div class="ds-srch-empty">Loading…</div>'; return; }
-      var q = input.value, r = search(q), html = '', flat = [];
-      if (!r.players.length && !r.teams.length) { resEl.innerHTML = '<div class="ds-srch-empty"><div class="big">No matches for “' + esc(q) + '”</div>Try a first name, last name, or team.</div>'; FLAT = []; return; }
-      if (r.players.length) {
-        html += '<div class="ds-srch-grp">' + (r.sug ? 'Top players' : 'Players') + '</div>';
-        r.players.forEach(function (p) {
-          var i = flat.length; flat.push({ kind: 'player', item: p });
-          var g = p.gender === 'F' ? "Women's" : p.gender === 'M' ? "Men's" : '';
-          html += '<div class="ds-srch-row" data-i="' + i + '">' +
-            '<div class="ds-srch-av" style="background:' + color(p.team) + '">' + esc(initials(p.name)) + '</div>' +
-            '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(p.name, q) + '</div><div class="ds-srch-sub">' + teamEmoji(p.team) + ' ' + esc(p.team) + (g ? ' · ' + g : '') + (p.cap ? ' · <span class="cp">Captain</span>' : '') + '</div></div>' +
-            (p.dsr != null ? '<div class="ds-srch-dsr' + (p.gender === 'F' ? ' teal' : '') + '">' + p.dsr.toFixed(1) + ' <small>DSR</small></div>' : '') +
-            (p.rank != null ? '<div class="ds-srch-rank">#' + p.rank + '</div>' : '') + '</div>';
-        });
-      }
-      if (r.teams.length) {
-        html += '<div class="ds-srch-grp">Teams</div>';
-        r.teams.forEach(function (t) {
-          var i = flat.length; flat.push({ kind: 'team', item: t });
-          html += '<div class="ds-srch-row" data-i="' + i + '">' +
-            '<div class="ds-srch-tav">' + esc(t.emoji || '🏓') + '</div>' +
-            '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(t.name, q) + '</div><div class="ds-srch-sub">' + (t.players ? t.players + ' players' : 'Team') + (t.cap ? ' · Captain ' + esc(t.cap) : '') + '</div></div></div>';
-        });
-      }
-      resEl.innerHTML = html; FLAT = flat; SEL = 0; paint();
-      Array.prototype.forEach.call(resEl.querySelectorAll('.ds-srch-row'), function (row) {
-        row.addEventListener('mousemove', function () { SEL = +row.dataset.i; paint(); });
-        row.addEventListener('click', function () { SEL = +row.dataset.i; go(); });
-      });
-    }
-    function paint() { Array.prototype.forEach.call(resEl.querySelectorAll('.ds-srch-row'), function (row) { var on = (+row.dataset.i === SEL); row.classList.toggle('is-sel', on); if (on) row.scrollIntoView({ block: 'nearest' }); }); }
-    function go() { var e = FLAT[SEL]; if (!e) return; location.href = e.kind === 'player' ? '/player?name=' + encodeURIComponent(e.item.name) + '&team=' + slugify(e.item.team) + SUF : '/team?id=' + slugify(e.item.name) + SUF; }
-
-    function open() {
-      overlay.classList.add('is-open'); overlay.setAttribute('aria-hidden', 'false'); document.body.style.overflow = 'hidden';
-      input.value = ''; resEl.innerHTML = '<div class="ds-srch-empty">Loading…</div>';
-      load().then(function () { if (overlay.classList.contains('is-open')) render(); });
-      setTimeout(function () { try { input.focus(); } catch (e) {} }, 40);
-    }
-    function close() { overlay.classList.remove('is-open'); overlay.setAttribute('aria-hidden', 'true'); document.body.style.overflow = ''; }
-
-    var trg = document.getElementById('ds-srch-open'); if (trg) trg.addEventListener('click', open);
-    input.addEventListener('input', render);
-    Array.prototype.forEach.call(overlay.querySelectorAll('[data-srch-close]'), function (c) { c.addEventListener('click', close); });
-    scopesEl.addEventListener('click', function (e) { var s = e.target.closest('.ds-srch-scope'); if (!s) return; SCOPE = s.dataset.scope; Array.prototype.forEach.call(scopesEl.querySelectorAll('.ds-srch-scope'), function (x) { x.classList.toggle('is-on', x === s); }); render(); input.focus(); });
-    document.addEventListener('keydown', function (e) {
-      if ((e.key === 'k' || e.key === 'K') && (e.metaKey || e.ctrlKey)) { e.preventDefault(); overlay.classList.contains('is-open') ? close() : open(); return; }
-      if (!overlay.classList.contains('is-open')) return;
-      if (e.key === 'Escape') { close(); }
-      else if (e.key === 'ArrowDown') { e.preventDefault(); if (FLAT.length) { SEL = (SEL + 1) % FLAT.length; paint(); } }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); if (FLAT.length) { SEL = (SEL - 1 + FLAT.length) % FLAT.length; paint(); } }
-      else if (e.key === 'Enter') { e.preventDefault(); go(); }
-    });
+    if (window.dsSearch || document.getElementById('ds-universal-search-js')) return;
+    var s = document.createElement('script');
+    s.id = 'ds-universal-search-js';
+    s.src = '/js/universal-search.js';
+    (document.head || document.documentElement).appendChild(s);
   })();
 })();
 </script>
