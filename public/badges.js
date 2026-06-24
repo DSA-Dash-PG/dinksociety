@@ -45,7 +45,8 @@
     teal:   ['#7af2dc', '#17d7b0', '#0b8e74'],
     lime:   ['#e4ff9e', '#b8ff2c', '#7da516'],
     violet: ['#d8ccff', '#a78bfa', '#6d4fd0'],
-    rose:   ['#ffc2dd', '#ff6fb5', '#c83d86']
+    rose:   ['#ffc2dd', '#ff6fb5', '#c83d86'],
+    blue:   ['#bfe0ff', '#3b9eff', '#1f6fd0']
   };
   function ring(id, tone, inner) {
     var g = GRADS[tone] || GRADS.gold;
@@ -73,9 +74,9 @@
   }
 
   // ── Per-badge crest art ─────────────────────────────────────────
-  function crestSvg(kind, px) {
+  function crestSvg(kind, px, tone) {
     px = px || 120;
-    if (LOGOS[kind]) return logoCrest(kind, px, (DEF[kind] && DEF[kind].tone) || 'gold', LOGOS[kind]);
+    if (LOGOS[kind]) return logoCrest(kind, px, tone || (DEF[kind] && DEF[kind].tone) || 'gold', LOGOS[kind]);
     var id = uid(), F = 'url(#' + id + ')';
     switch (kind) {
       case 'ladder':
@@ -112,15 +113,16 @@
           '<path d="M-16 8 L0 -8 L16 8"/><path d="M-16 22 L0 6 L16 22"/></g>' +
           '<text x="60" y="100" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="10" fill="' + F + '" letter-spacing="1">IMPROVED</text>') + '</svg>';
       case 'bestdressed':
-        return open(px) + ring(id, 'rose',
-          '<g transform="translate(60 54)" fill="' + F + '"><path d="M-2 0 L-26 -15 L-26 15 Z"/><path d="M2 0 L26 -15 L26 15 Z"/><rect x="-7" y="-10" width="14" height="20" rx="4"/></g>' +
-          '<path d="M40 30 l2 5 5 2 -5 2 -2 5 -2-5 -5-2 5-2 z" fill="' + F + '"/>' +
+        return open(px) + ring(id, tone || 'rose',
+          '<path d="M60 34 c0 -5 7 -5 7 0 c0 4 -3.5 4 -3.5 6.5" fill="none" stroke="' + F + '" stroke-width="3" stroke-linecap="round"/>' +
+          '<path d="M63.5 40.5 L36 64 a2 2 0 001.3 3.5 h45.4 a2 2 0 001.3 -3.5 Z" fill="none" stroke="' + F + '" stroke-width="3" stroke-linejoin="round"/>' +
           '<text x="60" y="100" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="9.5" fill="' + F + '" letter-spacing="1.2">BEST DRESSED</text>') + '</svg>';
       case 'potw':
       default:
         return open(px) + ring(id, 'gold',
-          '<g transform="translate(60 48)" fill="' + F + '"><path d="M-26 12 L-26 -14 L-13 -2 L0 -20 L13 -2 L26 -14 L26 12 Z"/><rect x="-26" y="13" width="52" height="9" rx="2.5"/><circle cx="-26" cy="-16" r="3.4"/><circle cx="0" cy="-22" r="3.8"/><circle cx="26" cy="-16" r="3.4"/></g>' +
-          '<text x="60" y="99" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="12" fill="' + F + '" letter-spacing="1.4">POTW</text>') + '</svg>';
+          '<g transform="translate(60 34)" fill="' + F + '"><path d="M-14 6 L-14 -6 L-7 0 L0 -10 L7 0 L14 -6 L14 6 Z"/><rect x="-14" y="6" width="28" height="4" rx="1.5"/></g>' +
+          '<text x="60" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-style="italic" font-size="25" fill="' + F + '" letter-spacing="-0.5">K\'CHN</text>' +
+          '<text x="60" y="90" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="11" fill="' + F + '" letter-spacing="2.5">POTW</text>') + '</svg>';
     }
   }
 
@@ -133,7 +135,7 @@
     streak5: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2c3 4 1 6-1 8 1-3-2-3-2-1-3-2-3-6 1-9 0 3 2 4 2 2z"/><path d="M12 9c4 2 6 5 6 8a6 6 0 11-12 0c0-2 1-4 3-5 0 2 1 3 2 1 1-1 1-3 1-5z"/></svg>',
     streak10: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M13 2c3 4 1 6-1 8 1-3-2-3-2-1-3-2-3-6 1-9 0 3 2 4 2 2z"/><path d="M12 9c4 2 6 5 6 8a6 6 0 11-12 0c0-2 1-4 3-5 0 2 1 3 2 1 1-1 1-3 1-5z"/></svg>',
     improved: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12l5-5 5 5M4 18l5-5 5 5M14 10l3-3 3 3"/></svg>',
-    bestdressed: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M11 12L3 7v10zM13 12l8-5v10zM10 9h4v6h-4z"/></svg>'
+    bestdressed: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5a2 2 0 112.4 1.96L12 9"/><path d="M12 9 3.6 16a1 1 0 00.6 1.8h15.6a1 1 0 00.6-1.8L12 9z"/></svg>'
   };
 
   // registry: pill label, color tone, marquee priority (higher = more prestige)
@@ -159,6 +161,8 @@
       items.push({
         kind: kind, title: title, meta: meta || '', sortDate: sortDate || '',
         permanent: !!extra.permanent,
+        type: extra.type || null,
+        tone: extra.tone || null,
         season: extra.season != null ? String(extra.season) : CS
       });
     }
@@ -175,6 +179,10 @@
           { permanent: !weekly, season: gr.season });
       } else if (gr.kind === 'champion') {
         push('champion', gr.label || 'Season Champion', fmtDate(gr.date), gr.date, { permanent: true, season: gr.season });
+      } else if (gr.kind === 'bestdressed') {
+        // Gendered by colour: men's = blue, women's = rose.
+        push('bestdressed', gr.label || 'Best Dressed', fmtDate(gr.date), gr.date,
+          { season: gr.season, type: gr.type, tone: gr.type === 'womens' ? 'rose' : 'blue' });
       } else {
         push(gr.kind, gr.label || DEF[gr.kind].label, fmtDate(gr.date), gr.date, { season: gr.season });
       }
@@ -245,7 +253,7 @@
     var it = marqueeItem(opts);
     if (!it) return '';
     var label = (DEF[it.kind] && DEF[it.kind].label) || it.title;
-    return '<span class="dsb-clip" title="' + esc(label) + '">' + crestSvg(it.kind, 46) + '</span>';
+    return '<span class="dsb-clip" title="' + esc(label) + '">' + crestSvg(it.kind, 46, it.tone) + '</span>';
   }
 
   function heroPills(opts) {
@@ -254,7 +262,9 @@
     var kinds = Object.keys(s.counts).sort(function (a, b) { return DEF[b].pri - DEF[a].pri; });
     return kinds.map(function (k) {
       var n = s.counts[k];
-      return '<span class="dsb-pill dsb-pill--' + DEF[k].tone + '" title="' + esc(DEF[k].label) + '">' +
+      var it = s.items.find(function (x) { return x.kind === k; });
+      var tone = (it && it.tone) || (DEF[k] && DEF[k].tone) || 'gold';
+      return '<span class="dsb-pill dsb-pill--' + tone + '" title="' + esc(DEF[k].label) + '">' +
         (ICONS[k] || ICONS.potw) + esc(DEF[k].label) + (n > 1 ? ' <span class="dsb-x">×' + n + '</span>' : '') + '</span>';
     }).join('');
   }
@@ -264,7 +274,7 @@
     if (!s.total) return '';
     var crests = s.items.map(function (it) {
       return '<div class="dsb-case-item">' +
-        '<div class="dsb-crest">' + crestSvg(it.kind, 78) + '</div>' +
+        '<div class="dsb-crest">' + crestSvg(it.kind, 78, it.tone) + '</div>' +
         '<div class="dsb-case-t">' + esc(it.title) + '</div>' +
         (it.meta ? '<div class="dsb-case-m">' + esc(it.meta) + '</div>' : '') +
         '</div>';
@@ -312,6 +322,7 @@
       '.dsb-pill--lime{color:var(--color-lime,#b8ff2c);border-color:rgba(184,255,44,.5);background:var(--color-lime-dim,rgba(184,255,44,.12))}' +
       '.dsb-pill--violet{color:#a78bfa;border-color:rgba(167,139,250,.5);background:rgba(167,139,250,.14)}' +
       '.dsb-pill--rose{color:#ff6fb5;border-color:rgba(255,111,181,.5);background:rgba(255,111,181,.14)}' +
+      '.dsb-pill--blue{color:#3b9eff;border-color:rgba(59,158,255,.5);background:rgba(59,158,255,.14)}' +
       '.dsb-x{font-weight:900;opacity:.75;font-size:11px;margin-left:1px}' +
       '.dsb-case{background:var(--color-surface,#161616);border:1px solid var(--color-border,rgba(255,255,255,.08));border-radius:var(--radius-lg,18px);padding:20px 22px;margin-bottom:14px}' +
       '.dsb-case-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}' +

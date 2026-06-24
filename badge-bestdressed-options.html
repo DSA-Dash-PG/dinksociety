@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Best Dressed badge options — Dink Society</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,800;0,900;1,900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e0e0e;--surf:#161616;--bd:rgba(255,255,255,.08);--tx:#f0f0ec;--mut:#9a9e97;--rose:#ff6fb5}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;padding:46px 20px 90px}
+  .wrap{width:min(100%,980px);margin:0 auto}
+  .eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--rose);margin-bottom:10px}
+  h1{font-size:clamp(1.8rem,1.2rem+2.5vw,2.8rem);font-weight:900;font-style:italic;text-transform:uppercase;line-height:1}
+  .sub{color:var(--mut);font-size:15px;margin-top:12px;max-width:62ch}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+  @media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:480px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surf);border:1px solid var(--bd);border-radius:18px;padding:24px 16px;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .opt{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--rose);margin-bottom:14px}
+  .stage{display:flex;align-items:flex-end;gap:16px}
+  .crest{width:112px;height:112px} .crest svg{width:100%;height:100%;display:block}
+  .av{position:relative;width:60px;height:60px;border-radius:50%;background:#17d7b0;display:flex;align-items:center;justify-content:center;font-weight:900;color:#06231d;font-size:18px}
+  .av .clip{position:absolute;bottom:-3px;right:-5px;width:30px;height:30px}
+  .av .clip svg{width:100%;height:100%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55))}
+  .name{font-size:13.5px;font-weight:800;margin-top:16px} .note{font-size:12px;color:var(--mut);margin-top:5px;line-height:1.45}
+  .foot{margin-top:32px;font-size:13px;color:var(--mut);background:var(--surf);border:1px solid var(--bd);border-left:3px solid var(--rose);border-radius:8px;padding:14px 18px;line-height:1.6}
+  .foot b{color:var(--tx)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Dink Society · Crest art</div>
+  <h1>Best Dressed — 6 options</h1>
+  <p class="sub">Gender-neutral takes on the Best Dressed award (rose). One icon for everyone — no bowtie. Each shows full-size plus shrunk onto an avatar.</p>
+  <div class="grid" id="grid"></div>
+  <div class="foot"><b>Pick a number</b> and I'll swap it into the Best Dressed badge. Sparkle &amp; sunglasses read cleanest at avatar size; the hanger and ribbon are the most literally "dressed".</div>
+</div>
+<script>
+function rring(id, inner){
+  return `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <defs><radialGradient id="${id}" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#ffc2dd"/><stop offset="55%" stop-color="#ff6fb5"/><stop offset="100%" stop-color="#c83d86"/>
+    </radialGradient></defs>
+    <circle cx="60" cy="60" r="56" fill="#1a1a1a" stroke="url(#${id})" stroke-width="3"/>
+    <circle cx="60" cy="60" r="47" fill="none" stroke="rgba(255,111,181,.28)" stroke-width="1.5" stroke-dasharray="2 4"/>
+    ${inner}
+  </svg>`;
+}
+function micro(id){ return `<text x="60" y="100" text-anchor="middle" font-family="Inter" font-weight="900" font-size="9" fill="url(#${id})" letter-spacing="1.2">BEST DRESSED</text>`; }
+function spark(x,y,r,id){ return `<path d="M${x} ${y-r} L${x+r*0.28} ${y-r*0.28} L${x+r} ${y} L${x+r*0.28} ${y+r*0.28} L${x} ${y+r} L${x-r*0.28} ${y+r*0.28} L${x-r} ${y} L${x-r*0.28} ${y-r*0.28} Z" fill="url(#${id})"/>`; }
+
+const BUILD = {
+  // 1 — single shining star/sparkle
+  star: id => spark(60,56,26,id) + spark(40,40,6,id) + spark(82,46,5,id) + micro(id),
+  // 2 — sparkle trio (glam)
+  trio: id => spark(56,50,18,id) + spark(80,42,9,id) + spark(74,66,7,id) + micro(id),
+  // 3 — clothes hanger
+  hanger: id => `<path d="M60 34 c0 -5 7 -5 7 0 c0 4 -3.5 4 -3.5 6.5" fill="none" stroke="url(#${id})" stroke-width="3" stroke-linecap="round"/>`
+    + `<path d="M63.5 40.5 L36 64 a2 2 0 001.3 3.5 h45.4 a2 2 0 001.3 -3.5 Z" fill="none" stroke="url(#${id})" stroke-width="3" stroke-linejoin="round"/>` + micro(id),
+  // 4 — sunglasses
+  shades: id => `<g fill="none" stroke="url(#${id})" stroke-width="3" stroke-linejoin="round"><path d="M30 50 h60"/><rect x="32" y="48" width="22" height="16" rx="7"/><rect x="66" y="48" width="22" height="16" rx="7"/></g>` + micro(id),
+  // 5 — diamond / gem
+  gem: id => `<g stroke="url(#${id})" stroke-width="2.6" fill="none" stroke-linejoin="round"><path d="M44 44 h32 l11 13 -27 30 -27 -30 z"/><path d="M44 44 l9 13 h14 l9 -13 M33 57 h54 M53 57 l7 30 M67 57 l-7 30"/></g>` + micro(id),
+  // 6 — prize ribbon / sash rosette
+  ribbon: id => `<circle cx="60" cy="48" r="15" fill="none" stroke="url(#${id})" stroke-width="3"/>`
+    + spark(60,48,7,id)
+    + `<path d="M51 61 L46 82 L60 74 L74 82 L69 61" fill="none" stroke="url(#${id})" stroke-width="3" stroke-linejoin="round"/>` + micro(id)
+};
+const OPTS=[
+  {k:'star',title:'Shining star',note:'Standout / star of the night. Cleanest at small size.'},
+  {k:'trio',title:'Sparkle trio',note:'Glam, a little playful.'},
+  {k:'hanger',title:'Clothes hanger',note:'Most literally "dressed".'},
+  {k:'shades',title:'Sunglasses',note:'Cool, fun, very neutral.'},
+  {k:'gem',title:'Diamond',note:'Glam, dressed to the nines.'},
+  {k:'ribbon',title:'Prize ribbon',note:'Award/pageant sash feel.'}
+];
+const grid=document.getElementById('grid');
+OPTS.forEach((o,i)=>{const a='b'+i+'a',b='b'+i+'b';const c=document.createElement('div');c.className='card';
+  c.innerHTML=`<div class="opt">Option ${i+1} · ${o.title}</div>
+    <div class="stage"><div class="crest">${rring(a,BUILD[o.k](a))}</div><div class="av">RH<div class="clip">${rring(b,BUILD[o.k](b))}</div></div></div>
+    <div class="name">${o.title}</div><div class="note">${o.note}</div>`;
+  grid.appendChild(c);});
+</script>
+</body>
+</html>
