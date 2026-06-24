@@ -1195,7 +1195,8 @@
           if (br.ok) { const bd = await br.json(); cfg = bd.config; grants = bd.grants || []; }
         } catch {}
         if (cfg) dsBadges.setConfig(cfg);
-        const bopts = { awards: Array.isArray(pl.awards) ? pl.awards : [], grants, currentSeason: (circ || 'I') };
+        const bopts = { awards: Array.isArray(pl.awards) ? pl.awards : [], grants, currentSeason: (circ || 'I'),
+          league: { w: pl.gamesWon || 0, l: pl.gamesLost || 0, gp: pl.gamesPlayed || row.gp || 0 } };
         bg.innerHTML = '<div class="dsb-pills">' + dsBadges.heroPills(bopts) + '</div>';
         const av = document.querySelector('#psheet-body .ph-av');
         if (av) { const cr = dsBadges.avatarCrest(bopts); if (cr) { av.style.position = 'relative'; av.insertAdjacentHTML('beforeend', cr); } }
@@ -1858,18 +1859,14 @@
     const deltaHtml = delta == null || delta === 0 ? '' : delta > 0 ? ` <span class="lb__delta up">▲${delta}</span>` : ` <span class="lb__delta down">▼${-delta}</span>`;
 
     // ★ Personalized "you" header — makes Home unmistakably the player's own.
-    // Chips: captain/co-captain only (gender + division removed per Richard).
     const hr = new Date().getHours();
     const greeting = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
-    const capChip = me.isCaptain ? '<span class="chip chip-cap">CAPTAIN</span>'
-      : me.isCoCaptain ? '<span class="chip chip-cap">CO-CAPTAIN</span>' : '';
     const dsrVal = fmtDsr(DATA.stats?.composite ?? myRow?.dsr);
     const mehead = `<div class="mehead">
       <div class="mehead__av">${esc(initials(me.name))}</div>
       <div class="mehead__main">
         <div class="mehead__hi">${greeting}</div>
         <div class="mehead__name">${esc((me.name || '').trim().split(/\s+/)[0] || 'Player')}</div>
-        ${capChip ? `<div class="mehead__chips">${capChip}</div>` : ''}
       </div>
       ${dsrVal !== '—' ? `<div class="mehead__dsr"><div class="mehead__dsrN">${dsrVal}</div><button class="mehead__dsrL" type="button" onclick="openDsrInfo(event)">Your DSR <i class="dsr-i">?</i></button></div>` : ''}
     </div>`;

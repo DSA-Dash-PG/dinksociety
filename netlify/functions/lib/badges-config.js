@@ -21,7 +21,7 @@ export const DEFAULT_BADGES = [
   { kind: 'ladder',      label: 'Ladder Winner',     tone: 'teal',   pri: 50, enabled: true, manual: false, gendered: false, scopes: [] },
   { kind: 'streak10',    label: '10+ Win Streak',    tone: 'lime',   pri: 45, enabled: true, manual: false, gendered: false, scopes: [] },
   { kind: 'improved',    label: 'Most Improved',     tone: 'violet', pri: 40, enabled: true, manual: true,  gendered: true,  scopes: ['weekly', 'season'] },
-  { kind: 'undefeated',  label: 'Undefeated Night',  tone: 'lime',   pri: 30, enabled: true, manual: false, gendered: false, scopes: [] },
+  { kind: 'undefeated',  label: 'Undefeated',        tone: 'lime',   pri: 30, enabled: true, manual: false, gendered: false, scopes: [] },
   { kind: 'bestdressed', label: 'Best Dressed',      tone: 'rose',   pri: 25, enabled: true, manual: true,  gendered: true,  scopes: ['weekly', 'season'] },
   { kind: 'streak5',     label: '5+ Win Streak',     tone: 'teal',   pri: 20, enabled: true, manual: false, gendered: false, scopes: [] },
 ];

@@ -151,7 +151,7 @@
     ladder:      { label: 'Ladder Winner',   tone: 'teal',   pri: 50 },
     streak10:    { label: '10+ Win Streak',  tone: 'lime',   pri: 45 },
     improved:    { label: 'Most Improved',   tone: 'violet', pri: 40 },
-    undefeated:  { label: 'Undefeated Night', tone: 'lime',  pri: 30 },
+    undefeated:  { label: 'Undefeated',      tone: 'lime',  pri: 30 },
     bestdressed: { label: 'Best Dressed',    tone: 'rose',   pri: 25 },
     streak5:     { label: '5+ Win Streak',   tone: 'teal',   pri: 20 }
   };
@@ -208,6 +208,24 @@
         [fmtDate(a.date), (a.w != null ? a.w + 'W–' + a.l + 'L' : ''), (a.diff != null ? (a.diff >= 0 ? '+' : '') + a.diff + ' pt diff' : '')].filter(Boolean).join(' · '), a.date,
         { domain: 'league' });
     });
+
+    // League undefeated — per-week perfect records when supplied, else a season-to-date
+    // perfect game record (0 losses). opts.leagueWeeks = [{week,w,l,date}].
+    var lw = Array.isArray(opts.leagueWeeks) ? opts.leagueWeeks : null;
+    if (lw && lw.length) {
+      lw.forEach(function (w) {
+        if ((w.w || 0) > 0 && (w.l || 0) === 0) {
+          push('undefeated', 'Undefeated · Week ' + w.week,
+            [fmtDate(w.date), w.w + '–0'].filter(Boolean).join(' · '), w.date || '', { domain: 'league' });
+        }
+      });
+    } else {
+      var lg = opts.league;
+      if (lg && (lg.l || 0) === 0 && (lg.w || 0) > 0) {
+        push('undefeated', 'Undefeated',
+          [lg.w + '–0', 'perfect record'].join(' · '), '', { domain: 'league' });
+      }
+    }
 
     // Ladder-derived awards — ladder-side.
     var per = (opts.ladder && Array.isArray(opts.ladder.perLadder)) ? opts.ladder.perLadder : [];
