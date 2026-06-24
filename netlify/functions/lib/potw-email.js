@@ -330,10 +330,10 @@ function renderApprovalEmail({ week, items }) {
  * Idempotent: if the latest week was already prepared, it no-ops.
  * @returns {Promise<{ok:boolean, reason?:string, week?:number, count?:number}>}
  */
-export async function prepareWeeklyPotwApproval(circuit = 'I', { force = false, notify = true, week = null } = {}) {
+export async function prepareWeeklyPotwApproval(circuit = 'I', { force = false, notify = true, week: weekArg = null } = {}) {
   const code = String(circuit);
-  const found = await fetchLatestWinners(code, week);
-  if (!found) return { ok: false, reason: week != null ? 'no-winners-for-week' : 'no-winners', week: week != null ? Number(week) : undefined };
+  const found = await fetchLatestWinners(code, weekArg);
+  if (!found) return { ok: false, reason: weekArg != null ? 'no-winners-for-week' : 'no-winners', week: weekArg != null ? Number(weekArg) : undefined };
   const { week, label, winners } = found;
 
   const marker = await stateStore().get(markerKey(code, week), { type: 'json' }).catch(() => null);
