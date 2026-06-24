@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Schedule tab redesign — mockup</title>
+<style>
+  :root{
+    --bg:#0e0e0e; --surface:#161616; --s2:#1e1e1e; --s3:#262626; --s4:#2e2e2e;
+    --bd:rgba(255,255,255,.08); --bds:rgba(255,255,255,.14);
+    --tx:#f0f0ec; --txf:#8b948a; --txm:#9a9e97; --inv:#0e0e0e;
+    --lime:#b8ff2c; --lime-dim:rgba(184,255,44,.12); --lime-hover:#c8ff58;
+    --teal:#17d7b0; --teal-dim:rgba(23,215,176,.12);
+    --gold:#f0c040; --gold-dim:rgba(240,192,64,.12);
+    --red:#ff5c47; --red-dim:rgba(255,92,71,.12);
+    --r-sm:10px; --r-md:14px; --r-lg:20px; --r-full:9999px;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px;margin:0 auto;padding:28px 22px 80px;}
+  .note{background:var(--lime-dim);border:1px solid rgba(184,255,44,.25);color:#e8ffd0;
+    border-radius:var(--r-md);padding:11px 14px;font-size:12.5px;margin-bottom:22px;}
+  .note b{color:var(--lime);}
+
+  /* ── toolbar ── */
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:18px;}
+  .bar h1{font-size:22px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;margin:0;}
+  .bar h1 small{display:block;font-size:10.5px;font-weight:700;font-style:normal;letter-spacing:.18em;color:var(--txf);margin-top:2px;}
+  .bar-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .sel{background:var(--s2);color:var(--tx);border:1px solid var(--bd);border-radius:var(--r-sm);
+    padding:8px 12px;font-size:12.5px;font-family:inherit;}
+  .btn{border:1px solid var(--bd);background:var(--s2);color:var(--tx);border-radius:var(--r-sm);
+    padding:8px 13px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .btn:hover{border-color:var(--bds);}
+  .btn--lime{background:var(--lime);color:var(--inv);border-color:var(--lime);}
+  .btn--lime:hover{background:var(--lime-hover);}
+  .btn--ghost{background:transparent;}
+  .icon-btn{width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;font-size:16px;padding:0;}
+
+  /* ── week rail ── */
+  .rail-wrap{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r-lg);padding:14px 14px 12px;margin-bottom:18px;}
+  .rail-legend{display:flex;gap:16px;flex-wrap:wrap;font-size:10.5px;letter-spacing:.04em;color:var(--txf);margin-bottom:12px;text-transform:uppercase;font-weight:700;}
+  .rail-legend i{width:9px;height:9px;border-radius:3px;display:inline-block;margin-right:5px;vertical-align:-1px;}
+  .rail{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;}
+  .wk{flex:1 0 auto;min-width:104px;text-align:left;background:var(--s2);border:1px solid var(--bd);
+    border-radius:var(--r-md);padding:11px 12px;cursor:pointer;transition:.12s;position:relative;}
+  .wk:hover{border-color:var(--bds);}
+  .wk.sel{border-color:var(--lime);box-shadow:0 0 0 1px var(--lime);background:#181c10;}
+  .wk .wk-n{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--txf);text-transform:uppercase;}
+  .wk .wk-ph{font-size:12px;font-weight:800;margin-top:3px;}
+  .wk .wk-meta{font-size:10.5px;color:var(--txm);margin-top:6px;display:flex;align-items:center;gap:5px;}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .dot.done{background:var(--lime);} .dot.live{background:var(--teal);box-shadow:0 0 7px var(--teal);}
+  .dot.up{background:#555;} .dot.tbd{background:transparent;border:1.5px dashed #6a6a6a;}
+  .ph-reg{color:var(--tx);} .ph-riv{color:var(--teal);} .ph-po{color:#ffb061;} .ph-champ{color:var(--gold);}
+  .wk .tag{position:absolute;top:10px;right:10px;font-size:8px;font-weight:900;letter-spacing:.1em;
+    text-transform:uppercase;padding:2px 5px;border-radius:5px;}
+  .tag-riv{background:var(--teal-dim);color:var(--teal);} .tag-po{background:rgba(255,176,97,.14);color:#ffb061;}
+  .tag-champ{background:var(--gold-dim);color:var(--gold);}
+
+  /* ── panel ── */
+  .panel{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r-lg);overflow:hidden;}
+  .panel-hd{padding:16px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .panel-hd h2{margin:0;font-size:16px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.01em;display:flex;align-items:center;gap:9px;}
+  .pill{font-size:9.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:var(--r-full);}
+  .pill-riv{background:var(--teal-dim);color:var(--teal);} .pill-po{background:rgba(255,176,97,.14);color:#ffb061;}
+  .pill-champ{background:var(--gold-dim);color:var(--gold);}
+  .panel-sub{font-size:12px;color:var(--txf);max-width:560px;}
+  .panel-bd{padding:16px 18px;}
+
+  /* ── match card ── */
+  .mrow{display:flex;align-items:center;gap:14px;background:var(--s2);border:1px solid var(--bd);
+    border-radius:var(--r-md);padding:13px 15px;margin-bottom:11px;}
+  .mrow:last-child{margin-bottom:0;}
+  .team{display:flex;align-items:center;gap:10px;flex:1;min-width:0;}
+  .team.r{justify-content:flex-end;text-align:right;}
+  .logo{width:34px;height:34px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:17px;background:var(--s4);}
+  .tname{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .seedbadge{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-size:12px;font-weight:900;font-family:var(--mono);background:var(--s4);color:var(--tx);border:1px solid var(--bds);}
+  .vs{font-size:11px;font-weight:900;color:var(--txf);letter-spacing:.1em;flex-shrink:0;}
+  .score{font-size:17px;font-weight:900;font-family:var(--mono);min-width:54px;text-align:center;flex-shrink:0;}
+  .score .w{color:var(--lime);}
+  .mmeta{display:flex;align-items:center;gap:7px;flex-shrink:0;}
+  .chip{font-size:10.5px;font-weight:700;color:var(--txm);background:var(--s3);border:1px solid var(--bd);
+    border-radius:var(--r-full);padding:4px 9px;white-space:nowrap;cursor:pointer;}
+  .chip:hover{border-color:var(--bds);color:var(--tx);}
+  .chip.empty{color:#d98;border-color:rgba(255,140,90,.3);background:rgba(255,140,90,.08);}
+  .st{font-size:9.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px;border-radius:var(--r-full);}
+  .st-final{background:var(--lime-dim);color:var(--lime);} .st-live{background:var(--teal-dim);color:var(--teal);}
+  .st-up{background:var(--s3);color:var(--txf);} .st-tbd{background:transparent;color:var(--txf);border:1px dashed #6a6a6a;}
+  .kebab{color:var(--txf);cursor:pointer;font-size:17px;padding:0 4px;}
+
+  /* placeholder (unresolved) */
+  .mrow.ph{border-style:dashed;border-color:#444;background:#141414;}
+  .placeholder .tname{color:var(--txf);font-style:italic;font-weight:700;}
+  .placeholder .logo{background:transparent;border:1.5px dashed #555;color:#666;font-size:13px;}
+
+  .grp-label{font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:var(--txf);margin:18px 2px 9px;}
+  .grp-label:first-child{margin-top:4px;}
+
+  /* ── bracket (week 8) ── */
+  .bracket{display:grid;grid-template-columns:1fr;gap:18px;}
+  .bcard{border:1px solid var(--bd);border-radius:var(--r-md);overflow:hidden;}
+  .bcard.gold{border-color:rgba(240,192,64,.4);}
+  .bcard.bronze{border-color:rgba(205,127,50,.35);}
+  .bcard-hd{padding:9px 14px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+  .bcard.gold .bcard-hd{background:var(--gold-dim);color:var(--gold);}
+  .bcard.bronze .bcard-hd{background:rgba(205,127,50,.12);color:#cd9a5a;}
+  .bcard-bd{padding:13px 15px;}
+  .medal{font-size:14px;}
+
+  /* ── advanced / all games ── */
+  .adv{margin-top:18px;border:1px solid var(--bd);border-radius:var(--r-md);background:var(--surface);}
+  .adv summary{cursor:pointer;list-style:none;padding:13px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12.5px;font-weight:800;color:var(--txm);}
+  .adv summary::-webkit-details-marker{display:none;}
+  .adv summary .hint{font-weight:600;color:var(--txf);font-size:11px;}
+  .adv[open] summary{border-bottom:1px solid var(--bd);}
+  .adv-bd{padding:14px 16px;}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{text-align:left;font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--txf);padding:6px 8px;border-bottom:1px solid var(--bd);}
+  td{padding:8px;border-bottom:1px solid var(--bd);color:var(--txm);}
+  .cap{font-size:11px;color:var(--txf);margin-top:14px;text-align:center;}
+  .legend-inline{font-size:11px;color:var(--txf);margin:2px 0 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="note">
+    <b>Mockup — not wired up.</b> This is the proposed redesign of the admin <b>Schedule</b> tab. Click the week chips
+    to see each phase, including the new Week 6–8 place cards. Nothing here saves; it's just to react to the layout and flow.
+  </div>
+
+  <!-- toolbar -->
+  <div class="bar">
+    <h1>Schedule<small>SEASON 1 · CIRCUIT I</small></h1>
+    <div class="bar-r">
+      <select class="sel"><option>3.5 Mixed — 6 teams</option></select>
+      <button class="btn btn--lime">＋ Generate season</button>
+      <button class="btn">↻ Rebuild standings</button>
+      <button class="btn icon-btn" title="More">⋯</button>
+    </div>
+  </div>
+
+  <!-- week rail -->
+  <div class="rail-wrap">
+    <div class="rail-legend">
+      <span><i style="background:var(--lime)"></i>Regular season</span>
+      <span><i style="background:var(--teal)"></i>Rivalry week</span>
+      <span><i style="background:#ffb061"></i>Playoffs</span>
+      <span><i style="background:var(--gold)"></i>Championship</span>
+    </div>
+    <div class="rail" id="rail"></div>
+  </div>
+
+  <!-- panel -->
+  <div class="panel" id="panel"></div>
+
+  <!-- advanced -->
+  <details class="adv">
+    <summary><span>⚙ All games &amp; bulk tools</span><span class="hint">every match · filters · CSV · delete — collapsed to keep the main view clean</span></summary>
+    <div class="adv-bd">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+        <select class="sel"><option>All weeks</option></select>
+        <select class="sel"><option>All divisions</option></select>
+        <button class="btn btn--ghost">↻ Reload</button>
+        <button class="btn btn--ghost">⤓ Export CSV</button>
+      </div>
+      <table>
+        <thead><tr><th>Wk</th><th>Match</th><th>Court</th><th>Date / time</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <tr><td>2</td><td>Smash Society vs Timog Cal</td><td>1 &amp; 2</td><td>Jun 15 · 7:00 PM</td><td>Final 4–0</td><td>✎ 🗑</td></tr>
+          <tr><td>2</td><td>ZERO ZERO TWO vs K'CHN</td><td>3 &amp; 6</td><td>Jun 15 · 7:00 PM</td><td>Final 3–1</td><td>✎ 🗑</td></tr>
+          <tr><td>6</td><td>#1 v #2 (Rivalry)</td><td>—</td><td>Set date</td><td>Seeded</td><td>✎ 🗑</td></tr>
+        </tbody>
+      </table>
+      <p class="cap">This dense table used to be the first thing you saw. It now lives here, out of the way.</p>
+    </div>
+  </details>
+
+  <p class="cap">Redesign mockup · The Dink Society admin</p>
+</div>
+
+<script>
+const WEEKS = [
+  {n:1, ph:'Regular season', cls:'ph-reg', status:'done',  meta:'3 games · Final'},
+  {n:2, ph:'Regular season', cls:'ph-reg', status:'done',  meta:'3 games · Final'},
+  {n:3, ph:'Regular season', cls:'ph-reg', status:'live',  meta:'In progress'},
+  {n:4, ph:'Regular season', cls:'ph-reg', status:'up',    meta:'Scheduled'},
+  {n:5, ph:'Regular season', cls:'ph-reg', status:'up',    meta:'Scheduled'},
+  {n:6, ph:'Rivalry',        cls:'ph-riv', status:'tbd',   meta:'Seeded by Wk 5', tag:'riv'},
+  {n:7, ph:'Playoffs',       cls:'ph-po',  status:'tbd',   meta:'Seeded by Wk 6', tag:'po'},
+  {n:8, ph:'Championship',   cls:'ph-champ',status:'tbd',  meta:'Gold · Bronze',  tag:'champ'},
+];
+
+function railHtml(sel){
+  return WEEKS.map(w=>`
+    <button class="wk ${w.n===sel?'sel':''}" onclick="select(${w.n})">
+      ${w.tag?`<span class="tag tag-${w.tag}">${w.tag==='riv'?'Rivalry':w.tag==='po'?'Playoffs':'Final'}</span>`:''}
+      <div class="wk-n">Week ${w.n}</div>
+      <div class="wk-ph ${w.cls}">${w.ph}</div>
+      <div class="wk-meta"><span class="dot ${w.status}"></span>${w.meta}</div>
+    </button>`).join('');
+}
+
+// team helpers
+const T = (emoji,name)=>`<span class="logo">${emoji}</span><span class="tname">${name}</span>`;
+const seededTeam = (n,emoji,name)=>`<span class="seedbadge">${n}</span><span class="logo">${emoji}</span><span class="tname">${name}</span>`;
+const placeTeam = (n,label)=>`<span class="seedbadge">${n}</span><span class="logo">?</span><span class="tname">${label}</span>`;
+
+function matchCard({a,b,score,court,time,status}){
+  return `<div class="mrow">
+    <div class="team">${a}</div>
+    ${score?`<div class="score">${score}</div>`:`<span class="vs">VS</span>`}
+    <div class="team r">${b}</div>
+    <div class="mmeta">
+      <span class="chip ${court?'':'empty'}">${court||'Set court'}</span>
+      <span class="chip ${time?'':'empty'}">${time||'Set time'}</span>
+      <span class="st st-${status.k}">${status.t}</span>
+      <span class="kebab">⋯</span>
+    </div>
+  </div>`;
+}
+function placeCard({a,b,note,court,time}){
+  // Playoff cards are still fully schedulable even while the teams are
+  // placeholders — court + time are editable exactly like regular weeks.
+  return `<div class="mrow ph">
+    <div class="team placeholder">${a}</div>
+    <span class="vs">VS</span>
+    <div class="team r placeholder">${b}</div>
+    <div class="mmeta">
+      <span class="chip ${court?'':'empty'}">${court||'Set court'}</span>
+      <span class="chip ${time?'':'empty'}">${time||'Set time'}</span>
+      <span class="st st-tbd">${note||'Awaiting teams'}</span>
+      <span class="kebab">⋯</span>
+    </div>
+  </div>`;
+}
+
+function panelHtml(n){
+  // ── Regular season example (Week 2) ──
+  if(n<=5){
+    const live = n===3;
+    const sub = live ? 'In progress — scores update as games finalize.' : (n<3?'Completed week.':'Upcoming — set dates and courts.');
+    return `
+    <div class="panel-hd">
+      <div><h2>Week ${n}</h2><div class="panel-sub">${sub}</div></div>
+      <button class="btn btn--ghost">✎ Edit week</button>
+    </div>
+    <div class="panel-bd">
+      ${matchCard({a:T('🏆','Smash Society'), b:T('🌴','Timog Cal'), score:'<span class="w">4</span>–0', court:'Courts 1 & 2', time:'Jun 15 · 7:00 PM', status:n<3?{k:'final',t:'Final'}:{k:'live',t:'Live'}})}
+      ${matchCard({a:T('💫','ZERO ZERO TWO'), b:T('🍌',"K'CHN"), score:n<3?'<span class="w">3</span>–1':'', court:'Courts 3 & 6', time:'Jun 15 · 7:00 PM', status:n<3?{k:'final',t:'Final'}:{k:'up',t:'Scheduled'}})}
+      ${matchCard({a:T('💥','Big Dink Energy'), b:T('🎯','What the Dink?!'), score:'', court:'', time:'', status:{k:'up',t:'Scheduled'}})}
+    </div>`;
+  }
+  // ── Week 6 Rivalry ──
+  if(n===6){
+    return `
+    <div class="panel-hd">
+      <div><h2>Week 6 <span class="pill pill-riv">Rivalry Week</span></h2>
+        <div class="panel-sub">Counts toward the regular season. Matchups seed off standings <b>through Week 5</b>: #1 v #2, #3 v #4, #5 v #6. Teams fill in automatically once Week 5 is final.</div></div>
+      <button class="btn btn--ghost">✎ Edit week</button>
+    </div>
+    <div class="panel-bd">
+      <div class="grp-label">Rivalry matchups · resolved from current standings (preview)</div>
+      ${matchCard({a:seededTeam(1,'🏆','Smash Society'), b:seededTeam(2,'💫','ZERO ZERO TWO'), score:'', court:'Courts 1 & 2', time:'Set time', status:{k:'up',t:'Seeded'}})}
+      ${matchCard({a:seededTeam(3,'💥','Big Dink Energy'), b:seededTeam(4,'🍌',"K'CHN"), score:'', court:'Courts 3 & 6', time:'Set time', status:{k:'up',t:'Seeded'}})}
+      ${matchCard({a:seededTeam(5,'🎯','What the Dink?!'), b:seededTeam(6,'🌴','Timog Cal'), score:'', court:'Courts 5 & 7', time:'Set time', status:{k:'up',t:'Seeded'}})}
+      <p class="legend-inline">Seeds shown reflect live standings and will lock when Week 5 finalizes.</p>
+    </div>`;
+  }
+  // ── Week 7 Playoffs ──
+  if(n===7){
+    return `
+    <div class="panel-hd">
+      <div><h2>Week 7 <span class="pill pill-po">Playoffs</span></h2>
+        <div class="panel-sub">Seeds lock from <b>final standings after Week 6</b>: #1 v #4, #2 v #3, #5 v #6. Winners and losers of the top two games feed the Championship.</div></div>
+      <button class="btn btn--ghost">✎ Edit week</button>
+    </div>
+    <div class="panel-bd">
+      <div class="grp-label">Championship bracket — semifinals</div>
+      ${placeCard({a:placeTeam(1,'#1 Seed'), b:placeTeam(4,'#4 Seed'), note:'Game A', court:'Courts 1 & 2', time:'Set time'})}
+      ${placeCard({a:placeTeam(2,'#2 Seed'), b:placeTeam(3,'#3 Seed'), note:'Game B', court:'Courts 3 & 6', time:'Set time'})}
+      <div class="grp-label">Consolation</div>
+      ${placeCard({a:placeTeam(5,'#5 Seed'), b:placeTeam(6,'#6 Seed'), note:'5th place', court:'Courts 5 & 7', time:'Set time'})}
+      <p class="legend-inline">Court &amp; time are editable now; the seed labels become real team names automatically once standings finalize.</p>
+    </div>`;
+  }
+  // ── Week 8 Championship ──
+  return `
+    <div class="panel-hd">
+      <div><h2>Week 8 <span class="pill pill-champ">Championship</span></h2>
+        <div class="panel-sub">Built from Week 7 results. The two semifinal winners play for <b>Gold/Silver</b>; the two losers play for <b>Bronze</b>. Seeds #5 and #6 are done after Week 7.</div></div>
+      <button class="btn btn--ghost">✎ Edit week</button>
+    </div>
+    <div class="panel-bd">
+      <div class="bracket">
+        <div class="bcard gold">
+          <div class="bcard-hd"><span class="medal">🥇</span> Gold / Silver final</div>
+          <div class="bcard-bd">
+            ${placeCard({a:placeTeam('A','Winner of Game A'), b:placeTeam('B','Winner of Game B'), note:'Awaiting Wk 7', court:'Center Court', time:'Set time'})}
+          </div>
+        </div>
+        <div class="bcard bronze">
+          <div class="bcard-hd"><span class="medal">🥉</span> Bronze game</div>
+          <div class="bcard-bd">
+            ${placeCard({a:placeTeam('A','Loser of Game A'), b:placeTeam('B','Loser of Game B'), note:'Awaiting Wk 7', court:'Courts 3 & 6', time:'Set time'})}
+          </div>
+        </div>
+      </div>
+      <p class="legend-inline" style="margin-top:14px;">Example once Week 7 is final:</p>
+      <div class="bcard gold" style="margin-top:8px;">
+        <div class="bcard-hd"><span class="medal">🥇</span> Gold / Silver final</div>
+        <div class="bcard-bd">
+          ${matchCard({a:T('🏆','Smash Society'), b:T('💥','Big Dink Energy'), score:'', court:'Center Court', time:'Set time', status:{k:'up',t:'Ready'}})}
+        </div>
+      </div>
+    </div>`;
+}
+
+let current = 6;
+function select(n){ current=n; render(); }
+function render(){
+  document.getElementById('rail').innerHTML = railHtml(current);
+  document.getElementById('panel').innerHTML = panelHtml(current);
+}
+render();
+</script>
+</body>
+</html>

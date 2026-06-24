@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Public schedule — Aloha-style mockup</title>
+<style>
+  :root{
+    --bg:#0e0e0e; --surface:#161616; --s2:#1e1e1e; --s3:#262626;
+    --bd:rgba(255,255,255,.08); --bds:rgba(255,255,255,.14);
+    --tx:#f0f0ec; --txf:#8b948a; --txm:#9a9e97; --inv:#0e0e0e;
+    --lime:#b8ff2c; --lime-ghost:rgba(184,255,44,.08); --lime-dim:rgba(184,255,44,.14);
+    --teal:#17d7b0; --gold:#f0c040; --orange:#ffb061;
+    --r-sm:10px; --r-md:14px; --r-lg:20px; --r-full:9999px;
+    --serif:'Newsreader',Georgia,serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px;margin:0 auto;padding:34px 22px 80px;}
+  .note{background:var(--lime-dim);border:1px solid rgba(184,255,44,.25);color:#e8ffd0;
+    border-radius:var(--r-md);padding:11px 14px;font-size:12.5px;margin-bottom:26px;}
+  .note b{color:var(--lime);}
+
+  /* ── masthead ── */
+  .mast{text-align:center;margin-bottom:8px;}
+  .mast h1{font-family:var(--serif);font-weight:800;font-style:italic;font-size:40px;letter-spacing:-.01em;margin:0;
+    display:inline-flex;align-items:center;gap:12px;}
+  .mast .sub{font-size:14px;color:var(--txm);margin-top:6px;}
+  .rule{width:64px;height:3px;background:var(--orange);border-radius:2px;margin:16px auto 22px;}
+
+  .legend{display:flex;justify-content:center;margin-bottom:18px;}
+  .legend-in{display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--bd);
+    border-radius:var(--r-full);padding:7px 14px;font-size:11.5px;color:var(--txm);}
+  .badge{font-size:9px;font-weight:900;letter-spacing:.08em;padding:3px 7px;border-radius:var(--r-full);}
+  .badge.home{background:var(--lime-ghost);color:var(--lime);border:1px solid rgba(184,255,44,.3);}
+  .badge.away{background:var(--s2);color:var(--txm);border:1px solid var(--bd);}
+
+  /* ── week pills ── */
+  .pills{display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-bottom:26px;}
+  .pill{border:1.5px solid var(--bd);background:transparent;color:var(--tx);border-radius:var(--r-full);
+    padding:8px 16px;font-size:12.5px;font-weight:800;cursor:pointer;transition:.12s;font-family:inherit;}
+  .pill:hover{border-color:var(--bds);}
+  .pill.sel{background:var(--lime);color:var(--inv);border-color:var(--lime);}
+  .pill.all.sel{background:var(--orange);border-color:var(--orange);}
+
+  /* ── week heading ── */
+  .wkhd{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:6px;}
+  .wkhd .wbadge{background:#21314a;color:#cfe0ff;font-weight:900;font-size:12px;padding:5px 12px;border-radius:var(--r-full);}
+  .wkhd .wbadge.riv{background:rgba(23,215,176,.16);color:var(--teal);}
+  .wkhd .wbadge.po{background:rgba(255,176,97,.16);color:var(--orange);}
+  .wkhd .wbadge.champ{background:rgba(240,192,64,.16);color:var(--gold);}
+  .wkhd .wdate{font-weight:800;font-size:15px;display:flex;align-items:center;gap:7px;}
+  .wktime{font-size:12.5px;color:var(--txm);margin:0 0 18px;display:flex;align-items:center;gap:6px;}
+
+  /* ── match grid ── */
+  .mgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  @media(max-width:860px){.mgrid{grid-template-columns:1fr;}}
+  .mcard{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r-lg);padding:16px 16px 18px;}
+  .mcard.phase-po{border-color:rgba(255,176,97,.25);}
+  .mcard.phase-champ{border-color:rgba(240,192,64,.3);}
+  .mc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .court{font-size:11px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:var(--orange);}
+  .status{font-size:10px;font-weight:800;letter-spacing:.04em;padding:3px 9px;border-radius:var(--r-full);
+    background:var(--s2);color:var(--txm);border:1px solid var(--bd);}
+  .status.final{background:var(--lime-dim);color:var(--lime);border-color:transparent;}
+  .status.live{background:rgba(23,215,176,.16);color:var(--teal);border-color:transparent;}
+
+  .mc-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;}
+  .side{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;}
+  .badge-sm{font-size:8.5px;font-weight:900;letter-spacing:.06em;padding:2px 7px;border-radius:var(--r-full);}
+  .badge-sm.home{background:var(--lime-ghost);color:var(--lime);}
+  .badge-sm.away{background:var(--s2);color:var(--txm);border:1px solid var(--bd);}
+  .emoji{width:48px;height:48px;border-radius:14px;background:var(--s2);display:flex;align-items:center;justify-content:center;font-size:26px;}
+  .nm{font-weight:800;font-size:14px;line-height:1.2;}
+  .nm.seed{color:#cfe0ff;}
+  .nm.away-c{color:var(--teal);}
+  .vs{font-size:12px;font-weight:900;color:var(--txf);background:var(--s2);border-radius:8px;padding:6px 8px;}
+  .sc{font-size:22px;font-weight:900;font-family:ui-monospace,Menlo,monospace;}
+  .sc .w{color:var(--lime);}
+
+  .placeholder .emoji{background:transparent;border:1.5px dashed #555;color:#666;font-size:20px;}
+  .ph-note{text-align:center;font-size:11px;color:var(--txf);margin-top:14px;}
+
+  /* championship bracket framing */
+  .champ-band{display:flex;align-items:center;gap:10px;margin:2px 0 14px;font-size:11px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;}
+  .champ-band .g{color:var(--gold);} .champ-band .b{color:#cd9a5a;}
+  .cap{font-size:11px;color:var(--txf);text-align:center;margin-top:26px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="note"><b>Mockup — not wired up.</b> Proposed public schedule styled after the Aloha layout you shared: centered masthead,
+    week pills, HOME/AWAY framing, and Week 6–8 seed place cards. Click the pills to move between weeks.</div>
+
+  <div class="mast">
+    <h1><span>📅</span> Season 1 Schedule</h1>
+    <div class="sub">The Dink Society · Southern California</div>
+  </div>
+  <div class="rule"></div>
+
+  <div class="legend">
+    <div class="legend-in"><span class="badge home">🏠 HOME</span> team listed first ·
+      <span class="badge away">✈️ AWAY</span> team listed second</div>
+  </div>
+
+  <div class="pills" id="pills"></div>
+
+  <div id="weekview"></div>
+
+  <p class="cap">Public schedule mockup · The Dink Society</p>
+</div>
+
+<script>
+const WEEKS=[
+  {n:1,date:'Tue, Jun 10, 2026',phase:'reg',label:null,status:'final'},
+  {n:2,date:'Tue, Jun 17, 2026',phase:'reg',label:null,status:'final'},
+  {n:3,date:'Tue, Jun 24, 2026',phase:'reg',label:null,status:'live'},
+  {n:4,date:'Tue, Jul 1, 2026', phase:'reg',label:null,status:'up'},
+  {n:5,date:'Tue, Jul 8, 2026', phase:'reg',label:null,status:'up'},
+  {n:6,date:'Tue, Jul 14, 2026',phase:'riv',label:'Rivalry Week',status:'up'},
+  {n:7,date:'Tue, Jul 21, 2026',phase:'po', label:'Playoffs',status:'up'},
+  {n:8,date:'Tue, Jul 28, 2026',phase:'champ',label:'Championship',status:'up'},
+];
+
+function pills(sel){
+  let h=`<button class="pill all ${sel==='all'?'sel':''}" onclick="sel2('all')">All Weeks</button>`;
+  h+=WEEKS.map(w=>`<button class="pill ${sel===w.n?'sel':''}" onclick="sel2(${w.n})">Wk ${w.n}</button>`).join('');
+  return h;
+}
+
+function side(badge,emoji,name,opts={}){
+  const ph=opts.ph?'placeholder':'';
+  const nmcls = opts.seed?'nm seed':(badge==='away'?'nm away-c':'nm');
+  return `<div class="side ${ph}">
+    <span class="badge-sm ${badge}">${badge==='home'?'🏠 HOME':'✈️ AWAY'}</span>
+    <div class="emoji">${emoji}</div>
+    <div class="${nmcls}">${name}</div>
+  </div>`;
+}
+function center(w){ // score or VS
+  if(w.score) return `<div class="sc">${w.score}</div>`;
+  return `<div class="vs">VS</div>`;
+}
+function mcard({court,status,phase,a,b,score}){
+  const stTxt = status==='final'?'Final':status==='live'?'● Live':'Upcoming';
+  return `<div class="mcard ${phase?('phase-'+phase):''}">
+    <div class="mc-top"><span class="court">${court}</span><span class="status ${status}">${stTxt}</span></div>
+    <div class="mc-row">${a}${score?`<div class="sc">${score}</div>`:`<div class="vs">VS</div>`}${b}</div>
+  </div>`;
+}
+
+function regWeek(w){
+  const fin=w.status==='final', live=w.status==='live';
+  return `<div class="mgrid">
+    ${mcard({court:'Courts 1–2',status:fin?'final':live?'live':'up',
+      a:side('home','🏆','Smash Society'), b:side('away','🌴','Timog Cal'),
+      score:fin?'<span class="w">4</span>–0':''})}
+    ${mcard({court:'Courts 3–6',status:fin?'final':'up',
+      a:side('home','💫','ZERO ZERO TWO'), b:side('away','🍌',"K'CHN"),
+      score:fin?'<span class="w">3</span>–1':''})}
+    ${mcard({court:'Courts 5–7',status:'up',
+      a:side('home','💥','Big Dink Energy'), b:side('away','🎯','What the Dink?!'),score:''})}
+  </div>`;
+}
+function rivWeek(){
+  return `<div class="mgrid">
+    ${mcard({court:'Courts 1–2',status:'up',a:side('home','🏆','#1 Smash Society',{seed:1}), b:side('away','💫','#2 ZERO ZERO TWO',{seed:1})})}
+    ${mcard({court:'Courts 3–6',status:'up',a:side('home','💥','#3 Big Dink Energy',{seed:1}), b:side('away','🍌',"#4 K'CHN",{seed:1})})}
+    ${mcard({court:'Courts 5–7',status:'up',a:side('home','🎯','#5 What the Dink?!',{seed:1}), b:side('away','🌴','#6 Timog Cal',{seed:1})})}
+  </div>
+  <p class="ph-note">Seeds shown reflect standings through Week 5 and lock when Week 5 finalizes.</p>`;
+}
+function poWeek(){
+  return `<div class="mgrid">
+    ${mcard({court:'Courts 1–2',phase:'po',status:'up',a:side('home','🔢','#1 Seed',{ph:1}), b:side('away','🔢','#4 Seed',{ph:1})})}
+    ${mcard({court:'Courts 3–6',phase:'po',status:'up',a:side('home','🔢','#2 Seed',{ph:1}), b:side('away','🔢','#3 Seed',{ph:1})})}
+    ${mcard({court:'Courts 5–7',phase:'po',status:'up',a:side('home','🔢','#5 Seed',{ph:1}), b:side('away','🔢','#6 Seed',{ph:1})})}
+  </div>
+  <p class="ph-note">Top-two games feed the Championship. Teams fill in automatically once Week 6 standings are final.</p>`;
+}
+function champWeek(){
+  return `<div class="champ-band"><span class="g">🥇 Gold / Silver Final</span></div>
+  <div class="mgrid" style="grid-template-columns:1fr;max-width:520px;">
+    ${mcard({court:'Center Court',phase:'champ',status:'up',a:side('home','🔢','Winner of #1/#4',{ph:1}), b:side('away','🔢','Winner of #2/#3',{ph:1})})}
+  </div>
+  <div class="champ-band" style="margin-top:22px;"><span class="b">🥉 Bronze Game</span></div>
+  <div class="mgrid" style="grid-template-columns:1fr;max-width:520px;">
+    ${mcard({court:'Courts 3–6',phase:'champ',status:'up',a:side('home','🔢','Loser of #1/#4',{ph:1}), b:side('away','🔢','Loser of #2/#3',{ph:1})})}
+  </div>
+  <p class="ph-note">Built from Week 7 results. Seeds #5 and #6 finish after Week 7.</p>`;
+}
+
+function weekBody(w){
+  if(w.phase==='riv')return rivWeek();
+  if(w.phase==='po')return poWeek();
+  if(w.phase==='champ')return champWeek();
+  return regWeek(w);
+}
+function weekBlock(w){
+  const lblcls=w.phase==='riv'?'riv':w.phase==='po'?'po':w.phase==='champ'?'champ':'';
+  return `<div class="wkhd">
+      <span class="wbadge ${lblcls}">Week ${w.n}${w.label?' · '+w.label:''}</span>
+      <span class="wdate">📅 ${w.date}</span>
+    </div>
+    <p class="wktime">⏰ 7:00 – 9:00 PM · Los Angeles</p>
+    ${weekBody(w)}`;
+}
+
+let cur=6;
+function sel2(n){cur=n;render();}
+function render(){
+  document.getElementById('pills').innerHTML=pills(cur);
+  const v=document.getElementById('weekview');
+  if(cur==='all'){
+    v.innerHTML=WEEKS.map(w=>`<div style="margin-bottom:34px;">${weekBlock(w)}</div>`).join('');
+  } else {
+    v.innerHTML=weekBlock(WEEKS.find(w=>w.n===cur));
+  }
+}
+render();
+</script>
+</body>
+</html>
