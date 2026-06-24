@@ -74,17 +74,23 @@
   }
 
   // ── Per-badge crest art ─────────────────────────────────────────
-  function crestSvg(kind, px, tone) {
+  function crestSvg(kind, px, tone, type) {
     px = px || 120;
     if (LOGOS[kind]) return logoCrest(kind, px, tone || (DEF[kind] && DEF[kind].tone) || 'gold', LOGOS[kind]);
     var id = uid(), F = 'url(#' + id + ')';
     switch (kind) {
-      case 'ladder':
-        return open(px) + ring(id, 'teal',
-          '<g transform="translate(60 40)" fill="' + F + '"><path d="M-15 7 L-15 -6 L-8 1 L0 -9 L8 1 L15 -6 L15 7 Z"/><rect x="-15" y="8" width="30" height="5" rx="1.5"/></g>' +
-          '<g transform="translate(60 78)" stroke="' + F + '" stroke-width="3" stroke-linecap="round">' +
-          '<line x1="-9" y1="-11" x2="-9" y2="13"/><line x1="9" y1="-11" x2="9" y2="13"/>' +
-          '<line x1="-9" y1="-5" x2="9" y2="-5"/><line x1="-9" y1="2" x2="9" y2="2"/><line x1="-9" y1="9" x2="9" y2="9"/></g>') + '</svg>';
+      case 'ladder': {
+        // Gendered "KING ME" (men) / "QUEEN ME" (women) — distinct crown per gender.
+        var fem = (type === 'womens' || type === 'F' || type === 'f');
+        var word = fem ? 'QUEEN' : 'KING';
+        var crwn = fem
+          ? '<g transform="translate(60 32)" fill="' + F + '"><path d="M-13 5 C-13 -3 -8 -3 -7 1 C-6 -6 -2 -8 0 -8 C2 -8 6 -6 7 1 C8 -3 13 -3 13 5 Z"/><rect x="-13" y="5" width="26" height="3.6" rx="1.6"/><circle cx="0" cy="-10" r="2.3"/></g>'
+          : '<g transform="translate(60 32) scale(0.9)" fill="' + F + '"><path d="M-14 6 L-14 -9 L-7 -1 L0 -12 L7 -1 L14 -9 L14 6 Z"/><rect x="-14" y="6" width="28" height="4" rx="1.5"/><circle cx="-14" cy="-11" r="2.1"/><circle cx="0" cy="-14" r="2.4"/><circle cx="14" cy="-11" r="2.1"/></g>';
+        return open(px) + ring(id, tone || 'teal',
+          crwn +
+          '<text x="60" y="66" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-style="italic" font-size="19" fill="' + F + '" letter-spacing="-0.5">' + word + '</text>' +
+          '<text x="60" y="88" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-style="italic" font-size="19" fill="' + F + '" letter-spacing="-0.5">ME</text>') + '</svg>';
+      }
       case 'champion':
         return open(px) + ring(id, 'gold',
           '<g transform="translate(60 56)" fill="' + F + '">' +
@@ -154,6 +160,8 @@
   function summarize(opts) {
     opts = opts || {};
     var CS = opts.currentSeason != null ? String(opts.currentSeason) : null;
+    // Player gender → 'mens' | 'womens' (drives KING ME / QUEEN ME on the ladder crest).
+    var GEN = (function (g) { g = String(g || '').toLowerCase(); return g[0] === 'f' ? 'womens' : g[0] === 'm' ? 'mens' : null; })(opts.gender);
     var items = [];
     // extra: { permanent:bool, season:string } — auto-derived badges default to the current season.
     function push(kind, title, meta, sortDate, extra) {
@@ -207,7 +215,7 @@
       if (Number(p.placeRank) === 1) {
         push('ladder', (p.name || 'Ladder Challenge') + ' — Champion',
           [fmtDate(p.date), (p.w != null ? p.w + 'W–' + p.l + 'L' : ''), 'finished #1'].filter(Boolean).join(' · '), p.date,
-          { domain: 'ladder' });
+          { domain: 'ladder', type: GEN });
       }
       if ((p.w || 0) > 0 && (p.l || 0) === 0) {
         push('undefeated', 'Undefeated Night',
@@ -269,7 +277,7 @@
     var it = marqueeItem(opts, domain);
     if (!it) return '';
     var label = (DEF[it.kind] && DEF[it.kind].label) || it.title;
-    return '<span class="dsb-clip" title="' + esc(label) + '">' + crestSvg(it.kind, 46, it.tone) + '</span>';
+    return '<span class="dsb-clip" title="' + esc(label) + '">' + crestSvg(it.kind, 46, it.tone, it.type) + '</span>';
   }
 
   function heroPills(opts, domain) {
@@ -295,7 +303,7 @@
     if (!s.total) return '';
     var crests = s.items.map(function (it) {
       return '<div class="dsb-case-item">' +
-        '<div class="dsb-crest">' + crestSvg(it.kind, 78, it.tone) + '</div>' +
+        '<div class="dsb-crest">' + crestSvg(it.kind, 78, it.tone, it.type) + '</div>' +
         '<div class="dsb-case-t">' + esc(it.title) + '</div>' +
         (it.meta ? '<div class="dsb-case-m">' + esc(it.meta) + '</div>' : '') +
         '</div>';

@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ladder Winner — KING ME / QUEEN ME — Dink Society</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,800;0,900;1,900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e0e0e;--surf:#161616;--bd:rgba(255,255,255,.08);--tx:#f0f0ec;--mut:#9a9e97;--teal:#17d7b0}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;padding:46px 20px 90px}
+  .wrap{width:min(100%,980px);margin:0 auto}
+  .eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--teal);margin-bottom:10px}
+  h1{font-size:clamp(1.8rem,1.2rem+2.5vw,2.8rem);font-weight:900;font-style:italic;text-transform:uppercase;line-height:1}
+  .sub{color:var(--mut);font-size:15px;margin-top:12px;max-width:64ch}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:40px}
+  @media(max-width:620px){.grid{grid-template-columns:1fr}}
+  .card{background:var(--surf);border:1px solid var(--bd);border-radius:18px;padding:24px 18px;display:flex;flex-direction:column;align-items:center;text-align:center}
+  .opt{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--teal);margin-bottom:16px}
+  .pair{display:flex;gap:26px;justify-content:center}
+  .one{display:flex;flex-direction:column;align-items:center;gap:9px}
+  .crest{width:100px;height:100px} .crest svg{width:100%;height:100%;display:block}
+  .av{position:relative;width:54px;height:54px;border-radius:50%;background:#b8ff2c;display:flex;align-items:center;justify-content:center;font-weight:900;color:#1f2a05;font-size:15px}
+  .av .clip{position:absolute;bottom:-3px;right:-5px;width:28px;height:28px}
+  .av .clip svg{width:100%;height:100%;filter:drop-shadow(0 2px 4px rgba(0,0,0,.55))}
+  .lbl{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mut)}
+  .name{font-size:13.5px;font-weight:800;margin-top:18px} .note{font-size:12px;color:var(--mut);margin-top:5px;line-height:1.45}
+  .foot{margin-top:32px;font-size:13px;color:var(--mut);background:var(--surf);border:1px solid var(--bd);border-left:3px solid var(--teal);border-radius:8px;padding:14px 18px;line-height:1.6}
+  .foot b{color:var(--tx)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Dink Society · Crest art</div>
+  <h1>Ladder Winner — KING / QUEEN ME</h1>
+  <p class="sub">Gendered wordmark crest: KING ME for the men's winner, QUEEN ME for the women's. No ladder. Teal. Each style shows both versions full-size + on an avatar.</p>
+  <div class="grid" id="grid"></div>
+  <div class="foot"><b>Pick a number.</b> When wired, the crest auto-picks KING vs QUEEN from the winner's division. Stacked (Option 1) is boldest when shrunk; Option 4 gives the queen a distinct tiara.</div>
+</div>
+<script>
+function tring(id, inner){
+  return `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <defs><radialGradient id="${id}" cx="50%" cy="38%" r="70%">
+      <stop offset="0%" stop-color="#7af2dc"/><stop offset="55%" stop-color="#17d7b0"/><stop offset="100%" stop-color="#0b8e74"/>
+    </radialGradient></defs>
+    <circle cx="60" cy="60" r="56" fill="#1a1a1a" stroke="url(#${id})" stroke-width="3"/>
+    <circle cx="60" cy="60" r="47" fill="none" stroke="rgba(23,215,176,.28)" stroke-width="1.5" stroke-dasharray="2 4"/>
+    ${inner}
+  </svg>`;
+}
+function kingCrown(id,cy,s){ s=s||1; return `<g transform="translate(60 ${cy}) scale(${s})" fill="url(#${id})"><path d="M-14 6 L-14 -9 L-7 -1 L0 -12 L7 -1 L14 -9 L14 6 Z"/><rect x="-14" y="6" width="28" height="4" rx="1.5"/><circle cx="-14" cy="-11" r="2.1"/><circle cx="0" cy="-14" r="2.4"/><circle cx="14" cy="-11" r="2.1"/></g>`; }
+function queenCrown(id,cy,s){ s=s||1; return `<g transform="translate(60 ${cy}) scale(${s})" fill="url(#${id})"><path d="M-13 5 C-13 -3 -8 -3 -7 1 C-6 -6 -2 -8 0 -8 C2 -8 6 -6 7 1 C8 -3 13 -3 13 5 Z"/><rect x="-13" y="5" width="26" height="3.6" rx="1.6"/><circle cx="0" cy="-10" r="2.3"/></g>`; }
+function txt(id,y,size,str){ return `<text x="60" y="${y}" text-anchor="middle" font-family="Inter" font-weight="900" font-style="italic" font-size="${size}" fill="url(#${id})" letter-spacing="-0.5">${str}</text>`; }
+function micro(id,y,str){ return `<text x="60" y="${y}" text-anchor="middle" font-family="Inter" font-weight="900" font-size="7.5" fill="url(#${id})" letter-spacing="1.8">${str}</text>`; }
+
+// styles: take (id, word) where word = 'KING' | 'QUEEN'; same crown for 1-3, gendered crown for 4.
+const STYLE = {
+  // 1 — crown + WORD / ME stacked
+  stack: (id,word) => kingCrown(id,32,0.9) + txt(id,66,19,word) + txt(id,88,19,'ME'),
+  // 2 — crown + "WORD ME" one line
+  line: (id,word) => kingCrown(id,40,1) + txt(id,82,(word==='QUEEN'?15:17),word+' ME'),
+  // 3 — crown + WORD/ME + LADDER CHALLENGE micro
+  micro: (id,word) => kingCrown(id,30,0.82) + txt(id,62,18,word) + txt(id,82,18,'ME') + micro(id,98,'LADDER CHALLENGE'),
+  // 4 — gendered crown (king spikes / queen tiara) + WORD/ME stacked
+  gendered: (id,word) => (word==='QUEEN'?queenCrown(id,32,1):kingCrown(id,32,0.9)) + txt(id,66,19,word) + txt(id,88,19,'ME')
+};
+const OPTS=[
+  {k:'stack',title:'Stacked wordmark',note:'KING/ME · QUEEN/ME. Biggest, boldest.'},
+  {k:'line',title:'One line',note:'Crown over a single line.'},
+  {k:'micro',title:'Wordmark + tagline',note:'Adds a "Ladder Challenge" line.'},
+  {k:'gendered',title:'Distinct crowns',note:'Spiked king crown vs rounded queen tiara.'}
+];
+const grid=document.getElementById('grid');
+OPTS.forEach((o,i)=>{
+  const c=document.createElement('div');c.className='card';
+  function unit(word,label,n){const a='s'+i+n+'a',b='s'+i+n+'b';
+    return `<div class="one"><div class="crest">${tring(a,STYLE[o.k](a,word))}</div>`
+      +`<div class="av">RH<div class="clip">${tring(b,STYLE[o.k](b,word))}</div></div><div class="lbl">${label}</div></div>`;}
+  c.innerHTML=`<div class="opt">Option ${i+1} · ${o.title}</div>
+    <div class="pair">${unit('KING','King Me · Men',0)}${unit('QUEEN','Queen Me · Women',1)}</div>
+    <div class="name">${o.title}</div><div class="note">${o.note}</div>`;
+  grid.appendChild(c);
+});
+</script>
+</body>
+</html>
