@@ -1196,11 +1196,22 @@
         } catch {}
         if (cfg) dsBadges.setConfig(cfg);
         const bopts = { awards: Array.isArray(pl.awards) ? pl.awards : [], grants, currentSeason: (circ || 'I'),
-          league: { w: pl.gamesWon || 0, l: pl.gamesLost || 0, gp: pl.gamesPlayed || row.gp || 0 } };
+          gender: pl.gender || row.gender || null,
+          league: { w: pl.gamesWon || 0, l: pl.gamesLost || 0, gp: pl.gamesPlayed || row.gp || 0, matchesPlayed: pl.matchesPlayed || 0 } };
         bg.innerHTML = '<div class="dsb-pills">' + dsBadges.heroPills(bopts) + '</div>';
         const av = document.querySelector('#psheet-body .ph-av');
         if (av) { const cr = dsBadges.avatarCrest(bopts); if (cr) { av.style.position = 'relative'; av.insertAdjacentHTML('beforeend', cr); } }
-        if (dsBadges.hasWins(bopts)) bg.insertAdjacentHTML('afterend', dsBadges.trophyCase(bopts));
+        if (dsBadges.hasWins(bopts)) {
+          const tabsEl = document.querySelector('#psheet-body .ph-tabs');
+          const ptPane = $('ph-pt');
+          if (tabsEl && ptPane) {
+            tabsEl.insertAdjacentHTML('beforeend', '<button class="ph-tab" data-pt="tr" onclick="phTab(\'tr\')">Trophies</button>');
+            ptPane.insertAdjacentHTML('afterend', '<div class="ph-pane" id="ph-tr"></div>');
+            const trPane = $('ph-tr'); if (trPane) trPane.innerHTML = dsBadges.trophyCase(bopts);
+          } else {
+            bg.insertAdjacentHTML('afterend', dsBadges.trophyCase(bopts));
+          }
+        }
       } else if (bg) {
         const aw = Array.isArray(pl.awards) ? pl.awards : [];
         bg.innerHTML = aw.length ? `<span class="ph-badge chef"><span class="kchn-mini"><b>K'CHN</b></span> ${aw.length > 1 ? aw.length + '× ' : ''}Top Chef</span>` : '';
