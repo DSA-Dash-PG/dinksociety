@@ -73,7 +73,7 @@ function firstName(name) {
  * function. Returns { week, label, winners: [{ winnerKey, gender, ...stats }] }
  * or null if there are no weekly performers yet.
  */
-export async function fetchLatestWinners(circuit = 'I') {
+export async function fetchLatestWinners(circuit = 'I', targetWeek = null) {
   const res = await fetch(`${siteUrl()}/.netlify/functions/public-leaderboard`, {
     headers: { 'Cache-Control': 'no-cache' },
   });
@@ -81,17 +81,20 @@ export async function fetchLatestWinners(circuit = 'I') {
   const data = await res.json();
   const wk = Array.isArray(data.weeklyTopPerformers) ? data.weeklyTopPerformers : [];
   if (!wk.length) return null;
-  // Highest week number present.
-  const latest = wk.reduce((a, b) => (Number(b.week) > Number(a.week) ? b : a));
+  // A specific past week if asked for, otherwise the highest week number present.
+  const entry = targetWeek != null
+    ? wk.find(e => Number(e.week) === Number(targetWeek))
+    : wk.reduce((a, b) => (Number(b.week) > Number(a.week) ? b : a));
+  if (!entry) return null;
   const winners = [];
   const take = (arr, key, gender) => {
     const w = Array.isArray(arr) ? arr[0] : null;
     if (w && w.name) winners.push({ winnerKey: key, gender, ...w });
   };
-  take(latest.men, 'men', 'M');
-  take(latest.women, 'women', 'F');
+  take(entry.men, 'men', 'M');
+  take(entry.women, 'women', 'F');
   if (!winners.length) return null;
-  return { week: Number(latest.week), label: latest.label || `Week ${latest.week}`, winners };
+  return { week: Number(entry.week), label: entry.label || `Week ${entry.week}`, winners };
 }
 
 // ── 2. recipient resolution from the teams blob (captain fallback) ───────────
@@ -327,10 +330,10 @@ function renderApprovalEmail({ week, items }) {
  * Idempotent: if the latest week was already prepared, it no-ops.
  * @returns {Promise<{ok:boolean, reason?:string, week?:number, count?:number}>}
  */
-export async function prepareWeeklyPotwApproval(circuit = 'I', { force = false, notify = true } = {}) {
+export async function prepareWeeklyPotwApproval(circuit = 'I', { force = false, notify = true, week = null } = {}) {
   const code = String(circuit);
-  const found = await fetchLatestWinners(code);
-  if (!found) return { ok: false, reason: 'no-winners' };
+  const found = await fetchLatestWinners(code, week);
+  if (!found) return { ok: false, reason: week != null ? 'no-winners-for-week' : 'no-winners', week: week != null ? Number(week) : undefined };
   const { week, label, winners } = found;
 
   const marker = await stateStore().get(markerKey(code, week), { type: 'json' }).catch(() => null);

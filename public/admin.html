@@ -1087,7 +1087,11 @@
             <div class="am-actions">
               <label class="drop-ck" id="potw-autosend-lbl" title="On: the Wednesday job sends both winners automatically. Off: drafts wait here for your Send."><input type="checkbox" id="potw-autosend"> Auto-send Wednesdays</label>
               <button class="ab ab--outline ab--sm" id="potw-sendall-btn">Send all ready</button>
-              <button class="ab ab--lime ab--sm" id="potw-generate-btn">✨ Draft this week</button>
+              <span class="potw-draftpast" title="Draft a specific past week (e.g. Week 1)">
+                <input type="number" id="potw-draft-week" min="1" max="20" placeholder="wk">
+                <button class="ab ab--outline ab--sm" id="potw-draftweek-btn">Draft week</button>
+              </span>
+              <button class="ab ab--lime ab--sm" id="potw-generate-btn" title="Draft the latest completed week">✨ Draft this week</button>
             </div>
           </div>
           <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:680px;">The weekly K'CHN Player of the Week congratulation emails. The Wednesday task drafts each winner from the stats; you review and <b>Send</b> here. Emails go out as <b>dink@dinksociety.app</b> and any reply lands in that inbox. Winners pick their shirt size with one tap and it shows up below.</p>
@@ -6045,15 +6049,27 @@
         else { alert('Could not send: '+((res.j&&(res.j.reason||res.j.error))||'unknown error')); btn.disabled=false; btn.textContent=old; }
       }).catch(function(e){ alert('Send failed: '+(e.message||e)); btn.disabled=false; btn.textContent=old; });
   }
-  function generatePotw(){
-    var b=$d('potw-generate-btn'); if(b){ b.disabled=true; b.textContent='Drafting…'; }
-    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'generate'})})
+  function generatePotw(week){
+    var past = (week!=null);
+    var b = past ? $d('potw-draftweek-btn') : $d('potw-generate-btn');
+    var label = past ? 'Draft week' : '✨ Draft this week';
+    if(b){ b.disabled=true; b.textContent='Drafting…'; }
+    var payload={action:'generate'}; if(past) payload.week=week;
+    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){ return r.json(); })
       .then(function(j){
-        if(b){ b.disabled=false; b.textContent='✨ Draft this week'; }
-        if(j&&j.ok){ renderPotw(); }
-        else { alert('Nothing to draft: '+((j&&j.result&&j.result.reason)||(j&&j.error)||'no new completed week with winners')); }
-      }).catch(function(e){ if(b){ b.disabled=false; b.textContent='✨ Draft this week'; } alert('Draft failed: '+(e.message||e)); });
+        if(b){ b.disabled=false; b.textContent=label; }
+        if(j&&j.ok){
+          var dw=$d('potw-draft-week'); if(past&&dw) dw.value='';
+          renderPotw();
+          if(j.result&&j.result.week!=null) openPotwWeek(j.result.week);
+        } else {
+          var reason=(j&&j.result&&j.result.reason)||(j&&j.error)||'no winners for that week';
+          if(reason==='no-winners-for-week') reason='no Player of the Week data for Week '+week+' yet';
+          if(reason==='no-winners') reason='no completed week with winners yet';
+          alert('Nothing to draft: '+reason+'.');
+        }
+      }).catch(function(e){ if(b){ b.disabled=false; b.textContent=label; } alert('Draft failed: '+(e.message||e)); });
   }
   function sendAllPotw(){
     if(POTW.week==null){ alert('Open a week first.'); return; }
@@ -6077,7 +6093,12 @@
   }
   function wirePotw(){
     POTW.wired=true;
-    var g=$d('potw-generate-btn'); if(g) g.addEventListener('click',generatePotw);
+    var g=$d('potw-generate-btn'); if(g) g.addEventListener('click',function(){ generatePotw(); });
+    var dw=$d('potw-draftweek-btn'); if(dw) dw.addEventListener('click',function(){
+      var v=parseInt(($d('potw-draft-week')||{value:''}).value,10);
+      if(!v||v<1){ alert('Enter a week number to draft (for example, 1).'); return; }
+      generatePotw(v);
+    });
     var sa=$d('potw-sendall-btn'); if(sa) sa.addEventListener('click',sendAllPotw);
     var ts=$d('potw-autosend'); if(ts) ts.addEventListener('change',function(){ toggleAutoSend(ts.checked, ts); });
   }
@@ -6159,6 +6180,8 @@
   .potw-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
   .potw-prevwrap { margin-top: 12px; }
   .potw-prev { width: 100%; height: 700px; border: 1px solid var(--color-border); border-radius: 8px; background: #0e0e0e; }
+  .potw-draftpast { display: inline-flex; align-items: center; gap: 6px; }
+  .potw-draftpast input { width: 52px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font-family: inherit; font-size: 13px; }
 </style>
 </body>
 </html>

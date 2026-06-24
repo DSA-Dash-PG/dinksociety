@@ -85,8 +85,10 @@ export default async (req) => {
     try { body = await req.json(); } catch { return json({ error: 'Invalid JSON' }, 400); }
 
     if (body.action === 'generate') {
-      // Silent draft of the latest completed week (no approval email).
-      const result = await prepareWeeklyPotwApproval(circuit, { force: true, notify: false });
+      // Silent draft (no approval email). Optional body.week drafts a specific
+      // past week; omitted = the latest completed week.
+      const week = (body.week != null && body.week !== '') ? Number(body.week) : null;
+      const result = await prepareWeeklyPotwApproval(circuit, { force: true, notify: false, week });
       return json({ ok: !!result.ok, result });
     }
 
