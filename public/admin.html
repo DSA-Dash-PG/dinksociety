@@ -436,6 +436,7 @@
       .tdp-jump button:active { background: var(--color-lime); color: var(--color-text-inverse); }
     }
   </style>
+  <script src="/badges.js"></script>
 </head>
 <body data-page="admin">
 
@@ -551,6 +552,10 @@
           <button class="sb__link" data-tab="potw">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></svg>
             Player of the Week <span class="sb__badge" id="sb-potw-ct" style="display:none;">0</span>
+          </button>
+          <button class="sb__link" data-tab="badges">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="6"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/></svg>
+            Badges
           </button>
           <button class="sb__link" data-tab="moments">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
@@ -1098,6 +1103,26 @@
               <span class="ac__s" id="potw-d-sub"></span>
             </div>
             <div id="potw-winners"><div class="loading">Loading…</div></div>
+          </div>
+        </section>
+
+        <section class="admin-section" data-section="badges">
+          <div class="am-head"><h1 class="am-title">Badges</h1><span class="ac__s">Player awards · crests, pills &amp; Trophy Case</span></div>
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Badge registry</h2><span class="ac__s">Enable · rename · recolor · reorder · logo</span></div>
+            <div id="bg-registry"><div class="loading">Loading…</div></div>
+            <div style="margin-top:14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+              <button id="bg-save" style="display:none;background:var(--color-lime);color:var(--color-text-inverse);border:0;border-radius:var(--radius-full);font:inherit;font-weight:800;font-size:13px;padding:9px 18px;cursor:pointer">Save changes</button>
+              <span id="bg-save-msg" style="font-size:12px;color:var(--color-text-faint)"></span>
+            </div>
+          </div>
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Grant an award</h2><span class="ac__s">Champion · Most Improved · Best Dressed</span></div>
+            <div id="bg-grant"><div class="loading">Loading…</div></div>
+          </div>
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Granted this season</h2><span class="ac__s" id="bg-grants-ct"></span></div>
+            <div id="bg-grants"><div class="loading">Loading…</div></div>
           </div>
         </section>
 
@@ -2385,6 +2410,7 @@
       if (t === 'messages') renderMessages();
       if (t === 'drop') renderDrop();
       if (t === 'potw') renderPotw();
+      if (t === 'badges') renderBadges();
       if (t === 'settings') { applySettings(); loadWaiverCompliance(); }
       if (t === 'moments') loadAdminGallery();
       if (t === 'activity') initActivityLog();
@@ -5768,6 +5794,161 @@
     var sv=$d('drop-save-btn'); if(sv) sv.addEventListener('click',saveDrop);
     var pb=$d('drop-publish-btn'); if(pb) pb.addEventListener('click',publishDropWeek);
     var pv=$d('drop-preview-btn'); if(pv) pv.addEventListener('click',function(){ if(DROP.week) window.open('/drop.html?week='+DROP.week+'&preview=1','_blank'); });
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // BADGES — registry config + manual award grants (admin-badges)
+  // ═══════════════════════════════════════════════════════════
+  var BG = { config: { badges: [] }, players: [], grants: {}, season: 'I' };
+  var BGIN = 'background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:8px;color:var(--color-text);font:inherit;font-size:13px;padding:8px 10px';
+  var BGLBL = 'font-size:11px;color:var(--color-text-faint);text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-top:6px';
+  function bgEsc(s){ return String(s==null?'':s).replace(/[<>&"]/g,function(m){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[m];}); }
+  function bgTone(sel){ return ['gold','teal','lime','violet','rose'].map(function(t){return '<option value="'+t+'"'+(t===sel?' selected':'')+'>'+t+'</option>';}).join(''); }
+
+  async function renderBadges(){
+    try {
+      var cRes = await api('/.netlify/functions/admin-badges?overview=1');
+      var pRes = await api('/.netlify/functions/admin-players');
+      var c = await cRes.json(); var p = await pRes.json();
+      BG.config = c.config || { badges: [] }; BG.grants = c.grants || {}; BG.season = c.season || 'I';
+      BG.players = (p.players || []).filter(function(x){ return !x.archived && x.playerId; });
+      if (window.dsBadges) dsBadges.setConfig(BG.config);
+      bgRenderRegistry(); bgRenderGrantForm(); bgRenderGrantsList();
+    } catch(e){ var el=$id('bg-registry'); if(el) el.innerHTML='<div class="empty">Could not load badges.</div>'; }
+  }
+
+  function bgRenderRegistry(){
+    var el=$id('bg-registry'); if(!el) return;
+    el.innerHTML = (BG.config.badges||[]).map(function(b){
+      return '<div class="bg-row" data-kind="'+b.kind+'" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--color-border);flex-wrap:wrap">'
+        +'<div class="bg-prev" style="width:44px;height:44px;flex:none">'+(window.dsBadges?dsBadges.crestSvg(b.kind,44):'')+'</div>'
+        +'<label style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer"><input type="checkbox" class="bg-en"'+(b.enabled!==false?' checked':'')+'>on</label>'
+        +'<input class="bg-label" value="'+bgEsc(b.label||'')+'" style="flex:1;min-width:120px;'+BGIN+'">'
+        +'<select class="bg-tone" style="'+BGIN+'">'+bgTone(b.tone)+'</select>'
+        +'<input class="bg-pri" type="number" value="'+(b.pri||0)+'" title="prestige — higher headlines the avatar" style="width:64px;'+BGIN+'">'
+        +'<button class="bg-logo" type="button" style="'+BGIN+';cursor:pointer;color:var(--color-text-muted)">Logo…</button>'
+        +'<input class="bg-logo-file" type="file" accept="image/png,image/webp,image/svg+xml,image/jpeg" style="display:none">'
+        +'</div>';
+    }).join('');
+    el.querySelectorAll('.bg-row').forEach(function(row){
+      var kind=row.dataset.kind;
+      function mark(){ $id('bg-save').style.display=''; bgUpdatePreview(row,kind); }
+      row.querySelector('.bg-en').addEventListener('change',mark);
+      row.querySelector('.bg-label').addEventListener('input',mark);
+      row.querySelector('.bg-tone').addEventListener('change',mark);
+      row.querySelector('.bg-pri').addEventListener('input',mark);
+      var file=row.querySelector('.bg-logo-file');
+      row.querySelector('.bg-logo').addEventListener('click',function(){ file.click(); });
+      file.addEventListener('change',function(){ if(file.files[0]) bgUploadLogo(kind,file.files[0],row); });
+    });
+    $id('bg-save').onclick = bgSaveConfig;
+  }
+
+  function bgUpdatePreview(row,kind){
+    if(!window.dsBadges) return;
+    dsBadges.setConfig({ badges:[{ kind:kind, label:row.querySelector('.bg-label').value, tone:row.querySelector('.bg-tone').value, pri:Number(row.querySelector('.bg-pri').value), enabled:row.querySelector('.bg-en').checked }] });
+    row.querySelector('.bg-prev').innerHTML = dsBadges.crestSvg(kind,44);
+  }
+
+  async function bgSaveConfig(){
+    var overrides={};
+    $id('bg-registry').querySelectorAll('.bg-row').forEach(function(row){
+      overrides[row.dataset.kind]={ label:row.querySelector('.bg-label').value, tone:row.querySelector('.bg-tone').value, pri:Number(row.querySelector('.bg-pri').value), enabled:row.querySelector('.bg-en').checked };
+    });
+    $id('bg-save-msg').textContent='Saving…';
+    try {
+      var r=await fetch('/.netlify/functions/admin-badges',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save-config',overrides:overrides})});
+      var d=await r.json();
+      if(d.ok){ BG.config=d.config; if(window.dsBadges)dsBadges.setConfig(d.config); $id('bg-save').style.display='none'; $id('bg-save-msg').textContent='Saved.'; bgRenderGrantForm(); }
+      else $id('bg-save-msg').textContent=d.error||'Save failed';
+    } catch(e){ $id('bg-save-msg').textContent='Save failed'; }
+  }
+
+  async function bgUploadLogo(kind,file,row){
+    var fd=new FormData(); fd.append('file',file); fd.append('kind',kind);
+    $id('bg-save-msg').textContent='Uploading logo…';
+    try {
+      var r=await fetch('/.netlify/functions/admin-badge-logo',{method:'POST',body:fd,credentials:'include'});
+      var d=await r.json();
+      if(d.ok){ BG.config=d.config; if(window.dsBadges){ dsBadges.setConfig(d.config); row.querySelector('.bg-prev').innerHTML=dsBadges.crestSvg(kind,44); } $id('bg-save-msg').textContent='Logo updated.'; }
+      else $id('bg-save-msg').textContent=d.error||'Upload failed';
+    } catch(e){ $id('bg-save-msg').textContent='Upload failed'; }
+  }
+
+  function bgTeams(){ var t={}; BG.players.forEach(function(p){ if(p.teamName)(t[p.teamName]=t[p.teamName]||[]).push(p); }); return t; }
+
+  function bgRenderGrantForm(){
+    var el=$id('bg-grant'); if(!el) return;
+    var manual=(BG.config.badges||[]).filter(function(b){ return b.manual; });
+    if(!manual.length){ el.innerHTML='<div class="empty">No manual awards configured.</div>'; return; }
+    var teams=bgTeams();
+    el.innerHTML='<div style="display:grid;gap:8px;max-width:580px">'
+      +'<label style="'+BGLBL+'">Award</label>'
+      +'<select id="bg-g-kind" style="'+BGIN+'">'+manual.map(function(b){return '<option value="'+b.kind+'">'+bgEsc(b.label)+'</option>';}).join('')+'</select>'
+      +'<div id="bg-g-opts" style="display:grid;gap:8px"></div>'
+      +'<label style="'+BGLBL+'">Give to</label>'
+      +'<div style="display:flex;gap:14px;font-size:13px"><label style="cursor:pointer"><input type="radio" name="bg-mode" value="player" checked> One player</label><label style="cursor:pointer"><input type="radio" name="bg-mode" value="team"> Whole team</label></div>'
+      +'<select id="bg-g-player" style="'+BGIN+'">'+BG.players.slice().sort(function(a,b){return a.name.localeCompare(b.name);}).map(function(p){return '<option value="'+p.playerId+'">'+bgEsc(p.name)+' — '+bgEsc(p.teamName||'')+'</option>';}).join('')+'</select>'
+      +'<select id="bg-g-team" style="display:none;'+BGIN+'">'+Object.keys(teams).sort().map(function(tn){return '<option value="'+bgEsc(tn)+'">'+bgEsc(tn)+' ('+teams[tn].length+')</option>';}).join('')+'</select>'
+      +'<label style="'+BGLBL+'">Date</label><input id="bg-g-date" type="date" value="'+new Date().toISOString().slice(0,10)+'" style="'+BGIN+'">'
+      +'<input id="bg-g-label" placeholder="Label (optional, e.g. Season 1)" style="'+BGIN+'">'
+      +'<button id="bg-g-go" style="margin-top:4px;background:var(--color-lime);color:var(--color-text-inverse);border:0;border-radius:var(--radius-full);font:inherit;font-weight:800;font-size:13px;padding:10px 18px;cursor:pointer">Grant award</button>'
+      +'<span id="bg-g-msg" style="font-size:12px;color:var(--color-text-faint)"></span></div>';
+
+    function renderOpts(){
+      var kind=$id('bg-g-kind').value; var b=manual.find(function(x){return x.kind===kind;})||{};
+      var h='';
+      if((b.scopes||[]).length>1) h+='<label style="'+BGLBL+'">When</label><select id="bg-g-scope" style="'+BGIN+'">'+b.scopes.map(function(s){return '<option value="'+s+'">'+s+'</option>';}).join('')+'</select>';
+      else if((b.scopes||[]).length===1) h+='<input id="bg-g-scope" type="hidden" value="'+b.scopes[0]+'">';
+      if(b.gendered) h+='<label style="'+BGLBL+'">Division</label><select id="bg-g-type" style="'+BGIN+'"><option value="mens">Men\'s</option><option value="womens">Women\'s</option></select>';
+      h+='<span id="bg-g-week-wrap" style="display:none;gap:8px"><label style="'+BGLBL+'">Week #</label><input id="bg-g-week" type="number" min="1" style="'+BGIN+'"></span>';
+      $id('bg-g-opts').innerHTML=h;
+      var sc=$id('bg-g-scope'); if(sc&&sc.tagName==='SELECT') sc.addEventListener('change',toggleWeek); toggleWeek();
+    }
+    function toggleWeek(){ var sc=$id('bg-g-scope'); var w=$id('bg-g-week-wrap'); if(w) w.style.display=(sc&&sc.value==='weekly')?'':'none'; }
+    $id('bg-g-kind').addEventListener('change',renderOpts); renderOpts();
+    el.querySelectorAll('input[name=bg-mode]').forEach(function(r){ r.addEventListener('change',function(){ var team=document.querySelector('input[name=bg-mode]:checked').value==='team'; $id('bg-g-player').style.display=team?'none':''; $id('bg-g-team').style.display=team?'':'none'; }); });
+    $id('bg-g-go').onclick=function(){ bgDoGrant(teams); };
+  }
+
+  async function bgDoGrant(teams){
+    var kind=$id('bg-g-kind').value;
+    var mode=document.querySelector('input[name=bg-mode]:checked').value;
+    var ids = mode==='team' ? (teams[$id('bg-g-team').value]||[]).map(function(p){return p.playerId;}).filter(Boolean) : [$id('bg-g-player').value];
+    if(!ids.length){ $id('bg-g-msg').textContent='Pick a recipient.'; return; }
+    var award={ kind:kind, date:$id('bg-g-date').value, label:($id('bg-g-label').value||null) };
+    var sc=$id('bg-g-scope'); if(sc) award.scope=sc.value;
+    var ty=$id('bg-g-type'); if(ty) award.type=ty.value;
+    var wk=$id('bg-g-week'); if(wk && award.scope==='weekly' && wk.value) award.week=Number(wk.value);
+    $id('bg-g-msg').textContent='Granting…';
+    try {
+      var r=await fetch('/.netlify/functions/admin-badges',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'grant',playerIds:ids,award:award})});
+      var d=await r.json();
+      if(d.ok){ $id('bg-g-msg').textContent='Granted to '+d.granted+' player'+(d.granted===1?'':'s')+'.'; renderBadges(); }
+      else $id('bg-g-msg').textContent=d.error||'Grant failed';
+    } catch(e){ $id('bg-g-msg').textContent='Grant failed'; }
+  }
+
+  function bgRenderGrantsList(){
+    var el=$id('bg-grants'); if(!el) return;
+    var byId={}; BG.players.forEach(function(p){ byId[p.playerId]=p; });
+    var pids=Object.keys(BG.grants||{}); var total=0; pids.forEach(function(pid){ total+=BG.grants[pid].length; });
+    var ct=$id('bg-grants-ct'); if(ct) ct.textContent= total? (total+' award'+(total===1?'':'s')) : '';
+    if(!pids.length){ el.innerHTML='<div class="empty">No awards granted yet this season.</div>'; return; }
+    el.innerHTML=pids.map(function(pid){
+      var pl=byId[pid]||{name:pid}; var arr=BG.grants[pid];
+      return '<div style="padding:10px 0;border-bottom:1px solid var(--color-border)"><div style="font-weight:700;font-size:13px;margin-bottom:6px">'+bgEsc(pl.name)+(pl.teamName?' <span style="color:var(--color-text-faint);font-weight:600">'+bgEsc(pl.teamName)+'</span>':'')+'</div>'
+        +arr.map(function(g){
+          var lbl=((BG.config.badges||[]).find(function(b){return b.kind===g.kind;})||{}).label||g.kind;
+          var extra=[g.scope,g.type==='womens'?'W':g.type==='mens'?'M':'',g.week?('wk'+g.week):'',g.label].filter(Boolean).join(' · ');
+          return '<div style="display:flex;align-items:center;gap:8px;font-size:12px;padding:3px 0"><span style="flex:1">'+bgEsc(lbl)+(extra?' <span style="color:var(--color-text-faint)">('+bgEsc(extra)+')</span>':'')+'</span><button data-pid="'+pid+'" data-gid="'+g.id+'" class="bg-revoke" style="background:var(--color-red-dim,rgba(255,92,71,.12));color:var(--color-red,#ff5c47);border:0;border-radius:6px;font:inherit;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer">Revoke</button></div>';
+        }).join('')+'</div>';
+    }).join('');
+    el.querySelectorAll('.bg-revoke').forEach(function(btn){ btn.addEventListener('click',function(){ bgRevoke(btn.dataset.pid,btn.dataset.gid); }); });
+  }
+
+  async function bgRevoke(pid,gid){
+    try { var r=await fetch('/.netlify/functions/admin-badges',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'revoke',playerId:pid,grantId:gid})}); var d=await r.json(); if(d.ok) renderBadges(); } catch(e){}
   }
 
   // ═══════════════════════════════════════════════════════════

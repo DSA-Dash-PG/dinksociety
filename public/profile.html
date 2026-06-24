@@ -54,6 +54,7 @@
 <div class="ov" id="ldOv"><div class="sheet"><button class="x" onclick="document.getElementById('ldOv').classList.remove('on')">×</button><div id="ldBody"></div></div></div>
 
 <script src="/ladder-profile-view.js"></script>
+<script src="/badges.js"></script>
 <script>
 const API='/.netlify/functions';
 const ICON_LADDER='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M4 20h5v-5h5v-5h5V5"/></svg>';
@@ -98,6 +99,24 @@ function render(j){
   if(ld&&!lg) h+='<div class="note" style="margin-top:13px;font-size:.74rem">Ladder-only profile. Links to a league profile automatically if they join with the same email.</div>';
   document.getElementById('root').innerHTML=h;
   window.__ld=ld;
+  try{ mountProfileBadges(j); }catch(e){}
+}
+
+async function mountProfileBadges(j){
+  if(!window.dsBadges) return;
+  const lg=j.league, ld=j.ladder, id=j.identity||{};
+  const circuit=(lg&&lg.circuit)||'I';
+  const pid=qp.get('leagueId')||id.leagueId||id.id||'';
+  let cfg=null, grants=[];
+  try{ const r=await fetch(`${API}/public-badges?circuit=${encodeURIComponent(circuit)}${pid?'&playerId='+encodeURIComponent(pid):''}`,{credentials:'include'}); if(r.ok){ const d=await r.json(); cfg=d.config; grants=d.grants||[]; } }catch(e){}
+  if(cfg) dsBadges.setConfig(cfg);
+  const opts={ awards:(lg&&lg.awards)||[], ladder:ld||null, grants, currentSeason:circuit };
+  const av=document.querySelector('#root .av');
+  if(av){ const cr=dsBadges.avatarCrest(opts); if(cr){ av.style.position='relative'; av.insertAdjacentHTML('beforeend',cr); } }
+  const nm=document.querySelector('#root .nm');
+  const pills=dsBadges.heroPills(opts);
+  if(nm&&pills) nm.insertAdjacentHTML('afterend','<div class="dsb-pills" style="margin-top:8px">'+pills+'</div>');
+  if(dsBadges.hasWins(opts)){ const root=document.getElementById('root'); if(root) root.insertAdjacentHTML('beforeend', dsBadges.trophyCase(opts)); }
 }
 
 function openLadder(){ if(!window.__ld)return; document.getElementById('ldBody').innerHTML=renderLadderCard(window.__ld); document.getElementById('ldOv').classList.add('on'); }

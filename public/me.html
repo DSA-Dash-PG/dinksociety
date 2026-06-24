@@ -12,6 +12,7 @@
 <script src="/js/short-name.js"></script>
 <script src="/js/live-poll.js"></script>
 <script src="/ladder-profile-view.js"></script>
+<script src="/badges.js"></script>
 <style>
   :root {
     --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626; --color-surface-4:#2e2e2e;
@@ -1187,7 +1188,19 @@
       if (ov) ov.innerHTML = _phOverview(row, pl);
       if (pt) pt.innerHTML = _phPartners(pl, d.partnerNames || {});
       const bg = $('ph-badges');
-      if (bg) {
+      if (bg && window.dsBadges) {
+        let cfg = null, grants = [];
+        try {
+          const br = await fetch(API + '/public-badges?circuit=' + encodeURIComponent(circ) + '&playerId=' + encodeURIComponent(pid), { credentials: 'include' });
+          if (br.ok) { const bd = await br.json(); cfg = bd.config; grants = bd.grants || []; }
+        } catch {}
+        if (cfg) dsBadges.setConfig(cfg);
+        const bopts = { awards: Array.isArray(pl.awards) ? pl.awards : [], grants, currentSeason: (circ || 'I') };
+        bg.innerHTML = '<div class="dsb-pills">' + dsBadges.heroPills(bopts) + '</div>';
+        const av = document.querySelector('#psheet-body .ph-av');
+        if (av) { const cr = dsBadges.avatarCrest(bopts); if (cr) { av.style.position = 'relative'; av.insertAdjacentHTML('beforeend', cr); } }
+        if (dsBadges.hasWins(bopts)) bg.insertAdjacentHTML('afterend', dsBadges.trophyCase(bopts));
+      } else if (bg) {
         const aw = Array.isArray(pl.awards) ? pl.awards : [];
         bg.innerHTML = aw.length ? `<span class="ph-badge chef"><span class="kchn-mini"><b>K'CHN</b></span> ${aw.length > 1 ? aw.length + '× ' : ''}Top Chef</span>` : '';
       }

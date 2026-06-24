@@ -28,6 +28,7 @@
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
   <script src="/js/short-name.js"></script>
+  <script src="/badges.js"></script>
   <style>
     /* ═══════════════════════════════════════
        PLAYER PROFILE — full-page layout
@@ -357,11 +358,13 @@
 
       // Combined profile: if this player also plays Ladder, wrap the league content
       // under League/Ladder tabs and make the hero rating follow the active tab.
+      let ladderData = null;
       try {
         const up = await fetch(`/.netlify/functions/public-profile?leagueId=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}`);
         if (up.ok) {
           const u = await up.json();
           if (u.found && u.ladder) {
+            ladderData = u.ladder;
             const L = u.ladder, root = document.getElementById('page-root'), hero = root.querySelector('.mlp-hero');
             if (hero) {
               const ordN = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); };
@@ -398,6 +401,43 @@
           }
         }
       } catch {}
+
+      try { await mountBadges(pStat, ladderData, resolvedId); } catch (e) {}
+    }
+
+    /* ─── Badges: avatar crest + hero pills + Trophy Case ──── */
+    async function mountBadges(stat, ladder, pid) {
+      if (!window.dsBadges) return;
+      let cfg = null, grants = [];
+      try {
+        const qs = `circuit=${encodeURIComponent(CIRCUIT)}${pid ? '&playerId=' + encodeURIComponent(pid) : ''}`;
+        const r = await fetch(`/.netlify/functions/public-badges?${qs}`);
+        if (r.ok) { const d = await r.json(); cfg = d.config; grants = d.grants || []; }
+      } catch {}
+      if (cfg) dsBadges.setConfig(cfg);
+      const opts = { awards: (stat && stat.awards) || [], ladder: ladder || null, grants, currentSeason: CIRCUIT };
+
+      // Avatar crest (marquee award)
+      const photo = document.querySelector('#page-root .mlp-photo');
+      if (photo) {
+        const crest = dsBadges.avatarCrest(opts);
+        if (crest) { photo.style.position = 'relative'; photo.insertAdjacentHTML('beforeend', crest); }
+      }
+      // Hero pills (alongside any captain pill)
+      const pillHtml = dsBadges.heroPills(opts);
+      if (pillHtml) {
+        let pills = document.querySelector('#page-root .pp-hero__pills');
+        if (!pills) {
+          const idEl = document.querySelector('#page-root .mlp-hero__id');
+          if (idEl) { pills = document.createElement('div'); pills.className = 'pp-hero__pills'; pills.style.marginTop = '10px'; idEl.appendChild(pills); }
+        }
+        if (pills) pills.insertAdjacentHTML('beforeend', pillHtml);
+      }
+      // Trophy Case — its own panel, only when the player has won something
+      if (dsBadges.hasWins(opts)) {
+        const root = document.getElementById('page-root');
+        if (root) { const sec = document.createElement('div'); sec.id = 'lane-trophy'; sec.innerHTML = dsBadges.trophyCase(opts); root.appendChild(sec); }
+      }
     }
 
     /* ─── Render ──────────────────────────────────────────── */
