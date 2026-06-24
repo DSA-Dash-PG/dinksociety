@@ -103,7 +103,7 @@
         return open(px) + ring(id, 'lime',
           '<path d="M60 32 l22 8 v18 c0 16-12 26-22 30 c-10-4-22-14-22-30 V40 z" fill="none" stroke="' + F + '" stroke-width="3.5"/>' +
           '<path d="M50 60 l7 8 14-16" fill="none" stroke="' + F + '" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>' +
-          '<text x="60" y="98" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="11" fill="' + F + '" letter-spacing="1">NO LOSSES</text>') + '</svg>';
+          '<text x="60" y="98" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="9.5" fill="' + F + '" letter-spacing="0.6">UNDEFEATED</text>') + '</svg>';
       case 'streak5':
       case 'streak10':
         var num = kind === 'streak10' ? '10' : '5';
@@ -134,7 +134,7 @@
 
   // pill icons
   var ICONS = {
-    potw: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M6 9a3 3 0 116 0 3 3 0 01-6 0zm6 0a3 3 0 116 0 3 3 0 01-6 0zM3 7a2 2 0 114 0 2 2 0 01-4 0zM5 13h14v6H5z"/></svg>',
+    potw: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M4 8l3.6 3.2L12 5l4.4 6.2L20 8l-1.4 10H5.4L4 8zm1.6 12h12.8v1.4H5.6V20z"/></svg>',
     ladder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M8 3v18M16 3v18M8 7h8M8 12h8M8 17h8"/></svg>',
     champion: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M5 4h14v3a5 5 0 01-5 5h-4A5 5 0 015 7zM4 5H2v1a4 4 0 004 4M20 5h2v1a4 4 0 01-4 4M9 13h6v4H9zM7 19h10v2H7z"/></svg>',
     undefeated: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l8 3v6c0 5-4 8-8 9-4-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg>',
@@ -171,6 +171,8 @@
         permanent: !!extra.permanent,
         type: extra.type || null,
         tone: extra.tone || null,
+        // count > 1 collapses repeats into one badge with a ×N pill (e.g. undefeated in N matches).
+        count: extra.count != null ? extra.count : 1,
         // 'league' | 'ladder' — which view a badge belongs to (for the hero crest +
         // pills, which are view-specific). null = show in both views.
         domain: extra.domain || null,
@@ -222,8 +224,11 @@
     } else {
       var lg = opts.league;
       if (lg && (lg.l || 0) === 0 && (lg.w || 0) > 0) {
+        // 0 losses → undefeated in every match played; show ×(matches) on the pill.
+        var nm = Number(lg.matchesPlayed || 0) || 1;
         push('undefeated', 'Undefeated',
-          [lg.w + '–0', 'perfect record'].join(' · '), '', { domain: 'league' });
+          [lg.w + '–0', nm + ' undefeated match' + (nm === 1 ? '' : 'es')].join(' · '), '',
+          { domain: 'league', count: nm });
       }
     }
 
@@ -258,7 +263,7 @@
     items.sort(function (a, b) { return (b.sortDate || '').localeCompare(a.sortDate || ''); });
 
     var counts = {};
-    items.forEach(function (it) { counts[it.kind] = (counts[it.kind] || 0) + 1; });
+    items.forEach(function (it) { counts[it.kind] = (counts[it.kind] || 0) + (it.count || 1); });
     return { total: items.length, counts: counts, items: items };
   }
 
@@ -303,7 +308,7 @@
     var items = itemsForDomain(s.items, domain);
     // one pill per distinct badge type, ordered by prestige, with ×N counts
     var counts = {};
-    items.forEach(function (it) { counts[it.kind] = (counts[it.kind] || 0) + 1; });
+    items.forEach(function (it) { counts[it.kind] = (counts[it.kind] || 0) + (it.count || 1); });
     var pri = function (k) { return DEF[k] ? DEF[k].pri : 0; };
     var kinds = Object.keys(counts).sort(function (a, b) { return pri(b) - pri(a); });
     return kinds.map(function (k) {
