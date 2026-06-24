@@ -163,6 +163,9 @@
         permanent: !!extra.permanent,
         type: extra.type || null,
         tone: extra.tone || null,
+        // 'league' | 'ladder' — which view a badge belongs to (for the hero crest +
+        // pills, which are view-specific). null = show in both views.
+        domain: extra.domain || null,
         season: extra.season != null ? String(extra.season) : CS
       });
     }
@@ -171,50 +174,56 @@
     // Permanent titles: Season Champion and season-end Most Improved (they headline the avatar forever).
     (Array.isArray(opts.grants) ? opts.grants : []).forEach(function (gr) {
       if (!gr || !DEF[gr.kind]) return;
+      // Admin-granted awards are league-side (judged on league play), so they
+      // headline the League view. A grant may override with gr.domain.
+      var gDomain = gr.domain || 'league';
       if (gr.kind === 'improved') {
         var weekly = gr.scope === 'weekly';
         var scope = weekly ? ('Week ' + (gr.week != null ? gr.week + ' ' : '')) : '';
         var sex = gr.type === 'womens' ? " (Women's)" : gr.type === 'mens' ? " (Men's)" : '';
         push('improved', scope + 'Most Improved' + sex, [gr.label, fmtDate(gr.date)].filter(Boolean).join(' · '), gr.date,
-          { permanent: !weekly, season: gr.season });
+          { permanent: !weekly, season: gr.season, domain: gDomain });
       } else if (gr.kind === 'champion') {
-        push('champion', gr.label || 'Season Champion', fmtDate(gr.date), gr.date, { permanent: true, season: gr.season });
+        push('champion', gr.label || 'Season Champion', fmtDate(gr.date), gr.date, { permanent: true, season: gr.season, domain: gDomain });
       } else if (gr.kind === 'bestdressed') {
         // Gendered by colour: men's = blue, women's = rose.
         push('bestdressed', gr.label || 'Best Dressed', fmtDate(gr.date), gr.date,
-          { season: gr.season, type: gr.type, tone: gr.type === 'womens' ? 'rose' : 'blue' });
+          { season: gr.season, type: gr.type, tone: gr.type === 'womens' ? 'rose' : 'blue', domain: gDomain });
       } else {
-        push(gr.kind, gr.label || DEF[gr.kind].label, fmtDate(gr.date), gr.date, { season: gr.season });
+        push(gr.kind, gr.label || DEF[gr.kind].label, fmtDate(gr.date), gr.date, { season: gr.season, domain: gDomain });
       }
     });
 
-    // POTW / Chef of the Week — one per award.
+    // POTW / Chef of the Week — league-side, one per award.
     (Array.isArray(opts.awards) ? opts.awards : []).forEach(function (a) {
       push('potw', 'Week ' + a.week + ' ' + (a.type === 'womens' ? "Women's" : "Men's") + ' Chef',
-        [fmtDate(a.date), (a.w != null ? a.w + 'W–' + a.l + 'L' : ''), (a.diff != null ? (a.diff >= 0 ? '+' : '') + a.diff + ' pt diff' : '')].filter(Boolean).join(' · '), a.date);
+        [fmtDate(a.date), (a.w != null ? a.w + 'W–' + a.l + 'L' : ''), (a.diff != null ? (a.diff >= 0 ? '+' : '') + a.diff + ' pt diff' : '')].filter(Boolean).join(' · '), a.date,
+        { domain: 'league' });
     });
 
-    // Ladder-derived awards.
+    // Ladder-derived awards — ladder-side.
     var per = (opts.ladder && Array.isArray(opts.ladder.perLadder)) ? opts.ladder.perLadder : [];
     per.forEach(function (p) {
       if (Number(p.placeRank) === 1) {
         push('ladder', (p.name || 'Ladder Challenge') + ' — Champion',
-          [fmtDate(p.date), (p.w != null ? p.w + 'W–' + p.l + 'L' : ''), 'finished #1'].filter(Boolean).join(' · '), p.date);
+          [fmtDate(p.date), (p.w != null ? p.w + 'W–' + p.l + 'L' : ''), 'finished #1'].filter(Boolean).join(' · '), p.date,
+          { domain: 'ladder' });
       }
       if ((p.w || 0) > 0 && (p.l || 0) === 0) {
         push('undefeated', 'Undefeated Night',
-          [fmtDate(p.date), (p.name ? esc(p.name) : ''), p.w + '–0'].filter(Boolean).join(' · '), p.date);
+          [fmtDate(p.date), (p.name ? esc(p.name) : ''), p.w + '–0'].filter(Boolean).join(' · '), p.date,
+          { domain: 'ladder' });
       }
     });
 
-    // Win-streak milestones (highest available streak across surfaces).
-    var streak = Math.max(
-      Number(opts.maxStreak || 0),
-      Number((opts.ladder && opts.ladder.maxStreak) || 0),
-      Number(opts.leagueStreak || 0)
-    );
-    if (streak >= 5) push('streak5', '5+ Win Streak', streak + ' in a row', '');
-    if (streak >= 10) push('streak10', '10+ Win Streak', streak + ' in a row', '');
+    // Win-streak milestones, tagged by where the streak came from so they show in
+    // the right view. (Most surfaces only supply one source.)
+    var ladderStreak = Number((opts.ladder && opts.ladder.maxStreak) || 0);
+    var leagueStreak = Math.max(Number(opts.leagueStreak || 0), Number(opts.maxStreak || 0));
+    if (ladderStreak >= 5) push('streak5', '5+ Win Streak', ladderStreak + ' in a row', '', { domain: 'ladder' });
+    if (ladderStreak >= 10) push('streak10', '10+ Win Streak', ladderStreak + ' in a row', '', { domain: 'ladder' });
+    if (leagueStreak >= 5) push('streak5', '5+ Win Streak', leagueStreak + ' in a row', '', { domain: 'league' });
+    if (leagueStreak >= 10) push('streak10', '10+ Win Streak', leagueStreak + ' in a row', '', { domain: 'league' });
 
     // drop any badge types the admin has disabled
     items = items.filter(function (it) { return !DISABLED[it.kind]; });
@@ -231,10 +240,17 @@
   // Avatar headline rule: permanent titles (Season Champion, season Most Improved) persist
   // forever; every other badge is only eligible during its own season. Among eligible badges,
   // highest prestige wins, ties broken by most recent.
-  function marqueeItem(opts) {
+  // Filter items to a view. domain 'league' | 'ladder' restricts to that view's
+  // badges (plus any untagged/shared ones); null/undefined returns everything.
+  function itemsForDomain(items, domain) {
+    if (!domain) return items;
+    return items.filter(function (it) { return it.domain === domain || it.domain == null; });
+  }
+
+  function marqueeItem(opts, domain) {
     var s = summarize(opts);
     var CS = opts.currentSeason != null ? String(opts.currentSeason) : null;
-    var cands = s.items.filter(function (it) {
+    var cands = itemsForDomain(s.items, domain).filter(function (it) {
       if (it.permanent) return true;        // titles always headline
       if (CS == null) return true;          // no season context → treat all as eligible
       if (it.season == null) return true;   // untagged → assume current
@@ -248,24 +264,29 @@
     return cands[0] || null;
   }
 
-  function avatarCrest(opts) {
+  function avatarCrest(opts, domain) {
     opts = opts || {};
-    var it = marqueeItem(opts);
+    var it = marqueeItem(opts, domain);
     if (!it) return '';
     var label = (DEF[it.kind] && DEF[it.kind].label) || it.title;
     return '<span class="dsb-clip" title="' + esc(label) + '">' + crestSvg(it.kind, 46, it.tone) + '</span>';
   }
 
-  function heroPills(opts) {
+  function heroPills(opts, domain) {
     var s = summarize(opts);
+    var items = itemsForDomain(s.items, domain);
     // one pill per distinct badge type, ordered by prestige, with ×N counts
-    var kinds = Object.keys(s.counts).sort(function (a, b) { return DEF[b].pri - DEF[a].pri; });
+    var counts = {};
+    items.forEach(function (it) { counts[it.kind] = (counts[it.kind] || 0) + 1; });
+    var pri = function (k) { return DEF[k] ? DEF[k].pri : 0; };
+    var kinds = Object.keys(counts).sort(function (a, b) { return pri(b) - pri(a); });
     return kinds.map(function (k) {
-      var n = s.counts[k];
-      var it = s.items.find(function (x) { return x.kind === k; });
+      var n = counts[k];
+      var it = items.find(function (x) { return x.kind === k; });
       var tone = (it && it.tone) || (DEF[k] && DEF[k].tone) || 'gold';
-      return '<span class="dsb-pill dsb-pill--' + tone + '" title="' + esc(DEF[k].label) + '">' +
-        (ICONS[k] || ICONS.potw) + esc(DEF[k].label) + (n > 1 ? ' <span class="dsb-x">×' + n + '</span>' : '') + '</span>';
+      var label = (DEF[k] && DEF[k].label) || k;
+      return '<span class="dsb-pill dsb-pill--' + tone + '" title="' + esc(label) + '">' +
+        (ICONS[k] || ICONS.potw) + esc(label) + (n > 1 ? ' <span class="dsb-x">×' + n + '</span>' : '') + '</span>';
     }).join('');
   }
 

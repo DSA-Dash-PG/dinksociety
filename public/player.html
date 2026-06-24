@@ -128,10 +128,10 @@
     .mlp-hero { border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: var(--space-4);
       background: linear-gradient(115deg, var(--color-surface) 0%, var(--color-surface-2) 100%); }
     .mlp-hero__top { display: flex; align-items: center; gap: 24px; padding: 28px 30px; }
-    .mlp-photo { width: 120px; height: 120px; flex-shrink: 0; border-radius: 50%; overflow: hidden;
+    .mlp-photo { position: relative; width: 120px; height: 120px; flex-shrink: 0; border-radius: 50%; overflow: visible;
       display: flex; align-items: center; justify-content: center; font-size: 44px; font-weight: 800; color: #fff;
       background: var(--ph, var(--color-teal)); border: 1px solid var(--color-border); }
-    .mlp-photo__img { width: 100%; height: 100%; object-fit: cover; }
+    .mlp-photo__img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
     .mlp-hero__id { flex: 1; min-width: 0; }
     .mlp-hero__eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; color: var(--color-text-faint); margin-bottom: 8px; }
     .mlp-hero__eyebrow a { color: var(--color-teal); text-decoration: none; font-weight: 700; }
@@ -356,58 +356,25 @@
 
       render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics);
 
-      // Combined profile: if this player also plays Ladder, wrap the league content
-      // under League/Ladder tabs and make the hero rating follow the active tab.
+      // Load badge data first (config + grants) so the tabs can show the right
+      // crest + pills per view, and house everything in a Trophy Case tab.
+      const badgeOpts = await loadBadgeOpts(pStat, resolvedId);
+
+      // Some players also play the Ladder — pull that profile if present.
       let ladderData = null;
       try {
         const up = await fetch(`/.netlify/functions/public-profile?leagueId=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}`);
-        if (up.ok) {
-          const u = await up.json();
-          if (u.found && u.ladder) {
-            ladderData = u.ladder;
-            const L = u.ladder, root = document.getElementById('page-root'), hero = root.querySelector('.mlp-hero');
-            if (hero) {
-              const ordN = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v-20)%10] || s[v] || s[0]); };
-              const dsrV = (ranks && ranks.dsr != null) ? Number(ranks.dsr).toFixed(1) : '—';
-              const dsrRank = [ranks && ranks.genderRank != null ? ('#' + ranks.genderRank + ' ' + (ranks.genderLabel || '').replace(' Ranking','')) : null, ranks && ranks.overallRank != null ? ('#' + ranks.overallRank + ' Overall') : null].filter(Boolean).join(' · ');
-              const drV = (L.dr == null ? '–' : L.dr), drRank = '#' + (L.rank || '–') + (L.mvp ? ' · ' + L.mvp + '× top' : '');
-              // Move existing league content (everything after the hero) into a League pane.
-              const leaguePane = document.createElement('div'); leaguePane.id = 'lane-league';
-              let nn = hero.nextSibling; while (nn) { const nx = nn.nextSibling; leaguePane.appendChild(nn); nn = nx; }
-              // Build the Ladder pane from u.ladder via the shared profile renderer.
-              const ladderPane = document.createElement('div'); ladderPane.id = 'lane-ladder'; ladderPane.style.display = 'none';
-              ladderPane.innerHTML = (window.ladderProfileBody ? window.ladderProfileBody(L) : '');
-              // Tab bar.
-              const tabs = document.createElement('div');
-              tabs.style.cssText = 'display:flex;gap:6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:9999px;padding:4px;margin:14px 0';
-              tabs.innerHTML = '<button id="tabL" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">League</button><button id="tabD" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">Ladder</button>';
-              root.appendChild(tabs); root.appendChild(leaguePane); root.appendChild(ladderPane);
-              const heroN = hero.querySelector('.mlp-hero__dsr-n'), heroLbl = hero.querySelector('.mlp-hero__dsr-lbl'), heroRk = hero.querySelector('.mlp-hero__dsr-rk');
-              const setTab = t => {
-                const lg = t === 'league';
-                document.getElementById('lane-league').style.display = lg ? '' : 'none';
-                document.getElementById('lane-ladder').style.display = lg ? 'none' : '';
-                const bL = document.getElementById('tabL'), bD = document.getElementById('tabD');
-                bL.style.background = lg ? '#17d7b0' : 'transparent'; bL.style.color = lg ? '#06231d' : 'var(--color-text-faint)';
-                bD.style.background = lg ? 'transparent' : '#b8ff2c'; bD.style.color = lg ? 'var(--color-text-faint)' : '#06210f';
-                if (heroN) { heroN.textContent = lg ? dsrV : drV; heroN.style.color = lg ? '#17d7b0' : '#b8ff2c'; }
-                if (heroLbl) heroLbl.textContent = lg ? 'League · DSR' : 'Ladder · DR';
-                if (heroRk) heroRk.textContent = lg ? dsrRank : drRank;
-              };
-              document.getElementById('tabL').onclick = () => setTab('league');
-              document.getElementById('tabD').onclick = () => setTab('ladder');
-              setTab('league');
-            }
-          }
-        }
+        if (up.ok) { const u = await up.json(); if (u.found && u.ladder) ladderData = u.ladder; }
       } catch {}
+      if (badgeOpts) badgeOpts.ladder = ladderData;
 
-      try { await mountBadges(pStat, ladderData, resolvedId); } catch (e) {}
+      try { buildProfileTabs(ladderData, badgeOpts, ranks); } catch (e) {}
     }
 
-    /* ─── Badges: avatar crest + hero pills + Trophy Case ──── */
-    async function mountBadges(stat, ladder, pid) {
-      if (!window.dsBadges) return;
+    /* ─── Badges + League / Ladder / Trophy Case tabs ──────── */
+    // Load badge config + grants and build the opts the renderers read.
+    async function loadBadgeOpts(stat, pid) {
+      if (!window.dsBadges) return null;
       let cfg = null, grants = [];
       try {
         const qs = `circuit=${encodeURIComponent(CIRCUIT)}${pid ? '&playerId=' + encodeURIComponent(pid) : ''}`;
@@ -415,29 +382,88 @@
         if (r.ok) { const d = await r.json(); cfg = d.config; grants = d.grants || []; }
       } catch {}
       if (cfg) dsBadges.setConfig(cfg);
-      const opts = { awards: (stat && stat.awards) || [], ladder: ladder || null, grants, currentSeason: CIRCUIT };
+      return { awards: (stat && stat.awards) || [], ladder: null, grants, currentSeason: CIRCUIT };
+    }
 
-      // Avatar crest (marquee award)
+    // Paint the avatar crest + hero pills for a view ('league' | 'ladder' | null = all).
+    function applyHeroBadges(opts, domain) {
+      if (!window.dsBadges || !opts) return;
       const photo = document.querySelector('#page-root .mlp-photo');
       if (photo) {
-        const crest = dsBadges.avatarCrest(opts);
+        const old = photo.querySelector('.dsb-clip'); if (old) old.remove();
+        const crest = dsBadges.avatarCrest(opts, domain);
         if (crest) { photo.style.position = 'relative'; photo.insertAdjacentHTML('beforeend', crest); }
       }
-      // Hero pills (alongside any captain pill)
-      const pillHtml = dsBadges.heroPills(opts);
-      if (pillHtml) {
-        let pills = document.querySelector('#page-root .pp-hero__pills');
-        if (!pills) {
-          const idEl = document.querySelector('#page-root .mlp-hero__id');
-          if (idEl) { pills = document.createElement('div'); pills.className = 'pp-hero__pills'; pills.style.marginTop = '10px'; idEl.appendChild(pills); }
-        }
-        if (pills) pills.insertAdjacentHTML('beforeend', pillHtml);
+      let pills = document.querySelector('#page-root .pp-hero__pills');
+      if (!pills) {
+        const idEl = document.querySelector('#page-root .mlp-hero__id');
+        if (idEl) { pills = document.createElement('div'); pills.className = 'pp-hero__pills'; pills.style.marginTop = '10px'; idEl.appendChild(pills); }
       }
-      // Trophy Case — its own panel, only when the player has won something
-      if (dsBadges.hasWins(opts)) {
-        const root = document.getElementById('page-root');
-        if (root) { const sec = document.createElement('div'); sec.id = 'lane-trophy'; sec.innerHTML = dsBadges.trophyCase(opts); root.appendChild(sec); }
+      if (pills) pills.innerHTML = dsBadges.heroPills(opts, domain) || '';
+    }
+
+    // Build the League / Ladder / Trophy Case tab bar. Tabs appear when there's
+    // more than one view to show (a Ladder profile and/or earned awards). The hero
+    // crest + pills follow the active view; the Trophy Case houses every award.
+    function buildProfileTabs(ladder, opts, ranks) {
+      const root = document.getElementById('page-root');
+      const hero = root && root.querySelector('.mlp-hero');
+      if (!hero) return;
+      const hasLadder = !!ladder;
+      const hasWins = !!(window.dsBadges && opts && dsBadges.hasWins(opts));
+      if (!hasLadder && !hasWins) { applyHeroBadges(opts, 'league'); return; }
+
+      // Move existing league content (everything after the hero) into a League pane.
+      const leaguePane = document.createElement('div'); leaguePane.id = 'lane-league';
+      let nn = hero.nextSibling; while (nn) { const nx = nn.nextSibling; leaguePane.appendChild(nn); nn = nx; }
+
+      let ladderPane = null;
+      if (hasLadder) {
+        ladderPane = document.createElement('div'); ladderPane.id = 'lane-ladder'; ladderPane.style.display = 'none';
+        ladderPane.innerHTML = (window.ladderProfileBody ? window.ladderProfileBody(ladder) : '');
       }
+      let trophyPane = null;
+      if (hasWins) {
+        trophyPane = document.createElement('div'); trophyPane.id = 'lane-trophy'; trophyPane.style.display = 'none';
+        trophyPane.innerHTML = dsBadges.trophyCase(opts);
+      }
+
+      const tabs = document.createElement('div');
+      tabs.style.cssText = 'display:flex;gap:6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:9999px;padding:4px;margin:14px 0';
+      const mkBtn = (id, label) => `<button id="${id}" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">${label}</button>`;
+      let btns = mkBtn('tabL', 'League');
+      if (hasLadder) btns += mkBtn('tabD', 'Ladder');
+      if (hasWins) btns += mkBtn('tabT', 'Trophy Case');
+      tabs.innerHTML = btns;
+      root.appendChild(tabs); root.appendChild(leaguePane);
+      if (ladderPane) root.appendChild(ladderPane);
+      if (trophyPane) root.appendChild(trophyPane);
+
+      const heroN = hero.querySelector('.mlp-hero__dsr-n'), heroLbl = hero.querySelector('.mlp-hero__dsr-lbl'), heroRk = hero.querySelector('.mlp-hero__dsr-rk');
+      const dsrV = (ranks && ranks.dsr != null) ? Number(ranks.dsr).toFixed(1) : '—';
+      const dsrRank = [ranks && ranks.genderRank != null ? ('#' + ranks.genderRank + ' ' + (ranks.genderLabel || '').replace(' Ranking', '')) : null, ranks && ranks.overallRank != null ? ('#' + ranks.overallRank + ' Overall') : null].filter(Boolean).join(' · ');
+      const drV = hasLadder ? (ladder.dr == null ? '–' : ladder.dr) : '';
+      const drRank = hasLadder ? ('#' + (ladder.rank || '–') + (ladder.mvp ? ' · ' + ladder.mvp + '× top' : '')) : '';
+
+      const style = (btn, active, color, fg) => { if (!btn) return; btn.style.background = active ? color : 'transparent'; btn.style.color = active ? fg : 'var(--color-text-faint)'; };
+      function setTab(t) {
+        const lg = t === 'league', ld = t === 'ladder', tr = t === 'trophy';
+        leaguePane.style.display = lg ? '' : 'none';
+        if (ladderPane) ladderPane.style.display = ld ? '' : 'none';
+        if (trophyPane) trophyPane.style.display = tr ? '' : 'none';
+        style(document.getElementById('tabL'), lg, '#17d7b0', '#06231d');
+        style(document.getElementById('tabD'), ld, '#b8ff2c', '#06210f');
+        style(document.getElementById('tabT'), tr, 'var(--color-gold, #f0c040)', '#241a02');
+        if (heroN) { heroN.textContent = ld ? drV : dsrV; heroN.style.color = ld ? '#b8ff2c' : '#17d7b0'; }
+        if (heroLbl) heroLbl.textContent = ld ? 'Ladder · DR' : 'League · DSR';
+        if (heroRk) heroRk.textContent = ld ? drRank : dsrRank;
+        // League/Ladder show that view's badges; Trophy Case shows the combined set.
+        applyHeroBadges(opts, tr ? null : (ld ? 'ladder' : 'league'));
+      }
+      document.getElementById('tabL').onclick = () => setTab('league');
+      if (hasLadder) document.getElementById('tabD').onclick = () => setTab('ladder');
+      if (hasWins) document.getElementById('tabT').onclick = () => setTab('trophy');
+      setTab('league');
     }
 
     /* ─── Render ──────────────────────────────────────────── */
@@ -450,9 +476,9 @@
       const fmtDsr  = d => (d != null ? Number(d).toFixed(1) : '—');
 
       /* ── HERO (MLP format) ── */
+      // Captain / Co-Captain now read as plain text in the meta line (see roleTxt),
+      // not as a pill. The pills row is reserved for earned award badges.
       const pills = [];
-      if (rp.isCaptain)   pills.push(`<span class="pp-pill pp-pill--captain">Captain</span>`);
-      if (rp.isCoCaptain) pills.push(`<span class="pp-pill pp-pill--captain" style="border-color:var(--color-teal);color:var(--color-teal);background:var(--color-teal-dim)">Co-Captain ⭐</span>`);
 
       // Photo (approved) or colored initials fallback.
       const avatarInner = rp.photoUrl
@@ -461,9 +487,11 @@
 
       // Meta line (team · gender · city) sits under the name; only non-empty parts.
       const genderTxt = rp.gender === 'F' ? 'Female' : rp.gender === 'M' ? 'Male' : '';
+      const roleTxt = rp.isCaptain ? 'Captain' : rp.isCoCaptain ? 'Co-Captain' : '';
       const metaLine = [
         `<a href="/team?id=${teamSlug}${LINK_SUFFIX}">${esc(team.name)}</a>${team.emoji ? ' ' + team.emoji : ''}`,
         genderTxt ? esc(genderTxt) : '',
+        roleTxt,
         rp.city ? esc(rp.city) : '',
       ].filter(Boolean).join(' · ');
 
