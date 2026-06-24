@@ -1195,8 +1195,15 @@
           if (br.ok) { const bd = await br.json(); cfg = bd.config; grants = bd.grants || []; }
         } catch {}
         if (cfg) dsBadges.setConfig(cfg);
+        // Pull this player's ladder profile too, so ladder badges (King/Queen Me,
+        // ladder streaks/undefeated) show alongside their league awards.
+        let ladderData = null;
+        try {
+          const up = await fetch(API + '/public-profile?leagueId=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' });
+          if (up.ok) { const u = await up.json(); if (u && u.found && u.ladder) ladderData = u.ladder; }
+        } catch {}
         const bopts = { awards: Array.isArray(pl.awards) ? pl.awards : [], grants, currentSeason: (circ || 'I'),
-          gender: pl.gender || row.gender || null,
+          gender: pl.gender || row.gender || null, ladder: ladderData,
           league: { w: pl.gamesWon || 0, l: pl.gamesLost || 0, gp: pl.gamesPlayed || row.gp || 0, matchesPlayed: pl.matchesPlayed || 0 } };
         bg.innerHTML = '<div class="dsb-pills">' + dsBadges.heroPills(bopts) + '</div>';
         const av = document.querySelector('#psheet-body .ph-av');
