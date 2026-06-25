@@ -31,6 +31,16 @@ export default async (req) => {
   const methods = Array.isArray(b.paymentMethods) && b.paymentMethods.length
     ? b.paymentMethods.filter(m => ['card', 'venmo', 'credit'].includes(m)) : ['card', 'venmo'];
 
+  // Play format (merged from the old PickleLadder create form):
+  // per-court names (top→bottom; index 0 = championship court), round count,
+  // round length, and scoring mode. The run-night engine defaults to these.
+  const courtNames = Array.isArray(b.courtNames)
+    ? b.courtNames.map(s => String(s).trim()).filter(Boolean).slice(0, 20)
+    : (existing?.courtNames || []);
+  const rounds = Number.isFinite(+b.rounds) && +b.rounds > 0 ? Math.min(20, Math.floor(+b.rounds)) : (existing?.rounds ?? 6);
+  const roundMin = Number.isFinite(+b.roundMin) && +b.roundMin > 0 ? Math.min(60, Math.floor(+b.roundMin)) : (existing?.roundMin ?? 12);
+  const scoreMode = ['points', 'winby2', 'to11', 'to15'].includes(b.scoreMode) ? b.scoreMode : (existing?.scoreMode || 'points');
+
   const event = {
     id,
     circuit: b.circuit || existing?.circuit || 'I',
@@ -40,9 +50,12 @@ export default async (req) => {
     endTime: b.endTime || existing?.endTime || '',
     place: b.place || existing?.place || '',
     courts,
-    // Optional free-text court numbers/labels (e.g. "Courts 5-7" or "1, 2, 3"),
-    // shown in reminders so players know exactly where to go.
-    courtNumbers: (b.courtNumbers != null ? String(b.courtNumbers).trim().slice(0, 60) : (existing?.courtNumbers || '')) || null,
+    courtNames,
+    rounds,
+    roundMin,
+    scoreMode,
+    // Display string derived from courtNames, shown in reminder emails.
+    courtNumbers: courtNames.length ? courtNames.join(' · ') : (existing?.courtNumbers || null),
     capacity,
     feeCents: Number.isFinite(feeCents) ? feeCents : 0,
     paymentMethods: methods,

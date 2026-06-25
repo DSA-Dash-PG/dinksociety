@@ -135,8 +135,13 @@
             <div><label class="l">Total players</label><input class="i" id="f-cap" type="number" value="12"></div>
             <div><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" value="7"></div>
           </div>
-          <div class="frow"><label class="l">Court numbers (optional)</label><input class="i" id="f-courts-list" placeholder="e.g. Courts 5–7  ·  or  1, 2, 3"></div>
-          <div class="help" style="margin:-6px 0 13px">Capacity auto-fills to courts × 4. Card adds a 10% service fee; Venmo is fee-free.</div>
+          <div class="frow row2">
+            <div><label class="l">Rounds</label><input class="i" id="f-rounds" type="number" value="6"></div>
+            <div><label class="l">Round time (min)</label><input class="i" id="f-roundmin" type="number" value="12"></div>
+            <div><label class="l">Scoring</label><select class="i" id="f-score"><option value="points">Points</option><option value="winby2">Win by 2</option><option value="to11">Games to 11</option><option value="to15">Rally to 15</option></select></div>
+          </div>
+          <div class="frow"><label class="l">Court names (top to bottom)</label><div id="f-courtnames" style="display:flex;flex-wrap:wrap;gap:8px"></div></div>
+          <div class="help" style="margin:-2px 0 13px">Pick Courts and the court-name boxes populate (A, B, C…) — rename to your real courts. Capacity auto-fills to courts × 4; card adds a 10% fee, Venmo is fee-free.</div>
           <div class="frow row2">
             <div><label class="l">League Venmo</label><input class="i" id="f-venmo" value="@DinkSociety"></div>
             <div><label class="l">Organizer emails (Venmo confirm)</label><input class="i" id="f-org" placeholder="you@email.com, treasurer@…"></div>
@@ -227,11 +232,16 @@
   <div class="frow"><label class="l">Location</label><input class="i" id="m-place"></div>
   <div class="frow"><label class="l">Division</label><select class="i" id="m-type"><option value="mixed">Mixed</option><option value="mens">Men's</option><option value="womens">Women's</option></select></div>
   <div class="frow row2">
-    <div><label class="l">Courts</label><input class="i" id="m-courts" type="number"></div>
+    <div><label class="l">Courts</label><input class="i" id="m-courts" type="number" oninput="renderCourtNames('m-courtnames', this.value)"></div>
     <div><label class="l">Total players</label><input class="i" id="m-cap" type="number"></div>
     <div><label class="l">Entry fee ($)</label><input class="i" id="m-fee" type="number" step="0.01"></div>
   </div>
-  <div class="frow"><label class="l">Court numbers (optional)</label><input class="i" id="m-courts-list" placeholder="e.g. Courts 5–7  ·  or  1, 2, 3"></div>
+  <div class="frow row2">
+    <div><label class="l">Rounds</label><input class="i" id="m-rounds" type="number"></div>
+    <div><label class="l">Round time (min)</label><input class="i" id="m-roundmin" type="number"></div>
+    <div><label class="l">Scoring</label><select class="i" id="m-score"><option value="points">Points</option><option value="winby2">Win by 2</option><option value="to11">Games to 11</option><option value="to15">Rally to 15</option></select></div>
+  </div>
+  <div class="frow"><label class="l">Court names (top to bottom)</label><div id="m-courtnames" style="display:flex;flex-wrap:wrap;gap:8px"></div></div>
   <div class="frow"><label class="l">League Venmo</label><input class="i" id="m-venmo"></div>
   <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
   <div id="mEditMsg"></div>
@@ -266,7 +276,20 @@ const fmt=c=>'$'+((Number(c)||0)/100%1===0?(Number(c)||0)/100:((Number(c)||0)/10
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 function seg(id){ const el=document.getElementById(id); const b=el.querySelector('button.on'); return b?b.dataset.v:el.querySelector('button').dataset.v; }
 document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(e.target.tagName==='BUTTON'){ s.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===e.target)); } }));
-function recalc(){ const c=parseInt(document.getElementById('f-courts').value)||0; document.getElementById('f-cap').value=c*4; }
+function defaultCourtName(i){ return String.fromCharCode(65+i); } // A, B, C…
+function renderCourtNames(containerId, count, values){
+  const c=document.getElementById(containerId); if(!c) return;
+  count=Math.max(0,Math.min(20,parseInt(count)||0));
+  const cur=Array.prototype.map.call(c.querySelectorAll('input'),x=>x.value);
+  let html='';
+  for(let i=0;i<count;i++){
+    const v=(values&&values[i]!=null&&values[i]!=='')?values[i]:(cur[i]!=null&&cur[i]!==''?cur[i]:defaultCourtName(i));
+    html+='<input class="i" style="flex:1;min-width:62px;text-align:center;font-weight:800" value="'+esc(v).replace(/"/g,'&quot;')+'" placeholder="'+defaultCourtName(i)+'">';
+  }
+  c.innerHTML=html;
+}
+function courtNamesOf(containerId){ const c=document.getElementById(containerId); if(!c) return []; return Array.prototype.map.call(c.querySelectorAll('input'),x=>x.value.trim()).filter(Boolean); }
+function recalc(){ const c=parseInt(document.getElementById('f-courts').value)||0; document.getElementById('f-cap').value=c*4; renderCourtNames('f-courtnames', c); }
 
 async function api(path,opts){ const r=await fetch(API+path,{credentials:'include',...opts}); let d={}; try{ d=await r.json(); }catch{} return {status:r.status,d}; }
 async function checkPayCfg(){
@@ -288,6 +311,7 @@ function ladSub(v){
   if(all) all.style.display=(v==='create')?'none':'';
   if(cr) cr.style.display=(v==='create')?'':'none';
   document.querySelectorAll('#ladSub button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));
+  if(v==='create') recalc(); // populate court-name boxes from the Courts count
 }
 function openDrawer(){ document.getElementById('side').classList.add('open'); document.getElementById('scrim').classList.add('on'); }
 function closeDrawer(){ const s=document.getElementById('side'); if(s) s.classList.remove('open'); const sc=document.getElementById('scrim'); if(sc) sc.classList.remove('on'); }
@@ -394,7 +418,10 @@ async function createLadder(){
     endTime:document.getElementById('f-end').value.trim(),
     place:document.getElementById('f-place').value.trim(),
     courts:parseInt(document.getElementById('f-courts').value)||0,
-    courtNumbers:document.getElementById('f-courts-list').value.trim(),
+    courtNames:courtNamesOf('f-courtnames'),
+    rounds:parseInt(document.getElementById('f-rounds').value)||6,
+    roundMin:parseInt(document.getElementById('f-roundmin').value)||12,
+    scoreMode:document.getElementById('f-score').value,
     capacity:parseInt(document.getElementById('f-cap').value)||0,
     fee:parseFloat(document.getElementById('f-fee').value)||0,
     venmoHandle:document.getElementById('f-venmo').value.trim(),
@@ -420,7 +447,8 @@ async function openManage(id){
   { const st=(d.event.status||'open'); const SC={open:'var(--lime)',live:'var(--gold)',final:'var(--teal)',cancelled:'var(--red)'}; const el=document.getElementById('statusLine'); if(el){ el.textContent=st.charAt(0).toUpperCase()+st.slice(1); el.style.color=SC[st]||'#9aa094'; } }
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
   setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-type',d.event.type||'mixed');
-  setv('m-courts',d.event.courts); setv('m-courts-list',d.event.courtNumbers||''); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
+  setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
+  setv('m-rounds',d.event.rounds||6); setv('m-roundmin',d.event.roundMin||12); setv('m-score',d.event.scoreMode||'points'); renderCourtNames('m-courtnames', d.event.courts, d.event.courtNames||[]);
   document.getElementById('mEditMsg').innerHTML='';
   let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
   h+= d.roster.length? d.roster.map(p=>{
@@ -482,7 +510,7 @@ async function saveEdit(){
   const body={
     id:CURRENT.id, circuit:CURRENT.circuit,
     name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(),
-    courts:parseInt(g('m-courts'))||0, courtNumbers:g('m-courts-list').trim(), capacity:parseInt(g('m-cap'))||0,
+    courts:parseInt(g('m-courts'))||0, courtNames:courtNamesOf('m-courtnames'), rounds:parseInt(g('m-rounds'))||6, roundMin:parseInt(g('m-roundmin'))||12, scoreMode:g('m-score'), capacity:parseInt(g('m-cap'))||0,
     feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(), type:g('m-type'),
     paymentMethods:CURRENT.paymentMethods, organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
     spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,

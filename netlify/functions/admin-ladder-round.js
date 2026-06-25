@@ -77,11 +77,15 @@ export default async (req) => {
   if (action === 'start') {
     const players = participants(signups);
     if (players.length < 4) return json({ error: 'Need at least 4 players on the roster to start.' }, 400);
-    const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || 6));
+    // Default the format from what was set at ladder creation (the merged form);
+    // an explicit value in the start request still wins.
+    const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || event.rounds || 6));
     const strength = await strengthFor(eventId, players);
     const r1 = genR1(players, event.courts || 1, strength);
-    const roundMin = Math.max(1, Math.min(60, parseInt(body.roundMin) || 12));
-    play = { eventId, date: event.date || null, config: { courts: event.courts || 1, rounds, roundMin, scoreMode: 'points' }, rounds: [r1], currentRound: 0, started: true, finished: false };
+    const roundMin = Math.max(1, Math.min(60, parseInt(body.roundMin) || event.roundMin || 12));
+    const scoreMode = body.scoreMode || event.scoreMode || 'points';
+    const courtNames = Array.isArray(event.courtNames) && event.courtNames.length ? event.courtNames : null;
+    play = { eventId, date: event.date || null, config: { courts: event.courts || 1, rounds, roundMin, scoreMode, courtNames }, rounds: [r1], currentRound: 0, started: true, finished: false };
     await setPlay(eventId, play);
     if (event.status === 'open') { event.status = 'live'; await setEvent(event); }
     return json({ ok: true, play });
