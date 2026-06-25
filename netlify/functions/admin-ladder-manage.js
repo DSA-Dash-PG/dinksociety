@@ -76,6 +76,25 @@ export default async (req) => {
   }
 
   if (action === 'promote') {
+    // Admin override: when a specific waitlist row is named (by index), move that
+    // person straight onto the roster now — bypassing capacity AND the held-claim
+    // flow (which is why the old "promote head into an open spot" did nothing on a
+    // full roster). Clears a matching held claim. Falls back to head-promote.
+    if (Number.isInteger(body.index) && signups.waitlist && signups.waitlist[body.index]) {
+      const w = signups.waitlist.splice(body.index, 1)[0];
+      if (signups.pendingClaim && (signups.pendingClaim.email || '').toLowerCase() === (w.email || '').toLowerCase()) {
+        signups.pendingClaim = null;
+      }
+      signups.roster = signups.roster || [];
+      signups.roster.push({
+        playerId: w.playerId || null, name: w.name, email: (w.email || '').toLowerCase(),
+        gender: w.gender || null, signedUpAt: new Date().toISOString(),
+        paymentMethod: null, paymentStatus: 'pending', amountCents: null,
+        checkoutSessionId: null, invitedBy: w.invitedBy || null, heldUntil: null,
+      });
+      await setSignups(signups);
+      return json({ ok: true, promoted: w.name });
+    }
     const r = await promoteAndNotify(event, signups);
     await setSignups(signups);
     return json({ ok: true, opened: r.opened });

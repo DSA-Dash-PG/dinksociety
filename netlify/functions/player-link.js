@@ -17,8 +17,9 @@ export default async (req) => {
     if (!consumed) return redirect('/me.html?error=invalid');
     const sessionId = await createPlayerSession({ playerId: consumed.playerId, teamId: consumed.teamId, email: consumed.email });
 
-    // Activity log: who's actually using the site (never throws, test teams skipped)
-    const team = await getStore('teams').get(`team/${consumed.teamId}.json`, { type: 'json' }).catch(() => null);
+    // Activity log: who's actually using the site (never throws, test teams skipped).
+    // Lite ladder-only accounts have no team (teamId null) — skip the team lookup.
+    const team = consumed.teamId ? await getStore('teams').get(`team/${consumed.teamId}.json`, { type: 'json' }).catch(() => null) : null;
     const rosterEntry = (team?.roster || []).find(p => p.id === consumed.playerId);
     await recordLogin({ email: consumed.email, role: 'player', name: rosterEntry?.name || null, team, playerId: consumed.playerId });
 

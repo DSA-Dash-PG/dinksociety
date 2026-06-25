@@ -451,7 +451,7 @@ async function openManage(id){
   setv('m-rounds',d.event.rounds||6); setv('m-roundmin',d.event.roundMin||12); setv('m-score',d.event.scoreMode||'points'); renderCourtNames('m-courtnames', d.event.courts, d.event.courtNames||[]);
   document.getElementById('mEditMsg').innerHTML='';
   let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
-  h+= d.roster.length? d.roster.map(p=>{
+  h+= d.roster.length? d.roster.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''))).map(p=>{
     const pay=p.paymentStatus==='paid'?`<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${p.paymentMethod||'?'}</span>`
       :p.paymentStatus==='venmo_pending'?'<span class="chip chip-gold">Venmo pending</span>':'<span class="chip chip-gray">pending</span>';
     const venmoBtns=p.paymentStatus==='venmo_pending'?`<button class="btn-out btn-sm" onclick="act('confirm-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Confirm</button> <button class="btn-danger" onclick="act('decline-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Decline</button>`:'';
@@ -460,7 +460,7 @@ async function openManage(id){
     return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} ${payEdit} ${linkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
   }).join(''):'<div class="empty">No signups yet.</div>';
   h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(d.pendingClaim?` · held: ${esc(d.pendingClaim.name)}`:'')+'</div>';
-  h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="act('promote','${esc(p.email)}','${esc(p.playerId||'')}')">Promote</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
+  h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="promoteWait(${i})">Promote</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
   document.getElementById('mBody').innerHTML=h;
   document.getElementById('mMsg').innerHTML='';
   { const pl=document.getElementById('ap-paylink'), pd=document.getElementById('ap-paid'); if(pl)pl.checked=false; if(pd)pd.checked=false; }
@@ -557,6 +557,11 @@ async function blastOpen(){
 async function act(action,email,playerId,method){
   if(!CURRENT)return;
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,email,playerId,method})});
+  if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
+}
+async function promoteWait(index){
+  if(!CURRENT)return;
+  const {status,d}=await api('\admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'promote',index})});
   if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
 }
 const PAY_METHODS=['cash','venmo','zelle','card','other'];

@@ -25,6 +25,34 @@ export default async (req) => {
   const ctx = verified.payload;
 
   const { playerId, teamId, team, player } = ctx;
+
+  // ── Teamless (lite) ladder-only account ──
+  // No team behind them, so there's no league schedule/roster/standing to load.
+  // Return a ladder-only payload; the portal's Ladder side is hydrated by
+  // me.html's own fetches (player-ladder-events / public-ladder-stats /
+  // public-badges). This MUST come before any team.* access below.
+  if (!team) {
+    const liteEmail = (player.email || '').toLowerCase();
+    const announcements = await getRelevantAnnouncements({ teamId: null, division: null, limit: 3, audiences: ['players'] }).catch(() => []);
+    return etagJson(req, {
+      profile: {
+        playerId, name: player.name, gender: player.gender || null,
+        teamId: null, teamName: null, teamEmoji: null,
+        division: null, divisionLabel: null, circuit: null,
+        isCaptain: false, isCoCaptain: false, isAdmin: isAdminEmail(ctx.session?.email || liteEmail),
+        lite: true,
+        bio: {}, pendingProfile: null, hasPhoto: false, photoUpdatedAt: null,
+      },
+      myTeams: [], currentTeamId: null,
+      stats: null, partnerNames: {},
+      leaderboard: [], pow: null, chefWeeks: [],
+      team: { standing: null, roster: [] },
+      schedule: [],
+      announcements,
+      waivers: [],
+    }, { cacheControl: PRIVATE });
+  }
+
   const circuit = circuitCode(team.circuit);
   const division = team.division || null;
 

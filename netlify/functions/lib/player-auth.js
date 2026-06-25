@@ -7,6 +7,7 @@ import { getStore } from '@netlify/blobs';
 import { normalizeEmail } from './identity.js';
 import { isTestTeam } from './circuit.js';
 import { getJSON } from './retry.js';
+import { getLiteByEmail, getLiteById } from './ladder-players.js';
 
 const COOKIE_NAME = 'ds_player_session';
 const SESSION_DAYS = 30;
@@ -91,6 +92,10 @@ export async function findPlayerByEmail(rawEmail) {
     );
     if (entry) return { playerId: entry.id, teamId: team.id, name: entry.name, team };
   }
+  // Not on any team roster — fall back to a "lite" ladder-only account. Teams
+  // always win (checked first), which is what makes migration-to-team seamless.
+  const lite = await getLiteByEmail(norm);
+  if (lite) return { playerId: lite.playerId, teamId: null, name: lite.name, team: null, lite: true };
   return null;
 }
 
@@ -128,6 +133,22 @@ export async function requirePlayer(req) {
     await sessionStore.delete(`session/${sessionId}.json`).catch(() => null);
     return null;
   }
+
+  // Teamless (lite) ladder-only account: resolve from the ladder-players store
+  // instead of a team roster. Email on the record must still match the session.
+  if (!session.teamId) {
+    const lite = await getLiteById(session.playerId);
+    if (!lite) return null;
+    const lEmail = normalizeEmail(lite.email);
+    if (lEmail && session.email && lEmail !== session.email) return null;
+    return {
+      session: { id: sessionId, email: session.email },
+      playerId: lite.playerId, teamId: null, team: null,
+      player: { id: lite.playerId, name: lite.name, email: lite.email, gender: lite.gender || null },
+      lite: true,
+    };
+  }
+
   const team = await getJSON(getStore('teams'), `team/${session.teamId}.json`).catch(() => null);
   if (!team?.roster) return null;
   // Confirm the player is still on this roster (by id, with matching email).

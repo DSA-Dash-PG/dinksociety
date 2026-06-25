@@ -46,6 +46,8 @@
   .login__sent { background:var(--color-teal-dim); border:1px solid rgba(23,215,176,0.3); color:var(--color-teal); border-radius:var(--radius-sm); padding:16px; font-size:13px; line-height:1.55; text-align:left; }
   .login__err { background:var(--color-red-dim); border:1px solid rgba(255,92,71,0.3); color:var(--color-red); border-radius:var(--radius-sm); padding:12px; font-size:12px; margin-bottom:14px; }
   .login__note { font-size:11px; color:var(--color-text-faint); margin-top:24px; line-height:1.5; }
+  .login__segbtn { flex:1; padding:11px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-2); color:var(--color-text-muted); font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .login__segbtn.on { background:var(--color-lime); border-color:var(--color-lime); color:var(--color-text-inverse); }
 
   /* app */
   /* ── Unified header (shared markup/CSS with captain.html — keep in sync) ── */
@@ -702,11 +704,24 @@
       <p class="login__p">Enter the email you signed up with and we'll send a one-tap link — no password.</p>
       <input class="login__in" id="login-email" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com">
       <button class="login__btn" id="login-btn">Send my magic link</button>
+      <p class="login__note" style="margin-top:16px">New here and not on a team? <a href="#" id="show-register" style="color:var(--color-lime)">Create a ladder account</a> to play ladders.</p>
+    </div>
+    <div id="login-register" class="hidden">
+      <h1 class="login__h">Create your account</h1>
+      <p class="login__p">For ladder players who aren't on a league team. We'll email you a one-tap sign-in link.</p>
+      <input class="login__in" id="reg-name" type="text" autocomplete="name" placeholder="Your name">
+      <input class="login__in" id="reg-email" type="email" inputmode="email" autocomplete="email" placeholder="you@email.com" style="margin-top:8px">
+      <div class="login__seg" id="reg-gender" style="display:flex;gap:8px;margin-top:8px">
+        <button type="button" class="login__segbtn" data-g="F">Women's</button>
+        <button type="button" class="login__segbtn" data-g="M">Men's</button>
+      </div>
+      <button class="login__btn" id="reg-btn" style="margin-top:12px">Create account &amp; send link</button>
+      <p class="login__note" style="margin-top:16px">Already have an account? <a href="#" id="show-login" style="color:var(--color-lime)">Sign in</a></p>
     </div>
     <div id="login-step2" class="hidden">
-      <div class="login__sent"><b>✉️ Check your inbox.</b><br>If that email is on a team roster, a one-tap sign-in link is on the way. It expires in 15 minutes.</div>
+      <div class="login__sent"><b>✉️ Check your inbox.</b><br>A one-tap sign-in link is on the way. It expires in 15 minutes.</div>
     </div>
-    <p class="login__note">Only emails on a team roster can sign in. On a roster but no link arrives? Ask your captain to add your email.</p>
+    <p class="login__note" id="login-foot">On a team roster but no link arrives? Ask your captain to add your email.</p>
   </div>
 
   <!-- APP -->
@@ -1409,7 +1424,7 @@
       sel.value = currentId;
       sel.addEventListener('change', e => switchPlayerTeam(e.target.value));
     } else {
-      el.textContent = p.teamName || '—';
+      el.textContent = p.teamName || (p.lite ? 'Ladder Player' : '—');
     }
   }
 
@@ -1447,6 +1462,34 @@
     }
   });
   $('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+
+  // ---- register (ladder-only / no team) ----
+  (function setupRegister() {
+    const show = (id) => { ['login-step1','login-register','login-step2'].forEach(s => $(s) && $(s).classList.add('hidden')); $(id).classList.remove('hidden'); };
+    const sr = $('show-register'), sl = $('show-login'), foot = $('login-foot');
+    if (sr) sr.addEventListener('click', e => { e.preventDefault(); $('login-err').classList.add('hidden'); show('login-register'); if (foot) foot.classList.add('hidden'); });
+    if (sl) sl.addEventListener('click', e => { e.preventDefault(); show('login-step1'); if (foot) foot.classList.remove('hidden'); });
+    let regGender = null;
+    document.querySelectorAll('#reg-gender .login__segbtn').forEach(b => b.addEventListener('click', () => {
+      document.querySelectorAll('#reg-gender .login__segbtn').forEach(x => x.classList.remove('on'));
+      b.classList.add('on'); regGender = b.dataset.g;
+    }));
+    const regBtn = $('reg-btn');
+    if (regBtn) regBtn.addEventListener('click', async () => {
+      const name = $('reg-name').value.trim();
+      const email = $('reg-email').value.trim();
+      if (!name || !email) { $('login-err').textContent = 'Name and email are required.'; $('login-err').classList.remove('hidden'); return; }
+      regBtn.disabled = true; regBtn.textContent = 'Creating…';
+      try {
+        await fetch(API + '/player-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, gender: regGender }) });
+        $('login-err').classList.add('hidden');
+        if (foot) foot.classList.add('hidden');
+        show('login-step2');
+      } catch (e) {
+        regBtn.disabled = false; regBtn.textContent = 'Create account & send link';
+      }
+    });
+  })();
 
   // ---- avatar drawer (mirrors captain.html drawer wiring) ----
   (function setupDrawer() {
@@ -2098,9 +2141,12 @@
     // hero + availability, your night, live, coming up, last result); "League" =
     // the season pulse (your tiles, Player of the Week, movers, team card).
     // Personal deep stats now live on their own "Me" tab.
-    const hasLadderTab = !!DATA.ladder || !!(DATA.ladderEvents && DATA.ladderEvents.registered && DATA.ladderEvents.registered.length);
+    const lite = !!(DATA.profile && DATA.profile.lite);
+    const hasLadderTab = !!DATA.ladder || !!(DATA.ladderEvents && DATA.ladderEvents.registered && DATA.ladderEvents.registered.length) || lite;
     let homeSeg = (() => { try { return localStorage.getItem('ds-home-seg') || 'week'; } catch { return 'week'; } })();
     if (homeSeg === 'ladder' && !hasLadderTab) homeSeg = 'week';
+    // Ladder-only accounts have no league side — default them to Ladder and hide League.
+    if (lite && (homeSeg === 'league' || homeSeg === 'week')) homeSeg = hasLadderTab ? 'ladder' : 'week';
     const ladderNights = (function () { try { return ladderNightsHtml(); } catch (e) { return ''; } })();
 
     // Next-up at the very top of This Week: if a registered ladder night is sooner
@@ -2119,12 +2165,12 @@
     const ladderHtml = hasLadderTab ? [ladderStat8(), ladderNights].map(x => x || '').join('') : '';
     const segHtml = `<div class="seg">
       <div class="seg__b ${homeSeg === 'week' ? 'is-active' : ''}" data-h="week">This Week</div>
-      <div class="seg__b ${homeSeg === 'league' ? 'is-active' : ''}" data-h="league">League</div>
+      ${lite ? '' : `<div class="seg__b ${homeSeg === 'league' ? 'is-active' : ''}" data-h="league">League</div>`}
       ${hasLadderTab ? `<div class="seg__b ${homeSeg === 'ladder' ? 'is-active' : ''}" data-h="ladder">Ladder</div>` : ''}
     </div>`;
     const html = mehead + announce + segHtml
       + `<div id="h-week" class="${homeSeg === 'week' ? '' : 'hidden'}">${weekHtml}</div>`
-      + `<div id="h-league" class="${homeSeg === 'league' ? '' : 'hidden'}">${leagueHtml}</div>`
+      + (lite ? '' : `<div id="h-league" class="${homeSeg === 'league' ? '' : 'hidden'}">${leagueHtml}</div>`)
       + (hasLadderTab ? `<div id="h-ladder" class="${homeSeg === 'ladder' ? '' : 'hidden'}">${ladderHtml}</div>` : '');
     $('v-home').innerHTML = html;
     $('v-home').querySelectorAll('.seg__b[data-h]').forEach(b => b.addEventListener('click', () => {
