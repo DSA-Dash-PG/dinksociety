@@ -2636,14 +2636,13 @@
     ].filter(Boolean).join(' · ');
 
     // Hero: photo (or initials), team eyebrow, name, Chef pill, big DSR.
-    const photoSrc = me.hasPhoto
-      ? `${API}/player-photo-serve?id=${encodeURIComponent(me.playerId)}&v=${encodeURIComponent(me.photoUpdatedAt || '')}`
-      : '';
-    const avatarInner = photoSrc ? `<img src="${esc(photoSrc)}" alt="">` : esc(initials(me.name));
+    // Always attempt the photo (404 → img removes itself, revealing initials).
+    const ini = esc(initials(me.name));
+    const photoUrl = `${API}/player-photo-serve?id=${encodeURIComponent(me.playerId)}` + (me.photoUpdatedAt ? `&v=${encodeURIComponent(me.photoUpdatedAt)}` : '');
+    const avatarInner = `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">${ini}</span><img src="${esc(photoUrl)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.remove()">`;
     const bopts = myBadgeOpts();
-    const meCrest = window.dsBadges ? dsBadges.avatarCrest(bopts) : '';
-    const mePills = window.dsBadges ? dsBadges.heroPills(bopts) : '';
-    const chefPill = mePills ? `<div class="dsb-pills" style="margin-top:9px">${mePills}</div>` : '';
+    const meCrest = window.dsBadges ? dsBadges.avatarCrest(bopts, 'league') : '';
+    const chefPill = `<div id="me-hero-pills" class="dsb-pills" style="margin-top:9px">${window.dsBadges ? dsBadges.heroPills(bopts, 'league') : ''}</div>`;
     const genderTxt = me.gender === 'F' ? 'Female' : me.gender === 'M' ? 'Male' : '';
     const roleTxt = me.isCaptain ? 'Captain' : me.isCoCaptain ? 'Co-Captain' : '';
     const metaLine = [
@@ -2657,7 +2656,7 @@
     const vitals = vitalDefs.map(([l, v]) => vital(l, v)).join('');
     const hero = `<div class="mlp-hero">
       <div class="mlp-hero__top">
-        <div class="mlp-photo" style="position:relative">${avatarInner}${meCrest}</div>
+        <div class="mlp-photo" style="position:relative;overflow:visible">${avatarInner}${meCrest}</div>
         <div class="mlp-hero__id">
           <div class="mlp-hero__name">${esc(me.name)}</div>
           <div class="mlp-hero__meta">${metaLine}</div>
@@ -2676,10 +2675,10 @@
     const seg = `<div class="seg">
       <div class="seg__b ${meSeg === 'stats' ? 'is-active' : ''}" data-me="stats">Stats</div>
       <div class="seg__b ${meSeg === 'partners' ? 'is-active' : ''}" data-me="partners">Partners</div>
-      ${hasTrophies ? `<div class="seg__b ${meSeg === 'trophies' ? 'is-active' : ''}" data-me="trophies">Trophies</div>` : ''}
     </div>`;
 
-    // ── Stats sub-tab ──
+    // ── 8-box (always visible, outside sub-tabs) + Stats/Partners detail ──
+    let league8box = '';
     let statsBody;
     if (!s || !s.gamesPlayed) {
       statsBody = `<div class="pending"><div class="pending__i">📊</div>
@@ -2694,8 +2693,9 @@
       const apd = gsum ? wsum / gsum : null;
       const avgScore = s.gamesPlayed ? (s.ps / s.gamesPlayed).toFixed(1) : '—';
       const diff = s.diff ?? ((s.ps ?? 0) - (s.pa ?? 0));
-      // 8 boxes, 2 rows of 4 — same layout as the Ladder view (sb8 helper).
-      let body = `<div class="label">Current season stats</div>`
+      // 8 boxes, 2 rows of 4 — rendered at the top of the League lane (outside the
+      // Stats/Partners sub-tabs) so it's always visible, matching the Ladder view.
+      league8box = `<div class="label">Current season stats</div>`
         + sb8([
           [`${s.gamesWon}–${s.gamesLost}`, 'Record', ''],
           [avgScore, 'Avg Score', ''],
@@ -2706,6 +2706,7 @@
           [`${diff >= 0 ? '+' : ''}${diff}`, 'Diff', diff >= 0 ? 'var(--color-lime)' : 'var(--color-red)'],
           [ptPct != null ? ptPct + '%' : '—', 'Pts Won %', 'var(--color-teal)'],
         ]);
+      let body = '';
       const bt = s.byType || {};
       const rows = [['womens', "Gender (Women's)"], ['mens', "Gender (Men's)"], ['mixed', 'Mixed']].filter(([k]) => (bt[k]?.played || 0) > 0);
       if (rows.length) {
@@ -2750,55 +2751,67 @@
       }).join('') + `<div class="ptot"><span>Total</span><span>${totW}–${totP - totW} <b>${wpct(totW, totP)}%</b></span></div>`;
     }
 
-    const trophiesBody = window.dsBadges ? (dsBadges.trophyCase(bopts) || '<div class="muted" style="padding:16px 4px;">No badges yet — win a Player of the Week, ladder night, and more to fill your Trophies.</div>') : '';
-    const leagueInner = seg
+    // League lane: 8-box (always) + Stats/Partners detail sub-tabs.
+    const leagueInner = league8box + seg
       + `<div id="me-stats" class="${meSeg === 'stats' ? '' : 'hidden'}">${statsBody}</div>`
-      + `<div id="me-partners" class="${meSeg === 'partners' ? '' : 'hidden'}">${partnersBody}</div>`
-      + `<div id="me-trophies" class="${meSeg === 'trophies' ? '' : 'hidden'}">${trophiesBody}</div>`;
+      + `<div id="me-partners" class="${meSeg === 'partners' ? '' : 'hidden'}">${partnersBody}</div>`;
 
     const L = DATA.ladder;
+    const trophyHtml = window.dsBadges ? (dsBadges.trophyCase(bopts) || '<div class="muted" style="padding:16px 4px;">No badges yet — earn awards to fill your Trophies.</div>') : '';
+
     const bindSeg = () => {
       $('v-stats').querySelectorAll('.seg__b[data-me]').forEach(b => b.addEventListener('click', () => {
         meSeg = b.dataset.me;
         $('v-stats').querySelectorAll('.seg__b[data-me]').forEach(x => x.classList.toggle('is-active', x === b));
         $('me-stats').classList.toggle('hidden', meSeg !== 'stats');
         $('me-partners').classList.toggle('hidden', meSeg !== 'partners');
-        const _tr = $('me-trophies'); if (_tr) _tr.classList.toggle('hidden', meSeg !== 'trophies');
         window.scrollTo(0, 0);
       }));
     };
 
-    if (!L) {
-      $('v-stats').innerHTML = hero + leagueInner;
+    // No Ladder and no Trophies → single League view (no top tabs).
+    if (!L && !hasTrophies) {
+      $('v-stats').innerHTML = hero + `<div id="lane-league">${leagueInner}</div>`;
       bindSeg();
       return;
     }
 
-    // Combined: this player also plays Ladder → League/Ladder tabs + dual-rating hero.
-    const ladderPane = `<div id="lane-ladder" class="hidden">` + (window.ladderProfileBody ? window.ladderProfileBody(L) : '') + `</div>`;
+    // Top-level lanes: League | Ladder | Trophies (Trophies spans both views).
+    const ladderPane = L ? `<div id="lane-ladder" class="hidden">` + (window.ladderProfileBody ? window.ladderProfileBody(L) : '') + `</div>` : '';
+    const trophyPane = hasTrophies ? `<div id="lane-trophy" class="hidden">${trophyHtml}</div>` : '';
+    const mkBtn = (id, label) => `<button id="${id}" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">${label}</button>`;
     const tabs = `<div id="lane-tabs" style="display:flex;gap:6px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:9999px;padding:4px;margin:14px 0">`
-      + `<button id="tabL" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">League</button>`
-      + `<button id="tabD" style="flex:1;padding:9px;border:0;border-radius:9999px;font:inherit;font-size:13.5px;font-weight:800;cursor:pointer">Ladder</button></div>`;
+      + mkBtn('tabL', 'League') + (L ? mkBtn('tabD', 'Ladder') : '') + (hasTrophies ? mkBtn('tabT', 'Trophies') : '') + `</div>`;
 
-    $('v-stats').innerHTML = hero + tabs + `<div id="lane-league">${leagueInner}</div>` + ladderPane;
+    $('v-stats').innerHTML = hero + tabs + `<div id="lane-league">${leagueInner}</div>` + ladderPane + trophyPane;
     bindSeg();
 
     const dsrV = fmtDsr(s?.composite), dsrRank = rankLine || '';
-    const drV = (L.dr == null ? '–' : L.dr), drRank = '#' + (L.rank || '–') + (L.mvp ? ' · ' + L.mvp + '× top' : '');
+    const drV = (L && L.dr != null) ? L.dr : '–', drRank = L ? ('#' + (L.rank || '–') + (L.mvp ? ' · ' + L.mvp + '× top' : '')) : '';
     const heroN = $('v-stats').querySelector('.mlp-hero__dsrN'), heroLbl = $('v-stats').querySelector('.mlp-hero__dsrL'), heroRk = $('v-stats').querySelector('.mlp-hero__rk');
-    const setTab = t => {
-      const lg = t === 'league';
-      $('lane-league').classList.toggle('hidden', !lg);
-      $('lane-ladder').classList.toggle('hidden', lg);
-      const bL = $('tabL'), bD = $('tabD');
-      bL.style.background = lg ? 'var(--color-teal)' : 'transparent'; bL.style.color = lg ? '#06231d' : 'var(--color-text-faint)';
-      bD.style.background = lg ? 'transparent' : 'var(--color-lime)'; bD.style.color = lg ? 'var(--color-text-faint)' : '#06210f';
-      if (heroN) { heroN.textContent = lg ? dsrV : drV; heroN.style.color = lg ? 'var(--color-teal)' : 'var(--color-lime)'; }
-      if (heroLbl) heroLbl.textContent = lg ? 'League · DSR' : 'Ladder · DR';
-      if (heroRk) heroRk.textContent = lg ? dsrRank : drRank;
+    const photoEl = $('v-stats').querySelector('.mlp-photo');
+    const updateHeroBadges = (dom) => {
+      const pillsEl = document.getElementById('me-hero-pills');
+      if (pillsEl && window.dsBadges) pillsEl.innerHTML = dsBadges.heroPills(bopts, dom);
+      if (photoEl && window.dsBadges) { const old = photoEl.querySelector('.dsb-clip'); if (old) old.remove(); const cr = dsBadges.avatarCrest(bopts, dom); if (cr) photoEl.insertAdjacentHTML('beforeend', cr); }
     };
-    $('tabL').addEventListener('click', () => setTab('league'));
-    $('tabD').addEventListener('click', () => setTab('ladder'));
+    const styleBtn = (b, on, bg, fg) => { if (!b) return; b.style.background = on ? bg : 'transparent'; b.style.color = on ? fg : 'var(--color-text-faint)'; };
+    const setTab = t => {
+      const lg = t === 'league', ld = t === 'ladder', tr = t === 'trophy';
+      $('lane-league').classList.toggle('hidden', !lg);
+      if ($('lane-ladder')) $('lane-ladder').classList.toggle('hidden', !ld);
+      if ($('lane-trophy')) $('lane-trophy').classList.toggle('hidden', !tr);
+      styleBtn($('tabL'), lg, 'var(--color-teal)', '#06231d');
+      styleBtn($('tabD'), ld, 'var(--color-lime)', '#06210f');
+      styleBtn($('tabT'), tr, 'var(--color-gold, #f0c040)', '#241a02');
+      if (heroN) { heroN.textContent = ld ? drV : dsrV; heroN.style.color = ld ? 'var(--color-lime)' : 'var(--color-teal)'; }
+      if (heroLbl) heroLbl.textContent = ld ? 'Ladder · DR' : 'League · DSR';
+      if (heroRk) heroRk.textContent = ld ? drRank : dsrRank;
+      updateHeroBadges(tr ? null : (ld ? 'ladder' : 'league'));
+    };
+    if ($('tabL')) $('tabL').addEventListener('click', () => setTab('league'));
+    if ($('tabD')) $('tabD').addEventListener('click', () => setTab('ladder'));
+    if ($('tabT')) $('tabT').addEventListener('click', () => setTab('trophy'));
     setTab('league');
   }
 
