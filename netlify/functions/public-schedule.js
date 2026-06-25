@@ -10,6 +10,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { shouldHideTestRecord } from './lib/test-data.js';
+import { buildBracketWeeks, resolveBracketDisplay } from './lib/bracket.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -33,59 +34,55 @@ export default async (req) => {
 
     if (schedBlobs.length > 0) {
       const weekMap = {};
+      // Per-division raw data so we can seed the Wk6–8 bracket (Rivalry /
+      // Playoffs / Championship) off round-robin results.
+      const realByDiv = {};        // division → [round-robin match (raw, with .week)]
+      const bracketByDiv = {};     // division → [bracket placeholder match (raw, with .week)]
+      const teamsByDiv = {};       // division → Map(id → {id,name})
+
       for (const b of schedBlobs) {
         const data = await schedStore.get(b.key, { type: 'json' }).catch(() => null);
         if (!data?.matches) continue;
         if (data.circuit && data.circuit !== circuitLetter) continue; // season isolation
         if (divisionFilter && data.division !== divisionFilter) continue;
 
+        const div = data.division;
         const w = data.week || 1;
-        if (!weekMap[w]) weekMap[w] = { week: w, division: data.division, matches: [] };
         for (const m of data.matches) {
-          // Total games won across both rounds (available once finalized).
-          const gamesA = (m.round1?.homeGames ?? 0) + (m.round2?.homeGames ?? 0);
-          const gamesB = (m.round1?.awayGames ?? 0) + (m.round2?.awayGames ?? 0);
+          const raw = { ...m, week: w, division: div };
+          if (m.phase) {
+            (bracketByDiv[div] ||= []).push(raw);    // persisted bracket placeholder/locked
+          } else {
+            (realByDiv[div] ||= []).push(raw);
+            const tm = (teamsByDiv[div] ||= new Map());
+            if (m.teamA?.id) tm.set(m.teamA.id, { id: m.teamA.id, name: m.teamA.name });
+            if (m.teamB?.id) tm.set(m.teamB.id, { id: m.teamB.id, name: m.teamB.name });
+            pushPublicMatch(weekMap, w, div, m, emojiById);
+          }
+        }
+      }
 
-          weekMap[w].matches.push({
-            id: m.id,
-            teamA: m.teamA?.name || 'TBD',
-            teamB: m.teamB?.name || 'TBD',
-            teamAId: m.teamA?.id || null,
-            teamBId: m.teamB?.id || null,
-            emojiA: (m.teamA?.id && emojiById[m.teamA.id]) || '',
-            emojiB: (m.teamB?.id && emojiById[m.teamB.id]) || '',
-            court: m.court || null,
-            venue: m.venue || null,
-            courtA: m.courtA ?? null,
-            courtB: m.courtB ?? null,
-            courtSet: m.courtSet ?? null,
-            scheduledAt: m.scheduledAt || null,
-            startTime: m.startTime || null,
-            scoreA: m.scoreA ?? null,
-            scoreB: m.scoreB ?? null,
-            // schedule.html renders finals from homeRoundPts/awayRoundPts (= match points)
-            homeRoundPts: m.scoreA ?? null,
-            awayRoundPts: m.scoreB ?? null,
-            // Games-won tally (round1 + round2), shown under the match-points score
-            gamesA: m.finalizedAt ? gamesA : null,
-            gamesB: m.finalizedAt ? gamesB : null,
-            // Per-round results — used by standings week snapshots to tally W/L/T
-            // per round (2 rounds/match) the same way the live blob does.
-            round1: m.finalizedAt && m.round1 ? {
-              homeGames: m.round1.homeGames ?? 0, awayGames: m.round1.awayGames ?? 0,
-              homePoints: m.round1.homePoints ?? null, awayPoints: m.round1.awayPoints ?? null,
-            } : null,
-            round2: m.finalizedAt && m.round2 ? {
-              homeGames: m.round2.homeGames ?? 0, awayGames: m.round2.awayGames ?? 0,
-              homePoints: m.round2.homePoints ?? null, awayPoints: m.round2.awayPoints ?? null,
-            } : null,
-            // Total rally points (PS/PA) for week-snapshot standings.
-            pointsA: m.finalizedAt ? (m.pointsA ?? null) : null,
-            pointsB: m.finalizedAt ? (m.pointsB ?? null) : null,
-            finalizedAt: m.finalizedAt || null,
-            status: m.finalizedAt ? 'final' : 'scheduled',
-            division: data.division,
-          });
+      // ── Resolve the bracket weeks per division and merge them in ──
+      for (const div of Object.keys(realByDiv)) {
+        const teamList = [...(teamsByDiv[div]?.values() || [])];
+        const numTeams = teamList.length;
+        if (numTeams < 2 || numTeams % 2 !== 0) continue;
+
+        // Use persisted bracket blobs if the admin generated them; otherwise
+        // synthesize the placeholders on the fly so the bracket always shows.
+        let bracketMatches = bracketByDiv[div];
+        if (!bracketMatches || !bracketMatches.length) {
+          const built = buildBracketWeeks({ circuit: circuitLetter, division: div, numTeams });
+          bracketMatches = Object.entries(built).flatMap(([wk, arr]) =>
+            arr.map(m => ({ ...m, week: Number(wk), division: div }))
+          );
+        }
+
+        const resolved = resolveBracketDisplay({
+          realMatches: realByDiv[div], bracketMatches, teamList, numTeams,
+        });
+        for (const m of resolved) {
+          pushPublicMatch(weekMap, m.week, div, m, emojiById, m);
         }
       }
 
@@ -179,6 +176,66 @@ async function loadTeamEmojis(seasonId) {
     }
   } catch {}
   return { byId, byName };
+}
+
+// Map a raw schedule match (round-robin OR resolved bracket) into the public
+// shape and push it onto weekMap[w]. When `br` (the resolved bracket match) is
+// passed, phase/seed metadata is attached and the week is tagged with its phase.
+function pushPublicMatch(weekMap, w, division, m, emojiById, br) {
+  if (!weekMap[w]) weekMap[w] = { week: w, division, matches: [] };
+  if (br) {
+    weekMap[w].phase = br.phase || weekMap[w].phase || null;
+    weekMap[w].phaseLabel = br.phaseLabel || weekMap[w].phaseLabel || null;
+  }
+  const gamesA = (m.round1?.homeGames ?? 0) + (m.round2?.homeGames ?? 0);
+  const gamesB = (m.round1?.awayGames ?? 0) + (m.round2?.awayGames ?? 0);
+  const tbd = br ? null : 'TBD';
+  weekMap[w].matches.push({
+    id: m.id,
+    teamA: m.teamA?.name || tbd,
+    teamB: m.teamB?.name || tbd,
+    teamAId: m.teamA?.id || null,
+    teamBId: m.teamB?.id || null,
+    emojiA: (m.teamA?.id && emojiById[m.teamA.id]) || '',
+    emojiB: (m.teamB?.id && emojiById[m.teamB.id]) || '',
+    court: m.court || null,
+    venue: m.venue || null,
+    courtA: m.courtA ?? null,
+    courtB: m.courtB ?? null,
+    courtSet: m.courtSet ?? null,
+    scheduledAt: m.scheduledAt || null,
+    startTime: m.startTime || null,
+    scoreA: m.scoreA ?? null,
+    scoreB: m.scoreB ?? null,
+    homeRoundPts: m.scoreA ?? null,
+    awayRoundPts: m.scoreB ?? null,
+    gamesA: m.finalizedAt ? gamesA : null,
+    gamesB: m.finalizedAt ? gamesB : null,
+    round1: m.finalizedAt && m.round1 ? {
+      homeGames: m.round1.homeGames ?? 0, awayGames: m.round1.awayGames ?? 0,
+      homePoints: m.round1.homePoints ?? null, awayPoints: m.round1.awayPoints ?? null,
+    } : null,
+    round2: m.finalizedAt && m.round2 ? {
+      homeGames: m.round2.homeGames ?? 0, awayGames: m.round2.awayGames ?? 0,
+      homePoints: m.round2.homePoints ?? null, awayPoints: m.round2.awayPoints ?? null,
+    } : null,
+    pointsA: m.finalizedAt ? (m.pointsA ?? null) : null,
+    pointsB: m.finalizedAt ? (m.pointsB ?? null) : null,
+    finalizedAt: m.finalizedAt || null,
+    status: m.finalizedAt ? 'final' : 'scheduled',
+    division,
+    // ── Bracket fields (null for ordinary round-robin matches) ──
+    phase: br ? (br.phase || null) : null,
+    bracketSlot: br ? (br.bracketSlot || null) : null,
+    bracketGroup: br ? (br.bracketGroup || null) : null,
+    gameLabel: br ? (br.gameLabel || null) : null,
+    placeLabel: br ? (br.placeLabel || null) : null,
+    medal: br ? (br.medal || null) : null,
+    seedLabelA: br ? (br.seedLabelA || null) : null,
+    seedLabelB: br ? (br.seedLabelB || null) : null,
+    seedLocked: br ? !!br.seedLocked : null,
+    championship: m.championship ? true : (br ? !!br.championship : false),
+  });
 }
 
 function json(data, status = 200) {

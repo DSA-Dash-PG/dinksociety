@@ -6,6 +6,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { resolveBracketDisplay } from './lib/bracket.js';
 
 export default async (req) => {
   const verified = await verifyAdminSession(req);
@@ -56,11 +57,16 @@ export default async (req) => {
       weeks.push({
         week: w,
         circuit, division,
+        phase: data.phase || null,
         matches: (data.matches || []).map(m => ({ ...m, division, week: w })),
         generatedAt: data.generatedAt,
         updatedAt: data.updatedAt,
       });
     }
+
+    // Resolve bracket seed previews (Rivalry/Playoffs/Championship) for display.
+    resolveBracketWeeksInPlace(weeks);
+
     return json({ circuit, division, weeks });
   }
 
@@ -189,6 +195,48 @@ export default async (req) => {
 
   return new Response('Method not allowed', { status: 405 });
 };
+
+// Overlay resolved seed previews onto the bracket weeks (Wk6–8). Display-only:
+// projected teams + seed labels + lock state for the admin schedule tab. Leaves
+// round-robin weeks untouched. Mutates the `weeks` array in place.
+function resolveBracketWeeksInPlace(weeks) {
+  const real = [], bracket = [], teamMap = new Map();
+  for (const wk of weeks) {
+    for (const m of wk.matches) {
+      if (m.phase) { bracket.push(m); }
+      else {
+        real.push(m);
+        if (m.teamA?.id) teamMap.set(m.teamA.id, { id: m.teamA.id, name: m.teamA.name });
+        if (m.teamB?.id) teamMap.set(m.teamB.id, { id: m.teamB.id, name: m.teamB.name });
+      }
+    }
+  }
+  if (!bracket.length) return;
+  const numTeams = teamMap.size;
+  if (numTeams < 2 || numTeams % 2 !== 0) return;
+
+  const resolved = resolveBracketDisplay({
+    realMatches: real, bracketMatches: bracket, teamList: [...teamMap.values()], numTeams,
+  });
+  const byId = new Map(resolved.map(r => [r.id, r]));
+  for (const wk of weeks) {
+    wk.matches = wk.matches.map(m => {
+      const r = byId.get(m.id);
+      if (!r) return m;
+      if (!wk.phase) wk.phase = r.phase || null;
+      return {
+        ...m,
+        teamA: r.teamA || null,
+        teamB: r.teamB || null,
+        seedLabelA: r.seedLabelA || null,
+        seedLabelB: r.seedLabelB || null,
+        seedLocked: !!r.seedLocked,
+        phase: r.phase, bracketSlot: r.bracketSlot, bracketGroup: r.bracketGroup,
+        gameLabel: r.gameLabel || null, placeLabel: r.placeLabel || null, medal: r.medal || null,
+      };
+    });
+  }
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {

@@ -12,6 +12,7 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { assignCourtSets } from './lib/courts.js';
 import { rebuildStandings } from './lib/standings.js';
 import { circuitCode } from './lib/circuit.js';
+import { buildBracketWeeks, regularRounds } from './lib/bracket.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -21,7 +22,9 @@ export default async (req) => {
   const admin = verified.payload;
 
   try {
-    const { circuit, division, teams, courts = [] } = await req.json();
+    // bracketOnly: write ONLY the Wk6–8 Rivalry/Playoff/Championship placeholders
+    // without touching the round-robin — used to add the bracket to a live season.
+    const { circuit, division, teams, courts = [], bracketOnly = false } = await req.json();
     if (!circuit || !division || !Array.isArray(teams) || teams.length < 2) {
       return json({ error: 'circuit, division, and at least 2 teams required' }, 400);
     }
@@ -29,44 +32,64 @@ export default async (req) => {
       return json({ error: 'Team count must be even for round-robin' }, 400);
     }
 
-    const schedule = generateRoundRobin(teams);
     const store = getStore('schedule');
-
-    // Rotate the 2-court sets (A=1&2, B=3&6, C=5&7) across the season so every
-    // team plays each set as evenly as possible.
-    const courtPlan = assignCourtSets(
-      schedule.map(week => week.map(pair => ({ teamAId: pair[0].id, teamBId: pair[1].id })))
-    );
-
+    const now = new Date().toISOString();
+    const numTeams = teams.length;
     const summary = [];
-    for (let i = 0; i < schedule.length; i++) {
-      const week = i + 1;
-      const pairings = schedule[i];
-      const matches = pairings.map((pair, idx) => {
-        const plan = courtPlan[i][idx];
-        return {
-          id: matchId(circuit, division, week, idx),
-          teamA: { id: pair[0].id, name: pair[0].name },
-          teamB: { id: pair[1].id, name: pair[1].name },
-          courtSet: plan.courtSet,
-          courtA: plan.courtA,
-          courtB: plan.courtB,
-          court: `Courts ${plan.courtA} & ${plan.courtB}`, // summary label
-          scheduledAt: null,
-          scoreA: null,
-          scoreB: null,
-          playedAt: null,
-        };
-      });
+    let weeksGenerated = 0;
 
+    if (!bracketOnly) {
+      const schedule = generateRoundRobin(teams);
+
+      // Rotate the 2-court sets (A=1&2, B=3&6, C=5&7) across the season so every
+      // team plays each set as evenly as possible.
+      const courtPlan = assignCourtSets(
+        schedule.map(week => week.map(pair => ({ teamAId: pair[0].id, teamBId: pair[1].id })))
+      );
+
+      for (let i = 0; i < schedule.length; i++) {
+        const week = i + 1;
+        const pairings = schedule[i];
+        const matches = pairings.map((pair, idx) => {
+          const plan = courtPlan[i][idx];
+          return {
+            id: matchId(circuit, division, week, idx),
+            teamA: { id: pair[0].id, name: pair[0].name },
+            teamB: { id: pair[1].id, name: pair[1].name },
+            courtSet: plan.courtSet,
+            courtA: plan.courtA,
+            courtB: plan.courtB,
+            court: `Courts ${plan.courtA} & ${plan.courtB}`, // summary label
+            scheduledAt: null,
+            scoreA: null,
+            scoreB: null,
+            playedAt: null,
+          };
+        });
+
+        const key = `schedule/${circuit}/${division}/week-${week}.json`;
+        await store.setJSON(key, { circuit, division, week, matches, generatedAt: now, generatedBy: admin.email });
+        summary.push({ week, matchCount: matches.length });
+      }
+      weeksGenerated = schedule.length;
+    }
+
+    // ── Bracket weeks (Rivalry / Playoffs / Championship) ──
+    // Placeholders carry phase + seed metadata; teams resolve from standings.
+    const bracket = buildBracketWeeks({ circuit, division, numTeams });
+    let bracketWeeks = 0;
+    for (const [wk, matches] of Object.entries(bracket)) {
+      const week = Number(wk);
       const key = `schedule/${circuit}/${division}/week-${week}.json`;
-      await store.setJSON(key, {
-        circuit, division, week,
-        matches,
-        generatedAt: new Date().toISOString(),
-        generatedBy: admin.email,
-      });
-      summary.push({ week, matchCount: matches.length });
+      // Non-destructive on bracketOnly: keep an existing bracket week as-is so we
+      // never clobber locked teams or admin-set court/time.
+      if (bracketOnly) {
+        const existing = await store.get(key, { type: 'json' }).catch(() => null);
+        if (existing?.matches?.length) { summary.push({ week, matchCount: existing.matches.length, phase: matches[0]?.phase, skipped: true }); continue; }
+      }
+      await store.setJSON(key, { circuit, division, week, phase: matches[0]?.phase || null, bracket: true, matches, generatedAt: now, generatedBy: admin.email });
+      summary.push({ week, matchCount: matches.length, phase: matches[0]?.phase });
+      bracketWeeks++;
     }
 
     // Rebuild standings so the division table goes live immediately (all teams
@@ -79,7 +102,7 @@ export default async (req) => {
       console.error('post-generate standings rebuild failed:', e);
     }
 
-    return json({ ok: true, weeksGenerated: schedule.length, summary, standingsRebuilt });
+    return json({ ok: true, weeksGenerated, bracketWeeks, regularRounds: regularRounds(numTeams), summary, standingsRebuilt });
   } catch (err) {
     console.error('admin-generate-schedule error:', err);
     return json({ error: 'Generation failed', detail: err.message }, 500);

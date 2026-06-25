@@ -226,12 +226,40 @@
     .fb__fill { height: 100%; border-radius: var(--radius-full); transition: width 0.4s; }
 
     /* ── Week chips ──────────────────────────────────────────── */
-    .wc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: 6px; margin-bottom: 14px; }
-    .wc { padding: 10px 12px; background: var(--color-surface-2); border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; border: 1px solid transparent; transition: all var(--transition); }
+    .wc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 6px; margin-bottom: 14px; }
+    .wc { position: relative; padding: 10px 12px; background: var(--color-surface-2); border-radius: var(--radius-sm); font-size: 11px; cursor: pointer; border: 1px solid transparent; transition: all var(--transition); }
     .wc:hover { border-color: var(--color-border-strong); }
     .wc.is-active { border-color: var(--color-lime); background: var(--color-lime-ghost); }
     .wc__n { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
     .wc__m { color: var(--color-text-faint); font-size: 10px; }
+    .wc__ph { font-size: 10px; font-weight: 800; margin: 1px 0 3px; }
+    .wc__ph.rivalry { color: var(--color-teal); }
+    .wc__ph.playoff { color: #ffb061; }
+    .wc__ph.championship { color: var(--color-gold); }
+    .wc__tag { position: absolute; top: 7px; right: 7px; font-size: 7.5px; font-weight: 900; letter-spacing: 0.08em; text-transform: uppercase; padding: 2px 5px; border-radius: 4px; }
+    .wc__tag.rivalry { background: var(--color-teal-dim); color: var(--color-teal); }
+    .wc__tag.playoff { background: rgba(255,176,97,0.14); color: #ffb061; }
+    .wc__tag.championship { background: var(--color-gold-dim); color: var(--color-gold); }
+
+    /* Bracket (Wk6–8) admin cards */
+    .bk-note { font-size: 12px; color: var(--color-text-faint); line-height: 1.55; margin: 2px 2px 14px; }
+    .bk-grp { font-size: 10px; font-weight: 900; letter-spacing: 0.13em; text-transform: uppercase; color: var(--color-text-faint); margin: 16px 2px 8px; display: flex; align-items: center; gap: 7px; }
+    .bk-grp:first-child { margin-top: 4px; }
+    .bk-grp .medal { font-size: 14px; }
+    .bk-card { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: center; padding: 12px 14px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 7px; }
+    .bk-card.locked { border-color: rgba(23,215,176,0.35); }
+    .bk-side { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .bk-side.r { justify-content: flex-end; text-align: right; }
+    .bk-seed { width: 22px; height: 22px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; border-radius: 50%; background: var(--color-surface); border: 1px solid var(--color-border); color: var(--color-text-muted); }
+    .bk-seed.s1 { background: var(--color-lime-ghost); color: var(--color-lime); border-color: rgba(184,255,44,0.3); }
+    .bk-name { font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bk-name.proj { color: var(--color-text-faint); font-style: italic; }
+    .bk-vs { font-size: 9px; letter-spacing: 0.2em; color: var(--color-text-faint); font-weight: 700; }
+    .bk-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 4px 2px 14px; margin-bottom: 12px; border-bottom: 1px solid var(--color-border); }
+    .bk-status { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 3px 8px; border-radius: 9999px; }
+    .bk-status.proj { background: var(--color-surface); color: var(--color-text-faint); border: 1px solid var(--color-border); }
+    .bk-status.locked { background: var(--color-teal-dim); color: var(--color-teal); }
+    .bk-status.final { background: var(--color-lime-dim); color: var(--color-lime); }
 
     /* ── Match row ───────────────────────────────────────────── */
     .mr { display: grid; grid-template-columns: 1fr auto 1fr auto; gap: 12px; align-items: center; padding: 12px 14px; background: var(--color-surface-2); border-radius: var(--radius-sm); margin-bottom: 5px; border: 1px solid var(--color-border); }
@@ -812,7 +840,8 @@
             <h1 class="am-title">Schedule</h1>
             <div class="am-actions">
               <select id="sched-div" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);"></select>
-              <button class="ab ab--lime ab--sm" id="gen-sched-btn">Generate round-robin</button>
+              <button class="ab ab--lime ab--sm" id="gen-sched-btn" title="Round-robin (Wk 1–5) + Rivalry / Playoffs / Championship (Wk 6–8). Overwrites this division's schedule.">Generate season</button>
+              <button class="ab ab--outline ab--sm" id="setup-bracket-btn" title="Add Rivalry / Playoffs / Championship (Weeks 6–8) without touching the round-robin">Set up playoffs (Wk 6–8)</button>
               <button class="ab ab--outline ab--sm" id="rebuild-standings-btn" title="Recompute standings + leaderboard from current schedule and scores">Rebuild standings</button>
             </div>
           </div>
@@ -4573,9 +4602,18 @@
         return;
       }
 
-      out.innerHTML = '<div class="wc-grid">' + weeks.map((w, i) =>
-        '<div class="wc' + (i === 0 ? ' is-active' : '') + '" data-week="' + w.week + '"><div class="wc__n">Week ' + w.week + '</div><div class="wc__m">' + (w.matches.length ? w.matches.filter(m => m.finalizedAt).length + '/' + w.matches.length + ' final' : '—') + '</div></div>'
-      ).join('') + '</div><div class="ac" id="wk-card"></div>' + addForm;
+      out.innerHTML = '<div class="wc-grid">' + weeks.map((w, i) => {
+        const ph = w.phase || '';
+        const phLabel = ph === 'rivalry' ? 'Rivalry' : ph === 'playoff' ? 'Playoffs' : ph === 'championship' ? 'Championship' : '';
+        const tag = ph ? '<span class="wc__tag ' + ph + '">' + (ph === 'rivalry' ? 'Riv' : ph === 'playoff' ? 'PO' : 'Final') + '</span>' : '';
+        const sub = ph
+          ? '<div class="wc__ph ' + ph + '">' + phLabel + '</div>'
+          : '';
+        const meta = w.matches.length ? w.matches.filter(m => m.finalizedAt).length + '/' + w.matches.length + (ph ? '' : ' final') : '—';
+        return '<div class="wc' + (i === 0 ? ' is-active' : '') + '" data-week="' + w.week + '">' + tag +
+          '<div class="wc__n">Week ' + w.week + '</div>' + sub +
+          '<div class="wc__m">' + meta + '</div></div>';
+      }).join('') + '</div><div class="ac" id="wk-card"></div>' + addForm;
 
       $$('.wc').forEach(c => c.addEventListener('click', () => selectWeek(parseInt(c.dataset.week), weeks)));
       const startWeek = weeks.some(w => w.week === _schedWeek) ? _schedWeek : weeks[0].week;
@@ -4759,8 +4797,70 @@
     const wk = weeks.find(w => w.week === n);
     const card = $id('wk-card');
     if (!wk?.matches?.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
+    if (wk.phase) { renderBracketPanel(card, wk, weeks); return; }
     card.innerHTML = '<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ' + n + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
       wk.matches.map(m => matchRowHTML(m, false)).join('') + '</div>';
+    wireMatchRows(card, wk.matches, weeks, renderSched);
+  }
+
+  // ── Bracket weeks (Wk6 Rivalry / Wk7 Playoffs / Wk8 Championship) ──
+  // Seeds resolve automatically from standings; the admin can still set the
+  // court + date/time via the schedule popover (reuses the .sched-edit pill).
+  const BK_NOTE = {
+    rivalry: 'Rivalry Week counts toward the regular season. Matchups seed off the standings through the round-robin (#1 v #2, #3 v #4, #5 v #6) and lock automatically once Week 5 is final.',
+    playoff: 'Seeds lock from the final regular-season standings (through Rivalry Week): Semifinals #1 v #4 and #2 v #3; #5 v #6 play a consolation match for 5th.',
+    championship: 'Built from the semifinal results — the two winners play for Gold/Silver, the two losers play for Bronze. Resolves automatically once Week 7 is final.',
+  };
+  const BK_TITLE = { rivalry: 'Rivalry Week', playoff: 'Playoffs', championship: 'Championship' };
+
+  function bkSeedBadge(label) {
+    const m = /^#(\d+)\b/.exec(label || '');
+    if (!m) return '<span class="bk-seed">·</span>';
+    return '<span class="bk-seed' + (m[1] === '1' ? ' s1' : '') + '">' + m[1] + '</span>';
+  }
+  function bkSide(name, label, right) {
+    const badge = bkSeedBadge(label);
+    const inner = name
+      ? '<span class="bk-name">' + h(name) + '</span>'
+      : '<span class="bk-name proj">' + h(label || 'TBD') + '</span>';
+    return '<div class="bk-side' + (right ? ' r' : '') + '">' + (right ? inner + badge : badge + inner) + '</div>';
+  }
+  function bracketAdminCard(m) {
+    const fin = m.finalizedAt;
+    const status = fin
+      ? '<span class="bk-status final">Final</span>'
+      : (m.seedLocked ? '<span class="bk-status locked">Locked</span>' : '<span class="bk-status proj">Projected</span>');
+    const score = fin && m.scoreA != null
+      ? '<div class="bk-vs" style="font-size:15px;font-weight:800;letter-spacing:0;">' + m.scoreA + '–' + m.scoreB + '</div>'
+      : '<div class="bk-vs">VS</div>';
+    return '<div class="bk-card' + (m.seedLocked ? ' locked' : '') + '">' +
+        bkSide(m.teamA?.name, m.seedLabelA, false) + score + bkSide(m.teamB?.name, m.seedLabelB, true) +
+      '</div>' +
+      '<div class="bk-foot">' +
+        '<button class="schedpill' + (m.scheduledAt ? '' : ' schedpill--empty') + ' sched-edit" data-mid="' + h(m.id) + '" id="sp-' + h(m.id) + '">' + schedPillLabel(m) + '</button>' +
+        status +
+        (m.championship ? '<span class="ac__s" style="font-size:10px;">Win by 2</span>' : '') +
+        '<button class="ab ab--outline ab--sm lineup-unlock" data-mid="' + h(m.id) + '" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">Unlock lineups</button>' +
+        '<span id="cst-' + h(m.id) + '" style="margin-left:4px;"></span>' +
+      '</div>';
+  }
+  function renderBracketPanel(card, wk, weeks) {
+    const note = BK_NOTE[wk.phase] || '';
+    // group by bracketGroup preserving order
+    const groups = []; const seen = {};
+    wk.matches.forEach(m => {
+      const g = m.bracketGroup || '';
+      if (!(g in seen)) { seen[g] = groups.length; groups.push({ label: g, medal: m.medal || '', items: [] }); }
+      groups[seen[g]].items.push(m);
+    });
+    const multi = groups.length > 1;
+    const body = groups.map(grp => {
+      const hdr = multi ? '<div class="bk-grp">' + (grp.medal ? '<span class="medal">' + h(grp.medal) + '</span>' : '') + h(grp.label) + '</div>' : '';
+      return hdr + grp.items.map(bracketAdminCard).join('');
+    }).join('');
+    card.innerHTML = '<div style="padding:18px">' +
+      '<div class="ac__h"><span class="ac__t">Week ' + wk.week + ' · ' + h(BK_TITLE[wk.phase] || '') + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
+      '<p class="bk-note">' + h(note) + '</p>' + body + '</div>';
     wireMatchRows(card, wk.matches, weeks, renderSched);
   }
 
@@ -4898,7 +4998,7 @@
 
     sp.el.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-        '<span style="font-size:12px;font-weight:700;">' + h(sp.match.teamA.name) + ' vs ' + h(sp.match.teamB.name) + '</span>' +
+        '<span style="font-size:12px;font-weight:700;">' + h((sp.match.teamA && sp.match.teamA.name) || sp.match.seedLabelA || 'TBD') + ' vs ' + h((sp.match.teamB && sp.match.teamB.name) || sp.match.seedLabelB || 'TBD') + '</span>' +
         '<button id="spop-x" style="background:none;border:none;color:var(--color-text-faint);cursor:pointer;font-size:16px;font-family:inherit;">✕</button>' +
       '</div>' +
       '<div class="spop__cols">' +
@@ -5073,7 +5173,7 @@
   $id('gen-sched-btn').addEventListener('click', async () => {
     const div = $id('sched-div').value;
     if (!div) return;
-    if (!confirm('Generate round-robin schedule for ' + div + '? This will overwrite any existing schedule for this division.')) return;
+    if (!confirm('Generate the full season for ' + div + ' (round-robin Wk 1–5 + Rivalry / Playoffs / Championship Wk 6–8)? This overwrites any existing schedule and scores for this division.')) return;
 
     const btn = $id('gen-sched-btn');
     btn.disabled = true; btn.textContent = 'Generating…';
@@ -5099,7 +5199,31 @@
     } catch (e) {
       alert('Schedule generation failed: ' + e.message);
     }
-    btn.disabled = false; btn.textContent = 'Generate round-robin';
+    btn.disabled = false; btn.textContent = 'Generate season';
+  });
+
+  // ── Set up playoffs (Wk6–8) without touching the round-robin ──
+  $id('setup-bracket-btn').addEventListener('click', async () => {
+    const div = $id('sched-div').value;
+    if (!div) { alert('Pick a division first.'); return; }
+    const btn = $id('setup-bracket-btn');
+    btn.disabled = true; const label = btn.textContent; btn.textContent = 'Setting up…';
+    try {
+      const teamsData = await apiJSON('/.netlify/functions/admin-teams');
+      const divTeams = (teamsData.teams || []).filter(t => t.division === div);
+      if (divTeams.length < 2) throw new Error('Need at least 2 teams in this division');
+      if (divTeams.length % 2 !== 0) throw new Error('Team count must be even');
+      const res = await apiJSON('/.netlify/functions/admin-generate-schedule', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ circuit: 'I', division: div, teams: divTeams.map(t => ({ id: t.id, name: t.name })), bracketOnly: true }),
+      });
+      const added = (res.summary || []).filter(s => s.phase && !s.skipped).length;
+      alert(added ? ('Playoffs ready — added ' + added + ' bracket week(s).') : 'Bracket weeks already set up.');
+      renderSched();
+    } catch (e) {
+      alert('Playoff setup failed: ' + e.message);
+    }
+    btn.disabled = false; btn.textContent = label;
   });
 
   // Manually recompute standings + leaderboard (also runs automatically after

@@ -249,6 +249,39 @@
     .week-tbd { text-align: center; padding: var(--space-6) 0 var(--space-2); font-size: 13px; color: var(--color-text-faint); }
     .empty-state { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--color-text-faint); }
 
+    /* ── Bracket phases (Wk 6 Rivalry / Wk 7 Playoffs / Wk 8 Champ) ─ */
+    .week-phase {
+      font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: 3px 10px; border-radius: var(--radius-full); border: 1px solid transparent;
+    }
+    .week-phase.rivalry      { color: var(--color-teal); background: rgba(45,212,191,0.12); border-color: rgba(45,212,191,0.3); }
+    .week-phase.playoff      { color: #ffb061; background: rgba(255,176,97,0.12); border-color: rgba(255,176,97,0.3); }
+    .week-phase.championship { color: #f0c040; background: rgba(240,192,64,0.12); border-color: rgba(240,192,64,0.3); }
+
+    .bracket-note { font-size: 12px; color: var(--color-text-faint); margin: 0 0 var(--space-4); line-height: 1.5; }
+    .bgrp { margin-bottom: var(--space-5); }
+    .bgrp:last-child { margin-bottom: 0; }
+    .bgrp-label {
+      font-size: 10px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--color-text-faint); margin: 0 2px var(--space-3); display: flex; align-items: center; gap: 8px;
+    }
+    .bgrp-label .medal { font-size: 14px; }
+
+    /* seed labels / chips inside a match card */
+    .m-seedchip {
+      font-size: 9px; font-weight: 800; letter-spacing: 0.04em;
+      padding: 2px 7px; border-radius: 5px; background: var(--color-surface);
+      color: var(--color-text-muted); border: 1px solid var(--color-border);
+    }
+    .m-seedchip.s1 { background: var(--color-lime-ghost); color: var(--color-lime); border-color: rgba(184,255,44,0.3); }
+    .m-seedlabel { font-size: 12.5px; font-weight: 700; font-style: italic; text-transform: uppercase; color: var(--color-text-faint); line-height: 1.25; }
+    .m-hint {
+      margin: 0 12px 12px; padding: 7px 10px; border-radius: 8px; text-align: center;
+      font-size: 10.5px; font-weight: 600; color: var(--color-text-faint);
+      background: var(--color-surface); border: 1px solid var(--color-divider);
+    }
+    .m-hint.locked { color: var(--color-teal); border-color: rgba(45,212,191,0.25); }
+
     /* ── Mobile ──────────────────────────────────────────────────── */
     @media (max-width: 720px) {
       .date-strip { padding: var(--space-3) var(--space-4); }
@@ -392,6 +425,13 @@
           ? `${matchCount} match${matchCount !== 1 ? 'es' : ''} · click to expand`
           : 'Click to expand';
 
+        const phasePill = wData?.phase
+          ? `<span class="week-phase ${wData.phase}">${esc(wData.phaseLabel || wData.phase)}</span>`
+          : '';
+        const body = wData?.phase
+          ? renderBracketWeek(wData, n, weeksData)
+          : renderMatches(wData?.matches || [], n, weeksData);
+
         return `
           <div class="${cardCls}" data-week="${n}">
             <div class="week-header" onclick="toggleWeek(${n})">
@@ -401,12 +441,13 @@
                 <span class="week-time-text">Matches start ${MATCH_START_TIME}</span>
               </div>
               <div class="week-right">
+                ${phasePill}
                 ${badge}
                 <span class="week-chevron">▾</span>
               </div>
             </div>
             <div class="week-body">
-              ${renderMatches(wData?.matches || [], n, weeksData)}
+              ${body}
             </div>
             <div class="week-collapsed-summary">${collapsedSummary}</div>
           </div>`;
@@ -508,6 +549,121 @@
             ${scores}
           </div>`;
       }).join('')}</div>`;
+    }
+
+    /* ── Bracket weeks (Rivalry / Playoffs / Championship) ───────── */
+    const PHASE_NOTE = {
+      rivalry: 'Rivalry Week counts toward the regular season. Matchups seed off the standings through the round-robin — #1 plays #2, #3 plays #4, #5 plays #6.',
+      playoff: 'Seeds lock from the final regular-season standings. The two semifinal winners meet for the title; #5 and #6 play a consolation match for 5th place.',
+      championship: 'Built from the semifinal results — the two winners play for Gold/Silver, the two losers play for Bronze.',
+    };
+    const PHASE_LOCK = { rivalry: 'the round-robin', playoff: 'Rivalry Week', championship: 'the semifinals' };
+
+    // Small seed chip from a "#N Seed" label (no chip for Winner/Loser labels).
+    function seedChip(label) {
+      const m = /^#(\d+)\b/.exec(label || '');
+      if (!m) return '';
+      return `<span class="m-seedchip${m[1] === '1' ? ' s1' : ''}">${m[1]}</span>`;
+    }
+
+    function bracketSide(name, id, emoji, seedLabel, seedSide) {
+      const chip = seedChip(seedLabel);
+      if (name) {
+        return `<span class="m-seed ${seedSide}">${seedSide.toUpperCase()}</span>${chip ? chip : ''}${logo(emoji, name)}${teamLink(name, id, 'm-team')}`;
+      }
+      return `<span class="m-seed ${seedSide}">${seedSide.toUpperCase()}</span>${chip ? chip : ''}<span class="m-logo m-logo--mono">?</span><span class="m-seedlabel">${esc(seedLabel || 'TBD')}</span>`;
+    }
+
+    function bracketCard(m, idx, weekNum, weeksData) {
+      const isFinal = m.status === 'final';
+      const meta = courtMeta(m, idx);
+      const today = isWeekToday(weekNum, weeksData);
+      const next  = weekNum === nextWeekNum(weeksData);
+      const resolvedBoth = !!(m.teamA && m.teamB);
+
+      let badge = '';
+      if (isFinal)                       badge = `<span class="match-badge is-final">Final</span>`;
+      else if (today && resolvedBoth)    badge = `<span class="match-badge is-live"><span class="ldot"></span>Live</span>`;
+      else if (next && resolvedBoth)     badge = `<span class="match-badge is-next">Up Next</span>`;
+
+      let center;
+      if (isFinal && m.homeRoundPts != null) {
+        const hWin = m.homeRoundPts > m.awayRoundPts, aWin = m.awayRoundPts > m.homeRoundPts;
+        const tie = m.homeRoundPts === m.awayRoundPts;
+        const gamesLine = (m.gamesA != null && m.gamesB != null) ? `<div class="m-sub">${m.gamesA}–${m.gamesB} games</div>` : '';
+        const result = tie ? 'Tie' : esc(hWin ? m.teamA : m.teamB);
+        center = `<div class="m-center">
+          <div class="m-tally"><span class="${hWin ? 'w' : ''}">${m.homeRoundPts}</span><span class="dash">–</span><span class="${aWin ? 'w' : ''}">${m.awayRoundPts}</span></div>
+          ${gamesLine}<div class="m-result${tie ? ' tie' : ''}">${result}</div>
+        </div>`;
+      } else {
+        center = `<div class="m-center up"><div class="m-vs">VS</div><div class="m-start">${esc(matchStartLabel(m))}</div></div>`;
+      }
+
+      // Status hint: projected vs locked (hidden once final).
+      let hint = '';
+      if (!isFinal) {
+        hint = m.seedLocked
+          ? `<div class="m-hint locked">Seeded · matchup locked</div>`
+          : `<div class="m-hint">Projected from live standings · locks after ${esc(PHASE_LOCK[m.phase] || 'the prior round')}</div>`;
+      }
+
+      // Serve / side rules only once teams are locked (avoid implying a projection is final).
+      const serves = (!isFinal && resolvedBoth && m.seedLocked) ? `
+        <div class="m-serves">
+          <div class="m-srow"><span class="m-rtag">R1</span><span><b>${esc(m.teamA)}</b> <span class="act">serve</span> · <b>${esc(m.teamB)}</b> <span class="act side">pick side</span></span></div>
+          <div class="m-srow"><span class="m-rtag r2">R2</span><span><b>${esc(m.teamA)}</b> <span class="act side">pick side</span> · <b>${esc(m.teamB)}</b> <span class="act">serve</span></span></div>
+        </div>` : '';
+
+      const scores = isFinal ? `
+        <button class="m-toggle" onclick="toggleScores(this, '${esc(m.id)}')"><span class="lbl">Show game scores</span> <span class="chev">▾</span></button>
+        <div class="m-scorebody" data-match="${esc(m.id)}"></div>` : '';
+
+      const sideAWin = isFinal && m.homeRoundPts > m.awayRoundPts;
+      const sideBWin = isFinal && m.awayRoundPts > m.homeRoundPts;
+
+      return `
+        <div class="match-entry${isFinal ? ' is-final' : ''}">
+          <div class="match-top">
+            <span class="match-court"><span class="court-dot" style="background:${meta.color}"></span>${esc(meta.label)}${m.venue ? ' · ' + esc(m.venue) : ''}</span>
+            ${badge}
+          </div>
+          <div class="match-teams">
+            <div class="m-side${sideAWin ? ' is-winner' : ''}">${bracketSide(m.teamA, m.teamAId, m.emojiA, m.seedLabelA, 'home')}</div>
+            ${center}
+            <div class="m-side${sideBWin ? ' is-winner' : ''}">${bracketSide(m.teamB, m.teamBId, m.emojiB, m.seedLabelB, 'away')}</div>
+          </div>
+          ${serves}
+          ${hint}
+          ${scores}
+        </div>`;
+    }
+
+    function renderBracketWeek(wData, weekNum, weeksData) {
+      const matches = wData.matches || [];
+      if (!matches.length) return `<p class="week-tbd">Matchups published closer to game night</p>`;
+      const note = PHASE_NOTE[wData.phase] ? `<p class="bracket-note">${esc(PHASE_NOTE[wData.phase])}</p>` : '';
+
+      // Group by bracketGroup, preserving order. Show group headers only when a
+      // week spans more than one group (Playoffs, Championship).
+      const groups = [];
+      const seen = {};
+      matches.forEach((m, i) => {
+        const g = m.bracketGroup || '';
+        if (!(g in seen)) { seen[g] = groups.length; groups.push({ label: g, medal: m.medal || '', items: [] }); }
+        groups[seen[g]].items.push({ m, idx: i });
+      });
+
+      const multi = groups.length > 1;
+      const body = groups.map(grp => {
+        const cards = grp.items.map(({ m, idx }) => bracketCard(m, idx, weekNum, weeksData)).join('');
+        const header = multi
+          ? `<div class="bgrp-label">${grp.medal ? `<span class="medal">${esc(grp.medal)}</span>` : ''}${esc(grp.label)}</div>`
+          : '';
+        return `<div class="bgrp">${header}<div class="matches-grid">${cards}</div></div>`;
+      }).join('');
+
+      return note + body;
     }
 
     /* ── Team logo (emoji, or monogram fallback) ─────────────────── */

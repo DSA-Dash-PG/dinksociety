@@ -15,6 +15,7 @@
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
 import { normalizeScore } from './score-helpers.js';
+import { resolveBracketDisplay } from './bracket.js';
 
 const DIVISIONS = ['3.0M', '3.5M', '3.5W'];
 
@@ -112,6 +113,10 @@ export async function rebuildStandings(circuit) {
 
     for (const match of weekFile.matches) {
       if (!match.finalizedAt) continue;
+      // Playoffs & Championship are post-season — they must not feed the regular
+      // standings table or player season stats. Rivalry Week DOES count (it is
+      // the last week of the regular season).
+      if (match.phase === 'playoff' || match.phase === 'championship') continue;
 
       if (match.scheduledAt && (!weekMeta[week] || new Date(match.scheduledAt) < new Date(weekMeta[week].date))) {
         weekMeta[week] = { date: match.scheduledAt };
@@ -352,6 +357,15 @@ export async function rebuildStandings(circuit) {
     standingsStore.setJSON(`standings/${circuit}.json`, standings),
     playerStatsStore.setJSON(`player-stats/${circuit}.json`, playerStatsOut),
   ]);
+
+  // Once a phase completes, freeze the next bracket week's matchups into the
+  // schedule blobs so they become concrete, playable matches (scoring/lineups
+  // need real team ids). Projections stay unpersisted until then.
+  try {
+    await lockBracketSeeds(scheduleStore, weekFiles);
+  } catch (e) {
+    console.error('bracket seed lock failed:', e);
+  }
 
   return { standings, playerStats: playerStatsOut };
 }
@@ -669,6 +683,65 @@ function computeRankDeltas(weekly) {
     deltas[pid] = (pr == null) ? null : (pr - rank);
   }
   return deltas;
+}
+
+// ════════════════════════════════════════════════════════════════════
+// Bracket seed locking
+// ════════════════════════════════════════════════════════════════════
+//
+// When a phase finishes (round-robin → rivalry → semifinals), the next bracket
+// week's matchups become final. We persist the resolved teams into the schedule
+// blobs so those matches can be played (lineups + scoring need real team ids).
+// Until a phase completes, bracket teams stay null in the blob and are resolved
+// as live previews by public-schedule.js / admin-matches.js.
+async function lockBracketSeeds(scheduleStore, weekFiles) {
+  // Group the loaded schedule files by division.
+  const byDiv = {};
+  for (const wf of weekFiles) {
+    const div = wf.data?.division;
+    if (!div) continue;
+    (byDiv[div] ||= []).push(wf);
+  }
+
+  const dirtyFiles = new Set();
+  for (const files of Object.values(byDiv)) {
+    const realMatches = [], bracketMatches = [], teamMap = new Map();
+    // map each bracket match id → its owning {wf, m} so we can mutate the blob.
+    const owner = new Map();
+    for (const wf of files) {
+      const week = wf.data.week, division = wf.data.division;
+      for (const m of (wf.data.matches || [])) {
+        if (m.phase) {
+          bracketMatches.push({ ...m, week, division });
+          owner.set(m.id, { wf, m });
+        } else {
+          realMatches.push({ ...m, week, division });
+          if (m.teamA?.id) teamMap.set(m.teamA.id, { id: m.teamA.id, name: m.teamA.name });
+          if (m.teamB?.id) teamMap.set(m.teamB.id, { id: m.teamB.id, name: m.teamB.name });
+        }
+      }
+    }
+    if (!bracketMatches.length) continue;
+    const numTeams = teamMap.size;
+    if (numTeams < 2 || numTeams % 2 !== 0) continue;
+
+    const resolved = resolveBracketDisplay({
+      realMatches, bracketMatches, teamList: [...teamMap.values()], numTeams,
+    });
+    for (const r of resolved) {
+      if (!r.seedLocked || !r.teamA?.id || !r.teamB?.id) continue;
+      const o = owner.get(r.id);
+      if (!o) continue;
+      const changed = (o.m.teamA?.id !== r.teamA.id) || (o.m.teamB?.id !== r.teamB.id);
+      if (changed) {
+        o.m.teamA = { id: r.teamA.id, name: r.teamA.name };
+        o.m.teamB = { id: r.teamB.id, name: r.teamB.name };
+        dirtyFiles.add(o.wf);
+      }
+    }
+  }
+
+  await Promise.all([...dirtyFiles].map(wf => scheduleStore.setJSON(wf.key, wf.data)));
 }
 
 // Tag each week's #1 male + #1 female onto their player record as a Chef of the Week award.
