@@ -15,7 +15,8 @@
   .wrap{ max-width:560px; margin:0 auto; padding:16px 14px 48px; }
   .back{ display:inline-flex;align-items:center;gap:6px;color:var(--mut);text-decoration:none;font-size:.78rem;font-weight:600;margin-bottom:14px; }
   .head{ display:flex;align-items:center;gap:13px; }
-  .av{ width:58px;height:58px;border-radius:16px;background:linear-gradient(135deg,var(--lime),var(--teal));color:#06210f;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;flex-shrink:0; }
+  .av{ width:58px;height:58px;border-radius:16px;background:linear-gradient(135deg,var(--lime),var(--teal));color:#06210f;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;flex-shrink:0;overflow:hidden; }
+  .av img{ width:100%;height:100%;object-fit:cover; }
   .nm{ font-size:1.3rem;font-weight:900; } .meta{ font-size:.72rem;color:var(--mut);margin-top:2px; }
   .onep{ display:inline-flex;align-items:center;gap:5px;font-size:.58rem;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--teal);background:rgba(23,215,176,.12);padding:5px 9px;border-radius:9999px; }
   .tiles{ display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px; }
@@ -62,6 +63,12 @@ const ICON_TROPHY='<svg viewBox="0 0 24 24" width="1em" height="1em" fill="none"
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 const qp=new URLSearchParams(location.search);
 const initials=n=>String(n||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase();
+function profAvatar(id){
+  const url=id.photoUrl||null, pid=qp.get('leagueId')||id.leagueId||id.id||'';
+  const src=url||(pid?('/.netlify/functions/player-photo-serve?id='+encodeURIComponent(pid)):null);
+  if(!src) return esc(initials(id.name));
+  return '<img src="'+src+'" alt="" loading="lazy" onerror="this.remove();this.parentNode.textContent=this.parentNode.getAttribute(\'data-ini\');">';
+}
 
 async function load(){
   const q=qp.get('ladderId')?`ladderId=${encodeURIComponent(qp.get('ladderId'))}`
@@ -78,7 +85,7 @@ function render(j){
   const dsr=lg?(lg.dsr==null?'–':lg.dsr):'–', dr=ld?(ld.dr==null?'–':ld.dr):'–';
   const g=(v,l,c)=>`<div class="g"><div class="n" style="color:${c||'var(--tx)'}">${v}</div><div class="l">${l}</div></div>`;
   let h=`<a class="back" href="javascript:history.length>1?history.back():location.href='/'">← Back</a>
-    <div class="head"><div class="av">${initials(id.name)}</div>
+    <div class="head"><div class="av" data-ini="${esc(initials(id.name))}">${profAvatar(id)}</div>
       <div style="flex:1;min-width:0"><div class="nm">${esc(id.name)}</div><div class="meta">${[lg&&lg.teamName?esc(lg.teamName):'',id.hasLeague&&id.hasLadder?'League + Ladder':id.hasLadder?'Ladder player':'League player'].filter(Boolean).join(' · ')}</div></div>
       ${id.hasLeague&&id.hasLadder?'<span class="onep">🔗 One profile</span>':''}
     </div>
