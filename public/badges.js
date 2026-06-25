@@ -334,7 +334,7 @@
     var sub = Object.keys(s.counts).sort(function (a, b) { return DEF[b].pri - DEF[a].pri; })
       .map(function (k) { return s.counts[k] + '× ' + DEF[k].label; }).join(' · ');
     return '<div class="dsb-case">' +
-      '<div class="dsb-case-head"><span class="dsb-case-h">🏆 Trophy Case</span>' +
+      '<div class="dsb-case-head"><span class="dsb-case-h">🏆 Trophies</span>' +
       '<span class="dsb-case-sub">' + esc(sub) + '</span></div>' +
       '<div class="dsb-case-grid">' + crests + '</div>' +
       '</div>';
