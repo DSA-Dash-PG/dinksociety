@@ -1280,14 +1280,16 @@
       // Cross-season history + division standings — public endpoints, fetched in parallel.
       const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
       const season = 'circuit-' + circ.toLowerCase();
-      const [hRes, sRes, pRes] = await Promise.allSettled([
+      const [hRes, sRes, pRes, lRes] = await Promise.allSettled([
         pid ? fetch(API + '/public-player?id=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' }) : Promise.resolve(null),
         fetch(API + '/public-standings?season=' + encodeURIComponent(season), { credentials: 'include' }),
         pid ? fetch(API + '/public-profile?leagueId=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' }) : Promise.resolve(null),
+        fetch(API + '/player-ladder-events', { credentials: 'include' }),
       ]);
       try { if (hRes.value?.ok) DATA.history = (await hRes.value.json()).history || []; } catch {}
       try { if (sRes.value?.ok) DATA.standings = await sRes.value.json(); } catch {}
       try { if (pRes.value?.ok) { const u = await pRes.value.json(); if (u && u.found && u.ladder) DATA.ladder = u.ladder; } } catch {}
+      try { if (lRes.value?.ok) DATA.ladderEvents = await lRes.value.json(); } catch {}
       showApp();
     } catch (e) {
       showLogin(err);
@@ -1742,6 +1744,41 @@
       $('v-home').innerHTML = '<div class="muted">Couldn’t display your home feed. Pull down to refresh, or try again shortly.</div>';
     }
   }
+  // Upcoming ladder nights — events the player is signed up for, plus open
+  // ladders they could still join. Mirrors the league "Coming up" list.
+  function ladderNightsHtml() {
+    const d = DATA.ladderEvents || null;
+    if (!d) return '';
+    const reg = Array.isArray(d.registered) ? d.registered : [];
+    const open = Array.isArray(d.open) ? d.open : [];
+    if (!reg.length && !open.length) return '';
+    const fmtD = iso => { if (!iso) return ''; try { return new Date(iso + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); } catch (e) { return iso; } };
+    const meta = ev => [fmtD(ev.date), ev.startTime, ev.place].filter(Boolean).join(' · ');
+    const pill = (txt, c, bg) => '<span style="font-size:10px;font-weight:800;color:' + c + ';background:' + bg + ';padding:3px 9px;border-radius:999px;white-space:nowrap;">' + txt + '</span>';
+    let h = '<div class="label">Ladder nights</div>';
+    reg.forEach(ev => {
+      const tag = ev.list === 'waitlist'
+        ? pill('Waitlist', 'var(--color-gold)', 'var(--color-gold-dim)')
+        : (ev.paymentStatus === 'pending' || ev.paymentStatus === 'venmo_pending')
+          ? pill('Payment due', 'var(--color-gold)', 'var(--color-gold-dim)')
+          : pill('You’re in', 'var(--color-lime)', 'var(--color-lime-dim)');
+      h += '<a href="/ladders.html" class="m hcard-tap" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">'
+        + '<div style="font-size:22px;">🎾</div>'
+        + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + esc(ev.name) + '</div>'
+        + '<div style="font-size:10px;color:var(--color-text-faint);margin-top:2px;">' + esc(meta(ev)) + '</div></div>'
+        + tag + '</a>';
+    });
+    open.forEach(ev => {
+      const left = ev.spotsLeft != null ? ' · ' + ev.spotsLeft + ' spot' + (ev.spotsLeft === 1 ? '' : 's') + ' left' : '';
+      h += '<div class="m" style="display:flex;align-items:center;gap:12px;">'
+        + '<div style="font-size:22px;opacity:.8;">🎾</div>'
+        + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + esc(ev.name) + '</div>'
+        + '<div style="font-size:10px;color:var(--color-text-faint);margin-top:2px;">' + esc(meta(ev)) + left + '</div></div>'
+        + '<a href="/ladders.html" style="font-size:11px;font-weight:800;color:var(--color-text-inverse);background:var(--color-lime);padding:7px 13px;border-radius:999px;text-decoration:none;white-space:nowrap;">Sign up</a></div>';
+    });
+    return h;
+  }
+
   function renderHomeInner() {
     const me = DATA.profile, sch = DATA.schedule || [];
     const upcoming = sch.filter(m => !m.final);
@@ -1988,7 +2025,8 @@
     // the season pulse (your tiles, Player of the Week, movers, team card).
     // Personal deep stats now live on their own "Me" tab.
     const homeSeg = (() => { try { return localStorage.getItem('ds-home-seg') || 'week'; } catch { return 'week'; } })();
-    const weekHtml = [hero, night, live, coming, recap].map(x => x || '').join('')
+    const ladder = (function () { try { return ladderNightsHtml(); } catch (e) { return ''; } })();
+    const weekHtml = [hero, night, live, coming, ladder, recap].map(x => x || '').join('')
       || '<div class="muted" style="padding:18px 4px;">No upcoming matches right now — check back when the next week is scheduled.</div>';
     const leagueHtml = [tiles, potw, movers, team].map(x => x || '').join('');
     const segHtml = `<div class="seg">
@@ -2123,6 +2161,7 @@
         catch (e) { console.warn('skipping malformed match', m && m.id, e); }
       });
     }
+    try { html += ladderNightsHtml(); } catch (e) {}
     if (results.length) {
       html += '<div class="label">Results</div>';
       results.forEach(m => {
