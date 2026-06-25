@@ -1782,6 +1782,29 @@
     return h;
   }
 
+  // League 8-box (Record / Avg Score / Win% / Partner DSR · PS / PA / Diff / Pts Won%).
+  function leagueStat8() {
+    const s = DATA.stats;
+    if (!s || !s.gamesPlayed) return '<div class="muted" style="padding:14px 4px;">League stats appear after your first match.</div>';
+    const lb = DATA.leaderboard || []; const dsrByPid = {}; lb.forEach(p => { if (p.playerId != null) dsrByPid[p.playerId] = p.dsr; });
+    const gwPct = wpct(s.gamesWon, s.gamesPlayed); const ptTot = (s.ps || 0) + (s.pa || 0); const ptPct = ptTot > 0 ? Math.round(s.ps / ptTot * 100) : null;
+    let wsum = 0, gsum = 0; Object.entries(s.partners || {}).forEach(([pid, o]) => { const d = dsrByPid[pid]; if (d != null && o.played) { wsum += d * o.played; gsum += o.played; } });
+    const apd = gsum ? wsum / gsum : null; const avgScore = s.gamesPlayed ? (s.ps / s.gamesPlayed).toFixed(1) : '—'; const diff = s.diff ?? ((s.ps ?? 0) - (s.pa ?? 0));
+    return sb8([
+      [`${s.gamesWon}–${s.gamesLost}`, 'Record', ''], [avgScore, 'Avg Score', ''], [`${gwPct}%`, 'Win %', 'var(--color-lime)'], [apd != null ? apd.toFixed(1) : '—', 'Partner DSR', ''],
+      [`${s.ps ?? 0}`, 'PS', ''], [`${s.pa ?? 0}`, 'PA', ''], [`${diff >= 0 ? '+' : ''}${diff}`, 'Diff', diff >= 0 ? 'var(--color-lime)' : 'var(--color-red)'], [ptPct != null ? ptPct + '%' : '—', 'Pts Won %', 'var(--color-teal)'],
+    ]);
+  }
+  // Ladder 8-box (Record / Win% / Avg / Rank · PS / PA / Diff / Streak).
+  function ladderStat8() {
+    const L = DATA.ladder; if (!L) return '';
+    const sk = L.streak || 0, skS = sk > 0 ? 'W' + sk : sk < 0 ? 'L' + Math.abs(sk) : '–';
+    return sb8([
+      [`${L.w}–${L.l}`, 'Record', ''], [(L.winPct != null ? L.winPct : 0) + '%', 'Win %', 'var(--color-lime)'], [L.avg != null ? L.avg : '—', 'Avg', ''], ['#' + (L.rank || '–'), 'Rank', ''],
+      [L.pf != null ? L.pf : '—', 'PS', ''], [L.pa != null ? L.pa : '—', 'PA', ''], [(L.diff > 0 ? '+' : '') + (L.diff || 0), 'Diff', (L.diff >= 0 ? 'var(--color-lime)' : 'var(--color-red)')], [skS, 'Streak', sk > 0 ? 'var(--color-lime)' : sk < 0 ? 'var(--color-red)' : ''],
+    ]);
+  }
+
   function renderHomeInner() {
     const me = DATA.profile, sch = DATA.schedule || [];
     const upcoming = sch.filter(m => !m.final);
@@ -1823,7 +1846,6 @@
           <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}${sideBadge(false)}</div>
         </div>
         <div class="next__meta">${next.venue ? esc(next.venue) + ' · ' : ''}${esc(next.court || 'Court TBD')} · ${esc(whenDate ? whenDate + ' · ' + startT : startT + ' · date TBD')}${next.championship ? ' · 🏆' : ''}</div>
-        ${roleStrip(next.home, next.opponent.name)}
         ${availControl(next)}
         ${nudge}
         ${lineupAcc}
@@ -1879,11 +1901,11 @@
             </div>`;
           }).join('');
           night += `<div class="yn">
-            <div class="yn__head"><h3>Your night${multiNight ? ' · vs ' + esc(nm.opponent.name) : ''}</h3><span class="sub2">${mySlotKeys.length} game${mySlotKeys.length === 1 ? '' : 's'}</span></div>
+            <div class="yn__head"><h3>Your night in League${multiNight ? ' · vs ' + esc(nm.opponent.name) : ''}</h3><span class="sub2">${mySlotKeys.length} game${mySlotKeys.length === 1 ? '' : 's'}</span></div>
             ${rows}
           </div>`;
         } else if (nm.myLocked && isMatchDay && !multiNight) {
-          night += `<div class="yn"><div class="yn__head"><h3>Your night</h3></div><div class="yn__none">You're not in this match's lineup — cheer loud. 📣</div></div>`;
+          night += `<div class="yn"><div class="yn__head"><h3>Your night in League</h3></div><div class="yn__none">You're not in this match's lineup — cheer loud. 📣</div></div>`;
         }
       }
 
@@ -2027,18 +2049,34 @@
     // hero + availability, your night, live, coming up, last result); "League" =
     // the season pulse (your tiles, Player of the Week, movers, team card).
     // Personal deep stats now live on their own "Me" tab.
-    const homeSeg = (() => { try { return localStorage.getItem('ds-home-seg') || 'week'; } catch { return 'week'; } })();
-    const ladder = (function () { try { return ladderNightsHtml(); } catch (e) { return ''; } })();
-    const weekHtml = [hero, night, live, coming, ladder, recap].map(x => x || '').join('')
-      || '<div class="muted" style="padding:18px 4px;">No upcoming matches right now — check back when the next week is scheduled.</div>';
-    const leagueHtml = [tiles, potw, movers, team].map(x => x || '').join('');
+    const hasLadderTab = !!DATA.ladder;
+    let homeSeg = (() => { try { return localStorage.getItem('ds-home-seg') || 'week'; } catch { return 'week'; } })();
+    if (homeSeg === 'ladder' && !hasLadderTab) homeSeg = 'week';
+    const ladderNights = (function () { try { return ladderNightsHtml(); } catch (e) { return ''; } })();
+
+    // Next-up at the very top of This Week: if a registered ladder night is sooner
+    // than the next league match, show ladder nights first; else the league hero leads.
+    let ladderFirst = false;
+    try {
+      const reg = (DATA.ladderEvents && DATA.ladderEvents.registered) || [];
+      const soonLadder = reg.map(e => e.date).filter(Boolean).sort()[0];
+      const nextLeague = (next && next.scheduledAt) ? next.scheduledAt.slice(0, 10) : null;
+      if (soonLadder && (!nextLeague || soonLadder < nextLeague)) ladderFirst = true;
+    } catch {}
+    const weekParts = ladderFirst ? [ladderNights, hero, night, live, recap] : [hero, night, live, ladderNights, recap];
+    const weekHtml = weekParts.map(x => x || '').join('')
+      || '<div class="muted" style="padding:18px 4px;">Nothing on the calendar right now — your next match or ladder night will show here.</div>';
+    const leagueHtml = [leagueStat8(), potw, movers, team].map(x => x || '').join('');
+    const ladderHtml = hasLadderTab ? [ladderStat8(), ladderNights].map(x => x || '').join('') : '';
     const segHtml = `<div class="seg">
       <div class="seg__b ${homeSeg === 'week' ? 'is-active' : ''}" data-h="week">This Week</div>
       <div class="seg__b ${homeSeg === 'league' ? 'is-active' : ''}" data-h="league">League</div>
+      ${hasLadderTab ? `<div class="seg__b ${homeSeg === 'ladder' ? 'is-active' : ''}" data-h="ladder">Ladder</div>` : ''}
     </div>`;
     const html = mehead + announce + segHtml
       + `<div id="h-week" class="${homeSeg === 'week' ? '' : 'hidden'}">${weekHtml}</div>`
-      + `<div id="h-league" class="${homeSeg === 'league' ? '' : 'hidden'}">${leagueHtml}</div>`;
+      + `<div id="h-league" class="${homeSeg === 'league' ? '' : 'hidden'}">${leagueHtml}</div>`
+      + (hasLadderTab ? `<div id="h-ladder" class="${homeSeg === 'ladder' ? '' : 'hidden'}">${ladderHtml}</div>` : '');
     $('v-home').innerHTML = html;
     $('v-home').querySelectorAll('.seg__b[data-h]').forEach(b => b.addEventListener('click', () => {
       const which = b.dataset.h;
@@ -2046,6 +2084,7 @@
       $('v-home').querySelectorAll('.seg__b[data-h]').forEach(x => x.classList.toggle('is-active', x === b));
       $('h-week').classList.toggle('hidden', which !== 'week');
       $('h-league').classList.toggle('hidden', which !== 'league');
+      const _hl = $('h-ladder'); if (_hl) _hl.classList.toggle('hidden', which !== 'ladder');
       window.scrollTo(0, 0);
     }));
     $('v-home').querySelectorAll('[data-go]').forEach(el => el.addEventListener('click', e => {
@@ -2697,8 +2736,7 @@
       const diff = s.diff ?? ((s.ps ?? 0) - (s.pa ?? 0));
       // 8 boxes, 2 rows of 4 — rendered at the top of the League lane (outside the
       // Stats/Partners sub-tabs) so it's always visible, matching the Ladder view.
-      league8box = `<div class="label">Current season stats</div>`
-        + sb8([
+      league8box = sb8([
           [`${s.gamesWon}–${s.gamesLost}`, 'Record', ''],
           [avgScore, 'Avg Score', ''],
           [`${gwPct}%`, 'Win %', 'var(--color-lime)'],
