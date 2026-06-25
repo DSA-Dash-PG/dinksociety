@@ -1280,16 +1280,18 @@
       // Cross-season history + division standings — public endpoints, fetched in parallel.
       const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
       const season = 'circuit-' + circ.toLowerCase();
-      const [hRes, sRes, pRes, lRes] = await Promise.allSettled([
+      const [hRes, sRes, pRes, lRes, bRes] = await Promise.allSettled([
         pid ? fetch(API + '/public-player?id=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' }) : Promise.resolve(null),
         fetch(API + '/public-standings?season=' + encodeURIComponent(season), { credentials: 'include' }),
         pid ? fetch(API + '/public-profile?leagueId=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' }) : Promise.resolve(null),
         fetch(API + '/player-ladder-events', { credentials: 'include' }),
+        fetch(API + '/public-badges?circuit=' + encodeURIComponent(circ) + (pid ? '&playerId=' + encodeURIComponent(pid) : ''), { credentials: 'include' }),
       ]);
       try { if (hRes.value?.ok) DATA.history = (await hRes.value.json()).history || []; } catch {}
       try { if (sRes.value?.ok) DATA.standings = await sRes.value.json(); } catch {}
       try { if (pRes.value?.ok) { const u = await pRes.value.json(); if (u && u.found && u.ladder) DATA.ladder = u.ladder; } } catch {}
       try { if (lRes.value?.ok) DATA.ladderEvents = await lRes.value.json(); } catch {}
+      try { if (bRes.value?.ok) { DATA.badges = await bRes.value.json(); if (window.dsBadges && DATA.badges.config) dsBadges.setConfig(DATA.badges.config); } } catch {}
       showApp();
     } catch (e) {
       showLogin(err);
@@ -1311,10 +1313,11 @@
     $('app').classList.remove('hidden');
     const p = DATA.profile || {};
     renderTeamSwitcher();
-    $('me-av').textContent = initials(p.name);
+    const meAvImg = p.hasPhoto ? ('<img src="' + API + '/player-photo-serve?id=' + encodeURIComponent(p.playerId) + '&v=' + encodeURIComponent(p.photoUpdatedAt || '') + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">') : null;
+    if (meAvImg) { $('me-av').innerHTML = meAvImg; $('me-av').style.overflow = 'hidden'; } else $('me-av').textContent = initials(p.name);
     // Drawer identity
     const dAv = $('ds-drawer-av'), dName = $('ds-drawer-name'), dEmail = $('ds-drawer-email');
-    if (dAv) dAv.textContent = initials(p.name);
+    if (dAv) { if (meAvImg) { dAv.innerHTML = meAvImg; dAv.style.overflow = 'hidden'; } else dAv.textContent = initials(p.name); }
     if (dName) dName.textContent = p.name || 'Player';
     if (dEmail) dEmail.textContent = (p.email || '') + (p.isCaptain ? ' · Captain' : p.isCoCaptain ? ' · Co-Captain' : '');
     // Role toggle shows only for team leaders. (The Team nav tab is for
@@ -2588,6 +2591,26 @@
   }
   // ---- Me page (MLP player layout: hero + vitals + Stats/Partners sub-tabs) ----
   let meSeg = 'stats';
+  // 8 stat boxes, 2 rows of 4 — shared by the League + Ladder views for consistency.
+  // rows: [value, label, optionalColor]
+  function sb8(rows) {
+    const box = r => '<div style="background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:11px;padding:11px 6px;text-align:center"><div style="font-size:18px;font-weight:900;line-height:1' + (r[2] ? ';color:' + r[2] : '') + '">' + r[0] + '</div><div style="font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-faint);margin-top:5px">' + r[1] + '</div></div>';
+    const g = a => '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:7px">' + a.map(box).join('') + '</div>';
+    return g(rows.slice(0, 4)) + g(rows.slice(4, 8));
+  }
+  // Badge opts for the logged-in player (own Me profile).
+  function myBadgeOpts() {
+    const s = DATA.stats, me = DATA.profile || {};
+    return {
+      awards: (s && s.awards) || [],
+      ladder: DATA.ladder || null,
+      grants: (DATA.badges && DATA.badges.grants) || [],
+      gender: me.gender || null,
+      currentSeason: me.circuit || 'I',
+      league: s ? { w: s.gamesWon, l: s.gamesLost, gp: s.gamesPlayed, matchesPlayed: s.matchesPlayed } : null,
+    };
+  }
+
   function renderStats() {
     const me = DATA.profile, s = DATA.stats, pn = DATA.partnerNames || {};
     const bio = me.bio || {};
@@ -2617,9 +2640,10 @@
       ? `${API}/player-photo-serve?id=${encodeURIComponent(me.playerId)}&v=${encodeURIComponent(me.photoUpdatedAt || '')}`
       : '';
     const avatarInner = photoSrc ? `<img src="${esc(photoSrc)}" alt="">` : esc(initials(me.name));
-    const chefPill = (s?.awards || []).length
-      ? `<div style="margin-top:8px"><span style="display:inline-block;font-size:8px;font-weight:800;letter-spacing:0.06em;padding:3px 8px;border-radius:var(--radius-full);background:var(--color-gold-dim);color:var(--color-gold);">👨‍🍳 CHEF OF THE WEEK</span></div>`
-      : '';
+    const bopts = myBadgeOpts();
+    const meCrest = window.dsBadges ? dsBadges.avatarCrest(bopts) : '';
+    const mePills = window.dsBadges ? dsBadges.heroPills(bopts) : '';
+    const chefPill = mePills ? `<div class="dsb-pills" style="margin-top:9px">${mePills}</div>` : '';
     const genderTxt = me.gender === 'F' ? 'Female' : me.gender === 'M' ? 'Male' : '';
     const roleTxt = me.isCaptain ? 'Captain' : me.isCoCaptain ? 'Co-Captain' : '';
     const metaLine = [
@@ -2633,7 +2657,7 @@
     const vitals = vitalDefs.map(([l, v]) => vital(l, v)).join('');
     const hero = `<div class="mlp-hero">
       <div class="mlp-hero__top">
-        <div class="mlp-photo">${avatarInner}</div>
+        <div class="mlp-photo" style="position:relative">${avatarInner}${meCrest}</div>
         <div class="mlp-hero__id">
           <div class="mlp-hero__name">${esc(me.name)}</div>
           <div class="mlp-hero__meta">${metaLine}</div>
@@ -2648,9 +2672,11 @@
       ${vitals ? `<div class="mlp-vitals">${vitals}</div>` : ''}
     </div>`;
 
+    const hasTrophies = window.dsBadges && dsBadges.hasWins(bopts);
     const seg = `<div class="seg">
       <div class="seg__b ${meSeg === 'stats' ? 'is-active' : ''}" data-me="stats">Stats</div>
       <div class="seg__b ${meSeg === 'partners' ? 'is-active' : ''}" data-me="partners">Partners</div>
+      ${hasTrophies ? `<div class="seg__b ${meSeg === 'trophies' ? 'is-active' : ''}" data-me="trophies">Trophies</div>` : ''}
     </div>`;
 
     // ── Stats sub-tab ──
@@ -2666,13 +2692,20 @@
       let wsum = 0, gsum = 0;
       Object.entries(s.partners || {}).forEach(([pid, o]) => { const d = dsrByPid[pid]; if (d != null && o.played) { wsum += d * o.played; gsum += o.played; } });
       const apd = gsum ? wsum / gsum : null;
-      const card = (val, lbl, sub) => `<div class="mlp-card"><div class="mlp-card__val">${val}</div><div class="mlp-card__lbl">${lbl}</div>${sub ? `<div class="mlp-card__sub">${sub}</div>` : ''}</div>`;
-      let body = `<div class="label">Current season stats</div><div class="mlp-cards">
-        ${card(`<span style="color:var(--color-lime)">${gwPct}%</span>`, 'Games Won %', `${s.gamesWon} W – ${s.gamesLost} L`)}
-        ${card(`<span style="color:var(--color-teal)">${ptPct != null ? ptPct + '%' : '—'}</span>`, 'Points Won %', `${s.ps ?? 0} – ${s.pa ?? 0}`)}
-        ${card(`${s.gamesPlayed}`, 'Games Played', `${s.matchesPlayed ?? 0} matches`)}
-        ${card(`<span style="color:var(--color-lime)">${apd != null ? apd.toFixed(1) : '—'}</span>`, 'Avg Partner DSR', `${Object.keys(s.partners || {}).length} partners`)}
-      </div>`;
+      const avgScore = s.gamesPlayed ? (s.ps / s.gamesPlayed).toFixed(1) : '—';
+      const diff = s.diff ?? ((s.ps ?? 0) - (s.pa ?? 0));
+      // 8 boxes, 2 rows of 4 — same layout as the Ladder view (sb8 helper).
+      let body = `<div class="label">Current season stats</div>`
+        + sb8([
+          [`${s.gamesWon}–${s.gamesLost}`, 'Record', ''],
+          [avgScore, 'Avg Score', ''],
+          [`${gwPct}%`, 'Win %', 'var(--color-lime)'],
+          [apd != null ? apd.toFixed(1) : '—', 'Partner DSR', ''],
+          [`${s.ps ?? 0}`, 'PS', ''],
+          [`${s.pa ?? 0}`, 'PA', ''],
+          [`${diff >= 0 ? '+' : ''}${diff}`, 'Diff', diff >= 0 ? 'var(--color-lime)' : 'var(--color-red)'],
+          [ptPct != null ? ptPct + '%' : '—', 'Pts Won %', 'var(--color-teal)'],
+        ]);
       const bt = s.byType || {};
       const rows = [['womens', "Gender (Women's)"], ['mens', "Gender (Men's)"], ['mixed', 'Mixed']].filter(([k]) => (bt[k]?.played || 0) > 0);
       if (rows.length) {
@@ -2717,9 +2750,11 @@
       }).join('') + `<div class="ptot"><span>Total</span><span>${totW}–${totP - totW} <b>${wpct(totW, totP)}%</b></span></div>`;
     }
 
+    const trophiesBody = window.dsBadges ? (dsBadges.trophyCase(bopts) || '<div class="muted" style="padding:16px 4px;">No badges yet — win a Player of the Week, ladder night, and more to fill your Trophies.</div>') : '';
     const leagueInner = seg
       + `<div id="me-stats" class="${meSeg === 'stats' ? '' : 'hidden'}">${statsBody}</div>`
-      + `<div id="me-partners" class="${meSeg === 'partners' ? '' : 'hidden'}">${partnersBody}</div>`;
+      + `<div id="me-partners" class="${meSeg === 'partners' ? '' : 'hidden'}">${partnersBody}</div>`
+      + `<div id="me-trophies" class="${meSeg === 'trophies' ? '' : 'hidden'}">${trophiesBody}</div>`;
 
     const L = DATA.ladder;
     const bindSeg = () => {
@@ -2728,6 +2763,7 @@
         $('v-stats').querySelectorAll('.seg__b[data-me]').forEach(x => x.classList.toggle('is-active', x === b));
         $('me-stats').classList.toggle('hidden', meSeg !== 'stats');
         $('me-partners').classList.toggle('hidden', meSeg !== 'partners');
+        const _tr = $('me-trophies'); if (_tr) _tr.classList.toggle('hidden', meSeg !== 'trophies');
         window.scrollTo(0, 0);
       }));
     };
@@ -2827,6 +2863,7 @@
 
   // ---- team ----
   let teamSeg = 'overview';
+  let teamLeadTab = 'dsr';
   function renderTeam() {
     const t = DATA.team || {}, me = DATA.profile, st = t.standing;
     const ros = t.roster || [];
@@ -2851,12 +2888,27 @@
       results.slice(-6).map(m => `<span class="tform__c ${m.result === 'W' ? 'w' : m.result === 'L' ? 'l' : 't'}" title="Week ${m.week}">${m.result}</span>`).join('')
     }<span class="tform__sub">last ${Math.min(results.length, 6)} match${results.length === 1 ? '' : 'es'}</span></div>` : '';
 
-    // Team leaders — roster arrives sorted by DSR desc, so first of each gender wins
-    const topW = ros.find(p => p.gender === 'F' && p.dsr != null) || null;
-    const topM = ros.find(p => p.gender === 'M' && p.dsr != null) || null;
-    const leadCard = (p, label, cls) => p ? `<div class="tlead"><div class="tlead__av ${cls}">${initials(p.name)}</div>
-      <div class="tlead__t"><div class="tlead__n">${playerLink(p.name, me.teamName, esc(shortName(p.name)))}</div><div class="tlead__s">${label} · ${esc(p.dsr)} DSR</div></div></div>` : '';
-    const leaders = (topW || topM) ? `<div class="label">Team leaders</div><div class="tlead__grid">${leadCard(topW, 'Top woman', 'gold')}${leadCard(topM, 'Top man', 'teal')}</div>` : '';
+    // Team leaders — the WHOLE roster ranked within the team, three lenses:
+    // DSR, Top Scorer (PS), Top Defender (fewest PA). Re-renders in place on tab click.
+    const teamLeaderRows = (tab) => {
+      let arr, val;
+      if (tab === 'scorer') { arr = ros.filter(p => (p.gp || 0) > 0).slice().sort((a, b) => (b.ps || 0) - (a.ps || 0)); val = p => (p.ps != null ? p.ps : '—'); }
+      else if (tab === 'def') { arr = ros.filter(p => (p.gp || 0) > 0).slice().sort((a, b) => (a.pa != null ? a.pa : 9e9) - (b.pa != null ? b.pa : 9e9)); val = p => (p.pa != null ? p.pa : '—'); }
+      else { arr = ros.filter(p => p.dsr != null).slice().sort((a, b) => (b.dsr ?? -1) - (a.dsr ?? -1)); val = p => (p.dsr != null ? p.dsr : '—'); }
+      if (!arr.length) return '<div class="muted" style="padding:12px 4px;">No stats yet — ranks fill in after matches.</div>';
+      return arr.map((p, i) => `<div class="rost${p.me ? ' rost--me' : ''}">
+        <span class="rost__rank"${i === 0 ? ' style="color:var(--color-gold)"' : ''}>${i + 1}</span>
+        <div class="rost__av">${initials(p.name)}</div>
+        <div class="rost__name">${playerLink(p.name, me.teamName, esc(shortName(p.name)))}${p.me ? '<span class="me">YOU</span>' : ''}</div>
+        <div class="rost__num"><div class="rost__dsr2"${i === 0 ? ' style="color:var(--color-lime)"' : ''}>${val(p)}</div></div></div>`).join('');
+    };
+    const leaders = `<div class="label">Team leaders <span class="sub">within team</span></div>
+      <div class="seg" style="margin-bottom:10px">
+        <div class="seg__b ${teamLeadTab === 'dsr' ? 'is-active' : ''}" data-tl="dsr">DSR</div>
+        <div class="seg__b ${teamLeadTab === 'scorer' ? 'is-active' : ''}" data-tl="scorer">Top Scorer</div>
+        <div class="seg__b ${teamLeadTab === 'def' ? 'is-active' : ''}" data-tl="def">Top Defender</div>
+      </div>
+      <div id="tl-list">${teamLeaderRows(teamLeadTab)}</div>`;
 
     // Roster ranked by DSR with captain badges + per-player game W–L
     const roster = ros.map((p, i) => {
@@ -2907,6 +2959,11 @@
       $('v-team').querySelectorAll('.seg__b[data-tm]').forEach(x => x.classList.toggle('is-active', x === b));
       ['overview', 'roster', 'schedule'].forEach(k => $('tm-' + k).classList.toggle('hidden', teamSeg !== k));
       window.scrollTo(0, 0);
+    }));
+    $('v-team').querySelectorAll('.seg__b[data-tl]').forEach(b => b.addEventListener('click', () => {
+      teamLeadTab = b.dataset.tl;
+      $('v-team').querySelectorAll('.seg__b[data-tl]').forEach(x => x.classList.toggle('is-active', x === b));
+      const list = $('tl-list'); if (list) list.innerHTML = teamLeaderRows(teamLeadTab);
     }));
   }
   function ordinal(n) { if (n == null) return '—'; const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }

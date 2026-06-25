@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Player Portal redesign — Dink Society (mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e0e0e;--surf:#161616;--surf2:#1e1e1e;--surf3:#262626;--bd:rgba(255,255,255,.08);--bd2:rgba(255,255,255,.14);
+    --tx:#f0f0ec;--mut:#9a9e97;--fnt:#5e625c;--inv:#0e0e0e;--lime:#b8ff2c;--limed:rgba(184,255,44,.12);--teal:#17d7b0;--teald:rgba(23,215,176,.12);--gold:#f0c040;--goldd:rgba(240,192,64,.12);--red:#ff5c47}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:#000;color:var(--tx);font-family:'Inter',sans-serif;line-height:1.45;display:flex;flex-direction:column;align-items:center;padding:24px 12px 60px;gap:14px}
+  .cap{color:var(--mut);font-size:13px;max-width:430px;text-align:center}
+  .cap b{color:var(--tx)}
+  /* phone frame */
+  .phone{width:412px;max-width:100%;background:var(--bg);border:1px solid var(--bd2);border-radius:26px;overflow:hidden;position:relative;height:840px;display:flex;flex-direction:column}
+  .hdr{display:flex;align-items:center;gap:11px;padding:16px 16px 12px;border-bottom:1px solid var(--bd);position:sticky;top:0;background:var(--bg);z-index:5}
+  .me-av{width:44px;height:44px;border-radius:50%;flex:none;background:#17d7b0;color:#06231d;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:16px;overflow:hidden;position:relative}
+  .me-av img{width:100%;height:100%;object-fit:cover}
+  .me-id{flex:1;min-width:0}.me-nm{font-size:15px;font-weight:900}.me-sub{font-size:11px;color:var(--mut);font-weight:600}
+  .me-bell{width:34px;height:34px;border-radius:50%;background:var(--surf2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:15px}
+  .scroll{flex:1;overflow-y:auto;padding:14px 14px 84px}
+  .scroll::-webkit-scrollbar{width:0}
+  /* bottom nav */
+  .nav{position:absolute;bottom:0;left:0;right:0;height:64px;background:rgba(14,14,14,.94);backdrop-filter:blur(12px);border-top:1px solid var(--bd);display:flex;z-index:6}
+  .nav button{flex:1;background:none;border:0;color:var(--fnt);font:inherit;font-size:9.5px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer}
+  .nav button .ic{font-size:18px}
+  .nav button.on{color:var(--lime)}
+  /* shared bits */
+  .ann{background:linear-gradient(120deg,var(--teald),transparent);border:1px solid var(--bd);border-left:3px solid var(--teal);border-radius:10px;padding:9px 12px;font-size:12px;color:var(--mut);margin-bottom:12px}
+  .ann b{color:var(--tx)}
+  .seg{display:flex;gap:4px;background:var(--surf2);border:1px solid var(--bd);border-radius:999px;padding:4px;margin-bottom:14px}
+  .seg button{flex:1;background:none;border:0;color:var(--mut);font:inherit;font-size:12.5px;font-weight:800;padding:8px;border-radius:999px;cursor:pointer}
+  .seg button.on{background:var(--lime);color:var(--inv)}
+  .seg.teal button.on{background:var(--teal);color:#06231d}
+  .lbl{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--fnt);margin:16px 2px 9px}
+  .lbl:first-child{margin-top:2px}
+  /* 8-box stat grid (2 rows of 4) */
+  .stat8{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+  .sb{background:var(--surf2);border:1px solid var(--bd);border-radius:11px;padding:11px 6px;text-align:center}
+  .sb .n{font-size:18px;font-weight:900;line-height:1}.sb .l{font-size:8px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--fnt);margin-top:5px}
+  .n.lime{color:var(--lime)}.n.teal{color:var(--teal)}.n.red{color:var(--red)}.n.gold{color:var(--gold)}
+  /* next-up hero (compact) */
+  .nu{border:1px solid var(--bd2);border-radius:16px;overflow:hidden;background:linear-gradient(150deg,rgba(184,255,44,.10),rgba(22,22,22,.6) 60%);margin-bottom:12px}
+  .nu.ld{background:linear-gradient(150deg,rgba(23,215,176,.12),rgba(22,22,22,.6) 60%)}
+  .nu__top{padding:12px 14px}
+  .nu__eye{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--lime);display:flex;align-items:center;gap:6px}
+  .nu.ld .nu__eye{color:var(--teal)}
+  .nu__row{display:flex;align-items:center;gap:10px;margin-top:9px}
+  .nu__t{flex:1;text-align:center;min-width:0}
+  .nu__em{font-size:24px}.nu__tn{font-size:13px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .nu__vs{font-size:11px;font-weight:900;color:var(--fnt)}
+  .nu__meta{font-size:11px;color:var(--mut);text-align:center;margin-top:9px;font-weight:600}
+  .nu__avail{display:flex;gap:8px;padding:11px 14px;background:rgba(0,0,0,.25);border-top:1px solid var(--bd)}
+  .nu__avail .q{flex:1;font-size:12.5px;font-weight:800;align-self:center}
+  .ab{padding:8px 14px;border-radius:999px;font:inherit;font-size:12px;font-weight:800;border:1px solid var(--bd);background:var(--surf2);color:var(--mut);cursor:pointer}
+  .ab.in{background:var(--lime);color:var(--inv);border-color:var(--lime)}
+  .ab.out{background:transparent;color:var(--red);border-color:var(--red)}
+  /* match / game card */
+  .mc{background:var(--surf);border:1px solid var(--bd);border-radius:12px;padding:11px 13px;margin-bottom:8px}
+  .mc__h{display:flex;align-items:center;gap:8px}
+  .mc__d{font-size:10px;font-weight:800;color:var(--fnt);width:46px;flex:none;letter-spacing:.02em}
+  .mc__o{flex:1;font-size:13px;font-weight:800;min-width:0}.mc__sub{font-size:10.5px;color:var(--mut);font-weight:600;margin-top:1px}
+  .pillW{font-size:10px;font-weight:900;padding:3px 9px;border-radius:999px;background:var(--limed);color:var(--lime)}
+  .pillL{background:rgba(255,92,71,.14);color:var(--red)}
+  .pillUp{background:var(--surf3);color:var(--mut)}
+  .pillLd{background:var(--teald);color:var(--teal)}
+  .chev{margin-left:6px;color:var(--fnt);font-size:13px;cursor:pointer}
+  .games{margin-top:9px;border-top:1px solid var(--bd);padding-top:8px;display:none}
+  .games.open{display:block}
+  .grow{display:flex;justify-content:space-between;font-size:11.5px;padding:4px 0;border-top:1px solid rgba(255,255,255,.05)}
+  .grow:first-child{border-top:0}.grow .w{font-weight:800;color:var(--lime)}.grow .l2{font-weight:800;color:var(--red)}
+  /* roster row */
+  .rr{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--bd)}
+  .rr:first-child{border-top:0}
+  .rr .rk{width:16px;font-size:12px;font-weight:900;color:var(--fnt);text-align:center}
+  .rr.lead .rk{color:var(--gold)}
+  .rr .av{width:30px;height:30px;border-radius:50%;flex:none;background:var(--surf3);border:1.5px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:var(--mut);overflow:hidden}
+  .rr .nm{flex:1;min-width:0;font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rr .v{font-size:14px;font-weight:900}.rr .v.lime{color:var(--lime)}
+  .card{background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:14px}
+  .note{font-size:11px;color:var(--fnt);margin-top:10px;line-height:1.5}
+  .ph-tabs{display:flex;gap:4px;background:var(--surf2);border:1px solid var(--bd);border-radius:9px;padding:3px;margin:12px 0}
+  .ph-tabs button{flex:1;background:none;border:0;color:var(--mut);font:inherit;font-size:11px;font-weight:800;padding:7px 2px;border-radius:7px;cursor:pointer}
+  .ph-tabs button.on{background:var(--surf3);color:var(--tx)}
+  .tag{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--lime);background:var(--limed);border:1px solid rgba(184,255,44,.4);padding:2px 7px;border-radius:999px;margin-left:6px}
+</style>
+</head>
+<body>
+  <div class="cap"><b>Player portal redesign — interactive mockup.</b> Tap the bottom nav + sub-tabs. Everything here is representative data on the real design tokens; nothing is wired yet.</div>
+
+  <div class="phone">
+    <div class="hdr">
+      <div class="me-av">RH</div>
+      <div class="me-id"><div class="me-nm">Ryan Hom</div><div class="me-sub">Smash Society · Captain</div></div>
+      <div class="me-bell">🔔</div>
+    </div>
+    <div class="scroll" id="screen"></div>
+    <div class="nav" id="nav">
+      <button data-v="home" class="on"><span class="ic">🏠</span>Home</button>
+      <button data-v="games"><span class="ic">🎾</span>Games</button>
+      <button data-v="team"><span class="ic">👥</span>Team</button>
+      <button data-v="me"><span class="ic">📊</span>Me</button>
+    </div>
+  </div>
+
+  <div class="cap" style="margin-top:4px">Avatar shows the player's photo when set (initials otherwise). The next-up event — league match <i>or</i> ladder night, whichever is sooner — sits at the very top of <b>This Week</b>.</div>
+
+<script>
+var STATE={ v:'home', home:'week', me:'league', team:'dsr' };
+
+/* ---------- mock data ---------- */
+var LEAGUE8=[['8–0','Record',''],['9.4','Avg Score',''],['100%','Win %','lime'],['80.6','Partner DSR','']
+  ,['88','PS',''],['21','PA',''],['+67','Diff','lime'],['80.7%','Pts Won %','teal']];
+var LADDER8=[['55–22','Record',''],['71%','Win %','lime'],['10.8','Avg',''],['#1','Rank','']
+  ,['833','PS',''],['553','PA',''],['+280','Diff','lime'],['W4','Streak','lime']];
+
+var TEAM=[
+  {n:'Ryan Hom',dsr:97.6,ps:88,pa:21},
+  {n:'Phoebe Bautista',dsr:93.8,ps:78,pa:24},
+  {n:'Annie Kang',dsr:93.2,ps:75,pa:28},
+  {n:'Devin Carroll',dsr:95.0,ps:80,pa:31},
+  {n:'Kai Park',dsr:80.4,ps:61,pa:55},
+  {n:'Mia Tan',dsr:78.1,ps:58,pa:49}
+];
+
+// merged chronological games (league + ladder)
+var GAMES=[
+  {t:'ladder',date:'Jul 5',name:'Weekend Open Ladder',sub:'Dink House · 10:00 AM',state:'up'},
+  {t:'league',date:'Jun 30',name:'vs ZERO ZERO TWO',sub:'Week 3 · The Yard · 7:00 PM',state:'next'},
+  {t:'ladder',date:'Jun 24',name:'Tuesday Night Ladder',sub:'5 rounds · finished #1',state:'win',
+     games:[['R1 w/ Mia','11–6','w'],['R2 w/ Devin','11–9','w'],['R3 w/ Annie','9–11','l'],['R4 w/ Phoebe','11–4','w']]},
+  {t:'league',date:'Jun 22',name:'vs What the Dink?!',sub:'Week 2 · 10–2 W',state:'win',
+     games:[['R1 Men\'s','11–7','w'],['R1 Mixed','11–5','w'],['R2 Mixed','9–11','l'],['R2 Women\'s','11–8','w']]},
+  {t:'league',date:'Jun 15',name:'vs Big Dink Energy',sub:'Week 1 · 8–4 W',state:'win',
+     games:[['R1 Men\'s','11–9','w'],['R1 Mixed','11–6','w'],['R2 Mixed','11–7','w'],['R2 Women\'s','8–11','l']]}
+];
+
+// season history (matches with toggle)
+var HISTORY=[
+  {date:'Jun 22',name:'Week 2 · vs What the Dink?!',res:'W',score:'10–2',
+     games:[['Men\'s','11–7','w'],['Mixed','11–5','w'],['Mixed','9–11','l'],['Women\'s','11–8','w']]},
+  {date:'Jun 15',name:'Week 1 · vs Big Dink Energy',res:'W',score:'8–4',
+     games:[['Men\'s','11–9','w'],['Mixed','11–6','w'],['Mixed','11–7','w'],['Women\'s','8–11','l']]}
+];
+
+/* ---------- helpers ---------- */
+function ini(n){return n.split(' ').map(function(x){return x[0];}).join('').slice(0,2).toUpperCase();}
+function stat8(arr,tealAccent){
+  return '<div class="stat8">'+arr.map(function(s){return '<div class="sb"><div class="n '+(s[2]||'')+'">'+s[0]+'</div><div class="l">'+s[1]+'</div></div>';}).join('')+'</div>';
+}
+
+/* ---------- HOME ---------- */
+function nextUpHero(kind){
+  if(kind==='ladder'){
+    return '<div class="nu ld"><div class="nu__top"><div class="nu__eye">🎾 Next up · Ladder night</div>'
+      +'<div class="nu__meta" style="margin-top:8px;font-size:13px;color:var(--tx);font-weight:800">Tuesday Night Ladder</div>'
+      +'<div class="nu__meta">Tue, Jul 1 · 6:30 PM · Dink House · You\'re in ✓</div></div></div>';
+  }
+  return '<div class="nu"><div class="nu__top">'
+    +'<div class="nu__eye">● Your night in League · Week 3</div>'
+    +'<div class="nu__row"><div class="nu__t"><div class="nu__em">🏔️</div><div class="nu__tn">Smash Society</div></div>'
+    +'<div class="nu__vs">VS</div><div class="nu__t"><div class="nu__em">🎯</div><div class="nu__tn">ZERO ZERO TWO</div></div></div>'
+    +'<div class="nu__meta">The Yard · Court 2 · Mon Jun 30 · 7:00 PM</div></div>'
+    +'<div class="nu__avail"><div class="q">Can you make it?</div>'
+    +'<button class="ab in">I\'m in</button><button class="ab out">Out</button></div></div>';
+}
+function homeWeek(){
+  // next-up: ladder is sooner (Jul 1) than league (Jun 30)? here league is next; ladder shown under.
+  return nextUpHero('league')
+    + '<div class="lbl">Ladder nights</div>'
+    + '<a class="mc" style="display:block;text-decoration:none;color:inherit"><div class="mc__h"><span class="mc__d">Jul 1</span><div class="mc__o">Tuesday Night Ladder<div class="mc__sub">6:30 PM · Dink House</div></div><span class="pillLd">You\'re in</span></div></a>'
+    + '<div class="mc"><div class="mc__h"><span class="mc__d">Jul 5</span><div class="mc__o">Weekend Open Ladder<div class="mc__sub">10 AM · 3 spots left</div></div><button class="ab in" style="padding:6px 12px;font-size:11px">Sign up</button></div></div>'
+    + '<div class="note">No "Coming up" list here anymore — all scheduled league + ladder games live in the <b>Games</b> tab.</div>';
+}
+function homeLeague(){
+  return '<div class="lbl">My league stats <span class="tag">consistent w/ ladder</span></div>'+stat8(LEAGUE8)
+    + '<div class="lbl">Standings</div><div class="card"><div class="rr lead"><span class="rk">1</span><span class="av">SS</span><span class="nm">Smash Society</span><span class="v lime">4–0</span></div><div class="rr"><span class="rk">2</span><span class="av">ZZ</span><span class="nm">ZERO ZERO TWO</span><span class="v">3–1</span></div><div class="rr"><span class="rk">3</span><span class="av">BD</span><span class="nm">Big Dink Energy</span><span class="v">2–1</span></div></div>';
+}
+function homeLadder(){
+  return '<div class="lbl">My ladder stats <span class="tag">consistent w/ league</span></div>'+stat8(LADDER8)
+    + '<div class="lbl">Ladder standing</div><div class="card"><div class="rr lead"><span class="rk">1</span><span class="av">RH</span><span class="nm">Ryan Hom</span><span class="v lime">10.8 avg</span></div><div class="rr"><span class="rk">2</span><span class="av">DV</span><span class="nm">Devin Carroll</span><span class="v">10.1 avg</span></div></div>';
+}
+function renderHome(){
+  var seg='<div class="seg"><button data-h="week" class="'+(STATE.home==='week'?'on':'')+'">This Week</button>'
+    +'<button data-h="league" class="'+(STATE.home==='league'?'on':'')+'">League</button>'
+    +'<button data-h="ladder" class="'+(STATE.home==='ladder'?'on':'')+'">Ladder</button></div>';
+  var body=STATE.home==='week'?homeWeek():STATE.home==='league'?homeLeague():homeLadder();
+  return '<div class="ann"><b>League announcement:</b> Week 3 lineups lock 1 hour before match. 🎾</div>'+seg+body;
+}
+
+/* ---------- GAMES ---------- */
+function gameCard(g,i){
+  var pill = g.state==='win'?'<span class="pillW">'+( g.t==='ladder'?'#1':'W')+'</span>'
+    : g.state==='loss'?'<span class="pillL">L</span>'
+    : g.state==='next'?'<span class="pillUp">Next</span>'
+    : g.t==='ladder'?'<span class="pillLd">Ladder</span>':'<span class="pillUp">Upcoming</span>';
+  var toggle = g.games?'<span class="chev" data-g="'+i+'">▾</span>':'';
+  var rows = g.games?'<div class="games" id="g'+i+'">'+g.games.map(function(r){return '<div class="grow"><span>'+r[0]+'</span><span class="'+(r[2]==='w'?'w':'l2')+'">'+r[1]+'</span></div>';}).join('')+'</div>':'';
+  var icon = g.t==='ladder'?'🎾 ':'';
+  return '<div class="mc"><div class="mc__h"><span class="mc__d">'+g.date+'</span><div class="mc__o">'+icon+g.name+'<div class="mc__sub">'+g.sub+'</div></div>'+pill+toggle+'</div>'+rows+'</div>';
+}
+function renderGames(){
+  var next=GAMES.filter(function(g){return g.state==='next';});
+  var up=GAMES.filter(function(g){return g.state==='up';});
+  var done=GAMES.filter(function(g){return g.state==='win'||g.state==='loss';});
+  var h='<div class="lbl">Next match</div>'+next.map(gameCard).join('');
+  h+='<div class="lbl">Schedule</div>'+up.map(gameCard).join('');
+  h+='<div class="lbl">Results</div>'+done.map(gameCard).join('');
+  return '<div class="note" style="margin:0 0 12px">League + ladder, one chronological flow: <b>Next match → Schedule → Results</b>. Tap a finished game to expand its scores.</div>'+h;
+}
+
+/* ---------- TEAM ---------- */
+function renderTeam(){
+  var seg='<div class="ph-tabs"><button data-t="dsr" class="'+(STATE.team==='dsr'?'on':'')+'">DSR</button>'
+    +'<button data-t="scorer" class="'+(STATE.team==='scorer'?'on':'')+'">Top Scorer</button>'
+    +'<button data-t="def" class="'+(STATE.team==='def'?'on':'')+'">Top Defender</button></div>';
+  var rows=TEAM.slice();
+  var valFn, lbl;
+  if(STATE.team==='dsr'){ rows.sort(function(a,b){return b.dsr-a.dsr;}); valFn=function(p){return p.dsr.toFixed(1);}; lbl='DSR'; }
+  else if(STATE.team==='scorer'){ rows.sort(function(a,b){return b.ps-a.ps;}); valFn=function(p){return p.ps;}; lbl='PS'; }
+  else { rows.sort(function(a,b){return a.pa-b.pa;}); valFn=function(p){return p.pa;}; lbl='PA'; }
+  var list=rows.map(function(p,i){return '<div class="rr'+(i===0?' lead':'')+'"><span class="rk">'+(i+1)+'</span><span class="av">'+ini(p.n)+'</span><span class="nm">'+p.n+'</span><span class="v'+(i===0?' lime':'')+'">'+valFn(p)+'</span></div>';}).join('');
+  var sub = STATE.team==='dsr'?'Whole roster ranked by DSR':STATE.team==='scorer'?'Ranked by points scored (PS)':'Ranked by fewest points allowed (PA)';
+  return '<div class="lbl">Team leaders · '+sub+'</div><div class="card">'+list+'</div>'
+    +'<div class="note">Now ranks the <b>entire team</b> within the team (not the whole league), with three lenses: DSR, Top Scorer, Top Defender.</div>';
+}
+
+/* ---------- ME ---------- */
+function renderMe(){
+  var seg='<div class="seg teal"><button data-m="league" class="'+(STATE.me==='league'?'on':'')+'">League</button>'
+    +'<button data-m="ladder" class="'+(STATE.me==='ladder'?'on':'')+'">Ladder</button></div>';
+  var stats = STATE.me==='league'?stat8(LEAGUE8):stat8(LADDER8);
+  var hist = HISTORY.map(function(m,i){
+    var rows='<div class="games" id="h'+i+'">'+m.games.map(function(r){return '<div class="grow"><span>'+r[0]+'</span><span class="'+(r[2]==='w'?'w':'l2')+'">'+r[1]+'</span></div>';}).join('')+'</div>';
+    return '<div class="mc"><div class="mc__h"><span class="mc__d">'+m.date+'</span><div class="mc__o">'+m.name+'<div class="mc__sub">'+m.score+' final</div></div><span class="pill'+m.res+'" class="pillW">'+m.res+'</span><span class="chev" data-h2="'+i+'">▾</span></div>'+rows+'</div>';
+  }).join('');
+  return seg
+    +'<div class="lbl">'+(STATE.me==='league'?'League':'Ladder')+' season stats <span class="tag">same 8 boxes</span></div>'+stats
+    +(STATE.me==='league'?'<div class="lbl">Season history <span class="tag">tap to expand scores</span></div>'+hist:'<div class="note" style="margin-top:14px">Ladder history (per-night results) shows here, same toggle pattern.</div>');
+}
+
+/* ---------- render + events ---------- */
+function render(){
+  var s=document.getElementById('screen');
+  s.innerHTML = STATE.v==='home'?renderHome():STATE.v==='games'?renderGames():STATE.v==='team'?renderTeam():renderMe();
+  s.scrollTop=0;
+  document.querySelectorAll('#nav button').forEach(function(b){b.classList.toggle('on',b.dataset.v===STATE.v);});
+}
+document.getElementById('nav').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;STATE.v=b.dataset.v;render();});
+document.getElementById('screen').addEventListener('click',function(e){
+  var h=e.target.closest('[data-h]'); if(h){STATE.home=h.dataset.h;render();return;}
+  var t=e.target.closest('[data-t]'); if(t){STATE.team=t.dataset.t;render();return;}
+  var m=e.target.closest('[data-m]'); if(m){STATE.me=m.dataset.m;render();return;}
+  var g=e.target.closest('[data-g]'); if(g){var el=document.getElementById('g'+g.dataset.g);if(el){el.classList.toggle('open');g.textContent=el.classList.contains('open')?'▴':'▾';}return;}
+  var h2=e.target.closest('[data-h2]'); if(h2){var el2=document.getElementById('h'+h2.dataset.h2);if(el2){el2.classList.toggle('open');h2.textContent=el2.classList.contains('open')?'▴':'▾';}return;}
+});
+render();
+</script>
+</body>
+</html>
