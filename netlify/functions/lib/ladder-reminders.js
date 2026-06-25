@@ -19,15 +19,17 @@ import { sendEmail } from './email.js';
 import { siteUrl, dateLineOf, fmtCents } from './ladder-notify.js';
 import { listEvents, getSignups, eventStartMs, effectiveCapacity } from './ladder.js';
 import { buildLadderProfile } from './profile-data.js';
+import { createLadderToken } from './ladder-token.js';
 
 const MARKERS = 'ladder-reminders';
 function markers() { return getStore({ name: MARKERS, consistency: 'strong' }); }
 const markerKey = (eventId, kind) => `sent/${eventId}/${kind}.json`;
 
-// Ladder reminders send AS the ladder desk so replies land in that shared inbox.
+// Ladder reminders send from the shared Dink Society notification address so
+// replies land in that inbox. Defaults to dink@dinksociety.app (override LADDER_FROM).
 function ladderFrom() {
   return (typeof Netlify !== 'undefined' && Netlify.env.get('LADDER_FROM'))
-    || process.env.LADDER_FROM || 'ladder@dinksociety.app';
+    || process.env.LADDER_FROM || 'dink@dinksociety.app';
 }
 
 const HOUR = 3600 * 1000;
@@ -130,13 +132,13 @@ function rosterChips(roster, profileById, meEmail) {
   }).join('');
 }
 
-export function renderReminderEmail({ event, kind, recipient, profile, roster, profileById, waitlistCount, capacity, nextEvent }) {
+export function renderReminderEmail({ event, kind, recipient, profile, roster, profileById, waitlistCount, capacity, nextEvent, cancelUrl }) {
   const meta = KIND_META[kind] || KIND_META.two_day;
   const fn = firstName(recipient.name);
   const site = siteUrl();
   const dateLine = dateLineOf(event);
   const courts = event.courtNumbers ? esc(event.courtNumbers) : `${event.courts || 0} courts`;
-  const cancelUrl = `${site}/ladders.html?event=${encodeURIComponent(event.id)}`;
+  const cancelHref = cancelUrl || `${site}/ladders.html?event=${encodeURIComponent(event.id)}`;
   const paidLine = recipient.amountCents != null ? fmtCents(recipient.amountCents) : (event.feeCents != null ? fmtCents(event.feeCents) : 'your entry fee');
 
   const ll = lastLadderLine(profile);
@@ -192,7 +194,7 @@ export function renderReminderEmail({ event, kind, recipient, profile, roster, p
 
     <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:22px 0 8px">
       <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.07em;color:#f0c040;margin-bottom:6px">${kind === 'morning' ? '⏰ Last call if you’re out' : '👋 Can’t make it?'}</div>
-      <p style="font-size:13.5px;color:#cfcfcf;line-height:1.6;margin:0"><a href="${cancelUrl}" style="color:#f0c040;font-weight:700;text-decoration:none">Cancel your spot</a> and you'll get back <b style="color:#fff">what you paid for this ladder</b> (${esc(paidLine)}) as a credit. The next person on the waitlist takes your place automatically, so the night stays full.</p>
+      <p style="font-size:13.5px;color:#cfcfcf;line-height:1.6;margin:0"><a href="${cancelHref}" style="color:#f0c040;font-weight:700;text-decoration:none">Cancel your spot</a> and you'll get back <b style="color:#fff">what you paid for this ladder</b> (${esc(paidLine)}) as a credit. The next person on the waitlist takes your place automatically, so the night stays full.</p>
     </div>
 
     ${nextBlock}
@@ -233,11 +235,20 @@ export async function sendEventReminder(event, signups, kind, { force = false } 
   const from = ladderFrom();
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+  // Cancel tokens stay valid until the ladder starts (plus a small buffer).
+  const start = eventStartMs(event);
+  const ttl = Math.max(3600000, (start || (Date.now() + 86400000)) - Date.now() + 3600000);
+
   let sent = 0, failed = 0; const errors = [];
   for (const p of roster) {
     const profile = p.playerId ? profileById[p.playerId] : null;
+    let cancelUrl = `${siteUrl()}/ladders.html?event=${encodeURIComponent(event.id)}`;
     try {
-      const html = renderReminderEmail({ event, kind, recipient: p, profile, roster, profileById, waitlistCount, capacity, nextEvent });
+      const tok = await createLadderToken({ type: 'cancel', eventId: event.id, playerId: p.playerId, email: p.email, ttlMs: ttl });
+      cancelUrl = `${siteUrl()}/.netlify/functions/ladder-cancel?t=${tok}`;
+    } catch { /* fall back to the logged-in cancel page */ }
+    try {
+      const html = renderReminderEmail({ event, kind, recipient: p, profile, roster, profileById, waitlistCount, capacity, nextEvent, cancelUrl });
       await sendEmail({ to: p.email, from, replyTo: from, subject: subjectFor(event, kind), html });
       sent++;
       await sleep(120); // stay under Resend's per-second limit

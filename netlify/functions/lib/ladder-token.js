@@ -29,6 +29,16 @@ export async function createLadderToken({ type, eventId, playerId = null, email 
   return token;
 }
 
+/** Read a token WITHOUT consuming it (for a GET confirm page, so an email-client
+ *  prefetch can't fire a destructive action). null if invalid/expired/used. */
+export async function peekLadderToken(token) {
+  if (!token || !/^[a-f0-9]{48}$/.test(token)) return null;
+  const rec = await store().get(`token/${token}.json`, { type: 'json' }).catch(() => null);
+  if (!rec || rec.used) return null;
+  if (new Date(rec.expiresAt).getTime() < Date.now()) return null;
+  return rec;
+}
+
 /** Consume a token (single-use). Returns the record, or null if invalid/expired/used. */
 export async function consumeLadderToken(token) {
   if (!token || !/^[a-f0-9]{48}$/.test(token)) return null;

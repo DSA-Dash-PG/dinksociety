@@ -244,6 +244,15 @@
   <div class="help" style="margin:-4px 0 6px">Emails everyone registered right now — the field, each player's last-ladder line, court #s, a cancel link, and the next ladder. Auto-sends also fire 2 days out, 5am day-of, and 3 hours out.</div>
   <div id="mRemMsg"></div>
 
+  <div class="sec" style="margin:22px 0 8px">Recruit players</div>
+  <div class="frow row2">
+    <div><label class="l">Players still needed (optional)</label><input class="i" id="m-needed" type="number" placeholder="auto = open spots"></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn btn-lime" style="width:100%" onclick="blastRecruit()">Email past players for this ladder</button></div>
+  </div>
+  <button onclick="blastOpen()" style="margin-top:8px;width:100%;background:#161616;border:1px solid #2a2a2a;color:#f5f5f5;padding:12px;border-radius:9999px;font-weight:800;font-family:inherit;cursor:pointer;font-size:.85rem">Announce all open ladders to past players</button>
+  <div class="help" style="margin:6px 0 4px">Emails everyone who's ever played a ladder (not just the waitlist). Recruit targets this ladder (skips those already in); Announce lists every open upcoming ladder.</div>
+  <div id="mBlastMsg"></div>
+
   <div class="frow" style="margin-top:16px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div><div class="help" style="margin-top:4px">Automatic: <b>Open</b> until the start date · <b>Live</b> while scoring · <b>Final</b> when you finish the ladder.</div></div>
 
   <div style="margin-top:20px;text-align:right"><button class="btn-danger" onclick="delLadder()">Delete ladder</button></div>
@@ -496,6 +505,25 @@ async function sendReminder(){
   if(status===401){ msg('mRemMsg','err','Sign in as admin first.'); return; }
   if(d&&d.ok){ msg('mRemMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); }
   else { msg('mRemMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').')); }
+}
+
+async function blastRecruit(){
+  if(!CURRENT) return;
+  const needed=parseInt(document.getElementById('m-needed').value)||0;
+  if(!confirm('Email ALL past ladder players that you need '+(needed||'more')+' for '+(CURRENT.name||'this ladder')+'? (Skips anyone already registered for it.)')) return;
+  const box=document.getElementById('mBlastMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
+  const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'recruit',eventId:CURRENT.id,neededCount:needed||undefined})});
+  if(status===401){ msg('mBlastMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){ msg('mBlastMsg','ok','Emailed '+d.sent+' past player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); }
+  else msg('mBlastMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
+}
+async function blastOpen(){
+  if(!confirm('Announce all OPEN upcoming ladders to every past player?')) return;
+  const box=document.getElementById('mBlastMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
+  const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'open'})});
+  if(status===401){ msg('mBlastMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){ msg('mBlastMsg','ok','Announced to '+d.sent+' past player'+(d.sent===1?'':'s')+'.'); }
+  else msg('mBlastMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }
 
 async function act(action,email,playerId,method){

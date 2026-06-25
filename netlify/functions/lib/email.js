@@ -26,11 +26,9 @@ function getResend() {
  *   override must still be on a Resend-verified domain (dinksociety.app is).
  */
 export async function sendEmail({ to, subject, html, replyTo, from, attachments }) {
-  const fromAddr = from || process.env.EMAIL_FROM;
-  if (!fromAddr) {
-    console.warn('EMAIL_FROM missing — skipping email send');
-    return null;
-  }
+  // Default sender for all Dink Society notifications is dink@dinksociety.app.
+  // A per-send `from` wins; otherwise EMAIL_FROM (if set) or the dink@ default.
+  const fromAddr = from || process.env.EMAIL_FROM || 'dink@dinksociety.app';
 
   const r = getResend();
   const payload = {
