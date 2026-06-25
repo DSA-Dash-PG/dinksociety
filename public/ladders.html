@@ -165,11 +165,20 @@ function route(){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b===btn));
   show(m);
   if(m==='home') hSub(sub==='up'?'up':'win');
-  else if(m==='ladders') ladTab((sub==='completed'||sub==='past')?'completed':'register');
+  else if(m==='ladders'){ ladTab((sub==='completed'||sub==='past')?'completed':'register'); if(sub && sub!=='register' && sub!=='completed' && sub!=='past') focusLadder(sub); }
   else if(m==='leaderboard'){ if(['wins','points','xp','dr'].includes(sub)) lbSetTab(sub); else writeHash(); }
   else writeHash();
 }
 window.addEventListener('hashchange', route);
+// Deep link: #ladders/<eventId> opens the ladders tab and scrolls/highlights that event.
+function focusLadder(id){
+  setTimeout(function(){
+    var el=document.getElementById('lad-'+id); if(!el) return;
+    el.scrollIntoView({behavior:'smooth',block:'center'});
+    el.style.transition='box-shadow .3s'; el.style.boxShadow='0 0 0 2px var(--lime)';
+    setTimeout(function(){ el.style.boxShadow=''; },1800);
+  },140);
+}
 
 async function init(){
   let pl={}, st={};
@@ -254,7 +263,7 @@ function renderFilters(){
 function setType(t){ FT=t; renderFilters(); renderAvail(); } function setDay(d){ FD=d; renderFilters(); renderAvail(); }
 function renderAvail(){
   const els=ACTIVE.filter(l=>(FT==='all'||(l.type||'mixed')===FT)&&(FD==='all'||wdShort(l.date)===FD));
-  document.getElementById('availList').innerHTML=els.length?els.map(ladderCard).join(''):'<div class="empty">No ladders match these filters.</div>';
+  document.getElementById('availList').innerHTML=els.length?els.map((l,i)=>'<div id="lad-'+l.id+'" style="scroll-margin-top:84px">'+ladderCard(l,i)+'</div>').join(''):'<div class="empty">No ladders match these filters.</div>';
 }
 const PEXP={}, PCACHE={};
 async function pToggle(id){
