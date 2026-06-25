@@ -74,6 +74,9 @@ export default async (req) => {
       dsr: (p.composite != null && (p.gamesPlayed || 0) > 0) ? Math.round(p.composite * 10) / 10 : null,
       gp: p.gamesPlayed || 0,
       w: p.gamesWon || 0, l: p.gamesLost || 0, rankDelta: p.rankDelta ?? null,
+      ps: p.ps || 0,
+      // Current win streak — trailing run of positive game diffs (Hot Streaks).
+      streak: (() => { const gd = p.gameDiffs || []; let s = 0; for (let i = gd.length - 1; i >= 0; i--) { if (gd[i] > 0) s++; else break; } return s; })(),
     }))
     .sort((a, b) => ((b.dsr ?? -1) - (a.dsr ?? -1)) || String(a.name || '').localeCompare(String(b.name || '')))
     // Rank ONLY players who have a DSR (played ≥1 game). Players with 0 games

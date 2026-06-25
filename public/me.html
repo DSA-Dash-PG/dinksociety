@@ -423,6 +423,20 @@
   .lb__body { flex:1; min-width:0; } .lb__name { font-size:13px; font-weight:700; } .lb__team { font-size:10px; color:var(--color-text-faint); }
   .lb__dsr { font-size:16px; font-weight:800; color:var(--color-lime); font-variant-numeric:tabular-nums; }
   .lb__delta { font-size:9px; font-weight:700; } .up{color:var(--color-lime);} .down{color:var(--color-red);} .flat{color:var(--color-text-faint);}
+  /* Standings sub-pills + Movers/Droppers columns */
+  .stsub{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin:0 0 14px;scrollbar-width:none;}
+  .stsub::-webkit-scrollbar{display:none;}
+  .stsub button{flex:0 0 auto;background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-muted);font:inherit;font-size:11.5px;font-weight:800;padding:7px 13px;border-radius:999px;cursor:pointer;white-space:nowrap;}
+  .stsub button.on{background:var(--color-lime);color:var(--color-text-inverse);border-color:var(--color-lime);}
+  .stmovers{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;}
+  .stmcol{background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:12px;padding:8px 9px;}
+  .stmcol h5{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:2px 0 4px;}
+  .stmrow{display:flex;align-items:center;gap:7px;padding:7px 0;border-top:1px solid var(--color-border);}
+  .stmrow:first-of-type{border-top:0;}
+  .stmrow .r{width:14px;text-align:center;font-weight:900;font-size:11px;color:var(--color-text-faint);}
+  .stmrow .a{width:24px;height:24px;border-radius:50%;flex:none;background:var(--color-surface-3);display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:var(--color-text-muted);}
+  .stmrow .n2{flex:1;min-width:0;font-size:11.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .stmrow .d{font-weight:900;font-size:12px;}
 
   .teamhero { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:16px; text-align:center; margin-bottom:14px; }
   .teamhero__emoji { font-size:38px; } .teamhero__name { font-size:17px; font-weight:800; margin-top:4px; } .teamhero__div { font-size:10px; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; margin-top:2px; }
@@ -1788,6 +1802,31 @@
     return h;
   }
 
+  // A single upcoming ladder night, for the merged Games schedule.
+  function ladderGameUpcoming(ev, registered) {
+    const dt = ev.date ? new Date(ev.date + 'T12:00:00').toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' }) : '';
+    const meta = [dt, ev.startTime, ev.place].filter(Boolean).join(' · ');
+    const tag = registered ? (ev.list === 'waitlist' ? 'Waitlist' : "You're in") : ((ev.spotsLeft != null ? ev.spotsLeft + ' spots' : 'Open'));
+    return `<a href="/ladders.html#ladders/${encodeURIComponent(ev.id)}" class="m" style="display:flex;align-items:center;gap:11px;text-decoration:none;color:inherit;">
+      <div style="font-size:20px">🎾</div>
+      <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:13px">${esc(ev.name || 'Ladder')}</div><div style="font-size:10.5px;color:var(--color-text-faint);margin-top:1px">${esc(meta)}</div></div>
+      <span style="font-size:10px;font-weight:800;color:var(--color-teal);background:var(--color-teal-dim);padding:3px 9px;border-radius:999px;white-space:nowrap">${tag}</span></a>`;
+  }
+  // A completed ladder night, with tap-to-expand round scores.
+  function ladderGameResult(p, i) {
+    const dt = p.date ? new Date(p.date + 'T12:00:00').toLocaleDateString([], { month: 'short', day: 'numeric' }) : '';
+    const place = p.placeRank ? ` · finished #${p.placeRank}` : '';
+    const rows = (p.rounds || []).map(r => `<div style="display:flex;justify-content:space-between;gap:8px;font-size:11.5px;padding:5px 2px;border-top:1px solid rgba(255,255,255,.05)"><span style="min-width:0;color:var(--color-text-muted)">w/ ${esc(r.partner || '—')} <span style="color:var(--color-text-faint)">vs ${esc((r.opp || []).join(' + '))}</span></span><span style="font-weight:800;white-space:nowrap;color:${r.won ? 'var(--color-lime)' : 'var(--color-red)'}">${r.pf}–${r.pa}</span></div>`).join('');
+    const bid = 'ldrg-' + i;
+    return `<div class="m" style="display:block">
+      <div onclick="(function(){var x=document.getElementById('${bid}');if(x)x.style.display=x.style.display==='none'?'block':'none';})()" style="display:flex;align-items:center;gap:11px;cursor:pointer">
+        <div style="font-size:20px">🎾</div>
+        <div style="flex:1;min-width:0;"><div style="font-weight:800;font-size:13px">${esc(p.name || 'Ladder')}</div><div style="font-size:10.5px;color:var(--color-text-faint);margin-top:1px">${dt} · ${p.w}W–${p.l}L${place}</div></div>
+        <span style="color:var(--color-text-faint);font-size:13px">▾</span>
+      </div>
+      <div id="${bid}" style="display:none;margin-top:4px">${rows || '<div class="muted" style="font-size:11px;padding:6px 2px">No round detail.</div>'}</div></div>`;
+  }
+
   // League 8-box (Record / Avg Score / Win% / Partner DSR · PS / PA / Diff / Pts Won%).
   function leagueStat8() {
     const s = DATA.stats;
@@ -2201,27 +2240,32 @@
           <div class="next__team">${teamLink(awayId, awayName, `<div class="next__emoji">${emo({emoji:awayEmoji})}</div><div class="next__tn">${esc(awayName)}</div>`)}${awayRec ? `<div class="next__rec">${awayRec}</div>` : ''}${sideBadge(false)}</div>
         </div>
         <div class="next__meta">${next.venue ? esc(next.venue) + ' · ' : ''}${esc(next.court||'Court TBD')} · ${esc(when)}${next.championship?' · 🏆':''}</div>
-        ${roleStrip(next.home, next.opponent.name)}
         ${youBlock}
         ${availControl(next)}
       </div>`;
     }
-    if (upcoming.length > (next?1:0)) {
-      html += '<div class="label">Upcoming</div>';
-      upcoming.slice(next?1:0).forEach(m => {
-        try { html += matchCard(m, me, false); }
-        catch (e) { console.warn('skipping malformed match', m && m.id, e); }
-      });
-    }
-    try { html += ladderNightsHtml(); } catch (e) {}
-    if (results.length) {
-      html += '<div class="label">Results</div>';
-      results.forEach(m => {
-        try { html += matchCard(m, me, true, true); }
-        catch (e) { console.warn('skipping malformed match', m && m.id, e); }
-      });
-    }
-    if (!sch.length) html += '<div class="muted">No matches scheduled yet. Your season schedule will show up here.</div>';
+    // ── Merged chronological flow: league + ladder ──
+    const safeCard = (m, isResult) => { try { return matchCard(m, me, isResult, isResult); } catch (e) { return ''; } };
+
+    // Schedule = remaining upcoming league matches + upcoming ladder nights, by date.
+    const schedItems = upcoming.slice(next ? 1 : 0).map(m => ({ d: m.scheduledAt || '', h: safeCard(m, false) }));
+    try {
+      const le = DATA.ladderEvents || {};
+      (le.registered || []).forEach(ev => schedItems.push({ d: ev.date || '', h: ladderGameUpcoming(ev, true) }));
+      (le.open || []).forEach(ev => schedItems.push({ d: ev.date || '', h: ladderGameUpcoming(ev, false) }));
+    } catch {}
+    const sched = schedItems.filter(x => x.h).sort((a, b) => String(a.d).localeCompare(String(b.d)));
+    if (sched.length) html += '<div class="label">Schedule</div>' + sched.map(x => x.h).join('');
+
+    // Results = league finals + completed ladder nights, most recent first.
+    const resItems = results.map(m => ({ d: m.scheduledAt || '', h: safeCard(m, true) }));
+    try {
+      ((DATA.ladder && DATA.ladder.perLadder) || []).forEach((p, i) => resItems.push({ d: p.date || '', h: ladderGameResult(p, i) }));
+    } catch {}
+    const res = resItems.filter(x => x.h).sort((a, b) => String(b.d).localeCompare(String(a.d)));
+    if (res.length) html += '<div class="label">Results</div>' + res.map(x => x.h).join('');
+
+    if (!next && !sched.length && !res.length) html += '<div class="muted">No games yet — your league matches and ladder nights will show up here.</div>';
     $('v-schedule').innerHTML = html;
     wireGamesSeg();
   }
@@ -2524,15 +2568,75 @@
   }
 
   // ---- standings (Teams / Players segments — Players absorbs the old Leaders tab) ----
-  let stSeg = 'teams';
+  let stMain = 'league', stSub = 'standings', stLadderData = null;
   function renderStandings() {
-    $('v-standings').innerHTML =
-      `<div class="seg">
-        <div class="seg__b ${stSeg==='teams'?'is-active':''}" data-s="teams">Teams</div>
-        <div class="seg__b ${stSeg==='players'?'is-active':''}" data-s="players">Players</div>
-      </div><div id="st-body"></div>`;
-    $('v-standings').querySelectorAll('.seg__b[data-s]').forEach(b => b.addEventListener('click', () => { stSeg = b.dataset.s; renderStandings(); }));
-    if (stSeg === 'teams') renderStandingsTeams(); else renderLeaderboard();
+    const hasLadder = !!DATA.ladder || !!(DATA.ladderEvents && DATA.ladderEvents.registered && DATA.ladderEvents.registered.length);
+    if (stMain === 'ladder' && !hasLadder) stMain = 'league';
+    const subs = stMain === 'league'
+      ? [['standings', 'Standings'], ['leaderboard', 'Leaderboard'], ['streaks', 'Hot Streaks'], ['dsr', 'DSR'], ['pts', 'PTS'], ['movers', 'Movers']]
+      : [['standings', 'Standings'], ['leaderboard', 'Leaderboard'], ['streaks', 'Hot Streaks'], ['avg', 'Avg'], ['wins', 'Wins'], ['movers', 'Movers']];
+    if (!subs.some(s => s[0] === stSub)) stSub = 'standings';
+    const main = `<div class="seg">
+      <div class="seg__b ${stMain === 'league' ? 'is-active' : ''}" data-sm="league">League</div>
+      ${hasLadder ? `<div class="seg__b ${stMain === 'ladder' ? 'is-active' : ''}" data-sm="ladder">Ladder</div>` : ''}
+    </div>`;
+    const sub = `<div class="stsub">` + subs.map(s => `<button data-ss="${s[0]}" class="${stSub === s[0] ? 'on' : ''}">${s[1]}</button>`).join('') + `</div>`;
+    $('v-standings').innerHTML = main + sub + `<div id="st-body"></div>`;
+    $('v-standings').querySelectorAll('.seg__b[data-sm]').forEach(b => b.addEventListener('click', () => { stMain = b.dataset.sm; stSub = 'standings'; renderStandings(); }));
+    $('v-standings').querySelectorAll('.stsub button[data-ss]').forEach(b => b.addEventListener('click', () => { stSub = b.dataset.ss; renderStandings(); }));
+    renderStBody();
+  }
+  // Player row reusing the .lb leaderboard styling.
+  function stRow(p, i, right) {
+    return `<div class="lb ${p.me ? 'lb--me' : ''}"><div class="lb__rank">${i < 3 ? '<span style="color:' + ['#f0c040', '#c0c8d0', '#cd7f32'][i] + ';font-weight:800">' + (i + 1) + '</span>' : (i + 1)}</div><div class="lb__av">${initials(p.name)}</div>
+      <div class="lb__body"><div class="lb__name">${playerLink(p.name, p.teamName, esc(shortName(p.name)))}${p.me ? ' · you' : ''}</div>${p.teamName ? `<div class="lb__team">${teamLink(null, p.teamName, esc(p.teamName))}</div>` : ''}</div>
+      <div style="text-align:right;">${right}</div></div>`;
+  }
+  function stList(arr, label, right) {
+    if (!arr.length) return `<div class="label">${label}</div><div class="muted" style="padding:14px 4px;">Nothing yet.</div>`;
+    return `<div class="label">${label}</div>` + arr.map((p, i) => stRow(p, i, right(p))).join('');
+  }
+  // Two columns: Movers (gainers ▲) + Droppers (fallers ▼), top 6 each.
+  function stMoversCols(arr) {
+    const withD = arr.filter(p => Number.isFinite(p.rankDelta) && p.rankDelta !== 0);
+    const gain = withD.filter(p => p.rankDelta > 0).sort((a, b) => b.rankDelta - a.rankDelta).slice(0, 6);
+    const drop = withD.filter(p => p.rankDelta < 0).sort((a, b) => a.rankDelta - b.rankDelta).slice(0, 6);
+    const col = (title, list, up) => `<div class="stmcol"><h5>${title}</h5>` + (list.length
+      ? list.map((p, i) => `<div class="stmrow"><span class="r">${i + 1}</span><span class="a">${initials(p.name)}</span><span class="n2">${esc(shortName(p.name))}</span><span class="d ${up ? 'up' : 'down'}">${up ? '▲' + p.rankDelta : '▼' + Math.abs(p.rankDelta)}</span></div>`).join('')
+      : '<div class="muted" style="font-size:11px;padding:8px 2px">None this week.</div>') + '</div>';
+    return `<div class="label">DSR rank moves · this week</div><div class="stmovers">${col('Movers', gain, true)}${col('Droppers', drop, false)}</div>`;
+  }
+  function renderStBody() {
+    const body = $('st-body'); if (!body) return;
+    if (stMain === 'ladder') return renderStLadder();
+    const me = DATA.profile;
+    const lb = (DATA.leaderboard || []).filter(p => !me.division || p.division === me.division);
+    if (stSub === 'standings') return renderStandingsTeams();
+    if (stSub === 'leaderboard') { body.innerHTML = `<div class="label">Player rankings</div><div id="lblist"></div>`; renderLbList(); return; }
+    if (stSub === 'streaks') { body.innerHTML = stList(lb.filter(p => (p.streak || 0) > 0).sort((a, b) => (b.streak || 0) - (a.streak || 0)), '🔥 Hot Streaks', p => `<span class="lb__delta up" style="font-size:12px;font-weight:900">W${p.streak}</span>`); return; }
+    if (stSub === 'dsr') { body.innerHTML = stList(lb.filter(p => p.dsr != null).slice(0, 10), 'Top 10 · DSR', p => `<div class="lb__dsr">${p.dsr}</div>`); return; }
+    if (stSub === 'pts') { body.innerHTML = stList(lb.slice().sort((a, b) => (b.ps || 0) - (a.ps || 0)).slice(0, 10), 'Top 10 · points scored', p => `<div class="lb__dsr">${p.ps || 0}</div>`); return; }
+    if (stSub === 'movers') { body.innerHTML = stMoversCols(lb); return; }
+  }
+  function renderStLadder() {
+    const body = $('st-body'); if (!body) return;
+    if (stLadderData === null) {
+      body.innerHTML = '<div class="muted" style="padding:18px 4px;">Loading ladder standings…</div>';
+      fetch(API + '/public-ladder-stats', { credentials: 'include' })
+        .then(r => r.ok ? r.json() : null).then(d => { stLadderData = d || {}; if (stMain === 'ladder') renderStLadder(); })
+        .catch(() => { stLadderData = {}; if (stMain === 'ladder') renderStLadder(); });
+      return;
+    }
+    const meId = DATA.profile.playerId;
+    const rows = (((stLadderData.divisions || {}).all) || stLadderData.standings || []).map(p => ({ ...p, me: p.id === meId || p.playerId === meId }));
+    if (!rows.length) { body.innerHTML = '<div class="muted" style="padding:18px 4px;">No ladder results yet — standings fill in after the first scored night.</div>'; return; }
+    const lrow = (p, i, right) => `<div class="lb ${p.me ? 'lb--me' : ''}"><div class="lb__rank">${i < 3 ? '<span style="color:' + ['#f0c040', '#c0c8d0', '#cd7f32'][i] + ';font-weight:800">' + (i + 1) + '</span>' : (i + 1)}</div><div class="lb__av">${initials(p.name)}</div><div class="lb__body"><div class="lb__name">${esc(shortName(p.name))}${p.me ? ' · you' : ''}</div></div><div style="text-align:right;">${right}</div></div>`;
+    const llist = (a, label, right) => a.length ? `<div class="label">${label}</div>` + a.map((p, i) => lrow(p, i, right(p))).join('') : `<div class="label">${label}</div><div class="muted" style="padding:14px 4px;">Nothing yet.</div>`;
+    if (stSub === 'standings' || stSub === 'leaderboard') { body.innerHTML = llist(rows, stSub === 'standings' ? 'Ladder standings' : 'Ladder leaderboard', p => `<div class="lb__dsr">${p.w != null ? p.w : 0}${p.l != null ? '–' + p.l : ''} W</div>`); return; }
+    if (stSub === 'streaks') { body.innerHTML = llist(rows.filter(p => (p.streak || 0) > 0).sort((a, b) => (b.streak || 0) - (a.streak || 0)), '🔥 Hot Streaks', p => `<span class="lb__delta up" style="font-size:12px;font-weight:900">W${p.streak}</span>`); return; }
+    if (stSub === 'avg') { body.innerHTML = llist(rows.slice().sort((a, b) => (b.avg || 0) - (a.avg || 0)).slice(0, 10), 'Top 10 · average', p => `<div class="lb__dsr">${p.avg != null ? p.avg : '—'}</div>`); return; }
+    if (stSub === 'wins') { body.innerHTML = llist(rows.slice().sort((a, b) => (b.w || 0) - (a.w || 0)).slice(0, 10), 'Top 10 · wins', p => `<div class="lb__dsr">${p.w || 0}</div>`); return; }
+    if (stSub === 'movers') { body.innerHTML = '<div class="label">DSR rank moves</div><div class="muted" style="padding:14px 4px;">Ladder rank movement isn\'t tracked week-over-week yet.</div>'; return; }
   }
   function renderStandingsTeams() {
     const st = DATA.standings, me = DATA.profile;
@@ -2606,27 +2710,19 @@
   }
 
   function seasonHistory() {
-    const hist = DATA.history || [], me = DATA.profile, s = DATA.stats;
-    let rows;
-    if (hist.length) {
-      rows = hist.map(h => `<div class="hrow">
-        <span class="hseason">${esc(h.seasonLabel || h.circuit)}</span>
-        <div class="hteam"><div class="hteam__n">${esc(h.teamName || '—')}</div><div class="hteam__y">${esc(h.year || '')}</div></div>
-        <div class="hstat"><div class="hstat__r">${h.stats?.gamesWon ?? '—'}–${h.stats?.gamesLost ?? '—'}</div>
-          <div class="hstat__p">${wpct(h.stats?.gamesWon || 0, h.stats?.gamesPlayed || 0)}% · ${h.stats?.matchesPlayed ?? 0} matches</div></div>
-      </div>`).join('');
-      return `<div class="label">🗂 Season History</div><div class="hlist">${rows}</div>`;
+    const me = DATA.profile;
+    const finals = (DATA.schedule || []).filter(m => m.final);
+    const ladderDone = (DATA.ladder && DATA.ladder.perLadder) || [];
+    if (!finals.length && !ladderDone.length) {
+      return `<div class="label">🗂 Season History</div><div class="muted" style="padding:14px 4px;">Your match results show here once you've played — each one expands to its game scores.</div>`;
     }
-    const live = s && s.gamesPlayed > 0;
-    rows = `<div class="hrow">
-      <span class="hseason">Season 1</span>
-      <div class="hteam"><div class="hteam__n">${esc(me.teamName)}</div><div class="hteam__y">2026 — In progress</div></div>
-      <div class="hstat">${live
-        ? `<div class="hstat__r">${s.gamesWon}–${s.gamesLost}</div><div class="hstat__p">${wpct(s.gamesWon, s.gamesPlayed)}%</div>`
-        : `<div class="hstat__r" style="color:var(--color-text-faint)">—</div>`}</div>
-    </div>`;
-    return `<div class="label">🗂 Season History</div><div class="hlist">${rows}</div>
-      <div class="hnote">Past seasons will be archived here at the end of each circuit.</div>`;
+    // Every match played this season, league + ladder, most recent first.
+    const items = finals.map(m => ({ d: m.scheduledAt || '', h: (function () { try { return matchCard(m, me, true, true); } catch (e) { return ''; } })() }))
+      .concat(ladderDone.map((p, i) => ({ d: p.date || '', h: ladderGameResult(p, 'sh' + i) })))
+      .filter(x => x.h).sort((a, b) => String(b.d).localeCompare(String(a.d)));
+    return `<div class="label">🗂 Season History <span class="sub">tap a match for scores</span></div>`
+      + items.map(x => x.h).join('')
+      + `<div class="hnote" style="margin-top:10px">Past seasons will be archived here at the end of each circuit.</div>`;
   }
 
   // Age from a YYYY-MM-DD DOB — display only; DOB itself is never shown publicly.
