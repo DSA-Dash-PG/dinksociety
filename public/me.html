@@ -370,7 +370,8 @@
 
   /* personalized "you" header */
   .mehead { background:linear-gradient(135deg, rgba(184,255,44,0.14), rgba(23,215,176,0.06)); border:1px solid rgba(184,255,44,0.22); border-radius:var(--radius-lg); padding:14px; display:flex; align-items:center; gap:12px; margin-bottom:4px; }
-  .mehead__av { width:54px; height:54px; border-radius:50%; background:var(--color-surface-3); border:2px solid var(--color-lime); display:grid; place-items:center; font-size:19px; font-weight:800; color:var(--color-lime); flex-shrink:0; }
+  .mehead__av { width:54px; height:54px; border-radius:50%; background:var(--color-surface-3); border:2px solid var(--color-lime); display:grid; place-items:center; font-size:19px; font-weight:800; color:var(--color-lime); flex-shrink:0; overflow:hidden; }
+  .mehead__av img { width:100%; height:100%; object-fit:cover; }
   .mehead__main { flex:1; min-width:0; }
   .mehead__hi { font-size:10px; letter-spacing:0.14em; text-transform:uppercase; color:var(--color-lime); font-weight:800; }
   .mehead__name { font-size:19px; font-weight:800; line-height:1.1; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -1313,11 +1314,16 @@
     $('app').classList.remove('hidden');
     const p = DATA.profile || {};
     renderTeamSwitcher();
-    const meAvImg = p.hasPhoto ? ('<img src="' + API + '/player-photo-serve?id=' + encodeURIComponent(p.playerId) + '&v=' + encodeURIComponent(p.photoUpdatedAt || '') + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">') : null;
-    if (meAvImg) { $('me-av').innerHTML = meAvImg; $('me-av').style.overflow = 'hidden'; } else $('me-av').textContent = initials(p.name);
+    // Always attempt the photo (404 → onerror reverts to initials), so a stale/absent
+    // hasPhoto flag doesn't force initials when the image actually exists.
+    const _ini = initials(p.name);
+    const _avImg = p.playerId
+      ? '<img src="' + API + '/player-photo-serve?id=' + encodeURIComponent(p.playerId) + (p.photoUpdatedAt ? '&v=' + encodeURIComponent(p.photoUpdatedAt) : '') + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.remove();this.parentNode.textContent=this.parentNode.dataset.ini;">'
+      : '';
+    $('me-av').dataset.ini = _ini; $('me-av').innerHTML = _avImg || _ini; $('me-av').style.overflow = 'hidden';
     // Drawer identity
     const dAv = $('ds-drawer-av'), dName = $('ds-drawer-name'), dEmail = $('ds-drawer-email');
-    if (dAv) { if (meAvImg) { dAv.innerHTML = meAvImg; dAv.style.overflow = 'hidden'; } else dAv.textContent = initials(p.name); }
+    if (dAv) { dAv.dataset.ini = _ini; dAv.innerHTML = _avImg || _ini; dAv.style.overflow = 'hidden'; }
     if (dName) dName.textContent = p.name || 'Player';
     if (dEmail) dEmail.textContent = (p.email || '') + (p.isCaptain ? ' · Captain' : p.isCoCaptain ? ' · Co-Captain' : '');
     // Role toggle shows only for team leaders. (The Team nav tab is for
@@ -1946,8 +1952,12 @@
     const hr = new Date().getHours();
     const greeting = hr < 12 ? 'Good morning' : hr < 18 ? 'Good afternoon' : 'Good evening';
     const dsrVal = fmtDsr(DATA.stats?.composite ?? myRow?.dsr);
+    const meIni = esc(initials(me.name));
+    const meAvImg = me.playerId
+      ? `<img src="${API}/player-photo-serve?id=${encodeURIComponent(me.playerId)}${me.photoUpdatedAt ? `&v=${encodeURIComponent(me.photoUpdatedAt)}` : ''}" alt="" onerror="this.remove();this.parentNode.textContent=this.parentNode.dataset.ini;">`
+      : '';
     const mehead = `<div class="mehead">
-      <div class="mehead__av">${esc(initials(me.name))}</div>
+      <div class="mehead__av" data-ini="${meIni}">${meAvImg || meIni}</div>
       <div class="mehead__main">
         <div class="mehead__hi">${greeting}</div>
         <div class="mehead__name">${esc((me.name || '').trim().split(/\s+/)[0] || 'Player')}</div>
@@ -2049,7 +2059,7 @@
     // hero + availability, your night, live, coming up, last result); "League" =
     // the season pulse (your tiles, Player of the Week, movers, team card).
     // Personal deep stats now live on their own "Me" tab.
-    const hasLadderTab = !!DATA.ladder;
+    const hasLadderTab = !!DATA.ladder || !!(DATA.ladderEvents && DATA.ladderEvents.registered && DATA.ladderEvents.registered.length);
     let homeSeg = (() => { try { return localStorage.getItem('ds-home-seg') || 'week'; } catch { return 'week'; } })();
     if (homeSeg === 'ladder' && !hasLadderTab) homeSeg = 'week';
     const ladderNights = (function () { try { return ladderNightsHtml(); } catch (e) { return ''; } })();
