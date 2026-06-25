@@ -179,6 +179,13 @@ function tick(){ const el=document.getElementById('td'); if(el){ el.textContent=
 
 /* ---------- helpers ---------- */
 function topCourt(round){ return Math.max(1,...round.courts.map(c=>c.court)); }
+// Court display name from the ladder setup (courtNames are top→bottom; top court =
+// highest court number). Falls back to the number for nights set up before names.
+function courtLabel(courtNum){
+  var cn=STATE&&STATE.play&&STATE.play.config&&STATE.play.config.courtNames;
+  if(Array.isArray(cn)&&cn.length){ var nm=cn[cn.length-courtNum]; if(nm!=null&&String(nm).trim()!=='') return String(nm); }
+  return String(courtNum);
+}
 function accent(courtNum,tC){
   if(courtNum===tC) return {col:'#ffcc00',king:true};
   if(courtNum===tC-1) return {col:'#00e5ff'};
@@ -186,9 +193,9 @@ function accent(courtNum,tC){
   return {col:'#a78bfa'};
 }
 function moveLabels(courtNum,tC){
-  if(courtNum===tC) return {w:'Stay & split', l:'↓ Court '+(tC-1)};
-  if(courtNum===1) return {w:'↑ Court 2', l:'Stay & split'};
-  return {w:'↑ Court '+(courtNum+1), l:'↓ Court '+(courtNum-1)};
+  if(courtNum===tC) return {w:'Stay & split', l:'↓ Court '+courtLabel(tC-1)};
+  if(courtNum===1) return {w:'↑ Court '+courtLabel(2), l:'Stay & split'};
+  return {w:'↑ Court '+courtLabel(courtNum+1), l:'↓ Court '+courtLabel(courtNum-1)};
 }
 function roundMVPs(round){
   const perfs=[];
@@ -254,7 +261,7 @@ function render(){
   // MVPs
   const mv=roundMVPs(round);
   if(round.courts.every(c=>c.score&&c.score.winner) && (mv.male.length||mv.female.length)){
-    const card=(x,lab,col)=>`<div class="mvpc"><div class="lab" style="color:${col}">🏆 ${lab}</div><div class="nm">${esc(x.p.name)}</div><div class="vl">${x.diff>=0?'+':''}${x.diff} diff</div><div class="sb">Court ${x.court}</div></div>`;
+    const card=(x,lab,col)=>`<div class="mvpc"><div class="lab" style="color:${col}">🏆 ${lab}</div><div class="nm">${esc(x.p.name)}</div><div class="vl">${x.diff>=0?'+':''}${x.diff} diff</div><div class="sb">Court ${courtLabel(x.court)}</div></div>`;
     h+=`<div class="seclbl">Round ${VR+1} Top Performers</div><div class="mvpg">`;
     if(mv.male[0]) h+=card(mv.male[0],'Top Man','#5b9fff');
     if(mv.female[0]) h+=card(mv.female[0],'Top Woman','#ff7bb0');
@@ -266,7 +273,7 @@ function render(){
   // court map
   h+=`<div class="maptog${mapOpen?' open':''}" onclick="mapOpen=!mapOpen;render()"><span>Court map — Rd ${VR+1}</span><span class="ar">▼</span></div><div class="cmap${mapOpen?' open':''}">`;
   [...round.courts].sort((a,b)=>b.court-a.court).forEach(c=>{ const hb=c.score&&c.score.t1!=null&&c.score.t2!=null;
-    h+=`<div class="cmc${hb?' scored':''}"><div class="l">Court ${c.court}</div><div class="m">${(c.team1||[]).filter(Boolean).map(p=>esc(p.name)).join(' & ')||'—'} <span style="color:var(--fnt)">vs</span> ${(c.team2||[]).filter(Boolean).map(p=>esc(p.name)).join(' & ')||'—'}</div>${hb?`<div class="s">${c.score.t1} – ${c.score.t2}</div>`:''}</div>`; });
+    h+=`<div class="cmc${hb?' scored':''}"><div class="l">Court ${courtLabel(c.court)}</div><div class="m">${(c.team1||[]).filter(Boolean).map(p=>esc(p.name)).join(' & ')||'—'} <span style="color:var(--fnt)">vs</span> ${(c.team2||[]).filter(Boolean).map(p=>esc(p.name)).join(' & ')||'—'}</div>${hb?`<div class="s">${c.score.t1} – ${c.score.t2}</div>`:''}</div>`; });
   h+=`</div>`;
 
   // court cards (top first)
@@ -305,8 +312,8 @@ function courtCard(c,ci,tC){
   };
   const wTeam=aWin?c.team1:bWin?c.team2:null, lTeam=aWin?c.team2:bWin?c.team1:null;
   const nm=t=>(t||[]).filter(Boolean).map(p=>esc(p.name)).join(' + ');
-  let h=`<div class="cc ${king?'king':''}"><div class="cc-h"><div class="cc-badge" style="background:${acc.col};color:#0a0a0a">${c.court}</div>`;
-  h+=`<div class="cc-ti" style="color:${acc.col}">${king?'👑 Owns the Kitchen':'Court '+c.court}${king?'<div class="s">Top court · Winners stay & split</div>':''}</div>`;
+  let h=`<div class="cc ${king?'king':''}"><div class="cc-h"><div class="cc-badge" style="background:${acc.col};color:#0a0a0a">${courtLabel(c.court)}</div>`;
+  h+=`<div class="cc-ti" style="color:${acc.col}">${king?'👑 Owns the Kitchen':'Court '+courtLabel(c.court)}${king?'<div class="s">Top court · Winners stay & split</div>':''}</div>`;
   if(hb) h+=`<div class="cc-tot" style="color:${acc.col}">${sc.t1} – ${sc.t2}</div>`;
   h+=`</div><div class="cc-cols">${panel(c.team1,0,'A')}${panel(c.team2,1,'B')}</div>`;
   if(tie) h+=`<div class="tie">Tie — who moves up? <button onclick="pickWin(${ci},'A')">Left</button><button onclick="pickWin(${ci},'B')">Right</button></div>`;
@@ -339,7 +346,7 @@ let subSlot=null;
 function openSub(ci,ti,pi){
   subSlot={ci,ti,pi};
   const round=STATE.play.rounds[VR]; const cur=(ti===0?round.courts[ci].team1:round.courts[ci].team2)[pi];
-  document.getElementById('subFor').textContent=cur?`Replacing ${cur.name} · Court ${round.courts[ci].court}`:`Empty slot · Court ${round.courts[ci].court}`;
+  document.getElementById('subFor').textContent=cur?`Replacing ${cur.name} · Court ${courtLabel(round.courts[ci].court)}`:`Empty slot · Court ${courtLabel(round.courts[ci].court)}`;
   const used=inRound(round);
   const bench=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled'&&!used.has(p.playerId));
   let h='';
