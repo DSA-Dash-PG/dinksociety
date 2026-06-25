@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Undefeated badge preview — Dink Society</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,600;0,700;0,800;0,900;1,900&display=swap" rel="stylesheet">
+<style>
+  :root{--color-bg:#0e0e0e;--color-surface:#161616;--color-surface-2:#1e1e1e;--color-border:rgba(255,255,255,.08);
+    --color-text:#f0f0ec;--color-text-muted:#9a9e97;--color-text-faint:#5e625c;--color-lime:#b8ff2c;--color-lime-dim:rgba(184,255,44,.12);
+    --color-teal:#17d7b0;--color-teal-dim:rgba(23,215,176,.12);--color-gold:#f0c040;--color-gold-dim:rgba(240,192,64,.12);--radius-lg:18px}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{background:var(--color-bg);color:var(--color-text);font-family:'Inter',sans-serif;padding:46px 20px 90px;line-height:1.5}
+  .wrap{width:min(100%,860px);margin:0 auto}
+  .eyebrow{font-size:11px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--color-lime);margin-bottom:10px}
+  h1{font-size:clamp(1.8rem,1.2rem+2.5vw,2.7rem);font-weight:900;font-style:italic;text-transform:uppercase;line-height:1}
+  .sub{color:var(--color-text-muted);font-size:14px;margin:12px 0 8px;max-width:64ch}
+  .warn{font-size:12px;color:var(--color-gold);background:var(--color-gold-dim);border:1px solid rgba(240,192,64,.3);border-radius:8px;padding:9px 13px;margin-bottom:20px}
+  h2{font-size:1.1rem;font-weight:900;font-style:italic;text-transform:uppercase;margin:34px 0 14px}
+  .hero{border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;background:linear-gradient(115deg,var(--color-surface),var(--color-surface-2))}
+  .hero__top{display:flex;align-items:center;gap:22px;padding:26px 28px}
+  .hero__photo{width:108px;height:108px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#06231d;background:#17d7b0;position:relative}
+  .hero__id{flex:1;min-width:0}
+  .hero__eye{font-size:12px;font-weight:700;color:var(--color-text-faint);margin-bottom:6px}
+  .hero__nm{font-size:clamp(1.4rem,3vw,2rem);font-weight:900;font-style:italic;text-transform:uppercase;line-height:1}
+  .hero__meta{font-size:13px;font-weight:600;color:var(--color-text-muted);margin-top:7px}
+  .hero__meta .t{color:var(--color-teal);font-weight:700}
+  .hero__row{margin-top:13px}
+  .hero__dsr{flex:none;text-align:center}
+  .hero__dsr .l{font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint)}
+  .hero__dsr .n{font-size:2.7rem;font-weight:900;color:var(--color-lime);line-height:1;margin:4px 0}
+  .hero__dsr .r{font-size:11px;color:var(--color-text-muted);font-weight:600}
+  @media(max-width:560px){.hero__top{flex-direction:column;text-align:center}.hero__dsr{order:-1}.hero__row .dsb-pills{justify-content:center}}
+  .team{border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);overflow:hidden}
+  .trow{display:flex;align-items:center;gap:14px;padding:13px 18px;border-top:1px solid var(--color-border)}
+  .trow:first-child{border-top:none}
+  .tav{width:40px;height:40px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#06231d;background:#b8ff2c;position:relative}
+  .tav.f{background:#ff6fb5;color:#2a0a1c}
+  .tinfo{min-width:0}.tnm{font-size:14px;font-weight:800}.trec{font-size:11px;color:var(--color-text-faint);font-weight:600}
+  .tbadges{margin-left:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Dink Society · Badge preview</div>
+  <h1>"Can't Touch This!" — with a count</h1>
+  <p class="sub">Rendered live by the real <code>badges.js</code>. Undefeated players now get the lime crest + a <b>×N</b> pill for how many matches they swept. POTW pill now uses a crown.</p>
+  <div class="warn">⚠ Representative data — the live leaderboard endpoint timed out, so these records are illustrative (Ryan's are his real 8–0 / 2 matches). After deploy, real counts come straight from each player's record.</div>
+
+  <h2>On Ryan's profile (League view)</h2>
+  <div class="hero"><div class="hero__top">
+    <div class="hero__photo" id="heroPhoto">RH</div>
+    <div class="hero__id">
+      <div class="hero__eye">← Smash Society</div>
+      <div class="hero__nm">Ryan Hom</div>
+      <div class="hero__meta"><span class="t">Smash Society</span> · Male · Captain</div>
+      <div class="hero__row dsb-pills" id="heroPills"></div>
+    </div>
+    <div class="hero__dsr"><div class="l">League · DSR</div><div class="n">94.9</div><div class="r">#1 Men's · #2 Overall</div></div>
+  </div></div>
+
+  <h2>Across Smash Society</h2>
+  <div class="team" id="team"></div>
+</div>
+
+<script src="public/badges.js"></script>
+<script>
+  var CIRCUIT='I';
+  function mkOpts(o){ return Object.assign({ awards:[], grants:[], currentSeason:CIRCUIT }, o); }
+  // Representative Smash Society — most went undefeated through weeks 1 & 2.
+  var ryan = mkOpts({ gender:'M',
+    awards:[{week:2,type:'mens',date:'2026-06-22',w:4,l:0,diff:38}],
+    league:{w:8,l:0,gp:8,matchesPlayed:2} });
+  var team = [
+    { name:'Ryan Hom',        f:false, rec:'8–0 · 2 matches', opts:ryan },
+    { name:'Devin Carroll',   f:false, rec:'8–0 · 2 matches', opts:mkOpts({gender:'M', league:{w:8,l:0,gp:8,matchesPlayed:2}}) },
+    { name:'Annie Kang',      f:true,  rec:'8–0 · 2 matches', opts:mkOpts({gender:'F', league:{w:8,l:0,gp:8,matchesPlayed:2}}) },
+    { name:'Phoebe Bautista', f:true,  rec:'7–0 · 2 matches', opts:mkOpts({gender:'F', league:{w:7,l:0,gp:7,matchesPlayed:2}}) },
+    { name:'Kai Park',        f:false, rec:'5–3 · 2 matches', opts:mkOpts({gender:'M', league:{w:5,l:3,gp:8,matchesPlayed:2}}) }
+  ];
+  function ini(n){return n.split(' ').map(function(x){return x[0];}).join('').slice(0,2).toUpperCase();}
+  function boot(){
+    dsBadges._injectStyles();
+    document.getElementById('heroPills').innerHTML = dsBadges.heroPills(ryan,'league');
+    var cr = dsBadges.avatarCrest(ryan,'league');
+    if (cr) document.getElementById('heroPhoto').insertAdjacentHTML('beforeend', cr);
+    document.getElementById('team').innerHTML = team.map(function(p){
+      var pills = dsBadges.heroPills(p.opts,'league');
+      return '<div class="trow"><div class="tav'+(p.f?' f':'')+'">'+ini(p.name)
+        + (dsBadges.avatarCrest(p.opts,'league')||'')
+        + '</div><div class="tinfo"><div class="tnm">'+p.name+'</div><div class="trec">'+p.rec+'</div></div>'
+        + '<div class="tbadges dsb-pills">'+(pills||'<span style="font-size:11px;color:var(--color-text-faint)">—</span>')+'</div></div>';
+    }).join('');
+  }
+  if (window.dsBadges) boot(); else window.addEventListener('load', boot);
+</script>
+</body>
+</html>

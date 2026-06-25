@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Universal Search · Mobile Mockup · The Dink Society</title>
+<style>
+  :root{
+    --bg:#0e0e0e; --bg2:#070707; --surf:#161616; --surf2:#1f1f1f; --line:#2a2a2a;
+    --ink:#f5f5f5; --mut:#cfcfcf; --dim:#8a8a8a; --faint:#5e625c;
+    --lime:#b8ff2c; --teal:#17d7b0;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg2);color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;padding:26px 18px 70px}
+  .intro{color:var(--mut);font-size:14px;line-height:1.6;margin:0 0 6px}
+  .intro b{color:var(--lime)}
+  .hintline{font-size:12.5px;color:var(--dim);margin:0 0 8px}
+  .src{font-size:11px;color:var(--faint);margin:0 0 22px}
+  .src.live{color:var(--teal)}
+
+  .rack{display:flex;gap:30px;flex-wrap:wrap;justify-content:center}
+  .col{width:330px}
+  .cap{margin:14px 2px 0}
+  .cap .t{font-size:14px;font-weight:800}
+  .cap .t .pin{display:inline-block;font-size:10px;font-weight:800;color:var(--lime);background:rgba(184,255,44,.12);
+    border:1px solid rgba(184,255,44,.35);border-radius:6px;padding:1px 7px;margin-right:7px;vertical-align:1px}
+  .cap .d{font-size:12px;color:var(--dim);line-height:1.55;margin-top:5px}
+
+  /* phone */
+  .phone{position:relative;width:330px;height:680px;background:#000;border:10px solid #1b1b1b;border-radius:42px;
+    box-shadow:0 20px 50px rgba(0,0,0,.5);overflow:hidden}
+  .screen{position:absolute;inset:0;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:26px;background:#000;
+    border-bottom-left-radius:14px;border-bottom-right-radius:14px;z-index:9}
+  .status{height:30px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 22px;
+    font-size:11px;font-weight:700;color:var(--mut)}
+
+  /* app chrome */
+  .appbar{height:50px;flex:none;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--line)}
+  .appbar .brand{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+  .appbar .sp{flex:1}
+  .iconbtn{width:34px;height:34px;border-radius:9999px;display:flex;align-items:center;justify-content:center;
+    background:var(--surf);border:1px solid var(--line);cursor:pointer}
+  .iconbtn svg{width:16px;height:16px}
+  .appbar .pill{flex:1;display:flex;align-items:center;gap:8px;background:var(--surf);border:1px solid var(--line);
+    border-radius:9999px;padding:8px 12px;color:var(--dim);font-size:12.5px;cursor:text}
+  .appbar .pill svg{width:14px;height:14px;flex:none}
+  .menu svg{width:18px;height:18px}
+
+  .page{flex:1;overflow:hidden;padding:14px;color:var(--faint);font-size:12px;line-height:1.6}
+  .skel{height:1px;background:transparent;margin:0}
+  .card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
+  .card h4{margin:0 0 10px;font-size:12px;font-weight:800;color:var(--mut);text-transform:uppercase;letter-spacing:.05em}
+  .lrow{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+  .lrow:last-child{border-bottom:0}
+  .lrow .rk{width:18px;color:var(--faint);font-weight:800}
+  .lrow .nm{flex:1;color:var(--mut);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .lrow .dv{font-weight:800;color:var(--lime)}
+
+  /* bottom nav (variant C) */
+  .botnav{height:58px;flex:none;display:flex;border-top:1px solid var(--line);background:rgba(14,14,14,.96)}
+  .botnav .bn{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+    color:var(--faint);font-size:9.5px;font-weight:700;cursor:pointer}
+  .botnav .bn svg{width:20px;height:20px}
+  .botnav .bn.on{color:var(--lime)}
+  .botnav .bn.search .ring{width:38px;height:38px;border-radius:9999px;background:var(--lime);color:#06210f;
+    display:flex;align-items:center;justify-content:center;margin-top:-14px;box-shadow:0 6px 14px rgba(184,255,44,.3)}
+  .botnav .bn.search .ring svg{width:20px;height:20px}
+
+  /* ── overlays ── */
+  .ov{position:absolute;inset:0;z-index:20;display:none;flex-direction:column}
+  .ov.open{display:flex}
+  /* full screen */
+  .ov--full{background:var(--bg)}
+  /* bottom sheet keeps page visible behind a scrim */
+  .ov--sheet{background:rgba(0,0,0,.5);justify-content:flex-end}
+  .ov--sheet .sheet{background:#121212;border-top-left-radius:20px;border-top-right-radius:20px;border-top:1px solid #333;
+    height:78%;display:flex;flex-direction:column;animation:up .18s ease}
+  @keyframes up{from{transform:translateY(28px)}to{transform:none}}
+  .grip{width:38px;height:4px;background:#3a3a3a;border-radius:9999px;margin:8px auto 2px}
+
+  .sbar{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .sbar .back{cursor:pointer;color:var(--dim);display:flex}
+  .sbar .back svg{width:20px;height:20px}
+  .sbar input{flex:1;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:16px}
+  .sbar input::placeholder{color:var(--faint)}
+  .sbar .x{cursor:pointer;color:var(--faint);font-size:18px;line-height:1;padding:2px 4px}
+  . infield{flex:1}
+
+  .scopes{display:flex;gap:7px;padding:9px 14px;border-bottom:1px solid var(--line)}
+  .scope{font-size:11px;font-weight:700;border:1px solid var(--line);border-radius:9999px;padding:4px 12px;color:var(--dim);cursor:pointer}
+  .scope.on{background:rgba(184,255,44,.12);border-color:rgba(184,255,44,.4);color:var(--lime)}
+
+  .res{flex:1;overflow-y:auto;padding:6px 6px 12px}
+  .res::-webkit-scrollbar{width:0}
+  .grp{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.09em;color:var(--faint);padding:11px 12px 5px}
+  .row{display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:11px;cursor:pointer}
+  .row:active{background:var(--surf2)}
+  .row .av{width:38px;height:38px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#06231d}
+  .row .tav{width:38px;height:38px;border-radius:11px;flex:none;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--surf)}
+  .row .body{flex:1;min-width:0}
+  .row .nm{font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .nm mark{background:rgba(184,255,44,.22);color:var(--lime);border-radius:3px;padding:0 1px}
+  .row .sub{font-size:11.5px;color:var(--dim);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .sub .cp{color:var(--lime);font-weight:700}
+  .row .dsr{font-size:15px;font-weight:800;color:var(--lime);flex:none;font-variant-numeric:tabular-nums}
+  .row .dsr.teal{color:var(--teal)}
+  .row .dsr small{font-size:8px;color:var(--faint);font-weight:700}
+  .row .rank{font-size:10px;font-weight:800;color:var(--mut);background:var(--surf);border:1px solid var(--line);border-radius:9999px;padding:3px 7px;flex:none;margin-left:8px}
+  .empty{padding:30px 18px;text-align:center;color:var(--faint);font-size:13px;line-height:1.6}
+  .empty .big{font-size:14px;color:var(--dim);margin-bottom:3px}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;z-index:90;
+    background:#1c1c1c;border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-size:13px;color:var(--mut);transition:.2s;pointer-events:none;max-width:92vw}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  .toast b{color:var(--lime)}
+
+  @media (max-width:760px){ .col{width:330px} .rack{gap:38px} }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="intro"><b>Universal search on mobile — three directions.</b> Same search, three ways to trigger and present it. Tap into each phone and type a name (“ryan”, “judy”, “smash”, “kchn”) to feel the difference.</p>
+  <p class="hintline">All three are live and use your real roster. Pick the one that feels best and I’ll wire it into the nav.</p>
+  <p class="src" id="src">Using built-in snapshot…</p>
+
+  <div class="rack">
+
+    <!-- A: header icon → full screen -->
+    <div class="col">
+      <div class="phone" data-style="full" data-trigger="icon">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="status"><span>9:41</span><span>●●● ⌁</span></div>
+          <div class="appbar">
+            <span class="menu iconbtn js-noop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></span>
+            <span class="brand">DINK SOCIETY</span>
+            <span class="sp"></span>
+            <span class="iconbtn js-trigger" aria-label="Search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
+          </div>
+          <div class="page"><div class="card"><h4>Leaderboard</h4>__LB__</div><div style="text-align:center;color:var(--faint);font-size:11px">Tap the 🔍 in the header</div></div>
+          <!-- overlay -->
+          <div class="ov ov--full js-ov">
+            <div class="status"><span>9:41</span><span>●●● ⌁</span></div>
+            <div class="sbar"><span class="back js-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></span><input class="js-input" type="text" placeholder="Search players, teams…" /><span class="x js-clear">✕</span></div>
+            <div class="scopes js-scopes"><span class="scope on" data-scope="all">All</span><span class="scope" data-scope="players">Players</span><span class="scope" data-scope="teams">Teams</span></div>
+            <div class="res js-res"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><div class="t"><span class="pin">A</span>Header icon → full screen</div><div class="d">A magnifier in the top bar opens a full takeover. Most screen for results and the keyboard. Familiar, but the icon is small and easy to miss.</div></div>
+    </div>
+
+    <!-- B: header pill → bottom sheet -->
+    <div class="col">
+      <div class="phone" data-style="sheet" data-trigger="pill">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="status"><span>9:41</span><span>●●● ⌁</span></div>
+          <div class="appbar">
+            <span class="brand">DINK</span>
+            <span class="pill js-trigger"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Search players, teams</span>
+          </div>
+          <div class="page"><div class="card"><h4>Leaderboard</h4>__LB__</div><div style="text-align:center;color:var(--faint);font-size:11px">Tap the search bar</div></div>
+          <!-- overlay -->
+          <div class="ov ov--sheet js-ov">
+            <div class="sheet">
+              <div class="grip"></div>
+              <div class="sbar"><input class="js-input" type="text" placeholder="Search players, teams…" /><span class="x js-close">Cancel</span></div>
+              <div class="scopes js-scopes"><span class="scope on" data-scope="all">All</span><span class="scope" data-scope="players">Players</span><span class="scope" data-scope="teams">Teams</span></div>
+              <div class="res js-res"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><div class="t"><span class="pin">B</span>Search bar → bottom sheet</div><div class="d">A visible search bar (clearly discoverable) opens a sheet that keeps the page behind it. Swipe-down or “Cancel” to dismiss. Input sits high; results fill the sheet. Feels light and modern.</div></div>
+    </div>
+
+    <!-- C: bottom-nav search tab → full screen -->
+    <div class="col">
+      <div class="phone" data-style="full" data-trigger="tab">
+        <div class="notch"></div>
+        <div class="screen">
+          <div class="status"><span>9:41</span><span>●●● ⌁</span></div>
+          <div class="appbar"><span class="brand">DINK SOCIETY</span></div>
+          <div class="page"><div class="card"><h4>Leaderboard</h4>__LB__</div><div style="text-align:center;color:var(--faint);font-size:11px">Tap Search in the bottom bar</div></div>
+          <div class="botnav">
+            <div class="bn on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Home</div>
+            <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Stand</div>
+            <div class="bn search js-trigger"><span class="ring"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>Search</div>
+            <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>Teams</div>
+            <div class="bn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>Me</div>
+          </div>
+          <!-- overlay -->
+          <div class="ov ov--full js-ov">
+            <div class="status"><span>9:41</span><span>●●● ⌁</span></div>
+            <div class="sbar"><span class="back js-close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></span><input class="js-input" type="text" placeholder="Search players, teams…" /><span class="x js-clear">✕</span></div>
+            <div class="scopes js-scopes"><span class="scope on" data-scope="all">All</span><span class="scope" data-scope="players">Players</span><span class="scope" data-scope="teams">Teams</span></div>
+            <div class="res js-res"></div>
+          </div>
+        </div>
+      </div>
+      <div class="cap"><div class="t"><span class="pin">C</span>Bottom-nav Search tab → full screen</div><div class="d">A dedicated Search tab in the thumb zone — the most discoverable and one-tap to reach. Costs a slot in the bottom nav. Opens the same full-screen search.</div></div>
+    </div>
+
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  var TEAMS = [
+    { name:"Smash Society",  emoji:"👊", cap:"Ryan Hom" },
+    { name:"ZERO ZERO TWO",  emoji:"🎯", cap:"Philip R" },
+    { name:"Big Dink Energy",emoji:"😤", cap:"Richard Hak" },
+    { name:"K'CHN",          emoji:"🤌", cap:"Patrick" },
+    { name:"What the Dink?!",emoji:"🤬", cap:"Sheri O'Neil" },
+    { name:"Timog Cal",      emoji:"🌴", cap:"Sandee Petersen" }
+  ];
+  var P = [
+    ["Ryan Hom","Smash Society","M",97.6],["Judy DV","ZERO ZERO TWO","F",96.7],["Shay C","ZERO ZERO TWO","F",96.1],
+    ["Phoebe Borsum","Smash Society","F",93.8],["Annie Kang","Smash Society","F",93.2],["Devin Carroll","Smash Society","M",93.1],
+    ["Lara P","ZERO ZERO TWO","F",92.9],["Richard Hak","Big Dink Energy","M",92.8],["Eli Henry","Big Dink Energy","M",91.7],
+    ["Katrina Nicasio","K'CHN","F",91.0],["Ant B","ZERO ZERO TWO","M",90.7],["Jobeth Zapata","Big Dink Energy","F",90.0],
+    ["Philip R","ZERO ZERO TWO","M",88.7],["Patrick","K'CHN","M",83.0],["Kyle U","ZERO ZERO TWO","M",69.8],
+    ["Philip Cadelina","K'CHN","M",68.8],["Vernice Carag","K'CHN","F",64.4],["Guilbert Balmaceda","K'CHN","M",62.7],
+    ["Kai Pylkkanen","Smash Society","M",52.6],["Sheri O'Neil","What the Dink?!","F",null],["Sandee Petersen","Timog Cal","F",null],
+    ["Aurora Timbol","Timog Cal","F",null],["Bernard Comia","Timog Cal","M",null],["Noel Manansala","Timog Cal","M",null],
+    ["Elaine Dodson","What the Dink?!","F",null],["Teddie Liu","What the Dink?!","M",null],["Amita Parikh","What the Dink?!","F",null],
+    ["Angel Munar","Big Dink Energy","F",null],["Kayo Hayashi","Big Dink Energy","F",null],["Chris Carag","K'CHN","M",null],
+    ["Jennifer Morales","K'CHN","F",null],["Anthony B","ZERO ZERO TWO","M",null],["Pam Morioka","Smash Society","F",null]
+  ];
+  var caps = {}; TEAMS.forEach(function(t){ caps[t.cap+"@"+t.name]=true; });
+  var DATA = {
+    players: P.map(function(r){ return { name:r[0], team:r[1], gender:r[2], dsr:r[3], cap:!!caps[r[0]+"@"+r[1]] }; }),
+    teams: TEAMS.map(function(t){ return { name:t.name, emoji:t.emoji, cap:t.cap, players:0 }; })
+  };
+  var emojiByTeam={}; TEAMS.forEach(function(t){ emojiByTeam[t.name]=t.emoji; });
+  function teamEmoji(n){ return emojiByTeam[n]||"🏓"; }
+  function slug(n){ return String(n||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""); }
+  function color(n){ var h=0,s=String(n||""); for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; var c=["#b8ff2c","#17d7b0","#f0c040","#ff6fb5","#3b9eff","#a78bfa"]; return c[h%c.length]; }
+  function initials(n){ var p=String(n||"").trim().split(/\s+/); return ((p[0]&&p[0][0]||"")+(p[1]&&p[1][0]||"")).toUpperCase()||"·"; }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+  function rankPlayers(){
+    var r=DATA.players.filter(function(p){return p.dsr!=null;}).slice().sort(function(a,b){return b.dsr-a.dsr;});
+    r.forEach(function(p,i){p.rank=i+1;}); DATA.players.forEach(function(p){ if(p.dsr==null) p.rank=null; });
+  }
+  rankPlayers();
+
+  // leaderboard teaser for the base pages
+  (function fillLB(){
+    var top=DATA.players.filter(function(p){return p.dsr!=null;}).sort(function(a,b){return b.dsr-a.dsr;}).slice(0,5);
+    var html=top.map(function(p,i){ return '<div class="lrow"><span class="rk">'+(i+1)+'</span><span class="nm">'+esc(p.name)+'</span><span class="dv">'+p.dsr.toFixed(1)+'</span></div>'; }).join('');
+    Array.prototype.forEach.call(document.querySelectorAll('.card'),function(c){ c.innerHTML=c.innerHTML.replace('__LB__',html); });
+  })();
+
+  function score(name,q){ name=name.toLowerCase(); var parts=name.split(/\s+/);
+    if(name===q) return 100; if(name.indexOf(q)===0) return 80; if(parts.some(function(p){return p.indexOf(q)===0;})) return 65; if(name.indexOf(q)>=0) return 40; return 0; }
+  function search(q,scope){ q=(q||"").trim().toLowerCase(); var players=[],teams=[];
+    if(!q){ if(scope!=="teams") players=DATA.players.filter(function(p){return p.dsr!=null;}).slice(0,6); if(scope!=="players") teams=DATA.teams.slice(0,6); return {players:players,teams:teams,sug:true}; }
+    if(scope!=="teams") players=DATA.players.map(function(p){return {p:p,s:score(p.name,q)};}).filter(function(x){return x.s>0;}).sort(function(a,b){return b.s-a.s||((b.p.dsr||0)-(a.p.dsr||0));}).slice(0,8).map(function(x){return x.p;});
+    if(scope!=="players") teams=DATA.teams.map(function(t){return {t:t,s:score(t.name,q)};}).filter(function(x){return x.s>0;}).sort(function(a,b){return b.s-a.s;}).slice(0,4).map(function(x){return x.t;});
+    return {players:players,teams:teams,sug:false};
+  }
+  function hl(name,q){ q=(q||"").trim(); if(!q) return esc(name); var i=name.toLowerCase().indexOf(q.toLowerCase()); if(i<0) return esc(name); return esc(name.slice(0,i))+"<mark>"+esc(name.slice(i,i+q.length))+"</mark>"+esc(name.slice(i+q.length)); }
+
+  var toast=document.getElementById("toast"), tT;
+  function showToast(h){ toast.innerHTML=h; toast.classList.add("show"); clearTimeout(tT); tT=setTimeout(function(){toast.classList.remove("show");},2400); }
+
+  function renderInto(resEl, q, scope){
+    var r=search(q,scope), html="";
+    if(!r.players.length && !r.teams.length){ resEl.innerHTML='<div class="empty"><div class="big">No matches for “'+esc(q)+'”</div>Try a first name, last name, or team.</div>'; return; }
+    if(r.players.length){ html+='<div class="grp">'+(r.sug?"Top players":"Players")+'</div>';
+      r.players.forEach(function(p){ var g=p.gender==="F"?"Women's":p.gender==="M"?"Men's":"";
+        html+='<div class="row" data-k="player" data-n="'+esc(p.name)+'" data-t="'+esc(p.team)+'">'+
+          '<div class="av" style="background:'+color(p.team)+'">'+esc(initials(p.name))+'</div>'+
+          '<div class="body"><div class="nm">'+hl(p.name,q)+'</div><div class="sub">'+teamEmoji(p.team)+' '+esc(p.team)+(g?' · '+g:'')+(p.cap?' · <span class="cp">Captain</span>':'')+'</div></div>'+
+          (p.dsr!=null?'<div class="dsr'+(p.gender==="F"?" teal":"")+'">'+p.dsr.toFixed(1)+' <small>DSR</small></div>':'')+
+          (p.rank!=null?'<div class="rank">#'+p.rank+'</div>':'')+'</div>';
+      });
+    }
+    if(r.teams.length){ html+='<div class="grp">Teams</div>';
+      r.teams.forEach(function(t){
+        html+='<div class="row" data-k="team" data-n="'+esc(t.name)+'">'+
+          '<div class="tav">'+esc(t.emoji||"🏓")+'</div>'+
+          '<div class="body"><div class="nm">'+hl(t.name,q)+'</div><div class="sub">'+(t.players?t.players+' players':'Team')+(t.cap?' · Captain '+esc(t.cap):'')+'</div></div></div>';
+      });
+    }
+    resEl.innerHTML=html;
+    Array.prototype.forEach.call(resEl.querySelectorAll(".row"),function(row){
+      row.addEventListener("click",function(){
+        var url = row.dataset.k==="player" ? "/player?name="+encodeURIComponent(row.dataset.n)+"&team="+slug(row.dataset.t) : "/team?team="+slug(row.dataset.n);
+        showToast('Would open <b>'+esc(url)+'</b>');
+      });
+    });
+  }
+
+  // wire each phone
+  Array.prototype.forEach.call(document.querySelectorAll(".phone"),function(ph){
+    var ov=ph.querySelector(".js-ov"), input=ph.querySelector(".js-input"), res=ph.querySelector(".js-res");
+    var scope="all";
+    function rerun(){ renderInto(res, input.value, scope); }
+    function open(){ ov.classList.add("open"); input.value=""; rerun(); setTimeout(function(){ try{input.focus();}catch(e){} },30); }
+    function close(){ ov.classList.remove("open"); }
+    Array.prototype.forEach.call(ph.querySelectorAll(".js-trigger"),function(t){ t.addEventListener("click",open); });
+    Array.prototype.forEach.call(ph.querySelectorAll(".js-close"),function(c){ c.addEventListener("click",close); });
+    var clr=ph.querySelector(".js-clear"); if(clr) clr.addEventListener("click",function(){ input.value=""; rerun(); input.focus(); });
+    input.addEventListener("input",rerun);
+    if(ph.dataset.style==="sheet"){ ov.addEventListener("mousedown",function(e){ if(e.target===ov) close(); }); }
+    var sc=ph.querySelector(".js-scopes");
+    if(sc) sc.addEventListener("click",function(e){ var s=e.target.closest(".scope"); if(!s) return; scope=s.dataset.scope;
+      Array.prototype.forEach.call(sc.querySelectorAll(".scope"),function(x){x.classList.toggle("on",x===s);}); rerun(); input.focus(); });
+  });
+
+  // live data on the deployed site
+  (function(){ if(location.protocol==="file:") return;
+    Promise.all([
+      fetch("/.netlify/functions/public-leaderboard?view=players").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/.netlify/functions/public-teams").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+    ]).then(function(res){ var pj=res[0],tj=res[1]; if(!pj) return;
+      var rt=(tj&&tj.teams)||[], capBy={}; rt.forEach(function(t){ emojiByTeam[t.name]=t.emoji||emojiByTeam[t.name]; capBy[t.name]=t.captain||((t.roster||[]).find(function(r){return r.isCaptain;})||{}).name||""; });
+      var raw=pj.players||pj.rows||pj, arr=Array.isArray(raw)?raw:Object.keys(raw||{}).map(function(k){return raw[k];});
+      var players=arr.map(function(p){ return { name:p.name, team:p.teamName, gender:p.gender, dsr:(p.composite!=null?Number(p.composite):(p.dsr!=null?Number(p.dsr):null)), cap:(capBy[p.teamName]===p.name) }; }).filter(function(p){return p.name&&p.team;});
+      if(!players.length) return; DATA.players=players;
+      if(rt.length) DATA.teams=rt.map(function(t){ return { name:t.name, emoji:t.emoji||"🏓", cap:capBy[t.name]||"", players:(t.roster||[]).length }; });
+      rankPlayers();
+      var src=document.getElementById("src"); if(src){ src.textContent="Live data · "+DATA.players.length+" players · "+DATA.teams.length+" teams"; src.className="src live"; }
+    }).catch(function(){});
+  })();
+})();
+</script>
+</body>
+</html>

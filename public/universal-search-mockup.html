@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Universal Search · Mockup · The Dink Society</title>
+<style>
+  :root{
+    --bg:#0e0e0e; --bg2:#070707; --surf:#161616; --surf2:#1c1c1c; --line:#2a2a2a;
+    --ink:#f5f5f5; --mut:#cfcfcf; --dim:#8a8a8a; --faint:#5e625c;
+    --lime:#b8ff2c; --teal:#17d7b0; --gold:#f0c040;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg2);color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;}
+  a{color:inherit}
+  .wrap{max-width:1080px;margin:0 auto;padding:26px 18px 80px}
+
+  /* explainer */
+  .intro{color:var(--mut);font-size:14px;line-height:1.6;margin:0 0 8px}
+  .intro b{color:var(--lime)}
+  .hintline{font-size:12.5px;color:var(--dim);margin:0 0 22px}
+  kbd{font-family:inherit;font-size:11px;font-weight:700;background:var(--surf2);border:1px solid var(--line);
+    border-bottom-width:2px;border-radius:6px;padding:2px 7px;color:var(--mut)}
+
+  /* faux site top bar */
+  .nav{display:flex;align-items:center;gap:18px;background:var(--bg);border:1px solid var(--line);
+    border-radius:14px;padding:13px 16px;margin-bottom:14px}
+  .nav .brand{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;white-space:nowrap}
+  .nav .links{display:flex;gap:16px;font-size:13px;color:var(--dim);font-weight:600}
+  .nav .links span{cursor:default}
+  .nav .links span:hover{color:var(--ink)}
+  .nav .spacer{flex:1}
+  .navsearch{display:inline-flex;align-items:center;gap:9px;background:var(--surf);border:1px solid var(--line);
+    border-radius:9999px;padding:9px 13px;min-width:230px;cursor:text;color:var(--dim);font-size:13px;transition:border-color .15s}
+  .navsearch:hover{border-color:#3a3a3a}
+  .navsearch svg{width:15px;height:15px;flex:none;opacity:.8}
+  .navsearch .ph{flex:1}
+  .navsearch .k{font-size:10px;font-weight:700;border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--faint)}
+  .navicon{display:none}
+
+  .stage{background:var(--bg);border:1px solid var(--line);border-radius:14px;padding:14px;min-height:120px;
+    display:flex;align-items:center;justify-content:center;color:var(--faint);font-size:13px;text-align:center;line-height:1.6}
+
+  /* ── command palette ── */
+  .pal-back{position:fixed;inset:0;background:rgba(0,0,0,.62);backdrop-filter:blur(3px);z-index:50;
+    display:none;align-items:flex-start;justify-content:center;padding:84px 16px 16px}
+  .pal-back.open{display:flex}
+  .pal{width:100%;max-width:620px;background:#121212;border:1px solid #333;border-radius:16px;overflow:hidden;
+    box-shadow:0 24px 70px rgba(0,0,0,.6);animation:pop .13s ease}
+  @keyframes pop{from{transform:translateY(-8px) scale(.985);opacity:.4}to{transform:none;opacity:1}}
+  .pal-in{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}
+  .pal-in svg{width:19px;height:19px;flex:none;opacity:.7}
+  .pal-in input{flex:1;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:17px}
+  .pal-in input::placeholder{color:var(--faint)}
+  .pal-in .esc{font-size:10px;font-weight:700;border:1px solid var(--line);border-radius:5px;padding:3px 7px;color:var(--faint)}
+  .pal-body{max-height:430px;overflow-y:auto;padding:8px 8px 10px}
+  .pal-body::-webkit-scrollbar{width:9px}
+  .pal-body::-webkit-scrollbar-thumb{background:#2c2c2c;border-radius:9px;border:2px solid #121212}
+
+  .grp{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);
+    padding:12px 12px 6px}
+  .row{display:flex;align-items:center;gap:12px;padding:9px 12px;border-radius:10px;cursor:pointer}
+  .row.sel{background:var(--surf2)}
+  .row .av{width:36px;height:36px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+    font-size:13px;font-weight:800;color:#06231d}
+  .row .tav{width:36px;height:36px;border-radius:10px;flex:none;display:flex;align-items:center;justify-content:center;font-size:18px;background:var(--surf)}
+  .row .body{flex:1;min-width:0}
+  .row .nm{font-size:14.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .nm mark{background:rgba(184,255,44,.22);color:var(--lime);border-radius:3px;padding:0 1px}
+  .row .sub{font-size:11.5px;color:var(--dim);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row .sub .cap{color:var(--lime);font-weight:700}
+  .row .right{display:flex;align-items:center;gap:9px;flex:none}
+  .row .dsr{font-size:15px;font-weight:800;color:var(--lime);font-variant-numeric:tabular-nums}
+  .row .dsr.teal{color:var(--teal)}
+  .row .dsr small{font-size:9px;color:var(--faint);font-weight:700}
+  .row .rank{font-size:10.5px;font-weight:800;color:var(--mut);background:var(--surf);border:1px solid var(--line);
+    border-radius:9999px;padding:3px 8px;white-space:nowrap}
+  .row .go{opacity:0;font-size:11px;color:var(--faint);font-weight:700}
+  .row.sel .go{opacity:1}
+  .empty{padding:34px 16px;text-align:center;color:var(--faint);font-size:13px;line-height:1.6}
+  .empty .big{font-size:15px;color:var(--dim);margin-bottom:4px}
+  .pal-foot{display:flex;align-items:center;gap:16px;border-top:1px solid var(--line);padding:9px 16px;
+    font-size:11px;color:var(--faint);font-weight:600}
+  .pal-foot .fk{display:inline-flex;align-items:center;gap:5px}
+  .pal-foot kbd{font-size:10px;padding:1px 5px}
+  .pal-foot .scopes{margin-left:auto;display:flex;gap:6px}
+  .scope{font-size:10.5px;font-weight:700;border:1px solid var(--line);border-radius:9999px;padding:3px 10px;color:var(--dim);cursor:pointer}
+  .scope.on{background:rgba(184,255,44,.12);border-color:rgba(184,255,44,.4);color:var(--lime)}
+
+  /* toast */
+  .toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);opacity:0;
+    background:#1c1c1c;border:1px solid var(--line);border-radius:10px;padding:11px 16px;font-size:13px;color:var(--mut);
+    z-index:60;transition:.2s;pointer-events:none;max-width:90vw}
+  .toast.show{opacity:1;transform:translateX(-50%)}
+  .toast b{color:var(--lime)}
+
+  .note{font-size:12px;color:var(--faint);line-height:1.6;margin:18px 2px 0}
+  .note b{color:var(--dim)}
+  .src{font-size:11px;color:var(--faint);margin-top:6px}
+  .src.live{color:var(--teal)}
+
+  @media (max-width:680px){
+    .nav .links{display:none}
+    .navsearch{min-width:0;flex:1}
+    .navsearch .ph{display:none}
+    .navsearch .k{display:none}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="intro"><b>Universal search — interactive mockup.</b> One search box in the nav that finds any <b>player</b> or <b>team</b> across the league. This demo uses your real roster (it pulls live data on the site; a snapshot is built in so it works here too).</p>
+  <p class="hintline">Try it: press <kbd>⌘</kbd><kbd>K</kbd> (or <kbd>Ctrl</kbd><kbd>K</kbd>), tap the search box, or just hit <kbd>/</kbd>. Type a name like “ryan”, “judy”, “smash”, or “kchn”.</p>
+
+  <!-- faux nav -->
+  <div class="nav">
+    <span class="brand">THE DINK SOCIETY</span>
+    <div class="links"><span>Home</span><span>Standings</span><span>Leaderboard</span><span>Teams</span></div>
+    <div class="spacer"></div>
+    <div class="navsearch" id="trigger" role="button" tabindex="0" aria-label="Open search">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <span class="ph">Search players, teams…</span>
+      <span class="k">⌘K</span>
+    </div>
+  </div>
+
+  <div class="stage" id="stage">This is a stand-in for any page. The search lives in the top nav and opens over whatever you’re looking at, so it works from anywhere on the site.</div>
+
+  <p class="note"><b>How it would work:</b> the search icon sits in the global nav (and as an icon on mobile). Picking a player opens their profile at <b>/player?name=…&amp;team=…</b>; picking a team opens <b>/team?…</b>. Results rank by best name match, then by DSR. Players show DSR + league rank; teams show their record. Scope chips let it be players-only or include teams.</p>
+  <p class="src" id="src">Using built-in snapshot…</p>
+
+</div>
+
+<!-- command palette -->
+<div class="pal-back" id="back">
+  <div class="pal" role="dialog" aria-label="Search">
+    <div class="pal-in">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="q" type="text" placeholder="Search players and teams…" autocomplete="off" spellcheck="false" />
+      <span class="esc">ESC</span>
+    </div>
+    <div class="pal-body" id="results"></div>
+    <div class="pal-foot">
+      <span class="fk"><kbd>↑</kbd><kbd>↓</kbd> navigate</span>
+      <span class="fk"><kbd>↵</kbd> open</span>
+      <span class="fk"><kbd>esc</kbd> close</span>
+      <span class="scopes" id="scopes">
+        <span class="scope on" data-scope="all">All</span>
+        <span class="scope" data-scope="players">Players</span>
+        <span class="scope" data-scope="teams">Teams</span>
+      </span>
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  // ── Built-in real-data snapshot (fallback when live fetch is unavailable) ──
+  var TEAMS = [
+    { name:"Smash Society",  emoji:"👊", cap:"Ryan Hom" },
+    { name:"ZERO ZERO TWO",  emoji:"🎯", cap:"Philip R" },
+    { name:"Big Dink Energy",emoji:"😤", cap:"Richard Hak" },
+    { name:"K'CHN",          emoji:"🤌", cap:"Patrick" },
+    { name:"What the Dink?!",emoji:"🤬", cap:"Sheri O'Neil" },
+    { name:"Timog Cal",      emoji:"🌴", cap:"Sandee Petersen" }
+  ];
+  var P = [
+    ["Ryan Hom","Smash Society","M",97.6,1],["Judy DV","ZERO ZERO TWO","F",96.7,1],["Shay C","ZERO ZERO TWO","F",96.1,0],
+    ["Phoebe Borsum","Smash Society","F",93.8,0],["Annie Kang","Smash Society","F",93.2,0],["Devin Carroll","Smash Society","M",93.1,0],
+    ["Lara P","ZERO ZERO TWO","F",92.9,0],["Richard Hak","Big Dink Energy","M",92.8,1],["Eli Henry","Big Dink Energy","M",91.7,0],
+    ["Katrina Nicasio","K'CHN","F",91.0,0],["Ant B","ZERO ZERO TWO","M",90.7,0],["Jobeth Zapata","Big Dink Energy","F",90.0,0],
+    ["Philip R","ZERO ZERO TWO","M",88.7,1],["Patrick","K'CHN","M",83.0,1],["Kyle U","ZERO ZERO TWO","M",69.8,0],
+    ["Philip Cadelina","K'CHN","M",68.8,0],["Vernice Carag","K'CHN","F",64.4,0],["Guilbert Balmaceda","K'CHN","M",62.7,0],
+    ["Kai Pylkkanen","Smash Society","M",52.6,0],["Sheri O'Neil","What the Dink?!","F",null,1],["Sandee Petersen","Timog Cal","F",null,1],
+    ["Aurora Timbol","Timog Cal","F",null,0],["Bernard Comia","Timog Cal","M",null,0],["GM Ardoy","Timog Cal","M",null,0],
+    ["Noel Manansala","Timog Cal","M",null,0],["Ricky Pedernal","Timog Cal","M",null,0],["Wally Quijano","Timog Cal","M",null,0],
+    ["Elaine Dodson","What the Dink?!","F",null,0],["Teddie Liu","What the Dink?!","M",null,0],["Ryan Yeung","What the Dink?!","M",null,0],
+    ["Amita Parikh","What the Dink?!","F",null,0],["Justin Kwok","What the Dink?!","M",null,0],["Grace Lee","What the Dink?!","F",null,0],
+    ["Albert Clarke","What the Dink?!","M",null,0],["Angel Munar","Big Dink Energy","F",null,0],["Chandler Hong","Big Dink Energy","M",null,0],
+    ["Kayo Hayashi","Big Dink Energy","F",null,0],["Tanya Deemer","Big Dink Energy","F",null,0],["Arica Green","Big Dink Energy","F",null,0],
+    ["Yoshi Nogimura","Big Dink Energy","M",null,0],["Chris Carag","K'CHN","M",null,0],["Elizabeth Acevedez","K'CHN","F",null,0],
+    ["Jennifer Morales","K'CHN","F",null,0],["Josh Manarang","K'CHN","M",null,0],["Anthony B","ZERO ZERO TWO","M",null,0],
+    ["Kaithlyn R","ZERO ZERO TWO","F",null,0],["Pam Morioka","Smash Society","F",null,0],["Stan Esperon","Smash Society","M",null,0]
+  ];
+  var DATA = {
+    players: P.map(function(r){ return { name:r[0], team:r[1], gender:r[2], dsr:r[3], cap:!!r[4] }; }),
+    teams: TEAMS.map(function(t){ return { name:t.name, emoji:t.emoji, cap:t.cap, players:0 }; })
+  };
+
+  var emojiByTeam = {}; TEAMS.forEach(function(t){ emojiByTeam[t.name]=t.emoji; });
+  function teamEmoji(n){ return emojiByTeam[n] || "🏓"; }
+  function slug(n){ return String(n||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,""); }
+  function teamColor(n){ var h=0,s=String(n||""); for(var i=0;i<s.length;i++) h=(h*31+s.charCodeAt(i))>>>0; var bg=["#b8ff2c","#17d7b0","#f0c040","#ff6fb5","#3b9eff","#a78bfa"]; return bg[h%bg.length]; }
+  function initials(n){ var p=String(n||"").trim().split(/\s+/); return ((p[0]&&p[0][0]||"")+(p[1]&&p[1][0]||"")).toUpperCase()||"·"; }
+  function rankPlayers(){
+    var ranked = DATA.players.filter(function(p){return p.dsr!=null;}).slice().sort(function(a,b){return b.dsr-a.dsr;});
+    ranked.forEach(function(p,i){ p.rank=i+1; });
+    DATA.players.forEach(function(p){ if(p.dsr==null) p.rank=null; });
+  }
+  rankPlayers();
+
+  // ── live data on the deployed site (same-origin) ──
+  (function loadLive(){
+    if(location.protocol==="file:") return;
+    Promise.all([
+      fetch("/.netlify/functions/public-leaderboard?view=players").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch("/.netlify/functions/public-teams").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+    ]).then(function(res){
+      var pj=res[0], tj=res[1]; if(!pj) return;
+      var rawTeams=(tj&&tj.teams)||[]; var capByTeam={};
+      rawTeams.forEach(function(t){ emojiByTeam[t.name]=t.emoji||emojiByTeam[t.name];
+        var cap=t.captain||((t.roster||[]).find(function(r){return r.isCaptain;})||{}).name||""; capByTeam[t.name]=cap; });
+      var raw = pj.players || pj.rows || pj; var arr = Array.isArray(raw)?raw:Object.keys(raw||{}).map(function(k){return raw[k];});
+      var players = arr.map(function(p){
+        return { name:p.name, team:p.teamName, gender:p.gender, dsr:(p.composite!=null?Number(p.composite):(p.dsr!=null?Number(p.dsr):null)),
+                 cap:(capByTeam[p.teamName]&&capByTeam[p.teamName]===p.name) };
+      }).filter(function(p){return p.name && p.team;});
+      if(!players.length) return;
+      DATA.players=players;
+      if(rawTeams.length){ DATA.teams=rawTeams.map(function(t){ return { name:t.name, emoji:t.emoji||"🏓", cap:capByTeam[t.name]||"", players:(t.roster||[]).length }; }); }
+      rankPlayers();
+      var src=document.getElementById("src"); if(src){ src.textContent="Live data · "+DATA.players.length+" players · "+DATA.teams.length+" teams"; src.className="src live"; }
+      if(back.classList.contains("open")) run();
+    }).catch(function(){});
+  })();
+
+  // ── search ──
+  function score(name, q){
+    name=name.toLowerCase();
+    var parts=name.split(/\s+/);
+    if(name===q) return 100;
+    if(name.indexOf(q)===0) return 80;
+    if(parts.some(function(p){return p.indexOf(q)===0;})) return 65;
+    if(name.indexOf(q)>=0) return 40;
+    return 0;
+  }
+  function search(q, scope){
+    q=q.trim().toLowerCase();
+    var players=[], teams=[];
+    if(!q){
+      if(scope!=="teams") players=DATA.players.filter(function(p){return p.dsr!=null;}).slice(0,6);
+      if(scope!=="players") teams=DATA.teams.slice(0,6);
+      return { players:players, teams:teams, suggested:true };
+    }
+    if(scope!=="teams"){
+      players=DATA.players.map(function(p){return {p:p,s:score(p.name,q)};}).filter(function(x){return x.s>0;})
+        .sort(function(a,b){ return b.s-a.s || ((b.p.dsr||0)-(a.p.dsr||0)); }).slice(0,8).map(function(x){return x.p;});
+    }
+    if(scope!=="players"){
+      teams=DATA.teams.map(function(t){return {t:t,s:score(t.name,q)};}).filter(function(x){return x.s>0;})
+        .sort(function(a,b){return b.s-a.s;}).slice(0,4).map(function(x){return x.t;});
+    }
+    return { players:players, teams:teams, suggested:false };
+  }
+  function hl(name,q){
+    q=q.trim(); if(!q) return esc(name);
+    var i=name.toLowerCase().indexOf(q.toLowerCase());
+    if(i<0) return esc(name);
+    return esc(name.slice(0,i))+"<mark>"+esc(name.slice(i,i+q.length))+"</mark>"+esc(name.slice(i+q.length));
+  }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];}); }
+
+  var back=document.getElementById("back"), qEl=document.getElementById("q"), resEl=document.getElementById("results");
+  var toast=document.getElementById("toast");
+  var SCOPE="all", FLAT=[], SEL=0;
+
+  function run(){
+    var q=qEl.value, r=search(q, SCOPE), html="", flat=[];
+    if(!r.players.length && !r.teams.length){
+      resEl.innerHTML='<div class="empty"><div class="big">No matches for “'+esc(q)+'”</div>Try a first name, last name, or team.</div>';
+      FLAT=[]; return;
+    }
+    if(r.players.length){
+      html+='<div class="grp">'+(r.suggested?"Top players":"Players")+'</div>';
+      r.players.forEach(function(p){
+        var idx=flat.length; flat.push({kind:"player",item:p});
+        var g=p.gender==="F"?"Women's":p.gender==="M"?"Men's":"";
+        html+='<div class="row" data-i="'+idx+'">'+
+          '<div class="av" style="background:'+teamColor(p.team)+'">'+esc(initials(p.name))+'</div>'+
+          '<div class="body"><div class="nm">'+hl(p.name,q)+'</div>'+
+            '<div class="sub">'+teamEmoji(p.team)+' '+esc(p.team)+(g?' · '+g:'')+(p.cap?' · <span class="cap">Captain</span>':'')+'</div></div>'+
+          '<div class="right">'+
+            (p.dsr!=null?'<div class="dsr'+(p.gender==="F"?" teal":"")+'">'+p.dsr.toFixed(1)+' <small>DSR</small></div>':'')+
+            (p.rank!=null?'<div class="rank">#'+p.rank+'</div>':'')+
+            '<div class="go">↵</div>'+
+          '</div></div>';
+      });
+    }
+    if(r.teams.length){
+      html+='<div class="grp">Teams</div>';
+      r.teams.forEach(function(t){
+        var idx=flat.length; flat.push({kind:"team",item:t});
+        html+='<div class="row" data-i="'+idx+'">'+
+          '<div class="tav">'+esc(t.emoji||"🏓")+'</div>'+
+          '<div class="body"><div class="nm">'+hl(t.name,q)+'</div>'+
+            '<div class="sub">'+(t.players?t.players+' players':'Team')+(t.cap?' · Captain '+esc(t.cap):'')+'</div></div>'+
+          '<div class="right"><div class="go">↵</div></div></div>';
+      });
+    }
+    resEl.innerHTML=html; FLAT=flat; SEL=0; paint();
+    Array.prototype.forEach.call(resEl.querySelectorAll(".row"),function(row){
+      row.addEventListener("mousemove",function(){ SEL=+row.dataset.i; paint(); });
+      row.addEventListener("click",function(){ SEL=+row.dataset.i; choose(); });
+    });
+  }
+  function paint(){
+    Array.prototype.forEach.call(resEl.querySelectorAll(".row"),function(row){
+      var on=(+row.dataset.i===SEL); row.classList.toggle("sel",on);
+      if(on) row.scrollIntoView({block:"nearest"});
+    });
+  }
+  function choose(){
+    var e=FLAT[SEL]; if(!e) return;
+    var url = e.kind==="player"
+      ? "/player?name="+encodeURIComponent(e.item.name)+"&team="+slug(e.item.team)
+      : "/team?team="+slug(e.item.name);
+    showToast('Would open <b>'+esc(url)+'</b>');
+    // On the real site: location.href = url;
+    close();
+  }
+  var tT;
+  function showToast(html){ toast.innerHTML=html; toast.classList.add("show"); clearTimeout(tT); tT=setTimeout(function(){toast.classList.remove("show");},2600); }
+
+  function open(){ back.classList.add("open"); qEl.value=""; run(); setTimeout(function(){qEl.focus();},20); }
+  function close(){ back.classList.remove("open"); }
+
+  document.getElementById("trigger").addEventListener("click",open);
+  document.getElementById("trigger").addEventListener("keydown",function(e){ if(e.key==="Enter"||e.key===" "){e.preventDefault();open();} });
+  qEl.addEventListener("input",run);
+  back.addEventListener("mousedown",function(e){ if(e.target===back) close(); });
+  document.getElementById("scopes").addEventListener("click",function(e){
+    var s=e.target.closest(".scope"); if(!s) return;
+    SCOPE=s.dataset.scope;
+    Array.prototype.forEach.call(this.querySelectorAll(".scope"),function(x){x.classList.toggle("on",x===s);});
+    run(); qEl.focus();
+  });
+  document.addEventListener("keydown",function(e){
+    var openK = (e.key==="k"||e.key==="K") && (e.metaKey||e.ctrlKey);
+    var slashK = e.key==="/" && !back.classList.contains("open") && document.activeElement.tagName!=="INPUT";
+    if(openK||slashK){ e.preventDefault(); open(); return; }
+    if(!back.classList.contains("open")) return;
+    if(e.key==="Escape"){ close(); }
+    else if(e.key==="ArrowDown"){ e.preventDefault(); if(FLAT.length){ SEL=(SEL+1)%FLAT.length; paint(); } }
+    else if(e.key==="ArrowUp"){ e.preventDefault(); if(FLAT.length){ SEL=(SEL-1+FLAT.length)%FLAT.length; paint(); } }
+    else if(e.key==="Enter"){ e.preventDefault(); choose(); }
+  });
+})();
+</script>
+</body>
+</html>
