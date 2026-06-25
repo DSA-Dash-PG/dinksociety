@@ -135,6 +135,7 @@
             <div><label class="l">Total players</label><input class="i" id="f-cap" type="number" value="12"></div>
             <div><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" value="7"></div>
           </div>
+          <div class="frow"><label class="l">Court numbers (optional)</label><input class="i" id="f-courts-list" placeholder="e.g. Courts 5–7  ·  or  1, 2, 3"></div>
           <div class="help" style="margin:-6px 0 13px">Capacity auto-fills to courts × 4. Card adds a 10% service fee; Venmo is fee-free.</div>
           <div class="frow row2">
             <div><label class="l">League Venmo</label><input class="i" id="f-venmo" value="@DinkSociety"></div>
@@ -230,9 +231,18 @@
     <div><label class="l">Total players</label><input class="i" id="m-cap" type="number"></div>
     <div><label class="l">Entry fee ($)</label><input class="i" id="m-fee" type="number" step="0.01"></div>
   </div>
+  <div class="frow"><label class="l">Court numbers (optional)</label><input class="i" id="m-courts-list" placeholder="e.g. Courts 5–7  ·  or  1, 2, 3"></div>
   <div class="frow"><label class="l">League Venmo</label><input class="i" id="m-venmo"></div>
   <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
   <div id="mEditMsg"></div>
+
+  <div class="sec" style="margin:22px 0 8px">Reminders</div>
+  <div class="frow row2">
+    <div><label class="l">Send a reminder now</label><select class="i" id="m-remkind"><option value="two_day">2 days out</option><option value="morning">Morning of (5am)</option><option value="three_hour">3 hours out</option></select></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn btn-lime" style="width:100%" onclick="sendReminder()">Send to roster now</button></div>
+  </div>
+  <div class="help" style="margin:-4px 0 6px">Emails everyone registered right now — the field, each player's last-ladder line, court #s, a cancel link, and the next ladder. Auto-sends also fire 2 days out, 5am day-of, and 3 hours out.</div>
+  <div id="mRemMsg"></div>
 
   <div class="frow" style="margin-top:16px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div><div class="help" style="margin-top:4px">Automatic: <b>Open</b> until the start date · <b>Live</b> while scoring · <b>Final</b> when you finish the ladder.</div></div>
 
@@ -375,6 +385,7 @@ async function createLadder(){
     endTime:document.getElementById('f-end').value.trim(),
     place:document.getElementById('f-place').value.trim(),
     courts:parseInt(document.getElementById('f-courts').value)||0,
+    courtNumbers:document.getElementById('f-courts-list').value.trim(),
     capacity:parseInt(document.getElementById('f-cap').value)||0,
     fee:parseFloat(document.getElementById('f-fee').value)||0,
     venmoHandle:document.getElementById('f-venmo').value.trim(),
@@ -400,7 +411,7 @@ async function openManage(id){
   { const st=(d.event.status||'open'); const SC={open:'var(--lime)',live:'var(--gold)',final:'var(--teal)',cancelled:'var(--red)'}; const el=document.getElementById('statusLine'); if(el){ el.textContent=st.charAt(0).toUpperCase()+st.slice(1); el.style.color=SC[st]||'#9aa094'; } }
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
   setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-type',d.event.type||'mixed');
-  setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
+  setv('m-courts',d.event.courts); setv('m-courts-list',d.event.courtNumbers||''); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
   document.getElementById('mEditMsg').innerHTML='';
   let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
   h+= d.roster.length? d.roster.map(p=>{
@@ -462,7 +473,7 @@ async function saveEdit(){
   const body={
     id:CURRENT.id, circuit:CURRENT.circuit,
     name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(),
-    courts:parseInt(g('m-courts'))||0, capacity:parseInt(g('m-cap'))||0,
+    courts:parseInt(g('m-courts'))||0, courtNumbers:g('m-courts-list').trim(), capacity:parseInt(g('m-cap'))||0,
     feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(), type:g('m-type'),
     paymentMethods:CURRENT.paymentMethods, organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
     spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,
@@ -473,6 +484,18 @@ async function saveEdit(){
   if(status===401){ msg('mEditMsg','err','Sign in as admin first.'); return; }
   if(d.ok){ CURRENT=d.event; msg('mEditMsg','ok','Saved.'); document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · ${d.event.courts} courts · ${fmt(d.event.feeCents)}`; loadList(); }
   else msg('mEditMsg','err',d.error||'Save failed.');
+}
+
+async function sendReminder(){
+  if(!CURRENT) return;
+  const sel=document.getElementById('m-remkind');
+  const kind=sel.value, label=sel.selectedOptions[0].text;
+  if(!confirm('Send the "'+label+'" reminder email to everyone registered for '+(CURRENT.name||'this ladder')+' right now?')) return;
+  const box=document.getElementById('mRemMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
+  const {status,d}=await api('/admin-ladder-remind',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:CURRENT.id,kind:kind,force:true})});
+  if(status===401){ msg('mRemMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){ msg('mRemMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); }
+  else { msg('mRemMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').')); }
 }
 
 async function act(action,email,playerId,method){

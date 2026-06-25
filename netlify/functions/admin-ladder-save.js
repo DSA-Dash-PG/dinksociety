@@ -40,6 +40,9 @@ export default async (req) => {
     endTime: b.endTime || existing?.endTime || '',
     place: b.place || existing?.place || '',
     courts,
+    // Optional free-text court numbers/labels (e.g. "Courts 5-7" or "1, 2, 3"),
+    // shown in reminders so players know exactly where to go.
+    courtNumbers: (b.courtNumbers != null ? String(b.courtNumbers).trim().slice(0, 60) : (existing?.courtNumbers || '')) || null,
     capacity,
     feeCents: Number.isFinite(feeCents) ? feeCents : 0,
     paymentMethods: methods,
