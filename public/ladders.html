@@ -63,7 +63,7 @@
   .payic{ width:36px;height:36px;border-radius:10px;background:var(--surf2);display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:900; }
   .payt{ font-size:.84rem;font-weight:800; } .pays{ font-size:.64rem;color:var(--fnt); } .payamt{ margin-left:auto;font-weight:900; }
   .msg{ padding:10px 13px;border-radius:9px;font-size:.78rem;font-weight:600;margin-top:10px; } .msg.ok{ background:rgba(184,255,44,.14);color:var(--lime); } .msg.info{ background:rgba(23,215,176,.14);color:var(--teal); } .msg.err{ background:rgba(255,92,71,.14);color:var(--red); } .msg.warn{ background:rgba(240,192,64,.14);color:var(--gold); }
-  .pf-head{ display:flex;align-items:center;gap:13px;margin-bottom:12px; } .pf-av{ width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--lime),var(--teal));color:#000;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900; }
+  .pf-head{ display:flex;align-items:center;gap:13px;margin-bottom:12px; } .pf-av{ width:56px;height:56px;border-radius:16px;background:linear-gradient(135deg,var(--lime),var(--teal));color:#000;display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:900;overflow:hidden; } .pf-av img{ width:100%;height:100%;object-fit:cover; }
   .pf-nm{ font-size:1.2rem;font-weight:900; } .pf-badge{ font-size:.56rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;padding:2px 8px;border-radius:9999px;margin-top:4px;display:inline-block; }
   .pf-league{ background:rgba(23,215,176,.16);color:var(--teal); } .pf-only{ background:rgba(184,255,44,.14);color:var(--lime); }
   .pf-kpis{ display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:6px; } .pf-kpi{ background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:10px 4px;text-align:center; }
@@ -429,6 +429,7 @@ async function profile(id){
   catch(e){ netErr=true; }
   if(netErr){ body.innerHTML='<div class="note">Couldn’t load this profile. Check your connection and <a href="#" onclick="profile(\''+id+'\');return false" style="color:var(--lime);font-weight:700">try again</a>.</div>'; return; }
   if(!j||!j.found){ body.innerHTML='<div class="note">No profile found for this player yet.</div>'; return; }
+  if(j.player && j.photoUrl) j.player.photoUrl = j.photoUrl;
   body.innerHTML=renderProfile(j.player, j.inLeague);
 }
 function ord(n){ const s=['th','st','nd','rd'],v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
@@ -472,7 +473,7 @@ function renderProfile(p,inLeague){
     return `<details style="background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:8px"><summary style="cursor:pointer;list-style:none"><div style="font-size:.86rem;font-weight:800">${esc(L.name)} <span style="color:#9aa094;font-weight:600;font-size:.72rem">${shortDate(L.date)}</span></div><div style="font-size:.72rem;color:#cdd2c6;font-weight:700;margin-top:2px">${stats} · ${note}</div></summary><div style="margin-top:8px">${rounds}${courtChart(L.rounds)}</div></details>`;
   }).join('');
   return `
-    <div class="pf-head"><div class="pf-av">${init}</div><div style="flex:1">
+    <div class="pf-head"><div class="pf-av" data-ini="${init}">${p.photoUrl?`<img src="${p.photoUrl}" alt="" loading="lazy" onerror="this.remove();this.parentNode.textContent=this.parentNode.dataset.ini;">`:init}</div><div style="flex:1">
       <div class="pf-nm">${esc(p.name)}</div>
       <div style="font-size:.7rem;color:#9aa094;margin:3px 0">${p.gender||''} · Rank #${p.rank||'–'} ${p.mvp?`<span class="pf-badge" style="background:rgba(167,139,250,.16);color:var(--purp)">🏅 ${p.mvp}× Top</span>`:''}</div>
       <div style="margin:4px 0">${badge}</div>
