@@ -378,10 +378,9 @@ function plRosterHtml(d){
   return h;
 }
 function plMergeHtml(d){
-  const opts=d.players.map(p=>`<option value="${p.id}">${esc(p.name)} (${p.gender||'—'} · ${p.nights} ladders)</option>`).join('');
   let h='<div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">Merge duplicate profiles into one. The kept player inherits all ladder history.</div>';
-  h+='<label class="l">Merge this duplicate</label><select class="i" id="mg-from"><option value="">Choose…</option>'+opts+'</select>';
-  h+='<label class="l" style="margin-top:8px;display:block">…into this player (keep)</label><select class="i" id="mg-to"><option value="">Choose…</option>'+opts+'</select>';
+  h+='<label class="l">Merge this duplicate</label><input type="hidden" id="mg-from"><input class="i" id="mgFromSearch" placeholder="Search the duplicate to merge…" autocomplete="off" oninput="mgSearch(\'from\')"><div id="mgFromResults" style="margin-top:6px"></div><div id="mgFromSel" style="font-size:.76rem;color:#5e655a;margin-top:4px"></div>';
+  h+='<label class="l" style="margin-top:10px;display:block">…into this player (keep)</label><input type="hidden" id="mg-to"><input class="i" id="mgToSearch" placeholder="Search the player to keep…" autocomplete="off" oninput="mgSearch(\'to\')"><div id="mgToResults" style="margin-top:6px"></div><div id="mgToSel" style="font-size:.76rem;color:#5e655a;margin-top:4px"></div>';
   h+='<input class="i" id="mg-name" placeholder="Name to keep (optional)" style="margin-top:8px">';
   h+='<button class="btn btn-lime" style="margin-top:8px" onclick="doMerge()">Merge players</button><div id="mgMsg"></div>';
   const dnorm=s=>String(s||'').trim().toLowerCase();
@@ -410,6 +409,23 @@ function plSearch(){
 }
 function plPick(i){ const p=(window.__PLS||[])[i]; if(p) plApply(p); }
 function plPickById(id){ const p=(PLDATA.players||[]).find(x=>x.id===id); if(p) plApply(p); }
+function mgSearch(which){
+  const cap=which==='from'?'From':'To';
+  const q=(document.getElementById('mg'+cap+'Search').value||'').trim(); const ql=q.toLowerCase();
+  const el=document.getElementById('mg'+cap+'Results'); if(!el) return;
+  if(!q){ el.innerHTML=''; window.__MG=window.__MG||{}; window.__MG[which]=[]; return; }
+  const pool=((PLDATA&&PLDATA.players)||[]).filter(p=>!p.mergedInto&&String(p.name).toLowerCase().includes(ql)).slice(0,8);
+  window.__MG=window.__MG||{}; window.__MG[which]=pool;
+  el.innerHTML=pool.length?pool.map((p,i)=>`<div class="prow" style="cursor:pointer" onclick="mgPick('${which}',${i})"><span class="pn">${esc(p.name)} <span style="color:#5e655a;font-weight:500;font-size:.7rem">${p.gender||''} · ${p.nights}L${p.email?' · ✉':''}</span></span><span class="chip chip-lime">Pick</span></div>`).join(''):'<div class="empty" style="font-size:.76rem">No match.</div>';
+}
+function mgPick(which,i){
+  const p=((window.__MG||{})[which]||[])[i]; if(!p) return;
+  const cap=which==='from'?'From':'To';
+  document.getElementById('mg-'+which).value=p.id;
+  document.getElementById('mg'+cap+'Search').value='';
+  document.getElementById('mg'+cap+'Results').innerHTML='';
+  document.getElementById('mg'+cap+'Sel').innerHTML='Selected <b style="color:#f5f5f5">'+esc(p.name)+'</b> · '+(p.nights||0)+'L'+(p.email?' · ✉':'');
+}
 function plApply(p){
   document.getElementById('ed-player').value=p.id;
   document.getElementById('ed-email').value=p.email||'';
