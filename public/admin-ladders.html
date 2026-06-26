@@ -537,11 +537,15 @@ async function loadRecap(){
   if(status===401){ document.getElementById('rcBody').innerHTML='<div class="empty">Sign in as admin to manage recaps.</div>'; return; }
   renderRecap(d&&d.recap);
 }
+let RECAP_CUR=null;
 function renderRecap(r){
+  RECAP_CUR=r||null;
   const body=document.getElementById('rcBody'), meta=document.getElementById('rcMeta');
   if(!r){
     meta.textContent='No recap drafted yet.';
-    body.innerHTML='<div class="empty" style="margin-bottom:12px">Auto-drafts 15 minutes after a night finishes. You can also draft it now.</div><button class="btn btn-lime" onclick="genRecap(false)">✨ Draft recap with Claude</button>';
+    body.innerHTML='<div class="empty" style="margin-bottom:12px">Auto-drafts after a night finishes — or build it now from the night’s results. No AI needed; you can edit the write-up before sending.</div>'
+      +'<button class="btn btn-lime" onclick="genRecap(false,\'basic\')">🧮 Build recap from the night</button>'
+      +'<button class="btn btn-out" style="margin-top:8px" onclick="genRecap(false,\'ai\')">✨ Try AI draft</button>';
     return;
   }
   const players=r.players?Object.values(r.players):[];
@@ -558,16 +562,40 @@ function renderRecap(r){
   h+='<div style="max-height:280px;overflow:auto">'+players.sort((a,b)=>(a.rank||99)-(b.rank||99)).map(p=>`<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:8px 0"><div style="font-size:.82rem;font-weight:700">${esc(p.name)} <span style="color:#5e655a;font-weight:500">· ${p.rank?('#'+p.rank):''} · ${p.w}-${p.l} · ${(p.diff>=0?'+':'')+p.diff}</span></div><div style="font-size:.76rem;color:#9aa094;margin-top:2px">${esc(p.hi||'')} ${esc((p.story&&p.story[0])||'')}</div></div>`).join('')+'</div>';
   // Actions
   h+='<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">';
-  h+='<button class="btn btn-out" onclick="genRecap(true)">↻ Regenerate</button>';
+  h+='<button class="btn btn-out" onclick="editRecap()">✏️ Edit write-up</button>';
+  h+='<button class="btn btn-out" onclick="genRecap(true,\'basic\')">↻ Rebuild from stats</button>';
   if(!sent) h+=`<button class="btn btn-lime" onclick="sendRecap()">Send to ${recips} player${recips===1?'':'s'} →</button>`;
   else h+='<button class="btn btn-lime" onclick="sendRecap()">Re-send to players</button>';
   h+='</div>';
   body.innerHTML=h;
 }
-async function genRecap(force){
-  document.getElementById('rcMsg').innerHTML='<div style="color:#9aa094;font-size:.78rem;margin-top:8px">Drafting with Claude… (a few seconds)</div>';
-  const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'generate',force:!!force})});
-  if(d&&d.ok){ document.getElementById('rcMsg').innerHTML=''; renderRecap(d.recap); }
+// Edit the shared Part 2 write-up (title / sub / article / season note). Lets
+// you paste a custom or Cowork-written recap before sending. Per-player notes
+// stay as built from the stats.
+function editRecap(){
+  const r=RECAP_CUR||{}, rc=r.recap||{};
+  const ta=(id,val,rows)=>`<textarea id="${id}" rows="${rows||3}" style="width:100%;background:var(--surf2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:9px;font:inherit;font-size:.82rem;line-height:1.5">${esc(val||'')}</textarea>`;
+  const inp=(id,val)=>`<input id="${id}" value="${esc(val||'')}" style="width:100%;background:var(--surf2);color:var(--tx);border:1px solid var(--bd);border-radius:8px;padding:9px;font:inherit;font-size:.86rem">`;
+  document.getElementById('rcBody').innerHTML=
+    '<div class="sec" style="margin:0 0 6px">Headline</div>'+inp('re-title',rc.title)+
+    '<div class="sec" style="margin:12px 0 6px">Sub-headline</div>'+inp('re-dek',rc.dek)+
+    '<div class="sec" style="margin:12px 0 6px">Article (HTML: &lt;p&gt;, &lt;strong&gt;, &lt;em&gt;, &lt;blockquote&gt;)</div>'+ta('re-html',rc.html,7)+
+    '<div class="sec" style="margin:12px 0 6px">Season note</div>'+ta('re-season',rc.seasonNote,3)+
+    '<div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-lime" onclick="saveRecapEdits()">Save write-up</button><button class="btn btn-out" onclick="loadRecap()">Cancel</button></div>';
+}
+async function saveRecapEdits(){
+  const g=id=>document.getElementById(id).value;
+  const recap={ title:g('re-title').trim(), dek:g('re-dek').trim(), html:g('re-html').trim(), seasonNote:g('re-season').trim() };
+  document.getElementById('rcMsg').innerHTML='<div style="color:#9aa094;font-size:.78rem;margin-top:8px">Saving…</div>';
+  const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'save-draft',recap})});
+  if(d&&d.ok){ msg('rcMsg','ok','Write-up saved.'); renderRecap(d.recap); }
+  else msg('rcMsg','err',(d&&d.error)||'Could not save ('+status+').');
+}
+async function genRecap(force,engine){
+  const ai=engine==='ai';
+  document.getElementById('rcMsg').innerHTML='<div style="color:#9aa094;font-size:.78rem;margin-top:8px">'+(ai?'Drafting with Claude…':'Building from the night’s results…')+'</div>';
+  const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'generate',force:!!force,engine:engine||'basic'})});
+  if(d&&d.ok){ const note=(d.engine&&d.engine.indexOf('basic')===0)?'<div style="color:#9aa094;font-size:.72rem;margin-top:6px">Built from the night’s numbers. Tap “Edit write-up” to customize.</div>':''; document.getElementById('rcMsg').innerHTML=note; renderRecap(d.recap); }
   else msg('rcMsg','err',(d&&d.error)||'Could not draft ('+status+').');
 }
 async function sendRecap(){

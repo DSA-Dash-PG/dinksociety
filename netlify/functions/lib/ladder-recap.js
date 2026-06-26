@@ -31,6 +31,23 @@ export async function saveRecapDraft(eventId, data) {
   return rec;
 }
 
+// Merge edited prose (and/or per-player notes) into an existing draft. Used by
+// the admin composer so hand-written (or Cowork-written) copy can replace the
+// generated Part 2 article without re-running the generator. Keeps it a draft.
+export async function updateRecapDraft(eventId, patch = {}) {
+  const rec = await getRecap(eventId);
+  if (!rec) return null;
+  if (patch.recap) rec.recap = { ...rec.recap, ...patch.recap };
+  if (patch.players) {
+    rec.players = rec.players || {};
+    for (const [pid, pp] of Object.entries(patch.players)) rec.players[pid] = { ...(rec.players[pid] || {}), ...pp };
+  }
+  rec.status = 'draft';
+  rec.editedAt = new Date().toISOString();
+  await store().setJSON(`recap/${eventId}.json`, rec);
+  return rec;
+}
+
 export async function markRecapSent(eventId, sentCount) {
   const rec = await getRecap(eventId);
   if (!rec) return null;

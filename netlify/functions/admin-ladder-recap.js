@@ -9,7 +9,7 @@
 // mirroring The Drop and the POTW mailer. Sends from dink@dinksociety.app.
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { getRecap, markRecapSent } from './lib/ladder-recap.js';
+import { getRecap, markRecapSent, updateRecapDraft } from './lib/ladder-recap.js';
 import { generateLadderRecapDraft } from './lib/ladder-recap-generate.js';
 import { renderLadderRecapEmail } from './lib/ladder-recap-email.js';
 import { sendEmail } from './lib/email.js';
@@ -38,12 +38,22 @@ export default async (req) => {
 
     if (body.action === 'generate') {
       try {
-        const r = await generateLadderRecapDraft(eventId, { force: !!body.force });
+        // engine 'basic' = no API (templated). Default tries Claude, then falls
+        // back to basic on any API error, so this endpoint never hard-fails.
+        const r = await generateLadderRecapDraft(eventId, { force: !!body.force, engine: body.engine });
         if (!r.ok) return json({ error: r.reason || 'Could not generate', skipped: true }, 409);
-        return json({ ok: true, recap: r.record });
+        return json({ ok: true, recap: r.record, engine: r.engine });
       } catch (e) {
         return json({ error: String(e.message || e) }, 502);
       }
+    }
+
+    // Save hand-edited prose (title / dek / article / season note) into the
+    // draft — lets the organizer paste a custom write-up before sending.
+    if (body.action === 'save-draft') {
+      const rec = await updateRecapDraft(eventId, { recap: body.recap || {}, players: body.players || null });
+      if (!rec) return json({ error: 'No draft to edit — generate one first.' }, 409);
+      return json({ ok: true, recap: rec });
     }
 
     if (body.action === 'send') {

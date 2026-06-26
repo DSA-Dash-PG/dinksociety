@@ -10,6 +10,7 @@
 
 import { buildRecapBrief } from './ladder-recap-insights.js';
 import { saveRecapDraft, getRecap } from './ladder-recap.js';
+import { buildBasicRecap } from './ladder-recap-basic.js';
 
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 function apiKey() { return (typeof Netlify !== 'undefined' && Netlify.env.get('ANTHROPIC_API_KEY')) || process.env.ANTHROPIC_API_KEY || ''; }
@@ -96,7 +97,7 @@ async function callClaude(brief) {
  * Skips if a draft was already SENT (unless force).
  * @returns {Promise<{ ok, skipped?, reason?, record? }>}
  */
-export async function generateLadderRecapDraft(eventId, { force = false } = {}) {
+export async function generateLadderRecapDraft(eventId, { force = false, engine } = {}) {
   const existing = await getRecap(eventId);
   if (existing && existing.status === 'sent' && !force) {
     return { ok: false, skipped: true, reason: 'already-sent' };
@@ -106,11 +107,27 @@ export async function generateLadderRecapDraft(eventId, { force = false } = {}) 
   if (!brief) return { ok: false, skipped: true, reason: 'no-scored-play' };
   if (!brief.night.players.length) return { ok: false, skipped: true, reason: 'no-players' };
 
-  const ai = await callClaude(brief);
+  // Choose the writer:
+  //   engine 'basic'  → templated, no API (always works)
+  //   engine 'ai'/default → try Claude, FALL BACK to basic if the API errors or
+  //                         there's no key, so a recap is never blocked on the API.
+  let ai, usedEngine;
+  if (engine === 'basic' || !apiKey()) {
+    ai = buildBasicRecap(brief);
+    usedEngine = 'basic';
+  } else {
+    try {
+      ai = await callClaude(brief);
+      usedEngine = 'claude';
+    } catch (e) {
+      ai = buildBasicRecap(brief);
+      usedEngine = 'basic-fallback';
+    }
+  }
 
   const rec = await saveRecapDraft(eventId, {
-    generatedBy: 'auto',
-    model: modelId(),
+    generatedBy: usedEngine,
+    model: usedEngine === 'claude' ? modelId() : 'basic',
     event: brief.event,
     recap: {
       title: ai.recap?.title || `${brief.event.name} — recap`,
@@ -142,5 +159,5 @@ export async function generateLadderRecapDraft(eventId, { force = false } = {}) 
     recipients: brief.recipients,
   });
 
-  return { ok: true, record: rec };
+  return { ok: true, record: rec, engine: usedEngine };
 }
