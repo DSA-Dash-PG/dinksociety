@@ -116,14 +116,14 @@ export default async (req) => {
   }
 
   if (action === 'finish') {
-    play.finished = true; await setPlay(eventId, play);
+    play.finished = true; play.finishedAt = new Date().toISOString(); await setPlay(eventId, play);
     event.status = 'final'; await setEvent(event);
     return json({ ok: true, play });
   }
 
   if (action === 'reopen') {
     // Un-finalize a completed night so scores/lineups can be edited, then re-finished.
-    play.finished = false; await setPlay(eventId, play);
+    play.finished = false; play.finishedAt = null; await setPlay(eventId, play);
     if (event.status === 'final') { event.status = 'live'; await setEvent(event); }
     return json({ ok: true, play });
   }
@@ -163,7 +163,7 @@ export default async (req) => {
     const tied = (cur.courts || []).filter(c => c.score && c.score.t1 !== null && c.score.t2 !== null && !c.score.winner);
     if (tied.length) return json({ error: `${tied.length} tied court(s) need a winner picked.` }, 409);
     if (play.currentRound >= play.config.rounds - 1) {
-      play.finished = true; await setPlay(eventId, play);
+      play.finished = true; play.finishedAt = new Date().toISOString(); await setPlay(eventId, play);
       event.status = 'final'; await setEvent(event);
       return json({ ok: true, finished: true, play });
     }

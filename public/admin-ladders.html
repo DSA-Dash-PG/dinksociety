@@ -269,6 +269,16 @@
   </div>
 </div></div>
 
+<!-- RECAP overlay -->
+<div class="ov" id="recapOv"><div class="sheet"><button class="x" onclick="closeRecap()">×</button>
+  <div class="sheet-in">
+  <h2 id="rcTitle" style="font-size:1.25rem;margin:0 0 2px">Ladder recap</h2>
+  <div id="rcMeta" style="font-size:.78rem;color:#9aa094;margin-bottom:14px"></div>
+  <div id="rcBody"><div class="empty">Loading…</div></div>
+  <div id="rcMsg"></div>
+  </div>
+</div></div>
+
 <script>
 const API='/.netlify/functions';
 let CURRENT=null;
@@ -453,7 +463,7 @@ async function loadList(){
     const pend=l.pendingVenmo?` · <span class="chip chip-gold">${l.pendingVenmo} Venmo pending</span>`:'';
     return `<div class="lad"><div><div class="nm">${esc(l.name)}</div><div class="mt">${esc(l.date||'')} ${esc(l.startTime||'')} · ${esc(l.place||'')} · ${fmt(l.feeCents)}</div></div>
       <div class="ct">${l.rosterCount}/${l.capacity} · ${l.waitlistCount} waitlist${pend}<br><span class="chip ${st}">${esc(l.status||'open')}</span></div>
-      <button class="btn btn-out btn-sm" onclick="openManage('${l.id}')">Manage</button></div>`;
+      <button class="btn btn-out btn-sm" onclick="openManage('${l.id}')">Manage</button>${l.status==='final'?`<button class="btn btn-out btn-sm" style="margin-left:6px" onclick="openRecap('${l.id}','${esc((l.name||'').replace(/'/g,''))}')">Recap</button>`:''}</div>`;
   }).join('');
 }
 
@@ -517,6 +527,56 @@ async function openManage(id){
   document.getElementById('ov').classList.add('on');
 }
 function closeManage(){ document.getElementById('ov').classList.remove('on'); CURRENT=null; }
+
+/* ---- Ladder recap (Part 1 per-player + Part 2 night recap) ---- */
+let RECAP_ID=null;
+function openRecap(id,name){ RECAP_ID=id; document.getElementById('rcTitle').textContent='Recap · '+(name||'Ladder'); document.getElementById('rcMeta').textContent=''; document.getElementById('rcMsg').innerHTML=''; document.getElementById('rcBody').innerHTML='<div class="empty">Loading…</div>'; document.getElementById('recapOv').classList.add('on'); loadRecap(); }
+function closeRecap(){ document.getElementById('recapOv').classList.remove('on'); RECAP_ID=null; }
+async function loadRecap(){
+  const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID));
+  if(status===401){ document.getElementById('rcBody').innerHTML='<div class="empty">Sign in as admin to manage recaps.</div>'; return; }
+  renderRecap(d&&d.recap);
+}
+function renderRecap(r){
+  const body=document.getElementById('rcBody'), meta=document.getElementById('rcMeta');
+  if(!r){
+    meta.textContent='No recap drafted yet.';
+    body.innerHTML='<div class="empty" style="margin-bottom:12px">Auto-drafts 15 minutes after a night finishes. You can also draft it now.</div><button class="btn btn-lime" onclick="genRecap(false)">✨ Draft recap with Claude</button>';
+    return;
+  }
+  const players=r.players?Object.values(r.players):[];
+  const recips=(r.recipients||[]).length;
+  const sent=r.status==='sent';
+  meta.innerHTML=(sent?`<span class="chip chip-gray">Sent ${recips?('· '+(r.sentCount||0)+' emails'):''}</span>`:'<span class="chip chip-gold">Draft</span>')+` · ${players.length} players · ${recips} on the send list`;
+  const rc=r.recap||{};
+  let h='';
+  // Part 2 preview
+  h+='<div class="sec" style="margin:0 0 8px">Part 2 · The recap</div>';
+  h+=`<div class="card"><div style="font-weight:800;font-size:1.05rem;font-style:italic">${esc(rc.title||'')}</div>${rc.dek?`<div style="color:#9aa094;font-size:.8rem;margin-top:3px">${esc(rc.dek)}</div>`:''}<div style="font-size:.86rem;line-height:1.6;color:#dcdfd7;margin-top:10px">${rc.html||''}</div>${rc.seasonNote?`<div style="background:rgba(184,255,44,.1);border:1px solid rgba(184,255,44,.22);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:.84rem;line-height:1.5">${rc.seasonNote}</div>`:''}</div>`;
+  // Part 1 list
+  h+='<div class="sec" style="margin:16px 0 8px">Part 1 · Per-player notes ('+players.length+')</div>';
+  h+='<div style="max-height:280px;overflow:auto">'+players.sort((a,b)=>(a.rank||99)-(b.rank||99)).map(p=>`<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:8px 0"><div style="font-size:.82rem;font-weight:700">${esc(p.name)} <span style="color:#5e655a;font-weight:500">· ${p.rank?('#'+p.rank):''} · ${p.w}-${p.l} · ${(p.diff>=0?'+':'')+p.diff}</span></div><div style="font-size:.76rem;color:#9aa094;margin-top:2px">${esc(p.hi||'')} ${esc((p.story&&p.story[0])||'')}</div></div>`).join('')+'</div>';
+  // Actions
+  h+='<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">';
+  h+='<button class="btn btn-out" onclick="genRecap(true)">↻ Regenerate</button>';
+  if(!sent) h+=`<button class="btn btn-lime" onclick="sendRecap()">Send to ${recips} player${recips===1?'':'s'} →</button>`;
+  else h+='<button class="btn btn-lime" onclick="sendRecap()">Re-send to players</button>';
+  h+='</div>';
+  body.innerHTML=h;
+}
+async function genRecap(force){
+  document.getElementById('rcMsg').innerHTML='<div style="color:#9aa094;font-size:.78rem;margin-top:8px">Drafting with Claude… (a few seconds)</div>';
+  const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'generate',force:!!force})});
+  if(d&&d.ok){ document.getElementById('rcMsg').innerHTML=''; renderRecap(d.recap); }
+  else msg('rcMsg','err',(d&&d.error)||'Could not draft ('+status+').');
+}
+async function sendRecap(){
+  if(!confirm('Email this recap to everyone who played?')) return;
+  document.getElementById('rcMsg').innerHTML='<div style="color:#9aa094;font-size:.78rem;margin-top:8px">Sending…</div>';
+  const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send'})});
+  if(d&&d.ok){ msg('rcMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); loadRecap(); }
+  else msg('rcMsg','err',(d&&d.error)||'Send failed ('+status+').');
+}
 let MROSTER=[];
 function rosterSearch(){
   const q=(document.getElementById('ros-search').value||'').trim();
