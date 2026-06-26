@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Live · Dink Society Ladder</title>
+<meta name="description" content="Live court pairings and scores for the Dink Society Ladder Challenge.">
+<meta property="og:title" content="Dink Society Ladder · Live">
+<meta property="og:description" content="Follow tonight's ladder — your court, the pairings, and live scores.">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0b0d0a; --surf:#161914; --surf2:#1c1f18; --bd:rgba(255,255,255,.08); --bds:rgba(255,255,255,.16);
+    --tx:#f0f2ec; --mut:#9aa094; --fnt:#5e655a;
+    --lime:#b8ff2c; --teal:#17d7b0; --blue:#4aa3e0; --pink:#ff7bb0; --gold:#f0c040; --red:#ff5c47; --purp:#a78bfa; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--tx); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
+  a{ color:inherit; text-decoration:none; }
+  .wrap{ max-width:560px; margin:0 auto; padding:0 14px 60px; }
+
+  .top{ position:sticky; top:0; z-index:30; background:rgba(11,13,10,.86); backdrop-filter:blur(10px); border-bottom:1px solid var(--bd); }
+  .top-in{ max-width:560px; margin:0 auto; padding:11px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .brand{ display:flex; align-items:center; gap:9px; font-weight:900; font-size:14px; letter-spacing:-.01em; }
+  .mk{ width:28px;height:28px;border-radius:8px;background:var(--lime);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:11px; }
+  .livepill{ display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; color:#06210f; background:var(--lime); border-radius:999px; padding:5px 11px; }
+  .livepill.final{ background:var(--teal); } .livepill.soon{ background:var(--gold); }
+  .ldot{ width:7px;height:7px;border-radius:50%;background:#06210f;animation:pulse 1.1s infinite; }
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+  .back{ font-size:12px; color:var(--mut); padding:10px 2px 0; display:inline-block; }
+  .hero{ padding:12px 2px 6px; }
+  .hero h1{ font-size:22px; font-weight:900; margin:0 0 5px; letter-spacing:-.02em; }
+  .hero .meta{ font-size:12.5px; color:var(--mut); display:flex; flex-wrap:wrap; gap:5px 10px; }
+  .hero .meta b{ color:var(--tx); font-weight:700; }
+
+  /* identity (one-time, remembered) */
+  .idcard{ background:var(--surf); border:1px solid var(--bd); border-radius:13px; padding:12px 13px; margin:12px 0 4px; }
+  .idcard .t{ font-size:13px; font-weight:800; margin-bottom:3px; }
+  .idcard .s{ font-size:11.5px; color:var(--mut); margin-bottom:9px; }
+  .idchips{ display:flex; gap:6px; flex-wrap:wrap; }
+  .idchips button{ font:inherit; font-size:12px; font-weight:700; padding:6px 11px; border-radius:999px; border:1px solid var(--bd); background:var(--surf2); color:var(--mut); cursor:pointer; }
+  .idchips button:hover{ border-color:var(--bds); color:var(--tx); }
+  .idskip{ background:none; border:0; color:var(--fnt); font:inherit; font-size:11.5px; cursor:pointer; margin-top:9px; text-decoration:underline; }
+
+  .you{ background:linear-gradient(135deg, rgba(184,255,44,.16), rgba(23,215,176,.08)); border:1px solid rgba(184,255,44,.4); border-radius:15px; padding:14px 15px; margin:12px 0 4px; }
+  .you-court{ font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--lime); }
+  .you-big{ font-size:26px; font-weight:900; letter-spacing:-.01em; margin:3px 0 2px; }
+  .you-sub{ font-size:12.5px; color:var(--mut); line-height:1.5; } .you-sub b{ color:var(--tx); }
+  .you-next{ margin-top:11px; padding-top:11px; border-top:1px solid rgba(184,255,44,.2); font-size:12px; color:var(--mut); display:flex; align-items:center; gap:7px; }
+  .you-reset{ background:none;border:0;color:var(--fnt);font:inherit;font-size:11px;cursor:pointer;text-decoration:underline;margin-top:8px; }
+
+  .seclbl{ font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--fnt); margin:18px 2px 9px; }
+  .tabs{ display:flex; gap:5px; background:var(--surf); border:1px solid var(--bd); border-radius:999px; padding:4px; margin:12px 0 4px; }
+  .tabs button{ flex:1; padding:8px; border:0; border-radius:999px; font:inherit; font-size:12.5px; font-weight:800; cursor:pointer; background:transparent; color:var(--mut); }
+  .tabs button.on{ background:var(--lime); color:#06210f; }
+
+  .rounds{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .rchip{ font:inherit; font-size:12px; font-weight:800; padding:7px 13px; border-radius:10px; border:1.5px solid var(--bd); background:var(--surf); color:var(--mut); cursor:pointer; display:flex; align-items:center; gap:6px; }
+  .rchip.on{ border-color:rgba(184,255,44,.5); background:rgba(184,255,44,.12); color:var(--lime); }
+  .rchip.locked{ opacity:.45; cursor:not-allowed; }
+  .rchip .d{ width:6px;height:6px;border-radius:50%; }
+  .rchip .d.done{ background:var(--lime);} .rchip .d.live{ background:var(--teal); box-shadow:0 0 7px var(--teal); animation:pulse 1.1s infinite;} .rchip .d.next{ background:transparent;border:1.5px dashed var(--fnt);}
+
+  .court{ background:var(--surf); border:1px solid var(--bd); border-radius:14px; padding:13px 14px; margin-bottom:10px; }
+  .court.mine{ border-color:rgba(184,255,44,.55); box-shadow:0 0 0 1px rgba(184,255,44,.25); }
+  .court-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:11px; }
+  .court-nm{ font-size:11px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color:var(--mut); display:flex; align-items:center; gap:7px; }
+  .court-dot{ width:8px;height:8px;border-radius:50%; }
+  .court-st{ font-size:9.5px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:999px; }
+  .court-st.live{ color:#06210f; background:var(--teal); display:inline-flex; align-items:center; gap:5px; } .court-st.live .ldot{ background:#06210f; }
+  .court-st.final{ color:var(--lime); background:rgba(184,255,44,.13); }
+  .court-st.wait{ color:var(--mut); background:var(--surf2); }
+  .matchup{ display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:10px; }
+  .side{ display:flex; flex-direction:column; gap:4px; min-width:0; } .side.r{ text-align:right; align-items:flex-end; }
+  .pl{ font-size:13.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%; }
+  .pl .g{ font-size:9px; font-weight:800; color:var(--fnt); margin-left:4px; } .pl.me{ color:var(--lime); }
+  .score{ text-align:center; min-width:64px; }
+  .score .n{ font-size:24px; font-weight:900; font-variant-numeric:tabular-nums; line-height:1; }
+  .score .n .w{ color:var(--lime); } .score .n .sep{ color:var(--fnt); margin:0 3px; }
+  .score .to{ font-size:9.5px; color:var(--fnt); font-weight:700; margin-top:3px; letter-spacing:.04em; }
+  .score .vs{ font-size:12px; font-weight:900; letter-spacing:.1em; color:var(--fnt); }
+
+  .lbt{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  .lbt th{ text-align:right; font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--fnt); font-weight:800; padding:5px 6px; border-bottom:1px solid var(--bd); }
+  .lbt th.l{ text-align:left; }
+  .lbt td{ text-align:right; padding:8px 6px; border-bottom:1px solid rgba(255,255,255,.05); white-space:nowrap; font-variant-numeric:tabular-nums; }
+  .lbt td.l{ text-align:left; font-weight:700; } .lbt tr.me td{ background:rgba(184,255,44,.07); }
+  .rk{ display:inline-flex; width:20px; justify-content:center; color:var(--fnt); font-weight:900; } .rk.top{ color:var(--gold); }
+
+  .roster-row{ display:flex; align-items:center; gap:9px; padding:9px 11px; background:var(--surf); border:1px solid var(--bd); border-radius:10px; margin-bottom:7px; }
+  .roster-row .av{ width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;flex-shrink:0; }
+  .roster-row .av.f{ background:rgba(255,123,176,.14); color:var(--pink); } .roster-row .av.m{ background:rgba(74,163,224,.14); color:var(--blue); }
+  .roster-row .nm{ flex:1; font-weight:700; font-size:13.5px; } .roster-row .tag{ font-size:10px; font-weight:800; color:var(--fnt); }
+
+  .note{ background:var(--surf); border:1px solid var(--bd); border-radius:12px; padding:14px 15px; color:var(--mut); font-size:13px; line-height:1.6; } .note b{ color:var(--tx); }
+  .countdown{ font-variant-numeric:tabular-nums; color:var(--gold); font-weight:800; }
+  .foot{ text-align:center; font-size:11px; color:var(--fnt); margin-top:18px; }
+  .hide{ display:none !important; }
+  .loading{ text-align:center; color:var(--mut); padding:50px 20px; font-size:14px; }
+</style>
+</head>
+<body>
+
+<div class="top"><div class="top-in">
+  <a class="brand" href="/ladders"><span class="mk">DS</span> Dink Society</a>
+  <span id="statePill" class="livepill hide"></span>
+</div></div>
+
+<div class="wrap">
+  <a class="back" href="/ladders">← All ladders</a>
+  <div class="hero" id="hero"></div>
+  <div id="idBox"></div>
+  <div id="youBanner"></div>
+  <div id="body"><div class="loading">Loading tonight…</div></div>
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const API='/.netlify/functions';
+const EID = new URLSearchParams(location.search).get('event') || '';
+const ME_KEY = 'dsLiveMe:'+EID, SKIP_KEY = 'dsLiveSkip:'+EID;
+
+let DATA = null;          // { event, roster, play }
+let me = localStorage.getItem(ME_KEY) || null;   // playerId, remembered
+let idSkipped = localStorage.getItem(SKIP_KEY)==='1';
+let tab = 'board';
+let viewRound = 0;
+let pollTimer = null;
+
+const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const first = n => String(n||'').split(' ')[0];
+
+function courtLabel(num){
+  const names = DATA?.play?.courtNames || DATA?.event?.courtNames;
+  if(Array.isArray(names) && names[num-1]) return names[num-1];
+  return 'Court '+num;
+}
+const COURT_COLORS = ['#4aa3e0','#a78bfa','#f0c040','#17d7b0','#ff7bb0','#b8ff2c'];
+
+/* ---------------- state derivation ---------------- */
+function nightState(){
+  const p = DATA?.play;
+  if(!p || !p.started) return 'soon';
+  if(p.finished || DATA.event.status==='final') return 'final';
+  return 'live';
+}
+function rounds(){ return DATA?.play?.rounds || []; }
+function currentIdx(){ const p=DATA?.play; return p? Math.max(0, Math.min(p.currentRound||0, (p.rounds||[]).length-1)) : 0; }
+function courtDone(c){ return !!(c.score && c.score.winner); }
+function myCourtIn(round){
+  if(!me || !round) return null;
+  for(const c of (round.courts||[])){ if([...c.team1,...c.team2].some(x=>x&&x.id===me)) return c; }
+  return null;
+}
+
+/* ---------------- identity (one-time, remembered) ---------------- */
+function setMe(id){ me=id; localStorage.setItem(ME_KEY, id); localStorage.removeItem(SKIP_KEY); idSkipped=false; render(); }
+function resetMe(){ me=null; localStorage.removeItem(ME_KEY); localStorage.removeItem(SKIP_KEY); idSkipped=false; render(); }
+function skipId(){ idSkipped=true; localStorage.setItem(SKIP_KEY,'1'); render(); }
+function idBox(){
+  const el=document.getElementById('idBox');
+  const known = me && (DATA.roster||[]).some(p=>p.id===me);
+  if(known || idSkipped || !(DATA.roster||[]).length){ el.innerHTML=''; return; }
+  const chips=(DATA.roster||[]).slice().sort((a,b)=>a.name.localeCompare(b.name))
+    .map(p=>`<button onclick="setMe('${esc(p.id)}')">${esc(p.name)}</button>`).join('');
+  el.innerHTML=`<div class="idcard"><div class="t">👋 Following along?</div><div class="s">Tap your name once and we'll always show your court.</div><div class="idchips">${chips}</div><button class="idskip" onclick="skipId()">Just browsing</button></div>`;
+}
+
+/* ---------------- you banner ---------------- */
+function youBanner(){
+  const el=document.getElementById('youBanner');
+  const st=nightState();
+  if(!me || st==='soon' || !(DATA.roster||[]).some(p=>p.id===me)){ el.innerHTML=''; return; }
+  const ci=currentIdx(), cur=rounds()[ci];
+  const ct=myCourtIn(cur);
+  const myName = (DATA.roster.find(p=>p.id===me)||{}).name||'';
+  if(!ct){
+    el.innerHTML=`<div class="you"><div class="you-court">You're sitting this round</div><div class="you-big">On the bench</div><div class="you-sub">You'll be back in next round — hang tight.</div><button class="you-reset" onclick="resetMe()">Not ${esc(first(myName))}?</button></div>`;
+    return;
+  }
+  const onA = ct.team1.some(x=>x&&x.id===me);
+  const mine = onA?ct.team1:ct.team2, partner=(mine.find(x=>x&&x.id!==me)||{}).name;
+  const oppArr = onA?ct.team2:ct.team1;
+  const ms = onA?ct.score?.t1:ct.score?.t2, os = onA?ct.score?.t2:ct.score?.t1;
+  const hasScore = ms!=null && os!=null;
+  const lead = hasScore ? (ms>os?'leading':ms<os?'trailing':'tied') : null;
+  const tail = st==='final' ? 'That’s a wrap — see the final standings below.'
+    : hasScore ? `Score <b style="color:var(--tx)">${ms}–${os}</b> · you're ${lead}.`
+    : `Get to your court — match coming up.`;
+  el.innerHTML=`
+    <div class="you">
+      <div class="you-court">📍 You're on</div>
+      <div class="you-big">${esc(courtLabel(ct.court))}</div>
+      <div class="you-sub">Round ${cur.round} of ${DATA.play.totalRounds||rounds().length}${partner?` · with <b>${esc(partner)}</b>`:''}${oppArr.length?` vs ${oppArr.map(x=>esc(first(x.name))).join(' & ')}`:''}</div>
+      <div class="you-next"><span>⏱️</span> ${tail}</div>
+      <button class="you-reset" onclick="resetMe()">Not ${esc(first(myName))}?</button>
+    </div>`;
+}
+
+/* ---------------- court card ---------------- */
+function courtCard(c, live){
+  const mine = me && [...c.team1,...c.team2].some(x=>x&&x.id===me);
+  const done = courtDone(c);
+  const st = done ? `<span class="court-st final">Final</span>`
+    : live ? `<span class="court-st live"><span class="ldot"></span>Live</span>`
+    : `<span class="court-st wait">Upcoming</span>`;
+  const t1=c.score?.t1, t2=c.score?.t2;
+  const aLead = t1!=null && t2!=null && t1>t2, bLead = t1!=null && t2!=null && t2>t1;
+  const plName = pl => pl ? `<div class="pl ${pl.id===me?'me':''}">${esc(pl.name)}<span class="g">${pl.gender}</span></div>` : `<div class="pl" style="color:var(--fnt)">—</div>`;
+  const scoreBlock = (t1!=null||t2!=null)
+    ? `<div class="n"><span class="${aLead?'w':''}">${t1??0}</span><span class="sep">–</span><span class="${bLead?'w':''}">${t2??0}</span></div><div class="to">to 11</div>`
+    : `<div class="vs">VS</div>`;
+  return `<div class="court ${mine?'mine':''}">
+    <div class="court-top"><div class="court-nm"><span class="court-dot" style="background:${COURT_COLORS[(c.court-1)%COURT_COLORS.length]}"></span>${esc(courtLabel(c.court))}</div>${st}</div>
+    <div class="matchup">
+      <div class="side">${plName(c.team1[0])}${plName(c.team1[1])}</div>
+      <div class="score">${scoreBlock}</div>
+      <div class="side r">${plName(c.team2[0])}${plName(c.team2[1])}</div>
+    </div></div>`;
+}
+
+function roundNav(){
+  const rs=rounds(), ci=currentIdx(), st=nightState(), total=DATA.play.totalRounds||rs.length;
+  let h='<div class="rounds">';
+  for(let i=0;i<total;i++){
+    const r=rs[i];
+    const done = r && (r.courts||[]).every(courtDone) && r.courts.length;
+    const live = r && i===ci && st==='live';
+    const locked=!r;
+    const cls='rchip'+(i===viewRound?' on':'')+(locked?' locked':'');
+    const dot = done?'<span class="d done"></span>':live?'<span class="d live"></span>':'<span class="d next"></span>';
+    h+=`<button class="${cls}" ${locked?'disabled':`onclick="viewRound=${i};render()"`}>${dot}Rd ${i+1}</button>`;
+  }
+  return h+'</div>';
+}
+
+/* ---------------- standings ---------------- */
+function standings(){
+  const s={};
+  (DATA.roster||[]).forEach(p=>{ if(p.id) s[p.id]={id:p.id,name:p.name,w:0,l:0,pf:0,pa:0}; });
+  rounds().forEach(r=>(r.courts||[]).forEach(c=>{
+    if(!courtDone(c)) return;
+    const aw=c.score.winner==='A';
+    c.team1.forEach(p=>{ if(p&&s[p.id]){ s[p.id].pf+=c.score.t1; s[p.id].pa+=c.score.t2; aw?s[p.id].w++:s[p.id].l++; } });
+    c.team2.forEach(p=>{ if(p&&s[p.id]){ s[p.id].pf+=c.score.t2; s[p.id].pa+=c.score.t1; aw?s[p.id].l++:s[p.id].w++; } });
+  }));
+  return Object.values(s).map(x=>({...x,diff:x.pf-x.pa})).sort((a,b)=> b.w-a.w || b.diff-a.diff || b.pf-a.pf);
+}
+function standingsTable(){
+  const rows=standings();
+  if(!rows.length) return `<div class="note">No scores yet — standings build as courts wrap.</div>`;
+  return `<table class="lbt"><thead><tr><th class="l">Player</th><th>W</th><th>L</th><th>Diff</th><th>PF</th></tr></thead><tbody>`+
+    rows.map((x,i)=>`<tr class="${x.id===me?'me':''}"><td class="l"><span class="rk ${i<3?'top':''}">${i+1}</span> ${esc(x.name)}</td><td>${x.w}</td><td>${x.l}</td><td>${x.diff>=0?'+':''}${x.diff}</td><td>${x.pf}</td></tr>`).join('')+
+    `</tbody></table>`;
+}
+
+/* ---------------- roster ---------------- */
+function rosterList(){
+  return (DATA.roster||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
+    <div class="roster-row"><div class="av ${p.gender==='F'?'f':'m'}">${esc(p.name[0]||'?')}</div>
+      <div class="nm">${esc(p.name)}${p.id===me?' <span style="color:var(--lime);font-size:11px">· you</span>':''}</div>
+      <div class="tag">${p.gender}</div></div>`).join('');
+}
+
+/* ---------------- render ---------------- */
+function render(){
+  if(!DATA){ return; }
+  const ev=DATA.event, st=nightState();
+  // hero
+  const dt=ev.date?new Date(ev.date+'T00:00:00'):null;
+  const dstr=dt&&!isNaN(dt)?dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}):'';
+  const typeLbl={mixed:'Mixed',mens:"Men's",womens:"Women's"}[ev.type]||'Mixed';
+  document.getElementById('hero').innerHTML=`<h1>${esc(ev.name||'Dink Society Ladder')}</h1>
+    <div class="meta">${dstr?`<span>📅 <b>${dstr}</b></span>`:''}${ev.startTime?`<span>🕖 <b>${esc(ev.startTime)}</b></span>`:''}${ev.place?`<span>📍 <b>${esc(ev.place)}</b></span>`:''}<span>🎾 ${typeLbl} · ${(DATA.roster||[]).length} players</span></div>`;
+  // state pill
+  const pill=document.getElementById('statePill');
+  pill.className='livepill '+(st==='final'?'final':st==='soon'?'soon':'');
+  pill.innerHTML = st==='live'?'<span class="ldot"></span>Live' : st==='final'?'Final' : 'Doors open';
+  pill.classList.remove('hide');
+
+  idBox(); youBanner();
+  const body=document.getElementById('body'), foot=document.getElementById('foot');
+
+  if(st==='soon'){
+    body.innerHTML=`<div class="note" style="margin:12px 0 14px">🔒 <b>Registration is closed.</b> The roster below is locked in. Court pairings post automatically when the night starts${ev.startTime?` at <b>${esc(ev.startTime)}</b>`:''} — check back to see your first court.</div>
+      <div class="seclbl">Who's playing · ${(DATA.roster||[]).length}</div>${rosterList()}`;
+    foot.textContent='This page updates automatically — no need to refresh.';
+    return;
+  }
+
+  const total=DATA.play.totalRounds||rounds().length, ci=currentIdx();
+  if(viewRound>rounds().length-1) viewRound=Math.max(0,rounds().length-1);
+
+  let h=`<div class="tabs">
+      <button class="${tab==='board'?'on':''}" onclick="tab='board';render()">Courts</button>
+      <button class="${tab==='standings'?'on':''}" onclick="tab='standings';render()">Standings</button>
+      <button class="${tab==='roster'?'on':''}" onclick="tab='roster';render()">Roster</button>
+    </div>`;
+  if(tab==='board'){
+    h+=roundNav();
+    const r=rounds()[viewRound];
+    if(r){
+      const isLive = viewRound===ci && st==='live';
+      h+=`<div class="seclbl" style="margin-top:4px">Round ${r.round} ${isLive?'· in play':'· final'} — all courts</div>`;
+      h+=(r.courts||[]).map(c=>courtCard(c,isLive)).join('');
+    } else { h+=`<div class="note">No rounds yet.</div>`; }
+  } else if(tab==='standings'){
+    h+=`<div class="seclbl" style="margin-top:4px">Night standings ${st==='final'?'· final':'· live'}</div>`+standingsTable();
+  } else {
+    h+=`<div class="seclbl" style="margin-top:4px">Roster · ${(DATA.roster||[]).length} players</div>`+rosterList();
+  }
+  body.innerHTML=h;
+  foot.textContent = st==='final' ? 'Night complete · final results' : 'Updates automatically';
+}
+
+/* ---------------- data ---------------- */
+async function load(initial){
+  if(!EID){ document.getElementById('body').innerHTML='<div class="note">No ladder selected.</div>'; return; }
+  try{
+    const r=await fetch(`${API}/public-ladder-night?event=${encodeURIComponent(EID)}`);
+    if(!r.ok) throw new Error(r.status);
+    const d=await r.json();
+    if(d.error) throw new Error(d.error);
+    const wasLen = DATA?.play?.rounds?.length || 0;
+    DATA=d;
+    if(initial || viewRound>=(DATA.play?.rounds?.length||0)) viewRound=currentIdx();
+    else if((DATA.play?.rounds?.length||0)>wasLen) viewRound=currentIdx(); // jump to a freshly-posted round
+    render();
+  }catch(e){
+    if(initial) document.getElementById('body').innerHTML=`<div class="note">Couldn't load this ladder. <a href="/ladders" style="color:var(--lime)">See all ladders →</a></div>`;
+  }
+}
+function startPolling(){ clearInterval(pollTimer); pollTimer=setInterval(()=>{ if(!document.hidden) load(false); }, 15000); }
+document.addEventListener('visibilitychange',()=>{ if(!document.hidden) load(false); });
+
+load(true).then(startPolling);
+</script>
+</body>
+</html>
