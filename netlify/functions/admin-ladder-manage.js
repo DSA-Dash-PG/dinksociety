@@ -136,10 +136,12 @@ export default async (req) => {
     entry.paymentMethod = 'venmo';
     entry.heldUntil = null;
     await setSignups(signups);
+    let emailed = false;
     if (entry.email) {
       await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event) }) }).catch(() => {});
+      emailed = true;
     }
-    return json({ ok: true, paid: entry.name });
+    return json({ ok: true, paid: entry.name, name: entry.name, emailed });
   }
 
   // Admin manually marks a roster player paid (cash/venmo received in person) or
@@ -177,6 +179,13 @@ export default async (req) => {
   }
 
   if (action === 'remove' || action === 'decline-venmo') {
+    // Explicit waitlist removal by row index (handles name-only entries with no
+    // email/playerId to match on). No credit — they never paid.
+    if (action === 'remove' && body.fromWaitlist && Number.isInteger(body.index) && signups.waitlist && signups.waitlist[body.index]) {
+      const w = signups.waitlist.splice(body.index, 1)[0];
+      await setSignups(signups);
+      return json({ ok: true, removed: w.name, removedFrom: 'waitlist' });
+    }
     const removed = removeFromRoster(signups, { playerId: body.playerId, email: body.email });
     if (!removed) {
       // maybe on the waitlist
@@ -193,6 +202,33 @@ export default async (req) => {
     const r = await promoteAndNotify(event, signups);
     await setSignups(signups);
     return json({ ok: true, removed: removed.name, creditedCents: credited, opened: r.opened });
+  }
+
+  // Add or edit a roster player's email (e.g. a manually-added player who had
+  // none) so they can receive the paid confirmation. Pass value:'' to clear it.
+  if (action === 'set-email') {
+    const entry = findRosterEntry(signups, body.playerId, body.email);
+    if (!entry) return json({ error: 'Player not on the roster' }, 404);
+    const newEmail = String(body.value || '').trim().toLowerCase();
+    if (newEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(newEmail)) {
+      return json({ error: 'That doesn’t look like a valid email.' }, 400);
+    }
+    entry.email = newEmail;
+    await setSignups(signups);
+    return json({ ok: true, name: entry.name, email: newEmail });
+  }
+
+  // Resend (or send) the "You're in" confirmation to a roster player on demand.
+  if (action === 'send-confirmation') {
+    const entry = findRosterEntry(signups, body.playerId, body.email);
+    if (!entry) return json({ error: 'Player not on the roster' }, 404);
+    if (!entry.email) return json({ error: 'No email on file for this player — add one first.' }, 400);
+    await sendEmail({
+      to: entry.email,
+      subject: `You're in — ${event.name}`,
+      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event) }),
+    }).catch(() => {});
+    return json({ ok: true, name: entry.name, email: entry.email, emailed: true });
   }
 
   return json({ error: 'unknown action' }, 400);

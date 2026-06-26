@@ -49,7 +49,7 @@
   .prow{ display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.84rem; }
   .prow:last-child{ border-bottom:none; } .prow .pn{ flex:1;font-weight:600; }
   .msg{ padding:10px 13px;border-radius:9px;font-size:.78rem;font-weight:600;margin:10px 0; }
-  .msg.ok{ background:rgba(184,255,44,.14);color:var(--lime); } .msg.err{ background:rgba(255,92,71,.14);color:var(--red); }
+  .msg.ok{ background:rgba(184,255,44,.14);color:var(--lime); } .msg.err{ background:rgba(255,92,71,.14);color:var(--red); } .msg.warn{ background:rgba(240,192,64,.14);color:var(--gold); }
   .empty{ color:#5e655a;font-size:.88rem;padding:18px 0; }
   .topbar2{ display:none;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.08);background:#0a0b09;position:sticky;top:0;z-index:40; }
   .ham{ background:none;border:0;color:#f0f2ec;font-size:1.5rem;line-height:1;cursor:pointer;padding:0 2px; }
@@ -504,7 +504,10 @@ async function openManage(id){
     const venmoBtns=p.paymentStatus==='venmo_pending'?`<button class="btn-out btn-sm" onclick="act('confirm-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Confirm</button> <button class="btn-danger" onclick="act('decline-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Decline</button>`:'';
     const payEdit=p.paymentStatus==='venmo_pending'?'':payCtl(p);
     const linkBtn=(p.paymentStatus!=='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="sendPaylink('${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send link</button>`:'';
-    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${venmoBtns} ${payEdit} ${linkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
+    const noEmail=p.email?'':'<span class="chip chip-gray" title="No email on file — they can\'t receive a confirmation">no email</span>';
+    const emailBtn=p.email?'':`<button class="btn-out btn-sm" onclick="setEmailFor('${esc(p.playerId||'')}','')">✉ Add email</button>`;
+    const resendBtn=(p.paymentStatus==='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="resendConfirm('${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`:'';
+    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${noEmail} ${venmoBtns} ${payEdit} ${linkBtn} ${emailBtn} ${resendBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
   }).join(''):'<div class="empty">No signups yet.</div>';
   h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(d.pendingClaim?` · held: ${esc(d.pendingClaim.name)}`:'')+'</div>';
   h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="promoteWait(${i})">Promote</button> <button class="btn-danger" onclick="removeWait(${i})">Remove</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
@@ -604,16 +607,42 @@ async function blastOpen(){
 async function act(action,email,playerId,method){
   if(!CURRENT)return;
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,email,playerId,method})});
-  if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
+  if(!d.ok){ msg('mMsg','err',d.error||'Failed ('+status+').'); return; }
+  await openManage(CURRENT.id); loadList();
+  // Tell the organizer whether the player actually got their "you're in" email.
+  if(action==='mark-paid'||action==='confirm-venmo'){
+    const who=d.name||'Player';
+    if(d.emailed) msg('mMsg','ok',who+' is paid ✓ — confirmation emailed.');
+    else msg('mMsg','warn',who+' is paid ✓ — but there’s no email on file, so no confirmation was sent. Add an email to send it.');
+  }
+}
+// Add or edit a player's email, then optionally send their paid confirmation.
+async function setEmailFor(playerId,email){
+  if(!CURRENT)return;
+  const v=prompt('Email address for this player:',email||'');
+  if(v==null)return;
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-email',playerId,email,value:v.trim()})});
+  if(!d.ok){ msg('mMsg','err',d.error||'Failed ('+status+').'); return; }
+  await openManage(CURRENT.id); loadList();
+  if(d.email && confirm('Email saved. Send '+(d.name||'them')+' the “you’re in” confirmation now?')){
+    await resendConfirm(d.email,playerId);
+  } else { msg('mMsg','ok','Email saved'+(d.name?' for '+d.name:'')+'.'); }
+}
+// Send (or resend) the paid confirmation email on demand.
+async function resendConfirm(email,playerId){
+  if(!CURRENT)return;
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-confirmation',email,playerId})});
+  if(d.ok) msg('mMsg','ok','Confirmation emailed to '+(d.email||'player')+' ✓');
+  else msg('mMsg','err',d.error||'Could not send ('+status+').');
 }
 async function promoteWait(index){
   if(!CURRENT)return;
-  const {status,d}=await api('\admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'promote',index})});
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'promote',index})});
   if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
 }
 async function removeWait(index){
   if(!CURRENT)return;
-  const {status,d}=await api('\admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',fromWaitlist:true,index})});
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'remove',fromWaitlist:true,index})});
   if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
 }
 const PAY_METHODS=['cash','venmo','zelle','card','other'];

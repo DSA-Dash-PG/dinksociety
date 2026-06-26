@@ -224,10 +224,12 @@ function resolveBracketWeeksInPlace(weeks) {
       const r = byId.get(m.id);
       if (!r) return m;
       if (!wk.phase) wk.phase = r.phase || null;
+      // Keep slots as seed placeholders until the phase locks (don't reveal the
+      // projected team names in the schedule yet).
       return {
         ...m,
-        teamA: r.teamA || null,
-        teamB: r.teamB || null,
+        teamA: r.seedLocked ? (r.teamA || null) : null,
+        teamB: r.seedLocked ? (r.teamB || null) : null,
         seedLabelA: r.seedLabelA || null,
         seedLabelB: r.seedLabelB || null,
         seedLocked: !!r.seedLocked,

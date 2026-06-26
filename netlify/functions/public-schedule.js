@@ -190,14 +190,20 @@ function pushPublicMatch(weekMap, w, division, m, emojiById, br) {
   const gamesA = (m.round1?.homeGames ?? 0) + (m.round2?.homeGames ?? 0);
   const gamesB = (m.round1?.awayGames ?? 0) + (m.round2?.awayGames ?? 0);
   const tbd = br ? null : 'TBD';
+  // Bracket slots stay as SEED PLACEHOLDERS (#1 Seed, …) until the phase locks.
+  // The projection still drives lock logic server-side; we just don't reveal the
+  // teams on the schedule until the matchup is final.
+  const locked = br ? !!br.seedLocked : true;
+  const tA = locked ? m.teamA : null;
+  const tB = locked ? m.teamB : null;
   weekMap[w].matches.push({
     id: m.id,
-    teamA: m.teamA?.name || tbd,
-    teamB: m.teamB?.name || tbd,
-    teamAId: m.teamA?.id || null,
-    teamBId: m.teamB?.id || null,
-    emojiA: (m.teamA?.id && emojiById[m.teamA.id]) || '',
-    emojiB: (m.teamB?.id && emojiById[m.teamB.id]) || '',
+    teamA: tA?.name || tbd,
+    teamB: tB?.name || tbd,
+    teamAId: tA?.id || null,
+    teamBId: tB?.id || null,
+    emojiA: (tA?.id && emojiById[tA.id]) || '',
+    emojiB: (tB?.id && emojiById[tB.id]) || '',
     court: m.court || null,
     venue: m.venue || null,
     courtA: m.courtA ?? null,
