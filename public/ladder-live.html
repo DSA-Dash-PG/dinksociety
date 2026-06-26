@@ -132,9 +132,17 @@ let pollTimer = null;
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const first = n => String(n||'').split(' ')[0];
 
+// Match the admin scorer's mapping exactly: courtNames are listed top→bottom
+// (top = highest court number). Anchor the top court to names[0] using the
+// courts actually in play, robust to a name-count mismatch.
 function courtLabel(num){
   const names = DATA?.play?.courtNames || DATA?.event?.courtNames;
-  if(Array.isArray(names) && names[num-1]) return names[num-1];
+  if(Array.isArray(names) && names.length){
+    const r0 = DATA?.play?.rounds?.[0];
+    const tC = (r0 && r0.courts && r0.courts.length) || names.length;
+    const idx = tC - num;
+    if(idx>=0 && idx<names.length){ const v=names[idx]; if(v!=null && String(v).trim()!=='') return String(v); }
+  }
   return 'Court '+num;
 }
 const COURT_COLORS = ['#4aa3e0','#a78bfa','#f0c040','#17d7b0','#ff7bb0','#b8ff2c'];

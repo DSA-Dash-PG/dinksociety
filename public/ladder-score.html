@@ -182,8 +182,20 @@ function topCourt(round){ return Math.max(1,...round.courts.map(c=>c.court)); }
 // Court display name from the ladder setup (courtNames are top→bottom; top court =
 // highest court number). Falls back to the number for nights set up before names.
 function courtLabel(courtNum){
-  var cn=STATE&&STATE.play&&STATE.play.config&&STATE.play.config.courtNames;
-  if(Array.isArray(cn)&&cn.length){ var nm=cn[cn.length-courtNum]; if(nm!=null&&String(nm).trim()!=='') return String(nm); }
+  var st=STATE||{};
+  // Prefer the night's snapshot, but fall back to the LIVE event's court names
+  // so renaming courts after the night started shows up without a restart.
+  var cn=(st.play&&st.play.config&&st.play.config.courtNames);
+  if(!(Array.isArray(cn)&&cn.length)) cn=(st.event&&st.event.courtNames);
+  if(Array.isArray(cn)&&cn.length){
+    // courtNames are listed top→bottom (top = highest court number). Anchor the
+    // top court to cn[0] using the courts ACTUALLY in play, so labels stay
+    // correct even if more/fewer courts were named than are used tonight.
+    var r0=st.play&&st.play.rounds&&st.play.rounds[0];
+    var tC=(r0&&r0.courts&&r0.courts.length)||(st.event&&st.event.courts)||cn.length;
+    var idx=tC-courtNum;
+    if(idx>=0&&idx<cn.length){ var nm=cn[idx]; if(nm!=null&&String(nm).trim()!=='') return String(nm); }
+  }
   return String(courtNum);
 }
 function accent(courtNum,tC){
@@ -244,8 +256,11 @@ function render(){
     h+=`<div class="brow">${timerOn?'<button class="btn b-warn" onclick="pauseTimer()">⏸ Pause</button>':'<button class="btn b-lime" onclick="startTimer()">'+(timer===0?'Start timer':'Resume')+'</button>'}
       <button class="btn b-ghost" onclick="endTimer()">End</button></div>
       <div class="brow"><button class="btn b-out" onclick="act('reshuffle',1)">Reshuffle</button>
-      <button class="btn b-lime" onclick="act('next')">${play.currentRound>=play.config.rounds-1?'Finish ladder':'Next round →'}</button></div>`;
+      <button class="btn b-out" onclick="scRestartRound()">⟲ Restart round</button></div>
+      <div class="brow"><button class="btn b-lime" onclick="act('next')">${play.currentRound>=play.config.rounds-1?'Finish ladder':'Next round →'}</button>
+      <button class="btn b-out" onclick="scAddRound()" style="flex:0 0 auto;width:auto;padding:0 16px">＋ Round</button></div>`;
     if(play.currentRound<play.config.rounds-1) h+=`<div class="brow"><button class="btn b-red" onclick="act('finish',1)">End ladder early</button></div>`;
+    h+=`<div class="brow"><button class="btn b-red" onclick="scRestart()">⟲ Restart night — re-pull roster, courts &amp; settings</button></div>`;
   } else if(!finished){
     h+=`<div class="brow"><button class="btn b-out" onclick="VR=${play.currentRound};render()">↩ Back to live round ${play.currentRound+1}</button></div>`;
   }
@@ -404,6 +419,35 @@ async function act(action,confirmFirst){
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   if(d.ok){ msg(''); STATE.play=d.play; if(action==='start'||action==='next'){ VR=d.play.currentRound; resetTimer(); } render(); }
   else msg('err',d.error||'Action failed.');
+}
+
+// Restart the night: wipe all rounds + scores and reopen the roster screen so
+// the latest roster / courts / settings can be re-pulled. Does NOT regenerate
+// pairings — the organizer reviews the roster and taps "Enter event" to start.
+async function scRestart(){
+  if(!confirm('Restart the night?\n\nThis erases all rounds and scores and returns to the roster screen, where it re-pulls the latest roster, courts, and settings.\n\nIt does NOT regenerate pairings — review the roster, then tap "Enter event" when you\'re ready. This cannot be undone.')) return;
+  const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart'})});
+  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  if(d.ok){ STATE.play=d.play; VR=0; resetTimer(); render(); msg('ok','Night reset. Review the roster below, then tap “Enter event” to regenerate Round 1.'); }
+  else msg('err',d.error||'Restart failed.');
+}
+
+// Restart ONLY the current round: clears its scores and rebuilds its pairings
+// from the latest roster (picks up adds/removes). Other rounds are untouched.
+async function scRestartRound(){
+  if(!confirm('Restart this round?\n\nClears THIS round’s scores and rebuilds its pairings from the latest roster (picks up anyone added or removed). Other rounds are untouched.')) return;
+  const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart-round'})});
+  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  if(d.ok){ STATE.play=d.play; resetTimer(); render(); msg('ok','Round rebuilt from the latest roster.'); }
+  else msg('err',d.error||'Restart round failed.');
+}
+
+// Extend the night by one more round (so "Next round" keeps going).
+async function scAddRound(){
+  const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add-rounds',n:1})});
+  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  if(d.ok){ STATE.play=d.play; render(); msg('ok','Added a round — now '+(d.rounds||(d.play.config&&d.play.config.rounds))+' total. Tap “Next round” to play it.'); }
+  else msg('err',d.error||'Could not add a round.');
 }
 loadPicker();
 </script>

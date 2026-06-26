@@ -108,6 +108,28 @@ export default async (req) => {
     return json({ ok: true, play });
   }
 
+  if (action === 'restart-round') {
+    // Rebuild ONLY the current round from the LATEST roster — picks up anyone
+    // added or removed since the night started, and clears this round's scores.
+    // Other rounds (and their scores) are left untouched.
+    const players = participants(signups);
+    if (players.length < 4) return json({ error: 'Need at least 4 players on the roster.' }, 400);
+    const strength = await strengthFor(eventId, players);
+    play.rounds[play.currentRound] = genR1(players, play.config.courts, strength);
+    await setPlay(eventId, play);
+    return json({ ok: true, play });
+  }
+
+  if (action === 'add-rounds') {
+    // Extend the night by N rounds (so "Next round" keeps going instead of
+    // finishing). Doesn't generate them — each is built when you advance.
+    const n = Math.max(1, Math.min(10, parseInt(body.n) || 1));
+    const base = play.config.rounds || play.rounds.length || 0;
+    play.config.rounds = Math.min(30, base + n);
+    await setPlay(eventId, play);
+    return json({ ok: true, play, rounds: play.config.rounds });
+  }
+
   if (action === 'restart') {
     play = { ...play, rounds: [], currentRound: -1, started: false, finished: false };
     await setPlay(eventId, play);
