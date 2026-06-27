@@ -48,6 +48,27 @@
   .x{ position:fixed;top:16px;right:22px;background:#161914;border:1px solid rgba(255,255,255,.14);border-radius:9999px;width:38px;height:38px;color:#f0f2ec;font-size:1.3rem;cursor:pointer;z-index:2; }
   .prow{ display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.84rem; }
   .prow:last-child{ border-bottom:none; } .prow .pn{ flex:1;font-weight:600; }
+  /* clickable list rows + row reminder pill */
+  .lad-row{ cursor:pointer;border-radius:9px;transition:background .12s; }
+  .lad-row:hover{ background:rgba(184,255,44,.05); }
+  .lad-row:hover .lad-chev{ color:var(--lime);transform:translateX(2px); }
+  .lad-chev{ color:#5e655a;font-size:1.3rem;line-height:1;transition:.12s;flex:none;padding-left:2px; }
+  .remind-pill{ border-color:rgba(23,215,176,.5)!important;color:var(--teal)!important; }
+  .remind-pill:hover{ background:rgba(23,215,176,.14); }
+  /* tabbed manage */
+  .mtabbar{ display:flex;gap:4px;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:4px;margin:0 0 18px; }
+  .mtabbar button{ flex:1;padding:10px 6px;border:0;border-radius:8px;background:transparent;color:#9aa094;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap; }
+  .mtabbar button.on{ background:var(--lime);color:#000; }
+  .mpanel{ display:none; } .mpanel.on{ display:block; }
+  /* row reminder popover + toast */
+  .rowpop{ position:absolute;z-index:60;background:#0f120c;border:1px solid rgba(255,255,255,.14);border-radius:13px;padding:7px;min-width:230px;box-shadow:0 18px 50px rgba(0,0,0,.6);display:none; }
+  .rowpop.on{ display:block; }
+  .rowpop .ph{ font-size:.62rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#5e655a;padding:7px 10px 6px; }
+  .rowpop button{ display:flex;justify-content:space-between;align-items:center;width:100%;background:transparent;border:0;color:#e6eadd;font:inherit;font-size:.84rem;font-weight:600;padding:9px 10px;border-radius:8px;cursor:pointer;text-align:left; }
+  .rowpop button:hover{ background:rgba(23,215,176,.12);color:var(--teal); }
+  .dstoast{ position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--lime);color:#06210f;font-weight:800;font-size:.86rem;padding:12px 20px;border-radius:9999px;box-shadow:0 14px 40px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.25s;z-index:90;max-width:90vw;text-align:center; }
+  .dstoast.on{ opacity:1;transform:translateX(-50%) translateY(0); }
+  .dstoast.err{ background:var(--red);color:#fff; }
   .msg{ padding:10px 13px;border-radius:9px;font-size:.78rem;font-weight:600;margin:10px 0; }
   .msg.ok{ background:rgba(184,255,44,.14);color:var(--lime); } .msg.err{ background:rgba(255,92,71,.14);color:var(--red); } .msg.warn{ background:rgba(240,192,64,.14);color:var(--gold); }
   .empty{ color:#5e655a;font-size:.88rem;padding:18px 0; }
@@ -198,8 +219,15 @@
   <h2 id="mTitle" style="font-size:1.25rem;margin:0 0 2px">Manage</h2>
   <div id="mMeta" style="font-size:.78rem;color:#9aa094;margin-bottom:12px"></div>
 
-  <button class="btn btn-lime" style="margin:0 0 18px" onclick="if(CURRENT)location.href='/ladder-score.html?event='+encodeURIComponent(CURRENT.id)">🎾 Ladder scoring →</button>
+  <div class="mtabbar">
+    <button id="mtab-info" onclick="mTab('info')">Ladder Info</button>
+    <button id="mtab-roster" class="on" onclick="mTab('roster')">Roster</button>
+    <button id="mtab-rem" onclick="mTab('rem')">Reminders</button>
+    <button id="mtab-score" onclick="mTab('score')">Ladder Scoring</button>
+  </div>
 
+  <!-- ===== ROSTER TAB ===== -->
+  <div class="mpanel on" id="mpanel-roster">
   <!-- ADD PLAYERS — first thing you do -->
   <div class="card" style="margin-bottom:16px">
     <div class="sec" style="margin:0 0 8px">Add players</div>
@@ -220,9 +248,11 @@
   <!-- ROSTER + WAITLIST -->
   <div id="mBody"></div>
   <div id="mMsg"></div>
+  </div><!-- /roster -->
 
-  <!-- EDIT DETAILS -->
-  <div class="sec" style="margin:20px 0 8px">Edit details</div>
+  <!-- ===== LADDER INFO TAB ===== -->
+  <div class="mpanel" id="mpanel-info">
+  <div class="sec" style="margin:8px 0 8px">Ladder info</div>
   <div class="frow"><label class="l">Name</label><input class="i" id="m-name"></div>
   <div class="frow row2">
     <div><label class="l">Date</label><input class="i" id="m-date" type="date"></div>
@@ -246,7 +276,18 @@
   <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
   <div id="mEditMsg"></div>
 
-  <div class="sec" style="margin:22px 0 8px">Reminders</div>
+  <div class="frow" style="margin-top:18px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div><div class="help" style="margin-top:4px">Automatic: <b>Open</b> until the start date · <b>Live</b> while scoring · <b>Final</b> when you finish the ladder.</div></div>
+
+  <div class="sec" style="margin:22px 0 8px;color:var(--red)">Danger zone</div>
+  <div style="border:1px solid rgba(255,92,71,.3);border-radius:12px;padding:13px 14px">
+    <div class="help" style="margin:0 0 10px">Deleting removes the ladder, its roster, and scores. This can't be undone.</div>
+    <button class="btn-danger" onclick="delLadder()">Delete ladder</button>
+  </div>
+  </div><!-- /info -->
+
+  <!-- ===== REMINDERS TAB ===== -->
+  <div class="mpanel" id="mpanel-rem">
+  <div class="sec" style="margin:8px 0 8px">Reminders</div>
   <div class="frow row2">
     <div><label class="l">Send a reminder now</label><select class="i" id="m-remkind"><option value="two_day">2 days out</option><option value="morning">Morning of (5am)</option><option value="three_hour">3 hours out</option></select></div>
     <div style="display:flex;align-items:flex-end"><button class="btn btn-lime" style="width:100%" onclick="sendReminder()">Send to roster now</button></div>
@@ -262,14 +303,29 @@
   <button onclick="blastOpen()" style="margin-top:8px;width:100%;background:#161616;border:1px solid #2a2a2a;color:#f5f5f5;padding:12px;border-radius:9999px;font-weight:800;font-family:inherit;cursor:pointer;font-size:.85rem">Announce all open ladders to past players</button>
   <div class="help" style="margin:6px 0 4px">Emails everyone who's ever played a ladder (not just the waitlist). Recruit targets this ladder (skips those already in); Announce lists every open upcoming ladder.</div>
   <div id="mBlastMsg"></div>
+  </div><!-- /reminders -->
 
-  <div class="frow" style="margin-top:16px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div><div class="help" style="margin-top:4px">Automatic: <b>Open</b> until the start date · <b>Live</b> while scoring · <b>Final</b> when you finish the ladder.</div></div>
-
-  <div style="margin-top:20px;text-align:right"><button class="btn-danger" onclick="delLadder()">Delete ladder</button></div>
+  <!-- ===== LADDER SCORING TAB ===== -->
+  <div class="mpanel" id="mpanel-score">
+    <div style="text-align:center;padding:24px 18px;background:linear-gradient(135deg,rgba(184,255,44,.12),rgba(23,215,176,.06));border:1px solid rgba(184,255,44,.3);border-radius:14px">
+      <div style="font-size:1.05rem;font-weight:900;margin-bottom:4px">Run the night</div>
+      <div class="help" style="margin:0 0 16px">Open the live scoreboard to seed courts, run rounds, and enter scores. Finishing there marks the ladder Final and triggers the recap draft.</div>
+      <button class="btn btn-lime" style="width:100%" onclick="if(CURRENT)location.href='/ladder-score.html?event='+encodeURIComponent(CURRENT.id)">Open ladder scoring →</button>
+    </div>
+  </div><!-- /scoring -->
   </div>
 </div></div>
 
 <!-- RECAP overlay -->
+<!-- Quick row-reminder popover + toast -->
+<div class="rowpop" id="rowRemPop">
+  <div class="ph" id="rowRemTitle">Send reminder</div>
+  <button onclick="doRowRemind('two_day','2 days out')"><span>2 days out</span><span style="color:#5e655a">›</span></button>
+  <button onclick="doRowRemind('morning','Morning of')"><span>Morning of (5am)</span><span style="color:#5e655a">›</span></button>
+  <button onclick="doRowRemind('three_hour','3 hours out')"><span>3 hours out</span><span style="color:#5e655a">›</span></button>
+</div>
+<div class="dstoast" id="dsToast"></div>
+
 <div class="ov" id="recapOv"><div class="sheet"><button class="x" onclick="closeRecap()">×</button>
   <div class="sheet-in">
   <h2 id="rcTitle" style="font-size:1.25rem;margin:0 0 2px">Ladder recap</h2>
@@ -461,9 +517,13 @@ async function loadList(){
   el.innerHTML=ls.map(l=>{
     const st=l.status==='final'?'chip-gray':l.status==='full'?'chip-red':'chip-lime';
     const pend=l.pendingVenmo?` · <span class="chip chip-gold">${l.pendingVenmo} Venmo pending</span>`:'';
-    return `<div class="lad"><div><div class="nm">${esc(l.name)}</div><div class="mt">${esc(l.date||'')} ${esc(l.startTime||'')} · ${esc(l.place||'')} · ${fmt(l.feeCents)}</div></div>
+    const safeName=esc((l.name||'').replace(/'/g,''));
+    const upcoming=['open','full'].includes(l.status||'open');
+    const remindPill=upcoming?`<button class="btn btn-out btn-sm remind-pill" onclick="event.stopPropagation();openRowRemind(event,'${l.id}','${safeName}')">Remind</button>`:'';
+    const recapBtn=l.status==='final'?`<button class="btn btn-out btn-sm" style="margin-left:6px" onclick="event.stopPropagation();openRecap('${l.id}','${safeName}')">Recap</button>`:'';
+    return `<div class="lad lad-row" onclick="openManage('${l.id}')"><div><div class="nm">${esc(l.name)}</div><div class="mt">${esc(l.date||'')} ${esc(l.startTime||'')} · ${esc(l.place||'')} · ${fmt(l.feeCents)}</div></div>
       <div class="ct">${l.rosterCount}/${l.capacity} · ${l.waitlistCount} waitlist${pend}<br><span class="chip ${st}">${esc(l.status||'open')}</span></div>
-      <button class="btn btn-out btn-sm" onclick="openManage('${l.id}')">Manage</button>${l.status==='final'?`<button class="btn btn-out btn-sm" style="margin-left:6px" onclick="openRecap('${l.id}','${esc((l.name||'').replace(/'/g,''))}')">Recap</button>`:''}</div>`;
+      ${remindPill}${recapBtn}<span class="lad-chev">›</span></div>`;
   }).join('');
 }
 
@@ -524,9 +584,32 @@ async function openManage(id){
   document.getElementById('mBody').innerHTML=h;
   document.getElementById('mMsg').innerHTML='';
   { const pl=document.getElementById('ap-paylink'), pd=document.getElementById('ap-paid'); if(pl)pl.checked=false; if(pd)pd.checked=false; }
+  mTab((d.event.status==='final')?'info':'roster');
   document.getElementById('ov').classList.add('on');
 }
 function closeManage(){ document.getElementById('ov').classList.remove('on'); CURRENT=null; }
+function mTab(k){ ['info','roster','rem','score'].forEach(x=>{ const p=document.getElementById('mpanel-'+x), b=document.getElementById('mtab-'+x); if(p)p.classList.toggle('on',x===k); if(b)b.classList.toggle('on',x===k); }); const sh=document.querySelector('#ov .sheet'); if(sh)sh.scrollTop=0; }
+
+/* ---- Quick "Remind" from a list row (open ladders only) ---- */
+let ROW_REMIND_ID=null;
+function openRowRemind(e,id,name){
+  e.stopPropagation(); ROW_REMIND_ID=id;
+  document.getElementById('rowRemTitle').textContent='Remind · '+(name||'ladder');
+  const pop=document.getElementById('rowRemPop'); const r=e.currentTarget.getBoundingClientRect();
+  pop.style.top=(window.scrollY+r.bottom+6)+'px';
+  let left=window.scrollX+r.right-230; if(left<window.scrollX+8) left=window.scrollX+8;
+  pop.style.left=left+'px'; pop.classList.add('on');
+}
+async function doRowRemind(kind,label){
+  const id=ROW_REMIND_ID; document.getElementById('rowRemPop').classList.remove('on'); if(!id) return;
+  showToast('Sending “'+label+'” reminder…');
+  const {status,d}=await api('/admin-ladder-remind',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:id,kind,force:true})});
+  if(status===401){ showToast('Sign in as admin first.',true); return; }
+  if(d&&d.ok) showToast('Reminder sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):''));
+  else showToast((d&&(d.reason||d.error))||('Could not send ('+status+')'),true);
+}
+document.addEventListener('click',function(e){ const p=document.getElementById('rowRemPop'); if(p&&p.classList.contains('on')&&!p.contains(e.target)&&!e.target.classList.contains('remind-pill')) p.classList.remove('on'); });
+let _toastT; function showToast(m,err){ const t=document.getElementById('dsToast'); if(!t)return; t.textContent=m; t.className='dstoast on'+(err?' err':''); clearTimeout(_toastT); _toastT=setTimeout(function(){ t.className='dstoast'+(err?' err':''); },2600); }
 
 /* ---- Ladder recap (Part 1 per-player + Part 2 night recap) ---- */
 let RECAP_ID=null;
