@@ -120,7 +120,7 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
   </td></tr>
 
   <tr><td style="padding:18px 24px 24px;border-top:1px solid ${C.bd};margin-top:18px">
-    <div style="font-size:11px;color:${C.fnt};line-height:1.6">You're getting this because you played the ${esc(event.name)} ladder. Scores are final once both captains on each court confirm.<br>
+    <div style="font-size:11px;color:${C.fnt};line-height:1.6">You're getting this because you played the ${esc(event.name)} ladder.<br>
     <a href="${url}/ladders.html" style="color:${C.lime};text-decoration:none;font-weight:700">View the ladder</a> · <a href="${url}/me.html" style="color:${C.lime};text-decoration:none;font-weight:700">Your profile</a></div>
   </td></tr>
 </table>
