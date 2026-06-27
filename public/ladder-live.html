@@ -131,6 +131,8 @@ let pollTimer = null;
 
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const first = n => String(n||'').split(' ')[0];
+// Ranked standings use first name + last initial; tight court cards use first only.
+const firstLast = n => { const p=String(n||'').trim().split(/\s+/); return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}`:(p[0]||String(n||'')); };
 
 // Match the admin scorer's mapping exactly: courtNames are listed top→bottom
 // (top = highest court number). Anchor the top court to names[0] using the
@@ -172,7 +174,7 @@ function idBox(){
   const known = me && (DATA.roster||[]).some(p=>p.id===me);
   if(known || idSkipped || !(DATA.roster||[]).length){ el.innerHTML=''; return; }
   const chips=(DATA.roster||[]).slice().sort((a,b)=>a.name.localeCompare(b.name))
-    .map(p=>`<button onclick="setMe('${esc(p.id)}')">${esc(p.name)}</button>`).join('');
+    .map(p=>`<button onclick="setMe('${esc(p.id)}')">${esc(first(p.name))}</button>`).join('');
   el.innerHTML=`<div class="idcard"><div class="t">👋 Following along?</div><div class="s">Tap your name once and we'll always show your court.</div><div class="idchips">${chips}</div><button class="idskip" onclick="skipId()">Just browsing</button></div>`;
 }
 
@@ -201,7 +203,7 @@ function youBanner(){
     <div class="you">
       <div class="you-court">📍 You're on</div>
       <div class="you-big">${esc(courtLabel(ct.court))}</div>
-      <div class="you-sub">Round ${cur.round} of ${DATA.play.totalRounds||rounds().length}${partner?` · with <b>${esc(partner)}</b>`:''}${oppArr.length?` vs ${oppArr.map(x=>esc(first(x.name))).join(' & ')}`:''}</div>
+      <div class="you-sub">Round ${cur.round} of ${DATA.play.totalRounds||rounds().length}${partner?` · with <b>${esc(first(partner))}</b>`:''}${oppArr.length?` vs ${oppArr.map(x=>esc(first(x.name))).join(' & ')}`:''}</div>
       <div class="you-next"><span>⏱️</span> ${tail}</div>
       <button class="you-reset" onclick="resetMe()">Not ${esc(first(myName))}?</button>
     </div>`;
@@ -216,7 +218,7 @@ function courtCard(c, live){
     : `<span class="court-st wait">Upcoming</span>`;
   const t1=c.score?.t1, t2=c.score?.t2;
   const aLead = t1!=null && t2!=null && t1>t2, bLead = t1!=null && t2!=null && t2>t1;
-  const plName = pl => pl ? `<div class="pl ${pl.id===me?'me':''}">${esc(pl.name)}<span class="g">${pl.gender}</span></div>` : `<div class="pl" style="color:var(--fnt)">—</div>`;
+  const plName = pl => pl ? `<div class="pl ${pl.id===me?'me':''}">${esc(first(pl.name))}<span class="g">${pl.gender}</span></div>` : `<div class="pl" style="color:var(--fnt)">—</div>`;
   const scoreBlock = (t1!=null||t2!=null)
     ? `<div class="n"><span class="${aLead?'w':''}">${t1??0}</span><span class="sep">–</span><span class="${bLead?'w':''}">${t2??0}</span></div><div class="to">to 11</div>`
     : `<div class="vs">VS</div>`;
@@ -260,7 +262,7 @@ function standingsTable(){
   const rows=standings();
   if(!rows.length) return `<div class="note">No scores yet — standings build as courts wrap.</div>`;
   return `<table class="lbt"><thead><tr><th class="l">Player</th><th>W</th><th>L</th><th>Diff</th><th>PF</th></tr></thead><tbody>`+
-    rows.map((x,i)=>`<tr class="${x.id===me?'me':''}"><td class="l"><span class="rk ${i<3?'top':''}">${i+1}</span> ${esc(x.name)}</td><td>${x.w}</td><td>${x.l}</td><td>${x.diff>=0?'+':''}${x.diff}</td><td>${x.pf}</td></tr>`).join('')+
+    rows.map((x,i)=>`<tr class="${x.id===me?'me':''}"><td class="l"><span class="rk ${i<3?'top':''}">${i+1}</span> ${esc(firstLast(x.name))}</td><td>${x.w}</td><td>${x.l}</td><td>${x.diff>=0?'+':''}${x.diff}</td><td>${x.pf}</td></tr>`).join('')+
     `</tbody></table>`;
 }
 
@@ -268,7 +270,7 @@ function standingsTable(){
 function rosterList(){
   return (DATA.roster||[]).slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>`
     <div class="roster-row"><div class="av ${p.gender==='F'?'f':'m'}">${esc(p.name[0]||'?')}</div>
-      <div class="nm">${esc(p.name)}${p.id===me?' <span style="color:var(--lime);font-size:11px">· you</span>':''}</div>
+      <div class="nm">${esc(first(p.name))}${p.id===me?' <span style="color:var(--lime);font-size:11px">· you</span>':''}</div>
       <div class="tag">${p.gender}</div></div>`).join('');
 }
 
