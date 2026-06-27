@@ -6,8 +6,8 @@
 //     'merge'   { from, to, name? }   alias player `from` onto canonical `to`
 //     'unmerge' { from }              undo a merge
 
-import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { checkLadderPin } from './lib/ladder-pin.js';
+import { unauthResponse } from './lib/auth.js';
+import { authScoreAccess } from './lib/ladder-scorer.js';
 import { listPlay, playersFromPlay } from './lib/ladder-play.js';
 import { getMergeMap, setMerge, removeMerge } from './lib/player-merge.js';
 import { getDirectory, setPlayerInfo } from './lib/player-directory.js';
@@ -15,8 +15,9 @@ import { getDirectory, setPlayerInfo } from './lib/player-directory.js';
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
 
 export default async (req) => {
-  const v = await verifyAdminSession(req);
-  if (!v.valid && !checkLadderPin(req)) return unauthResponse('Unauthorized');
+  const auth = await authScoreAccess(req, null); // event-agnostic read for roster search
+  if (!auth.ok) return unauthResponse('Unauthorized');
+  if (auth.scorer && req.method !== 'GET') return unauthResponse('Scorer access is read-only here.');
 
   if (req.method === 'GET') {
     const plays = await listPlay();                 // RAW — duplicates intact so they can be merged

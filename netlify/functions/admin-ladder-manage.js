@@ -12,6 +12,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { authScoreAccess } from './lib/ladder-scorer.js';
 import { normalizeEmail } from './lib/identity.js';
 import {
   getEvent, setEvent, getSignups, setSignups, removeFromRoster,
@@ -34,10 +35,12 @@ const findRosterEntry = (s, playerId, email) => {
 };
 
 export default async (req) => {
-  const v = await verifyAdminSession(req);
-  if (!v.valid) return unauthResponse(v.error);
-
   const eventId = new URL(req.url).searchParams.get('event');
+  const auth = await authScoreAccess(req, eventId);
+  if (!auth.ok) return unauthResponse('Unauthorized');
+  // Scorer links can only ADD/REMOVE players (subs) on their own night — not read
+  // payments/emails (GET), delete the ladder, or run other admin actions.
+  if (auth.scorer && req.method !== 'POST') return unauthResponse('Scorer access is limited to scoring.');
   if (!eventId) return json({ error: 'event id required' }, 400);
   const event = await getEvent(eventId);
   if (!event) return json({ error: 'Ladder not found' }, 404);
@@ -66,6 +69,7 @@ export default async (req) => {
 
   const body = await req.json().catch(() => ({}));
   const action = body.action;
+  if (auth.scorer && action !== 'add' && action !== 'remove') return unauthResponse('Scorer access is limited to roster subs.');
   const signups = await getSignups(eventId);
   const feeCents = Number(event.feeCents) || 0;
 

@@ -5,8 +5,8 @@
 //
 //   POST ?event=<id>  { round, court, t1, t2, winner? }
 
-import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { checkLadderPin } from './lib/ladder-pin.js';
+import { unauthResponse } from './lib/auth.js';
+import { authScoreAccess } from './lib/ladder-scorer.js';
 import { getPlay, setPlay } from './lib/ladder-play.js';
 
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
@@ -14,10 +14,9 @@ const num = v => (v === '' || v === null || v === undefined || isNaN(+v)) ? null
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
-  const v = await verifyAdminSession(req);
-  if (!v.valid && !checkLadderPin(req)) return unauthResponse('Unauthorized');
-
   const eventId = new URL(req.url).searchParams.get('event');
+  const auth = await authScoreAccess(req, eventId);
+  if (!auth.ok) return unauthResponse('Unauthorized');
   const body = await req.json().catch(() => ({}));
   const ri = parseInt(body.round), ci = parseInt(body.court);
   const play = await getPlay(eventId);
