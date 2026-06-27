@@ -28,7 +28,13 @@ function getResend() {
 export async function sendEmail({ to, subject, html, replyTo, from, attachments }) {
   // Default sender for all Dink Society notifications is dink@dinksociety.app.
   // A per-send `from` wins; otherwise EMAIL_FROM (if set) or the dink@ default.
-  const fromAddr = from || process.env.EMAIL_FROM || 'dink@dinksociety.app';
+  const rawFrom = from || process.env.EMAIL_FROM || 'dink@dinksociety.app';
+  // Always include a friendly display name so inboxes show "The Dink Society"
+  // instead of "dink" (which Gmail derives from a bare address). If the caller
+  // already passed a "Name <addr>" form, respect it.
+  const fromAddr = rawFrom.includes('<')
+    ? rawFrom
+    : `${process.env.EMAIL_FROM_NAME || 'The Dink Society'} <${rawFrom}>`;
 
   const r = getResend();
   const payload = {
