@@ -8,6 +8,7 @@ import { promoteHead, HOLD_MS } from './ladder.js';
 import { createLadderToken } from './ladder-token.js';
 import { claimUrl, dateLineOf, siteUrl } from './ladder-notify.js';
 import { sendEmail, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen } from './email.js';
+import { sendNotify } from './notify-prefs.js';
 
 export async function promoteAndNotify(event, signups) {
   const next = promoteHead(signups, event);
@@ -18,7 +19,7 @@ export async function promoteAndNotify(event, signups) {
       const openUrl = `${siteUrl()}/ladders?event=${encodeURIComponent(event.id)}`;
       const html = renderLadderFcfsOpen({ eventName: event.name, dateLine: dateLineOf(event), openUrl });
       await Promise.allSettled((signups.waitlist || []).map(w => w.email).filter(Boolean)
-        .map(to => sendEmail({ to, subject: `Spot open (first come, first served) — ${event.name}`, html })));
+        .map(to => sendNotify({ to, category: 'waitlist', subject: `Spot open (first come, first served) — ${event.name}`, html })));
       return { opened: 'fcfs' };
     }
     if (next.autoClaimed) {
@@ -30,8 +31,9 @@ export async function promoteAndNotify(event, signups) {
       return { opened: next.name };
     }
     const tok = await createLadderToken({ type: 'claim', eventId: event.id, playerId: next.playerId, email: next.email, ttlMs: HOLD_MS });
-    await sendEmail({
+    await sendNotify({
       to: next.email,
+      category: 'waitlist',
       subject: `A spot opened for ${event.name}`,
       html: renderLadderSpotOpened({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), minutesLeft: 30, claimUrl: claimUrl(tok) }),
     });

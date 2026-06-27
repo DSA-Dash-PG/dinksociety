@@ -30,7 +30,7 @@ export default async (req) => {
 
   const payUrl = `${siteUrl()}/ladders?event=${encodeURIComponent(event.id)}&claimed=1`;
   return resultPage(
-    'Spot claimed 🎾',
+    'Spot claimed',
     `You're on the roster for ${escapeName(event.name)}. Last step — <a href="${payUrl}" style="color:#b8ff2c;font-weight:700">open the app to pay</a> and lock it in.`,
   );
 };

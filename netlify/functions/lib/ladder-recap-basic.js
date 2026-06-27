@@ -69,7 +69,7 @@ function basicPlayer(p, count) {
   }
 
   if (p.maxStreak >= 2) streak = { emoji: '🔥', text: `Best run of your night: ${p.maxStreak} straight.` };
-  else streak = { emoji: '🎾', text: `Night ${p.nights} on the ladder, ${p.seasonWins} season win${p.seasonWins === 1 ? '' : 's'} and counting.` };
+  else streak = { emoji: '🔥', text: `Night ${p.nights} on the ladder, ${p.seasonWins} season win${p.seasonWins === 1 ? '' : 's'} and counting.` };
 
   return { hi, sub, story, call, streak };
 }

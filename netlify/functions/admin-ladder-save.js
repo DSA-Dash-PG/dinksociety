@@ -9,6 +9,7 @@
 import crypto from 'crypto';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { getEvent, setEvent, capacityFromCourts } from './lib/ladder.js';
+import { announceNewLadder } from './lib/ladder-announce.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -69,10 +70,24 @@ export default async (req) => {
     status: b.status || existing?.status || 'open',
     createdAt: existing?.createdAt || new Date().toISOString(),
     createdBy: existing?.createdBy || v.payload?.email || null,
+    // Fire-once flag: set when the "new ladder open" blast goes out so a later
+    // edit (which re-runs this same endpoint) never re-announces. Preserved on update.
+    announcedAt: existing?.announcedAt || null,
   };
 
+  const isNew = !b.id;
+
+  // Announce a brand-new, open ladder to all past players — exactly once.
+  // Done before the final save so `announcedAt` is persisted with the event.
+  // Email failure never blocks creation (announceNewLadder never throws).
+  let announced = null;
+  if (isNew && event.status === 'open' && !event.announcedAt) {
+    announced = await announceNewLadder(event);
+    if (announced && announced.sent > 0) event.announcedAt = new Date().toISOString();
+  }
+
   await setEvent(event);
-  return json({ ok: true, created: !b.id, event });
+  return json({ ok: true, created: isNew, event, announced });
 };
 
 export const config = { path: '/.netlify/functions/admin-ladder-save' };

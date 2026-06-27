@@ -15,7 +15,7 @@
 // same marker so the automatic send won't duplicate it.
 
 import { getStore } from '@netlify/blobs';
-import { sendEmail } from './email.js';
+import { sendNotify } from './notify-prefs.js';
 import { siteUrl, dateLineOf, fmtCents } from './ladder-notify.js';
 import { listEvents, getSignups, eventStartMs, effectiveCapacity } from './ladder.js';
 import { buildLadderProfile } from './profile-data.js';
@@ -183,7 +183,7 @@ export function renderReminderEmail({ event, kind, recipient, profile, roster, p
     <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 18px">
       <div style="font-size:16px;font-weight:800">${esc(event.name)}</div>
       <div style="font-size:13px;color:#cfcfcf;margin-top:5px"><b style="color:#17d7b0">${esc(dateLine)}</b></div>
-      <div style="font-size:12px;color:#8a8a8a;margin-top:7px;padding-top:8px;border-top:1px solid #2a2a2a">📍 ${esc(event.place || '')} · 🎾 ${courts} · ${capacity} players · ${esc(event.type || 'mixed')}</div>
+      <div style="font-size:12px;color:#8a8a8a;margin-top:7px;padding-top:8px;border-top:1px solid #2a2a2a">📍 ${esc(event.place || '')} · ${courts} · ${capacity} players · ${esc(event.type || 'mixed')}</div>
     </div>
 
     ${strip}${hype}
@@ -239,7 +239,7 @@ export async function sendEventReminder(event, signups, kind, { force = false } 
   const start = eventStartMs(event);
   const ttl = Math.max(3600000, (start || (Date.now() + 86400000)) - Date.now() + 3600000);
 
-  let sent = 0, failed = 0; const errors = [];
+  let sent = 0, failed = 0, skipped = 0; const errors = [];
   for (const p of roster) {
     const profile = p.playerId ? profileById[p.playerId] : null;
     let cancelUrl = `${siteUrl()}/ladders.html?event=${encodeURIComponent(event.id)}`;
@@ -249,13 +249,14 @@ export async function sendEventReminder(event, signups, kind, { force = false } 
     } catch { /* fall back to the logged-in cancel page */ }
     try {
       const html = renderReminderEmail({ event, kind, recipient: p, profile, roster, profileById, waitlistCount, capacity, nextEvent, cancelUrl });
-      await sendEmail({ to: p.email, from, replyTo: from, subject: subjectFor(event, kind), html });
+      const r = await sendNotify({ to: p.email, from, replyTo: from, category: 'reminders', subject: subjectFor(event, kind), html });
+      if (r && r.skipped) { skipped++; continue; }
       sent++;
       await sleep(120); // stay under Resend's per-second limit
     } catch (e) { failed++; if (errors.length < 3) errors.push(e.message || String(e)); }
   }
   await setMarker(event.id, kind, { sent, failed, forced: !!force });
-  return { ok: true, kind, sent, failed, skipped: 0, errors };
+  return { ok: true, kind, sent, failed, skipped, errors };
 }
 
 /** Cron entry: scan upcoming events and fire any reminders that are due. */

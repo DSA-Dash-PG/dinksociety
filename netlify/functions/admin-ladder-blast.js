@@ -10,7 +10,7 @@
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { listEvents, getEvent, getSignups, eventStartMs, spotsLeft } from './lib/ladder.js';
-import { sendEmail } from './lib/email.js';
+import { sendNotify } from './lib/notify-prefs.js';
 import { dateLineOf, siteUrl } from './lib/ladder-notify.js';
 import { normalizeEmail } from './lib/identity.js';
 
@@ -53,7 +53,7 @@ function evCard(ev, site) {
   return `<div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 12px">
     <div style="font-size:15px;font-weight:800">${esc(ev.name)}</div>
     <div style="font-size:12.5px;color:#17d7b0;font-weight:700;margin-top:4px">${esc(dateLineOf(ev))}</div>
-    <div style="font-size:12px;color:#8a8a8a;margin-top:6px">📍 ${esc(ev.place || '')} · 🎾 ${courts}${spots !== '' ? ` · ${spots} spot${spots === 1 ? '' : 's'} open` : ''}</div>
+    <div style="font-size:12px;color:#8a8a8a;margin-top:6px">📍 ${esc(ev.place || '')} · ${courts}${spots !== '' ? ` · ${spots} spot${spots === 1 ? '' : 's'} open` : ''}</div>
     <div style="margin-top:10px">${btn(`${site}/ladders.html?event=${encodeURIComponent(ev.id)}`, 'Register →')}</div>
   </div>`;
 }
@@ -61,13 +61,13 @@ function evCard(ev, site) {
 function renderRecruit({ name, event, needed, site }) {
   const courts = event.courtNumbers ? esc(event.courtNumbers) : `${event.courts || 0} courts`;
   return shell(`
-    <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#b8ff2c;background:rgba(184,255,44,.10);border:1px solid rgba(184,255,44,.30);padding:6px 12px;border-radius:9999px;margin-bottom:14px">🎾 Players wanted</span>
+    <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#b8ff2c;background:rgba(184,255,44,.10);border:1px solid rgba(184,255,44,.30);padding:6px 12px;border-radius:9999px;margin-bottom:14px">Players wanted</span>
     <h1 style="font-size:26px;font-weight:800;line-height:1.15;margin:0 0 12px">We need <span style="color:#b8ff2c">${esc(needed)}</span> more, ${esc(firstName(name))}.</h1>
     <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 16px">A spot (or ${esc(needed)}) just opened up for an upcoming ladder. If you're free, jump in — it fills fast.</p>
     <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 16px">
       <div style="font-size:16px;font-weight:800">${esc(event.name)}</div>
       <div style="font-size:13px;color:#17d7b0;font-weight:700;margin-top:5px">${esc(dateLineOf(event))}</div>
-      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${esc(event.place || '')} · 🎾 ${courts} · ${esc(event.type || 'mixed')}</div>
+      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${esc(event.place || '')} · ${courts} · ${esc(event.type || 'mixed')}</div>
     </div>
     ${btn(`${site}/ladders.html?event=${encodeURIComponent(event.id)}`, `Grab a spot →`)}
     <p style="font-size:12.5px;color:#777;margin-top:16px">Not this time? No worries — you'll always get first look at the next one.</p>
@@ -108,7 +108,7 @@ export default async (req) => {
     [...(signups.roster || []), ...(signups.waitlist || [])].forEach(p => { const e = normalizeEmail(p.email); if (e) exclude.add(e); });
     const open = spotsLeft(event, signups);
     const needed = (b.neededCount != null && +b.neededCount > 0) ? Math.floor(+b.neededCount) : (open || 1);
-    subject = `🎾 ${needed} spot${needed === 1 ? '' : 's'} open — ${event.name}`;
+    subject = `${needed} spot${needed === 1 ? '' : 's'} open — ${event.name}`;
     htmlFor = (name) => renderRecruit({ name, event, needed, site });
   } else {
     const now = Date.now();
@@ -123,13 +123,16 @@ export default async (req) => {
     htmlFor = (name) => renderOpen({ name, events, site });
   }
 
-  let sent = 0, failed = 0;
+  let sent = 0, failed = 0, skipped = 0;
   for (const [email, name] of people) {
     if (exclude.has(email)) continue;
-    try { await sendEmail({ to: email, from, replyTo: from, subject, html: htmlFor(name) }); sent++; await sleep(120); }
+    try {
+      const r = await sendNotify({ to: email, from, replyTo: from, category: 'new_ladders', subject, html: htmlFor(name) });
+      if (r && r.skipped) { skipped++; } else { sent++; await sleep(120); }
+    }
     catch { failed++; }
   }
-  return json({ ok: true, mode, sent, failed, recipients: people.size - exclude.size });
+  return json({ ok: true, mode, sent, failed, skipped, recipients: people.size - exclude.size });
 };
 
 export const config = { path: '/.netlify/functions/admin-ladder-blast' };

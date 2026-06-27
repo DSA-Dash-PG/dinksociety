@@ -12,7 +12,7 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { getRecap, markRecapSent, updateRecapDraft } from './lib/ladder-recap.js';
 import { generateLadderRecapDraft } from './lib/ladder-recap-generate.js';
 import { renderLadderRecapEmail } from './lib/ladder-recap-email.js';
-import { sendEmail } from './lib/email.js';
+import { sendNotify } from './lib/notify-prefs.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } });
@@ -66,13 +66,14 @@ export default async (req) => {
       const results = await Promise.allSettled(recipients.map(rcpt => {
         const pr = (rec.players && rec.players[rcpt.playerId]) || { name: rcpt.name, rank: null, count: rec.recap.podium?.length || 0, w: 0, l: 0, diff: 0, delta: null, story: [] };
         const html = renderLadderRecapEmail(pr, rec.recap, rec.event || { name: 'Ladder', date: null }, url);
-        return sendEmail({
+        return sendNotify({
           to: rcpt.email,
+          category: 'recap',
           subject: `Your ladder recap — ${rec.event?.name || 'Dink Society'}`,
           html,
         });
       }));
-      const sent = results.filter(r => r.status === 'fulfilled').length;
+      const sent = results.filter(r => r.status === 'fulfilled' && !(r.value && r.value.skipped)).length;
       const failed = results.length - sent;
       await markRecapSent(eventId, sent);
       return json({ ok: true, sent, failed });

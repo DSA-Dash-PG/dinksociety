@@ -429,7 +429,7 @@ export function renderLadderNudge({ playerName, eventName, minutesLeft = 5, clai
 /** Confirmation once a spot is claimed / paid. */
 export function renderLadderConfirmed({ playerName, eventName, dateLine }) {
   return _ladderShell(`
-      <h1 style="font-size: 22px; font-weight: 800; color: #b8ff2c; margin: 0 0 14px; line-height: 1.25;">You're in! 🎾</h1>
+      <h1 style="font-size: 22px; font-weight: 800; color: #b8ff2c; margin: 0 0 14px; line-height: 1.25;">You're in!</h1>
       <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">See you at <b style="color:#fff;">${escapeBody(eventName)}</b>${playerName ? ', ' + escapeBody(playerName) : ''}.</p>
       ${_ladderEventCard(eventName, dateLine)}
       <p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">It's on your profile now. Need to cancel? Open the ladder and tap cancel — you'll get ladder credit for a future night.</p>
@@ -487,7 +487,7 @@ export function renderLadderPayRequest({ playerName, eventName, dateLine, cardUr
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
       <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
-      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">You're on the roster — just pay your spot 🎾</h1>
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">You're on the roster — just pay your spot</h1>
       <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Hey ${escapeBody(playerName || 'there')}, you've been added to <b style="color:#fff;">${escapeBody(eventName)}</b>. Lock in your spot by paying below.</p>
       ${_ladderEventCard(eventName, dateLine)}
       ${card}${venmo}
