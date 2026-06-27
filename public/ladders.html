@@ -367,7 +367,11 @@ function lbToggleInfo(t){ lbInfo=(lbInfo===t)?null:t; renderStats(); }
 function renderStats(){
   const body=document.getElementById('statsBody'); const j=STATS||{};
   if(!j.leaderboard||!j.leaderboard.length){ body.innerHTML='<div class="note">No results yet — stats appear after the first scored event (or import your history).</div>'; return; }
-  const rowsAll=(j.divisions&&j.divisions.all)||j.leaderboard;
+  // Must have played a minimum number of games (~2 ladder nights at 7-9 rounds)
+  // before ranking on the SEASON leaderboard — keeps small-sample ratings (e.g.
+  // a 2-0 night) from topping the DR board. Single-night results are unaffected.
+  const MIN_LB_GAMES=10;
+  const rowsAll=((j.divisions&&j.divisions.all)||j.leaderboard).filter(p=>((p.w||0)+(p.l||0))>=MIN_LB_GAMES);
   const tabBtn=(k,label)=>`<button onclick="lbSetTab('${k}')" style="flex:1;padding:8px 4px;border:0;border-radius:9999px;font:inherit;font-size:.76rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:${lbTab===k?'var(--lime)':'transparent'};color:${lbTab===k?'#06210f':'var(--mut)'}">${label} <span onclick="event.stopPropagation();lbToggleInfo('${k}')" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid currentColor;font-size:.56rem;opacity:.7">i</span></button>`;
   let h=`<div style="display:flex;gap:4px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:6px">${tabBtn('wins','Wins')}${tabBtn('points','Points')}${tabBtn('xp','XP')}${tabBtn('dr','DR')}</div>`;
   const gChip=(k,label)=>`<button onclick="lbSetGender('${k}')" style="padding:6px 13px;border-radius:9999px;border:1px solid ${lbGender===k?'var(--lime)':'var(--bd)'};background:${lbGender===k?'rgba(184,255,44,.08)':'var(--surf)'};color:${lbGender===k?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">${label}</button>`;
@@ -387,7 +391,7 @@ function renderStats(){
     else sec=`<span style="color:var(--fnt)">#${overallRank[p.id]} ov</span>`;
     return Object.assign({}, p, {_sec:sec}); });
   const lbM = lbTab==='wins'?'wins':lbTab==='points'?'total':lbTab;
-  if(!view.length) h+=`<div class="note">No players in this division yet.</div>`;
+  if(!view.length) h+=`<div class="note">${rowsAll.length?'No players in this division yet.':`Players join the leaderboard after ${MIN_LB_GAMES} games — about two ladder nights.`}</div>`;
   else h+=lbBoard(view, lbM);
   if(lbTab==='wins' && lbGender==='all'){
     if(j.mvpLeaders&&j.mvpLeaders.length) h+=`<div class="seclbl">🏅 Top performers</div>`+lbCard('#f0c040', j.mvpLeaders.map((x,i)=>lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:1rem;font-weight:900;color:#f0c040;text-shadow:0 0 12px rgba(240,192,64,.4)">${x.count}<span style="font-size:.6rem;color:#5e655a">×</span></span>`)).join(''));
