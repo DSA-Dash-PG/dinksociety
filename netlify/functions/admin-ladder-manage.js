@@ -18,6 +18,8 @@ import {
   effectiveCapacity, spotsLeft,
 } from './lib/ladder.js';
 import { promoteAndNotify } from './lib/ladder-promote.js';
+import { findPlayerByEmail } from './lib/player-auth.js';
+import { createLitePlayer } from './lib/ladder-players.js';
 import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js';
 import { earn } from './lib/credits.js';
 import { dateLineOf } from './lib/ladder-notify.js';
@@ -108,10 +110,25 @@ export default async (req) => {
     const gender = body.gender === 'F' ? 'F' : body.gender === 'M' ? 'M' : null;
     const email = String(body.email || '').trim().toLowerCase();
     const paid = !!body.paid;
-    // Use an existing master-roster id when provided (links their stats/profile);
-    // otherwise mint a fresh manual id.
-    const pid = body.playerId ? String(body.playerId) : ('manual_' + Math.random().toString(36).slice(2, 10));
-    if (body.playerId && (signups.roster || []).some(p => p.playerId === pid)) return json({ error: 'Already on the roster' }, 409);
+    // Resolve a STABLE identity so a returning player isn't minted as a brand-new
+    // person on the leaderboard. Priority:
+    //   1. explicit master-roster id (picked from search) — links stats/profile
+    //   2. existing player matched BY EMAIL (team roster first, then lite account)
+    //   3. a fresh email-keyed lite account (so the same email links next time)
+    //   4. a manual id (only when there's no usable email)
+    let pid;
+    if (body.playerId) {
+      pid = String(body.playerId);
+    } else if (email) {
+      try {
+        const found = await findPlayerByEmail(email);
+        if (found && found.playerId) pid = found.playerId;
+        else { const { record } = await createLitePlayer({ name, email, gender }); pid = record.playerId; }
+      } catch { pid = null; }
+    }
+    if (!pid) pid = 'manual_' + Math.random().toString(36).slice(2, 10);
+    // Don't add the same resolved person twice (manual ids are always unique).
+    if (!String(pid).startsWith('manual_') && (signups.roster || []).some(p => p.playerId === pid)) return json({ error: 'Already on the roster' }, 409);
     if (spotsLeft(event, signups) > 0 || body.force) {
       signups.roster.push({
         playerId: pid, name, email, gender,
