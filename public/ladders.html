@@ -166,7 +166,7 @@ function route(){
   const btn=document.querySelector('#tabs button[data-t="'+m+'"]');
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b===btn));
   show(m);
-  if(m==='home') hSub(sub==='up'?'up':'win');
+  if(m==='home') hSub(sub==='up'?'up':(sub==='win'?'win':(hasUpcoming()?'up':'win')));
   else if(m==='ladders'){ ladTab((sub==='completed'||sub==='past')?'completed':'register'); if(sub && sub!=='register' && sub!=='completed' && sub!=='past') focusLadder(sub); }
   else if(m==='leaderboard'){ if(['wins','points','xp','dr'].includes(sub)) lbSetTab(sub); else writeHash(); }
   else writeHash();
@@ -229,9 +229,13 @@ function hSub(t){
   document.getElementById('homeSub').textContent=win?'Ranked by wins · tap an event to open the full ladder':'Open for registration';
   RT.home=t; writeHash();
 }
+// Is there an upcoming/registerable ladder? Drives the default home view.
+function hasUpcoming(){ return (ACTIVE||[]).some(l=>['open','full','live'].includes(l.status||'open')); }
 function renderHomeWeek(){
   const el=document.getElementById('homeUp');
-  el.innerHTML=ACTIVE.length?ACTIVE.map(ladderCard).join('')+`<button class="btn btn-out" onclick="gotab('ladders')">See all ladders →</button>`:'<div class="note">No ladders open right now.</div>';
+  // Soonest first, so "the next ladder" sits at the top of the upcoming list.
+  const up=(ACTIVE||[]).slice().sort((a,b)=>String(a.date||'').localeCompare(String(b.date||'')));
+  el.innerHTML=up.length?up.map(ladderCard).join('')+`<button class="btn btn-out" onclick="gotab('ladders')">See all ladders →</button>`:'<div class="note">No ladders open right now.</div>';
 }
 // When a ladder is in play, pin it to the very top of the challengers' home so
 // players see exactly where to go — taps through to the live board.
