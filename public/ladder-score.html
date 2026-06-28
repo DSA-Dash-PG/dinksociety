@@ -258,11 +258,11 @@ function render(){
   const play=STATE.play;
   if(!play||!play.started){
     const roster=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled'); const n=roster.length;
-    let bh=`<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">Build the roster, then start rounds. ${n} player${n===1?'':'s'} in${n<4?' — need at least 4.':''}</div>`;
-    bh+=roster.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:9px;margin-bottom:6px"><span style="font-size:.84rem;font-weight:700">${esc(p.name)}</span><button onclick="scRemove('${esc(p.playerId||'')}','${esc(p.email||'')}')" style="font-size:.62rem;font-weight:800;color:var(--red);background:none;border:1px solid rgba(255,92,71,.3);border-radius:9999px;padding:4px 10px;cursor:pointer">Remove</button></div>`).join('');
+    let bh=`<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">Add players, then start rounds. ${n} player${n===1?'':'s'} in${n<4?' — need at least 4.':''}</div>`;
     bh+='<label class="seclbl" style="margin-top:6px;display:block">Add from master roster</label><input class="i" id="sc-search" placeholder="Search players…" autocomplete="off" oninput="scSearch()"><div id="sc-res" style="margin-top:6px"></div>';
     bh+='<label class="seclbl" style="margin-top:12px;display:block">Or add a new player</label><div class="brow" style="gap:6px"><input class="i" id="sc-name" placeholder="Name" style="flex:2"><select class="i" id="sc-gender" style="flex:1;max-width:78px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select></div><div class="brow" style="gap:6px;margin-top:6px"><input class="i" id="sc-email" placeholder="Email (optional)" style="flex:1"><button class="btn b-out" style="flex:0 0 auto;width:auto;padding:0 14px" onclick="scAddNew()">Add</button></div>';
     bh+='<div style="border-top:1px solid var(--bd);margin:14px 0 10px"></div><div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="6"></div><div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="12"></div></div><button class="btn b-lime" '+(n<4?'disabled':'')+' onclick="act(\'start\')">Enter event</button>';
+    if(roster.length) bh+='<label class="seclbl" style="margin-top:18px;display:block">Players in tonight ('+n+')</label>'+roster.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:9px;margin-bottom:6px"><span style="font-size:.84rem;font-weight:700">${esc(p.name)}</span><button onclick="scRemove('${esc(p.playerId||'')}','${esc(p.email||'')}')" style="font-size:.62rem;font-weight:800;color:var(--red);background:none;border:1px solid rgba(255,92,71,.3);border-radius:9999px;padding:4px 10px;cursor:pointer">Remove</button></div>`).join('');
     b.innerHTML=bh; return;
   }
   const finished=!!play.finished;
@@ -281,6 +281,11 @@ function render(){
   else h+=`<div class="ov" style="text-align:right">${finished?'Finalized':'Viewing round '+(VR+1)}</div>`;
   h+=`</div>`;
   if(isCurrent) h+=`<div class="tbar"><i id="tf" style="width:${timer/roundSecs()*100}%;background:${timer<=60?'#ff5c47':timer<=180?'#ffcc00':'#b8ff2c'}"></i></div>`;
+
+  // SCORE ENTRY FIRST — the scorer lands right on the courts. Enter every court,
+  // then hit Save once (one write, one render — fast double-entry never gets wiped).
+  [...round.courts].map((c)=>({c,ci:round.courts.indexOf(c)})).sort((a,b)=>b.c.court-a.c.court).forEach(({c,ci})=>{ h+=courtCard(c,ci,tC); });
+  if(!finished) h+=`<button class="btn b-lime" onclick="saveAllScores()" style="margin-top:4px">✓ Save scores</button>`;
 
   // controls
   if(isCurrent){
@@ -322,9 +327,6 @@ function render(){
     h+=`<div class="cmc${hb?' scored':''}"><div class="l">Court ${courtLabel(c.court)}</div><div class="m">${(c.team1||[]).filter(Boolean).map(p=>esc(first(p.name))).join(' & ')||'—'} <span style="color:var(--fnt)">vs</span> ${(c.team2||[]).filter(Boolean).map(p=>esc(first(p.name))).join(' & ')||'—'}</div>${hb?`<div class="s">${c.score.t1} – ${c.score.t2}</div>`:''}</div>`; });
   h+=`</div>`;
 
-  // court cards (top first)
-  [...round.courts].map((c)=>({c,ci:round.courts.indexOf(c)})).sort((a,b)=>b.c.court-a.c.court).forEach(({c,ci})=>{ h+=courtCard(c,ci,tC); });
-
   b.innerHTML=h;
   if(isCurrent && timerOn){ clearInterval(timerInt); timerInt=setInterval(()=>{ timer--; if(timer<=0){timer=0;timerOn=false;clearInterval(timerInt);} tick(); },1000); }
 }
@@ -351,7 +353,7 @@ function courtCard(c,ci,tC){
       p+=`</div>`;
     });
     const scls=isWin?(king?'wink':'win'):isLose?'lose':'';
-    p+=`<input class="scin ${scls}" inputmode="numeric" value="${ti===0?(sc.t1??''):(sc.t2??'')}" id="sc-${ci}-${ti}" onchange="saveScore(${ci})">`;
+    p+=`<input class="scin ${scls}" inputmode="numeric" value="${ti===0?(sc.t1??''):(sc.t2??'')}" id="sc-${ci}-${ti}">`;
     if(hb&&sc.winner){ const txt=isWin?ml.w:ml.l; const col=txt.indexOf('Stay')>=0?'var(--gold)':isWin?'var(--lime)':'var(--red)';
       p+=`<div class="mvbadge" style="color:${col};background:${col.replace('var(--gold)','rgba(240,204,0,.12)').replace('var(--lime)','rgba(184,255,44,.12)').replace('var(--red)','rgba(255,92,71,.12)')}">${txt}</div>`; }
     p+=`</div>`; return p;
@@ -368,10 +370,17 @@ function courtCard(c,ci,tC){
 }
 
 /* ---------- scoring ---------- */
-async function saveScore(ci){
-  const t1=document.getElementById(`sc-${ci}-0`).value, t2=document.getElementById(`sc-${ci}-1`).value;
-  const {d}=await api('/admin-ladder-score?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({round:VR,court:ci,t1,t2})});
-  if(d.ok){ STATE.play.rounds[VR].courts[ci].score=d.score; render(); } else msg('err',d.error||'Could not save score.');
+// Batch-save EVERY court for the current round in one request, then render once.
+// Score inputs no longer save per keystroke, so a fast second entry can't be
+// wiped by a mid-entry re-render.
+async function saveAllScores(){
+  if(!STATE||!STATE.play) return;
+  const round=STATE.play.rounds[VR]; if(!round) return;
+  const courts=round.courts.map((c,ci)=>{ const e1=document.getElementById('sc-'+ci+'-0'), e2=document.getElementById('sc-'+ci+'-1'); return { court:ci, t1:e1?e1.value:'', t2:e2?e2.value:'' }; });
+  msg('','Saving…');
+  const {d}=await api('/admin-ladder-score?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({round:VR,courts})});
+  if(d.ok){ (d.scores||[]).forEach(s=>{ const c=STATE.play.rounds[VR]&&STATE.play.rounds[VR].courts[s.court]; if(c) c.score=s.score; }); render(); msg('ok','Scores saved.'); }
+  else msg('err',d.error||'Could not save scores.');
 }
 async function pickWin(ci,side){
   const t1=document.getElementById(`sc-${ci}-0`).value, t2=document.getElementById(`sc-${ci}-1`).value;

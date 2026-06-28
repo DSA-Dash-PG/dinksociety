@@ -428,9 +428,20 @@ function plPillBtn(key,label){ const on=plTab===key; return `<button onclick="pl
 function renderPlayers(){
   const el=document.getElementById('playersCard'); const d=PLDATA;
   if(!d||!d.players){ el.innerHTML='<div class="empty">Sign in as admin (or use the scoring PIN) to manage players.</div>'; return; }
-  let h='<div style="display:flex;gap:6px;margin-bottom:14px">'+plPillBtn('roster','Master Roster')+plPillBtn('merge','Merge')+'</div>';
+  let h='<div style="background:#161914;border:1px solid rgba(184,255,44,.25);border-radius:11px;padding:12px 13px;margin-bottom:14px"><div class="sec" style="margin:0 0 7px">Owner: view as a player</div><div class="row2" style="gap:8px"><input class="i" id="va-email" type="email" placeholder="Player email" style="flex:1"><button class="btn btn-lime" style="flex:0 0 auto;width:auto;padding:0 16px" onclick="viewAsPlayer()">View as</button></div><div class="help" style="margin:6px 0 0">Owner only — opens their portal fully impersonated for 4h. Other admins are denied.</div><div id="vaMsg"></div></div>';
+  h+='<div style="display:flex;gap:6px;margin-bottom:14px">'+plPillBtn('roster','Master Roster')+plPillBtn('merge','Merge')+'</div>';
   h += plTab==='merge' ? plMergeHtml(d) : plRosterHtml(d);
   el.innerHTML=h;
+}
+async function viewAsPlayer(){
+  const email=(document.getElementById('va-email').value||'').trim();
+  if(!email){ msg('vaMsg','err','Enter a player email.'); return; }
+  msg('vaMsg','','Starting…');
+  const {status,d}=await api('/admin-preview-as',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+  if(status===403){ msg('vaMsg','err','Owner only — your account can’t impersonate players.'); return; }
+  if(status===401){ msg('vaMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){ location.href=d.redirect||'/me.html'; return; }
+  msg('vaMsg','err',(d&&d.error)||('Could not start ('+status+').'));
 }
 function plRosterHtml(d){
   let h='<div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">Set a player\'s email (links their league profile) or fix name/gender. Changes apply across every ladder.</div>';
@@ -685,8 +696,28 @@ async function sendRecap(){
   if(!confirm('Email this recap to everyone who played?')) return;
   document.getElementById('rcMsg').innerHTML='<div style="color:#9aa094;font-size:.78rem;margin-top:8px">Sending…</div>';
   const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send'})});
-  if(d&&d.ok){ msg('rcMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); loadRecap(); }
+  if(d&&d.ok){ recapSendResult(d); loadRecap(); }
   else msg('rcMsg','err',(d&&d.error)||'Send failed ('+status+').');
+}
+// Render the send result with a per-recipient breakdown: who got it, who opted
+// out of recap emails (not a problem), and who genuinely errored (needs a look).
+function recapSendResult(d){
+  const optedOut=d.optedOut||[], errored=d.errored||[];
+  const cls=errored.length?'err':'ok';
+  let h=`<div class="msg ${cls}">Sent to ${d.sent} player${d.sent===1?'':'s'}`;
+  if(optedOut.length) h+=` · ${optedOut.length} opted out`;
+  if(errored.length) h+=` · ${errored.length} failed`;
+  h+='.</div>';
+  const nm=p=>esc(p.name||p.email);
+  if(errored.length){
+    h+=`<div style="margin-top:8px;font-size:.78rem;color:#ffb4a8"><b>Didn’t send (needs attention):</b><ul style="margin:4px 0 0;padding-left:18px">`+
+       errored.map(p=>`<li>${nm(p)}${p.email?` &lt;${esc(p.email)}&gt;`:''}${p.reason?` — <span style="color:#9aa094">${esc(p.reason)}</span>`:''}</li>`).join('')+`</ul></div>`;
+  }
+  if(optedOut.length){
+    h+=`<div style="margin-top:8px;font-size:.78rem;color:#9aa094"><b>Opted out of recap emails</b> (skipped on purpose):<ul style="margin:4px 0 0;padding-left:18px">`+
+       optedOut.map(p=>`<li>${nm(p)}</li>`).join('')+`</ul></div>`;
+  }
+  document.getElementById('rcMsg').innerHTML=h;
 }
 let MROSTER=[];
 function rosterSearch(){

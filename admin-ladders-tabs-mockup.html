@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Admin Ladders — clickable rows + tabbed Manage (mockup)</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --lime:#b8ff2c; --teal:#17d7b0; --gold:#f0c040; --red:#ff5c47; --bg:#0b0d0a; --panel:#15170f; --panel2:#191c12; --bd:#2a2e22; --mut:#9aa094; }
+  *{box-sizing:border-box}
+  body{ background:var(--bg); color:#f0f2ec; font-family:'Inter',system-ui,sans-serif; margin:0; }
+  .app{ display:flex; min-height:100vh; }
+
+  /* sidebar */
+  .side{ width:230px; flex:none; border-right:1px solid var(--bd); padding:20px 14px; }
+  .brand{ display:flex; align-items:center; gap:10px; margin:6px 4px 26px }
+  .brand .mk{ width:36px;height:36px;border-radius:10px;background:var(--lime);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px }
+  .brand .lad{ font-size:11px;font-weight:900;letter-spacing:.14em;color:var(--teal) }
+  .brand .adm{ font-size:16px;font-weight:900;font-style:italic }
+  .navi{ display:block;padding:11px 14px;border-radius:9px;color:#c7ccc0;text-decoration:none;font-size:.92rem;font-weight:600;border-left:3px solid transparent;margin-bottom:2px;cursor:pointer }
+  .navi:hover{ background:rgba(255,255,255,.04) }
+  .navi.on{ color:var(--lime);font-weight:800;border-left-color:var(--lime);background:rgba(184,255,44,.08) }
+  .scorepill{ margin-top:18px;display:flex;align-items:center;justify-content:center;gap:7px;width:100%;background:var(--lime);color:#000;border:none;border-radius:9999px;padding:13px;font:inherit;font-weight:800;cursor:pointer }
+
+  /* main */
+  .main{ flex:1; padding:34px 40px; max-width:1180px }
+  h1{ font-size:2rem;font-weight:900;margin:0 0 22px }
+  .seg{ display:inline-flex;gap:4px;background:var(--panel);border:1px solid var(--bd);border-radius:13px;padding:5px;margin-bottom:22px }
+  .seg button{ padding:11px 30px;border:0;border-radius:9px;font:inherit;font-weight:800;font-size:.92rem;cursor:pointer;background:transparent;color:var(--mut) }
+  .seg button.on{ background:var(--lime);color:#000 }
+
+  .list{ background:var(--panel);border:1px solid var(--bd);border-radius:18px;overflow:hidden }
+  .row{ display:flex;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--bd);cursor:pointer;transition:background .12s;position:relative }
+  .row:last-child{ border-bottom:0 }
+  .row:hover{ background:var(--panel2) }
+  .row:hover .chev{ color:var(--lime);transform:translateX(3px) }
+  .row .nm{ flex:1;min-width:0 }
+  .row .nm .t{ font-size:1.18rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis }
+  .row .nm .d{ font-size:.82rem;color:var(--mut);margin-top:3px }
+  .row .ct{ font-size:.82rem;color:var(--mut);text-align:right;white-space:nowrap }
+  .pill{ display:inline-block;font-size:.66rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;padding:4px 11px;border-radius:9999px;margin-top:5px }
+  .pill.open{ background:rgba(184,255,44,.12);color:var(--lime);border:1px solid rgba(184,255,44,.4) }
+  .pill.final{ background:#23271c;color:#9aa094;border:1px solid var(--bd) }
+  .btn{ border:1px solid var(--bd);background:transparent;color:#f0f2ec;border-radius:9999px;padding:9px 18px;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer;white-space:nowrap }
+  .btn:hover{ border-color:rgba(255,255,255,.4) }
+  .remind{ border:1px solid rgba(23,215,176,.45);color:var(--teal);background:rgba(23,215,176,.08) }
+  .remind:hover{ background:rgba(23,215,176,.16) }
+  .chev{ color:#5e655a;font-size:1.5rem;line-height:1;transition:.12s;flex:none;width:14px;text-align:center }
+
+  /* remind popover */
+  .pop{ position:absolute;right:60px;top:60px;z-index:30;background:#0f120c;border:1px solid var(--bd);border-radius:13px;padding:7px;min-width:210px;box-shadow:0 18px 50px rgba(0,0,0,.6);display:none }
+  .pop.on{ display:block }
+  .pop .ph{ font-size:.66rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#5e655a;padding:7px 10px 6px }
+  .pop button{ display:flex;justify-content:space-between;width:100%;background:transparent;border:0;color:#e6eadd;font:inherit;font-size:.86rem;font-weight:600;padding:9px 10px;border-radius:8px;cursor:pointer;text-align:left }
+  .pop button:hover{ background:rgba(23,215,176,.12);color:var(--teal) }
+
+  /* toast */
+  .toast{ position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--lime);color:#06210f;font-weight:800;font-size:.9rem;padding:13px 22px;border-radius:9999px;box-shadow:0 14px 40px rgba(0,0,0,.5);opacity:0;pointer-events:none;transition:.25s;z-index:80 }
+  .toast.on{ opacity:1;transform:translateX(-50%) translateY(0) }
+
+  /* manage sheet */
+  .backdrop{ position:fixed;inset:0;background:rgba(0,0,0,.55);opacity:0;pointer-events:none;transition:.2s;z-index:40 }
+  .backdrop.on{ opacity:1;pointer-events:auto }
+  .sheet{ position:fixed;top:0;right:0;height:100vh;width:min(580px,100%);background:#0e110b;border-left:1px solid var(--bd);z-index:50;transform:translateX(100%);transition:transform .26s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column }
+  .sheet.on{ transform:translateX(0) }
+  .sheet .hd{ padding:22px 24px 0;flex:none }
+  .sheet .x{ position:absolute;top:16px;right:18px;background:transparent;border:0;color:#9aa094;font-size:1.5rem;cursor:pointer;line-height:1 }
+  .sheet h2{ font-size:1.3rem;font-weight:900;margin:0 0 2px }
+  .sheet .meta{ font-size:.8rem;color:var(--mut);margin-bottom:16px }
+  .tabs{ display:flex;gap:4px;background:var(--panel);border:1px solid var(--bd);border-radius:11px;padding:4px;margin-bottom:4px }
+  .tabs button{ flex:1;padding:10px 6px;border:0;border-radius:8px;font:inherit;font-size:.8rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut);white-space:nowrap }
+  .tabs button.on{ background:var(--lime);color:#000 }
+  .body{ flex:1;overflow-y:auto;padding:18px 24px 40px }
+  .panel{ display:none } .panel.on{ display:block }
+
+  .sec{ font-size:.72rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:#7c8472;margin:0 0 9px }
+  .card{ background:var(--panel);border:1px solid var(--bd);border-radius:13px;padding:15px 16px;margin-bottom:16px }
+  .l{ display:block;font-size:.72rem;font-weight:800;color:var(--mut);margin:0 0 5px;text-transform:uppercase;letter-spacing:.04em }
+  .i{ width:100%;background:#0b0d0a;border:1px solid var(--bd);border-radius:9px;color:#f0f2ec;padding:11px 12px;font:inherit;font-size:.9rem }
+  .i:focus{ outline:none;border-color:var(--lime) }
+  .frow{ margin-bottom:12px } .row2{ display:flex;gap:10px } .row2>*{ flex:1 }
+  .btn-lime{ background:var(--lime);color:#000;border:0;border-radius:9999px;padding:12px 20px;font:inherit;font-weight:800;cursor:pointer }
+  .btn-wide{ width:100% }
+  .btn-danger{ background:transparent;border:1px solid rgba(255,92,71,.5);color:var(--red);border-radius:9999px;padding:11px 20px;font:inherit;font-weight:800;cursor:pointer }
+  .help{ font-size:.76rem;color:#6e756699;color:#7c8472;line-height:1.5;margin:6px 0 0 }
+  .rost{ display:grid;grid-template-columns:1fr 1fr;gap:8px }
+  .pl{ display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;font-size:.85rem }
+  .av{ width:26px;height:26px;border-radius:50%;background:#23271c;display:flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:800;border:1.5px solid var(--bd);flex:none }
+  .av.paid{ border-color:var(--lime);color:var(--lime) }
+  .scoreCta{ text-align:center;padding:26px 18px;background:linear-gradient(135deg,rgba(184,255,44,.12),rgba(23,215,176,.06));border:1px solid rgba(184,255,44,.3);border-radius:14px }
+  .note{ font-size:.85rem;color:var(--mut);line-height:1.6 }
+  .hintbar{ font-size:.8rem;color:var(--teal);background:rgba(23,215,176,.08);border:1px solid rgba(23,215,176,.25);border-radius:10px;padding:10px 13px;margin-bottom:16px }
+  @media(max-width:760px){ .side{display:none} .main{padding:22px 16px} .rost{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="mk">DS</div><div><div class="lad">LADDER</div><div class="adm">ADMIN</div></div></div>
+    <a class="navi">Dashboard</a>
+    <a class="navi on">Ladders</a>
+    <a class="navi">Players</a>
+    <a class="navi">Scoring</a>
+    <a class="navi">XP &amp; rewards</a>
+    <a class="navi">Import</a>
+    <a class="navi">Settings</a>
+    <button class="scorepill">Ladder scoring</button>
+  </aside>
+
+  <main class="main">
+    <h1>Ladders</h1>
+    <div class="seg"><button class="on">All ladders</button><button>+ Create new</button></div>
+
+    <div class="hintbar">New: tap any row to manage it. Open ladders show a quick <b>Remind</b> pill to send reminders without opening the ladder.</div>
+
+    <div class="list" id="list"></div>
+  </main>
+</div>
+
+<!-- remind popover (shared, repositioned per row) -->
+<div class="pop" id="pop">
+  <div class="ph">Send reminder to roster</div>
+  <button onclick="doRemind('2 days out')"><span>2 days out</span><span style="color:#5e655a">›</span></button>
+  <button onclick="doRemind('Morning of')"><span>Morning of (5am)</span><span style="color:#5e655a">›</span></button>
+  <button onclick="doRemind('3 hours out')"><span>3 hours out</span><span style="color:#5e655a">›</span></button>
+</div>
+
+<!-- manage sheet -->
+<div class="backdrop" id="bd" onclick="closeManage()"></div>
+<div class="sheet" id="sheet">
+  <div class="hd">
+    <button class="x" onclick="closeManage()">×</button>
+    <h2 id="mTitle">Thursday Night</h2>
+    <div class="meta" id="mMeta">2026-07-02 · 6:30pm · SBTC · roster 7/12 · 5 left</div>
+    <div class="tabs">
+      <button id="t-info" class="on" onclick="tab('info')">Ladder Info</button>
+      <button id="t-roster" onclick="tab('roster')">Roster</button>
+      <button id="t-rem" onclick="tab('rem')">Reminders</button>
+      <button id="t-score" onclick="tab('score')">Ladder Scoring</button>
+    </div>
+  </div>
+  <div class="body">
+
+    <!-- LADDER INFO -->
+    <div class="panel on" id="p-info">
+      <div class="sec">Ladder details</div>
+      <div class="frow"><label class="l">Name</label><input class="i" value="Thursday Night"></div>
+      <div class="frow row2">
+        <div><label class="l">Date</label><input class="i" type="date" value="2026-07-02"></div>
+        <div><label class="l">Start</label><input class="i" value="6:30pm"></div>
+        <div><label class="l">End</label><input class="i" value="8:30pm"></div>
+      </div>
+      <div class="frow"><label class="l">Location</label><input class="i" value="SBTC"></div>
+      <div class="frow row2">
+        <div><label class="l">Division</label><input class="i" value="Mixed"></div>
+        <div><label class="l">Courts</label><input class="i" type="number" value="3"></div>
+        <div><label class="l">Players</label><input class="i" type="number" value="12"></div>
+      </div>
+      <div class="frow row2">
+        <div><label class="l">Entry fee ($)</label><input class="i" type="number" value="9"></div>
+        <div><label class="l">Rounds</label><input class="i" type="number" value="6"></div>
+        <div><label class="l">Round (min)</label><input class="i" type="number" value="12"></div>
+      </div>
+      <button class="btn-lime btn-wide" style="margin-top:4px">Save changes</button>
+
+      <div class="sec" style="margin:26px 0 9px">Status</div>
+      <div class="note" style="margin-bottom:18px">Currently <b style="color:var(--lime)">Open</b>. Automatic: Open until the start date, Live while scoring, Final when you finish the ladder.</div>
+
+      <div class="sec" style="color:var(--red)">Danger zone</div>
+      <div class="card" style="border-color:rgba(255,92,71,.3)">
+        <div class="note" style="margin-bottom:12px">Deleting removes the ladder, its roster, and scores. This can't be undone.</div>
+        <button class="btn-danger">Delete ladder</button>
+      </div>
+    </div>
+
+    <!-- ROSTER -->
+    <div class="panel" id="p-roster">
+      <div class="card">
+        <div class="sec">Add players</div>
+        <input class="i" placeholder="Search existing players…">
+        <div class="sec" style="margin:16px 0 8px">Or add a new player</div>
+        <div class="row2"><input class="i" placeholder="Player name"><input class="i" style="max-width:80px" placeholder="M/F"></div>
+        <input class="i" style="margin-top:10px" placeholder="Email (optional — links stats &amp; profile)">
+        <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--mut);margin:10px 0"><input type="checkbox"> Paid (cash)</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;color:var(--mut);margin:0 0 12px"><input type="checkbox"> ✉ Email a payment link (card / Venmo)</label>
+        <button class="btn">Add to roster</button>
+      </div>
+      <div class="sec">Roster · 7 of 12</div>
+      <div class="rost" id="rost"></div>
+      <div class="sec" style="margin:18px 0 9px">Waitlist · 0</div>
+      <div class="note">No one waiting — 5 spots still open.</div>
+    </div>
+
+    <!-- REMINDERS -->
+    <div class="panel" id="p-rem">
+      <div class="sec">Send a reminder now</div>
+      <div class="card">
+        <div class="row2">
+          <select class="i"><option>2 days out</option><option>Morning of (5am)</option><option>3 hours out</option></select>
+          <button class="btn-lime" style="flex:none">Send to roster</button>
+        </div>
+        <div class="help">Emails everyone registered right now — the field, each player's last-ladder line, court #s, a cancel link, and the next ladder. Auto-sends still fire 2 days out, 5am day-of, and 3 hours out.</div>
+      </div>
+
+      <div class="sec" style="margin-top:6px">Recruit players</div>
+      <div class="card">
+        <div class="row2">
+          <input class="i" type="number" placeholder="Players needed (auto = open spots)">
+          <button class="btn-lime" style="flex:none">Email past players</button>
+        </div>
+        <button class="btn btn-wide" style="margin-top:10px">Announce all open ladders to past players</button>
+        <div class="help">Emails everyone who's ever played a ladder. Recruit targets this ladder (skips those already in); Announce lists every open upcoming ladder.</div>
+      </div>
+    </div>
+
+    <!-- LADDER SCORING -->
+    <div class="panel" id="p-score">
+      <div class="scoreCta">
+        <div style="font-size:1.05rem;font-weight:900;margin-bottom:4px">Run the night</div>
+        <div class="note" style="margin-bottom:16px">Open the live scoreboard to seed courts, run rounds, and enter scores. Finishing here marks the ladder Final and triggers the recap draft.</div>
+        <button class="btn-lime btn-wide">Open ladder scoring →</button>
+      </div>
+      <div class="sec" style="margin-top:20px">At a glance</div>
+      <div class="row2">
+        <div class="card" style="text-align:center;margin:0"><div style="font-size:1.5rem;font-weight:900;color:var(--lime)">3</div><div class="l" style="margin:4px 0 0">Courts</div></div>
+        <div class="card" style="text-align:center;margin:0"><div style="font-size:1.5rem;font-weight:900;color:var(--teal)">6</div><div class="l" style="margin:4px 0 0">Rounds</div></div>
+        <div class="card" style="text-align:center;margin:0"><div style="font-size:1.5rem;font-weight:900">Not&nbsp;started</div><div class="l" style="margin:4px 0 0">Tonight</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const LADDERS=[
+  {n:'Thursday Night', d:'2026-07-02 · 6:30pm · SBTC · $9', ct:'7/12 · 0 waitlist', s:'open'},
+  {n:'6/25 Ladder Challenge', d:'2026-06-25 · 6:30 PM · SBTC · $9', ct:'12/12 · 0 waitlist', s:'final'},
+  {n:'Saturday Morning 6/20', d:'2026-06-20 · 08:30 · SBTC · $0', ct:'12/12 · 0 waitlist', s:'final'},
+  {n:'TNL 6/20', d:'2026-06-18 · 18:30 · SBTC · $0', ct:'12/12 · 0 waitlist', s:'final'},
+  {n:'TNL 6/16', d:'2026-06-16 · 18:30 · SBTC · $0', ct:'12/12 · 0 waitlist', s:'final'},
+  {n:'TNL - 6/2', d:'2026-06-02 · 18:30 · SBTC · $0', ct:'12/12 · 0 waitlist', s:'final'},
+  {n:'Dink Party', d:'2026-05-30 · 12:00 · $0', ct:'20/20 · 0 waitlist', s:'final'},
+  {n:'Monday Memorial Madness 5/25', d:'2026-05-25 · 17:00 · SBTC · $0', ct:'20/20 · 0 waitlist', s:'final'},
+];
+const ROSTER=[['Marcus L',1],['Priya N',1],['Dev R',1],['Sam K',1],['Jordan T',0],['Alex M',1],['Casey W',0]];
+
+function rowHtml(l,i){
+  const right = l.s==='open'
+    ? `<button class="btn remind" onclick="openRemind(event,${i})">Remind</button>`
+    : `<button class="btn" onclick="event.stopPropagation();toast('Opening recap…')">Recap</button>`;
+  return `<div class="row" onclick="openManage(${i})">
+    <div class="nm"><div class="t">${l.n}</div><div class="d">${l.d}</div></div>
+    <div class="ct">${l.ct}<br><span class="pill ${l.s}">${l.s}</span></div>
+    ${right}
+    <span class="chev">›</span>
+  </div>`;
+}
+document.getElementById('list').innerHTML=LADDERS.map(rowHtml).join('');
+
+/* remind pill popover */
+const pop=document.getElementById('pop');
+function openRemind(e,i){
+  e.stopPropagation();
+  const r=e.currentTarget.getBoundingClientRect();
+  pop.style.top=(window.scrollY+r.bottom+8)+'px';
+  pop.style.right=(window.innerWidth-r.right)+'px';
+  pop.classList.add('on');
+}
+function doRemind(kind){ pop.classList.remove('on'); toast('Reminder sent · '+kind); }
+document.addEventListener('click',e=>{ if(!pop.contains(e.target) && !e.target.classList.contains('remind')) pop.classList.remove('on'); });
+
+/* manage sheet */
+function openManage(i){
+  const l=LADDERS[i];
+  document.getElementById('mTitle').textContent=l.n;
+  document.getElementById('mMeta').textContent=l.d.replace(/ · \$\d+/,'')+' · roster '+l.ct.split(' · ')[0];
+  // open ladders default to Roster (the common task); finals open on Ladder Info
+  tab(l.s==='open'?'roster':'info');
+  document.getElementById('bd').classList.add('on');
+  document.getElementById('sheet').classList.add('on');
+}
+function closeManage(){ document.getElementById('bd').classList.remove('on'); document.getElementById('sheet').classList.remove('on'); }
+function tab(k){
+  ['info','roster','rem','score'].forEach(x=>{
+    document.getElementById('p-'+x).classList.toggle('on',x===k);
+    document.getElementById('t-'+x).classList.toggle('on',x===k);
+  });
+}
+document.getElementById('rost').innerHTML=ROSTER.map(([n,p])=>`<div class="pl"><span class="av ${p?'paid':''}">${n.split(' ').map(x=>x[0]).join('')}</span>${n}</div>`).join('');
+
+/* toast */
+let tt;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(tt); tt=setTimeout(()=>t.classList.remove('on'),2200); }
+</script>
+</body>
+</html>

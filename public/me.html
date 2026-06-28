@@ -691,6 +691,26 @@
 </head>
 <body>
 
+  <!-- Owner impersonation banner: shows when viewing the portal as another player -->
+  <script>
+  (function(){
+    function readVA(){ try{ var m=document.cookie.match(/(?:^|; )ds_view_as=([^;]+)/); return m?JSON.parse(decodeURIComponent(m[1])):null; }catch(e){ return null; } }
+    var va=readVA(); if(!va||!va.name) return;
+    function esc(s){ return String(s||'').replace(/[<>&]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;'}[c];}); }
+    function mk(){
+      if(document.getElementById('ds-viewas-bar')) return;
+      var bar=document.createElement('div'); bar.id='ds-viewas-bar';
+      bar.style.cssText='position:fixed;top:0;left:0;right:0;z-index:99999;background:#b8ff2c;color:#06210f;font:700 13px/1.3 Inter,system-ui,sans-serif;display:flex;align-items:center;justify-content:center;gap:12px;padding:8px 14px;box-shadow:0 2px 12px rgba(0,0,0,.45)';
+      bar.innerHTML='<span>Viewing as <b>'+esc(va.name)+'</b> · impersonating</span>';
+      var btn=document.createElement('button'); btn.textContent='Exit';
+      btn.style.cssText='background:#06210f;color:#b8ff2c;border:0;border-radius:9999px;font:800 12px Inter,system-ui,sans-serif;padding:5px 14px;cursor:pointer';
+      btn.onclick=function(){ btn.textContent='Exiting…'; fetch('/.netlify/functions/player-logout',{method:'POST',credentials:'include'}).catch(function(){}).then(function(){ document.cookie='ds_view_as=; Path=/; Max-Age=0'; location.href='/admin-ladders'; }); };
+      bar.appendChild(btn); document.body.appendChild(bar); document.body.style.paddingTop='40px';
+    }
+    if(document.body) mk(); else document.addEventListener('DOMContentLoaded',mk);
+  })();
+  </script>
+
   <!-- BOOT -->
   <div id="boot" class="center">Loading…</div>
 

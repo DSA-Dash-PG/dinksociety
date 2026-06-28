@@ -73,10 +73,25 @@ export default async (req) => {
           html,
         });
       }));
-      const sent = results.filter(r => r.status === 'fulfilled' && !(r.value && r.value.skipped)).length;
-      const failed = results.length - sent;
+
+      // Classify each recipient so the panel can show WHO didn't get the email,
+      // and split genuine send failures from opt-outs (recap unsubscribes come
+      // back as { skipped:true } and must not be mistaken for delivery errors).
+      const optedOut = [];
+      const errored = [];
+      results.forEach((r, i) => {
+        const rcpt = recipients[i];
+        const who = { name: rcpt.name || rcpt.email, email: rcpt.email };
+        if (r.status === 'fulfilled' && r.value && r.value.skipped) {
+          optedOut.push(who);
+        } else if (r.status === 'rejected') {
+          errored.push({ ...who, reason: String((r.reason && r.reason.message) || r.reason || 'send failed') });
+        }
+      });
+      const sent = results.length - optedOut.length - errored.length;
       await markRecapSent(eventId, sent);
-      return json({ ok: true, sent, failed });
+      // `failed` kept for backward compat = anyone who didn't receive it.
+      return json({ ok: true, sent, failed: optedOut.length + errored.length, optedOut, errored });
     }
 
     return json({ error: 'unknown action' }, 400);
