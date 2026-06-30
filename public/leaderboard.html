@@ -386,9 +386,13 @@
     filter = filter || state.filter;
     searchQ = (searchQ !== undefined ? searchQ : state.search).toLowerCase();
     const gf = state.genderFilter || 'all';
+    // Gendered game-type tabs (Women's / Men's) also restrict the player list:
+    // only women play women's doubles, only men play men's. Mixed/All keep both.
+    const typeGender = filter === 'womens' ? 'F' : filter === 'mens' ? 'M' : null;
     const rows = playerList()
       .filter(p => !searchQ || p.name.toLowerCase().includes(searchQ) || (p.teamName||'').toLowerCase().includes(searchQ))
       .filter(p => gf === 'all' || lbGenderOf(p) === gf)
+      .filter(p => !typeGender || lbGenderOf(p) === typeGender)
       .map(p => {
         // GP / WON / LOSS respect the active game-type filter
         const s = filter === 'all'
