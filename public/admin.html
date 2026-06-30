@@ -934,7 +934,7 @@
 
           <!-- Broadcast composer (hidden until opened) -->
           <div class="ac" id="msg-broadcast-card" style="display:none;">
-            <div class="ac__h"><h2 class="ac__t">Broadcast to captains</h2></div>
+            <div class="ac__h"><h2 class="ac__t">Broadcast to the league</h2></div>
             <div class="arow">
               <div class="af">
                 <label for="bc-scope">Send to</label>
@@ -951,9 +951,9 @@
               <div class="af">
                 <label for="bc-audience">Audience (who sees it)</label>
                 <select id="bc-audience">
-                  <option value="captains">Captains only</option>
+                  <option value="players" selected>All players</option>
                   <option value="cocaptains">Captains + co-captains</option>
-                  <option value="players">All players</option>
+                  <option value="captains">Captains only</option>
                 </select>
                 <div style="font-size:10px;color:var(--color-text-faint);margin-top:4px;line-height:1.4;">"All players" shows on every player's home + emails them. "Captains" stays in the captain portal.</div>
               </div>
@@ -3449,6 +3449,12 @@
     if (scope === 'teams') {
       payload.teamIds = [...document.querySelectorAll('.bc-team-cb:checked')].map(c => c.value);
       if (!payload.teamIds.length) { status.style.display = 'block'; status.className = 'a-status is-err'; status.textContent = 'Pick at least one team.'; return; }
+    }
+
+    // Guard the footgun: a wide send addressed to captains only never reaches players.
+    if (payload.audience === 'captains' && (scope === 'all' || scope === 'division')) {
+      const where = scope === 'all' ? 'every team' : 'this division';
+      if (!confirm(`Heads up: Audience is "Captains only", so this goes to the captains of ${where} — not the players. Send anyway?`)) { return; }
     }
 
     const btn = $id('bc-send'); btn.disabled = true;
