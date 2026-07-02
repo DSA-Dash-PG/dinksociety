@@ -138,6 +138,25 @@
       .ml-score { min-width: 62px; font-size: 13px; }
     }
 
+    /* ── Split ratings + DSR trend ── */
+    .mlp-card--dsr  .mlp-card__val { color: var(--color-lime); }
+    .mlp-card--gdsr .mlp-card__val { color: var(--color-teal); }
+    .mlp-card--xdsr .mlp-card__val { color: #a78bfa; }
+    .mlp-card.is-unq::after { content: 'UNQ'; position: absolute; top: 7px; right: 7px; font-size: 8px; font-weight: 800; letter-spacing: 0.06em; color: var(--color-text-faint); background: var(--color-surface); border: 1px solid var(--color-border); padding: 2px 5px; border-radius: 4px; }
+    .trend-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .trend-chip { font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-faint); cursor: pointer; font-family: inherit; }
+    .trend-chip.on { border-color: currentColor; }
+    .trend-seg { display: flex; gap: 4px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px; }
+    .trend-seg button { border: 0; background: transparent; color: var(--color-text-faint); font: inherit; font-size: 11px; font-weight: 800; padding: 5px 13px; border-radius: var(--radius-full); cursor: pointer; }
+    .trend-seg button.on { background: var(--color-teal); color: #06231d; }
+    .trend-wrap { position: relative; }
+    .trend-wrap svg { width: 100%; height: auto; display: block; }
+    .trend-tip { position: absolute; pointer-events: none; background: var(--color-bg, #0b0e0c); border: 1px solid var(--color-border); border-radius: 10px; padding: 9px 11px; font-size: 11px; line-height: 1.5; min-width: 130px; opacity: 0; transform: translate(-50%, -110%); transition: opacity 0.12s; z-index: 5; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+    .trend-tip.show { opacity: 1; }
+    .trend-tip .tt-wk { font-weight: 800; color: var(--color-lime); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 3px; }
+    .trend-legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; font-size: 11px; color: var(--color-text-muted); align-items: center; }
+    .trend-legend .sw { display: inline-block; width: 16px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+
     /* ── Season history ── */
     .history-list { display: flex; flex-direction: column; gap: 0; }
     .history-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
@@ -340,10 +359,13 @@
       }
 
       // ── Ranking: league-wide, by DSR (composite), overall + within gender ──
+      // Rank pools only include QUALIFIED players (≥ half the possible games,
+      // p.dsrQualified from the standings rebuild). Blobs built before the
+      // qualification field existed treat everyone as qualified.
       const norm = g => { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; };
       const myGender = norm(pStat?.gender || rosterPlayer.gender);
       const dsr = pStat?.composite;
-      const withDsr = allP.filter(p => p.composite != null);
+      const withDsr = allP.filter(p => p.composite != null && p.dsrQualified !== false);
       let overallRank = null, genderRank = null;
       if (dsr != null && pStat) {
         const oSorted = [...withDsr].sort((a, b) => b.composite - a.composite);
@@ -352,7 +374,7 @@
         genderRank = gSorted.indexOf(pStat) + 1 || null;
       }
       const genderLabel = myGender === 'F' ? "Women's Ranking" : myGender === 'M' ? "Men's Ranking" : 'Division Ranking';
-      const ranks = { dsr, overallRank, genderRank, genderLabel };
+      const ranks = { dsr, overallRank, genderRank, genderLabel, unqualified: pStat?.dsrQualified === false, myGender };
 
       // ── Derived MLP-style metrics ──
       const playersMap = pstats?.players || {};
@@ -384,28 +406,63 @@
       const metrics = { avgPartnerDsr, avgOpponentDsr, opponentCount, pointsWonPct };
 
       // Annotate each logged game with SNAPSHOT DSRs — each player's season-to-
-      // date DSR as of that game's week (dsrHistory, written by rebuildStandings),
-      // falling back to the current composite for blobs built before the rebuild.
-      const dsrAt = (pid, week) => {
+      // date rating as of that game's week (dsrHistory from the standings
+      // rebuild), using the rating for that game's DISCIPLINE: Mixed games
+      // compare Mixed DSR, gender-line games compare Men's/Women's DSR, each
+      // falling back to the overall snapshot while a split is still thin.
+      // Returns { v, snap } — snap=false means no weekly history existed and we
+      // fell back to the CURRENT composite (label it honestly, see render).
+      const dsrAt = (pid, week, type) => {
         const hist = playersMap[pid]?.dsrHistory;
         if (Array.isArray(hist) && hist.length && week != null) {
           let best = null;
           for (const h of hist) if (h.week <= week && (!best || h.week > best.week)) best = h;
-          if (best) return best.dsr;
+          if (best) {
+            const v = type === 'mixed' ? (best.xDsr ?? best.dsr)
+                    : (type === 'mens' || type === 'womens') ? (best.gDsr ?? best.dsr)
+                    : best.dsr;
+            if (v != null) return { v, snap: true };
+          }
         }
-        return playersMap[pid]?.composite ?? null;
+        const cur = playersMap[pid]?.composite;
+        return cur != null ? { v: cur, snap: false } : null;
       };
       for (const g of gameLog) {
-        g.myDsr = resolvedId ? dsrAt(resolvedId, g.week) : null;
-        const comps = (g.oppIds || []).map(pid => dsrAt(pid, g.week)).filter(c => c != null);
-        g.oppDsr = comps.length ? comps.reduce((s, c) => s + c, 0) / comps.length : null;
+        const mine = resolvedId ? dsrAt(resolvedId, g.week, g.type) : null;
+        g.myDsr = mine?.v ?? null;
+        const oppRes = (g.oppIds || []).map(pid => dsrAt(pid, g.week, g.type)).filter(Boolean);
+        g.oppDsr = oppRes.length ? oppRes.reduce((s, r) => s + r.v, 0) / oppRes.length : null;
+        g.isSnap = !!(mine?.snap && oppRes.length && oppRes.every(r => r.snap));
         const pn = g.partnerId ? playersMap[g.partnerId] : null;
         if (pn && !g.partnerName) g.partnerName = pn.name;
         g.partnerTeamName = pn?.teamName || null;
         g._oppTeams = (g.oppIds || []).map(pid => playersMap[pid]?.teamName || null);
       }
 
-      render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics, gameLog);
+      // ── DSR trend data: this player's weekly snapshots + league average ──
+      let trend = null;
+      const myHist = pStat?.dsrHistory;
+      if (Array.isArray(myHist) && myHist.length) {
+        const avgByWeek = {};
+        for (const p of allP) {
+          for (const h of (p.dsrHistory || [])) {
+            if (h.dsr == null) continue;
+            (avgByWeek[h.week] ||= []).push(h.dsr);
+          }
+        }
+        const leagueAvg = {};
+        for (const [wk, vals] of Object.entries(avgByWeek)) {
+          leagueAvg[wk] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10;
+        }
+        trend = {
+          hist: myHist,
+          leagueAvg,
+          genderLabel: myGender === 'F' ? "Women's" : "Men's",
+          totalWeeks: Math.max(8, ...myHist.map(h => h.week)),
+        };
+      }
+
+      render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics, gameLog, trend);
 
       // Load badge data first (config + grants) so the tabs can show the right
       // crest + pills per view, and house everything in a Trophy Case tab.
@@ -519,7 +576,7 @@
     }
 
     /* ─── Render ──────────────────────────────────────────── */
-    function render(rp, team, teamSlug, stat, history, ranks = {}, metrics = {}, gameLog = []) {
+    function render(rp, team, teamSlug, stat, history, ranks = {}, metrics = {}, gameLog = [], trend = null) {
       const color    = avatarColor(team.name || rp.name);
 
       let html = '';
@@ -554,10 +611,12 @@
       ].filter(([, v]) => v != null && v !== '');
       const vitals = vitalDefs.map(([l, v]) => vital(l, v)).join('');
 
-      const rankLine = [
-        ranks.genderRank != null ? `${fmtRank(ranks.genderRank)} ${ranks.genderLabel.replace(' Ranking','')}` : null,
-        ranks.overallRank != null ? `${fmtRank(ranks.overallRank)} Overall` : null,
-      ].filter(Boolean).join(' · ');
+      const rankLine = ranks.unqualified
+        ? 'Unqualified · under half of possible games'
+        : [
+            ranks.genderRank != null ? `${fmtRank(ranks.genderRank)} ${ranks.genderLabel.replace(' Ranking','')}` : null,
+            ranks.overallRank != null ? `${fmtRank(ranks.overallRank)} Overall` : null,
+          ].filter(Boolean).join(' · ');
 
       html += `<div class="mlp-hero">
         <div class="mlp-hero__top">
@@ -583,9 +642,28 @@
         const apd   = metrics.avgPartnerDsr;
         const aod   = metrics.avgOpponentDsr;
         const card = (val, lbl, sub, cls = '') => `<div class="mlp-card ${cls}"><div class="mlp-card__val">${val}</div><div class="mlp-card__lbl">${lbl}</div>${sub ? `<div class="mlp-card__sub">${sub}</div>` : ''}</div>`;
+        const bt0  = (s, t) => s.byType?.[t]?.played || 0;
+
+        // ── Ratings row: overall + gender-line + Mixed DSR ──
+        // Label follows the player: Men's DSR / Women's DSR. Unqualified
+        // ratings (under half of possible games) show UNQ and no rank.
+        const gLbl = ranks.myGender === 'F' ? "Women's" : "Men's";
+        const gType = ranks.myGender === 'F' ? 'womens' : 'mens';
+        const ratingSub = (games, rank, qualified) => {
+          if (!games) return 'no games yet';
+          const g = `${games} game${games === 1 ? '' : 's'}`;
+          if (qualified === false) return `${g} · unqualified`;
+          return rank != null ? `${g} · #${rank}` : g;
+        };
+        const ratingsRow = `<div class="mlp-cards mlp-cards--3">
+          ${card(`<span>${fmtDsr(stat.composite)}</span>`, 'DSR (Overall)', ratingSub(stat.gamesPlayed, ranks.overallRank, stat.dsrQualified), 'mlp-card--dsr' + (stat.dsrQualified === false ? ' is-unq' : ''))}
+          ${card(`<span>${fmtDsr(stat.dsrGender)}</span>`, `${gLbl} DSR`, ratingSub(bt0(stat, gType), stat.dsrGenderRank, stat.dsrGenderQualified), 'mlp-card--gdsr' + (stat.dsrGenderQualified === false ? ' is-unq' : ''))}
+          ${card(`<span>${fmtDsr(stat.dsrMixed)}</span>`, 'Mixed DSR', ratingSub(bt0(stat, 'mixed'), stat.dsrMixedRank, stat.dsrMixedQualified), 'mlp-card--xdsr' + (stat.dsrMixedQualified === false ? ' is-unq' : ''))}
+        </div>`;
 
         html += `<div class="mlp-panel">
           <div class="mlp-panel__h">Current Season Stats</div>
+          ${ratingsRow}
           <div class="mlp-cards mlp-cards--4">
             ${card(`<span class="val--green">${gwPct}%</span>`, 'Games Won %', `${stat.gamesWon} W – ${stat.gamesLost} L`)}
             ${card(`<span class="val--teal">${ptPct != null ? ptPct + '%' : '—'}</span>`, 'Points Won %', `${stat.ps} – ${stat.pa}`)}
@@ -621,6 +699,34 @@
 
       // Chef of the Week wins now live in the Trophy Case tab, so the inline
       // awards card has been removed to avoid duplicating them here.
+
+      /* ── DSR TREND — weekly snapshots, drawn after inject (see wireTrend) ── */
+      if (trend && trend.hist.length) {
+        html += `<div class="pp-card" id="dsr-trend-card">
+          <div class="ml-head-row">
+            <div class="pp-card__head">📈 DSR Trend</div>
+            <div class="trend-controls">
+              <button type="button" class="trend-chip on" data-line="all" style="color:var(--color-lime)">Overall</button>
+              <button type="button" class="trend-chip" data-line="gender" style="color:var(--color-teal)">${esc(trend.genderLabel)}</button>
+              <button type="button" class="trend-chip" data-line="mixed" style="color:#a78bfa">Mixed</button>
+              <div class="trend-seg" id="trend-seg">
+                <button type="button" class="on" data-mode="dsr">DSR</button>
+                <button type="button" data-mode="rank">Rank</button>
+              </div>
+            </div>
+          </div>
+          <div class="trend-wrap">
+            <svg id="trend-svg" viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="trend-tip" id="trend-tip"></div>
+          </div>
+          <div class="trend-legend">
+            <span><span class="sw" style="background:var(--color-lime)"></span>Overall</span>
+            <span id="tl-gender" style="display:none"><span class="sw" style="background:var(--color-teal)"></span>${esc(trend.genderLabel)}</span>
+            <span id="tl-mixed" style="display:none"><span class="sw" style="background:#a78bfa"></span>Mixed</span>
+            <span><span class="sw" style="border-top:2px dashed var(--color-text-faint);background:transparent"></span>League avg</span>
+          </div>
+        </div>`;
+      }
 
       /* ── MATCH LOG — every game, grouped by week ── */
       if (gameLog.length) {
@@ -659,11 +765,17 @@
               const dsrCell = (g.myDsr != null && g.oppDsr != null)
                 ? `<span class="${g.myDsr >= g.oppDsr ? 'val--green' : 'val--red'}">${Number(g.myDsr).toFixed(1)}</span> <span class="ml-lbl" style="display:inline">v</span> ${g.oppDsr.toFixed(1)}`
                 : '—';
+              // Honest labeling: only claim a week snapshot when one actually
+              // exists — otherwise the values are today's ratings.
+              const discLbl = g.type === 'mixed' ? 'Mixed' : (TYPE_LBL[g.type] || '');
+              const dsrLbl = g.isSnap
+                ? `Wk ${g.week ?? '—'} ${discLbl} DSR you v them`
+                : 'Current DSR you v them';
               const wl = g.won === true ? '<span class="ml-wl ml-wl--w">W</span>' : g.won === false ? '<span class="ml-wl ml-wl--l">L</span>' : '';
               return `<div class="ml-row">
                 <span class="ml-type">R${g.round} ${TYPE_LBL[g.type] || g.type}</span>
                 <div class="ml-who"><span class="ml-lbl">w/</span> ${partnerLink} <span class="ml-lbl">vs</span> ${oppLinks}</div>
-                <div class="ml-dsr"><span class="ml-lbl">Wk ${g.week ?? '—'} DSR you v them</span>${dsrCell}</div>
+                <div class="ml-dsr"><span class="ml-lbl">${dsrLbl}</span>${dsrCell}</div>
                 <div class="ml-score">${g.myScore}–${g.oppScore}${wl}</div>
               </div>`;
             }).join('')}
@@ -811,6 +923,146 @@
           });
         });
       }
+
+      // ── DSR Trend chart (weekly snapshots from dsrHistory) ──
+      if (trend && document.getElementById('dsr-trend-card')) wireTrend(trend);
+    }
+
+    /* ─── DSR trend chart ─────────────────────────────────── */
+    function wireTrend(trend) {
+      const svg = document.getElementById('trend-svg');
+      const tip = document.getElementById('trend-tip');
+      const cardEl = document.getElementById('dsr-trend-card');
+      if (!svg || !cardEl) return;
+
+      const TOTAL = trend.totalWeeks;
+      const byWeek = {};
+      for (const h of trend.hist) byWeek[h.week] = h;
+
+      // Series definitions: value + rank pickers per line
+      const SERIES = {
+        all:    { name: 'Overall', color: '#b8ff2c', width: 3, v: h => h.dsr,  r: h => h.rank },
+        gender: { name: trend.genderLabel, color: '#17d7b0', width: 2, v: h => h.gDsr, r: h => h.gRank },
+        mixed:  { name: 'Mixed', color: '#a78bfa', width: 2, v: h => h.xDsr, r: h => h.xRank },
+      };
+      let mode = 'dsr';
+      const show = { all: true, gender: false, mixed: false };
+
+      const W = 720, H = 300, PL = 44, PR = 16, PT = 18, PB = 34;
+      const xFor = wk => PL + (wk - 1) * ((W - PL - PR) / Math.max(1, TOTAL - 1));
+
+      // Points for a series in the current mode: [{wk, val}] (nulls skipped)
+      const pts = k => {
+        const out = [];
+        for (let wk = 1; wk <= TOTAL; wk++) {
+          const h = byWeek[wk]; if (!h) continue;
+          const val = mode === 'rank' ? SERIES[k].r(h) : SERIES[k].v(h);
+          if (val != null) out.push({ wk, val });
+        }
+        return out;
+      };
+
+      function bounds() {
+        let vals = [];
+        for (const k of Object.keys(SERIES)) if (show[k]) vals = vals.concat(pts(k).map(p => p.val));
+        if (mode === 'rank') {
+          const hi = Math.max(10, ...(vals.length ? vals : [10]));
+          return { lo: 1, hi };
+        }
+        for (const [, avg] of Object.entries(trend.leagueAvg || {})) vals.push(avg);
+        if (!vals.length) vals = [0, 100];
+        const lo = Math.max(0, Math.floor(Math.min(...vals) / 10) * 10 - 5);
+        const hi = Math.ceil(Math.max(...vals) / 10) * 10 + 5;
+        return { lo, hi: hi > lo ? hi : lo + 10 };
+      }
+      const yFor = (v, b) => {
+        const t = (v - b.lo) / (b.hi - b.lo);
+        return PT + (mode === 'rank' ? t : 1 - t) * (H - PT - PB);
+      };
+      // Segmented path — breaks on missing weeks so gaps don't draw fake lines.
+      const pathFor = (points, b) => {
+        let d = '', prevWk = null;
+        for (const p of points) {
+          const cmd = (prevWk != null && p.wk === prevWk + 1) ? 'L' : 'M';
+          d += `${cmd}${xFor(p.wk).toFixed(1)},${yFor(p.val, b).toFixed(1)} `;
+          prevWk = p.wk;
+        }
+        return d.trim();
+      };
+
+      function draw() {
+        const b = bounds();
+        let s = '';
+        for (let i = 0; i <= 4; i++) {
+          const v = b.lo + (b.hi - b.lo) * i / 4;
+          const y = yFor(v, b);
+          s += `<line x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}" stroke="var(--color-border)" stroke-width="1"/>`;
+          s += `<text x="${PL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--color-text-faint)" font-weight="600">${mode === 'rank' ? '#' + Math.round(v) : v.toFixed(0)}</text>`;
+        }
+        const lastWk = Math.max(...trend.hist.map(h => h.week));
+        if (lastWk < TOTAL) {
+          s += `<rect x="${xFor(lastWk)}" y="${PT}" width="${xFor(TOTAL) - xFor(lastWk)}" height="${H - PT - PB}" fill="rgba(255,255,255,0.02)"/>`;
+        }
+        for (let wk = 1; wk <= TOTAL; wk++) {
+          s += `<text x="${xFor(wk)}" y="${H - 12}" text-anchor="middle" font-size="9.5" fill="var(--color-text-faint)" font-weight="700" ${wk > lastWk ? 'opacity="0.45"' : ''}>Wk ${wk}</text>`;
+        }
+        if (mode === 'dsr' && trend.leagueAvg) {
+          const avgPts = [];
+          for (let wk = 1; wk <= TOTAL; wk++) if (trend.leagueAvg[wk] != null) avgPts.push({ wk, val: trend.leagueAvg[wk] });
+          if (avgPts.length) s += `<path d="${pathFor(avgPts, b)}" fill="none" stroke="var(--color-text-faint)" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.7"/>`;
+        }
+        for (const k of Object.keys(SERIES)) {
+          if (!show[k]) continue;
+          const sd = SERIES[k], points = pts(k);
+          if (!points.length) continue;
+          s += `<path d="${pathFor(points, b)}" fill="none" stroke="${sd.color}" stroke-width="${sd.width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+          for (const p of points) {
+            s += `<circle class="tdot" data-k="${k}" data-wk="${p.wk}" cx="${xFor(p.wk)}" cy="${yFor(p.val, b)}" r="${k === 'all' ? 5.5 : 4.5}" fill="var(--color-surface)" stroke="${sd.color}" stroke-width="2.5" style="cursor:pointer"/>`;
+          }
+          const last = points[points.length - 1];
+          s += `<text x="${Math.min(xFor(last.wk) + 10, W - 40)}" y="${yFor(last.val, b) - 8}" font-size="12" font-weight="800" fill="${sd.color}">${mode === 'rank' ? '#' + last.val : Number(last.val).toFixed(1)}</text>`;
+        }
+        svg.innerHTML = s;
+
+        svg.querySelectorAll('.tdot').forEach(dot => {
+          dot.addEventListener('mouseenter', () => {
+            const k = dot.dataset.k, wk = +dot.dataset.wk, sd = SERIES[k], h = byWeek[wk];
+            if (!h) return;
+            const v = sd.v(h), r = sd.r(h);
+            let prevV = null;
+            for (let p = wk - 1; p >= 1; p--) { const ph = byWeek[p]; if (ph && sd.v(ph) != null) { prevV = sd.v(ph); break; } }
+            const delta = (v != null && prevV != null) ? Math.round((v - prevV) * 10) / 10 : null;
+            tip.innerHTML = `<div class="tt-wk">Week ${wk} · ${esc(sd.name)}</div>
+              DSR <b>${v != null ? Number(v).toFixed(1) : '—'}</b>${delta != null ? ` <span class="${delta >= 0 ? 'val--green' : 'val--red'}" style="font-weight:800">(${delta >= 0 ? '+' : ''}${delta})</span>` : ''}<br>
+              ${r != null ? `Rank <b>#${r}</b>` : '<span style="color:var(--color-text-faint)">Unranked (unqualified)</span>'}`;
+            const rect = svg.getBoundingClientRect();
+            tip.style.left = (parseFloat(dot.getAttribute('cx')) / W * rect.width) + 'px';
+            tip.style.top = (parseFloat(dot.getAttribute('cy')) / H * rect.height) + 'px';
+            tip.classList.add('show');
+          });
+          dot.addEventListener('mouseleave', () => tip.classList.remove('show'));
+        });
+      }
+
+      document.getElementById('trend-seg').addEventListener('click', e => {
+        const btn = e.target.closest('button'); if (!btn) return;
+        mode = btn.dataset.mode;
+        cardEl.querySelectorAll('#trend-seg button').forEach(x => x.classList.toggle('on', x === btn));
+        draw();
+      });
+      cardEl.querySelectorAll('.trend-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const k = chip.dataset.line;
+          show[k] = !show[k];
+          if (!show.all && !show.gender && !show.mixed) { show[k] = true; return; }
+          chip.classList.toggle('on', show[k]);
+          const lg = document.getElementById('tl-' + k);
+          if (lg) lg.style.display = show[k] ? '' : 'none';
+          draw();
+        });
+      });
+
+      draw();
     }
 
     load().catch(e => { console.error('player load failed', e); const pr = document.getElementById('page-root'); if (pr) pr.innerHTML = '<div class="pp-loading">Couldn’t load this player. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>'; });

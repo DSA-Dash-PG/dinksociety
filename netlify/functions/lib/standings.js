@@ -77,6 +77,7 @@ export async function rebuildStandings(circuit) {
   const playerStats = new Map();
   const weeklyPlayers = {}; // week → Map(pid → weekly game stats) for POW + rank movement
   const weekMeta = {};      // week → { date } for display
+  const finalizedWeeks = new Set(); // regular-season weeks with any finalized match (ranking qualification)
 
   // Seed every rostered player AND every team for this circuit so the
   // leaderboard and standings list everyone (zeroed) even before a single game
@@ -121,6 +122,7 @@ export async function rebuildStandings(circuit) {
       if (match.scheduledAt && (!weekMeta[week] || new Date(match.scheduledAt) < new Date(weekMeta[week].date))) {
         weekMeta[week] = { date: match.scheduledAt };
       }
+      finalizedWeeks.add(week);
 
       const teamA = match.teamA;
       const teamB = match.teamB;
@@ -327,6 +329,41 @@ export async function rebuildStandings(circuit) {
     p.avgPointsPct = p.gamesScored ? Math.round((p.sumGamePct / p.gamesScored) * 1000) / 10 : null;
   }
 
+  // ── Split composites: gender-line DSR + Mixed DSR ─────────────
+  // Same formula per discipline. Volume is measured against that discipline's
+  // own max games so the gender line (2 of 12 slots/night) isn't punished.
+  const maxByType = { womens: 1, mens: 1, mixed: 1 };
+  for (const p of activePlayers) {
+    for (const t of ['womens', 'mens', 'mixed']) {
+      maxByType[t] = Math.max(maxByType[t], p.byType?.[t]?.played || 0);
+    }
+  }
+  // Ranking qualification: a player must have played at least HALF the games
+  // possible so far (per discipline) to hold a rank. Possible per match night:
+  // ~4 games overall, 2 on the gender line, 4 mixed. Unqualified players keep
+  // their rating (shown as "unqualified") but are excluded from rank pools.
+  const weeksPlayed = finalizedWeeks.size;
+  const needAll    = Math.ceil(4 * weeksPlayed * 0.5);
+  const needGender = Math.ceil(2 * weeksPlayed * 0.5);
+  const needMixed  = Math.ceil(4 * weeksPlayed * 0.5);
+
+  for (const p of playerStats.values()) {
+    const g = normGender(p.gender);
+    const gType = g === 'F' ? 'womens' : g === 'M' ? 'mens' : null;
+    p.dsrGender = gType ? splitComposite(p.byType?.[gType], maxByType[gType]) : null;
+    p.dsrMixed  = splitComposite(p.byType?.mixed, maxByType.mixed);
+    p.dsrQualified       = p.gamesPlayed >= needAll;
+    p.dsrGenderQualified = (gType ? (p.byType?.[gType]?.played || 0) : 0) >= needGender;
+    p.dsrMixedQualified  = (p.byType?.mixed?.played || 0) >= needMixed;
+  }
+  // Ranks: gender line within the same gender pool; Mixed across everyone.
+  // Only qualified players are ranked.
+  for (const p of playerStats.values()) { p.dsrGenderRank = null; p.dsrMixedRank = null; }
+  for (const gflag of ['M', 'F']) {
+    rankByField(Array.from(playerStats.values()).filter(p => normGender(p.gender) === gflag && p.dsrGenderQualified), 'dsrGender', 'dsrGenderRank');
+  }
+  rankByField(Array.from(playerStats.values()).filter(p => p.dsrMixedQualified), 'dsrMixed', 'dsrMixedRank');
+
   // ── Weekly Player of the Week (gender-split, by that week's DSR) + rank movement ──
   const weeklyTopPerformers = buildWeeklyTopPerformers(weeklyPlayers, weekMeta);
   // Stamp each performer/leader with the player's cache-busted photo URL (or
@@ -455,13 +492,13 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
       const player = rosterA.get(pid);
       if (!player) continue;
       bumpPlayer(playerStats, pid, player, teamA, slotType, homeWon, homePlayers.filter(p => p !== pid), homeScore, awayScore, awayPlayers);
-      if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamA, homeWon, homeScore, awayScore);
+      if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamA, homeWon, homeScore, awayScore, slotType);
     }
     for (const pid of awayPlayers) {
       const player = rosterB.get(pid);
       if (!player) continue;
       bumpPlayer(playerStats, pid, player, teamB, slotType, !homeWon, awayPlayers.filter(p => p !== pid), awayScore, homeScore, homePlayers);
-      if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamB, !homeWon, awayScore, homeScore);
+      if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamB, !homeWon, awayScore, homeScore, slotType);
     }
 
     // Track distinct matches each player appeared in (handled separately below)
@@ -526,10 +563,12 @@ function ensurePlayer(map, pid, player, team) {
       gamesPlayed: 0,
       gamesWon: 0,
       gamesLost: 0,
+      // Per-discipline splits now carry full scoring data so each discipline
+      // gets its own composite (gender-line DSR + Mixed DSR).
       byType: {
-        womens: { played: 0, won: 0 },
-        mens: { played: 0, won: 0 },
-        mixed: { played: 0, won: 0 },
+        womens: newTypeSplit(),
+        mens: newTypeSplit(),
+        mixed: newTypeSplit(),
       },
       matchesPlayed: 0,
       // Scoring data (needed for composite score)
@@ -548,13 +587,21 @@ function ensurePlayer(map, pid, player, team) {
   }
 }
 
+// Fresh per-discipline split (full scoring data for the split composite).
+function newTypeSplit() {
+  return { played: 0, won: 0, ps: 0, pa: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0 };
+}
+
 function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = null, oppScore = null, opponents = []) {
   ensurePlayer(map, pid, player, team);
   const p = map.get(pid);
   p.gamesPlayed++;
   if (won) p.gamesWon++; else p.gamesLost++;
-  p.byType[slotType].played++;
-  if (won) p.byType[slotType].won++;
+  // Legacy blobs may lack the richer split fields — top up in place.
+  if (!p.byType[slotType].gameDiffs) p.byType[slotType] = { ...newTypeSplit(), ...p.byType[slotType] };
+  const bt = p.byType[slotType];
+  bt.played++;
+  if (won) bt.won++;
 
   // Track per-game scoring for composite score
   if (myScore !== null && oppScore !== null) {
@@ -569,6 +616,10 @@ function bumpPlayer(map, pid, player, team, slotType, won, partners, myScore = n
       p.clutchG++;
       if (won) p.clutchW++;
     }
+    // Same tracking inside the discipline split
+    bt.ps += myScore; bt.pa += oppScore; bt.diff += d;
+    bt.gameDiffs.push(d);
+    if (Math.abs(d) <= 3) { bt.clutchG++; if (won) bt.clutchW++; }
   }
 
   for (const partnerId of partners) {
@@ -606,6 +657,29 @@ function compositeScore(p, maxGames) {
 
 function normGender(g) { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; }
 
+// Composite for one discipline split ({played, won, diff, gameDiffs, clutch*}).
+// Returns a rounded DSR or null when the split has no games.
+function splitComposite(bt, maxGames) {
+  if (!bt || !bt.played) return null;
+  const s = compositeScore({
+    gamesPlayed: bt.played,
+    gamesWon: bt.won || 0,
+    diff: bt.diff || 0,
+    gameDiffs: bt.gameDiffs || [],
+    clutchW: bt.clutchW || 0,
+    clutchG: bt.clutchG || 0,
+  }, Math.max(1, maxGames));
+  return s == null ? null : Math.round(s * 10) / 10;
+}
+
+// Dense-ish rank by a numeric field (higher = better). Writes rankField onto
+// each object; players without a value get null.
+function rankByField(players, field, rankField) {
+  const ranked = players.filter(p => p[field] != null).sort((a, b) => b[field] - a[field]);
+  for (const p of players) p[rankField] = null;
+  ranked.forEach((p, i) => { p[rankField] = i + 1; });
+}
+
 function ensureWeeklyPlayer(weekly, week, pid, player, team) {
   if (!weekly[week]) weekly[week] = new Map();
   const m = weekly[week];
@@ -613,18 +687,30 @@ function ensureWeeklyPlayer(weekly, week, pid, player, team) {
     playerId: pid, name: player.name, gender: player.gender || null,
     teamId: team?.id || null, teamName: team?.name || null,
     gamesPlayed: 0, gamesWon: 0, gamesLost: 0, ps: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0,
+    // Discipline splits for the week (g = gender line, x = mixed)
+    g: newWeeklySplit(), x: newWeeklySplit(),
   });
   return m.get(pid);
 }
 
-function bumpWeeklyPlayer(weekly, week, pid, player, team, won, myScore, oppScore) {
+function newWeeklySplit() {
+  return { gamesPlayed: 0, gamesWon: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0 };
+}
+
+function bumpWeeklyPlayer(weekly, week, pid, player, team, won, myScore, oppScore, slotType = null) {
   if (week == null) return;
   const p = ensureWeeklyPlayer(weekly, week, pid, player, team);
   p.gamesPlayed++; if (won) p.gamesWon++; else p.gamesLost++;
+  const sp = slotType === 'mixed' ? p.x : (slotType === 'mens' || slotType === 'womens') ? p.g : null;
+  if (sp) { sp.gamesPlayed++; if (won) sp.gamesWon++; }
   if (Number.isInteger(myScore)) p.ps += myScore;
   if (Number.isInteger(myScore) && Number.isInteger(oppScore)) {
     const d = myScore - oppScore; p.diff += d; p.gameDiffs.push(d);
     if (Math.abs(d) <= 3) { p.clutchG++; if (won) p.clutchW++; }
+    if (sp) {
+      sp.diff += d; sp.gameDiffs.push(d);
+      if (Math.abs(d) <= 3) { sp.clutchG++; if (won) sp.clutchW++; }
+    }
   }
 }
 
@@ -661,29 +747,80 @@ function buildWeeklyTopPerformers(weekly, weekMeta = {}) {
 
 // Weekly season-to-date DSR snapshots. Returns:
 //   deltas  — rank movement vs the prior week, { pid: delta|null } (+ = moved up)
-//   history — Map(pid → [{ week, dsr, rank }]) end-of-week cumulative DSR + rank
+//   history — Map(pid → [{ week, dsr, rank, gDsr, gRank, xDsr, xRank }])
+//             end-of-week cumulative DSR + rank, overall and per discipline
+//             (g = gender line ranked within gender, x = mixed ranked overall)
 function computeRankDeltas(weekly) {
   const weeks = Object.keys(weekly).map(Number).sort((a, b) => a - b);
   const cum = new Map();
   const snaps = [];
   const history = new Map();
+  const pushHist = (pid, entry) => {
+    if (!history.has(pid)) history.set(pid, []);
+    history.get(pid).push(entry);
+  };
   for (const wk of weeks) {
     for (const [pid, w] of weekly[wk]) {
-      if (!cum.has(pid)) cum.set(pid, { gamesPlayed: 0, gamesWon: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0 });
+      if (!cum.has(pid)) cum.set(pid, {
+        gender: w.gender || null,
+        gamesPlayed: 0, gamesWon: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0,
+        g: newWeeklySplit(), x: newWeeklySplit(),
+      });
       const c = cum.get(pid);
       c.gamesPlayed += w.gamesPlayed; c.gamesWon += w.gamesWon; c.diff += w.diff;
       for (const d of w.gameDiffs) c.gameDiffs.push(d);
       c.clutchW += w.clutchW; c.clutchG += w.clutchG;
+      for (const key of ['g', 'x']) {
+        const ws = w[key]; if (!ws) continue;
+        const cs = c[key];
+        cs.gamesPlayed += ws.gamesPlayed; cs.gamesWon += ws.gamesWon; cs.diff += ws.diff;
+        for (const d of ws.gameDiffs) cs.gameDiffs.push(d);
+        cs.clutchW += ws.clutchW; cs.clutchG += ws.clutchG;
+      }
     }
     const active = [...cum.entries()].filter(([, c]) => c.gamesPlayed > 0);
-    const maxGames = Math.max(1, ...active.map(([, c]) => c.gamesPlayed));
-    const ranked = active.map(([pid, c]) => ({ pid, s: compositeScore(c, maxGames) })).sort((a, b) => b.s - a.s);
+    const maxGames  = Math.max(1, ...active.map(([, c]) => c.gamesPlayed));
+    const maxGGames = Math.max(1, ...active.map(([, c]) => c.g.gamesPlayed));
+    const maxXGames = Math.max(1, ...active.map(([, c]) => c.x.gamesPlayed));
+
+    // Ranking qualification so far: at least half the possible games
+    // (per night: ~4 overall, 2 gender line, 4 mixed).
+    const weeksSoFar = weeks.indexOf(wk) + 1;
+    const qAll = Math.ceil(4 * weeksSoFar * 0.5);
+    const qG   = Math.ceil(2 * weeksSoFar * 0.5);
+    const qX   = Math.ceil(4 * weeksSoFar * 0.5);
+
+    const rows = active.map(([pid, c]) => ({
+      pid,
+      gender: normGender(c.gender),
+      games: c.gamesPlayed, gGames: c.g.gamesPlayed, xGames: c.x.gamesPlayed,
+      s: compositeScore(c, maxGames),
+      gS: c.g.gamesPlayed > 0 ? compositeScore(c.g, maxGGames) : null,
+      xS: c.x.gamesPlayed > 0 ? compositeScore(c.x, maxXGames) : null,
+    }));
+
+    // Overall rank — qualified players only
+    const ranked = rows.filter(r => r.games >= qAll).sort((a, b) => b.s - a.s);
     const snap = new Map();
-    ranked.forEach((r, i) => {
-      snap.set(r.pid, i + 1);
-      if (!history.has(r.pid)) history.set(r.pid, []);
-      history.get(r.pid).push({ week: wk, dsr: Math.round(r.s * 10) / 10, rank: i + 1 });
-    });
+    ranked.forEach((r, i) => { snap.set(r.pid, i + 1); r._rank = i + 1; });
+    // Gender-line rank within each gender pool
+    for (const gflag of ['M', 'F']) {
+      const pool = rows.filter(r => r.gender === gflag && r.gS != null && r.gGames >= qG).sort((a, b) => b.gS - a.gS);
+      pool.forEach((r, i) => { r._gRank = i + 1; });
+    }
+    // Mixed rank across everyone
+    const xPool = rows.filter(r => r.xS != null && r.xGames >= qX).sort((a, b) => b.xS - a.xS);
+    xPool.forEach((r, i) => { r._xRank = i + 1; });
+
+    const round1 = v => (v == null ? null : Math.round(v * 10) / 10);
+    for (const r of rows) {
+      pushHist(r.pid, {
+        week: wk,
+        dsr: round1(r.s), rank: r._rank ?? null,
+        gDsr: round1(r.gS), gRank: r._gRank ?? null,
+        xDsr: round1(r.xS), xRank: r._xRank ?? null,
+      });
+    }
     snaps.push(snap);
   }
   const cur = snaps[snaps.length - 1] || new Map();
