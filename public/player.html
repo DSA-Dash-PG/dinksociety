@@ -110,6 +110,34 @@
     .partner-total-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0 0; font-size: 12px; font-weight: 700; color: var(--color-text-faint); }
     .partner-total-row .total-val { font-size: 14px; font-weight: 800; color: var(--color-text); }
 
+    /* ── Match log ── */
+    .ml-head-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: var(--space-4); }
+    .ml-head-row .pp-card__head { margin-bottom: 0; }
+    .ml-seasons { display: flex; gap: 6px; flex-wrap: wrap; }
+    .ml-season-chip { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 12px; border-radius: var(--radius-full); border: 1px solid var(--color-border); background: transparent; color: var(--color-text-faint); cursor: pointer; font-family: inherit; transition: all var(--transition); }
+    .ml-season-chip.is-on { background: var(--color-lime-ghost); border-color: var(--color-lime); color: var(--color-lime); }
+    .ml-week { margin-bottom: var(--space-2); }
+    .ml-week__head { display: flex; align-items: baseline; gap: 8px; padding: 10px 0 6px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; color: var(--color-teal); }
+    .ml-week__vs { color: var(--color-text-faint); font-weight: 700; letter-spacing: 0.04em; text-transform: none; font-size: 11px; }
+    .ml-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--color-border); font-size: 12.5px; }
+    .ml-week:last-child .ml-row:last-child { border-bottom: none; }
+    .ml-type { flex-shrink: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-text-faint); background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: 5px; padding: 3px 7px; min-width: 62px; text-align: center; }
+    .ml-who { flex: 1; min-width: 0; line-height: 1.45; }
+    .ml-who a { color: var(--color-text); text-decoration: none; font-weight: 700; }
+    .ml-who a:hover { color: var(--color-teal); }
+    .ml-who .ml-lbl { color: var(--color-text-faint); font-weight: 600; }
+    .ml-dsr { flex-shrink: 0; text-align: right; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--color-text-muted); }
+    .ml-dsr .ml-lbl { display: block; font-size: 8.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-faint); }
+    .ml-score { flex-shrink: 0; min-width: 74px; text-align: right; font-weight: 800; font-size: 14px; font-variant-numeric: tabular-nums; }
+    .ml-wl { display: inline-block; min-width: 18px; text-align: center; font-size: 10px; font-weight: 800; border-radius: 4px; padding: 2px 5px; margin-left: 6px; }
+    .ml-wl--w { color: #22c55e; background: rgba(34,197,94,0.12); }
+    .ml-wl--l { color: #ef4444; background: rgba(239,68,68,0.12); }
+    .ml-empty { font-size: 12px; color: var(--color-text-faint); padding: var(--space-4) 0; text-align: center; }
+    @media (max-width: 600px) {
+      .ml-dsr { display: none; }
+      .ml-score { min-width: 62px; font-size: 13px; }
+    }
+
     /* ── Season history ── */
     .history-list { display: flex; flex-direction: column; gap: 0; }
     .history-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
@@ -295,15 +323,16 @@
       const pStat   = allP.find(p => p.name === playerName && (p.teamName === team.name || p.teamId === team.id))
                    || allP.find(p => p.name === playerName);
 
-      // If we have a player ID, fetch cross-season history
-      let history = [];
+      // If we have a player ID, fetch cross-season history + per-game log
+      let history = [], gameLog = [];
       const resolvedId = pStat?.playerId || rosterPlayer?.id || '';
       if (resolvedId) {
         try {
-          const hr = await fetch(`/.netlify/functions/public-player?id=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}`);
+          const hr = await fetch(`/.netlify/functions/public-player?id=${encodeURIComponent(resolvedId)}&circuit=${encodeURIComponent(CIRCUIT)}&games=1`);
           if (hr.ok) {
             const hd = await hr.json();
             history = hd.history || [];
+            gameLog = hd.games || [];
             // merge partnerNames for display
             if (pStat && hd.partnerNames) pStat._partnerNames = hd.partnerNames;
           }
@@ -354,7 +383,18 @@
         : null;
       const metrics = { avgPartnerDsr, avgOpponentDsr, opponentCount, pointsWonPct };
 
-      render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics);
+      // Annotate each logged game with the opponents' avg DSR (current-season
+      // composite from the leaderboard blob) for the "your DSR vs theirs" edge.
+      for (const g of gameLog) {
+        const comps = (g.oppIds || []).map(pid => playersMap[pid]?.composite).filter(c => c != null);
+        g.oppDsr = comps.length ? comps.reduce((s, c) => s + c, 0) / comps.length : null;
+        const pn = g.partnerId ? playersMap[g.partnerId] : null;
+        if (pn && !g.partnerName) g.partnerName = pn.name;
+        g.partnerTeamName = pn?.teamName || null;
+        g._oppTeams = (g.oppIds || []).map(pid => playersMap[pid]?.teamName || null);
+      }
+
+      render(rosterPlayer, team, teamSlug, pStat, history, ranks, metrics, gameLog);
 
       // Load badge data first (config + grants) so the tabs can show the right
       // crest + pills per view, and house everything in a Trophy Case tab.
@@ -468,7 +508,7 @@
     }
 
     /* ─── Render ──────────────────────────────────────────── */
-    function render(rp, team, teamSlug, stat, history, ranks = {}, metrics = {}) {
+    function render(rp, team, teamSlug, stat, history, ranks = {}, metrics = {}, gameLog = []) {
       const color    = avatarColor(team.name || rp.name);
 
       let html = '';
@@ -570,6 +610,66 @@
 
       // Chef of the Week wins now live in the Trophy Case tab, so the inline
       // awards card has been removed to avoid duplicating them here.
+
+      /* ── MATCH LOG — every game, grouped by week ── */
+      if (gameLog.length) {
+        const TYPE_LBL = { womens: "Women's", mens: "Men's", mixed: 'Mixed' };
+        const myDsr = ranks.dsr;
+        const playerHref = (name, teamName) =>
+          `/player?team=${teamName ? slug(teamName) : teamSlug}&name=${encodeURIComponent(name)}${LINK_SUFFIX}`;
+
+        // Season chips: current season (has game data) + any archived seasons.
+        const curLabel = CIRCUIT === 'I' ? 'Season 1' : `Season ${CIRCUIT}`;
+        const seasonChips = [{ id: 'current', label: curLabel }]
+          .concat(history.map(s => ({ id: `hist-${s.circuit}`, label: s.seasonLabel || s.circuit })));
+
+        // Group games by match (week header shows opponent team once).
+        const groups = [];
+        for (const g of gameLog) {
+          const last = groups[groups.length - 1];
+          if (last && last.matchId === g.matchId) last.games.push(g);
+          else groups.push({ matchId: g.matchId, week: g.week, phase: g.phase, date: g.date, opp: g.opponentTeamName, oppId: g.opponentTeamId, games: [g] });
+        }
+
+        const phaseTag = ph => ph === 'playoff' ? ' · Playoffs' : ph === 'championship' ? ' · Championship' : ph === 'rivalry' ? ' · Rivalry Week' : '';
+
+        const rowsHtml = groups.map(grp => `
+          <div class="ml-week">
+            <div class="ml-week__head">
+              <span>Week ${grp.week ?? '—'}${phaseTag(grp.phase)}</span>
+              <span class="ml-week__vs">${grp.date ? fmtDate(grp.date) + ' · ' : ''}vs <a href="/team?id=${slug(grp.opp || '')}${LINK_SUFFIX}" style="color:var(--color-teal);text-decoration:none;font-weight:700">${esc(grp.opp || '')}</a></span>
+            </div>
+            ${grp.games.map(g => {
+              const oppLinks = (g.oppNames || []).map((n, i) => n
+                ? `<a href="${playerHref(n, g._oppTeams?.[i] || g.opponentTeamName)}">${esc(shortName(n))}</a>`
+                : '—').join(' &amp; ');
+              const partnerLink = g.partnerName
+                ? `<a href="${playerHref(g.partnerName, g.partnerTeamName || team.name)}">${esc(shortName(g.partnerName))}</a>`
+                : '—';
+              const dsrCell = (myDsr != null && g.oppDsr != null)
+                ? `<span class="${myDsr >= g.oppDsr ? 'val--green' : 'val--red'}">${Number(myDsr).toFixed(1)}</span> <span class="ml-lbl" style="display:inline">v</span> ${g.oppDsr.toFixed(1)}`
+                : '—';
+              const wl = g.won === true ? '<span class="ml-wl ml-wl--w">W</span>' : g.won === false ? '<span class="ml-wl ml-wl--l">L</span>' : '';
+              return `<div class="ml-row">
+                <span class="ml-type">R${g.round} ${TYPE_LBL[g.type] || g.type}</span>
+                <div class="ml-who"><span class="ml-lbl">w/</span> ${partnerLink} <span class="ml-lbl">vs</span> ${oppLinks}</div>
+                <div class="ml-dsr"><span class="ml-lbl">DSR you v them</span>${dsrCell}</div>
+                <div class="ml-score">${g.myScore}–${g.oppScore}${wl}</div>
+              </div>`;
+            }).join('')}
+          </div>`).join('');
+
+        html += `<div class="pp-card" id="match-log-card">
+          <div class="ml-head-row">
+            <div class="pp-card__head">📋 Match Log</div>
+            <div class="ml-seasons">
+              ${seasonChips.map((c, i) => `<button type="button" class="ml-season-chip${i === 0 ? ' is-on' : ''}" data-season="${c.id}">${esc(c.label)}</button>`).join('')}
+            </div>
+          </div>
+          <div id="ml-body">${rowsHtml}</div>
+          <div id="ml-archived" class="ml-empty" style="display:none">Game-level detail isn't available for archived seasons.</div>
+        </div>`;
+      }
 
       /* ── PARTNERS — only if we have game data ── */
       if (stat && stat.gamesPlayed > 0) {
@@ -674,6 +774,33 @@
       html += `</div>`;
 
       document.getElementById('page-root').innerHTML = html;
+
+      // ── Match Log season toggle ──
+      // Click the active season chip to collapse/expand its log; click an
+      // archived season chip to switch to it (game detail only exists for the
+      // current season, so archived chips show a note).
+      const mlCard = document.getElementById('match-log-card');
+      if (mlCard) {
+        const body = document.getElementById('ml-body');
+        const archived = document.getElementById('ml-archived');
+        mlCard.querySelectorAll('.ml-season-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            const isCurrent = chip.dataset.season === 'current';
+            const wasOn = chip.classList.contains('is-on');
+            if (wasOn) {
+              // Toggle off/on within the same season
+              const hidden = (isCurrent ? body : archived).style.display === 'none';
+              (isCurrent ? body : archived).style.display = hidden ? '' : 'none';
+              chip.classList.toggle('is-on', hidden);
+              return;
+            }
+            mlCard.querySelectorAll('.ml-season-chip').forEach(c => c.classList.remove('is-on'));
+            chip.classList.add('is-on');
+            body.style.display = isCurrent ? '' : 'none';
+            archived.style.display = isCurrent ? 'none' : '';
+          });
+        });
+      }
     }
 
     load().catch(e => { console.error('player load failed', e); const pr = document.getElementById('page-root'); if (pr) pr.innerHTML = '<div class="pp-loading">Couldn’t load this player. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>'; });
