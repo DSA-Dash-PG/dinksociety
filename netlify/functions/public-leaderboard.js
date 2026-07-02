@@ -35,7 +35,10 @@ export default async (req) => {
 };
 
 async function serveAggregate(circuit, storeName, key) {
-  const store = getStore(storeName);
+  // Strong consistency: rebuildStandings writes these aggregates moments before
+  // the public read can land. Eventual reads can return the PRE-rebuild blob,
+  // which is why a fresh rebuild appeared not to "take". (See June 2026 fix.)
+  const store = getStore({ name: storeName, consistency: 'strong' });
   const data = await store.get(key, { type: 'json' }).catch(() => null);
   if (!data) {
     return json({
@@ -48,7 +51,11 @@ async function serveAggregate(circuit, storeName, key) {
 }
 
 async function serveSchedule(circuit) {
-  const store = getStore('schedule');
+  // Strong consistency: captain-score.js / rebuildStandings write finalizedAt +
+  // scoreA/scoreB onto these schedule blobs. With eventual reads the public
+  // schedule can show finalized weeks as still "upcoming" with null scores,
+  // even though standings (which read strong) already reflect them.
+  const store = getStore({ name: 'schedule', consistency: 'strong' });
   const { blobs } = await store.list({ prefix: `schedule/${circuit}/` });
 
   const allMatches = [];
