@@ -112,13 +112,43 @@ export function parseTime(s) {
   return { h, m: min };
 }
 
-/** Event start as epoch ms (from date + startTime), or null if not parseable. */
+// All event dates/times are wall-clock times in the league's timezone. Netlify
+// functions run in UTC, so parsing "2026-07-02T05:00:00" with new Date() lands
+// 7-8 hours early in Pacific time (that bug fired "morning of" reminders at
+// 10 PM the night before). Always convert through LADDER_TZ instead.
+export const LADDER_TZ = process.env.LADDER_TZ || 'America/Los_Angeles';
+
+// Offset (ms) between UTC and `timeZone` at the moment `utcMs`.
+function tzOffsetMs(utcMs, timeZone) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(utcMs));
+  const p = {};
+  for (const { type, value } of parts) p[type] = value;
+  const asUtc = Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second);
+  return asUtc - utcMs;
+}
+
+/**
+ * Epoch ms for a wall-clock time ("YYYY-MM-DD" + h/m) in the league timezone.
+ * Two-pass so DST transitions resolve correctly.
+ */
+export function zonedTimeMs(dateStr, h = 0, m = 0, timeZone = LADDER_TZ) {
+  const md = String(dateStr || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!md) return null;
+  const wall = Date.UTC(+md[1], +md[2] - 1, +md[3], h, m, 0);
+  let ms = wall - tzOffsetMs(wall, timeZone);
+  ms = wall - tzOffsetMs(ms, timeZone);
+  return ms;
+}
+
+/** Event start as epoch ms (from date + startTime, league timezone), or null. */
 export function eventStartMs(event) {
   if (!event?.date) return null;
   const t = parseTime(event.startTime) || { h: 0, m: 0 };
-  const pad = (n) => String(n).padStart(2, '0');
-  const d = new Date(`${event.date}T${pad(t.h)}:${pad(t.m)}:00`);
-  return isNaN(d.getTime()) ? null : d.getTime();
+  return zonedTimeMs(event.date, t.h, t.m);
 }
 
 /**

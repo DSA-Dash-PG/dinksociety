@@ -17,7 +17,7 @@
 import { getStore } from '@netlify/blobs';
 import { sendNotify } from './notify-prefs.js';
 import { siteUrl, dateLineOf, fmtCents } from './ladder-notify.js';
-import { listEvents, getSignups, eventStartMs, effectiveCapacity } from './ladder.js';
+import { listEvents, getSignups, eventStartMs, effectiveCapacity, zonedTimeMs } from './ladder.js';
 import { buildLadderProfile } from './profile-data.js';
 import { createLadderToken } from './ladder-token.js';
 
@@ -41,11 +41,10 @@ function shortName(n) { const p = String(n || '').trim().split(/\s+/); return p.
 function initials(n) { const p = String(n || '').trim().split(/\s+/); return ((p[0] && p[0][0] || '') + (p[1] && p[1][0] || '')).toUpperCase() || '·'; }
 function avatarColor(n) { let h = 0, s = String(n || ''); for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return ['#b8ff2c', '#17d7b0', '#f0c040', '#ff6fb5', '#3b9eff', '#a78bfa'][h % 6]; }
 
-// 5:00 AM on the event's local date.
+// 5:00 AM on the event's local date (league timezone, NOT server UTC).
 function morningMs(event) {
   if (!event?.date) return null;
-  const d = new Date(`${event.date}T05:00:00`);
-  return isNaN(d.getTime()) ? null : d.getTime();
+  return zonedTimeMs(event.date, 5, 0);
 }
 
 /** The moment a given reminder kind should first fire for this event (epoch ms). */
