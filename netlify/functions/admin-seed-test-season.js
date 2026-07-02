@@ -546,9 +546,10 @@ async function writeAggregates({ teamAgg, playerAgg, weeklyPerTeam, weeklyPlayer
 
   // Weekly Player of the Week (gender-split, by that week's DSR) + rank movement (+/-)
   standings.weeklyTopPerformers = buildWeeklyTopPerformers(weeklyPlayers, weekMeta);
-  const rankDeltas = computeRankDeltas(weeklyPlayers);
+  const { deltas: rankDeltas, history: dsrHistory } = computeRankDeltas(weeklyPlayers);
   for (const p of playerAgg.values()) {
     p.rankDelta = Object.prototype.hasOwnProperty.call(rankDeltas, p.playerId) ? rankDeltas[p.playerId] : null;
+    p.dsrHistory = dsrHistory.get(p.playerId) || [];
   }
   attachAwards(playerAgg, standings.weeklyTopPerformers);
 
@@ -636,6 +637,7 @@ function computeRankDeltas(weekly) {
   const weeks = Object.keys(weekly).map(Number).sort((a, b) => a - b);
   const cum = new Map();
   const snaps = [];
+  const history = new Map();
   for (const wk of weeks) {
     for (const [pid, w] of weekly[wk]) {
       if (!cum.has(pid)) cum.set(pid, { gamesPlayed: 0, gamesWon: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0 });
@@ -647,7 +649,12 @@ function computeRankDeltas(weekly) {
     const active = [...cum.entries()].filter(([, c]) => c.gamesPlayed > 0);
     const maxGames = Math.max(1, ...active.map(([, c]) => c.gamesPlayed));
     const ranked = active.map(([pid, c]) => ({ pid, s: compositeScore(c, maxGames) })).sort((a, b) => b.s - a.s);
-    const snap = new Map(); ranked.forEach((r, i) => snap.set(r.pid, i + 1));
+    const snap = new Map();
+    ranked.forEach((r, i) => {
+      snap.set(r.pid, i + 1);
+      if (!history.has(r.pid)) history.set(r.pid, []);
+      history.get(r.pid).push({ week: wk, dsr: Math.round(r.s * 10) / 10, rank: i + 1 });
+    });
     snaps.push(snap);
   }
   const cur = snaps[snaps.length - 1] || new Map();
@@ -657,7 +664,7 @@ function computeRankDeltas(weekly) {
     const pr = prev.get(pid);
     deltas[pid] = (pr == null) ? null : (pr - rank);
   }
-  return deltas;
+  return { deltas, history };
 }
 
 function attachAwards(playerMap, weeklyTopPerformers) {

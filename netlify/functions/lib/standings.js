@@ -337,9 +337,12 @@ export async function rebuildStandings(circuit) {
     enrich(wk.men); enrich(wk.women);
     if (wk.leaders) for (const g of ['men', 'women']) { const L = wk.leaders[g]; if (L) for (const k of Object.keys(L)) enrich(L[k]); }
   }
-  const rankDeltas = computeRankDeltas(weeklyPlayers);
+  const { deltas: rankDeltas, history: dsrHistory } = computeRankDeltas(weeklyPlayers);
   for (const p of playerStats.values()) {
     p.rankDelta = Object.prototype.hasOwnProperty.call(rankDeltas, p.playerId) ? rankDeltas[p.playerId] : null;
+    // Season-to-date DSR snapshot at the end of each week: [{ week, dsr, rank }].
+    // Powers the match-log "DSR at time of game" column + the DSR trend chart.
+    p.dsrHistory = dsrHistory.get(p.playerId) || [];
   }
   attachAwards(playerStats, weeklyTopPerformers);
   standings.weeklyTopPerformers = weeklyTopPerformers;
@@ -656,11 +659,14 @@ function buildWeeklyTopPerformers(weekly, weekMeta = {}) {
   return out.sort((a, b) => b.week - a.week);
 }
 
-// Rank movement on cumulative season DSR vs the prior week. { pid: delta|null } (+ = moved up).
+// Weekly season-to-date DSR snapshots. Returns:
+//   deltas  — rank movement vs the prior week, { pid: delta|null } (+ = moved up)
+//   history — Map(pid → [{ week, dsr, rank }]) end-of-week cumulative DSR + rank
 function computeRankDeltas(weekly) {
   const weeks = Object.keys(weekly).map(Number).sort((a, b) => a - b);
   const cum = new Map();
   const snaps = [];
+  const history = new Map();
   for (const wk of weeks) {
     for (const [pid, w] of weekly[wk]) {
       if (!cum.has(pid)) cum.set(pid, { gamesPlayed: 0, gamesWon: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0 });
@@ -672,7 +678,12 @@ function computeRankDeltas(weekly) {
     const active = [...cum.entries()].filter(([, c]) => c.gamesPlayed > 0);
     const maxGames = Math.max(1, ...active.map(([, c]) => c.gamesPlayed));
     const ranked = active.map(([pid, c]) => ({ pid, s: compositeScore(c, maxGames) })).sort((a, b) => b.s - a.s);
-    const snap = new Map(); ranked.forEach((r, i) => snap.set(r.pid, i + 1));
+    const snap = new Map();
+    ranked.forEach((r, i) => {
+      snap.set(r.pid, i + 1);
+      if (!history.has(r.pid)) history.set(r.pid, []);
+      history.get(r.pid).push({ week: wk, dsr: Math.round(r.s * 10) / 10, rank: i + 1 });
+    });
     snaps.push(snap);
   }
   const cur = snaps[snaps.length - 1] || new Map();
@@ -682,7 +693,7 @@ function computeRankDeltas(weekly) {
     const pr = prev.get(pid);
     deltas[pid] = (pr == null) ? null : (pr - rank);
   }
-  return deltas;
+  return { deltas, history };
 }
 
 // ════════════════════════════════════════════════════════════════════

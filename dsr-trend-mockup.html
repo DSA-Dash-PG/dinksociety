@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MOCKUP · DSR Trend · The Dink Society</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0e1110;
+    --surface: #151917;
+    --surface-2: #1b201d;
+    --border: #262c28;
+    --text: #eef2ee;
+    --muted: #9aa69d;
+    --faint: #6b756e;
+    --lime: #b8ff2c;
+    --lime-ghost: rgba(184,255,44,0.10);
+    --teal: #17d7b0;
+    --teal-dim: rgba(23,215,176,0.12);
+    --red: #ef4444;
+    --green: #22c55e;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; padding: 40px 18px 110px; }
+  .shell { max-width: 780px; margin: 0 auto; }
+
+  .mock-note { background: var(--lime-ghost); border: 1px dashed var(--lime); color: var(--lime); font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 9px 14px; border-radius: 10px; margin-bottom: 22px; text-align: center; }
+
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; margin-bottom: 16px; }
+  .card__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  .card__title { font-size: 10px; font-weight: 700; font-style: italic; text-transform: uppercase; letter-spacing: 0.14em; color: var(--faint); }
+
+  /* mini hero */
+  .hero { display: flex; align-items: center; gap: 16px; }
+  .hero__avatar { width: 58px; height: 58px; border-radius: 50%; background: #3b82f6; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 20px; }
+  .hero__name { font-size: 1.5rem; font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: -0.01em; }
+  .hero__meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+  .hero__meta b { color: var(--teal); font-weight: 700; }
+  .hero__dsr { margin-left: auto; text-align: center; }
+  .hero__dsr-lbl { font-size: 9px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--faint); }
+  .hero__dsr-n { font-size: 2.4rem; font-weight: 900; color: var(--lime); line-height: 1; margin-top: 3px; }
+  .hero__dsr-delta { font-size: 11px; font-weight: 800; color: var(--green); margin-top: 4px; }
+
+  /* seg toggle */
+  .seg { display: flex; gap: 4px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 9999px; padding: 3px; }
+  .seg button { border: 0; background: transparent; color: var(--faint); font: inherit; font-size: 11px; font-weight: 800; padding: 6px 14px; border-radius: 9999px; cursor: pointer; letter-spacing: 0.04em; }
+  .seg button.on { background: var(--teal); color: #06231d; }
+
+  /* chart */
+  .chart-wrap { position: relative; }
+  svg { width: 100%; height: auto; display: block; }
+  .tip { position: absolute; pointer-events: none; background: #0b0e0c; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 11px; line-height: 1.55; min-width: 150px; opacity: 0; transform: translate(-50%, -110%); transition: opacity 0.12s; z-index: 5; box-shadow: 0 8px 24px rgba(0,0,0,0.5); }
+  .tip.show { opacity: 1; }
+  .tip__wk { font-weight: 800; color: var(--lime); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 4px; }
+  .tip b { color: var(--text); }
+  .tip .up { color: var(--green); font-weight: 800; }
+  .tip .dn { color: var(--red); font-weight: 800; }
+
+  /* legend + compare */
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 11px; color: var(--muted); align-items: center; }
+  .legend .sw { display: inline-block; width: 16px; height: 3px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+  .cmp-chip { font-size: 11px; font-weight: 800; padding: 4px 12px; border-radius: 9999px; border: 1px solid var(--border); background: transparent; color: var(--faint); cursor: pointer; font-family: inherit; }
+  .cmp-chip.on { border-color: currentColor; }
+
+  /* weekly delta strip */
+  .wk-strip { display: grid; grid-template-columns: repeat(8, 1fr); gap: 6px; margin-top: 16px; }
+  .wk-cell { background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; padding: 9px 4px; text-align: center; }
+  .wk-cell__wk { font-size: 8.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--faint); }
+  .wk-cell__v { font-size: 13px; font-weight: 800; margin-top: 3px; }
+  .wk-cell__d { font-size: 9.5px; font-weight: 800; margin-top: 1px; }
+  .wk-cell.future { opacity: 0.35; }
+  .up { color: var(--green); } .dn { color: var(--red); } .flat { color: var(--faint); }
+
+  /* match log tie-in */
+  .ml-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .ml-row:last-child { border-bottom: none; }
+  .ml-type { flex-shrink: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; padding: 3px 7px; min-width: 62px; text-align: center; }
+  .ml-who { flex: 1; min-width: 0; }
+  .ml-who a { color: var(--text); text-decoration: none; font-weight: 700; }
+  .ml-lbl { color: var(--faint); font-weight: 600; }
+  .ml-dsr { flex-shrink: 0; text-align: right; font-size: 11px; font-weight: 700; color: var(--muted); }
+  .ml-dsr .ml-lbl { display: block; font-size: 8.5px; letter-spacing: 0.08em; text-transform: uppercase; }
+  .ml-score { flex-shrink: 0; min-width: 72px; text-align: right; font-weight: 800; font-size: 14px; }
+  .ml-wl { display: inline-block; font-size: 10px; font-weight: 800; border-radius: 4px; padding: 2px 5px; margin-left: 6px; }
+  .ml-wl--w { color: var(--green); background: rgba(34,197,94,0.12); }
+  .ml-wl--l { color: var(--red); background: rgba(239,68,68,0.12); }
+
+  .note { font-size: 11px; color: var(--faint); line-height: 1.6; margin-top: 14px; }
+  .note b { color: var(--muted); }
+
+  @media (max-width: 600px) {
+    .wk-strip { grid-template-columns: repeat(4, 1fr); }
+    .hero__dsr-n { font-size: 1.9rem; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <div class="mock-note">Mockup · Player DSR Trend + snapshot tie-in · not wired</div>
+
+  <!-- mini hero -->
+  <div class="card">
+    <div class="hero">
+      <div class="hero__avatar">SS</div>
+      <div>
+        <div class="hero__name">Matt P.</div>
+        <div class="hero__meta"><b>Smash Society</b> · Male · #3 Men's · #4 Overall</div>
+      </div>
+      <div class="hero__dsr">
+        <div class="hero__dsr-lbl">DSR Rating</div>
+        <div class="hero__dsr-n">78.2</div>
+        <div class="hero__dsr-delta">▲ +8.7 vs Wk 4</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- trend chart -->
+  <div class="card">
+    <div class="card__head">
+      <div class="card__title">📈 DSR Trend · Season 1</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="cmp-chip" id="cmp-sally" style="color:#17d7b0">+ Sally W.</button>
+        <button class="cmp-chip" id="cmp-ryan" style="color:#eab308">+ Ryan H.</button>
+        <div class="seg" id="mode-seg">
+          <button class="on" data-mode="dsr">DSR</button>
+          <button data-mode="rank">Rank</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-wrap">
+      <svg id="chart" viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="tip" id="tip"></div>
+    </div>
+
+    <div class="legend">
+      <span><span class="sw" style="background:var(--lime)"></span>Matt P.</span>
+      <span id="lg-sally" style="display:none"><span class="sw" style="background:#17d7b0"></span>Sally W.</span>
+      <span id="lg-ryan" style="display:none"><span class="sw" style="background:#eab308"></span>Ryan H.</span>
+      <span><span class="sw" style="background:var(--faint);height:2px;border-top:2px dashed var(--faint);background:transparent"></span>League avg</span>
+    </div>
+
+    <div class="wk-strip" id="wk-strip"></div>
+
+    <div class="note"><b>Snapshot DSR</b> is the player's season-to-date rating at the end of each week, written by the standings rebuild (dsrHistory). Hover any dot for that week's record, night diff, and rank. Weeks 6 to 8 fill in as the season plays out; Rivalry Week is tagged on the axis.</div>
+  </div>
+
+  <!-- match log tie-in -->
+  <div class="card">
+    <div class="card__head"><div class="card__title">📋 Match Log · snapshot column</div></div>
+    <div class="ml-row">
+      <span class="ml-type">R1 Mixed</span>
+      <div class="ml-who"><span class="ml-lbl">w/</span> <a href="#">Sally W.</a> <span class="ml-lbl">vs</span> <a href="#">Ryan H.</a> &amp; <a href="#">Phoebe B.</a></div>
+      <div class="ml-dsr"><span class="ml-lbl">Wk 3 DSR you v them</span><span class="up">71.9</span> <span class="ml-lbl" style="display:inline">v</span> 66.8</div>
+      <div class="ml-score">11–7<span class="ml-wl ml-wl--w">W</span></div>
+    </div>
+    <div class="ml-row">
+      <span class="ml-type">R2 Men's</span>
+      <div class="ml-who"><span class="ml-lbl">w/</span> <a href="#">Dev K.</a> <span class="ml-lbl">vs</span> <a href="#">Marcus T.</a> &amp; <a href="#">Jordan L.</a></div>
+      <div class="ml-dsr"><span class="ml-lbl">Wk 3 DSR you v them</span><span class="dn">71.9</span> <span class="ml-lbl" style="display:inline">v</span> 74.5</div>
+      <div class="ml-score">9–11<span class="ml-wl ml-wl--l">L</span></div>
+    </div>
+    <div class="note">The DSR column now reads from the same weekly snapshots as the chart, so a Week 1 upset shows the ratings as they stood that night, not today's.</div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  const TOTAL_WEEKS = 8;
+  const PLAYED = 5;
+
+  // { dsr: [...], rank: [...], wl: [...], diff: [...] } per player, weeks 1..5
+  const DATA = {
+    matt:  { color: getComputedStyle(document.documentElement).getPropertyValue('--lime').trim() || '#b8ff2c',
+             name: 'Matt P.',
+             dsr:  [62.4, 68.1, 71.9, 69.5, 78.2],
+             rank: [12, 8, 5, 7, 3],
+             wl:   ['2–1', '3–0', '2–1', '1–2', '3–0'],
+             diff: ['+4', '+11', '+7', '-3', '+14'] },
+    sally: { color: '#17d7b0', name: 'Sally W.',
+             dsr:  [58.2, 61.0, 59.4, 63.8, 66.1],
+             rank: [18, 14, 16, 11, 9],
+             wl:   ['2–1', '2–1', '1–2', '2–1', '2–1'],
+             diff: ['+2', '+5', '-4', '+6', '+5'] },
+    ryan:  { color: '#eab308', name: 'Ryan H.',
+             dsr:  [70.1, 66.4, 64.9, 68.2, 65.3],
+             rank: [4, 7, 9, 6, 10],
+             wl:   ['3–0', '1–2', '1–2', '2–1', '1–2'],
+             diff: ['+9', '-2', '-5', '+4', '-3'] },
+  };
+  const LEAGUE_AVG = [55.0, 55.8, 56.2, 56.0, 56.5];
+
+  let mode = 'dsr';
+  const show = { matt: true, sally: false, ryan: false };
+
+  const svg = document.getElementById('chart');
+  const tip = document.getElementById('tip');
+  const W = 720, H = 300, PAD_L = 44, PAD_R = 16, PAD_T = 18, PAD_B = 34;
+
+  const xFor = wk => PAD_L + (wk - 1) * ((W - PAD_L - PAD_R) / (TOTAL_WEEKS - 1));
+
+  function bounds() {
+    if (mode === 'rank') return { lo: 1, hi: 20 };
+    let vals = [...LEAGUE_AVG];
+    for (const k of Object.keys(DATA)) if (show[k]) vals = vals.concat(DATA[k].dsr);
+    const lo = Math.floor(Math.min(...vals) / 10) * 10 - 5;
+    const hi = Math.ceil(Math.max(...vals) / 10) * 10 + 5;
+    return { lo, hi };
+  }
+
+  function yFor(v, b) {
+    const t = (v - b.lo) / (b.hi - b.lo);
+    const tt = mode === 'rank' ? t : 1 - t;   // rank 1 belongs at the top
+    return PAD_T + tt * (H - PAD_T - PAD_B);
+  }
+
+  function pathFor(vals, b) {
+    return vals.map((v, i) => `${i ? 'L' : 'M'}${xFor(i + 1).toFixed(1)},${yFor(v, b).toFixed(1)}`).join(' ');
+  }
+
+  function draw() {
+    const b = bounds();
+    let s = '';
+
+    // horizontal gridlines + y labels
+    const steps = 4;
+    for (let i = 0; i <= steps; i++) {
+      const v = b.lo + (b.hi - b.lo) * i / steps;
+      const y = yFor(v, b);
+      s += `<line x1="${PAD_L}" y1="${y}" x2="${W - PAD_R}" y2="${y}" stroke="#262c28" stroke-width="1"/>`;
+      s += `<text x="${PAD_L - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="#6b756e" font-weight="600">${mode === 'rank' ? '#' + Math.round(v) : v.toFixed(0)}</text>`;
+    }
+
+    // x labels + future shading
+    s += `<rect x="${xFor(PLAYED)}" y="${PAD_T}" width="${xFor(TOTAL_WEEKS) - xFor(PLAYED)}" height="${H - PAD_T - PAD_B}" fill="rgba(255,255,255,0.02)"/>`;
+    for (let wk = 1; wk <= TOTAL_WEEKS; wk++) {
+      const lbl = wk === 6 ? 'Wk 6 · RIV' : wk === 7 ? 'Wk 7 · PO' : wk === 8 ? 'Wk 8 · CHIP' : 'Wk ' + wk;
+      s += `<text x="${xFor(wk)}" y="${H - 12}" text-anchor="middle" font-size="9.5" fill="${wk > PLAYED ? '#4a534d' : '#6b756e'}" font-weight="700">${lbl}</text>`;
+    }
+
+    // league avg (DSR mode only)
+    if (mode === 'dsr') {
+      s += `<path d="${pathFor(LEAGUE_AVG, b)}" fill="none" stroke="#6b756e" stroke-width="1.5" stroke-dasharray="5 5" opacity="0.7"/>`;
+    }
+
+    // player lines
+    for (const k of Object.keys(DATA)) {
+      if (!show[k]) continue;
+      const d = DATA[k];
+      const vals = mode === 'rank' ? d.rank : d.dsr;
+      if (k === 'matt' && mode === 'dsr') {
+        // area fill under the primary line
+        const area = pathFor(vals, b) + ` L${xFor(PLAYED)},${H - PAD_B} L${xFor(1)},${H - PAD_B} Z`;
+        s += `<path d="${area}" fill="${d.color}" opacity="0.07"/>`;
+      }
+      s += `<path d="${pathFor(vals, b)}" fill="none" stroke="${d.color}" stroke-width="${k === 'matt' ? 3 : 2}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      vals.forEach((v, i) => {
+        s += `<circle class="dot" data-k="${k}" data-i="${i}" cx="${xFor(i + 1)}" cy="${yFor(v, b)}" r="${k === 'matt' ? 5.5 : 4.5}" fill="#0e1110" stroke="${d.color}" stroke-width="2.5" style="cursor:pointer"/>`;
+      });
+      // value label on the last played point of the primary line
+      if (k === 'matt') {
+        const lastV = vals[PLAYED - 1];
+        s += `<text x="${xFor(PLAYED) + 10}" y="${yFor(lastV, b) - 8}" font-size="13" font-weight="800" fill="${d.color}">${mode === 'rank' ? '#' + lastV : lastV.toFixed(1)}</text>`;
+      }
+    }
+
+    svg.innerHTML = s;
+
+    svg.querySelectorAll('.dot').forEach(dot => {
+      dot.addEventListener('mouseenter', () => {
+        const k = dot.dataset.k, i = +dot.dataset.i, d = DATA[k];
+        const prev = i > 0 ? d.dsr[i - 1] : null;
+        const delta = prev == null ? null : Math.round((d.dsr[i] - prev) * 10) / 10;
+        tip.innerHTML = `<div class="tip__wk">Week ${i + 1} · ${d.name}</div>
+          DSR <b>${d.dsr[i].toFixed(1)}</b>${delta != null ? ` <span class="${delta >= 0 ? 'up' : 'dn'}">(${delta >= 0 ? '+' : ''}${delta})</span>` : ''}<br>
+          Rank <b>#${d.rank[i]}</b> · Night <b>${d.wl[i]}</b> · Diff <span class="${String(d.diff[i]).startsWith('-') ? 'dn' : 'up'}">${d.diff[i]}</span>`;
+        const r = svg.getBoundingClientRect();
+        tip.style.left = (parseFloat(dot.getAttribute('cx')) / W * r.width) + 'px';
+        tip.style.top = (parseFloat(dot.getAttribute('cy')) / H * r.height) + 'px';
+        tip.classList.add('show');
+      });
+      dot.addEventListener('mouseleave', () => tip.classList.remove('show'));
+    });
+  }
+
+  // weekly delta strip (primary player)
+  function strip() {
+    const el = document.getElementById('wk-strip');
+    let h = '';
+    for (let wk = 1; wk <= TOTAL_WEEKS; wk++) {
+      if (wk <= PLAYED) {
+        const v = DATA.matt.dsr[wk - 1];
+        const prev = wk > 1 ? DATA.matt.dsr[wk - 2] : null;
+        const d = prev == null ? null : Math.round((v - prev) * 10) / 10;
+        h += `<div class="wk-cell"><div class="wk-cell__wk">Wk ${wk}</div><div class="wk-cell__v">${v.toFixed(1)}</div>
+          <div class="wk-cell__d ${d == null ? 'flat' : d >= 0 ? 'up' : 'dn'}">${d == null ? 'debut' : (d >= 0 ? '▲ +' : '▼ ') + d}</div></div>`;
+      } else {
+        h += `<div class="wk-cell future"><div class="wk-cell__wk">Wk ${wk}</div><div class="wk-cell__v">·</div><div class="wk-cell__d flat">${wk === 6 ? 'rivalry' : wk === 7 ? 'playoffs' : 'chip'}</div></div>`;
+      }
+    }
+    el.innerHTML = h;
+  }
+
+  // controls
+  document.getElementById('mode-seg').addEventListener('click', e => {
+    const btn = e.target.closest('button'); if (!btn) return;
+    mode = btn.dataset.mode;
+    document.querySelectorAll('#mode-seg button').forEach(x => x.classList.toggle('on', x === btn));
+    draw();
+  });
+  const wire = (btnId, key, lgId) => document.getElementById(btnId).addEventListener('click', e => {
+    show[key] = !show[key];
+    e.currentTarget.classList.toggle('on', show[key]);
+    document.getElementById(lgId).style.display = show[key] ? '' : 'none';
+    draw();
+  });
+  wire('cmp-sally', 'sally', 'lg-sally');
+  wire('cmp-ryan', 'ryan', 'lg-ryan');
+
+  draw();
+  strip();
+})();
+</script>
+</body>
+</html>

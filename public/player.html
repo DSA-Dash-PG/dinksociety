@@ -383,10 +383,21 @@
         : null;
       const metrics = { avgPartnerDsr, avgOpponentDsr, opponentCount, pointsWonPct };
 
-      // Annotate each logged game with the opponents' avg DSR (current-season
-      // composite from the leaderboard blob) for the "your DSR vs theirs" edge.
+      // Annotate each logged game with SNAPSHOT DSRs — each player's season-to-
+      // date DSR as of that game's week (dsrHistory, written by rebuildStandings),
+      // falling back to the current composite for blobs built before the rebuild.
+      const dsrAt = (pid, week) => {
+        const hist = playersMap[pid]?.dsrHistory;
+        if (Array.isArray(hist) && hist.length && week != null) {
+          let best = null;
+          for (const h of hist) if (h.week <= week && (!best || h.week > best.week)) best = h;
+          if (best) return best.dsr;
+        }
+        return playersMap[pid]?.composite ?? null;
+      };
       for (const g of gameLog) {
-        const comps = (g.oppIds || []).map(pid => playersMap[pid]?.composite).filter(c => c != null);
+        g.myDsr = resolvedId ? dsrAt(resolvedId, g.week) : null;
+        const comps = (g.oppIds || []).map(pid => dsrAt(pid, g.week)).filter(c => c != null);
         g.oppDsr = comps.length ? comps.reduce((s, c) => s + c, 0) / comps.length : null;
         const pn = g.partnerId ? playersMap[g.partnerId] : null;
         if (pn && !g.partnerName) g.partnerName = pn.name;
@@ -614,7 +625,6 @@
       /* ── MATCH LOG — every game, grouped by week ── */
       if (gameLog.length) {
         const TYPE_LBL = { womens: "Women's", mens: "Men's", mixed: 'Mixed' };
-        const myDsr = ranks.dsr;
         const playerHref = (name, teamName) =>
           `/player?team=${teamName ? slug(teamName) : teamSlug}&name=${encodeURIComponent(name)}${LINK_SUFFIX}`;
 
@@ -646,14 +656,14 @@
               const partnerLink = g.partnerName
                 ? `<a href="${playerHref(g.partnerName, g.partnerTeamName || team.name)}">${esc(shortName(g.partnerName))}</a>`
                 : '—';
-              const dsrCell = (myDsr != null && g.oppDsr != null)
-                ? `<span class="${myDsr >= g.oppDsr ? 'val--green' : 'val--red'}">${Number(myDsr).toFixed(1)}</span> <span class="ml-lbl" style="display:inline">v</span> ${g.oppDsr.toFixed(1)}`
+              const dsrCell = (g.myDsr != null && g.oppDsr != null)
+                ? `<span class="${g.myDsr >= g.oppDsr ? 'val--green' : 'val--red'}">${Number(g.myDsr).toFixed(1)}</span> <span class="ml-lbl" style="display:inline">v</span> ${g.oppDsr.toFixed(1)}`
                 : '—';
               const wl = g.won === true ? '<span class="ml-wl ml-wl--w">W</span>' : g.won === false ? '<span class="ml-wl ml-wl--l">L</span>' : '';
               return `<div class="ml-row">
                 <span class="ml-type">R${g.round} ${TYPE_LBL[g.type] || g.type}</span>
                 <div class="ml-who"><span class="ml-lbl">w/</span> ${partnerLink} <span class="ml-lbl">vs</span> ${oppLinks}</div>
-                <div class="ml-dsr"><span class="ml-lbl">DSR you v them</span>${dsrCell}</div>
+                <div class="ml-dsr"><span class="ml-lbl">Wk ${g.week ?? '—'} DSR you v them</span>${dsrCell}</div>
                 <div class="ml-score">${g.myScore}–${g.oppScore}${wl}</div>
               </div>`;
             }).join('')}
