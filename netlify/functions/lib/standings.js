@@ -338,23 +338,23 @@ export async function rebuildStandings(circuit) {
       maxByType[t] = Math.max(maxByType[t], p.byType?.[t]?.played || 0);
     }
   }
-  // Ranking qualification: a player must have played at least HALF the games
-  // possible so far (per discipline) to hold a rank. Possible per match night:
-  // ~4 games overall, 2 on the gender line, 4 mixed. Unqualified players keep
-  // their rating (shown as "unqualified") but are excluded from rank pools.
+  // Ranking qualification: a player holds a rank once they've played MORE
+  // than 6 games total, OR at least 50% of the games possible so far (~3 per
+  // night → ceil(1.5 × weeks)): Wk1 = 2, Wk2 = 3, Wk3 = 5, Wk4 = 6, Wk5+ = 7.
+  // Unqualified players keep their rating (shown "unqualified") but are
+  // excluded from every rank pool.
   const weeksPlayed = finalizedWeeks.size;
-  const needAll    = Math.ceil(4 * weeksPlayed * 0.5);
-  const needGender = Math.ceil(2 * weeksPlayed * 0.5);
-  const needMixed  = Math.ceil(4 * weeksPlayed * 0.5);
+  const needGames = qualifyThreshold(weeksPlayed);
 
   for (const p of playerStats.values()) {
     const g = normGender(p.gender);
     const gType = g === 'F' ? 'womens' : g === 'M' ? 'mens' : null;
     p.dsrGender = gType ? splitComposite(p.byType?.[gType], maxByType[gType]) : null;
     p.dsrMixed  = splitComposite(p.byType?.mixed, maxByType.mixed);
-    p.dsrQualified       = p.gamesPlayed >= needAll;
-    p.dsrGenderQualified = (gType ? (p.byType?.[gType]?.played || 0) : 0) >= needGender;
-    p.dsrMixedQualified  = (p.byType?.mixed?.played || 0) >= needMixed;
+    const qualified = p.gamesPlayed >= needGames;
+    p.dsrQualified       = qualified;
+    p.dsrGenderQualified = qualified;
+    p.dsrMixedQualified  = qualified;
   }
   // Ranks: gender line within the same gender pool; Mixed across everyone.
   // Only qualified players are ranked.
@@ -657,6 +657,12 @@ function compositeScore(p, maxGames) {
 
 function normGender(g) { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; }
 
+// Ranking qualification threshold: more than 6 games total OR at least 50% of
+// possible games so far (~3 per night). ceil(1.5 × weeks), capped at 7.
+function qualifyThreshold(weeksPlayed) {
+  return Math.min(7, Math.ceil(1.5 * Math.max(0, weeksPlayed)));
+}
+
 // Composite for one discipline split ({played, won, diff, gameDiffs, clutch*}).
 // Returns a rounded DSR or null when the split has no games.
 function splitComposite(bt, maxGames) {
@@ -783,12 +789,10 @@ function computeRankDeltas(weekly) {
     const maxGGames = Math.max(1, ...active.map(([, c]) => c.g.gamesPlayed));
     const maxXGames = Math.max(1, ...active.map(([, c]) => c.x.gamesPlayed));
 
-    // Ranking qualification so far: at least half the possible games
-    // (per night: ~4 overall, 2 gender line, 4 mixed).
+    // Ranking qualification so far: >6 games OR 50% of possible (~3/night).
+    // One TOTAL-games threshold gates every rank pool (overall + splits).
     const weeksSoFar = weeks.indexOf(wk) + 1;
-    const qAll = Math.ceil(4 * weeksSoFar * 0.5);
-    const qG   = Math.ceil(2 * weeksSoFar * 0.5);
-    const qX   = Math.ceil(4 * weeksSoFar * 0.5);
+    const qAll = qualifyThreshold(weeksSoFar);
 
     const rows = active.map(([pid, c]) => ({
       pid,
@@ -803,13 +807,13 @@ function computeRankDeltas(weekly) {
     const ranked = rows.filter(r => r.games >= qAll).sort((a, b) => b.s - a.s);
     const snap = new Map();
     ranked.forEach((r, i) => { snap.set(r.pid, i + 1); r._rank = i + 1; });
-    // Gender-line rank within each gender pool
+    // Gender-line rank within each gender pool (same total-games qualification)
     for (const gflag of ['M', 'F']) {
-      const pool = rows.filter(r => r.gender === gflag && r.gS != null && r.gGames >= qG).sort((a, b) => b.gS - a.gS);
+      const pool = rows.filter(r => r.gender === gflag && r.gS != null && r.games >= qAll).sort((a, b) => b.gS - a.gS);
       pool.forEach((r, i) => { r._gRank = i + 1; });
     }
-    // Mixed rank across everyone
-    const xPool = rows.filter(r => r.xS != null && r.xGames >= qX).sort((a, b) => b.xS - a.xS);
+    // Mixed rank across everyone (same total-games qualification)
+    const xPool = rows.filter(r => r.xS != null && r.games >= qAll).sort((a, b) => b.xS - a.xS);
     xPool.forEach((r, i) => { r._xRank = i + 1; });
 
     const round1 = v => (v == null ? null : Math.round(v * 10) / 10);

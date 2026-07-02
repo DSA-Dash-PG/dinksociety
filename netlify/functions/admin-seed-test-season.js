@@ -558,21 +558,20 @@ async function writeAggregates({ teamAgg, playerAgg, weeklyPerTeam, weeklyPlayer
       maxByType[t] = Math.max(maxByType[t], p.byType?.[t]?.played || 0);
     }
   }
-  // Ranking qualification: at least half the possible games so far
-  // (per night: ~4 overall, 2 gender line, 4 mixed) — mirrors lib/standings.js.
+  // Ranking qualification: >6 games total OR 50% of possible so far
+  // (~3/night → ceil(1.5 × weeks), capped at 7) — mirrors lib/standings.js.
   const weeksPlayed = Object.keys(weeklyPerTeam).length;
-  const needAll    = Math.ceil(4 * weeksPlayed * 0.5);
-  const needGender = Math.ceil(2 * weeksPlayed * 0.5);
-  const needMixed  = Math.ceil(4 * weeksPlayed * 0.5);
+  const needGames = qualifyThreshold(weeksPlayed);
 
   for (const p of playerAgg.values()) {
     const g = normGender(p.gender);
     const gType = g === 'F' ? 'womens' : g === 'M' ? 'mens' : null;
     p.dsrGender = gType ? splitComposite(p.byType?.[gType], maxByType[gType]) : null;
     p.dsrMixed  = splitComposite(p.byType?.mixed, maxByType.mixed);
-    p.dsrQualified       = p.gamesPlayed >= needAll;
-    p.dsrGenderQualified = (gType ? (p.byType?.[gType]?.played || 0) : 0) >= needGender;
-    p.dsrMixedQualified  = (p.byType?.mixed?.played || 0) >= needMixed;
+    const qualified = p.gamesPlayed >= needGames;
+    p.dsrQualified       = qualified;
+    p.dsrGenderQualified = qualified;
+    p.dsrMixedQualified  = qualified;
   }
   for (const p of playerAgg.values()) { p.dsrGenderRank = null; p.dsrMixedRank = null; }
   for (const gflag of ['M', 'F']) {
@@ -620,6 +619,11 @@ function compositeScore(p, maxGames) {
 }
 
 function normGender(g) { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; }
+
+// Ranking qualification threshold — mirrors lib/standings.js.
+function qualifyThreshold(weeksPlayed) {
+  return Math.min(7, Math.ceil(1.5 * Math.max(0, weeksPlayed)));
+}
 
 // Composite for one discipline split — mirrors lib/standings.js.
 function splitComposite(bt, maxGames) {
@@ -735,9 +739,7 @@ function computeRankDeltas(weekly) {
 
     // Ranking qualification so far (mirrors lib/standings.js)
     const weeksSoFar = weeks.indexOf(wk) + 1;
-    const qAll = Math.ceil(4 * weeksSoFar * 0.5);
-    const qG   = Math.ceil(2 * weeksSoFar * 0.5);
-    const qX   = Math.ceil(4 * weeksSoFar * 0.5);
+    const qAll = qualifyThreshold(weeksSoFar);
 
     const rows = active.map(([pid, c]) => ({
       pid,
@@ -752,10 +754,10 @@ function computeRankDeltas(weekly) {
     const snap = new Map();
     ranked.forEach((r, i) => { snap.set(r.pid, i + 1); r._rank = i + 1; });
     for (const gflag of ['M', 'F']) {
-      const pool = rows.filter(r => r.gender === gflag && r.gS != null && r.gGames >= qG).sort((a, b) => b.gS - a.gS);
+      const pool = rows.filter(r => r.gender === gflag && r.gS != null && r.games >= qAll).sort((a, b) => b.gS - a.gS);
       pool.forEach((r, i) => { r._gRank = i + 1; });
     }
-    const xPool = rows.filter(r => r.xS != null && r.xGames >= qX).sort((a, b) => b.xS - a.xS);
+    const xPool = rows.filter(r => r.xS != null && r.games >= qAll).sort((a, b) => b.xS - a.xS);
     xPool.forEach((r, i) => { r._xRank = i + 1; });
 
     const round1 = v => (v == null ? null : Math.round(v * 10) / 10);
