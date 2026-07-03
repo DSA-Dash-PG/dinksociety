@@ -216,6 +216,25 @@
   .m.is-open .m__toggle .chev { transform:rotate(180deg); }
   .m__detail { display:none; margin-top:11px; }
   .m.is-open .m__detail { display:block; }
+  /* Past results recede: dimmed + desaturated inside a subtly recessed panel. */
+  .past-wrap { background:rgba(255,255,255,0.015); border:1px solid var(--color-divider); border-radius:var(--radius-lg); padding:10px 10px 2px; margin-top:2px; }
+  .past-wrap .m { filter:saturate(0.55); opacity:0.7; transition:filter var(--transition), opacity var(--transition); }
+  .past-wrap .m:hover, .past-wrap .m.is-open { filter:saturate(1); opacity:1; }
+  .label--past { color:var(--color-text-faint); }
+  /* Match-history rows inside a team profile sheet. */
+  .thist { background:var(--color-surface-2); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:10px 12px; margin-bottom:8px; }
+  .thist__top { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .thist__wk { font-size:9px; letter-spacing:0.08em; text-transform:uppercase; color:var(--color-text-faint); font-weight:800; }
+  .thist__opp { font-weight:800; font-size:14px; margin-top:2px; }
+  .thist__right { display:flex; align-items:center; gap:9px; }
+  .thist__sc { font-size:16px; font-weight:900; letter-spacing:.02em; }
+  .thist__sc .w { color:var(--color-lime); }
+  .thist .m__toggle { margin-top:8px; }
+  .thist .m__detail { display:none; margin-top:8px; }
+  .thist.is-open .m__detail { display:block; }
+  .thist.is-open .m__toggle .chev { transform:rotate(180deg); }
+  .venmo-btn { display:block; width:100%; background:#3d95ce; color:#fff; border:0; border-radius:var(--radius-full); padding:10px; font-size:13px; font-weight:800; cursor:pointer; font-family:inherit; }
+  .venmo-btn:hover { background:#4fa4d8; }
   .gs__rd { border:1px solid var(--color-border); border-radius:var(--radius-sm); overflow:hidden; margin-bottom:9px; }
   .gs__rdhead { padding:7px 10px 6px; }
   .gs__badge { font-size:8px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; background:var(--color-lime); color:var(--color-text-inverse); padding:3px 9px; border-radius:var(--radius-full); }
@@ -949,6 +968,53 @@
       .then(r => r.ok ? r.json() : { teams: [] }).then(d => d.teams || []).catch(() => []);
     return _teamsCache;
   }
+  // Season-wide schedule (every team's matches + scores), fetched once and cached.
+  // Powers the "Match history" section on any team's profile sheet.
+  let _scheduleCache = null;
+  function _scheduleData() {
+    if (_scheduleCache) return _scheduleCache;
+    const season = 'circuit-' + (DATA?.profile?.circuit || 'I').toLowerCase();
+    _scheduleCache = fetch(API + '/public-schedule?season=' + encodeURIComponent(season), { credentials: 'include' })
+      .then(r => r.ok ? r.json() : { weeks: [] })
+      .then(d => { const out = []; (d.weeks || []).forEach(wk => (wk.matches || []).forEach(m => out.push({ ...m, week: m.week ?? wk.week }))); return out; })
+      .catch(() => []);
+    return _scheduleCache;
+  }
+  // Normalize the season schedule into ONE team's match rows (from that team's
+  // perspective). Upcoming first (soonest), then finals (most recent first).
+  function teamHistoryRows(matches, id, name) {
+    const rows = (matches || []).filter(m =>
+      (id && (m.teamAId === id || m.teamBId === id)) ||
+      (!id && (slug(m.teamA) === slug(name) || slug(m.teamB) === slug(name)))
+    ).map(m => {
+      const isA = id ? m.teamAId === id : slug(m.teamA) === slug(name);
+      const final = !!m.finalizedAt;
+      const myGames = isA ? m.gamesA : m.gamesB, oppGames = isA ? m.gamesB : m.gamesA;
+      let result = null;
+      if (final && myGames != null && oppGames != null) result = myGames > oppGames ? 'W' : myGames < oppGames ? 'L' : 'T';
+      return { matchId: m.id, week: m.week, home: isA, opp: isA ? m.teamB : m.teamA, oppId: isA ? m.teamBId : m.teamAId,
+        oppEmoji: isA ? m.emojiB : m.emojiA, myGames, oppGames, final, result, scheduledAt: m.scheduledAt };
+    });
+    return rows.sort((a, b) => (a.final !== b.final) ? (a.final ? 1 : -1) : (a.final ? b.week - a.week : a.week - b.week));
+  }
+  function renderTeamHistory(rows) {
+    if (!rows || !rows.length) return '<div class="ph-empty">No matches yet this season.</div>';
+    return rows.map(r => {
+      if (!r.final) {
+        const dt = r.scheduledAt ? new Date(r.scheduledAt).toLocaleDateString([], { month: 'short', day: 'numeric' }) : 'TBD';
+        return `<div class="thist"><div class="thist__top"><div><div class="thist__wk">WEEK ${r.week}</div><div class="thist__opp">${r.home ? 'vs' : '@'} ${esc(r.opp || 'TBD')}</div></div><span class="m__pill pill-up">${esc(dt)}</span></div></div>`;
+      }
+      const badge = r.result === 'W' ? '<span class="m__pill pill-win">Won</span>' : r.result === 'L' ? '<span class="m__pill pill-loss">Lost</span>' : '<span class="m__pill pill-final">Tie</span>';
+      const gv = (r.myGames != null && r.oppGames != null) ? `<span class="${r.myGames > r.oppGames ? 'w' : ''}">${r.myGames}</span>–<span class="${r.oppGames > r.myGames ? 'w' : ''}">${r.oppGames}</span>` : '';
+      return `<div class="thist">
+        <div class="thist__top">
+          <div><div class="thist__wk">WEEK ${r.week}</div><div class="thist__opp">${r.home ? 'vs' : '@'} ${esc(r.opp || '—')}</div></div>
+          <div class="thist__right"><div class="thist__sc">${gv}</div>${badge}</div>
+        </div>
+        ${r.matchId ? `<button class="m__toggle" onclick="toggleGameScores(this, '${esc(r.matchId)}')"><span class="lbl">Show game scores</span> <span class="chev">▾</span></button><div class="m__detail"></div>` : ''}
+      </div>`;
+    }).join('');
+  }
   function openProfileSheet(kind, data, _isBack) {
     if (!_isBack) _profStack.push({ kind, data });
     $('psheet').setAttribute('aria-hidden', 'false');
@@ -1299,10 +1365,14 @@
       <div class="ph-emoji">${emo({ emoji })}</div>
       <div class="ph-name">${esc(name)}</div>
       ${divLabel ? `<div class="ph-sub">${esc(divLabel)}</div>` : ''}
-    </div>${tiles}<div class="label">Roster</div><div id="ph-roster"><div class="ph-empty">Loading roster…</div></div>`;
+    </div>${tiles}<div class="label">Match history</div><div id="ph-history"><div class="ph-empty">Loading history…</div></div><div class="label">Roster</div><div id="ph-roster"><div class="ph-empty">Loading roster…</div></div>`;
     // Roster from public-teams (cached); names tap through to player sheets.
     const teams = await _teamsData();
     const team = teams.find(t => (id && t.id === id) || slug(t.name) === slug(name));
+    // Match history — every match this team has played/scheduled, with scores.
+    // Fetched independently so it renders even when the roster isn't available.
+    const _tid = id || team?.id || null;
+    _scheduleData().then(matches => { const hEl = $('ph-history'); if (hEl) hEl.innerHTML = renderTeamHistory(teamHistoryRows(matches, _tid, team?.name || name)); });
     const rosterEl = $('ph-roster');
     if (!rosterEl) return;
     const ros = (team?.roster || []);
@@ -1843,26 +1913,47 @@
     const pill = (txt, c, bg) => '<span style="font-size:10px;font-weight:800;color:' + c + ';background:' + bg + ';padding:3px 9px;border-radius:999px;white-space:nowrap;">' + txt + '</span>';
     let h = '<div class="label">Ladder nights</div>';
     reg.forEach(ev => {
+      const duePay = ev.paymentStatus === 'pending' || ev.paymentStatus === 'venmo_pending';
       const tag = ev.list === 'waitlist'
         ? pill('Waitlist', 'var(--color-gold)', 'var(--color-gold-dim)')
-        : (ev.paymentStatus === 'pending' || ev.paymentStatus === 'venmo_pending')
+        : duePay
           ? pill('Payment due', 'var(--color-gold)', 'var(--color-gold-dim)')
           : pill('You’re in', 'var(--color-lime)', 'var(--color-lime-dim)');
-      h += '<a href="/ladders.html#ladders/' + encodeURIComponent(ev.id) + '" class="m hcard-tap" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;">'
-        + '<div style="font-size:22px;">🎾</div>'
+      const venmo = duePay ? venmoPayBtn(ev) : '';
+      h += '<div class="m" style="display:block;padding:0;overflow:hidden;">'
+        + '<a href="/ladders.html#ladders/' + encodeURIComponent(ev.id) + '" class="hcard-tap" style="display:flex;align-items:center;gap:12px;text-decoration:none;color:inherit;padding:11px 13px;">'
+        + '<div style="font-size:22px;">🪜</div>'
         + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + esc(ev.name) + '</div>'
         + '<div style="font-size:10px;color:var(--color-text-faint);margin-top:2px;">' + esc(meta(ev)) + '</div></div>'
-        + tag + '</a>';
+        + tag + '</a>'
+        + (venmo ? '<div style="padding:0 13px 12px;">' + venmo + '</div>' : '')
+        + '</div>';
     });
     open.forEach(ev => {
       const left = ev.spotsLeft != null ? ' · ' + ev.spotsLeft + ' spot' + (ev.spotsLeft === 1 ? '' : 's') + ' left' : '';
       h += '<div class="m" style="display:flex;align-items:center;gap:12px;">'
-        + '<div style="font-size:22px;opacity:.8;">🎾</div>'
+        + '<div style="font-size:22px;opacity:.8;">🪜</div>'
         + '<div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;">' + esc(ev.name) + '</div>'
         + '<div style="font-size:10px;color:var(--color-text-faint);margin-top:2px;">' + esc(meta(ev)) + left + '</div></div>'
         + '<a href="/ladders.html#ladders/' + encodeURIComponent(ev.id) + '" style="font-size:11px;font-weight:800;color:var(--color-text-inverse);background:var(--color-lime);padding:7px 13px;border-radius:999px;text-decoration:none;white-space:nowrap;">Sign up</a></div>';
     });
     return h;
+  }
+  // One-tap Venmo: build a deep link (opens the app prefilled) with a web
+  // fallback for anyone without the app. Only shows when the ladder takes Venmo.
+  function venmoPayBtn(ev) {
+    const methods = ev.paymentMethods || ['card', 'venmo'];
+    if (!ev.venmoHandle || !methods.includes('venmo') || !ev.feeCents) return '';
+    const amt = (ev.feeCents / 100).toFixed(2);
+    return `<button class="venmo-btn" data-h="${esc(String(ev.venmoHandle).replace(/^@/, ''))}" data-a="${amt}" data-n="${esc(ev.name || 'Ladder entry')}" onclick="payVenmo(this)">Pay $${amt} with Venmo</button>`;
+  }
+  function payVenmo(btn) {
+    const h = encodeURIComponent(btn.dataset.h || ''), a = btn.dataset.a || '', n = encodeURIComponent(btn.dataset.n || 'Ladder entry');
+    const deep = `venmo://paycharge?txn=pay&recipients=${h}&amount=${a}&note=${n}`;
+    const web = `https://venmo.com/${h}?txn=pay&amount=${a}&note=${n}`;
+    const t = setTimeout(() => { location.href = web; }, 700);
+    window.addEventListener('blur', () => clearTimeout(t), { once: true });
+    location.href = deep;
   }
 
   // A single upcoming ladder night, for the merged Games schedule.
@@ -2329,7 +2420,7 @@
       ((DATA.ladder && DATA.ladder.perLadder) || []).forEach((p, i) => resItems.push({ d: p.date || '', h: ladderGameResult(p, i) }));
     } catch {}
     const res = resItems.filter(x => x.h).sort((a, b) => String(b.d).localeCompare(String(a.d)));
-    if (res.length) html += '<div class="label">Results</div>' + res.map(x => x.h).join('');
+    if (res.length) html += '<div class="label label--past">Past results</div><div class="past-wrap">' + res.map(x => x.h).join('') + '</div>';
 
     if (!next && !sched.length && !res.length) html += '<div class="muted">No games yet — your league matches and ladder nights will show up here.</div>';
     $('v-schedule').innerHTML = html;
@@ -2444,7 +2535,7 @@
   // signed-in player's games get the lime YOU treatment.
   const gameScoreCache = {};
   async function toggleGameScores(btn, matchId) {
-    const card = btn.closest('.m');
+    const card = btn.closest('.m, .thist');
     const body = card && card.querySelector('.m__detail');
     if (!card || !body) return;
     const open = card.classList.toggle('is-open');
@@ -3153,13 +3244,15 @@
     const sched = DATA.schedule || [];
     const teamRow = (m) => {
       const opp = m.opponent?.name || 'TBD';
+      // Opponent taps through to their profile sheet (record + full match history).
+      const oppEl = m.opponent?.id || m.opponent?.name ? teamLink(m.opponent?.id, opp, `${m.home ? 'vs' : '@'} ${esc(opp)}`) : `${m.home ? 'vs' : '@'} ${esc(opp)}`;
       const dt = m.scheduledAt ? new Date(m.scheduledAt).toLocaleDateString([], { month:'short', day:'numeric' }) : '';
       if (m.final) {
         const cls = m.result === 'W' ? 'w' : m.result === 'L' ? 'l' : 't';
         const sc = (m.myMp != null && m.oppMp != null) ? `${m.myMp}–${m.oppMp}` : '';
-        return `<div class="trow"><span class="trow__wk">WK ${m.week}</span><span class="trow__opp">${m.home ? 'vs' : '@'} ${esc(opp)}</span><span class="trow__res ${cls}">${m.result || '—'}${sc ? ' ' + sc : ''}</span></div>`;
+        return `<div class="trow"><span class="trow__wk">WK ${m.week}</span><span class="trow__opp">${oppEl}</span><span class="trow__res ${cls}">${m.result || '—'}${sc ? ' ' + sc : ''}</span></div>`;
       }
-      return `<div class="trow"><span class="trow__wk">WK ${m.week}</span><span class="trow__opp">${m.home ? 'vs' : '@'} ${esc(opp)}</span><span class="trow__dt">${esc(dt || 'TBD')}</span></div>`;
+      return `<div class="trow"><span class="trow__wk">WK ${m.week}</span><span class="trow__opp">${oppEl}</span><span class="trow__dt">${esc(dt || 'TBD')}</span></div>`;
     };
     const upc = sched.filter(m => !m.final), fin = sched.filter(m => m.final);
     let scheduleBody = '';

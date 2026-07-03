@@ -48,6 +48,9 @@ export default async (req) => {
       id: e.id, name: e.name || 'Ladder', date: e.date || null,
       startTime: e.startTime || null, place: e.place || null,
       status: e.status || 'open', spotsLeft: left, capacity: cap,
+      // Payment info so the portal can offer a one-tap Venmo deep link.
+      venmoHandle: e.venmoHandle || null, feeCents: Number(e.feeCents) || 0,
+      paymentMethods: Array.isArray(e.paymentMethods) && e.paymentMethods.length ? e.paymentMethods : null,
     };
     if (entry) {
       registered.push({ ...base, list: entry.list, paymentStatus: entry.entry?.paymentStatus || null });

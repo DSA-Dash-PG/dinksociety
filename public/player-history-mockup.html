@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Mockup · Team match history + schedule polish</title>
+<style>
+  :root{
+    --bg:#0e0e0e; --surface:#161616; --surface-2:#1e1e1e; --surface-3:#262626;
+    --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.14); --divider:rgba(255,255,255,.06);
+    --tx:#f0f0ec; --tx-muted:#9a9e97; --tx-faint:#5e625c; --ink:#0e0e0e;
+    --lime:#b8ff2c; --lime-dim:rgba(184,255,44,.12); --lime-ghost:rgba(184,255,44,.06);
+    --teal:#17d7b0; --teal-dim:rgba(23,215,176,.12);
+    --red:#ff5c47; --gold:#f0c040; --gold-dim:rgba(240,192,64,.12);
+    --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    --venmo:#3d95ce;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 50% -10%,#181818,#0e0e0e);color:var(--tx);font-family:var(--font);-webkit-font-smoothing:antialiased;padding:28px 16px 60px}
+  .wrap{max-width:1140px;margin:0 auto}
+  .head{text-align:center;margin-bottom:26px}
+  .head .kick{font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--tx-faint);font-weight:800}
+  .head h1{font-size:26px;font-weight:900;font-style:italic;text-transform:uppercase;margin:6px 0 6px;letter-spacing:-.01em}
+  .head p{color:var(--tx-muted);font-size:14px;max-width:640px;margin:0 auto;line-height:1.6}
+  .stage{display:flex;gap:32px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+
+  /* phone */
+  .phone{width:390px;flex:0 0 390px;background:var(--bg);border:1px solid var(--border-strong);border-radius:34px;padding:12px;box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative}
+  .screen{background:var(--bg);border-radius:24px;overflow:hidden;height:760px;display:flex;flex-direction:column;position:relative}
+  .sbar{display:flex;justify-content:space-between;align-items:center;padding:10px 18px 4px;font-size:12px;color:var(--tx-faint);font-weight:700}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:6px 16px 12px;border-bottom:1px solid var(--divider)}
+  .brand{font-size:13px;font-weight:900;letter-spacing:.14em;text-transform:uppercase}
+  .brand b{color:var(--lime)}
+  .avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--lime),var(--teal));color:var(--ink);font-weight:900;font-size:12px;display:flex;align-items:center;justify-content:center}
+
+  /* segmented tabs */
+  .segs{display:flex;gap:6px;padding:12px 14px 6px}
+  .seg{flex:1;text-align:center;font-size:12.5px;font-weight:800;padding:9px 0;border-radius:999px;background:var(--surface);color:var(--tx-muted);border:1px solid var(--border);cursor:pointer;transition:.15s}
+  .seg.on{background:var(--lime);color:var(--ink);border-color:var(--lime)}
+
+  .body{flex:1;overflow-y:auto;padding:8px 14px 90px}
+  .body::-webkit-scrollbar{width:0}
+  .view{display:none} .view.on{display:block}
+
+  /* section headers with clearer separation */
+  .band{display:flex;align-items:center;gap:9px;margin:16px 2px 9px}
+  .band .lbl{font-size:10px;font-weight:900;letter-spacing:.16em;text-transform:uppercase;color:var(--tx-faint)}
+  .band .rule{flex:1;height:1px;background:var(--divider)}
+  .band.next .lbl{color:var(--lime)}
+  .band.live .lbl{color:var(--red)}
+  .band.past .lbl{color:var(--tx-faint)}
+
+  /* match card */
+  .mc{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:.15s;position:relative;overflow:hidden}
+  .mc:active{transform:scale(.99)}
+  .mc .row{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .mc .wk{font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--tx-faint)}
+  .mc .team{display:flex;align-items:center;gap:9px;min-width:0}
+  .dot{width:26px;height:26px;border-radius:8px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;color:var(--ink)}
+  .mc .nm{font-weight:800;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mc .meta{font-size:11.5px;color:var(--tx-muted);margin-top:3px}
+  .sc{font-size:19px;font-weight:900;letter-spacing:.02em}
+  .sc .w{color:var(--lime)} .sc .l{color:var(--tx-faint)} .sc .sep{color:var(--tx-faint);margin:0 3px;font-size:14px}
+  .pill{font-size:9px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:3px 7px;border-radius:999px}
+  .pill.w{background:var(--lime-dim);color:var(--lime)} .pill.l{background:var(--red-dim,rgba(255,92,71,.12));color:var(--red)} .pill.t{background:var(--gold-dim);color:var(--gold)}
+
+  /* the "up next" hero card */
+  .mc.hero{background:linear-gradient(180deg,rgba(184,255,44,.10),rgba(184,255,44,.02));border-color:rgba(184,255,44,.35)}
+  .mc.hero .bignm{font-size:17px;font-weight:900}
+  .mc.hero .cta{margin-top:11px;display:flex;gap:8px}
+  .btn{flex:1;text-align:center;font-size:12.5px;font-weight:800;padding:10px 0;border-radius:999px;border:1px solid var(--border-strong);background:var(--surface-2);color:var(--tx);cursor:pointer}
+  .btn.lime{background:var(--lime);color:var(--ink);border-color:var(--lime)}
+  .livechip{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:900;text-transform:uppercase;color:var(--red)}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 0 0 rgba(255,92,71,.6);animation:p 1.4s infinite}
+  @keyframes p{0%{box-shadow:0 0 0 0 rgba(255,92,71,.5)}70%{box-shadow:0 0 0 7px rgba(255,92,71,0)}100%{box-shadow:0 0 0 0 rgba(255,92,71,0)}}
+
+  /* PAST — dimmed + desaturated so it recedes */
+  .past-wrap{margin-top:4px;padding:10px 10px 2px;background:rgba(255,255,255,.015);border:1px solid var(--divider);border-radius:16px}
+  .mc.past{filter:saturate(.55);opacity:.72;background:var(--surface-2);border-color:var(--divider)}
+  .mc.past .nm{color:var(--tx-muted)}
+  .mc.past:hover{opacity:1;filter:saturate(1)}
+
+  .tapnote{position:absolute;top:9px;right:10px;font-size:9px;font-weight:900;letter-spacing:.05em;text-transform:uppercase;color:var(--tx-faint);display:flex;align-items:center;gap:4px}
+  .tapnote svg{width:11px;height:11px}
+
+  /* standings table */
+  .tbl{width:100%;border-collapse:collapse;font-size:13px}
+  .tbl th{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx-faint);text-align:right;padding:8px 6px;font-weight:800}
+  .tbl th:first-child{text-align:left}
+  .tbl td{padding:11px 6px;border-top:1px solid var(--divider);text-align:right}
+  .tbl td:first-child{text-align:left}
+  .tbl tr{cursor:pointer}
+  .tbl tr:active td{background:var(--surface)}
+  .trank{color:var(--tx-faint);font-weight:800;margin-right:8px}
+  .tnm{font-weight:800}
+  .tbl .clip{color:var(--lime);font-weight:900}
+
+  /* team header + sub tabs */
+  .thero{display:flex;align-items:center;gap:12px;padding:14px 4px 12px}
+  .thero .dot{width:46px;height:46px;border-radius:12px;font-size:18px}
+  .thero h2{margin:0;font-size:19px;font-weight:900;font-style:italic;text-transform:uppercase}
+  .thero .sub{color:var(--tx-muted);font-size:12px;margin-top:2px}
+  .subsegs{display:flex;gap:6px;margin:6px 2px 10px}
+  .ss{font-size:12px;font-weight:800;padding:7px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--tx-muted);cursor:pointer}
+  .ss.on{background:var(--surface-3);color:var(--tx);border-color:var(--border-strong)}
+
+  /* bottom nav */
+  .nav{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-around;padding:8px 6px 14px;background:linear-gradient(180deg,rgba(14,14,14,0),var(--bg) 34%);backdrop-filter:blur(6px);border-top:1px solid var(--divider)}
+  .nb{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;font-weight:800;color:var(--tx-faint);cursor:pointer}
+  .nb.on{color:var(--lime)}
+  .nb i{width:20px;height:20px;border-radius:6px;background:currentColor;opacity:.9;mask-size:contain;-webkit-mask-size:contain}
+
+  /* modal */
+  .ov{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);display:none;align-items:flex-end;z-index:20}
+  .ov.on{display:flex}
+  .sheet{width:100%;max-height:92%;background:var(--surface);border-top-left-radius:22px;border-top-right-radius:22px;border-top:1px solid var(--border-strong);display:flex;flex-direction:column;animation:up .22s cubic-bezier(.16,1,.3,1)}
+  @keyframes up{from{transform:translateY(30px);opacity:.4}to{transform:translateY(0);opacity:1}}
+  .grab{width:38px;height:4px;border-radius:99px;background:var(--surface-4,#2e2e2e);margin:9px auto 2px}
+  .sheet .sh-head{padding:8px 16px 12px;border-bottom:1px solid var(--divider)}
+  .sheet .sh-body{overflow-y:auto;padding:10px 14px 24px}
+  .sh-top{display:flex;align-items:center;gap:11px}
+  .sh-top .dot{width:42px;height:42px;border-radius:11px;font-size:16px}
+  .sh-top h3{margin:0;font-size:17px;font-weight:900;font-style:italic;text-transform:uppercase}
+  .sh-top .sub{font-size:11.5px;color:var(--tx-muted);margin-top:2px}
+  .sh-stats{display:flex;gap:7px;margin-top:11px}
+  .kpi{flex:1;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:8px 6px;text-align:center}
+  .kpi .n{font-size:16px;font-weight:900;color:var(--lime)}
+  .kpi .l{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx-faint);font-weight:800;margin-top:2px}
+  .x{position:absolute;top:12px;right:14px;width:30px;height:30px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);color:var(--tx-muted);font-size:16px;cursor:pointer;z-index:2}
+
+  /* match history row inside sheet */
+  .hrow{border:1px solid var(--border);border-radius:13px;padding:11px 12px;margin-bottom:9px;background:var(--surface-2)}
+  .hrow .hr-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .hrow .hr-wk{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--tx-faint)}
+  .hrow .hr-opp{font-weight:800;font-size:14px;margin-top:1px}
+  .hrow .hr-final{font-size:18px;font-weight:900}
+  .games{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+  .gm{font-size:11px;font-weight:800;padding:4px 8px;border-radius:8px;background:var(--surface-3);color:var(--tx-muted)}
+  .gm b{color:var(--tx)}
+  .gm.win{background:var(--lime-ghost);color:var(--lime)}
+  .gm.win b{color:var(--lime)}
+
+  /* venmo card */
+  .venmo{background:linear-gradient(180deg,rgba(61,149,206,.14),rgba(61,149,206,.03));border:1px solid rgba(61,149,206,.3);border-radius:16px;padding:14px;margin:14px 2px}
+  .venmo h4{margin:0 0 4px;font-size:14px;font-weight:900}
+  .venmo p{margin:0 0 11px;font-size:12px;color:var(--tx-muted);line-height:1.5}
+  .venmo .vbtn{display:block;text-align:center;background:var(--venmo);color:#fff;font-weight:900;font-size:14px;padding:12px;border-radius:999px;text-decoration:none;border:0;width:100%;cursor:pointer}
+  .venmo .vurl{margin-top:9px;font-size:10.5px;color:var(--tx-faint);word-break:break-all;font-family:ui-monospace,monospace;background:var(--surface);border:1px solid var(--divider);border-radius:8px;padding:7px 9px}
+
+  /* right rail notes */
+  .rail{flex:1;min-width:300px;max-width:420px}
+  .rail h3{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--tx-faint);font-weight:900;margin:2px 0 12px}
+  .note{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--lime);border-radius:0 12px 12px 0;padding:12px 14px;margin-bottom:10px}
+  .note b{color:var(--tx);font-weight:800;font-size:13.5px}
+  .note p{margin:5px 0 0;color:var(--tx-muted);font-size:12.5px;line-height:1.55}
+  .note .try{margin-top:8px;font-size:11px;color:var(--lime);font-weight:800}
+  .legend{font-size:11px;color:var(--tx-faint);text-align:center;margin-top:22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <div class="kick">The Dink Society · Player app mock</div>
+    <h1>Team history everywhere · cleaner schedule</h1>
+    <p>Tap any team — on Games, Standings, or Team → Schedule — to pull up its full match history with scores. Past games recede visually so the schedule reads at a glance. Plus a one-tap Venmo pay link. All screens below are interactive.</p>
+  </div>
+
+  <div class="stage">
+    <!-- PHONE -->
+    <div class="phone">
+      <div class="screen">
+        <div class="sbar"><span>9:41</span><span>The Dink Society</span></div>
+        <div class="topbar">
+          <div class="brand">DINK<b>·</b>SOCIETY</div>
+          <div class="avatar">RH</div>
+        </div>
+
+        <div class="segs">
+          <div class="seg on" data-tab="games" onclick="tab('games')">Games</div>
+          <div class="seg" data-tab="standings" onclick="tab('standings')">Standings</div>
+          <div class="seg" data-tab="team" onclick="tab('team')">Team</div>
+        </div>
+
+        <div class="body">
+          <!-- GAMES -->
+          <section class="view on" id="v-games">
+            <div class="band live"><span class="lbl">Live now</span><span class="rule"></span></div>
+            <div class="mc hero" onclick="openHist('ninjas')">
+              <div class="tapnote">tap for history <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div>
+              <span class="livechip"><span class="pulse"></span> Live · Court 3</span>
+              <div class="row" style="margin-top:8px">
+                <div class="team"><span class="dot" style="background:var(--teal)">NN</span><span class="bignm">Net Ninjas</span></div>
+                <div class="sc"><span class="w">3</span><span class="sep">–</span><span class="l">2</span></div>
+              </div>
+              <div class="meta">Week 5 · through 5 of 12 games</div>
+              <div class="cta">
+                <button class="btn lime" onclick="event.stopPropagation()">Watch live</button>
+                <button class="btn" onclick="event.stopPropagation();openHist('ninjas')">Match history</button>
+              </div>
+            </div>
+
+            <div class="band next"><span class="lbl">Up next</span><span class="rule"></span></div>
+            <div class="mc" onclick="openHist('bangers')">
+              <div class="tapnote">tap for history <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div>
+              <div class="row">
+                <div class="team"><span class="dot" style="background:var(--gold)">BB</span><div><div class="nm">Backhand Bandits</div><div class="meta">Mon Jul 6 · 7:00 PM · Court 1</div></div></div>
+                <span class="pill t">Wk 6</span>
+              </div>
+            </div>
+
+            <div class="band"><span class="lbl">Upcoming</span><span class="rule"></span></div>
+            <div class="mc" onclick="openHist('llamas')">
+              <div class="row"><div class="team"><span class="dot" style="background:#c07be0">VL</span><div><div class="nm">Volley Llamas</div><div class="meta">Mon Jul 13 · 7:00 PM</div></div></div><span class="pill" style="background:var(--surface-3);color:var(--tx-muted)">Wk 7</span></div>
+            </div>
+            <div class="mc" onclick="openHist('heroes')">
+              <div class="row"><div class="team"><span class="dot" style="background:var(--red)">TH</span><div><div class="nm">Third Shot Heroes</div><div class="meta">Mon Jul 20 · 7:00 PM</div></div></div><span class="pill" style="background:var(--surface-3);color:var(--tx-muted)">Wk 8</span></div>
+            </div>
+
+            <div class="band past"><span class="lbl">Past results</span><span class="rule"></span></div>
+            <div class="past-wrap">
+              <div class="mc past" onclick="openHist('sinkers')">
+                <div class="row"><div class="team"><span class="dot" style="background:#6b7280">KS</span><div><div class="nm">Kitchen Sinkers</div><div class="meta">Week 4 · Jun 29</div></div></div><div style="text-align:right"><div class="sc"><span class="w">4</span><span class="sep">–</span><span class="l">0</span></div><span class="pill w">Won</span></div></div>
+              </div>
+              <div class="mc past" onclick="openHist('dinkers')">
+                <div class="row"><div class="team"><span class="dot" style="background:#6b7280">DD</span><div><div class="nm">Dilly Dinkers</div><div class="meta">Week 3 · Jun 22</div></div></div><div style="text-align:right"><div class="sc"><span class="l">1</span><span class="sep">–</span><span class="w">3</span></div><span class="pill l">Lost</span></div></div>
+              </div>
+              <div class="mc past" onclick="openHist('smash')">
+                <div class="row"><div class="team"><span class="dot" style="background:#6b7280">SB</span><div><div class="nm">Smash Bros</div><div class="meta">Week 2 · Jun 15</div></div></div><div style="text-align:right"><div class="sc"><span class="w">4</span><span class="sep">–</span><span class="l">0</span></div><span class="pill w">Won</span></div></div>
+              </div>
+            </div>
+
+            <div class="venmo">
+              <h4>Ladder entry · Backhand Bandits night</h4>
+              <p>Pay your $7 spot. This button opens the Venmo app straight to a prefilled payment, so nobody has to hunt for your handle.</p>
+              <button class="vbtn" onclick="payVenmo()">Pay $7 with Venmo →</button>
+              <div class="vurl" id="vurl">venmo://paycharge?txn=pay&amp;recipients=DinkSociety&amp;amount=7&amp;note=Ladder%20entry</div>
+            </div>
+          </section>
+
+          <!-- STANDINGS -->
+          <section class="view" id="v-standings">
+            <div class="band"><span class="lbl">Season 1 · Standings</span><span class="rule"></span></div>
+            <div style="font-size:11.5px;color:var(--tx-muted);margin:0 2px 8px">Tap a team to see their full match history and scores.</div>
+            <table class="tbl">
+              <thead><tr><th>Team</th><th>PTS</th><th>GW</th><th>DIFF</th></tr></thead>
+              <tbody>
+                <tr onclick="openHist('ninjas')"><td><span class="trank">1</span><span class="tnm">Net Ninjas</span></td><td class="clip">14</td><td>34</td><td>+41</td></tr>
+                <tr onclick="openHist('bangers')"><td><span class="trank">2</span><span class="tnm">Backhand Bandits</span></td><td>12</td><td>31</td><td>+28</td></tr>
+                <tr onclick="openHist('mine')"><td><span class="trank">3</span><span class="tnm">Court Jesters (you)</span></td><td>11</td><td>29</td><td>+17</td></tr>
+                <tr onclick="openHist('llamas')"><td><span class="trank">4</span><span class="tnm">Volley Llamas</span></td><td>9</td><td>26</td><td>+3</td></tr>
+                <tr onclick="openHist('heroes')"><td><span class="trank">5</span><span class="tnm">Third Shot Heroes</span></td><td>6</td><td>21</td><td>−14</td></tr>
+                <tr onclick="openHist('sinkers')"><td><span class="trank">6</span><span class="tnm">Kitchen Sinkers</span></td><td>4</td><td>18</td><td>−31</td></tr>
+              </tbody>
+            </table>
+          </section>
+
+          <!-- TEAM -->
+          <section class="view" id="v-team">
+            <div class="thero">
+              <span class="dot" style="background:var(--lime)">CJ</span>
+              <div><h2>Court Jesters</h2><div class="sub">Season 1 · 5–3 · 3rd place</div></div>
+            </div>
+            <div class="subsegs">
+              <div class="ss" onclick="teamSub('ov',this)">Overview</div>
+              <div class="ss" onclick="teamSub('ro',this)">Roster</div>
+              <div class="ss on" onclick="teamSub('sc',this)">Schedule</div>
+            </div>
+            <div class="band"><span class="lbl">Schedule &amp; results</span><span class="rule"></span></div>
+            <div style="font-size:11.5px;color:var(--tx-muted);margin:0 2px 8px">Tap any opponent for the full head-to-head with scores.</div>
+
+            <div class="mc" onclick="openHist('bangers')"><div class="row"><div class="team"><span class="dot" style="background:var(--gold)">BB</span><div><div class="nm">vs Backhand Bandits</div><div class="meta">Wk 6 · Mon Jul 6 · 7:00 PM</div></div></div><span class="pill t">Upcoming</span></div></div>
+
+            <div class="band past"><span class="lbl">Played</span><span class="rule"></span></div>
+            <div class="past-wrap">
+              <div class="mc past" onclick="openHist('sinkers')"><div class="row"><div class="team"><span class="dot" style="background:#6b7280">KS</span><div><div class="nm">vs Kitchen Sinkers</div><div class="meta">Week 4</div></div></div><div style="text-align:right"><div class="sc"><span class="w">4</span><span class="sep">–</span><span class="l">0</span></div><span class="pill w">Won</span></div></div></div>
+              <div class="mc past" onclick="openHist('dinkers')"><div class="row"><div class="team"><span class="dot" style="background:#6b7280">DD</span><div><div class="nm">vs Dilly Dinkers</div><div class="meta">Week 3</div></div></div><div style="text-align:right"><div class="sc"><span class="l">1</span><span class="sep">–</span><span class="w">3</span></div><span class="pill l">Lost</span></div></div></div>
+              <div class="mc past" onclick="openHist('smash')"><div class="row"><div class="team"><span class="dot" style="background:#6b7280">SB</span><div><div class="nm">vs Smash Bros</div><div class="meta">Week 2</div></div></div><div style="text-align:right"><div class="sc"><span class="w">4</span><span class="sep">–</span><span class="l">0</span></div><span class="pill w">Won</span></div></div></div>
+              <div class="mc past" onclick="openHist('ninjas')"><div class="row"><div class="team"><span class="dot" style="background:var(--teal)">NN</span><div><div class="nm">vs Net Ninjas</div><div class="meta">Week 1</div></div></div><div style="text-align:right"><div class="sc"><span class="l">2</span><span class="sep">–</span><span class="w">2</span></div><span class="pill t">Tie</span></div></div></div>
+            </div>
+          </section>
+        </div>
+
+        <!-- bottom nav -->
+        <div class="nav">
+          <div class="nb on" data-tab="games" onclick="tab('games')"><i style="-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><rect x=\'3\' y=\'4\' width=\'18\' height=\'16\' rx=\'2\'/></svg>') center/contain no-repeat"></i>Games</div>
+          <div class="nb" data-tab="standings" onclick="tab('standings')"><i style="-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><path d=\'M4 20V10M12 20V4M20 20v-7\' stroke=\'black\' stroke-width=\'3\'/></svg>') center/contain no-repeat"></i>Standings</div>
+          <div class="nb" data-tab="team" onclick="tab('team')"><i style="-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'8\' r=\'4\'/><path d=\'M4 20a8 8 0 0116 0\'/></svg>') center/contain no-repeat"></i>Team</div>
+          <div class="nb"><i style="-webkit-mask:url('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\'><circle cx=\'12\' cy=\'12\' r=\'9\'/></svg>') center/contain no-repeat"></i>Me</div>
+        </div>
+
+        <!-- MATCH HISTORY MODAL -->
+        <div class="ov" id="ov" onclick="if(event.target===this)closeHist()">
+          <div class="sheet">
+            <button class="x" onclick="closeHist()">×</button>
+            <div class="grab"></div>
+            <div class="sh-head" id="shHead"></div>
+            <div class="sh-body" id="shBody"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT RAIL: maps to your 5 notes -->
+    <div class="rail">
+      <h3>What this mock nails down</h3>
+      <div class="note"><b>1 · Team → match history, from Games</b><p>Every team card is tappable and opens a bottom sheet with the full head-to-head: opponent, final round score, and the game-by-game breakdown.</p><div class="try">Try: tap any card on Games</div></div>
+      <div class="note"><b>2 · Same from Standings</b><p>Tapping a standings row opens the identical history sheet, so scores are one tap from the table.</p><div class="try">Try: Standings tab → tap a team</div></div>
+      <div class="note"><b>3 · Same from Team → Schedule</b><p>The Schedule sub-tab lists every opponent, past and upcoming, each opening the head-to-head.</p><div class="try">Try: Team tab → tap an opponent</div></div>
+      <div class="note"><b>4 · Cleaner schedule separation</b><p>Live (red), Up next (lime), Upcoming (plain), and Past results (dimmed + desaturated inside a recessed panel) are visually banded so past games don't compete for attention. Hovering a past card brings it back to full color.</p></div>
+      <div class="note" style="border-left-color:var(--venmo)"><b>5 · One-tap Venmo</b><p>The pay button uses a Venmo deep link (<code>venmo://paycharge</code>) that opens the app prefilled with your handle, amount, and note, with a web fallback for anyone without the app.</p><div class="try">Try: Games tab → Pay $7 with Venmo</div></div>
+    </div>
+  </div>
+  <div class="legend">Interactive mockup · fictional teams &amp; scores · not wired to live data</div>
+</div>
+
+<script>
+  const TEAMS = {
+    ninjas:{nm:'Net Ninjas',ab:'NN',c:'#17d7b0',rec:'6-1-1',rank:'#1',diff:'+41',
+      hist:[
+        {wk:'Wk 5 · LIVE',opp:'Court Jesters',final:'3–2',res:'live',games:['W 11-7','L 8-11','W 11-6','W 11-9','L 9-11']},
+        {wk:'Wk 4',opp:'Volley Llamas',final:'4–0',res:'w',games:['W 11-4','W 11-8','W 11-6','W 11-9','W 11-3','W 11-7']},
+        {wk:'Wk 3',opp:'Third Shot Heroes',final:'3–1',res:'w',games:['W 11-6','L 7-11','W 11-8','W 11-5']},
+        {wk:'Wk 1',opp:'Court Jesters',final:'2–2',res:'t',games:['W 11-9','L 8-11','W 11-7','L 6-11']},
+      ]},
+    bangers:{nm:'Backhand Bandits',ab:'BB',c:'#f0c040',rec:'6-2',rank:'#2',diff:'+28',
+      hist:[
+        {wk:'Wk 6 · UPCOMING',opp:'Court Jesters',final:'—',res:'next',games:['Mon Jul 6 · 7:00 PM · Court 1']},
+        {wk:'Wk 4',opp:'Smash Bros',final:'4–0',res:'w',games:['W 11-5','W 11-7','W 11-9','W 11-2','W 11-8','W 11-6']},
+        {wk:'Wk 3',opp:'Kitchen Sinkers',final:'3–1',res:'w',games:['W 11-4','W 11-9','L 9-11','W 11-7']},
+      ]},
+    mine:{nm:'Court Jesters',ab:'CJ',c:'#b8ff2c',rec:'5-3',rank:'#3',diff:'+17',
+      hist:[
+        {wk:'Wk 4',opp:'Kitchen Sinkers',final:'4–0',res:'w',games:['W 11-6','W 11-8','W 11-4','W 11-9','W 11-7','W 11-5']},
+        {wk:'Wk 3',opp:'Dilly Dinkers',final:'1–3',res:'l',games:['L 8-11','W 11-9','L 6-11','L 7-11']},
+        {wk:'Wk 2',opp:'Smash Bros',final:'4–0',res:'w',games:['W 11-7','W 11-8','W 11-3','W 11-9','W 11-6','W 11-5']},
+        {wk:'Wk 1',opp:'Net Ninjas',final:'2–2',res:'t',games:['L 9-11','W 11-8','L 7-11','W 11-6']},
+      ]},
+    llamas:{nm:'Volley Llamas',ab:'VL',c:'#c07be0',rec:'4-4',rank:'#4',diff:'+3',hist:[
+      {wk:'Wk 7 · UPCOMING',opp:'Court Jesters',final:'—',res:'next',games:['Mon Jul 13 · 7:00 PM']},
+      {wk:'Wk 4',opp:'Net Ninjas',final:'0–4',res:'l',games:['L 4-11','L 8-11','L 6-11','L 9-11']},
+    ]},
+    heroes:{nm:'Third Shot Heroes',ab:'TH',c:'#ff5c47',rec:'3-5',rank:'#5',diff:'−14',hist:[
+      {wk:'Wk 8 · UPCOMING',opp:'Court Jesters',final:'—',res:'next',games:['Mon Jul 20 · 7:00 PM']},
+      {wk:'Wk 3',opp:'Net Ninjas',final:'1–3',res:'l',games:['L 6-11','W 11-9','L 8-11','L 5-11']},
+    ]},
+    sinkers:{nm:'Kitchen Sinkers',ab:'KS',c:'#6b7280',rec:'2-6',rank:'#6',diff:'−31',hist:[
+      {wk:'Wk 4',opp:'Court Jesters',final:'0–4',res:'l',games:['L 6-11','L 8-11','L 4-11','L 9-11','L 7-11','L 5-11']},
+      {wk:'Wk 3',opp:'Backhand Bandits',final:'1–3',res:'l',games:['W 11-9','L 4-11','L 7-11','L 9-11']},
+    ]},
+    dinkers:{nm:'Dilly Dinkers',ab:'DD',c:'#6b7280',rec:'4-4',rank:'—',diff:'+2',hist:[
+      {wk:'Wk 3',opp:'Court Jesters',final:'3–1',res:'w',games:['W 11-8','L 9-11','W 11-6','W 11-7']},
+    ]},
+    smash:{nm:'Smash Bros',ab:'SB',c:'#6b7280',rec:'3-5',rank:'—',diff:'−9',hist:[
+      {wk:'Wk 4',opp:'Backhand Bandits',final:'0–4',res:'l',games:['L 5-11','L 7-11','L 9-11','L 2-11']},
+      {wk:'Wk 2',opp:'Court Jesters',final:'0–4',res:'l',games:['L 7-11','L 8-11','L 3-11','L 9-11']},
+    ]},
+  };
+
+  function tab(name){
+    document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+name));
+    document.querySelectorAll('.seg').forEach(s=>s.classList.toggle('on',s.dataset.tab===name));
+    document.querySelectorAll('.nb').forEach(n=>n.classList.toggle('on',n.dataset.tab===name));
+    document.querySelector('.body').scrollTop=0;
+  }
+  function teamSub(k,el){ document.querySelectorAll('.subsegs .ss').forEach(s=>s.classList.remove('on')); el.classList.add('on'); }
+
+  function openHist(key){
+    const t=TEAMS[key]; if(!t) return;
+    document.getElementById('shHead').innerHTML=
+      `<div class="sh-top"><span class="dot" style="background:${t.c}">${t.ab}</span>`
+      +`<div><h3>${t.nm}</h3><div class="sub">Season 1 · ${t.rec} · ${t.rank}</div></div></div>`
+      +`<div class="sh-stats"><div class="kpi"><div class="n">${t.rank}</div><div class="l">Standing</div></div>`
+      +`<div class="kpi"><div class="n">${t.rec}</div><div class="l">Record</div></div>`
+      +`<div class="kpi"><div class="n">${t.diff}</div><div class="l">Point diff</div></div></div>`;
+    document.getElementById('shBody').innerHTML=
+      `<div class="band"><span class="lbl">Match history</span><span class="rule"></span></div>`+
+      t.hist.map(h=>{
+        const cls=h.res==='w'?'w':h.res==='l'?'l':h.res==='t'?'t':'';
+        const badge=h.res==='w'?'<span class="pill w">Won</span>':h.res==='l'?'<span class="pill l">Lost</span>':h.res==='t'?'<span class="pill t">Tie</span>':h.res==='live'?'<span class="livechip"><span class="pulse"></span>Live</span>':'<span class="pill t">Upcoming</span>';
+        const games=h.games.map(g=>{
+          const win=/^W/.test(g);
+          return `<span class="gm ${win?'win':''}">${g.replace(/^([WL])\s/,'<b>$1</b> ')}</span>`;
+        }).join('');
+        return `<div class="hrow"><div class="hr-top"><div><div class="hr-wk">${h.wk}</div><div class="hr-opp">vs ${h.opp}</div></div>`
+          +`<div style="text-align:right"><div class="hr-final">${h.final}</div>${badge}</div></div>`
+          +`<div class="games">${games}</div></div>`;
+      }).join('');
+    document.getElementById('ov').classList.add('on');
+  }
+  function closeHist(){ document.getElementById('ov').classList.remove('on'); }
+
+  function payVenmo(){
+    const handle='DinkSociety', amount='7', note='Ladder entry';
+    const deep=`venmo://paycharge?txn=pay&recipients=${handle}&amount=${amount}&note=${encodeURIComponent(note)}`;
+    const web=`https://venmo.com/${handle}?txn=pay&amount=${amount}&note=${encodeURIComponent(note)}`;
+    document.getElementById('vurl').textContent=deep;
+    // Real behavior: try the app deep link, fall back to web if it doesn't open.
+    const t=setTimeout(()=>{ window.open(web,'_blank'); }, 700);
+    window.location.href=deep;
+    window.addEventListener('blur',()=>clearTimeout(t),{once:true});
+  }
+</script>
+</body>
+</html>
