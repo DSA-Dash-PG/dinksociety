@@ -759,14 +759,23 @@ function recapSendResult(d){
   h+='.</div>';
   const nm=p=>esc(p.name||p.email);
   if(errored.length){
-    h+=`<div style="margin-top:8px;font-size:.78rem;color:#ffb4a8"><b>Didn’t send (needs attention):</b><ul style="margin:4px 0 0;padding-left:18px">`+
-       errored.map(p=>`<li>${nm(p)}${p.email?` &lt;${esc(p.email)}&gt;`:''}${p.reason?` — <span style="color:#9aa094">${esc(p.reason)}</span>`:''}</li>`).join('')+`</ul></div>`;
+    h+=`<div style="margin-top:8px;font-size:.78rem;color:#ffb4a8"><b>Didn’t send (needs attention):</b><ul style="margin:4px 0 0;padding-left:18px;list-style:none">`+
+       errored.map(p=>`<li style="margin-bottom:6px">${nm(p)}${p.email?` &lt;${esc(p.email)}&gt;`:''}${p.reason?` — <span style="color:#9aa094">${esc(p.reason)}</span>`:''} <button class="btn-out btn-sm" style="margin-left:4px;font-size:.68rem;padding:2px 9px" onclick="resendRecapOne(this,${p.playerId?`'${esc(p.playerId)}'`:'null'},'${esc((p.email||'').replace(/'/g,'&#39;'))}')">Resend</button></li>`).join('')+`</ul></div>`;
   }
   if(optedOut.length){
     h+=`<div style="margin-top:8px;font-size:.78rem;color:#9aa094"><b>Opted out of recap emails</b> (skipped on purpose):<ul style="margin:4px 0 0;padding-left:18px">`+
        optedOut.map(p=>`<li>${nm(p)}</li>`).join('')+`</ul></div>`;
   }
   document.getElementById('rcMsg').innerHTML=h;
+}
+// Resend the recap to one recipient who bounced. Single request, so it never
+// trips the rate limit. Updates the button in place with the outcome.
+async function resendRecapOne(btn,playerId,email){
+  const old=btn.textContent; btn.disabled=true; btn.textContent='Sending…';
+  const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-one',playerId:playerId||null,email:email||null})});
+  if(d&&d.ok&&d.skipped){ btn.textContent='Opted out'; btn.style.color='#9aa094'; }
+  else if(d&&d.ok){ btn.textContent='Sent ✓'; btn.style.color='#b8ff2c'; btn.style.borderColor='#b8ff2c'; }
+  else { btn.disabled=false; btn.textContent=old; alert((d&&d.error)||'Resend failed ('+status+').'); }
 }
 let MROSTER=[];
 function rosterSearch(){
