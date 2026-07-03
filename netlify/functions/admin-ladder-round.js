@@ -181,7 +181,14 @@ export default async (req) => {
 
   if (action === 'next') {
     if (cur && cur.wave2started === false) return json({ error: 'Start Wave 2 before advancing.' }, 409);
-    const tied = (cur.courts || []).filter(c => c.score && c.score.t1 !== null && c.score.t2 !== null && !c.score.winner);
+    const courts = cur.courts || [];
+    // Ladder movement rule: a court must be fully resolved before anyone moves.
+    // Advancing with a blank court used to leave all 4 of its players "in place"
+    // in genNR while neighbors still fed in — overflowing one court, starving
+    // others, and silently dropping players. Block it here at the source.
+    const blank = courts.filter(c => !c.score || c.score.t1 === null || c.score.t1 === undefined || c.score.t2 === null || c.score.t2 === undefined);
+    if (blank.length) return json({ error: `${blank.length} court(s) still need a final score before advancing.` }, 409);
+    const tied = courts.filter(c => !c.score.winner);
     if (tied.length) return json({ error: `${tied.length} tied court(s) need a winner picked.` }, 409);
     if (play.currentRound >= play.config.rounds - 1) {
       play.finished = true; play.finishedAt = new Date().toISOString(); await setPlay(eventId, play);

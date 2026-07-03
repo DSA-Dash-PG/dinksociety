@@ -24,7 +24,7 @@ import { createLitePlayer } from './lib/ladder-players.js';
 import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js';
 import { earn } from './lib/credits.js';
 import { dateLineOf } from './lib/ladder-notify.js';
-import { sendEmail, renderLadderConfirmed } from './lib/email.js';
+import { sendEmail, renderLadderConfirmed, renderLadderRemoved } from './lib/email.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } });
@@ -214,15 +214,30 @@ export default async (req) => {
       if (i >= 0) { signups.waitlist.splice(i, 1); await setSignups(signups); return json({ ok: true, removedFrom: 'waitlist' }); }
       return json({ error: 'Player not found on this ladder' }, 404);
     }
-    // credit on admin removal only for a genuine cancel of a PAID spot under auto_credit
+    // No refunds — a paid spot becomes ladder credit for a future night. Default
+    // to auto_credit so removing someone by hand behaves like the self-serve
+    // cancel button (which already defaults this way); 'no_credit' events opt out.
+    const policy = event.cancelPolicy || 'auto_credit';
     let credited = 0;
-    if (action === 'remove' && event.cancelPolicy === 'auto_credit' && removed.paymentStatus === 'paid' && feeCents > 0 && removed.email) {
+    if (action === 'remove' && policy === 'auto_credit' && removed.paymentStatus === 'paid' && feeCents > 0 && removed.email) {
       await earn(removed.email, feeCents, `Removed from ${event.name}`, { eventId, key: `adminremove:${eventId}:${normalizeEmail(removed.email)}` }).catch(() => {});
       credited = feeCents;
     }
+    // Tell the removed player what happened — manual removals used to send nothing.
+    // Mandatory confirmation (not gated by notify prefs), same as the cancel path.
+    let emailedRemoved = false;
+    if (action === 'remove' && removed.email) {
+      const creditLabel = credited ? `$${(credited / 100).toFixed(2)}` : null;
+      await sendEmail({
+        to: removed.email,
+        subject: `You're off the list — ${event.name}`,
+        html: renderLadderRemoved({ playerName: removed.name, eventName: event.name, dateLine: dateLineOf(event), creditLabel }),
+      }).catch(() => {});
+      emailedRemoved = true;
+    }
     const r = await promoteAndNotify(event, signups);
     await setSignups(signups);
-    return json({ ok: true, removed: removed.name, creditedCents: credited, opened: r.opened });
+    return json({ ok: true, removed: removed.name, creditedCents: credited, emailed: emailedRemoved, opened: r.opened });
   }
 
   // Add or edit a roster player's email (e.g. a manually-added player who had

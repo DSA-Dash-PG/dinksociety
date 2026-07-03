@@ -443,6 +443,24 @@ export function renderLadderConfirmed({ playerName, eventName, dateLine }) {
 }
 
 /**
+ * Player was removed/cancelled by an organizer. Confirms the removal and, when a
+ * paid spot was credited, tells them the credit is waiting for their next ladder.
+ * No refunds, credit only.
+ */
+export function renderLadderRemoved({ playerName, eventName, dateLine, creditLabel }) {
+  const creditLine = creditLabel
+    ? `<p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">No refunds, but we've added <b style="color:#b8ff2c;">${escapeBody(creditLabel)}</b> in ladder credit to your account. It applies automatically the next time you sign up.</p>`
+    : `<p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Hope to catch you on the next one.</p>`;
+  return _ladderShell(`
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">You're off the list</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Hey ${escapeBody(playerName || 'there')}, we've taken you off <b style="color:#fff;">${escapeBody(eventName)}</b> and opened your spot for the next player.</p>
+      ${_ladderEventCard(eventName, dateLine)}
+      ${creditLine}
+      <p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">Think this was a mistake? Just reply to this email and we'll sort it out.</p>
+  `);
+}
+
+/**
  * To the ORGANIZER: a player claims they paid by Venmo. One tap confirms or
  * declines — both are signed, single-use links (no login). Mirrors the
  * captain availability-notify pattern.

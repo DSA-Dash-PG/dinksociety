@@ -114,6 +114,24 @@ export function genNR(prev, nC, strength) {
   mvs.forEach(m => { if (bk[m.to]) bk[m.to].push(m.p); });
   for (let i = 1; i <= tC; i++) bk[i] = shuffle(bk[i]);
 
+  // Safety net for the "four to a court" rule: if a round was ever advanced with
+  // an unresolved court, winners/losers can pile onto one court while neighbors
+  // starve. Spill any overflow (>4) into the nearest court that still has an open
+  // slot so a player is never silently dropped by the makeCoed slice(0,4) below.
+  for (let i = 1; i <= tC; i++) {
+    while (bk[i].length > 4) {
+      const extra = bk[i].pop();
+      let target = null, best = Infinity;
+      for (let j = 1; j <= tC; j++) {
+        if (j === i || bk[j].length >= 4) continue;
+        const d = Math.abs(j - i);
+        if (d < best) { best = d; target = j; }
+      }
+      if (target == null) { bk[i].unshift(extra); break; }
+      bk[target].push(extra);
+    }
+  }
+
   const courts = [];
   for (let c = 0; c < tC; c++) {
     const g = bk[c + 1] || [];
