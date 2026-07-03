@@ -523,6 +523,32 @@ export function renderLadderPayRequest({ playerName, eventName, dateLine, cardUr
 }
 
 /**
+ * Reminder to an UNPAID roster player: your spot is not locked until you pay.
+ * Leads with a Venmo deep link (one tap, prefilled) and offers a card fallback.
+ * Sent 1h after an unpaid signup, then daily until they pay or the event passes.
+ */
+export function renderLadderPayReminder({ playerName, eventName, dateLine, venmoHandle, venmoUrl, venmoAmountLabel, venmoNote, payUrl }) {
+  const venmo = venmoUrl ? `
+      <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin: 0 0 8px;">Pay by Venmo — fastest</div>
+      <div style="background:#161616; border-radius:8px; padding:14px 16px; margin:0 0 12px;">
+        <div style="font-size:14px; color:#cfcfcf; line-height:1.6;">Send <b style="color:#fff;">${escapeBody(venmoAmountLabel || '')}</b> to <b style="color:#fff;">@${escapeBody(String(venmoHandle || '').replace(/^@/, ''))}</b>${venmoNote ? ` with note <b style="color:#fff;">${escapeBody(venmoNote)}</b>` : ''}.</div>
+      </div>
+      ${_btn(venmoUrl, `Pay ${venmoAmountLabel || ''} on Venmo →`, '#3d95ce')}
+      <div style="height:22px"></div>` : '';
+  const card = payUrl ? `
+      <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin: 0 0 8px;">Prefer card?</div>
+      ${_btn(payUrl, 'Pay by card →')}
+      <div style="height:22px"></div>` : '';
+  return _ladderShell(`
+      <h1 style="font-size: 22px; font-weight: 800; color: #f0c040; margin: 0 0 14px; line-height: 1.25;">Your spot isn't locked yet</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 14px;">Hey ${escapeBody(playerName || 'there')}, you signed up for <b style="color:#fff;">${escapeBody(eventName)}</b> but we haven't received your payment yet. <b style="color:#fff;">Your spot isn't confirmed until it's paid</b>, and it can be given to someone on the waitlist.</p>
+      ${_ladderEventCard(eventName, dateLine)}
+      ${venmo}${card}
+      <p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">Already paid? You can ignore this, it can take us a moment to mark it. Questions? Just reply to this email.</p>
+  `);
+}
+
+/**
  * Final-24h: a spot opened and it's first-come-first-serve (no priority hold).
  * Blasted to the whole waitlist — first to grab it wins.
  */

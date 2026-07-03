@@ -15,12 +15,24 @@ import {
   nudgeDue, minutesLeft, HOLD_MS,
 } from './lib/ladder.js';
 import { createLadderToken } from './lib/ladder-token.js';
-import { claimUrl, dateLineOf, siteUrl } from './lib/ladder-notify.js';
-import { sendEmail, renderLadderNudge, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen } from './lib/email.js';
+import { claimUrl, dateLineOf, siteUrl, venmoPayLink } from './lib/ladder-notify.js';
+import { sendEmail, renderLadderNudge, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen, renderLadderPayReminder } from './lib/email.js';
+
+// Unpaid-spot reminders: first goes out 1h after signup, then once a day until
+// the player pays or the event passes. No auto-drop — the organizer removes.
+const PAY_REMIND_FIRST_MS = 60 * 60 * 1000;
+const PAY_REMIND_EVERY_MS = 24 * 60 * 60 * 1000;
+
+// Coarse "is this event already over?" — stop reminding once the day has passed.
+function eventPast(ev, now) {
+  if (!ev?.date) return false;
+  const end = Date.parse(`${ev.date}T23:59:59`);
+  return Number.isFinite(end) && end < now;
+}
 
 export default async () => {
   const now = Date.now();
-  let nudged = 0, expired = 0, promoted = 0;
+  let nudged = 0, expired = 0, promoted = 0, payReminders = 0;
 
   let events = [];
   try { events = await listEvents(); } catch (e) { console.error('[ladder-cron] listEvents failed:', e); return new Response('ok'); }
@@ -29,9 +41,41 @@ export default async () => {
     if (ev.status === 'final' || ev.status === 'cancelled') continue;
     let rec;
     try { rec = await getSignups(ev.id); } catch { continue; }
-    if (!rec.pendingClaim) continue;
 
     let changed = false;
+
+    // ── Unpaid-spot reminders (independent of the waitlist-claim flow) ──
+    if (!eventPast(ev, now) && Array.isArray(rec.roster)) {
+      const pay = venmoPayLink(ev);
+      const payUrl = `${siteUrl()}/ladders?event=${encodeURIComponent(ev.id)}`;
+      for (const entry of rec.roster) {
+        // Only genuinely unpaid card/unchosen spots — never venmo_pending (they
+        // say they've paid; the organizer confirms that separately) or paid.
+        if (entry.paymentStatus !== 'pending' || !entry.email) continue;
+        const signed = entry.signedUpAt ? Date.parse(entry.signedUpAt) : null;
+        if (!signed) continue;
+        const last = entry.lastPayReminderAt ? Date.parse(entry.lastPayReminderAt) : null;
+        const due = last ? (now - last) >= PAY_REMIND_EVERY_MS : (now - signed) >= PAY_REMIND_FIRST_MS;
+        if (!due) continue;
+        try {
+          await sendEmail({
+            to: entry.email,
+            subject: `Your spot isn't locked yet — ${ev.name}`,
+            html: renderLadderPayReminder({
+              playerName: entry.name, eventName: ev.name, dateLine: dateLineOf(ev),
+              venmoHandle: pay?.venmoHandle, venmoUrl: pay?.venmoUrl,
+              venmoAmountLabel: pay?.venmoAmountLabel, venmoNote: pay?.venmoNote,
+              payUrl,
+            }),
+          });
+          entry.lastPayReminderAt = new Date(now).toISOString();
+          changed = true; payReminders++;
+        } catch (e) { console.warn('[ladder-cron] pay reminder failed:', e?.message || e); }
+      }
+    }
+
+    // ── Waitlist priority-claim flow (only when a claim is outstanding) ──
+    if (rec.pendingClaim) {
     const pc = rec.pendingClaim;
 
     // 1) last-chance nudge (within the final lead window, not yet nudged)
@@ -85,11 +129,12 @@ export default async () => {
         } catch (e) { console.warn('[ladder-cron] promote email failed:', e?.message || e); }
       }
     }
+    } // end if (rec.pendingClaim)
 
     if (changed) { try { await setSignups(rec); } catch (e) { console.error('[ladder-cron] setSignups failed:', e); } }
   }
 
-  console.log(`[ladder-cron] nudged=${nudged} expired=${expired} promoted=${promoted}`);
+  console.log(`[ladder-cron] nudged=${nudged} expired=${expired} promoted=${promoted} payReminders=${payReminders}`);
   return new Response('ok');
 };
 

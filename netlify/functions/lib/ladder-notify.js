@@ -53,6 +53,28 @@ export function fmtCents(cents) {
   return '$' + (Number.isInteger(n) ? n : n.toFixed(2));
 }
 
+/**
+ * Player-facing Venmo deep link for a ladder's flat entry fee, or null when the
+ * ladder has no Venmo handle / doesn't accept Venmo / is free. Opens the Venmo
+ * app prefilled with the amount and a matchable note.
+ */
+export function venmoPayLink(ev) {
+  if (!ev?.venmoHandle) return null;
+  const methods = Array.isArray(ev?.paymentMethods) && ev.paymentMethods.length ? ev.paymentMethods : ['card', 'venmo'];
+  if (!methods.includes('venmo')) return null;
+  const feeCents = Number(ev?.feeCents) || 0;
+  if (feeCents <= 0) return null;
+  const handle = String(ev.venmoHandle).replace(/^@/, '');
+  const dollars = (feeCents / 100).toFixed(2);
+  const note = ev?.name || 'Ladder entry';
+  return {
+    venmoHandle: handle,
+    venmoUrl: `https://venmo.com/${encodeURIComponent(handle)}?txn=pay&amount=${dollars}&note=${encodeURIComponent(note)}`,
+    venmoAmountLabel: fmtCents(feeCents),
+    venmoNote: note,
+  };
+}
+
 /** Tiny standalone HTML page returned by the one-tap link endpoints. */
 export function resultPage(title, message, accent = '#b8ff2c') {
   return new Response(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>
