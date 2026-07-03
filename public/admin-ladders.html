@@ -191,6 +191,16 @@
       <div class="card" id="xpCard"><div class="empty">Loading…</div></div>
     </section>
 
+    <section class="ssec" id="s-credits">
+      <h1 style="margin:0 0 4px">Credits</h1>
+      <div class="sec">Look up a player's ladder credit</div>
+      <div class="card">
+        <div style="font-size:.82rem;color:#9aa094;line-height:1.55;margin-bottom:10px">Ladder credit follows a player's email across every ladder. Enter an email to see their balance and full history, or issue a credit (no refunds, credit only).</div>
+        <div class="row2"><input class="i" id="cl-email" type="email" placeholder="player@email.com" onkeydown="if(event.key==='Enter')creditLookup()"><button class="btn btn-lime" onclick="creditLookup()" style="max-width:130px">Look up</button></div>
+        <div id="clResult" style="margin-top:12px"></div>
+      </div>
+    </section>
+
     <section class="ssec" id="s-import">
       <h1 style="margin:0 0 4px">Import history</h1>
       <div class="card">
@@ -368,7 +378,7 @@ async function checkPayCfg(){
 }
 
 /* ---- admin shell: sidebar nav + mobile drawer ---- */
-const SECS=[['dash','Dashboard'],['ladders','Ladders'],['players','Players'],['scoring','Scoring'],['xp','XP & rewards'],['import','Import'],['settings','Settings']];
+const SECS=[['dash','Dashboard'],['ladders','Ladders'],['players','Players'],['scoring','Scoring'],['xp','XP & rewards'],['credits','Credits'],['import','Import'],['settings','Settings']];
 let CURSEC='dash';
 function renderNav(){ const n=document.getElementById('nav'); if(n) n.innerHTML=SECS.map(([k,l])=>`<div class="navi${k===CURSEC?' on':''}" onclick="showSec('${k}')">${l}</div>`).join(''); }
 function showSec(k){ CURSEC=k; document.querySelectorAll('.ssec').forEach(s=>s.classList.toggle('on',s.id==='s-'+k)); renderNav(); if(k==='dash') renderDash(); if(k==='ladders') ladSub('all'); closeDrawer(); window.scrollTo({top:0}); }
@@ -417,6 +427,45 @@ async function rmAward(id){ const {d}=await xpPost({action:'remove-award',id}); 
 async function grantXp(){ const playerId=document.getElementById('gr-player').value; if(!playerId){ document.getElementById('grMsg').innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick a player.</div>'; return; } const awardId=document.getElementById('gr-award').value; let label,xp; if(awardId){ const a=(XPDATA.awards||[]).find(a=>a.id===awardId); label=a?a.label:'Award'; xp=a?a.xp:0; } else { label=(document.getElementById('gr-label').value||'').trim()||'Bonus'; xp=parseInt(document.getElementById('gr-xp').value)||0; } const {d}=await xpPost({action:'grant',playerId,label,xp,awardId:awardId||null}); if(d.ok){ loadXp(); document.getElementById('grMsg').innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Granted.</div>'; } else document.getElementById('grMsg').innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
 async function ungrant(id){ const {d}=await xpPost({action:'ungrant',id}); if(d.ok) loadXp(); }
 loadXp();
+
+/* ---- Credit lookup ---- */
+const money=c=>'$'+((Number(c)||0)/100).toFixed(2);
+async function creditLookup(){
+  const email=(document.getElementById('cl-email').value||'').trim();
+  const R=document.getElementById('clResult');
+  if(!email){ R.innerHTML='<div class="msg err">Enter an email.</div>'; return; }
+  R.innerHTML='<div class="msg">Looking up…</div>';
+  const {status,d}=await api('/admin-ladder-credits?email='+encodeURIComponent(email));
+  if(status===401){ R.innerHTML='<div class="msg err">Sign in as admin first.</div>'; return; }
+  if(!d||d.error){ R.innerHTML='<div class="msg err">'+esc(d&&d.error||'Not found')+'</div>'; return; }
+  renderCredit(d);
+}
+function renderCredit(d){
+  const R=document.getElementById('clResult');
+  const bal=Number(d.balanceCents)||0;
+  const led=(d.ledger||[]);
+  let h=`<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.08)"><span style="font-size:.8rem;color:#9aa094">${esc(d.email)}</span><span style="font-size:1.35rem;font-weight:900;color:${bal>0?'#b8ff2c':'#9aa094'}">${money(bal)}</span></div>`;
+  if(led.length){
+    h+='<div class="sec" style="margin:12px 0 6px">History</div>';
+    h+=led.map(e=>{ const pos=(Number(e.delta)||0)>=0; return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:.78rem"><span style="flex:1"><span style="color:${pos?'#b8ff2c':'#ff7a5c'};font-weight:800">${pos?'+':''}${money(e.delta)}</span> · ${esc(e.reason||e.type)}</span><span style="color:#5e655a;white-space:nowrap">${esc((e.ts||'').slice(0,10))}</span></div>`; }).join('');
+  } else {
+    h+='<div style="font-size:.8rem;color:#5e655a;padding:10px 0">No credit history yet — this player has never earned or spent ladder credit.</div>';
+  }
+  h+='<div class="sec" style="margin:14px 0 6px">Issue a credit</div>';
+  h+='<div class="row2"><input class="i" id="cl-amt" type="number" step="0.01" placeholder="Amount (e.g. 7)" style="max-width:150px"><input class="i" id="cl-reason" placeholder="Reason (optional)"></div>';
+  h+=`<button class="btn btn-lime" style="margin-top:8px" onclick="grantCredit('${esc(d.email)}')">Add credit</button><div id="clGrantMsg"></div>`;
+  R.innerHTML=h;
+}
+async function grantCredit(email){
+  const amt=parseFloat(document.getElementById('cl-amt').value);
+  const M=document.getElementById('clGrantMsg');
+  if(!amt||amt<=0){ M.innerHTML='<div class="msg err">Enter a positive amount.</div>'; return; }
+  const reason=(document.getElementById('cl-reason').value||'').trim()||'Admin credit';
+  const {status,d}=await api('/admin-ladder-credits',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'grant',email,cents:Math.round(amt*100),reason})});
+  if(status===401){ M.innerHTML='<div class="msg err">Sign in as admin first.</div>'; return; }
+  if(!d||!d.ok){ M.innerHTML='<div class="msg err">'+esc(d&&d.error||'Failed')+'</div>'; return; }
+  renderCredit(d);
+}
 
 /* ---- Players & duplicate merge ---- */
 let PLDATA=null;
