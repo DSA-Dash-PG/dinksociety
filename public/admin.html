@@ -1600,6 +1600,8 @@
     renderOV();
     refreshMsgBadge();
     refreshPotwBadge();
+    // Honor a deep-link hash (#teams, #team/<id>, #player/<teamId>/<playerId>) now that we're authed.
+    routeFromHash();
   }
 
   $id('login-form').addEventListener('submit', async (e) => {
@@ -2478,34 +2480,68 @@
   }
   window.renderPlayers = renderPlayers;
 
+  function activateTab(t) {
+    $$('.sb__link').forEach(x => x.classList.toggle('is-active', x.dataset.tab === t));
+    $$('.admin-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === t));
+    if (t === 'overview') renderOV();
+    if (t === 'seasons') loadAndRenderSeasons();
+    if (t === 'registrations') renderReg();
+    if (t === 'teams') renderTeams();
+    if (t === 'players') renderPlayers();
+    if (t === 'approvals') renderApprovals();
+    if (t === 'schedule') { renderGameday(); renderAllGames(); renderSched(); }
+    if (t === 'scores') {}
+    if (t === 'messages') renderMessages();
+    if (t === 'drop') renderDrop();
+    if (t === 'potw') renderPotw();
+    if (t === 'badges') renderBadges();
+    if (t === 'settings') { applySettings(); loadWaiverCompliance(); }
+    if (t === 'moments') loadAdminGallery();
+    if (t === 'activity') initActivityLog();
+    if (t === 'analytics') renderAnalytics();
+    // Keep the bottom nav in sync. Tabs that aren't one of the 5 nav slots just clear all highlights.
+    document.querySelectorAll('#am-bottomnav .am-bn').forEach(bn => bn.classList.toggle('is-active', bn.dataset.bn === t));
+  }
+
   $$('.sb__link[data-tab]').forEach(b => {
     b.addEventListener('click', () => {
-      $$('.sb__link').forEach(x => x.classList.remove('is-active'));
-      b.classList.add('is-active');
       const t = b.dataset.tab;
-      $$('.admin-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === t));
-      if (t === 'overview') renderOV();
-      if (t === 'seasons') loadAndRenderSeasons();
-      if (t === 'registrations') renderReg();
-      if (t === 'teams') renderTeams();
-      if (t === 'players') renderPlayers();
-      if (t === 'approvals') renderApprovals();
-      if (t === 'schedule') { renderGameday(); renderAllGames(); renderSched(); }
-      if (t === 'scores') {}
-      if (t === 'messages') renderMessages();
-      if (t === 'drop') renderDrop();
-      if (t === 'potw') renderPotw();
-      if (t === 'badges') renderBadges();
-      if (t === 'settings') { applySettings(); loadWaiverCompliance(); }
-      if (t === 'moments') loadAdminGallery();
-      if (t === 'activity') initActivityLog();
-      if (t === 'analytics') renderAnalytics();
-      // Keep the bottom nav in sync when a tab is chosen from the drawer. Tabs
-      // that aren't one of the 5 nav slots just clear all highlights.
-      document.querySelectorAll('#am-bottomnav .am-bn').forEach(bn => bn.classList.toggle('is-active', bn.dataset.bn === t));
+      activateTab(t);
+      setHash(t);
       closeAdminDrawer();
     });
   });
+
+  // ── Hash routing: shareable deep links ──
+  //   #teams                        → open a tab
+  //   #team/<teamId>                → Teams tab + that team's editor panel
+  //   #player/<teamId>/<playerId>   → Teams tab + that player's popup
+  let _suppressHashRoute = false;
+  function setHash(h) {
+    const nh = '#' + h;
+    if (location.hash === nh) return;
+    _suppressHashRoute = true;   // our own change — don't re-route on the resulting event
+    location.hash = nh;
+  }
+  async function routeFromHash() {
+    const raw = (location.hash || '').replace(/^#/, '');
+    const parts = raw.split('/').filter(Boolean);
+    if (!parts.length) return; // no hash → leave the default (Overview) as-is
+    const head = parts[0];
+    if (head === 'team' && parts[1]) {
+      activateTab('teams'); await renderTeams(); openTeamPanel(parts[1]); return;
+    }
+    if (head === 'player' && parts[1] && parts[2]) {
+      activateTab('teams'); await renderTeams(); openPlayerPop(parts[1], parts[2]); return;
+    }
+    const validTabs = new Set(Array.from($$('.sb__link[data-tab]'), b => b.dataset.tab));
+    activateTab(validTabs.has(head) ? head : 'overview');
+  }
+  window.addEventListener('hashchange', () => {
+    if (_suppressHashRoute) { _suppressHashRoute = false; return; }
+    routeFromHash();
+  });
+  // A hash present on first load is honored after auth, from showShell() → routeFromHash().
 
   function openAdminDrawer() { $id('sb').classList.add('is-open'); $id('mob-overlay').classList.add('is-open'); $id('mob-av')?.setAttribute('aria-expanded', 'true'); }
   function closeAdminDrawer() { $id('sb').classList.remove('is-open'); $id('mob-overlay').classList.remove('is-open'); $id('mob-av')?.setAttribute('aria-expanded', 'false'); }
@@ -4015,7 +4051,7 @@
     s.textContent = msg || '';
     s.style.color = err ? 'var(--color-red)' : 'var(--color-text-faint)';
   }
-  function closePlayerPop() { $id('player-pop').classList.remove('is-open'); }
+  function closePlayerPop() { $id('player-pop').classList.remove('is-open'); if ((location.hash || '').startsWith('#player/')) setHash('teams'); }
   window.closePlayerPop = closePlayerPop;
   function ppAction(action, body) {
     return apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(PP_TEAM.id) + '&action=' + action, {
@@ -4061,6 +4097,7 @@
     $id('pp-remove').addEventListener('click', removePlayerFromPop);
     $id('pp-save').addEventListener('click', savePlayerFromPop);
     $id('player-pop').classList.add('is-open');
+    setHash('player/' + teamId + '/' + playerId);
   }
 
   async function savePlayerFromPop() {
@@ -4249,6 +4286,7 @@
     renderPanelBody();
     $id('tdp-overlay').classList.add('is-open');
     $id('tdp-panel').classList.add('is-open');
+    setHash('team/' + teamId);
   }
 
   function closePanel() {
@@ -4256,6 +4294,7 @@
     $id('tdp-panel').classList.remove('is-open');
     currentPanelTeam = null;
     $id('tdp-status').className = 'a-status';
+    if ((location.hash || '').startsWith('#team/')) setHash('teams');
   }
 
   $id('tdp-close').addEventListener('click', closePanel);
