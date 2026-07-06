@@ -262,10 +262,10 @@ export function renderAvailabilityNotify({ playerName, status, teamName, teamEmo
   const accent = '#b8ff2c';
   const out = status === 'out';
   const h1 = out ? `${escapeBody(playerName)} is out for Week ${escapeBody(String(week))}`
-                 : `${escapeBody(playerName)} is back in for Week ${escapeBody(String(week))}`;
+                 : `${escapeBody(playerName)} is in for Week ${escapeBody(String(week))}`;
   const lead = out
     ? `<b>${escapeBody(playerName)}</b> just marked themselves <b>unavailable</b> for your upcoming match. They won't show up in your lineup picker for this game.`
-    : `<b>${escapeBody(playerName)}</b> is <b>available again</b> for your upcoming match — they're back in your lineup picker.`;
+    : `<b>${escapeBody(playerName)}</b> marked themselves <b>available</b> for your upcoming match — they're in your lineup picker.`;
 
   const matchCard = `
       <div style="background: #161616; border-radius: 8px; padding: 14px 16px; margin: 0 0 18px;">

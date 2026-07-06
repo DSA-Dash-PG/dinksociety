@@ -10,8 +10,9 @@
 
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './lib/circuit.js';
-import { setPlayerAvailability } from './lib/availability.js';
+import { getTeamAvailability, setPlayerAvailability } from './lib/availability.js';
 import { verifyAvailabilityToken, signAvailabilityToken } from './lib/availability-token.js';
+import { notifyCaptainsOfChange } from './lib/availability-notify.js';
 import { logActivity } from './lib/activity-log.js';
 
 const TZ = 'America/Los_Angeles';
@@ -34,10 +35,21 @@ export default async (req) => {
     return page('Too late to change', 'This match has already started or wrapped up, so availability is locked. Thanks anyway!', team);
   }
 
+  // Previous status (null = no response) → only notify the captain on a real change.
+  const before = await getTeamAvailability(matchId, teamId);
+  const prev = before.players?.[playerId]?.status || null;
+
   await setPlayerAvailability({
     matchId, teamId, playerId, status,
     reason: '', byEmail: player?.email || null, byRole: 'player',
   });
+
+  // Let the captain know without them logging in; the email links back to set the
+  // lineup. Best-effort — never block the player's confirmation on it.
+  if (prev !== status && player) {
+    try { await notifyCaptainsOfChange({ team, player, actingEmail: player.email, match, status, reason: '' }); }
+    catch (e) { console.warn('availability confirm notify failed:', e?.message || e); }
+  }
 
   await logActivity({
     type: 'availability.set',
