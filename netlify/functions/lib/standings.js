@@ -375,11 +375,25 @@ export async function rebuildStandings(circuit) {
     if (wk.leaders) for (const g of ['men', 'women']) { const L = wk.leaders[g]; if (L) for (const k of Object.keys(L)) enrich(L[k]); }
   }
   const { deltas: rankDeltas, history: dsrHistory } = computeRankDeltas(weeklyPlayers);
+  // Per-week game W/L per player → powers the per-MATCH "Undefeated" badge
+  // (a night you won ≥1 game and lost 0). Without this the badge falls back to a
+  // season-long 0-losses check, which almost nobody keeps all season.
+  const weeklyRecById = new Map();
+  for (const [wk, m] of Object.entries(weeklyPlayers)) {
+    const weekNum = Number(wk);
+    const date = (weekMeta[wk] && weekMeta[wk].date) || null;
+    for (const [pid, wp] of m) {
+      if (!weeklyRecById.has(pid)) weeklyRecById.set(pid, []);
+      weeklyRecById.get(pid).push({ week: weekNum, w: wp.gamesWon || 0, l: wp.gamesLost || 0, date });
+    }
+  }
   for (const p of playerStats.values()) {
     p.rankDelta = Object.prototype.hasOwnProperty.call(rankDeltas, p.playerId) ? rankDeltas[p.playerId] : null;
     // Season-to-date DSR snapshot at the end of each week: [{ week, dsr, rank }].
     // Powers the match-log "DSR at time of game" column + the DSR trend chart.
     p.dsrHistory = dsrHistory.get(p.playerId) || [];
+    // Per-week game record: [{ week, w, l, date }] → per-match Undefeated badge.
+    p.weeklyGameRecords = (weeklyRecById.get(p.playerId) || []).sort((a, b) => a.week - b.week);
   }
   attachAwards(playerStats, weeklyTopPerformers);
   standings.weeklyTopPerformers = weeklyTopPerformers;
