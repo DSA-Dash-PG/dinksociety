@@ -178,6 +178,18 @@
     .av-banner { margin-top:10px; font-size:12px; line-height:1.5; color:var(--color-text-muted); background:var(--color-red-dim); border:1px solid rgba(255,90,90,0.3); border-radius:var(--radius-sm); padding:9px 11px; }
     .av-banner b { color:var(--color-red); }
     #avail-panel { margin: 6px 0 18px; padding:14px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); }
+    .av-grp { margin-top:14px; }
+    .av-grp__l { font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--color-text-faint); margin:0 0 7px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+    .av-prow { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-2); margin-bottom:6px; }
+    .av-prow.pending { border-color:rgba(245,166,35,.35); }
+    .av-prow__nm { flex:1; min-width:0; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .av-prow__meta { font-size:10px; color:var(--color-text-faint); font-weight:500; }
+    .av-st { font-size:10px; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:var(--radius-full); white-space:nowrap; }
+    .av-st.in { background:var(--color-lime-dim); color:var(--color-lime); }
+    .av-st.out { background:var(--color-red-dim); color:var(--color-red); }
+    .av-nudge { font-size:11px; font-weight:800; color:#0b0b0b; background:#f5a623; border:none; border-radius:var(--radius-full); padding:6px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
+    .av-nudge:disabled { opacity:.6; cursor:default; }
+    .av-nudgeall { font-size:10px; font-weight:800; color:#f5a623; background:none; border:1px solid rgba(245,166,35,.45); border-radius:var(--radius-full); padding:4px 10px; cursor:pointer; text-transform:uppercase; letter-spacing:.04em; }
 
     /* ── Reveal box ──────────────────────────────────────────── */
     .reveal-box { background: var(--color-lime-ghost, rgba(184,255,44,0.04)); border: 1px solid rgba(184,255,44,0.12); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 16px; }
@@ -3311,26 +3323,81 @@
       const roster = activeRoster();
       if (locked || revealed || !roster.length) { el.style.display = 'none'; el.innerHTML = ''; return; }
       const avail = state.lineupAvail || {};
-      const outList = roster.filter(p => avail[p.id]?.status === 'out');
-      const chips = roster.map(p => {
-        const st = avail[p.id]?.status;
-        const out = st === 'out';
-        return `<button type="button" class="av-chip ${out ? 'is-out' : 'is-in'}" onclick="toggleAvail('${p.id}')">
-          <span class="av-chip__nm">${escapeHtml(p.name)}</span>
-          <span class="av-chip__st">${out ? 'Out' : 'In'}</span>
-        </button>`;
-      }).join('');
-      const banner = outList.length
-        ? `<div class="av-banner"><b>${outList.length} unavailable</b> — removed from the picker: ${outList.map(p => {
-            const r = avail[p.id]?.reason; const cap = avail[p.id]?.byRole === 'captain';
-            return escapeHtml(p.name) + (r ? ` (${escapeHtml(r)})` : '') + (cap ? '' : ' — said so');
-          }).join(', ')}</div>`
-        : '';
+      const stOf = p => avail[p.id]?.status || null;
+      const nm = p => escapeHtml(p.name);
+      const subs = roster.filter(p => p.isSub);
+      const regs = roster.filter(p => !p.isSub);
+      const inList = regs.filter(p => stOf(p) === 'in');
+      const outList = regs.filter(p => stOf(p) === 'out');
+      const pend = regs.filter(p => !stOf(p));
+
+      let html = `<div class="av-head"><span class="av-head__t">Availability</span>
+        <span class="av-head__h">${inList.length} in · ${outList.length} out · ${pend.length} no reply · tap a name to set it for them</span></div>`;
+
+      if (pend.length) {
+        html += `<div class="av-grp"><div class="av-grp__l"><span>Not confirmed · ${pend.length}</span>
+          <span class="av-nudgeall" onclick="nudgeAllAvail(this)">Nudge all</span></div>` +
+          pend.map(p => `<div class="av-prow pending">
+            <span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span>
+            <button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button></div>`).join('') +
+          `</div>`;
+      }
+      if (inList.length) {
+        html += `<div class="av-grp"><div class="av-grp__l"><span>Confirmed in · ${inList.length}</span></div>` +
+          inList.map(p => `<div class="av-prow" style="cursor:pointer" onclick="toggleAvail('${p.id}')">
+            <span class="av-prow__nm">${nm(p)}</span><span class="av-st in">✓ In</span></div>`).join('') +
+          `</div>`;
+      }
+      if (outList.length) {
+        html += `<div class="av-grp"><div class="av-grp__l"><span>Out · ${outList.length}</span></div>` +
+          outList.map(p => {
+            const r = avail[p.id]?.reason;
+            return `<div class="av-prow" style="cursor:pointer" onclick="toggleAvail('${p.id}')">
+              <span class="av-prow__nm">${nm(p)}${r ? ` <span class="av-prow__meta">— ${escapeHtml(r)}</span>` : ''}</span>
+              <span class="av-st out">Out</span></div>`;
+          }).join('') + `</div>`;
+      }
+      if (subs.length) {
+        html += `<div class="av-grp"><div class="av-grp__l"><span>Subs · ${subs.length}</span>
+          <span class="av-prow__meta">not auto-reminded</span></div>` +
+          subs.map(p => {
+            const st = stOf(p);
+            const right = st
+              ? `<span class="av-st ${st}">${st === 'in' ? '✓ In' : 'Out'}</span>`
+              : `<button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button>`;
+            return `<div class="av-prow"><span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span>${right}</div>`;
+          }).join('') + `</div>`;
+      }
+      html += `<div class="av-head__h" style="display:block;margin-top:12px;line-height:1.5;">Players who haven't replied get an email automatically — 4 days before, then daily until they confirm or the lineup locks. Nudge only if you want to send one now. Anyone marked <b style="color:var(--color-red)">out</b> is removed from the picker below.</div>`;
+
       el.style.display = '';
-      el.innerHTML = `
-        <div class="av-head"><span class="av-head__t">Availability</span><span class="av-head__h">Tap a player to toggle. Players marked out are removed from the lineup below.</span></div>
-        <div class="av-chips">${chips}</div>
-        ${banner}`;
+      el.innerHTML = html;
+    }
+    async function nudgeAvail(playerId, btn) {
+      if (!state.currentMatch) return;
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
+      try {
+        const res = await fetch(`/.netlify/functions/captain-nudge-availability?match=${encodeURIComponent(state.currentMatch.id)}`, {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(d.error || 'Could not send the reminder.'); if (btn) { btn.disabled = false; btn.textContent = 'Nudge'; } return; }
+        if (btn) btn.textContent = d.sent ? 'Sent ✓' : (d.noEmail ? 'No email' : 'Sent');
+      } catch { alert('Could not send the reminder.'); if (btn) { btn.disabled = false; btn.textContent = 'Nudge'; } }
+    }
+    async function nudgeAllAvail(btn) {
+      if (!state.currentMatch) return;
+      if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+      try {
+        const res = await fetch(`/.netlify/functions/captain-nudge-availability?match=${encodeURIComponent(state.currentMatch.id)}`, {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ all: true }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(d.error || 'Could not send reminders.'); if (btn) { btn.disabled = false; btn.textContent = 'Nudge all'; } return; }
+        if (btn) btn.textContent = `Sent to ${d.sent}`;
+      } catch { alert('Could not send reminders.'); if (btn) { btn.disabled = false; btn.textContent = 'Nudge all'; } }
     }
     async function toggleAvail(playerId) {
       if (!state.currentMatch) return;

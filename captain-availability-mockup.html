@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Captain · Availability + reminders (mockup)</title>
+<style>
+  :root{
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-red:#ff5c47; --color-red-dim:rgba(255,92,71,0.12);
+    --color-amber:#f5a623; --color-amber-dim:rgba(245,166,35,0.13);
+    --radius-sm:10px; --radius-lg:20px; --radius-full:9999px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#080808;color:var(--color-text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;}
+  .stage{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 60px;}
+  .bar{display:flex;gap:8px;align-items:center;margin-bottom:20px;flex-wrap:wrap;justify-content:center;}
+  .bar .lab{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--color-text-faint);font-weight:800;margin-right:4px;}
+  .seg{display:flex;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-full);padding:3px;gap:2px;}
+  .seg button{border:none;background:none;color:var(--color-text-muted);font-family:inherit;font-size:11px;font-weight:700;padding:6px 14px;border-radius:var(--radius-full);cursor:pointer;text-transform:uppercase;}
+  .seg button.on{background:var(--color-lime);color:#0b0b0b;}
+
+  /* phone frame */
+  .phone{width:400px;max-width:100%;background:var(--color-bg);border:1px solid var(--color-border-strong);border-radius:26px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.6);}
+  .view{display:none;} .view.on{display:block;}
+
+  .ph-hd{padding:16px 18px 14px;border-bottom:1px solid var(--color-border);}
+  .ph-eyebrow{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-teal);font-weight:800;}
+  .ph-title{font-weight:900;font-style:italic;text-transform:uppercase;font-size:19px;margin-top:4px;line-height:1.05;}
+  .ph-sub{font-size:12px;color:var(--color-text-muted);margin-top:4px;}
+
+  .body{padding:16px 16px 22px;}
+
+  /* summary */
+  .sum{display:flex;gap:8px;margin-bottom:12px;}
+  .sum .cell{flex:1;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px 6px;text-align:center;}
+  .sum .n{font-size:22px;font-weight:900;line-height:1;}
+  .sum .l{font-size:9px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;margin-top:4px;}
+  .sum .in .n{color:var(--color-lime);} .sum .out .n{color:var(--color-red);} .sum .pend .n{color:var(--color-amber);}
+
+  .warn{display:flex;gap:9px;align-items:flex-start;background:var(--color-amber-dim);border:1px solid rgba(245,166,35,.3);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;line-height:1.45;color:var(--color-text);margin-bottom:16px;}
+  .warn b{color:var(--color-amber);}
+
+  .grp-lbl{font-size:9px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-faint);margin:16px 2px 8px;display:flex;justify-content:space-between;align-items:center;}
+  .nudgeall{font-size:10px;font-weight:800;color:var(--color-amber);background:var(--color-amber-dim);border:1px solid rgba(245,166,35,.3);border-radius:var(--radius-full);padding:4px 10px;cursor:pointer;text-transform:uppercase;letter-spacing:.04em;}
+
+  .prow{display:flex;align-items:center;gap:11px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:7px;}
+  .prow.pending{border-color:rgba(245,166,35,.3);}
+  .prow .av{width:32px;height:32px;border-radius:50%;background:var(--color-surface-3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--color-text-muted);flex-shrink:0;}
+  .prow .who{flex:1;min-width:0;}
+  .prow .nm{font-size:13px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .prow .rl{font-size:8px;font-weight:800;letter-spacing:.06em;padding:1px 5px;border-radius:var(--radius-full);text-transform:uppercase;}
+  .prow .rl.c{background:var(--color-lime-dim);color:var(--color-lime);}
+  .prow .rl.co{background:var(--color-teal-dim);color:var(--color-teal);}
+  .prow .rl.sub{background:var(--color-surface-3);color:var(--color-text-muted);}
+  .status.sub{background:var(--color-surface-3);color:var(--color-text-muted);}
+  .prow .meta{font-size:10.5px;color:var(--color-text-faint);margin-top:2px;}
+  .status{font-size:10px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:4px 9px;border-radius:var(--radius-full);white-space:nowrap;}
+  .status.in{background:var(--color-lime-dim);color:var(--color-lime);}
+  .status.out{background:var(--color-red-dim);color:var(--color-red);}
+  .status.pend{background:var(--color-amber-dim);color:var(--color-amber);}
+  .nudge{font-size:11px;font-weight:800;color:#0b0b0b;background:var(--color-amber);border:none;border-radius:var(--radius-full);padding:6px 12px;cursor:pointer;text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;}
+  .nudge.sent{background:none;border:1px solid var(--color-border-strong);color:var(--color-text-faint);cursor:default;}
+
+  .autonote{margin-top:16px;font-size:11px;line-height:1.5;color:var(--color-text-muted);background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:11px 13px;}
+  .autonote b{color:var(--color-text);}
+
+  /* email preview */
+  .mail{background:#0b0b0b;padding:18px;}
+  .mail-card{max-width:360px;margin:0 auto;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:16px;overflow:hidden;}
+  .mail-top{padding:20px 22px 0;text-align:center;}
+  .mail-brand{font-size:10px;letter-spacing:.2em;text-transform:uppercase;color:var(--color-teal);font-weight:800;}
+  .mail-h1{font-size:20px;font-weight:900;font-style:italic;text-transform:uppercase;margin:14px 0 0;line-height:1.15;}
+  .mail-match{margin:18px 22px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:12px;padding:14px;text-align:center;}
+  .mail-match .vs{font-size:15px;font-weight:800;}
+  .mail-match .dt{font-size:12px;color:var(--color-text-muted);margin-top:4px;}
+  .mail-body{padding:0 22px;font-size:13px;line-height:1.6;color:var(--color-text-muted);}
+  .mail-gate{display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--color-text);background:var(--color-amber-dim);border:1px solid rgba(245,166,35,.3);border-radius:10px;padding:10px 12px;margin:14px 22px;line-height:1.4;}
+  .mail-btns{padding:4px 22px 22px;display:flex;gap:10px;}
+  .mail-btns a{flex:1;text-align:center;text-decoration:none;font-weight:800;font-size:13px;padding:13px;border-radius:11px;}
+  .mail-in{background:var(--color-lime);color:#0b0b0b;}
+  .mail-out{background:none;border:1px solid var(--color-border-strong);color:var(--color-text);}
+  .mail-foot{padding:14px 22px 20px;border-top:1px solid var(--color-border);font-size:10.5px;color:var(--color-text-faint);text-align:center;line-height:1.5;}
+
+  .note{max-width:400px;margin:20px auto 0;font-size:12px;line-height:1.6;color:var(--color-text-muted);text-align:center;}
+  .note b{color:var(--color-text);}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="bar">
+    <span class="lab">Preview</span>
+    <div class="seg">
+      <button class="on" onclick="show('cap',this)">Captain view</button>
+      <button onclick="show('mail',this)">Reminder email</button>
+    </div>
+  </div>
+
+  <div class="phone">
+    <!-- CAPTAIN VIEW -->
+    <div class="view on" id="v-cap">
+      <div class="ph-hd">
+        <div class="ph-eyebrow">Availability</div>
+        <div class="ph-title">Week 3 vs K'CHN</div>
+        <div class="ph-sub">Mon, Jul 13 · 7:00 PM · Courts 5 &amp; 7 · lineup locks 6:00 PM</div>
+      </div>
+      <div class="body">
+        <div class="sum">
+          <div class="cell in"><div class="n">5</div><div class="l">Confirmed</div></div>
+          <div class="cell out"><div class="n">2</div><div class="l">Out</div></div>
+          <div class="cell pend"><div class="n">2</div><div class="l">No reply</div></div>
+        </div>
+
+        <div class="warn"><span>🔔</span><div><b>2 regulars haven't replied.</b> Reminders go out automatically — no need to chase anyone. Nudge below only if you want to send one right now.</div></div>
+
+        <!-- Not confirmed -->
+        <div class="grp-lbl">Not confirmed · 2 <span class="nudgeall" onclick="nudgeAll()">Nudge all</span></div>
+        <div class="prow pending">
+          <div class="av">AM</div>
+          <div class="who"><div class="nm">Angel Munar</div><div class="meta">Reminded 1 day ago · auto-reminders on</div></div>
+          <button class="nudge" onclick="this.className='nudge sent';this.textContent='Sent'">Nudge</button>
+        </div>
+        <div class="prow pending">
+          <div class="av">FT</div>
+          <div class="who"><div class="nm">Fiat Tapaneeyakorn</div><div class="meta">Reminded 4h ago · auto-reminders on</div></div>
+          <button class="nudge" onclick="this.className='nudge sent';this.textContent='Sent'">Nudge</button>
+        </div>
+
+        <!-- Confirmed in -->
+        <div class="grp-lbl">Confirmed in · 5</div>
+        <div class="prow"><div class="av">RH</div><div class="who"><div class="nm">Richard Hak <span class="rl c">Captain</span></div></div><span class="status in">✓ In</span></div>
+        <div class="prow"><div class="av">JZ</div><div class="who"><div class="nm">Jobeth Zapata <span class="rl co">Co-Cap</span></div></div><span class="status in">✓ In</span></div>
+        <div class="prow"><div class="av">CH</div><div class="who"><div class="nm">Chandler Hong</div></div><span class="status in">✓ In</span></div>
+        <div class="prow"><div class="av">KH</div><div class="who"><div class="nm">Kayo Hayashi</div></div><span class="status in">✓ In</span></div>
+        <div class="prow"><div class="av">LL</div><div class="who"><div class="nm">Leslie Lee</div></div><span class="status in">✓ In</span></div>
+
+        <!-- Out -->
+        <div class="grp-lbl">Out · 2</div>
+        <div class="prow"><div class="av">EH</div><div class="who"><div class="nm">Eli Henry</div><div class="meta">"Out of town this week"</div></div><span class="status out">Out</span></div>
+        <div class="prow"><div class="av">TD</div><div class="who"><div class="nm">Tanya Deemer</div><div class="meta">"Ankle injury"</div></div><span class="status out">Out</span></div>
+
+        <!-- Subs -->
+        <div class="grp-lbl">Subs · 2 <span style="font-weight:600;letter-spacing:0;text-transform:none;color:var(--color-text-faint)">not auto-reminded</span></div>
+        <div class="prow"><div class="av">YN</div><div class="who"><div class="nm">Yoshi Nogimura <span class="rl sub">Sub</span></div><div class="meta">Only nudged when you need to fill a spot</div></div><button class="nudge" onclick="this.className='nudge sent';this.textContent='Sent'">Nudge</button></div>
+        <div class="prow"><div class="av">AG</div><div class="who"><div class="nm">Arica Green <span class="rl sub">Sub</span></div><div class="meta">Only nudged when you need to fill a spot</div></div><button class="nudge" onclick="this.className='nudge sent';this.textContent='Sent'">Nudge</button></div>
+
+        <div class="autonote">🔔 <b>Auto-reminders</b> go to regular players who haven't replied: an email <b>4 days before</b> the match, then <b>once a day</b> until they confirm or the lineup locks. <b>Subs are skipped</b> — nudge a sub manually only when you need one. Everyone stays eligible for the lineup either way. Tap a name to set someone's status for them.</div>
+      </div>
+    </div>
+
+    <!-- REMINDER EMAIL -->
+    <div class="view" id="v-mail">
+      <div class="mail">
+        <div class="mail-card">
+          <div class="mail-top">
+            <div class="mail-brand">The Dink Society</div>
+            <div class="mail-h1">Are you in for<br>Week 3?</div>
+          </div>
+          <div class="mail-match">
+            <div class="vs">Big Dink Energy vs K'CHN</div>
+            <div class="dt">Mon, Jul 13 · 7:00 PM · Courts 5 &amp; 7</div>
+          </div>
+          <div class="mail-body">Hi Angel — your captain needs to know if you can play. It only takes a second and helps them set the lineup.</div>
+          <div class="mail-btns">
+            <a class="mail-in" href="#">✓ I'm in</a>
+            <a class="mail-out" href="#">Can't make it</a>
+          </div>
+          <div class="mail-foot">One tap — no login needed. Lineup locks Mon 6:00 PM.<br>Sent by dink@dinksociety.app · <a href="#" style="color:var(--color-text-faint)">manage reminders</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">Captain view groups the roster by <b>Not confirmed</b> (with per-player Nudge + "Nudge all"), <b>Confirmed in</b>, <b>Out</b>, and <b>Subs</b>. Everyone stays lineup-eligible; reminders just chase a reply automatically. Subs don't get auto-reminders. The email is one-tap, no login. Toggle above to compare.</div>
+</div>
+
+<script>
+  function show(which, el){
+    document.querySelectorAll('.seg button').forEach(b=>b.classList.remove('on'));
+    el.classList.add('on');
+    document.getElementById('v-cap').classList.toggle('on', which==='cap');
+    document.getElementById('v-mail').classList.toggle('on', which==='mail');
+  }
+  function nudgeAll(){
+    document.querySelectorAll('#v-cap .nudge:not(.sent)').forEach(b=>{ b.className='nudge sent'; b.textContent='Sent'; });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin · Teams page redesign (mockup)</title>
+<style>
+  :root{
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14); --color-divider:rgba(255,255,255,0.06);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-red:#ff5c47; --radius-sm:10px; --radius-lg:20px; --radius-full:9999px;
+    --men:#5b8bd0; --women:#d06ba0;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1240px;margin:0 auto;padding:26px 22px 80px;}
+
+  /* page header */
+  .hd{display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap;}
+  .hd h1{font-size:26px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:.01em;margin:0;}
+  .hd .sp{flex:1;}
+  .btn{border:none;border-radius:var(--radius-sm);font-family:inherit;font-weight:700;font-size:12px;padding:9px 15px;cursor:pointer;letter-spacing:.02em;}
+  .btn--lime{background:var(--color-lime);color:#0b0b0b;}
+  .btn--outline{background:none;border:1px solid var(--color-border-strong);color:var(--color-text);}
+  .btn--sm{padding:7px 12px;font-size:11px;}
+
+  /* option switcher */
+  .opts{display:flex;gap:8px;align-items:center;margin-bottom:22px;flex-wrap:wrap;padding:12px 14px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);}
+  .opts .lab{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--color-text-faint);font-weight:800;margin-right:4px;}
+  .opts button{border:1px solid var(--color-border-strong);background:var(--color-surface-2);color:var(--color-text-muted);font-family:inherit;font-size:12px;font-weight:700;padding:8px 14px;border-radius:var(--radius-full);cursor:pointer;}
+  .opts button.on{background:var(--color-lime);color:#0b0b0b;border-color:var(--color-lime);}
+  .opt-desc{font-size:12px;color:var(--color-text-muted);margin:0 0 18px;line-height:1.5;}
+  .opt-desc b{color:var(--color-text);}
+
+  /* toolbar (shared) */
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;}
+  .toolbar input[type=search],.toolbar select{background:var(--color-surface);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-family:inherit;}
+  .toolbar input[type=search]{flex:1;min-width:180px;max-width:300px;}
+  .toolbar .muted{font-size:11px;color:var(--color-text-faint);}
+
+  .pill{font-size:9px;letter-spacing:.06em;text-transform:uppercase;font-weight:700;padding:3px 9px;border-radius:var(--radius-full);background:var(--color-surface-3);color:var(--color-text-muted);}
+  .logo{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;color:#0b0b0b;flex-shrink:0;}
+
+  /* gender split bar */
+  .split{height:5px;border-radius:3px;overflow:hidden;display:flex;background:var(--color-surface-3);}
+  .split i{display:block;height:100%;}
+  .split i.m{background:var(--men);} .split i.w{background:var(--women);}
+  .mw{font-size:10px;color:var(--color-text-faint);font-weight:700;letter-spacing:.04em;}
+  .mw b.m{color:var(--men);} .mw b.w{color:var(--women);}
+
+  /* name chips */
+  .chips{display:flex;flex-wrap:wrap;gap:5px;}
+  .chip{font-size:11px;padding:3px 10px;border-radius:var(--radius-full);background:var(--color-surface-2);border:1px solid var(--color-border);color:var(--color-text-muted);white-space:nowrap;line-height:1.5;cursor:pointer;transition:border-color .12s,color .12s;}
+  .chip:hover{border-color:var(--color-border-strong);color:var(--color-text);}
+  .chip.cap{border-color:var(--color-lime);color:var(--color-text);background:var(--color-lime-dim);}
+  .chip.co{border-color:var(--color-teal);color:var(--color-text);background:var(--color-teal-dim);}
+  .chip .mk{font-weight:800;margin-left:2px;}
+  .chip.cap .mk{color:var(--color-lime);} .chip.co .mk{color:var(--color-teal);}
+  .chip.add{border-style:dashed;border-color:var(--color-teal);color:var(--color-teal);background:none;font-weight:700;}
+  .chip.add:hover{background:var(--color-teal-dim);color:var(--color-teal);}
+
+  /* player popup (edit / add) */
+  .scrim{position:fixed;inset:0;background:rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:opacity .2s;z-index:50;}
+  .scrim.open{opacity:1;pointer-events:auto;}
+  .modal{position:fixed;left:50%;top:50%;transform:translate(-50%,-46%) scale(.96);opacity:0;pointer-events:none;transition:transform .2s,opacity .2s;z-index:51;
+         width:440px;max-width:92vw;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:var(--radius-lg);padding:20px;max-height:88vh;overflow:auto;}
+  .modal.open{transform:translate(-50%,-50%) scale(1);opacity:1;pointer-events:auto;}
+  @media(max-width:520px){
+    .modal{left:0;right:0;bottom:0;top:auto;width:100%;max-width:100%;transform:translateY(100%);border-radius:18px 18px 0 0;}
+    .modal.open{transform:translateY(0);}
+  }
+  .m-hd{display:flex;align-items:center;gap:11px;margin-bottom:16px;}
+  .m-av{width:40px;height:40px;border-radius:50%;background:var(--color-surface-3);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px;color:var(--color-text-muted);flex-shrink:0;}
+  .m-nm{font-weight:900;font-style:italic;text-transform:uppercase;font-size:17px;}
+  .m-sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;margin-top:2px;}
+  .m-x{margin-left:auto;background:none;border:none;color:var(--color-text-muted);font-size:22px;cursor:pointer;line-height:1;}
+  .m-arow{display:flex;gap:11px;margin-bottom:11px;}
+  .m-af{flex:1;min-width:0;}
+  .m-af label{display:block;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:5px;}
+  .m-af input,.m-af select{width:100%;background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:9px 11px;font-size:13px;font-family:inherit;}
+  .roleseg{display:flex;gap:4px;background:var(--color-bg);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:3px;margin-bottom:13px;}
+  .roleseg button{flex:1;border:none;background:none;color:var(--color-text-muted);font-family:inherit;font-size:11px;font-weight:700;padding:7px;border-radius:7px;cursor:pointer;text-transform:uppercase;}
+  .roleseg button.on{background:var(--color-lime);color:#0b0b0b;}
+  .m-foot{display:flex;gap:9px;align-items:center;margin-top:17px;}
+  .gcol{margin-top:2px;}
+  .gcol .glab{font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin:0 0 6px 2px;}
+  .gcol .glab.m{color:var(--men);} .gcol .glab.w{color:var(--women);}
+
+  /* ============ OPTION A — refined card grid ============ */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px;}
+  .tcard{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;cursor:pointer;transition:border-color .15s,transform .15s;position:relative;}
+  .tcard::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--tc,#666);}
+  .tcard:hover{border-color:var(--color-border-strong);transform:translateY(-2px);}
+  .tcard .body{padding:16px 16px 15px;}
+  .tcard .top{display:flex;align-items:center;gap:11px;margin-bottom:13px;}
+  .tcard .nm{font-weight:900;font-style:italic;text-transform:uppercase;font-size:16px;line-height:1.05;}
+  .tcard .cap{font-size:11px;color:var(--color-text-muted);margin-top:2px;}
+  .tcard .cap b{color:var(--color-text);font-weight:600;}
+  .tcard .count{margin-left:auto;text-align:right;flex-shrink:0;}
+  .tcard .count .n{font-size:20px;font-weight:900;line-height:1;}
+  .tcard .count .l{font-size:8px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;}
+  .tcard .splitwrap{margin:12px 0 11px;}
+  .tcard .splitwrap .mw{display:flex;justify-content:space-between;margin-bottom:5px;}
+
+  /* ============ OPTION B — dense table ============ */
+  .tbl{width:100%;border-collapse:collapse;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;}
+  .tbl th{text-align:left;font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;padding:11px 14px;border-bottom:1px solid var(--color-border-strong);cursor:pointer;white-space:nowrap;}
+  .tbl th.sorted{color:var(--color-lime);}
+  .tbl td{padding:12px 14px;border-bottom:1px solid var(--color-border);font-size:13px;vertical-align:middle;}
+  .tbl tr:last-child td{border-bottom:none;}
+  .tbl tbody tr{cursor:pointer;}
+  .tbl tbody tr:hover td{background:var(--color-surface-2);}
+  .tbl .tname{display:flex;align-items:center;gap:10px;font-weight:800;font-style:italic;text-transform:uppercase;font-size:13px;}
+  .tbl .who{color:var(--color-text-muted);font-size:12px;}
+  .tbl .splitcell{display:flex;align-items:center;gap:9px;min-width:150px;}
+  .tbl .splitcell .split{flex:1;}
+  .tbl .cnum{font-weight:900;font-size:15px;}
+  .tbl .act{color:var(--color-text-faint);font-size:15px;text-align:right;}
+
+  /* ============ OPTION C — list rows w/ roster preview ============ */
+  .list{display:flex;flex-direction:column;gap:10px;}
+  .lrow{display:flex;align-items:center;gap:16px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:14px 16px;cursor:pointer;transition:border-color .15s;position:relative;overflow:hidden;}
+  .lrow::before{content:"";position:absolute;top:0;bottom:0;left:0;width:3px;background:var(--tc,#666);}
+  .lrow:hover{border-color:var(--color-border-strong);}
+  .lrow .idb{display:flex;align-items:center;gap:11px;width:250px;flex-shrink:0;}
+  .lrow .nm{font-weight:900;font-style:italic;text-transform:uppercase;font-size:15px;line-height:1.1;}
+  .lrow .cap{font-size:10.5px;color:var(--color-text-muted);margin-top:2px;}
+  .lrow .midb{width:170px;flex-shrink:0;}
+  .lrow .midb .mw{display:flex;justify-content:space-between;margin-bottom:5px;}
+  .lrow .rosb{flex:1;min-width:0;}
+  .lrow .cntb{text-align:right;flex-shrink:0;width:52px;}
+  .lrow .cntb .n{font-size:22px;font-weight:900;line-height:1;}
+  .lrow .cntb .l{font-size:8px;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;}
+  @media(max-width:820px){
+    .lrow{flex-wrap:wrap;}
+    .lrow .idb{width:auto;flex:1;} .lrow .midb{width:100%;order:4;} .lrow .rosb{width:100%;order:5;}
+  }
+
+  .view{display:none;} .view.on{display:block;}
+
+  /* viewport toggle */
+  .vt{display:flex;background:var(--color-surface-2);border:1px solid var(--color-border-strong);border-radius:var(--radius-full);padding:3px;gap:2px;}
+  .vt button{border:none;background:none;color:var(--color-text-muted);font-family:inherit;font-size:11px;font-weight:700;padding:6px 13px;border-radius:var(--radius-full);cursor:pointer;text-transform:uppercase;}
+  .vt button.on{background:var(--color-lime);color:#0b0b0b;}
+
+  /* ===== MOBILE PREVIEW (phone frame) ===== */
+  body.mob{background:#080808;}
+  body.mob .wrap{position:relative;overflow:hidden;max-width:412px;margin:22px auto;background:var(--color-bg);
+                 border:1px solid var(--color-border-strong);border-radius:28px;padding:20px 15px 46px;box-shadow:0 30px 90px rgba(0,0,0,.6);}
+  body.mob .hd h1{font-size:21px;}
+  body.mob .hd{gap:8px;}
+  body.mob .hd .btn{padding:6px 9px;font-size:10px;}
+  body.mob .opts{position:sticky;top:0;z-index:5;}
+  body.mob .grid{grid-template-columns:1fr;}
+  body.mob .lrow{flex-wrap:wrap;}
+  body.mob .lrow .idb{width:auto;flex:1;}
+  body.mob .lrow .midb{width:100%;order:4;margin-top:6px;}
+  body.mob .lrow .rosb{width:100%;order:5;}
+  body.mob .lrow .cntb{width:auto;text-align:left;}
+  body.mob .tbl{min-width:600px;} /* stays wide → shows the table is cramped on a phone */
+  /* popup docks to the bottom of the phone frame */
+  body.mob .scrim{position:absolute;}
+  body.mob .modal{position:absolute;left:0;right:0;bottom:0;top:auto;width:100%;max-width:100%;
+                  transform:translateY(100%);border-radius:18px 18px 0 0;max-height:80%;}
+  body.mob .modal.open{transform:translateY(0);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hd">
+    <h1>Teams</h1>
+    <div class="sp"></div>
+    <button class="btn btn--outline btn--sm">⟲ Sync from Registrations</button>
+    <button class="btn btn--outline btn--sm">⇄ Transfer player</button>
+  </div>
+
+  <div class="opts">
+    <span class="lab">Layout option</span>
+    <button class="on" onclick="opt('a',this)">A · Refined cards</button>
+    <button onclick="opt('b',this)">B · Dense table</button>
+    <button onclick="opt('c',this)">C · List + roster</button>
+    <span style="flex:1"></span>
+    <span class="lab">View</span>
+    <div class="vt"><button class="on" onclick="setVP('desktop',this)">Desktop</button><button onclick="setVP('mobile',this)">Mobile</button></div>
+  </div>
+  <p class="opt-desc" id="desc"></p>
+
+  <div class="toolbar">
+    <input type="search" placeholder="Search team or player…">
+    <select><option>All divisions</option></select>
+    <select><option>Sort: Name A–Z</option><option>Sort: Roster size</option></select>
+    <span class="muted">6 teams</span>
+  </div>
+
+  <div class="view on" id="view-a"><div class="grid" id="grid-a"></div></div>
+  <div class="view" id="view-b"><div style="overflow-x:auto;"><table class="tbl" id="tbl-b"></table></div></div>
+  <div class="view" id="view-c"><div class="list" id="list-c"></div></div>
+
+  <!-- PLAYER POPUP (edit / add) -->
+  <div class="scrim" id="scrim" onclick="closeModal()"></div>
+  <div class="modal" id="modal"></div>
+</div>
+
+<script>
+  function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/'/g,'&#39;');}
+  function initials(nm){return nm.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();}
+  function roleSeg(active){
+    return '<div class="roleseg">'+['Player','Co-Captain','Captain'].map(r=>
+      '<button class="'+(r===active?'on':'')+'" onclick="this.parentNode.querySelectorAll(\'button\').forEach(b=>b.classList.remove(\'on\'));this.classList.add(\'on\')">'+r+'</button>').join('')+'</div>';
+  }
+  function openPlayer(e, name, team, gender, r){
+    e.stopPropagation();
+    const active = r==='cap'?'Captain':r==='co'?'Co-Captain':'Player';
+    document.getElementById('modal').innerHTML =
+      '<div class="m-hd"><div class="m-av">'+initials(name)+'</div>'+
+        '<div><div class="m-nm">'+esc(name)+'</div><div class="m-sub">'+esc(gender)+' · '+esc(team)+'</div></div>'+
+        '<button class="m-x" onclick="closeModal()">✕</button></div>'+
+      roleSeg(active)+
+      '<div class="m-arow"><div class="m-af"><label>Name</label><input value="'+esc(name)+'"></div></div>'+
+      '<div class="m-arow"><div class="m-af"><label>Email</label><input value="player@example.com"></div>'+
+        '<div class="m-af" style="max-width:120px"><label>Gender</label><select><option'+(gender==='Male'?' selected':'')+'>Male</option><option'+(gender==='Female'?' selected':'')+'>Female</option></select></div></div>'+
+      '<div class="m-arow"><div class="m-af"><label>Phone</label><input placeholder="(555) 123-4567"></div>'+
+        '<div class="m-af"><label>DUPR</label><input placeholder="e.g. 3.4"></div></div>'+
+      '<div class="m-foot"><button class="btn btn--sm" style="background:var(--color-red);color:#fff" onclick="closeModal()">Remove from team</button>'+
+        '<span style="flex:1"></span>'+
+        '<button class="btn btn--outline btn--sm" onclick="closeModal()">Cancel</button>'+
+        '<button class="btn btn--lime btn--sm" onclick="closeModal()">Save</button></div>';
+    openModal();
+  }
+  function openAdd(e, team){
+    e.stopPropagation();
+    document.getElementById('modal').innerHTML =
+      '<div class="m-hd"><div class="m-av" style="color:var(--color-teal)">+</div>'+
+        '<div><div class="m-nm">Add player</div><div class="m-sub">'+esc(team)+'</div></div>'+
+        '<button class="m-x" onclick="closeModal()">✕</button></div>'+
+      '<div class="m-arow"><div class="m-af"><label>Name</label><input placeholder="Full name" autofocus></div></div>'+
+      '<div class="m-arow"><div class="m-af"><label>Email</label><input placeholder="email@example.com"></div>'+
+        '<div class="m-af" style="max-width:120px"><label>Gender</label><select><option>Male</option><option>Female</option></select></div></div>'+
+      '<div class="m-arow"><div class="m-af"><label>Phone</label><input placeholder="(555) 123-4567"></div>'+
+        '<div class="m-af"><label>DUPR</label><input placeholder="e.g. 3.4"></div></div>'+
+      '<div class="m-foot"><span style="flex:1"></span>'+
+        '<button class="btn btn--outline btn--sm" onclick="closeModal()">Cancel</button>'+
+        '<button class="btn btn--lime btn--sm" onclick="closeModal()">Add to roster</button></div>';
+    openModal();
+  }
+  function openModal(){document.getElementById('scrim').classList.add('open');document.getElementById('modal').classList.add('open');}
+  function closeModal(){document.getElementById('scrim').classList.remove('open');document.getElementById('modal').classList.remove('open');}
+  function setVP(mode, el){
+    document.querySelectorAll('.vt button').forEach(b=>b.classList.remove('on'));
+    el.classList.add('on');
+    document.body.classList.toggle('mob', mode==='mobile');
+    closeModal();
+  }
+</script>
+
+<script>
+  const C = {green:'#3ecf8e',yellow:'#e5c100',orange:'#e08a2b',orange2:'#d0692b',purple:'#9b7bd4',dark:'#5a5a5a'};
+  const TEAMS = [
+    {name:"Big Dink Energy",logo:"BDE",color:C.green,div:"3.0–3.5 Mixed",cap:"Richard Hak",co:"",
+     men:["Chandler Hong","Eli Henry","Richard Hak*","Yoshi Nogimura"],
+     women:["Jobeth Zapata","Angel Munar","Fiat Tapaneeyakorn","Kayo Hayashi","Leslie Lee","Tanya Deemer","Arica Green"]},
+    {name:"K'CHN",logo:"KC",color:C.yellow,div:"3.0–3.5 Mixed",cap:"Patrick",co:"Kathleen Paraiso",
+     men:["Chris Carag","Guilbert Balmaceda","Jesse Nicasio","Patrick*","Philip Cadelina","Josh Manarang"],
+     women:["Elizabeth Acevedez","Kathleen Paraiso^","Katrina Nicasio","Vernice Carag","Jennifer Morales","Angela C."]},
+    {name:"Smash Society",logo:"SS",color:C.orange,div:"3.0–3.5 Mixed",cap:"Ryan Hom",co:"Annie Kang",
+     men:["Devin Carroll","Kai Pylkkanen","Ryan Hom*","Matt P.","Stan Esperon"],
+     women:["Annie Kang^","Pam Morioka","Phoebe Borsum","Sallie Kane","Sally Whitty","Dot M.","Cheryl","Antonette Petitt"]},
+    {name:"Timog Cal",logo:"TC",color:C.orange2,div:"3.0–3.5 Mixed",cap:"Sandee Petersen",co:"Bernard Comia",
+     men:["Bernard Comia^","Enrique","GM Ardoy","Noel Manansala","Ricky Pedernal","Robert Del Rosario","Wally Quijano"],
+     women:["Selene","Aurora Timbol","Sandee Petersen*"]},
+    {name:"What the Dink?!",logo:"WTD",color:C.purple,div:"3.0–3.5 Mixed",cap:"Sheri O'Neil",co:"Teddie Liu",
+     men:["Teddie Liu^","Ryan Yeung","Justin Kwok","Emanual Escamilla","Albert Clarke"],
+     women:["Elaine Dodson","Sheri O'Neil*","Amita Parikh","Chrisherlyn Dumrique","Grace Lee"]},
+    {name:"Zero Zero Two",logo:"002",color:C.dark,div:"3.0–3.5 Mixed",cap:"Philip R",co:"Ant B",
+     men:["Ant B^","Anthony B","Francis A","Ian B","Kyle U","Philip R*","Masaki"],
+     women:["Dona B","Kaithlyn R","Lara P","Shay C^","Judy DV"]},
+  ];
+  const DESCS = {
+    a:"<b>Refined cards</b> — your grid, tightened: colored top strip, logo tile, a men/women split bar, and a big roster count. Player names stay as clean chips grouped Men/Women, captain (★) and co-captain (☆) highlighted. Click a card to edit.",
+    b:"<b>Dense table</b> — one sortable row per team for managing at a glance: captain, co-captain, M/W balance, roster size. Click any row to expand the full roster names underneath. Most admin-efficient.",
+    c:"<b>List + roster</b> — a middle ground. Each team is a wide row with identity, split bar, and the full roster shown as name chips inline, count on the right. Scannable and every name is visible without clicking."
+  };
+  const role = n => n.endsWith('*') ? 'cap' : n.endsWith('^') ? 'co' : '';
+  const splitBar = t => {
+    const m=t.men.length, w=t.women.length, tot=m+w||1;
+    return '<div class="split"><i class="m" style="width:'+(m/tot*100)+'%"></i><i class="w" style="width:'+(w/tot*100)+'%"></i></div>';
+  };
+  const mwLabel = t => '<span class="mw"><b class="m">'+t.men.length+' M</b> · <b class="w">'+t.women.length+' W</b></span>';
+  const chip = (n, team, gender) => {
+    const r=role(n), nm=n.replace(/[*^]/,'').trim();
+    const mk = r==='cap'?'<span class="mk">★</span>':r==='co'?'<span class="mk">☆</span>':'';
+    return '<span class="chip '+r+'" onclick="openPlayer(event,\''+nm.replace(/'/g,"\\'")+'\',\''+team.replace(/'/g,"\\'")+'\',\''+gender+'\',\''+r+'\')">'+nm+mk+'</span>';
+  };
+  const chips = (list, team, gender, addable) =>
+    '<div class="chips">'+list.map(n=>chip(n,team,gender)).join('')+
+    (addable?'<span class="chip add" onclick="openAdd(event,\''+team.replace(/'/g,"\\'")+'\')">+ Add player</span>':'')+
+    '</div>';
+
+  // OPTION A
+  document.getElementById('grid-a').innerHTML = TEAMS.map(t=>{
+    const tot=t.men.length+t.women.length;
+    return '<div class="tcard" style="--tc:'+t.color+'"><div class="body">'+
+      '<div class="top">'+
+        '<div class="logo" style="background:'+t.color+'">'+t.logo+'</div>'+
+        '<div style="min-width:0"><div class="nm">'+t.name+'</div>'+
+          '<div class="cap"><b>'+t.cap+'</b>'+(t.co?' · co: '+t.co:'')+'</div></div>'+
+        '<div class="count"><div class="n">'+tot+'</div><div class="l">Players</div></div>'+
+      '</div>'+
+      '<div class="splitwrap"><div class="mw">'+mwLabel(t)+'<span class="pill">'+t.div+'</span></div>'+splitBar(t)+'</div>'+
+      '<div class="gcol"><div class="glab m">Men · '+t.men.length+'</div>'+chips(t.men,t.name,'Male')+'</div>'+
+      '<div class="gcol" style="margin-top:11px"><div class="glab w">Women · '+t.women.length+'</div>'+chips(t.women,t.name,'Female',true)+'</div>'+
+    '</div></div>';
+  }).join('');
+
+  // OPTION B  (rows expand on click to reveal the full roster names)
+  document.getElementById('tbl-b').innerHTML =
+    '<thead><tr><th class="sorted">Team ▾</th><th>Division</th><th>Captain</th><th>Co-Captain</th><th>M / W balance</th><th>Players</th><th></th></tr></thead>'+
+    '<tbody>'+TEAMS.map((t,i)=>{
+      const tot=t.men.length+t.women.length;
+      return '<tr onclick="toggleRow('+i+')">'+
+        '<td><span class="tname"><span class="logo" style="background:'+t.color+';width:26px;height:26px;font-size:10px;border-radius:7px;">'+t.logo+'</span>'+t.name+'</span></td>'+
+        '<td><span class="pill">'+t.div+'</span></td>'+
+        '<td class="who">'+t.cap+'</td>'+
+        '<td class="who">'+(t.co||'—')+'</td>'+
+        '<td><div class="splitcell">'+splitBar(t)+mwLabel(t)+'</div></td>'+
+        '<td class="cnum">'+tot+'</td>'+
+        '<td class="act" id="chev-'+i+'">▸</td>'+
+      '</tr>'+
+      '<tr class="detail" id="detail-'+i+'" style="display:none"><td colspan="7" style="background:var(--color-bg);padding:14px 18px;">'+
+        '<div class="gcol"><div class="glab m">Men · '+t.men.length+'</div>'+chips(t.men,t.name,'Male')+'</div>'+
+        '<div class="gcol" style="margin-top:11px"><div class="glab w">Women · '+t.women.length+'</div>'+chips(t.women,t.name,'Female',true)+'</div>'+
+      '</td></tr>';
+    }).join('')+'</tbody>';
+  window.toggleRow = i => {
+    const d=document.getElementById('detail-'+i), c=document.getElementById('chev-'+i);
+    const open = d.style.display==='none';
+    d.style.display = open ? 'table-row' : 'none';
+    c.textContent = open ? '▾' : '▸';
+  };
+
+  // OPTION C
+  document.getElementById('list-c').innerHTML = TEAMS.map(t=>{
+    const tot=t.men.length+t.women.length;
+    const roster = '<div class="chips">'+
+      t.men.map(n=>chip(n,t.name,'Male')).join('')+
+      t.women.map(n=>chip(n,t.name,'Female')).join('')+
+      '<span class="chip add" onclick="openAdd(event,\''+t.name.replace(/'/g,"\\'")+'\')">+ Add player</span>'+
+    '</div>';
+    return '<div class="lrow" style="--tc:'+t.color+'">'+
+      '<div class="idb"><div class="logo" style="background:'+t.color+'">'+t.logo+'</div>'+
+        '<div style="min-width:0"><div class="nm">'+t.name+'</div>'+
+          '<div class="cap"><b style="color:var(--color-text)">'+t.cap+'</b>'+(t.co?' · co '+t.co:'')+'</div></div></div>'+
+      '<div class="midb"><div class="mw">'+mwLabel(t)+'<span class="pill">'+t.div+'</span></div>'+splitBar(t)+'</div>'+
+      '<div class="rosb">'+roster+'</div>'+
+      '<div class="cntb"><div class="n">'+tot+'</div><div class="l">Players</div></div>'+
+    '</div>';
+  }).join('');
+
+  document.getElementById('desc').innerHTML = DESCS.a;
+  function opt(which, el){
+    document.querySelectorAll('.opts button').forEach(b=>b.classList.remove('on'));
+    el.classList.add('on');
+    ['a','b','c'].forEach(k=>document.getElementById('view-'+k).classList.toggle('on', k===which));
+    document.getElementById('desc').innerHTML = DESCS[which];
+  }
+</script>
+</body>
+</html>

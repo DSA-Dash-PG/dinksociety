@@ -107,6 +107,9 @@ export default async (req) => {
           dupr: p.dupr || null,
           isCaptain: !!p.isCaptain,
           isCoCaptain: !!p.isCoCaptain,
+          // Sub = backup player, excluded from automatic availability reminders.
+          // A sub can't simultaneously be captain/co-captain.
+          isSub: !!p.isSub && !p.isCaptain && !p.isCoCaptain,
           // Profile bio / pending edits / photo stamp are owned by the profile
           // endpoints — preserve (or live-merge) them so a team save can't wipe them.
           ...(mergedProfile ? { profile: mergedProfile } : {}),
@@ -286,6 +289,7 @@ export default async (req) => {
         // Clear existing captain flags
         for (const p of roster) p.isCaptain = false;
         target.isCaptain = true;
+        target.isSub = false; // captain can't be a sub
         // Sync captain name + email
         team.captain = target.name;
         if (target.email) team.captainEmail = target.email;
@@ -310,6 +314,7 @@ export default async (req) => {
         // Clear existing co-captain flags
         for (const p of roster) p.isCoCaptain = false;
         target.isCoCaptain = true;
+        target.isSub = false; // co-captain can't be a sub
         team.roster = roster;
         team.updatedAt = now;
         team.updatedBy = admin.email;

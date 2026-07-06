@@ -418,6 +418,8 @@
     .pchip.cap .mk { color: var(--color-lime); } .pchip.co .mk { color: var(--color-teal); }
     .pchip.add { border-style: dashed; border-color: var(--color-teal); color: var(--color-teal); background: none; font-weight: 700; }
     .pchip.add:hover { background: var(--color-teal-dim); }
+    .pchip.subp { border-style: dashed; }
+    .pchip.subp .mk { font-size: 8px; letter-spacing: 0.06em; font-weight: 800; color: var(--color-text-faint); background: var(--color-surface-3); padding: 1px 4px; border-radius: 4px; }
 
     /* player popup role segment */
     .roleseg { display: flex; gap: 4px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 3px; margin-bottom: 13px; }
@@ -4001,8 +4003,8 @@
       const logo = (t.emoji && t.emoji.trim()) ? h(t.emoji.trim()) : h(initials(t.name));
 
       const pchip = p => {
-        const cls = p.isCaptain ? ' cap' : p.isCoCaptain ? ' co' : '';
-        const mk = p.isCaptain ? '<span class="mk">★</span>' : p.isCoCaptain ? '<span class="mk">☆</span>' : '';
+        const cls = p.isCaptain ? ' cap' : p.isCoCaptain ? ' co' : p.isSub ? ' subp' : '';
+        const mk = p.isCaptain ? '<span class="mk">★</span>' : p.isCoCaptain ? '<span class="mk">☆</span>' : p.isSub ? '<span class="mk">SUB</span>' : '';
         return '<span class="pchip' + cls + '" data-team="' + h(t.id) + '" data-player="' + h(p.id) + '">' + h(p.name) + mk + '</span>';
       };
       const gcol = (label, cls, list, addAfter) =>
@@ -4063,7 +4065,7 @@
     const t = ppFindTeam(teamId); if (!t) return;
     const p = (t.roster || []).find(x => x.id === playerId); if (!p) return;
     PP_TEAM = t; PP_PLAYER = p;
-    const curRole = p.isCaptain ? 'captain' : p.isCoCaptain ? 'cocaptain' : 'player';
+    const curRole = p.isCaptain ? 'captain' : p.isCoCaptain ? 'cocaptain' : p.isSub ? 'sub' : 'player';
     PP_ROLE = curRole;
     const g = p.gender || '';
     $id('player-pop-inner').innerHTML =
@@ -4072,8 +4074,10 @@
         '<button class="pp-x" onclick="closePlayerPop()">✕</button></div>' +
       '<div class="roleseg" id="pp-role">' +
         '<button data-r="player">Player</button>' +
-        '<button data-r="cocaptain">Co-Captain</button>' +
+        '<button data-r="sub">Sub</button>' +
+        '<button data-r="cocaptain">Co-Cap</button>' +
         '<button data-r="captain">Captain</button></div>' +
+      '<div style="font-size:10px;color:var(--color-text-faint);margin:-6px 0 12px;">Subs are backups — they don\'t get the automatic availability reminders.</div>' +
       '<div class="arow"><div class="af" style="grid-column:1/-1"><label>Name</label><input id="pp-name" value="' + h(p.name || '') + '"></div></div>' +
       '<div class="arow"><div class="af"><label>Email</label><input id="pp-email" value="' + h(p.email || '') + '"></div>' +
         '<div class="af"><label>Gender</label><select id="pp-gender"><option value="">—</option><option value="M"' + (g === 'M' ? ' selected' : '') + '>Male</option><option value="F"' + (g === 'F' ? ' selected' : '') + '>Female</option></select></div></div>' +
@@ -4111,13 +4115,20 @@
     const gender = $id('pp-gender').value;
     const dupr = $id('pp-dupr').value.trim();
     try {
-      const roster = (t.roster || []).map(x => x.id === p.id
-        ? { ...x, name, email: email || null, phone: phone || null, gender, dupr: dupr || null }
-        : x);
+      // Field edits + Sub flag go through the full-roster PUT. Sub is mutually
+      // exclusive with captain/co-captain; captain/co-captain promotions use the
+      // dedicated actions below (they anchor the login identity).
+      const roster = (t.roster || []).map(x => {
+        if (x.id !== p.id) return x;
+        const base = { ...x, name, email: email || null, phone: phone || null, gender, dupr: dupr || null };
+        if (PP_ROLE === 'sub') { base.isSub = true; base.isCaptain = false; base.isCoCaptain = false; }
+        else base.isSub = false;
+        return base;
+      });
       await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(t.id), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roster }),
       });
-      const oldRole = p.isCaptain ? 'captain' : p.isCoCaptain ? 'cocaptain' : 'player';
+      const oldRole = p.isCaptain ? 'captain' : p.isCoCaptain ? 'cocaptain' : p.isSub ? 'sub' : 'player';
       if (PP_ROLE !== oldRole) {
         if (PP_ROLE === 'captain') await ppAction('set-captain', { playerId: p.id });
         else if (PP_ROLE === 'cocaptain') await ppAction('set-cocaptain', { playerId: p.id });

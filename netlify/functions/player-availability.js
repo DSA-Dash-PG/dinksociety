@@ -14,12 +14,7 @@ import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { getTeamAvailability, setPlayerAvailability } from './lib/availability.js';
 import { logActivity } from './lib/activity-log.js';
-import { sendEmail, renderAvailabilityNotify } from './lib/email.js';
-
-function siteUrl() {
-  return (typeof Netlify !== 'undefined' && Netlify.env.get('SITE_URL'))
-    || process.env.SITE_URL || 'https://dinksociety.netlify.app';
-}
+import { notifyCaptainsOfChange } from './lib/availability-notify.js';
 
 export default async (req) => {
   const verified = await verifyPlayerSession(req);

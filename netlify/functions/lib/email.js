@@ -311,6 +311,44 @@ export function renderAvailabilityNotify({ playerName, status, teamName, teamEmo
 }
 
 /**
+ * Render the one-tap "confirm your availability" reminder email sent to players
+ * who haven't responded yet. Two buttons ("I'm in" / "Can't make it") link to
+ * pre-signed, no-login confirm URLs. Deliberately short — it's a quick ask.
+ */
+export function renderAvailabilityReminder({ playerName, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, lockLine, inUrl, outUrl }) {
+  const first = String(playerName || '').trim().split(/\s+/)[0] || playerName || 'there';
+  const matchCard = `
+      <div style="background:#161616;border-radius:8px;padding:14px 16px;margin:0 0 18px;">
+        <div style="font-size:14px;font-weight:700;color:#f5f5f5;">
+          ${teamEmoji ? escapeBody(teamEmoji) + ' ' : ''}${escapeBody(teamName)}
+          <span style="color:#666;font-weight:700;margin:0 6px;">vs</span>
+          ${oppEmoji ? escapeBody(oppEmoji) + ' ' : ''}${escapeBody(opponentName)}
+        </div>
+        ${dateLine ? `<div style="font-size:12px;color:#8a8a8a;margin-top:9px;padding-top:9px;border-top:1px solid #2a2a2a;">${escapeBody(dateLine)}</div>` : ''}
+      </div>`;
+  return `
+    <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
+      <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#17d7b0;margin-bottom:26px;">THE DINK SOCIETY</div>
+      <h1 style="font-size:22px;font-weight:800;color:#f5f5f5;margin:0 0 14px;line-height:1.25;">Are you in for Week ${escapeBody(String(week))}?</h1>
+      <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">Hi ${escapeBody(first)} — your captain needs to know if you can play. It only takes a second and helps them set the lineup.</p>
+      ${matchCard}
+      <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;"><tr>
+        <td style="padding-right:10px;">
+          <a href="${inUrl}" style="display:inline-block;padding:14px 30px;background:#b8ff2c;color:#0e0e0e;font-size:14px;font-weight:800;text-decoration:none;border-radius:9999px;">✓ I'm in</a>
+        </td>
+        <td>
+          <a href="${outUrl}" style="display:inline-block;padding:14px 26px;background:transparent;border:1px solid #3a3a3a;color:#f5f5f5;font-size:14px;font-weight:700;text-decoration:none;border-radius:9999px;">Can't make it</a>
+        </td>
+      </tr></table>
+      <p style="font-size:13px;color:#777;margin:0 0 6px;line-height:1.5;">One tap — no login needed.${lockLine ? ' ' + escapeBody(lockLine) : ''}</p>
+      <div style="margin-top:34px;padding-top:20px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;">
+        ${teamName ? 'Sent to ' + escapeBody(teamName) + ' · ' : ''}The Dink Society · Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Render the PLAYER magic-link sign-in email.
  * @param {string} magicUrl - The full magic link URL
  * @param {string} playerName - The player's name
