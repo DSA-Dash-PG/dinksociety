@@ -96,6 +96,9 @@ export default async (req) => {
           ...(prev?.photo ? { photo: prev.photo } : {}),
           ...(prev?.isCaptain ? { isCaptain: true } : {}),
           ...(prev?.isCoCaptain ? { isCoCaptain: true } : {}),
+          // Sub flag is owned by the set-sub endpoint — preserve it so a plain
+          // roster save can't wipe it.
+          ...(prev?.isSub ? { isSub: true } : {}),
           // Archive state is owned by the archive/restore endpoint — preserve it
           // from the stored roster so an ordinary roster save can't flip or wipe it.
           ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),

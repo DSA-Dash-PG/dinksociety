@@ -42,6 +42,12 @@
 
     .lb-section { display:none; }
     .lb-section.is-active { display:block; }
+    .lb-subseg { display:none; gap:6px; margin:0 0 var(--space-4); flex-wrap:wrap; }
+    .lb-subseg.is-active { display:flex; }
+    .lb-sub { padding:6px 13px; border-radius:var(--radius-full); font-size:11px; font-weight:700; border:1px solid var(--color-border); background:var(--color-surface-2); color:var(--color-text-muted); cursor:pointer; font-family:inherit; }
+    .lb-sub:hover { color:var(--color-text); }
+    .lb-sub.is-active { border-color:var(--color-lime); color:var(--color-lime); background:var(--color-lime-dim); }
+    #nvz-frame { width:100%; border:0; display:block; min-height:70vh; }
 
     /* Generic card */
     .lb-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:var(--space-5); margin-bottom:var(--space-4); }
@@ -235,21 +241,25 @@
     </div>
 
     <nav class="lb-tabs">
-      <button class="lb-tab is-active" data-tab="rankings">🏆 Rankings</button>
-      <button class="lb-tab" data-tab="topchefs">👨‍🍳 K'CHN Top Chefs</button>
-      <button class="lb-tab" data-tab="leaders">🎯 Team Leaders</button>
-      <button class="lb-tab" data-tab="streaks">🔥 Hot Streaks</button>
-      <button class="lb-tab" data-tab="analytics">📊 Analytics</button>
+      <button class="lb-tab is-active" data-top="rankings">🏆 Rankings</button>
+      <button class="lb-tab" data-top="awards">🏅 Awards</button>
+      <button class="lb-tab" data-top="nvz">📈 The NVZ</button>
     </nav>
+
+    <!-- Rankings sub-toggle: Players vs Team Leaders -->
+    <div class="lb-subseg is-active" data-subfor="rankings">
+      <button class="lb-sub is-active" data-section="rankings">Players</button>
+      <button class="lb-sub" data-section="leaders">🎯 Team Leaders</button>
+    </div>
+    <!-- Awards sub-toggle: Top Chefs vs Hot Streaks -->
+    <div class="lb-subseg" data-subfor="awards">
+      <button class="lb-sub is-active" data-section="topchefs">👨‍🍳 K'CHN Top Chefs</button>
+      <button class="lb-sub" data-section="streaks">🔥 Hot Streaks</button>
+    </div>
 
     <!-- RANKINGS -->
     <section class="lb-section is-active" data-section="rankings">
       <div id="rankings-content"><div class="empty-state">Loading…</div></div>
-    </section>
-
-    <!-- K'CHN TOP CHEFS -->
-    <section class="lb-section" data-section="topchefs">
-      <div id="topchefs-content"><div class="empty-state">Loading…</div></div>
     </section>
 
     <!-- TEAM LEADERS -->
@@ -257,14 +267,19 @@
       <div id="leaders-content"><div class="empty-state">Loading…</div></div>
     </section>
 
+    <!-- K'CHN TOP CHEFS -->
+    <section class="lb-section" data-section="topchefs">
+      <div id="topchefs-content"><div class="empty-state">Loading…</div></div>
+    </section>
+
     <!-- HOT STREAKS -->
     <section class="lb-section" data-section="streaks">
       <div id="streaks-content"><div class="empty-state">Loading…</div></div>
     </section>
 
-    <!-- ANALYTICS -->
-    <section class="lb-section" data-section="analytics">
-      <div id="analytics-content"></div>
+    <!-- THE NVZ (embedded analytics) -->
+    <section class="lb-section" data-section="nvz">
+      <iframe id="nvz-frame" title="The NVZ — deep stats" loading="lazy" scrolling="no"></iframe>
     </section>
 
   </main>
@@ -279,10 +294,15 @@
   const SLOT_LABELS = { womens:"Women's", mens:"Men's", mixed:'Mixed' };
 
   const state = {
-    circuit:'I', division:'', tab:'rankings',
+    circuit:'I', division:'', section:'rankings',
+    lastSub:{ rankings:'rankings', awards:'topchefs' },
     filter:'all', genderFilter:'all', search:'', sort:'dsr', sortDir:'desc',
     playerStats:null, standings:null, potw:null
   };
+  // Which top tab owns each content section.
+  const SECTION_TOP = { rankings:'rankings', leaders:'rankings', topchefs:'awards', streaks:'awards', nvz:'nvz' };
+  const TOP_DEFAULT = { rankings:'rankings', awards:'topchefs', nvz:'nvz' };
+  const KNOWN_SECTIONS = ['rankings','leaders','topchefs','streaks','nvz'];
   const LB_GENDER_COLOR = { M:'#6aa8ff', F:'#ff8fb3' };
   const lbGenderOf = p => /^f/i.test(p.gender||'') ? 'F' : /^m/i.test(p.gender||'') ? 'M' : null;
 
@@ -302,17 +322,20 @@
     if (p.get('circuit'))  state.circuit  = p.get('circuit');
     if (p.get('division')) state.division = p.get('division');
     const v = p.get('view');
-    // Legacy redirects
-    if (v) state.tab = (v === 'society' || v === 'standings') ? 'rankings' : v;
+    // Legacy redirects: society/standings → rankings, analytics → the NVZ.
+    if (v) {
+      const legacy = { society:'rankings', standings:'rankings', analytics:'nvz' };
+      state.section = legacy[v] || (KNOWN_SECTIONS.includes(v) ? v : 'rankings');
+    }
     $('circuit-select').value  = state.circuit;
     $('division-select').value = state.division || '';
-    activateTab(state.tab, true);
+    activate(state.section, true);
   }
   function writeUrl() {
     const p = new URLSearchParams();
-    if (state.circuit !== 'I')    p.set('circuit', state.circuit);
-    if (state.division)           p.set('division', state.division);
-    if (state.tab !== 'rankings') p.set('view', state.tab);
+    if (state.circuit !== 'I')        p.set('circuit', state.circuit);
+    if (state.division)               p.set('division', state.division);
+    if (state.section !== 'rankings') p.set('view', state.section);
     const q = p.toString();
     history.replaceState({}, '', q ? `?${q}` : window.location.pathname);
   }
@@ -893,34 +916,41 @@
   }
 
   // ── ANALYTICS ────────────────────────────────────────────────────
-  function renderAnalytics() {
-    $('analytics-content').innerHTML = `<div class="lb-card">
-      <h2 class="lb-card__title">League Analytics</h2>
-      <div class="empty-state" style="padding:var(--space-10)">
-        Analytics will appear here once enough match data has been collected.
-        Track scoring averages, team momentum, point differentials, and head-to-head records.
-      </div>
-    </div>`;
+  // ── The NVZ iframe (lazy, auto-sized via postMessage) ────────────
+  function loadNvzFrame() {
+    const f = $('nvz-frame'); if (!f) return;
+    const season = 'circuit-' + String(state.circuit || 'I').toLowerCase();
+    if (f.dataset.season === season) return;   // already showing this season
+    f.dataset.season = season;
+    f.src = '/the-nvz.html?embed=1&season=' + encodeURIComponent(season);
   }
+  window.addEventListener('message', e => {
+    const h = e.data && e.data.nvzHeight;
+    if (typeof h === 'number' && h > 0) { const f = $('nvz-frame'); if (f) f.style.height = (h + 8) + 'px'; }
+  });
 
-  // ── Tab activation ───────────────────────────────────────────────
-  function activateTab(name, skipWrite) {
-    state.tab = name;
-    document.querySelectorAll('.lb-tab').forEach(b => b.classList.toggle('is-active', b.dataset.tab===name));
-    document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section===name));
-    if (!skipWrite) writeUrl();
-    if (name === 'analytics') { renderAnalytics(); return; }
+  // ── Section activation ───────────────────────────────────────────
+  function ensureDataThenRender() {
     if (!state.playerStats && !state._loading) {
       state._loading = true;
       Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
-        state._loading = false;
-        renderHero();
-        renderAll();
+        state._loading = false; renderHero(); renderAll();
       });
     } else if (state.playerStats) {
-      renderHero();
-      renderAll();
+      renderHero(); renderAll();
     }
+  }
+  function activate(section, skipWrite) {
+    state.section = section;
+    const top = SECTION_TOP[section] || 'rankings';
+    if (top !== 'nvz') state.lastSub[top] = section;
+    document.querySelectorAll('.lb-tab').forEach(b => b.classList.toggle('is-active', b.dataset.top === top));
+    document.querySelectorAll('.lb-subseg').forEach(s => s.classList.toggle('is-active', s.dataset.subfor === top));
+    document.querySelectorAll('.lb-sub').forEach(b => b.classList.toggle('is-active', b.dataset.section === section));
+    document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === section));
+    if (!skipWrite) writeUrl();
+    if (section === 'nvz') { loadNvzFrame(); return; }
+    ensureDataThenRender();
   }
 
   function renderAll() {
@@ -943,11 +973,15 @@
   }
 
   // ── Boot ─────────────────────────────────────────────────────────
-  document.querySelectorAll('.lb-tab').forEach(b => b.addEventListener('click', () => activateTab(b.dataset.tab)));
+  document.querySelectorAll('.lb-tab').forEach(b => b.addEventListener('click', () => {
+    const top = b.dataset.top;
+    activate(top === 'nvz' ? 'nvz' : (state.lastSub[top] || TOP_DEFAULT[top]));
+  }));
+  document.querySelectorAll('.lb-sub').forEach(b => b.addEventListener('click', () => activate(b.dataset.section)));
   $('circuit-select').addEventListener('change', e => {
     state.circuit = e.target.value;
-    state.playerStats = state.standings = null;
-    writeUrl(); activateTab(state.tab, true); activateTab(state.tab);
+    state.playerStats = state.standings = state.potw = null;
+    writeUrl(); activate(state.section, true);
   });
   $('division-select').addEventListener('change', e => {
     state.division = e.target.value;

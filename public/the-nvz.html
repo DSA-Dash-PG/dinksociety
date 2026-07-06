@@ -125,6 +125,14 @@
     .av-c { display:inline-flex; align-items:center; justify-content:center; overflow:hidden; }
     .av-c img { width:100%; height:100%; object-fit:cover; border-radius:inherit; }
     .spark { display:block; }
+
+    /* Embedded inside the Leaderboard's "The NVZ" tab: drop the page chrome and
+       let the parent iframe own the sizing. */
+    body.nvz-embed { background:transparent; }
+    body.nvz-embed [data-partial], body.nvz-embed .nvz-hero { display:none !important; }
+    body.nvz-embed .nvz-shell { max-width:none; padding:4px 0 20px; }
+    body.nvz-embed .tabs { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; margin-top:4px; scrollbar-width:none; }
+    body.nvz-embed .tabs::-webkit-scrollbar { display:none; }
   </style>
 </head>
 <body data-page="nvz">
@@ -149,6 +157,18 @@
     var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
     var CIRCUIT = SEASON_ID.replace('circuit-', '').toUpperCase();
     var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
+
+    // When embedded in the Leaderboard tab (?embed=1): strip chrome and report our
+    // height to the parent so the iframe auto-sizes (no nested scrollbar).
+    var EMBED = new URLSearchParams(location.search).get('embed') === '1';
+    if (EMBED) {
+      document.body.classList.add('nvz-embed');
+      var postH = function () { try { parent.postMessage({ nvzHeight: document.documentElement.scrollHeight }, '*'); } catch (e) {} };
+      window.addEventListener('load', postH);
+      window.addEventListener('resize', postH);
+      if (window.ResizeObserver) { try { new ResizeObserver(postH).observe(document.body); } catch (e) {} }
+      setInterval(postH, 1200); // safety net for late chart/select renders
+    }
 
     function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
     function sgn(n){ return (n>0?'+':n<0?'−':'')+Math.abs(n); }

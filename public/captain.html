@@ -237,7 +237,9 @@
     .ros-call.off { color: var(--color-text-faint); pointer-events: none; opacity: 0.45; }
     .ros-contact { font-size: 12px; color: var(--color-text-muted); margin-top: 2px; display: flex; flex-wrap: wrap; gap: 4px 10px; }
     .ros-contact .none { color: var(--color-text-faint); font-style: italic; }
-    .ros-actions { display: flex; gap: 7px; flex-shrink: 0; }
+    .ros-actions { display: flex; gap: 7px; flex-shrink: 0; align-items: center; }
+    .ros-sub { font-size: 9px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 4px 9px; border-radius: var(--radius-full); border: 1px dashed var(--color-border-strong); color: var(--color-text-faint); background: none; cursor: pointer; user-select: none; white-space: nowrap; }
+    .ros-sub.on { border-style: solid; border-color: #f5a623; color: #f5a623; background: rgba(245,166,35,0.12); }
     .ros-act { display: inline-flex; align-items: center; justify-content: center; width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--color-border-strong); background: var(--color-surface-2); flex-shrink: 0; text-decoration: none; font-size: 16px; }
     .ros-act svg { width: 17px; height: 17px; }
     .ros-act--call { color: var(--color-teal); }
@@ -3456,22 +3458,45 @@
         ? `<a class="ros-act ros-act--email" href="mailto:${escapeAttr(p.email)}" onclick="event.stopPropagation()" aria-label="Email ${escapeAttr(p.name)}">${icoMail}</a>`
         : `<span class="ros-act ros-act--email off" aria-hidden="true">${icoMail}</span>`;
 
+      // Sub toggle — a captain can mark any non-leader as a backup (excluded from
+      // availability reminders). A <span> role=button so it can nest inside the
+      // row's own <button>. Allowed even when the roster is locked.
+      const subBtn = lead ? '' :
+        `<span class="ros-sub ${p.isSub ? 'on' : ''}" role="button" tabindex="0" onclick="event.stopPropagation();toggleSub('${p.id}',this)" title="Subs don't get the automatic availability reminders">${p.isSub ? 'Sub ✓' : 'Sub'}</span>`;
       const inner = `<span class="ros-av">${escapeHtml(initialsOf(p.name || '?'))}</span>
         <span class="ros-body"><span class="ros-name">${escapeHtml(p.name)} ${badge} ${gtag}</span>${contact}</span>
-        <span class="ros-actions">${callBtn}${textBtn}${emailBtn}</span>`;
+        <span class="ros-actions">${subBtn}${callBtn}${textBtn}${emailBtn}</span>`;
       if (readOnly) return `<div class="ros-row ${lead ? 'is-lead' : ''}">${inner}</div>`;
       return `<button type="button" class="ros-row ${lead ? 'is-lead' : ''}" data-rid="${state.roster.indexOf(p)}">${inner}<span class="ros-chev">›</span></button>`;
+    }
+
+    async function toggleSub(playerId, btn) {
+      const p = (state.roster || []).find(x => x.id === playerId);
+      if (!p) return;
+      const next = !p.isSub;
+      if (btn) { btn.style.opacity = '0.5'; btn.textContent = '…'; }
+      try {
+        const res = await fetch('/.netlify/functions/captain-set-sub', {
+          method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ playerId, isSub: next }),
+        });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) { alert(d.error || 'Could not update.'); renderRoster(); return; }
+        p.isSub = d.isSub;
+        renderRoster();
+      } catch { alert('Could not update.'); renderRoster(); }
     }
 
     function renderRoster() {
       const container = $id('roster-rows');
       const addBtn = $id('add-player-btn');
 
-      // Locked for the season (Week 2 played) — read-only list, no editing.
+      // Locked for the season (Week 2 played) — roster is read-only, BUT subs can
+      // still be changed (it only affects reminders, not who's on the team).
       if (state.rosterLocked) {
         if (addBtn) addBtn.style.display = 'none';
         container.innerHTML = `
-          <div class="cap-status is-info" style="margin-bottom:12px;">🔒 Roster is locked for the season (Week 2 has been played). Contact a league admin if you need a change.</div>
+          <div class="cap-status is-info" style="margin-bottom:12px;">🔒 Roster is locked for the season (Week 2 has been played). You can still mark players as subs; contact a league admin for any other change.</div>
           ${state.roster.length ? rosterSorted().map(p => rosterRowHtml(p, true)).join('') : '<div class="empty-state">No players on the roster.</div>'}
         `;
         return;

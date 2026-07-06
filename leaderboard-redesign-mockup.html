@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leaderboard + NVZ reorg (mockup)</title>
+<style>
+  :root{
+    --color-bg:#0e0e0e; --color-surface:#161616; --color-surface-2:#1e1e1e; --color-surface-3:#262626;
+    --color-border:rgba(255,255,255,0.08); --color-border-strong:rgba(255,255,255,0.14);
+    --color-text:#f0f0ec; --color-text-muted:#9a9e97; --color-text-faint:#5e625c;
+    --color-lime:#b8ff2c; --color-lime-dim:rgba(184,255,44,0.12);
+    --color-teal:#17d7b0; --color-teal-dim:rgba(23,215,176,0.12);
+    --color-amber:#f5a623;
+    --radius-sm:10px; --radius-lg:20px; --radius-full:9999px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:#080808;color:var(--color-text);font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;-webkit-font-smoothing:antialiased;}
+  .stage{min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px 70px;}
+  .bar{display:flex;gap:8px;align-items:center;margin-bottom:8px;flex-wrap:wrap;justify-content:center;}
+  .bar .lab{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--color-text-faint);font-weight:800;margin-right:2px;}
+  .seg{display:flex;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-full);padding:3px;gap:2px;}
+  .seg button{border:none;background:none;color:var(--color-text-muted);font-family:inherit;font-size:11px;font-weight:700;padding:6px 12px;border-radius:var(--radius-full);cursor:pointer;}
+  .seg button.on{background:var(--color-lime);color:#0b0b0b;}
+  .idea-desc{max-width:430px;font-size:12px;line-height:1.5;color:var(--color-text-muted);text-align:center;margin:6px 0 16px;}
+  .idea-desc b{color:var(--color-text);}
+
+  /* device frame */
+  .frame{background:var(--color-bg);border:1px solid var(--color-border-strong);border-radius:26px;overflow:hidden;box-shadow:0 30px 90px rgba(0,0,0,.6);width:410px;max-width:100%;}
+  .frame.desktop{width:720px;}
+  .scr{max-height:74vh;overflow-y:auto;}
+  .hd{padding:18px 18px 4px;}
+  .hd .eyebrow{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--color-teal);font-weight:800;}
+  .hd h1{font-size:24px;font-weight:900;font-style:italic;text-transform:uppercase;margin:5px 0 0;}
+  .hd .sub{font-size:12px;color:var(--color-text-faint);margin-top:3px;}
+  .body{padding:14px 16px 22px;}
+
+  /* pill tab rows */
+  .pills{display:flex;gap:7px;overflow-x:auto;padding:12px 16px 12px;scrollbar-width:none;border-bottom:1px solid var(--color-border);position:sticky;top:0;background:var(--color-bg);z-index:3;}
+  .pills::-webkit-scrollbar{display:none;}
+  .pill{flex:0 0 auto;border:1px solid var(--color-border-strong);background:var(--color-surface);color:var(--color-text-muted);font-family:inherit;font-size:12px;font-weight:700;padding:8px 13px;border-radius:var(--radius-full);cursor:pointer;white-space:nowrap;}
+  .pill.on{background:var(--color-lime);color:#0b0b0b;border-color:var(--color-lime);}
+
+  /* 2-3 even tabs */
+  .tabrow{display:flex;gap:4px;padding:10px 14px 0;border-bottom:1px solid var(--color-border);position:sticky;top:0;background:var(--color-bg);z-index:3;}
+  .tabrow .t{flex:1;position:relative;border:none;background:none;color:var(--color-text-faint);font-family:inherit;font-size:12.5px;font-weight:800;padding:11px 4px 13px;cursor:pointer;text-transform:uppercase;letter-spacing:.02em;}
+  .tabrow .t.on{color:var(--color-text);}
+  .tabrow .t.on::after{content:"";position:absolute;left:12px;right:12px;bottom:-1px;height:2px;background:var(--color-lime);border-radius:2px;}
+
+  /* mode toggle (idea C) */
+  .mode{display:flex;margin:14px 16px 0;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:var(--radius-full);padding:4px;gap:3px;}
+  .mode button{flex:1;border:none;background:none;color:var(--color-text-muted);font-family:inherit;font-size:13px;font-weight:800;padding:10px;border-radius:var(--radius-full);cursor:pointer;}
+  .mode button.on{background:var(--color-lime);color:#0b0b0b;}
+
+  /* sub-nav for NVZ */
+  .subchips{display:flex;gap:6px;overflow-x:auto;padding:12px 0 4px;scrollbar-width:none;}
+  .subchips::-webkit-scrollbar{display:none;}
+  .subchip{flex:0 0 auto;border:1px solid var(--color-border);background:var(--color-surface-2);color:var(--color-text-muted);font-family:inherit;font-size:11px;font-weight:700;padding:6px 11px;border-radius:var(--radius-full);cursor:pointer;white-space:nowrap;}
+  .subchip.on{border-color:var(--color-teal);color:var(--color-teal);background:var(--color-teal-dim);}
+  .subchip.soon{opacity:.5;}
+  .nvzsel{width:100%;background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border-strong);border-radius:var(--radius-sm);padding:11px 12px;font-size:13px;font-family:inherit;font-weight:700;margin:12px 0 4px;}
+  .grouplabel{font-size:9px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);margin:14px 2px 8px;}
+
+  /* content bits */
+  .sectitle{font-size:13px;font-weight:800;margin:16px 2px 10px;display:flex;align-items:center;gap:7px;}
+  .rrow{display:flex;align-items:center;gap:11px;padding:10px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:7px;}
+  .rk{width:24px;text-align:center;font-weight:900;font-size:15px;color:var(--color-text-faint);flex-shrink:0;}
+  .rk.g1{color:var(--color-lime);} .rk.g2{color:#d9d9d9;} .rk.g3{color:var(--color-amber);}
+  .av{width:32px;height:32px;border-radius:50%;background:var(--color-surface-3);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:var(--color-text-muted);flex-shrink:0;}
+  .who{flex:1;min-width:0;}
+  .who .n{font-size:13px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .who .t{font-size:10.5px;color:var(--color-text-faint);}
+  .metric{text-align:right;flex-shrink:0;}
+  .metric .v{font-size:15px;font-weight:900;color:var(--color-lime);line-height:1;}
+  .metric .l{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;}
+  .wl{font-size:11px;color:var(--color-text-muted);}
+  .filterchips{display:flex;gap:6px;margin:4px 0 4px;flex-wrap:wrap;}
+  .fc{border:1px solid var(--color-border);background:var(--color-surface-2);color:var(--color-text-muted);font-family:inherit;font-size:11px;font-weight:700;padding:5px 11px;border-radius:var(--radius-full);cursor:pointer;}
+  .fc.on{border-color:var(--color-lime);color:var(--color-lime);background:var(--color-lime-dim);}
+  .chef{display:flex;align-items:center;gap:11px;padding:10px 12px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);margin-bottom:7px;}
+  .crest{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#b8ff2c,#17d7b0);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;}
+  .streak{font-size:11px;font-weight:800;color:var(--color-amber);white-space:nowrap;}
+  .h2h{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:14px;}
+  .h2h .vs{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+  .h2h .vs .s{flex:1;text-align:center;}
+  .h2h .vs .s .nm{font-weight:800;font-size:13px;}
+  .h2h .vs .big{font-size:30px;font-weight:900;font-style:italic;}
+  .bar2{height:8px;border-radius:4px;background:var(--color-surface-3);overflow:hidden;display:flex;margin-top:12px;}
+  .bar2 i{display:block;height:100%;} .bar2 .a{background:var(--color-lime);} .bar2 .b{background:var(--color-teal);}
+  .pi-row{display:grid;grid-template-columns:1fr auto auto;gap:8px;padding:8px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface);margin-bottom:6px;font-size:12px;align-items:center;}
+  .pi-row .pos{color:var(--color-lime);font-weight:800;} .pi-row .neg{color:var(--color-red,#ff5c47);font-weight:800;}
+  .soonbox{text-align:center;color:var(--color-text-faint);font-size:12px;padding:30px 16px;border:1px dashed var(--color-border-strong);border-radius:var(--radius-sm);}
+  .note{max-width:430px;margin:16px auto 0;font-size:11.5px;line-height:1.55;color:var(--color-text-muted);text-align:center;}
+  .note b{color:var(--color-text);}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div class="bar">
+    <span class="lab">Idea</span>
+    <div class="seg" id="ideaseg">
+      <button class="on" data-i="a">A · Scroll pills</button>
+      <button data-i="b">B · 3 groups</button>
+      <button data-i="c">C · Two modes</button>
+    </div>
+    <span class="lab" style="margin-left:8px">View</span>
+    <div class="seg" id="vpseg">
+      <button class="on" data-v="mobile">Mobile</button>
+      <button data-v="desktop">Desktop</button>
+    </div>
+  </div>
+  <div class="idea-desc" id="ideadesc"></div>
+
+  <div class="frame" id="frame">
+    <div class="hd">
+      <div class="eyebrow">The Dink Society · Season 1</div>
+      <h1>Leaderboard</h1>
+      <div class="sub">Rankings, awards &amp; The NVZ deep stats</div>
+    </div>
+    <div id="app"></div>
+  </div>
+
+  <div class="note" id="note"></div>
+</div>
+
+<script>
+/* ---------- sample data ---------- */
+const PLAYERS=[
+  ['Ryan Hom','Smash Society',1842,12,2,86],
+  ['Katrina Nicasio',"K'CHN",1798,11,3,79],
+  ['Richard Hak','Big Dink Energy',1776,10,4,71],
+  ['Ant B','Zero Zero Two',1755,10,4,71],
+  ['Teddie Liu','What the Dink?!',1740,9,5,64],
+  ['Jobeth Zapata','Big Dink Energy',1722,9,5,64],
+  ['Kathleen Paraiso',"K'CHN",1710,8,6,57],
+  ['Philip R','Zero Zero Two',1699,8,6,57],
+];
+const CHEFS=[
+  ['Week 3','Ryan Hom','Smash Society','M'],
+  ['Week 3','Katrina Nicasio',"K'CHN",'F'],
+  ['Week 2','Ant B','Zero Zero Two','M'],
+  ['Week 2','Jobeth Zapata','Big Dink Energy','F'],
+];
+const LEADERS=[
+  ['Smash Society','Ryan Hom',1842],['K’CHN','Katrina Nicasio',1798],
+  ['Big Dink Energy','Richard Hak',1776],['Zero Zero Two','Ant B',1755],
+  ['What the Dink?!','Teddie Liu',1740],['Timog Cal','Bernard Comia',1690],
+];
+const STREAKS=[['Ryan Hom','Smash Society',6],['Katrina Nicasio',"K'CHN",4],['Ant B','Zero Zero Two',3],['Richard Hak','Big Dink Energy',2]];
+const NVZ=[
+  ['pvp','⚔️ Player vs Player','h2h'],['tvt','🌸 Team vs Team','h2h'],
+  ['splits','🎯 Game Splits','pi'],['margins','📊 Win Margins','pi'],
+  ['partners','🤝 Partner Impact','pi'],['sos','💪 Opponent Strength','pi'],
+  ['rounds','⏱️ R1 vs R2','soon'],['scoring','📈 Scoring Trends','soon'],['weekly','🔥 Weekly Trends','soon'],
+];
+const NVZ_GROUPS=[
+  ['Head-to-head',['pvp','tvt']],
+  ['Performance',['splits','margins']],
+  ['Context',['partners','sos']],
+  ['Coming soon',['rounds','scoring','weekly']],
+];
+const init=n=>n.split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+
+/* ---------- content blocks ---------- */
+function rankings(){
+  const chips=`<div class="filterchips"><span class="fc on">All players</span><span class="fc">Men</span><span class="fc">Women</span><span class="fc">Teams</span></div>`;
+  const rows=PLAYERS.map((p,i)=>`<div class="rrow">
+    <div class="rk ${i<3?'g'+(i+1):''}">${i+1}</div>
+    <div class="av">${init(p[0])}</div>
+    <div class="who"><div class="n">${p[0]}</div><div class="t">${p[1]} · <span class="wl">${p[3]}–${p[4]} · ${p[5]}%</span></div></div>
+    <div class="metric"><div class="v">${p[2]}</div><div class="l">DSR</div></div>
+  </div>`).join('');
+  return chips+rows;
+}
+function topChefs(){
+  return `<div class="sectitle">👨‍🍳 K'CHN Players of the Week</div>`+
+    CHEFS.map(c=>`<div class="chef"><div class="crest">${c[3]==='F'?'👩‍🍳':'👨‍🍳'}</div>
+      <div class="who"><div class="n">${c[1]}</div><div class="t">${c[2]} · ${c[3]==='F'?'Women':'Men'}</div></div>
+      <div class="metric"><div class="l">${c[0]}</div></div></div>`).join('');
+}
+function teamLeaders(){
+  return `<div class="sectitle">🎯 Team Leaders</div>`+
+    LEADERS.map((t,i)=>`<div class="rrow"><div class="rk ${i<3?'g'+(i+1):''}">${i+1}</div>
+      <div class="who"><div class="n">${t[0]}</div><div class="t">Top: ${t[1]}</div></div>
+      <div class="metric"><div class="v">${t[2]}</div><div class="l">Lead DSR</div></div></div>`).join('');
+}
+function streaks(){
+  return `<div class="sectitle">🔥 Hot Streaks</div>`+
+    STREAKS.map(s=>`<div class="rrow"><div class="av">${init(s[0])}</div>
+      <div class="who"><div class="n">${s[0]}</div><div class="t">${s[1]}</div></div>
+      <div class="streak">🔥 ${s[2]} wins</div></div>`).join('');
+}
+function nvzContent(key){
+  const item=NVZ.find(v=>v[0]===key)||NVZ[0];
+  if(item[2]==='soon') return `<div class="soonbox">📈 <b>${item[1].replace(/^\S+\s/,'')}</b><br><br>Coming soon — needs per-round / per-week player data that isn't tracked yet.</div>`;
+  if(item[2]==='h2h') return `<div class="sectitle">${item[1]}</div><div class="h2h">
+    <div class="vs"><div class="s"><div class="nm">Ryan Hom</div><div class="big" style="color:var(--color-lime)">3</div></div>
+      <div style="color:var(--color-text-faint);font-weight:800;font-size:11px">GAMES</div>
+      <div class="s"><div class="nm">Ant B</div><div class="big" style="color:var(--color-teal)">1</div></div></div>
+    <div class="bar2"><i class="a" style="width:75%"></i><i class="b" style="width:25%"></i></div>
+    <div style="font-size:11px;color:var(--color-text-faint);margin-top:10px;text-align:center">Head-to-head across all games this season</div></div>`;
+  // pi style
+  const rows=[['with Katrina Nicasio','+18%','pos'],['with Jobeth Zapata','+7%','pos'],['with Chandler Hong','−4%','neg'],['with Eli Henry','−11%','neg']];
+  return `<div class="sectitle">${item[1]}</div>
+    <div style="font-size:11px;color:var(--color-text-faint);margin:0 2px 10px">Sample view — how each partner shifts win rate.</div>`+
+    rows.map(r=>`<div class="pi-row"><span>${r[0]}</span><span style="color:var(--color-text-muted)">GP 6</span><span class="${r[2]}">${r[1]}</span></div>`).join('');
+}
+
+/* ---------- state ---------- */
+let IDEA='a', VP='mobile';
+const state={ a:'rankings', b:'rankings', c_mode:'lb', c_lb:'rankings', c_nvz:'pvp', nvz:'pvp' };
+const LB_TABS=[['rankings','🏆 Rankings'],['chefs','👨‍🍳 Top Chefs'],['leaders','🎯 Team Leaders'],['streaks','🔥 Streaks']];
+
+function lbBlock(key){
+  return key==='rankings'?rankings():key==='chefs'?topChefs():key==='leaders'?teamLeaders():streaks();
+}
+function nvzSubNav(cur){
+  if(VP==='mobile'){
+    // grouped dropdown for 9 views
+    const opts=NVZ_GROUPS.map(g=>`<optgroup label="${g[0]}">`+g[1].map(k=>{const v=NVZ.find(x=>x[0]===k);return `<option value="${k}" ${k===cur?'selected':''}>${v[1]}${v[2]==='soon'?' (soon)':''}</option>`;}).join('')+`</optgroup>`).join('');
+    return `<select class="nvzsel" data-nvzsel>${opts}</select>`;
+  }
+  // desktop: grouped chips
+  return NVZ_GROUPS.map(g=>`<div class="grouplabel">${g[0]}</div><div class="subchips" style="flex-wrap:wrap;overflow:visible">`+
+    g[1].map(k=>{const v=NVZ.find(x=>x[0]===k);return `<span class="subchip ${v[2]==='soon'?'soon':''} ${k===cur?'on':''}" data-nvz="${k}">${v[1]}</span>`;}).join('')+`</div>`).join('');
+}
+
+/* ---------- idea renderers ---------- */
+function renderA(){
+  const tabs=[...LB_TABS,['nvz','📈 The NVZ']];
+  const cur=state.a;
+  let html=`<div class="pills">`+tabs.map(t=>`<button class="pill ${t[0]===cur?'on':''}" data-a="${t[0]}">${t[1]}</button>`).join('')+`</div><div class="body">`;
+  if(cur==='nvz'){ html+=nvzSubNav(state.nvz)+`<div style="margin-top:6px">`+nvzContent(state.nvz)+`</div>`; }
+  else html+=lbBlock(cur);
+  html+=`</div>`;
+  return html;
+}
+function renderB(){
+  const groups=[['rankings','🏆 Rankings'],['awards','🏅 Awards'],['nvz','📈 The NVZ']];
+  const cur=state.b;
+  let html=`<div class="tabrow">`+groups.map(g=>`<button class="t ${g[0]===cur?'on':''}" data-b="${g[0]}">${g[1]}</button>`).join('')+`</div><div class="body">`;
+  if(cur==='rankings') html+=rankings();
+  else if(cur==='awards') html+=topChefs()+streaks();
+  else html+=nvzSubNav(state.nvz)+`<div style="margin-top:6px">`+nvzContent(state.nvz)+`</div>`;
+  html+=`</div>`;
+  return html;
+}
+function renderC(){
+  let html=`<div class="mode"><button class="${state.c_mode==='lb'?'on':''}" data-cm="lb">🏆 Leaderboard</button><button class="${state.c_mode==='nvz'?'on':''}" data-cm="nvz">📈 The NVZ</button></div>`;
+  if(state.c_mode==='lb'){
+    html+=`<div class="pills" style="border-top:none">`+LB_TABS.map(t=>`<button class="pill ${t[0]===state.c_lb?'on':''}" data-clb="${t[0]}">${t[1]}</button>`).join('')+`</div><div class="body">`+lbBlock(state.c_lb)+`</div>`;
+  } else {
+    html+=`<div class="body">`+nvzSubNav(state.c_nvz)+`<div style="margin-top:6px">`+nvzContent(state.c_nvz)+`</div></div>`;
+  }
+  return html;
+}
+const DESCS={
+  a:`<b>A · Scroll pills.</b> One horizontally-scrollable pill bar holds all five sections including The NVZ. Pick NVZ and a grouped picker appears (a dropdown on mobile, chips on desktop) for its 9 views. Fewest layout changes, everything one tap away.`,
+  b:`<b>B · 3 groups.</b> Collapse to three clean tabs — Rankings, Awards (Top Chefs + Streaks together), and The NVZ. Fits any phone with no scrolling tabs; Team Leaders folds under Rankings' filter.`,
+  c:`<b>C · Two modes.</b> A big toggle splits "who's winning" (Leaderboard) from "deep stats" (The NVZ). Each mode has its own simple sub-nav. Clearest mental model, best if NVZ is a destination of its own.`
+};
+
+function render(){
+  document.getElementById('app').innerHTML = IDEA==='a'?renderA():IDEA==='b'?renderB():renderC();
+  // wrap app content in a scroll region
+  document.getElementById('ideadesc').innerHTML=DESCS[IDEA];
+  document.getElementById('note').innerHTML = VP==='mobile'
+    ? `Showing the <b>mobile</b> layout. The NVZ's 9 views use a <b>grouped dropdown</b> on phones (tidiest for many options) and <b>grouped chips</b> on desktop.`
+    : `Showing the <b>desktop</b> layout — NVZ views expand into grouped chip rows. Flip to Mobile to see the phone flow.`;
+}
+document.getElementById('frame').classList.toggle('desktop', VP==='desktop');
+
+/* ---------- events ---------- */
+document.getElementById('ideaseg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;IDEA=b.dataset.i;document.querySelectorAll('#ideaseg button').forEach(x=>x.classList.toggle('on',x===b));render();});
+document.getElementById('vpseg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;VP=b.dataset.v;document.querySelectorAll('#vpseg button').forEach(x=>x.classList.toggle('on',x===b));document.getElementById('frame').classList.toggle('desktop',VP==='desktop');render();});
+document.getElementById('app').addEventListener('click',e=>{
+  const a=e.target.closest('[data-a]'); if(a){state.a=a.dataset.a;render();return;}
+  const b=e.target.closest('[data-b]'); if(b){state.b=b.dataset.b;render();return;}
+  const cm=e.target.closest('[data-cm]'); if(cm){state.c_mode=cm.dataset.cm;render();return;}
+  const clb=e.target.closest('[data-clb]'); if(clb){state.c_lb=clb.dataset.clb;render();return;}
+  const nv=e.target.closest('[data-nvz]'); if(nv){ if(IDEA==='c')state.c_nvz=nv.dataset.nvz; else state.nvz=nv.dataset.nvz; render(); return;}
+});
+document.getElementById('app').addEventListener('change',e=>{
+  const s=e.target.closest('[data-nvzsel]'); if(s){ if(IDEA==='c')state.c_nvz=s.value; else state.nvz=s.value; render(); }
+});
+render();
+</script>
+</body>
+</html>
