@@ -4944,7 +4944,7 @@
   // Week rollup status: done (all final) · live (some final / in play) · up (dated, none final) · tbd (no dates).
   function weekStatus(w) {
     const ms = w.matches || [];
-    if (!ms.length) return 'tbd';
+    if (!ms.length) return (SETTINGS.weekDates && SETTINGS.weekDates[w.week]) ? 'up' : 'tbd';
     const fin = ms.filter(m => m.finalizedAt).length;
     if (fin === ms.length) return 'done';
     if (fin > 0) return 'live';
@@ -4952,6 +4952,17 @@
   }
   // A week is locked (won't move on a season shift) if any match is already final.
   function weekLocked(w) { return (w.matches || []).some(m => m.finalizedAt); }
+
+  // Planned game-night date for a week: the matches' date if any, otherwise the
+  // admin-set planned date from settings — so a week can carry a date before its
+  // matchups exist (empty Weeks 6–8, etc.).
+  function plannedWeekDate(w) {
+    const d = weekDateObj(w);
+    if (d) return d;
+    const wd = (SETTINGS.weekDates || {})[w.week];
+    if (wd) { const x = new Date(wd); if (!isNaN(x)) return x; }
+    return null;
+  }
 
   async function renderSched() {
     const div = $id('sched-div').value;
@@ -4983,7 +4994,7 @@
         const phCls = ph || 'regular';
         const tag = ph ? '<span class="wc__tag ' + ph + '">' + (ph === 'rivalry' ? 'Riv' : ph === 'playoff' ? 'PO' : 'Final') + '</span>' : '';
         const st = weekStatus(w);
-        const dObj = weekDateObj(w);
+        const dObj = plannedWeekDate(w);
         const dateStr = dObj ? dObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : (STATUS_WORD[st] || 'Set date');
         return '<div class="wc' + (i === 0 ? ' is-active' : '') + '" data-week="' + w.week + '">' + tag +
           '<div class="wc__n">Week ' + w.week + '</div>' +
@@ -5173,7 +5184,7 @@
     const n = wk.week;
     const phLabel = wk.phase ? (BK_TITLE[wk.phase] || '') : '';
     const pill = wk.phase ? ' <span class="wc__tag ' + wk.phase + '" style="position:static;">' + h(phLabel) + '</span>' : '';
-    const dObj = weekDateObj(wk);
+    const dObj = plannedWeekDate(wk);
     const nMatch = wk.matches.length + ' match' + (wk.matches.length === 1 ? '' : 'es');
     let when;
     if (dObj) {
@@ -5259,7 +5270,7 @@
   function openWeekEditor(wk, weeks) {
     const card = $id('wk-card');
     const teams = window.__schedTeams || [];
-    const dObj = weekDateObj(wk);
+    const dObj = plannedWeekDate(wk);
     const dateVal = dObj ? toISODate(dObj) : '';
     const timeVal = dObj ? fmtTime12(dObj) : '7:00 PM';
     const venueVal = ((wk.matches || []).find(m => m.venue) || {}).venue || '';
@@ -5352,10 +5363,20 @@
     const courtStr = (ca, cb) => (ca && cb) ? ('Courts ' + ca + ' & ' + cb) : null;
     const total = deletes.length + desired.length;
     let done = 0;
-    const prog = () => { if (status) { status.textContent = 'Saving… ' + done + '/' + total; status.style.color = 'var(--color-text-faint)'; } };
+    const prog = () => { if (status) { status.textContent = total ? ('Saving… ' + done + '/' + total) : 'Saving date…'; status.style.color = 'var(--color-text-faint)'; } };
     card.querySelectorAll('button, select, input').forEach(el => { el.disabled = true; });
     prog();
     try {
+      // Persist the week's planned date league-wide (in settings), so the date
+      // sticks even when the week has no matches yet — and shows on the public
+      // schedule. Matches created later inherit it.
+      SETTINGS.weekDates = SETTINGS.weekDates || {};
+      if (scheduledAt) SETTINGS.weekDates[wk.week] = scheduledAt;
+      else delete SETTINGS.weekDates[wk.week];
+      await apiJSON('/.netlify/functions/admin-settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ weekDates: SETTINGS.weekDates }),
+      });
       for (const m of deletes) {
         await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(m.id), { method: 'DELETE' });
         done++; prog();

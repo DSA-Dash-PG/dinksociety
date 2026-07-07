@@ -327,6 +327,7 @@
     /* ── Constants ───────────────────────────────────────────────── */
     const SEASON_START = new Date('2026-06-08T00:00:00');
     const TOTAL_WEEKS  = 8;
+    let   PLANNED_DATES = {};   // week # → ISO date published by admin (for weeks without matches yet)
     const MATCH_START_TIME = '7:00 PM';   // fallback only — scheduledAt is the source of truth
     const matchStartLabel = m => {
       if (m && m.scheduledAt) { const d = new Date(m.scheduledAt); if (!isNaN(d)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
@@ -359,7 +360,9 @@
       const wData = weeksData?.find(w => w.week === n);
       const firstMatch = wData?.matches?.[0];
       const dt = firstMatch?.date || firstMatch?.scheduledAt;
-      return dt ? new Date(dt) : weekDate(n);
+      if (dt) return new Date(dt);
+      if (PLANNED_DATES[n]) { const d = new Date(PLANNED_DATES[n]); if (!isNaN(d)) return d; }
+      return weekDate(n);
     }
     function isWeekPast(n, weeksData) {
       const d = weekNightDate(n, weeksData);
@@ -778,6 +781,12 @@
       renderDateStrip(null);
       renderAllWeeks(null);
       try {
+        // Planned week dates published by the admin — used for weeks that don't
+        // have matches scheduled yet, so teams still see when they'll play.
+        try {
+          const sr = await fetch('/.netlify/functions/admin-settings');
+          if (sr.ok) { const s = await sr.json(); if (s && s.weekDates) PLANNED_DATES = s.weekDates; }
+        } catch {}
         const p = new URLSearchParams({ season: SEASON_ID });
         const r = await fetch(`/.netlify/functions/public-schedule?${p}`);
         if (!r.ok) throw 0;
