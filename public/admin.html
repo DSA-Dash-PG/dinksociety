@@ -272,6 +272,37 @@
     .shf-wk .shf-new { color: var(--color-lime); font-weight: 700; margin-left: auto; }
     .shf-wk .shf-lock { color: var(--color-text-faint); margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; }
 
+    /* ── Week editor (inline "Edit week") ─────────────────────── */
+    .we-defaults { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 13px 15px; margin-bottom: 12px; }
+    .we-fld { display: flex; flex-direction: column; gap: 5px; }
+    .we-fld label { font-size: 9.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--color-text-faint); }
+    .we-fld input, .we-fld select { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 8px 10px; font-size: 13px; font-family: inherit; }
+    .we-fld input[type=date] { min-width: 150px; }
+    .we-hint { font-size: 11px; color: var(--color-text-faint); max-width: 220px; line-height: 1.4; margin-left: auto; }
+    .we-head, .we-row { display: grid; grid-template-columns: 1.7fr 30px 1.7fr 150px 30px; gap: 10px; align-items: center; }
+    .we-head { padding: 8px 12px 6px; font-size: 9.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--color-text-faint); }
+    .we-head span:nth-child(2), .we-head span:nth-child(5) { text-align: center; }
+    .we-row { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 10px 12px; margin-bottom: 8px; }
+    .we-row.dupe { border-color: rgba(239,68,68,0.55); }
+    .we-sel { background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 10px; font-size: 13px; font-weight: 700; font-family: inherit; width: 100%; cursor: pointer; }
+    .we-vs { font-size: 10px; font-weight: 900; letter-spacing: 0.1em; color: var(--color-text-faint); text-align: center; }
+    .we-courts { display: flex; align-items: center; gap: 5px; }
+    .we-courts input { width: 52px; background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 9px 6px; font-size: 13px; font-family: inherit; text-align: center; }
+    .we-courts .amp { color: var(--color-text-faint); font-size: 12px; }
+    .we-del { background: none; border: none; color: var(--color-text-faint); cursor: pointer; font-size: 16px; padding: 4px; border-radius: 6px; }
+    .we-del:hover { color: #ef4444; background: rgba(239,68,68,0.1); }
+    .we-locked { font-size: 13px; font-weight: 700; color: var(--color-text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .we-fin { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-teal); text-align: center; }
+    .we-addbtn { border: 1px dashed var(--color-border-strong); background: transparent; color: var(--color-text-muted); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12.5px; font-weight: 700; cursor: pointer; font-family: inherit; width: 100%; text-align: center; margin-top: 2px; }
+    .we-addbtn:hover { border-color: var(--color-lime); color: var(--color-lime); }
+    .we-foot { display: flex; align-items: center; gap: 10px; justify-content: flex-end; margin-top: 14px; flex-wrap: wrap; }
+    .we-foot .we-status { margin-right: auto; font-size: 11.5px; color: var(--color-text-faint); }
+    @media (max-width: 720px) {
+      .we-head { display: none; }
+      .we-row { grid-template-columns: 1fr 1fr; }
+      .we-row .we-vs { display: none; }
+    }
+
     /* Bracket (Wk6–8) admin cards */
     .bk-note { font-size: 12px; color: var(--color-text-faint); line-height: 1.55; margin: 2px 2px 14px; }
     .bk-grp { font-size: 10px; font-weight: 900; letter-spacing: 0.13em; text-transform: uppercase; color: var(--color-text-faint); margin: 16px 2px 8px; display: flex; align-items: center; gap: 7px; }
@@ -5160,11 +5191,16 @@
     '</div>';
   }
 
-  // Wire the "Edit week" button to open the scheduler popover in whole-week mode.
+  // Wire the "Edit week" button. Regular-season weeks open the full inline
+  // week editor (date + matchups + courts); bracket weeks (auto-seeded teams)
+  // just set the shared date/time via the scheduler popover in week mode.
   function wireWeekEdit(scope, wk, weeks) {
     const btn = scope.querySelector('.wk-edit');
-    if (!btn || !wk.matches.length) return;
-    btn.addEventListener('click', () => openSchedPop(btn, wk.matches[0], wk, weeks, renderSched, true));
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      if (wk.phase) openSchedPop(btn, wk.matches[0], wk, weeks, renderSched, true);
+      else openWeekEditor(wk, weeks);
+    });
   }
 
   function selectWeek(n, weeks) {
@@ -5172,12 +5208,182 @@
     $$('.wc').forEach(c => c.classList.toggle('is-active', parseInt(c.dataset.week) === n));
     const wk = weeks.find(w => w.week === n);
     const card = $id('wk-card');
-    if (!wk?.matches?.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
-    if (wk.phase) { renderBracketPanel(card, wk, weeks); return; }
+    if (!wk) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
+    if (wk.phase) {
+      if (!wk.matches.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
+      renderBracketPanel(card, wk, weeks); return;
+    }
+    if (!wk.matches.length) {
+      card.innerHTML = '<div style="padding:18px">' + weekPanelHeader(wk) +
+        '<div class="empty" style="padding:22px 4px;">No matches yet — click <b>✎ Edit week</b> to set the date and add matchups.</div></div>';
+      wireWeekEdit(card, wk, weeks);
+      return;
+    }
     card.innerHTML = '<div style="padding:18px">' + weekPanelHeader(wk) +
       wk.matches.map(m => matchRowHTML(m, false)).join('') + '</div>';
     wireMatchRows(card, wk.matches, weeks, renderSched);
     wireWeekEdit(card, wk, weeks);
+  }
+
+  // ── Inline WEEK EDITOR ──────────────────────────────────────
+  // Set the week's date/time/venue once (applies to every match), pick
+  // home/away teams and courts per match, add/remove matches, and Save the
+  // whole week in one pass. Reuses the existing admin-matches endpoints:
+  // DELETE removed rows, PATCH changed matches, POST new ones. Finalized
+  // matches render read-only so scores can't be knocked out of alignment.
+  function weTeamOpts(teams, selId) {
+    return '<option value="">— pick —</option>' + teams.map(t =>
+      '<option value="' + h(t.id) + '"' + (t.id === selId ? ' selected' : '') + '>' + h(t.name) + '</option>'
+    ).join('');
+  }
+  function weRowHTML(teams, m) {
+    if (m && m.finalizedAt) {
+      const score = (m.scoreA != null && m.scoreB != null) ? (m.scoreA + '–' + m.scoreB) : 'VS';
+      return '<div class="we-row" data-mid="' + h(m.id) + '" data-fin="1">' +
+        '<div class="we-locked">' + h((m.teamA && m.teamA.name) || 'TBD') + '</div>' +
+        '<div class="we-vs">' + h(score) + '</div>' +
+        '<div class="we-locked" style="text-align:right;">' + h((m.teamB && m.teamB.name) || 'TBD') + '</div>' +
+        '<div class="we-locked" style="text-align:center;">' + h(m.court || '—') + '</div>' +
+        '<div class="we-fin">Final</div></div>';
+    }
+    const ca = (m && m.courtA != null) ? h(String(m.courtA)) : '';
+    const cb = (m && m.courtB != null) ? h(String(m.courtB)) : '';
+    return '<div class="we-row"' + (m ? ' data-mid="' + h(m.id) + '"' : '') + '>' +
+      '<select class="we-sel we-home">' + weTeamOpts(teams, m && m.teamA ? m.teamA.id : '') + '</select>' +
+      '<div class="we-vs">VS</div>' +
+      '<select class="we-sel we-away">' + weTeamOpts(teams, m && m.teamB ? m.teamB.id : '') + '</select>' +
+      '<div class="we-courts"><input type="number" min="1" max="20" class="we-ca" value="' + ca + '" placeholder="A"><span class="amp">&amp;</span><input type="number" min="1" max="20" class="we-cb" value="' + cb + '" placeholder="B"></div>' +
+      '<button class="we-del" title="Remove match">✕</button>' +
+      '<div class="we-dupe" style="grid-column:1/-1;font-size:11px;color:#ef4444;display:none;">A team can’t play itself — pick a different away team.</div></div>';
+  }
+  function openWeekEditor(wk, weeks) {
+    const card = $id('wk-card');
+    const teams = window.__schedTeams || [];
+    const dObj = weekDateObj(wk);
+    const dateVal = dObj ? toISODate(dObj) : '';
+    const timeVal = dObj ? fmtTime12(dObj) : '7:00 PM';
+    const venueVal = ((wk.matches || []).find(m => m.venue) || {}).venue || '';
+    const venues = spVenueList(weeks);
+    const timeOpts = SP_TIMES.map(t => '<option' + (t === timeVal ? ' selected' : '') + '>' + t + '</option>').join('') +
+      (SP_TIMES.includes(timeVal) ? '' : '<option selected>' + h(timeVal) + '</option>');
+    const venueOpts = '<option value="">— none —</option>' +
+      venues.map(v => '<option' + (v === venueVal ? ' selected' : '') + '>' + h(v) + '</option>').join('') +
+      (venueVal && !venues.includes(venueVal) ? '<option selected>' + h(venueVal) + '</option>' : '');
+    const phLabel = wk.phase ? (BK_TITLE[wk.phase] || '') : '';
+    const pill = wk.phase ? ' <span class="wc__tag ' + wk.phase + '" style="position:static;">' + h(phLabel) + '</span>' : '';
+    const rowsHTML = (wk.matches || []).map(m => weRowHTML(teams, m)).join('');
+
+    card.innerHTML = '<div style="padding:18px">' +
+      '<div class="wk-phd"><div><div class="wk-title">Week ' + wk.week + pill +
+        ' <span style="font-size:11px;font-style:normal;font-weight:800;color:var(--color-lime);letter-spacing:0.04em;">· EDITING</span></div>' +
+        '<div class="wk-when">Set the date, time &amp; venue once — it applies to every match in this week.</div></div></div>' +
+      '<div class="we-defaults">' +
+        '<div class="we-fld"><label>Week date</label><input type="date" id="we-date" value="' + h(dateVal) + '"></div>' +
+        '<div class="we-fld"><label>Start time</label><select id="we-time">' + timeOpts + '</select></div>' +
+        '<div class="we-fld"><label>Venue</label><select id="we-venue">' + venueOpts + '</select></div>' +
+        '<div class="we-hint">All matches in a week start at the same time. Courts are set per match below.</div>' +
+      '</div>' +
+      '<div class="we-head"><span>Home</span><span></span><span>Away</span><span>Courts</span><span></span></div>' +
+      '<div id="we-rows">' + rowsHTML + '</div>' +
+      '<button class="we-addbtn" id="we-add">＋ Add match</button>' +
+      '<div class="we-foot"><span class="we-status" id="we-status"></span>' +
+        '<button class="ab ab--outline ab--sm" id="we-cancel">Cancel</button>' +
+        '<button class="ab ab--lime ab--sm" id="we-save">Save week</button></div>' +
+      '</div>';
+
+    const rowsEl = card.querySelector('#we-rows');
+    const dupeCheck = () => {
+      card.querySelectorAll('#we-rows .we-row').forEach(r => {
+        const ho = r.querySelector('.we-home');
+        if (!ho) return;
+        const dup = ho.value && ho.value === r.querySelector('.we-away').value;
+        r.classList.toggle('dupe', dup);
+        const dn = r.querySelector('.we-dupe');
+        if (dn) dn.style.display = dup ? 'block' : 'none';
+      });
+    };
+    const wireRow = (r) => {
+      const del = r.querySelector('.we-del');
+      if (del) del.addEventListener('click', () => { r.remove(); dupeCheck(); });
+      r.querySelectorAll('.we-sel').forEach(s => s.addEventListener('change', dupeCheck));
+    };
+    card.querySelectorAll('#we-rows .we-row').forEach(wireRow);
+    card.querySelector('#we-add').addEventListener('click', () => {
+      rowsEl.insertAdjacentHTML('beforeend', weRowHTML(teams, null));
+      wireRow(rowsEl.lastElementChild);
+    });
+    card.querySelector('#we-cancel').addEventListener('click', () => selectWeek(wk.week, weeks));
+    card.querySelector('#we-save').addEventListener('click', () => saveWeek(card, wk, weeks, teams));
+    dupeCheck();
+  }
+  async function saveWeek(card, wk, weeks, teams) {
+    const status = card.querySelector('#we-status');
+    const setErr = m => { if (status) { status.textContent = m; status.style.color = '#ef4444'; } };
+    const teamById = id => teams.find(t => t.id === id);
+    const div = _schedCtx.div;
+
+    const dateStr = (card.querySelector('#we-date').value || '').trim();
+    const timeStr = card.querySelector('#we-time').value;
+    const venue = (card.querySelector('#we-venue').value || '').trim() || null;
+    let scheduledAt = null;
+    if (dateStr) {
+      const p = dateStr.split('-').map(Number);
+      const t = parseTime12(timeStr) || { h: 19, m: 0 };
+      scheduledAt = new Date(p[0], p[1] - 1, p[2], t.h, t.m).toISOString();
+    }
+    const startTime = scheduledAt ? timeStr : null;
+
+    const rowEls = [...card.querySelectorAll('#we-rows .we-row')].filter(r => !r.dataset.fin);
+    const desired = [];
+    for (const r of rowEls) {
+      const home = r.querySelector('.we-home').value, away = r.querySelector('.we-away').value;
+      const ca = (r.querySelector('.we-ca').value || '').trim(), cb = (r.querySelector('.we-cb').value || '').trim();
+      if (!home || !away) return setErr('Every match needs a home and away team.');
+      if (home === away) return setErr('A team can’t play itself — check the highlighted row.');
+      if ((ca && !cb) || (!ca && cb)) return setErr('Enter both court numbers, or leave both blank.');
+      if (!teamById(home) || !teamById(away)) return setErr('Unknown team — reload and try again.');
+      desired.push({ mid: r.dataset.mid || null, home, away, ca, cb });
+    }
+
+    const finalIds = [...card.querySelectorAll('#we-rows .we-row[data-fin]')].map(r => r.dataset.mid);
+    const keep = new Set(desired.filter(d => d.mid).map(d => d.mid).concat(finalIds));
+    const deletes = (wk.matches || []).filter(m => !keep.has(m.id) && !m.finalizedAt);
+
+    const courtStr = (ca, cb) => (ca && cb) ? ('Courts ' + ca + ' & ' + cb) : null;
+    const total = deletes.length + desired.length;
+    let done = 0;
+    const prog = () => { if (status) { status.textContent = 'Saving… ' + done + '/' + total; status.style.color = 'var(--color-text-faint)'; } };
+    card.querySelectorAll('button, select, input').forEach(el => { el.disabled = true; });
+    prog();
+    try {
+      for (const m of deletes) {
+        await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(m.id), { method: 'DELETE' });
+        done++; prog();
+      }
+      for (const d of desired) {
+        const A = teamById(d.home), B = teamById(d.away);
+        const body = { teamA: { id: A.id, name: A.name }, teamB: { id: B.id, name: B.name }, venue };
+        if (d.ca && d.cb) { body.courtA = d.ca; body.courtB = d.cb; body.court = courtStr(d.ca, d.cb); }
+        else { body.courtA = null; body.courtB = null; body.court = null; }
+        if (scheduledAt) { body.scheduledAt = scheduledAt; body.startTime = startTime; }
+        if (d.mid) {
+          await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(d.mid), {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+          });
+        } else {
+          await apiJSON('/.netlify/functions/admin-matches?circuit=I', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ division: div, week: wk.week, ...body }),
+          });
+        }
+        done++; prog();
+      }
+      renderSched();
+      if (typeof renderAllGames === 'function') renderAllGames();
+    } catch (e) {
+      card.querySelectorAll('button, select, input').forEach(el => { el.disabled = false; });
+      setErr(e.message || 'Save failed');
+    }
   }
 
   // ── Bracket weeks (Wk6 Rivalry / Wk7 Playoffs / Wk8 Championship) ──
