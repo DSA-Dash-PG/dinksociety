@@ -240,6 +240,37 @@
     .wc__tag.rivalry { background: var(--color-teal-dim); color: var(--color-teal); }
     .wc__tag.playoff { background: rgba(255,176,97,0.14); color: #ffb061; }
     .wc__tag.championship { background: var(--color-gold-dim); color: var(--color-gold); }
+    .wc__ph.regular { color: var(--color-text); }
+    .wc__date { font-size: 10.5px; color: var(--color-text-muted); font-weight: 600; margin-top: 3px; }
+    .wc__m { display: flex; align-items: center; gap: 5px; }
+    .wc__dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+    .wc__dot.done { background: var(--color-lime); }
+    .wc__dot.live { background: var(--color-teal); box-shadow: 0 0 7px var(--color-teal); }
+    .wc__dot.up { background: #555; }
+    .wc__dot.tbd { background: transparent; border: 1.5px dashed #6a6a6a; }
+
+    /* Week panel header + Edit week */
+    .wk-phd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+    .wk-phd .wk-title { font-size: 15px; font-weight: 900; font-style: italic; text-transform: uppercase; letter-spacing: -0.01em; display: flex; align-items: center; gap: 9px; }
+    .wk-phd .wk-when { font-size: 12px; color: var(--color-text-faint); margin-top: 3px; }
+    .wk-phd .wk-when b { color: var(--color-text-muted); font-weight: 700; }
+
+    /* All games & bulk tools — collapsible */
+    .adv-details { border: 1px solid var(--color-border); border-radius: var(--radius-md); background: var(--color-surface); margin-bottom: 18px; }
+    .adv-details > summary { cursor: pointer; list-style: none; padding: 13px 16px; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12.5px; font-weight: 800; color: var(--color-text-muted); }
+    .adv-details > summary::-webkit-details-marker { display: none; }
+    .adv-details > summary .adv-hint { font-weight: 600; color: var(--color-text-faint); font-size: 11px; }
+    .adv-details[open] > summary { border-bottom: 1px solid var(--color-border); }
+    .adv-details .ac { margin: 0; border: none; border-radius: 0; }
+
+    /* Shift-dates dialog */
+    .shf-wk { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); margin-bottom: 7px; background: var(--color-surface-2); font-size: 12px; }
+    .shf-wk.locked { opacity: 0.6; }
+    .shf-wk .shf-n { font-weight: 800; min-width: 62px; }
+    .shf-wk .shf-old { color: var(--color-text-faint); }
+    .shf-wk .shf-arrow { color: var(--color-text-faint); }
+    .shf-wk .shf-new { color: var(--color-lime); font-weight: 700; margin-left: auto; }
+    .shf-wk .shf-lock { color: var(--color-text-faint); margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; }
 
     /* Bracket (Wk6–8) admin cards */
     .bk-note { font-size: 12px; color: var(--color-text-faint); line-height: 1.55; margin: 2px 2px 14px; }
@@ -890,33 +921,37 @@
             <div class="am-actions">
               <select id="sched-div" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);"></select>
               <button class="ab ab--lime ab--sm" id="gen-sched-btn" title="Round-robin (Wk 1–5) + Rivalry / Playoffs / Championship (Wk 6–8). Overwrites this division's schedule.">Generate season</button>
+              <button class="ab ab--outline ab--sm" id="shift-season-btn" title="Move upcoming weeks' dates all at once — finished weeks stay put">⇄ Shift dates</button>
               <button class="ab ab--outline ab--sm" id="setup-bracket-btn" title="Add Rivalry / Playoffs / Championship (Weeks 6–8) without touching the round-robin">Set up playoffs (Wk 6–8)</button>
               <button class="ab ab--outline ab--sm" id="rebuild-standings-btn" title="Recompute standings + leaderboard from current schedule and scores">Rebuild standings</button>
             </div>
           </div>
           <div id="gameday"></div>
 
-          <!-- ALL GAMES — every match across every division & week, with full
-               editing + delete. Surfaces games in divisions not in the dropdown
-               (e.g. auto-generated/leftover test games). -->
-          <div class="ac" id="all-games-card" style="margin-bottom:18px;">
-            <div class="ac__h" style="flex-wrap:wrap;gap:10px;">
-              <h2 class="ac__t">All games</h2>
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;">
-                <label style="display:inline-flex;align-items:center;gap:5px;color:var(--color-text-faint);">Week
-                  <select id="ag-week" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;"><option value="all">All weeks</option></select>
-                </label>
-                <label style="display:inline-flex;align-items:center;gap:5px;color:var(--color-text-faint);">Division
-                  <select id="ag-div" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;"><option value="all">All divisions</option></select>
-                </label>
-                <button class="ab ab--outline ab--sm" id="ag-reload">↻ Reload</button>
-                <span class="ac__s" id="ag-count"></span>
-              </div>
-            </div>
-            <div id="ag-out"><div class="loading">Loading every game…</div></div>
-          </div>
-
           <div id="sched-out"><div class="loading">Select a division above.</div></div>
+
+          <!-- ALL GAMES — every match across every division & week, with full
+               editing + delete. Collapsed by default to keep the week view clean.
+               Surfaces games in divisions not in the dropdown (leftover/test games). -->
+          <details class="adv-details" id="all-games-details">
+            <summary><span>⚙ All games &amp; bulk tools</span><span class="adv-hint">every match across divisions · filters · delete</span></summary>
+            <div class="ac" id="all-games-card">
+              <div class="ac__h" style="flex-wrap:wrap;gap:10px;">
+                <h2 class="ac__t">All games</h2>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;">
+                  <label style="display:inline-flex;align-items:center;gap:5px;color:var(--color-text-faint);">Week
+                    <select id="ag-week" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;"><option value="all">All weeks</option></select>
+                  </label>
+                  <label style="display:inline-flex;align-items:center;gap:5px;color:var(--color-text-faint);">Division
+                    <select id="ag-div" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;"><option value="all">All divisions</option></select>
+                  </label>
+                  <button class="ab ab--outline ab--sm" id="ag-reload">↻ Reload</button>
+                  <span class="ac__s" id="ag-count"></span>
+                </div>
+              </div>
+              <div id="ag-out"><div class="loading">Loading every game…</div></div>
+            </div>
+          </details>
         </section>
 
         <!-- SCORE ENTRY -->
@@ -4860,6 +4895,33 @@
     });
   }
 
+  // Last-loaded schedule context (division + weeks), used by the Shift-dates tool.
+  let _schedCtx = { div: null, weeks: [] };
+  const STATUS_WORD = { done: 'Final', live: 'In progress', up: 'Scheduled', tbd: 'Set date' };
+
+  // Earliest scheduled datetime among a week's matches (null if none dated).
+  function weekDateObj(w) {
+    let best = null;
+    for (const m of (w.matches || [])) {
+      if (!m.scheduledAt) continue;
+      const d = new Date(m.scheduledAt);
+      if (isNaN(d)) continue;
+      if (!best || d < best) best = d;
+    }
+    return best;
+  }
+  // Week rollup status: done (all final) · live (some final / in play) · up (dated, none final) · tbd (no dates).
+  function weekStatus(w) {
+    const ms = w.matches || [];
+    if (!ms.length) return 'tbd';
+    const fin = ms.filter(m => m.finalizedAt).length;
+    if (fin === ms.length) return 'done';
+    if (fin > 0) return 'live';
+    return ms.some(m => m.scheduledAt) ? 'up' : 'tbd';
+  }
+  // A week is locked (won't move on a season shift) if any match is already final.
+  function weekLocked(w) { return (w.matches || []).some(m => m.finalizedAt); }
+
   async function renderSched() {
     const div = $id('sched-div').value;
     const out = $id('sched-out');
@@ -4883,17 +4945,19 @@
         return;
       }
 
+      _schedCtx = { div, weeks };
       out.innerHTML = '<div class="wc-grid">' + weeks.map((w, i) => {
         const ph = w.phase || '';
-        const phLabel = ph === 'rivalry' ? 'Rivalry' : ph === 'playoff' ? 'Playoffs' : ph === 'championship' ? 'Championship' : '';
+        const phLabel = ph === 'rivalry' ? 'Rivalry' : ph === 'playoff' ? 'Playoffs' : ph === 'championship' ? 'Championship' : 'Regular season';
+        const phCls = ph || 'regular';
         const tag = ph ? '<span class="wc__tag ' + ph + '">' + (ph === 'rivalry' ? 'Riv' : ph === 'playoff' ? 'PO' : 'Final') + '</span>' : '';
-        const sub = ph
-          ? '<div class="wc__ph ' + ph + '">' + phLabel + '</div>'
-          : '';
-        const meta = w.matches.length ? w.matches.filter(m => m.finalizedAt).length + '/' + w.matches.length + (ph ? '' : ' final') : '—';
+        const st = weekStatus(w);
+        const dObj = weekDateObj(w);
+        const dateStr = dObj ? dObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) : (STATUS_WORD[st] || 'Set date');
         return '<div class="wc' + (i === 0 ? ' is-active' : '') + '" data-week="' + w.week + '">' + tag +
-          '<div class="wc__n">Week ' + w.week + '</div>' + sub +
-          '<div class="wc__m">' + meta + '</div></div>';
+          '<div class="wc__n">Week ' + w.week + '</div>' +
+          '<div class="wc__ph ' + phCls + '">' + phLabel + '</div>' +
+          '<div class="wc__m"><span class="wc__dot ' + st + '"></span>' + h(dateStr) + '</div></div>';
       }).join('') + '</div><div class="ac" id="wk-card"></div>' + addForm;
 
       $$('.wc').forEach(c => c.addEventListener('click', () => selectWeek(parseInt(c.dataset.week), weeks)));
@@ -5072,6 +5136,37 @@
 
   let _schedWeek = null; // remembered selected week so refreshes don't jump
 
+  // Panel header for a week: title (+ phase pill), the week's date/time summary,
+  // and a prominent "Edit week" button that schedules ALL matches in the week.
+  function weekPanelHeader(wk) {
+    const n = wk.week;
+    const phLabel = wk.phase ? (BK_TITLE[wk.phase] || '') : '';
+    const pill = wk.phase ? ' <span class="wc__tag ' + wk.phase + '" style="position:static;">' + h(phLabel) + '</span>' : '';
+    const dObj = weekDateObj(wk);
+    const nMatch = wk.matches.length + ' match' + (wk.matches.length === 1 ? '' : 'es');
+    let when;
+    if (dObj) {
+      const ds = dObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+      const ts = dObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      when = '<b>' + h(ds) + '</b> · ' + h(ts) + ' · ' + nMatch;
+    } else {
+      when = 'No date set · ' + nMatch;
+    }
+    const lockNote = weekLocked(wk) ? ' · <span style="color:var(--color-text-faint);">has final results</span>' : '';
+    return '<div class="wk-phd">' +
+      '<div><div class="wk-title">Week ' + n + pill + '</div>' +
+        '<div class="wk-when">' + when + lockNote + '</div></div>' +
+      '<button class="ab ab--outline ab--sm wk-edit" data-week="' + n + '" title="Set date, time &amp; venue for every match in this week at once">✎ Edit week</button>' +
+    '</div>';
+  }
+
+  // Wire the "Edit week" button to open the scheduler popover in whole-week mode.
+  function wireWeekEdit(scope, wk, weeks) {
+    const btn = scope.querySelector('.wk-edit');
+    if (!btn || !wk.matches.length) return;
+    btn.addEventListener('click', () => openSchedPop(btn, wk.matches[0], wk, weeks, renderSched, true));
+  }
+
   function selectWeek(n, weeks) {
     _schedWeek = n;
     $$('.wc').forEach(c => c.classList.toggle('is-active', parseInt(c.dataset.week) === n));
@@ -5079,9 +5174,10 @@
     const card = $id('wk-card');
     if (!wk?.matches?.length) { card.innerHTML = '<div class="empty" style="padding:28px">No matches.</div>'; return; }
     if (wk.phase) { renderBracketPanel(card, wk, weeks); return; }
-    card.innerHTML = '<div style="padding:18px"><div class="ac__h"><span class="ac__t">Week ' + n + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
+    card.innerHTML = '<div style="padding:18px">' + weekPanelHeader(wk) +
       wk.matches.map(m => matchRowHTML(m, false)).join('') + '</div>';
     wireMatchRows(card, wk.matches, weeks, renderSched);
+    wireWeekEdit(card, wk, weeks);
   }
 
   // ── Bracket weeks (Wk6 Rivalry / Wk7 Playoffs / Wk8 Championship) ──
@@ -5139,10 +5235,10 @@
       const hdr = multi ? '<div class="bk-grp">' + (grp.medal ? '<span class="medal">' + h(grp.medal) + '</span>' : '') + h(grp.label) + '</div>' : '';
       return hdr + grp.items.map(bracketAdminCard).join('');
     }).join('');
-    card.innerHTML = '<div style="padding:18px">' +
-      '<div class="ac__h"><span class="ac__t">Week ' + wk.week + ' · ' + h(BK_TITLE[wk.phase] || '') + '</span><span class="ac__s">' + wk.matches.length + ' matches</span></div>' +
+    card.innerHTML = '<div style="padding:18px">' + weekPanelHeader(wk) +
       '<p class="bk-note">' + h(note) + '</p>' + body + '</div>';
     wireMatchRows(card, wk.matches, weeks, renderSched);
+    wireWeekEdit(card, wk, weeks);
   }
 
   // ════════════════════════════════════════════════════════════
@@ -5207,16 +5303,16 @@
     sp = null;
   }
   function spOutside(e) {
-    if (sp && !sp.el.contains(e.target) && !e.target.closest('.sched-edit')) spClose();
+    if (sp && !sp.el.contains(e.target) && !e.target.closest('.sched-edit') && !e.target.closest('.wk-edit')) spClose();
   }
 
-  function openSchedPop(anchor, m, weekObj, weeks, refresh) {
+  function openSchedPop(anchor, m, weekObj, weeks, refresh, weekMode) {
     spClose();
     const d = m.scheduledAt ? new Date(m.scheduledAt) : null;
     const valid = d && !isNaN(d);
     const today = new Date();
     sp = {
-      match: m, weekObj, weeks, refresh,
+      match: m, weekObj, weeks, refresh, weekMode: !!weekMode,
       date: valid ? new Date(d.getFullYear(), d.getMonth(), d.getDate()) : null,
       time: valid ? fmtTime12(d) : '7:00 PM',
       venue: m.venue || null,
@@ -5277,9 +5373,13 @@
       prev = 'Lineups lock <b>' + h(fdt(new Date(t - 60 * 60000).toISOString())) + '</b> · reveal <b>' + h(fdt(new Date(t - 15 * 60000).toISOString())) + '</b>';
     }
 
+    const nMatch = (sp.weekObj && sp.weekObj.matches ? sp.weekObj.matches.length : 1);
+    const title = sp.weekMode
+      ? 'Week ' + (sp.weekObj ? sp.weekObj.week : '') + ' · all ' + nMatch + ' match' + (nMatch === 1 ? '' : 'es')
+      : h((sp.match.teamA && sp.match.teamA.name) || sp.match.seedLabelA || 'TBD') + ' vs ' + h((sp.match.teamB && sp.match.teamB.name) || sp.match.seedLabelB || 'TBD');
     sp.el.innerHTML =
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-        '<span style="font-size:12px;font-weight:700;">' + h((sp.match.teamA && sp.match.teamA.name) || sp.match.seedLabelA || 'TBD') + ' vs ' + h((sp.match.teamB && sp.match.teamB.name) || sp.match.seedLabelB || 'TBD') + '</span>' +
+        '<span style="font-size:12px;font-weight:700;">' + title + '</span>' +
         '<button id="spop-x" style="background:none;border:none;color:var(--color-text-faint);cursor:pointer;font-size:16px;font-family:inherit;">✕</button>' +
       '</div>' +
       '<div class="spop__cols">' +
@@ -5300,9 +5400,12 @@
         '</div>' +
       '</div>' +
       '<div class="spop__foot">' +
-        '<div class="spop__prev">' + prev + '</div>' +
-        '<button class="ab ab--lime ab--sm" id="spop-save">Save</button>' +
-        '<button class="ab ab--outline ab--sm" id="spop-week">Apply to whole week</button>' +
+        '<div class="spop__prev">' + prev + (sp.weekMode ? ' <span style="color:var(--color-text-faint);">· courts stay per match</span>' : '') + '</div>' +
+        (sp.weekMode
+          ? '<button class="ab ab--lime ab--sm" id="spop-week">Save whole week</button>' +
+            '<button class="ab ab--outline ab--sm" id="spop-save">This match only</button>'
+          : '<button class="ab ab--lime ab--sm" id="spop-save">Save</button>' +
+            '<button class="ab ab--outline ab--sm" id="spop-week">Apply to whole week</button>') +
         '<span id="spop-stat" style="font-size:11px;"></span>' +
       '</div>';
 
@@ -5520,6 +5623,152 @@
     }
     btn.disabled = false; btn.textContent = 'Rebuild standings';
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // SHIFT DATES — move every UPCOMING week's date by one delta.
+  // Weeks that already have a final result (e.g. completed Weeks 1–4)
+  // are locked and never move. Each match keeps its own time, venue,
+  // and courts — only the calendar date shifts. Client-side: loops the
+  // existing admin-matches PATCH (scheduledAt) per match.
+  // ═══════════════════════════════════════════════════════════
+  const _2 = n => String(n).padStart(2, '0');
+  const toISODate = d => d.getFullYear() + '-' + _2(d.getMonth() + 1) + '-' + _2(d.getDate());
+  const dateOnly = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  function addDaysKeepTime(d, delta) {
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta, d.getHours(), d.getMinutes(), 0, 0);
+  }
+  const fmtShort = d => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+  $id('shift-season-btn').addEventListener('click', openShiftDialog);
+
+  function openShiftDialog() {
+    const { div, weeks } = _schedCtx;
+    if (!div || !weeks.length) { alert('Pick a division with a generated schedule first.'); return; }
+
+    // Categorize weeks. Movable = not final AND already has a date to shift from.
+    const movable = [], locked = [], undated = [];
+    weeks.forEach(w => {
+      const d = weekDateObj(w);
+      if (weekLocked(w)) locked.push(w);
+      else if (d) movable.push({ w, date: d });
+      else undated.push(w);
+    });
+    if (!movable.length) {
+      alert('No movable weeks. Every dated week is either final (locked) or has no date yet — use “Edit week” to set a date.');
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'pm-overlay is-open';
+    const anchorDefault = movable[0]; // earliest movable week
+    overlay.innerHTML =
+      '<div class="pm-modal" style="width:440px;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
+          '<h2 style="margin:0;font-size:16px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-0.01em;">Shift dates</h2>' +
+          '<button id="shf-x" style="background:none;border:none;color:var(--color-text-faint);cursor:pointer;font-size:18px;font-family:inherit;">✕</button>' +
+        '</div>' +
+        '<p style="font-size:12px;color:var(--color-text-faint);margin:0 0 16px;line-height:1.5;">Set a new date for one week and every upcoming week moves by the same amount. Finished weeks stay put; each match keeps its time, venue, and courts.</p>' +
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px;">' +
+          '<label style="font-size:11px;color:var(--color-text-faint);">Set</label>' +
+          '<select id="shf-anchor" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;">' +
+            movable.map(mv => '<option value="' + mv.w.week + '">Week ' + mv.w.week + '</option>').join('') +
+          '</select>' +
+          '<label style="font-size:11px;color:var(--color-text-faint);">to</label>' +
+          '<input type="date" id="shf-date" value="' + toISODate(anchorDefault.date) + '" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;">' +
+        '</div>' +
+        '<div id="shf-delta" style="font-size:11px;color:var(--color-text-faint);margin-bottom:12px;"></div>' +
+        '<div id="shf-list" style="max-height:280px;overflow-y:auto;margin-bottom:16px;"></div>' +
+        '<div style="display:flex;align-items:center;gap:10px;justify-content:flex-end;">' +
+          '<span id="shf-stat" style="font-size:11px;margin-right:auto;"></span>' +
+          '<button class="ab ab--outline ab--sm" id="shf-cancel">Cancel</button>' +
+          '<button class="ab ab--lime ab--sm" id="shf-apply">Shift dates</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+
+    const close = () => overlay.remove();
+    overlay.querySelector('#shf-x').addEventListener('click', close);
+    overlay.querySelector('#shf-cancel').addEventListener('click', close);
+    overlay.addEventListener('mousedown', e => { if (e.target === overlay) close(); });
+
+    const anchorSel = overlay.querySelector('#shf-anchor');
+    const dateInp = overlay.querySelector('#shf-date');
+    const listEl = overlay.querySelector('#shf-list');
+    const deltaEl = overlay.querySelector('#shf-delta');
+    const applyBtn = overlay.querySelector('#shf-apply');
+
+    function currentDelta() {
+      const aw = parseInt(anchorSel.value, 10);
+      const mv = movable.find(m => m.w.week === aw);
+      if (!mv || !dateInp.value) return 0;
+      const parts = dateInp.value.split('-').map(Number);
+      const nd = new Date(parts[0], parts[1] - 1, parts[2]);
+      return Math.round((dateOnly(nd) - dateOnly(mv.date)) / 86400000);
+    }
+
+    function renderList() {
+      const delta = currentDelta();
+      deltaEl.innerHTML = delta === 0
+        ? 'No change yet — pick a new date.'
+        : (delta > 0 ? 'Moving <b style="color:var(--color-text-muted);">' + delta + ' day' + (delta === 1 ? '' : 's') + ' later</b>' : 'Moving <b style="color:var(--color-text-muted);">' + Math.abs(delta) + ' day' + (delta === -1 ? '' : 's') + ' earlier</b>');
+      applyBtn.disabled = delta === 0;
+      applyBtn.style.opacity = delta === 0 ? '0.5' : '1';
+
+      let rows = movable.map(mv => {
+        const nd = addDaysKeepTime(mv.date, delta);
+        return '<div class="shf-wk"><span class="shf-n">Week ' + mv.w.week + '</span>' +
+          '<span class="shf-old">' + h(fmtShort(mv.date)) + '</span>' +
+          '<span class="shf-arrow">→</span>' +
+          '<span class="shf-new">' + h(fmtShort(nd)) + '</span></div>';
+      }).join('');
+      const lockRows = locked.map(w => {
+        const d = weekDateObj(w);
+        return '<div class="shf-wk locked"><span class="shf-n">Week ' + w.week + '</span>' +
+          '<span class="shf-old">' + h(d ? fmtShort(d) : '—') + '</span>' +
+          '<span class="shf-lock">Final · stays</span></div>';
+      }).join('');
+      const undRows = undated.map(w =>
+        '<div class="shf-wk locked"><span class="shf-n">Week ' + w.week + '</span>' +
+        '<span class="shf-lock">No date · use Edit week</span></div>').join('');
+      listEl.innerHTML = rows + lockRows + undRows;
+    }
+
+    anchorSel.addEventListener('change', () => {
+      const mv = movable.find(m => m.w.week === parseInt(anchorSel.value, 10));
+      if (mv) dateInp.value = toISODate(mv.date); // reset to that week's current date
+      renderList();
+    });
+    dateInp.addEventListener('input', renderList);
+    renderList();
+
+    applyBtn.addEventListener('click', async () => {
+      const delta = currentDelta();
+      if (delta === 0) return;
+      const stat = overlay.querySelector('#shf-stat');
+      const jobs = [];
+      movable.forEach(mv => (mv.w.matches || []).forEach(m => { if (m.scheduledAt) jobs.push(m); }));
+      if (!confirm('Shift ' + movable.length + ' week' + (movable.length === 1 ? '' : 's') + ' (' + jobs.length + ' match' + (jobs.length === 1 ? '' : 'es') + ') by ' + delta + ' day' + (Math.abs(delta) === 1 ? '' : 's') + '? Final weeks stay put.')) return;
+
+      overlay.querySelectorAll('button, select, input').forEach(el => { el.disabled = true; });
+      let done = 0, failed = 0;
+      for (const m of jobs) {
+        const nd = addDaysKeepTime(new Date(m.scheduledAt), delta);
+        try {
+          await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(m.id), {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scheduledAt: nd.toISOString(), startTime: fmtTime12(nd) }),
+          });
+          m.scheduledAt = nd.toISOString();
+        } catch (e) { failed++; }
+        done++;
+        if (stat) { stat.textContent = 'Shifting… ' + done + '/' + jobs.length; stat.style.color = 'var(--color-text-faint)'; }
+      }
+      close();
+      renderSched();
+      if (typeof renderAllGames === 'function') renderAllGames();
+      if (failed) alert('Shifted with ' + failed + ' error' + (failed === 1 ? '' : 's') + '. Reload to check those matches.');
+    });
+  }
 
   // ═══════════════════════════════════════════════════════════
   // SCORE ENTRY — live from admin-matches + admin-scores
