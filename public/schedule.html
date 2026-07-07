@@ -65,6 +65,24 @@
     }
     .date-pill.is-selected .wk { color: var(--color-bg); opacity: 0.7; }
 
+    /* ── Team filter chips (under the game-night pills) ──────────── */
+    .team-strip-label { margin-top: var(--space-3); }
+    .team-scroll {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .team-scroll::-webkit-scrollbar { display: none; }
+    .team-chip {
+      background: var(--color-surface-2); border: 1px solid var(--color-border);
+      border-radius: var(--radius-full); padding: 5px 12px; font-size: 11px;
+      font-weight: 600; color: var(--color-text-muted); white-space: nowrap;
+      flex-shrink: 0; cursor: pointer; transition: all var(--transition);
+    }
+    .team-chip:hover { border-color: var(--color-border-strong); color: var(--color-text); }
+    .team-chip.is-selected {
+      border-color: var(--color-lime); color: var(--color-bg); background: var(--color-lime);
+    }
+
     /* ── Toolbar ─────────────────────────────────────────────────── */
     .sched-toolbar { display: flex; justify-content: flex-end; margin-bottom: var(--space-3); }
     .sched-collapse-btn {
@@ -202,7 +220,7 @@
 
     /* show-scores toggle + lazy body */
     .m-toggle {
-      margin-top: auto; width: 100%; background: transparent; border: none;
+      margin-top: 4px; width: 100%; background: transparent; border: none;
       border-top: 1px solid var(--color-divider); color: var(--color-text-muted);
       padding: 11px; font-size: 12px; font-weight: 700; font-family: inherit; cursor: pointer;
       display: flex; align-items: center; justify-content: center; gap: 8px; transition: color var(--transition);
@@ -311,6 +329,8 @@
     <div class="date-strip">
       <div class="strip-label">Game nights</div>
       <div class="pills-scroll" id="date-pills"></div>
+      <div class="strip-label team-strip-label" id="team-strip-label" style="display:none;">Filter by team</div>
+      <div class="team-scroll" id="team-filter"></div>
     </div>
 
     <div class="sched-toolbar">
@@ -346,6 +366,7 @@
     let scheduleData  = null;
     let allCollapsed = false;
     let selectedWeek  = null;
+    let selectedTeam  = null;   // team id to filter the schedule to (null = all teams)
     const detailCache = {};   // matchId → loaded game detail (or 'error')
 
     const $id = id => document.getElementById(id);
@@ -403,11 +424,52 @@
       }).join('');
     }
 
+    /* ── Team filter (under the game-night pills) ────────────────── */
+    // Unique teams across the season's matches, for the "just my games" filter.
+    function collectTeams(weeksData) {
+      if (!weeksData) return [];
+      const map = new Map();
+      weeksData.forEach(w => (w.matches || []).forEach(m => {
+        if (m.teamAId && m.teamA && m.teamA !== 'TBD') map.set(m.teamAId, m.teamA);
+        if (m.teamBId && m.teamB && m.teamB !== 'TBD') map.set(m.teamBId, m.teamB);
+      }));
+      return [...map.entries()].map(([id, name]) => ({ id, name }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+    }
+    // Matches in a week involving the selected team (all matches when no filter).
+    function teamMatches(wData) {
+      const ms = wData?.matches || [];
+      return selectedTeam ? ms.filter(m => m.teamAId === selectedTeam || m.teamBId === selectedTeam) : ms;
+    }
+    function renderTeamFilter(weeksData) {
+      const el = $id('team-filter'), label = $id('team-strip-label');
+      if (!el) return;
+      const teams = collectTeams(weeksData);
+      if (!teams.length) { el.innerHTML = ''; el.style.display = 'none'; if (label) label.style.display = 'none'; return; }
+      el.style.display = ''; if (label) label.style.display = '';
+      el.innerHTML = `<div class="team-chip${selectedTeam == null ? ' is-selected' : ''}" data-team="">All teams</div>` +
+        teams.map(t => `<div class="team-chip${selectedTeam === t.id ? ' is-selected' : ''}" data-team="${esc(t.id)}">${esc(t.name)}</div>`).join('');
+    }
+    function selectTeam(id) {
+      selectedTeam = id || null;
+      const weeksData = scheduleData?.empty ? null : scheduleData?.weeks;
+      renderTeamFilter(weeksData);
+      renderDateStrip(weeksData);
+      renderAllWeeks(weeksData);
+    }
+
     /* ── Render all weeks ────────────────────────────────────────── */
     function renderAllWeeks(weeksData) {
       const nextWk = nextWeekNum(weeksData);
-      const weekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1)
+      let weekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1)
         .filter(n => selectedWeek == null || n === selectedWeek);
+      if (selectedTeam) {
+        weekNums = weekNums.filter(n => teamMatches(weeksData?.find(w => w.week === n)).length > 0);
+      }
+      if (!weekNums.length) {
+        $id('weeks-list').innerHTML = `<p class="week-tbd" style="text-align:center;padding:28px 12px;">No games found for this team yet.</p>`;
+        return;
+      }
 
       $id('weeks-list').innerHTML = weekNums.map(n => {
         const past = isWeekPast(n, weeksData);
@@ -423,7 +485,8 @@
         const cardCls   = ['week-card', past ? 'is-past' : '', collapsed ? 'is-collapsed' : ''].filter(Boolean).join(' ');
 
         const wData  = weeksData?.find(w => w.week === n);
-        const matchCount = wData?.matches?.length || 0;
+        const wMatches = teamMatches(wData);
+        const matchCount = wMatches.length;
         const collapsedSummary = matchCount
           ? `${matchCount} match${matchCount !== 1 ? 'es' : ''} · click to expand`
           : 'Click to expand';
@@ -432,8 +495,8 @@
           ? `<span class="week-phase ${wData.phase}">${esc(wData.phaseLabel || wData.phase)}</span>`
           : '';
         const body = wData?.phase
-          ? renderBracketWeek(wData, n, weeksData)
-          : renderMatches(wData?.matches || [], n, weeksData);
+          ? renderBracketWeek(selectedTeam ? { ...wData, matches: wMatches } : wData, n, weeksData)
+          : renderMatches(wMatches, n, weeksData);
 
         return `
           <div class="${cardCls}" data-week="${n}">
@@ -779,6 +842,7 @@
     /* ── Load schedule from API ──────────────────────────────────── */
     async function loadSchedule() {
       renderDateStrip(null);
+      renderTeamFilter(null);
       renderAllWeeks(null);
       try {
         // Planned week dates published by the admin — used for weeks that don't
@@ -793,6 +857,7 @@
         scheduleData = await r.json();
         const weeksData = scheduleData?.empty ? null : scheduleData?.weeks;
         renderDateStrip(weeksData);
+        renderTeamFilter(weeksData);
         renderAllWeeks(weeksData);
       } catch {
         // Keep the placeholder week cards already rendered; no-op
@@ -819,6 +884,13 @@
       if (!pill) return;
       const n = Number(pill.dataset.week);
       if (n) selectWeek(n);
+    });
+
+    /* ── Filter to one team's games by clicking a team chip ──────── */
+    $id('team-filter').addEventListener('click', e => {
+      const chip = e.target.closest('.team-chip');
+      if (!chip) return;
+      selectTeam(chip.dataset.team || null);
     });
 
     loadSchedule();
