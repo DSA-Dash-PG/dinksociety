@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Week editor — mockup</title>
+<style>
+  :root{
+    --bg:#0e0e0e; --surface:#161616; --s2:#1e1e1e; --s3:#262626; --s4:#2e2e2e;
+    --bd:rgba(255,255,255,.08); --bds:rgba(255,255,255,.16);
+    --tx:#f0f0ec; --txf:#8b948a; --txm:#9a9e97; --inv:#0e0e0e;
+    --lime:#b8ff2c; --lime-dim:rgba(184,255,44,.12); --lime-hover:#c8ff58;
+    --teal:#17d7b0; --teal-dim:rgba(23,215,176,.12);
+    --gold:#f0c040; --red:#ff5c47;
+    --r-sm:9px; --r-md:13px; --r-lg:18px; --r-full:9999px;
+    --mono:ui-monospace,"SF Mono",Menlo,monospace;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--tx);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:1080px;margin:0 auto;padding:26px 22px 90px;}
+  .note{background:var(--lime-dim);border:1px solid rgba(184,255,44,.25);color:#e8ffd0;
+    border-radius:var(--r-md);padding:11px 14px;font-size:12.5px;margin-bottom:22px;}
+  .note b{color:var(--lime);}
+
+  /* toolbar */
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:16px;}
+  .bar h1{font-size:22px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;margin:0;}
+  .bar-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .sel{background:var(--s2);color:var(--tx);border:1px solid var(--bd);border-radius:var(--r-sm);
+    padding:7px 11px;font-size:12.5px;font-family:inherit;}
+  .btn{border:1px solid var(--bd);background:var(--s2);color:var(--tx);border-radius:var(--r-sm);
+    padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .btn:hover{border-color:var(--bds);}
+  .btn--lime{background:var(--lime);color:var(--inv);border-color:var(--lime);}
+  .btn--lime:hover{background:var(--lime-hover);}
+  .btn--ghost{background:transparent;}
+  .btn--sm{padding:5px 10px;font-size:11.5px;}
+
+  /* week rail */
+  .rail{display:flex;gap:7px;overflow-x:auto;padding-bottom:4px;margin-bottom:18px;}
+  .wk{flex:1 0 auto;min-width:112px;text-align:left;background:var(--s2);border:1px solid var(--bd);
+    border-radius:var(--r-md);padding:10px 12px;cursor:pointer;transition:.12s;}
+  .wk:hover{border-color:var(--bds);}
+  .wk.sel{border-color:var(--lime);box-shadow:0 0 0 1px var(--lime);background:#181c10;}
+  .wk .wk-n{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;}
+  .wk .wk-ph{font-size:11px;font-weight:700;color:var(--txm);margin-top:2px;}
+  .wk .wk-d{font-size:10.5px;color:var(--txf);margin-top:6px;display:flex;align-items:center;gap:5px;}
+  .dot{width:7px;height:7px;border-radius:50%;display:inline-block;}
+  .dot.done{background:var(--lime);} .dot.live{background:var(--teal);box-shadow:0 0 7px var(--teal);}
+  .dot.up{background:#555;} .dot.tbd{background:transparent;border:1.5px dashed #6a6a6a;}
+
+  /* panel */
+  .panel{background:var(--surface);border:1px solid var(--bd);border-radius:var(--r-lg);overflow:hidden;}
+  .panel-hd{padding:16px 18px;border-bottom:1px solid var(--bd);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .panel-hd h2{margin:0;font-size:17px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.01em;display:flex;align-items:center;gap:9px;}
+  .pill{font-size:9.5px;font-weight:900;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:var(--r-full);background:var(--s3);color:var(--txm);}
+  .panel-bd{padding:16px 18px;}
+
+  /* week defaults strip */
+  .defaults{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;background:var(--s2);border:1px solid var(--bd);
+    border-radius:var(--r-md);padding:13px 15px;margin-bottom:8px;}
+  .fld{display:flex;flex-direction:column;gap:5px;}
+  .fld label{font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--txf);}
+  .fld input,.fld select{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:var(--r-sm);
+    padding:8px 10px;font-size:13px;font-family:inherit;}
+  .fld input[type=date]{min-width:150px;} .fld--time select{min-width:120px;}
+  .defaults .hint{font-size:11px;color:var(--txf);max-width:210px;line-height:1.4;margin-left:auto;}
+  .defaults .hint b{color:var(--txm);}
+
+  /* matches grid */
+  .grid-head{display:grid;grid-template-columns:1.7fr 34px 1.7fr 150px 30px;gap:10px;
+    padding:12px 12px 6px;font-size:9.5px;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--txf);}
+  .grid-head span:nth-child(2),.grid-head span:nth-child(5){text-align:center;}
+  .mrow{display:grid;grid-template-columns:1.7fr 34px 1.7fr 150px 30px;gap:10px;align-items:center;
+    background:var(--s2);border:1px solid var(--bd);border-radius:var(--r-md);padding:11px 12px;margin-bottom:9px;}
+  .mrow.dupe{border-color:rgba(255,92,71,.5);}
+  .tsel{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:var(--r-sm);
+    padding:9px 10px;font-size:13px;font-weight:700;font-family:inherit;width:100%;cursor:pointer;}
+  .vs{font-size:10px;font-weight:900;letter-spacing:.1em;color:var(--txf);text-align:center;}
+  .courts{display:flex;align-items:center;gap:5px;}
+  .courts input{width:52px;background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:var(--r-sm);
+    padding:9px 6px;font-size:13px;font-family:inherit;text-align:center;}
+  .courts .amp{color:var(--txf);font-size:12px;}
+  .timesel{background:var(--bg);color:var(--tx);border:1px solid var(--bd);border-radius:var(--r-sm);
+    padding:9px 8px;font-size:12.5px;font-family:inherit;width:100%;}
+  .timesel.def{color:var(--txf);}
+  .del{background:none;border:none;color:var(--txf);cursor:pointer;font-size:16px;padding:4px;border-radius:6px;}
+  .del:hover{color:var(--red);background:rgba(255,92,71,.1);}
+  .dupe-note{grid-column:1 / -1;font-size:11px;color:var(--red);padding:2px 2px 0;display:none;}
+  .mrow.dupe .dupe-note{display:block;}
+
+  .addrow{display:flex;align-items:center;gap:8px;margin-top:4px;}
+  .addbtn{border:1px dashed var(--bds);background:transparent;color:var(--txm);border-radius:var(--r-sm);
+    padding:10px 14px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;text-align:center;}
+  .addbtn:hover{border-color:var(--lime);color:var(--lime);}
+
+  .foot{display:flex;align-items:center;gap:10px;justify-content:flex-end;padding:14px 18px;border-top:1px solid var(--bd);flex-wrap:wrap;}
+  .foot .status{margin-right:auto;font-size:11.5px;color:var(--txf);}
+  .cap{font-size:11px;color:var(--txf);margin-top:16px;text-align:center;}
+
+  @media(max-width:760px){
+    .grid-head{display:none;}
+    .mrow{grid-template-columns:1fr 1fr;gap:8px;}
+    .mrow .vs{display:none;}
+    .courts,.timesel{grid-column:auto;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="note"><b>Mockup — not wired up.</b> Proposed “click a week to edit it” panel: set the whole week’s date/time/venue once at the top, then pick teams, courts, and (optional) per-match time in one grid. Replaces adding matches one-by-one. Try the team dropdowns, <b>+ Add match</b>, and the ✕ to remove.</div>
+
+  <!-- toolbar -->
+  <div class="bar">
+    <h1>Schedule</h1>
+    <div class="bar-r">
+      <select class="sel"><option>3.0 – 3.5 Mixed</option></select>
+      <button class="btn btn--lime">＋ Generate season</button>
+      <button class="btn">⇄ Shift dates</button>
+      <button class="btn">Rebuild standings</button>
+    </div>
+  </div>
+
+  <!-- week rail -->
+  <div class="rail" id="rail"></div>
+
+  <!-- editor panel -->
+  <div class="panel">
+    <div class="panel-hd">
+      <h2>Week 6 <span class="pill">Regular season</span></h2>
+      <span style="font-size:12px;color:var(--txf);" id="summary"></span>
+    </div>
+    <div class="panel-bd">
+
+      <!-- week defaults -->
+      <div class="defaults">
+        <div class="fld"><label>Week date</label><input type="date" id="wk-date" value="2026-07-20"></div>
+        <div class="fld fld--time"><label>Default time</label>
+          <select id="wk-time">
+            <option>6:00 PM</option><option>6:30 PM</option>
+            <option selected>7:00 PM</option><option>7:30 PM</option><option>8:00 PM</option>
+          </select>
+        </div>
+        <div class="fld"><label>Venue</label>
+          <select id="wk-venue"><option selected>Dink House</option><option>+ Add venue…</option></select>
+        </div>
+        <div class="hint">Sets the date for <b>every match below</b>. Each match can still override its own time &amp; courts.</div>
+      </div>
+
+      <!-- matches -->
+      <div class="grid-head">
+        <span>Home</span><span></span><span>Away</span><span>Courts</span><span></span>
+      </div>
+      <div id="rows"></div>
+
+      <button class="addbtn" id="addbtn">＋ Add match</button>
+    </div>
+
+    <div class="foot">
+      <span class="status" id="status">3 matches · all on Mon, Jul 20 · 7:00 PM</span>
+      <button class="btn btn--ghost btn--sm">Cancel</button>
+      <button class="btn btn--lime">Save week</button>
+    </div>
+  </div>
+
+  <p class="cap">Week editor mockup · The Dink Society admin</p>
+</div>
+
+<script>
+  const TEAMS = [
+    {id:'bde', e:'💥', n:'Big Dink Energy'},
+    {id:'kchn', e:'🍌', n:"K'CHN"},
+    {id:'smash', e:'🏆', n:'Smash Society'},
+    {id:'zzt', e:'💫', n:'ZERO ZERO TWO'},
+    {id:'timog', e:'🌴', n:'Timog Cal'},
+    {id:'wtd', e:'🎯', n:'What the Dink?!'},
+  ];
+  const WEEKS = [
+    {n:1, d:'Mon, Jun 8',  s:'done'}, {n:2, d:'Mon, Jun 22', s:'done'},
+    {n:3, d:'Mon, Jun 29', s:'done'}, {n:4, d:'Mon, Jul 6',  s:'done'},
+    {n:5, d:'Mon, Jul 13', s:'live'}, {n:6, d:'Set date',    s:'tbd', sel:true},
+    {n:7, d:'Set date',    s:'tbd'},  {n:8, d:'Set date',    s:'tbd'},
+  ];
+  // initial matchups for the week being edited
+  const START = [
+    {home:'bde',  away:'zzt',   ca:1, cb:2},
+    {home:'kchn', away:'wtd',   ca:3, cb:6},
+    {home:'smash',away:'timog', ca:5, cb:7},
+  ];
+
+  document.getElementById('rail').innerHTML = WEEKS.map(w=>`
+    <div class="wk ${w.sel?'sel':''}">
+      <div class="wk-n">Week ${w.n}</div>
+      <div class="wk-ph">Regular season</div>
+      <div class="wk-d"><span class="dot ${w.s}"></span>${w.d}</div>
+    </div>`).join('');
+
+  function teamOpts(sel){
+    return TEAMS.map(t=>`<option value="${t.id}" ${t.id===sel?'selected':''}>${t.e}  ${t.n}</option>`).join('');
+  }
+  function rowHtml(m){
+    return `<div class="mrow">
+      <select class="tsel home">${teamOpts(m.home)}</select>
+      <span class="vs">VS</span>
+      <select class="tsel away">${teamOpts(m.away)}</select>
+      <div class="courts"><input type="number" min="1" max="20" value="${m.ca}"><span class="amp">&amp;</span><input type="number" min="1" max="20" value="${m.cb}"></div>
+      <button class="del" title="Remove match">✕</button>
+      <div class="dupe-note">A team can’t play itself — pick a different away team.</div>
+    </div>`;
+  }
+  const rows = document.getElementById('rows');
+  function addRow(m){ rows.insertAdjacentHTML('beforeend', rowHtml(m || {home:'bde',away:'kchn',ca:'',cb:''})); wire(); dupeCheck(); }
+  START.forEach(addRow);
+
+  function wire(){
+    rows.querySelectorAll('.del').forEach(b=>b.onclick=()=>{ b.closest('.mrow').remove(); dupeCheck(); });
+    rows.querySelectorAll('.tsel').forEach(s=>s.onchange=dupeCheck);
+  }
+  function dupeCheck(){
+    rows.querySelectorAll('.mrow').forEach(r=>{
+      const h=r.querySelector('.home').value, a=r.querySelector('.away').value;
+      r.classList.toggle('dupe', h===a);
+    });
+    const n=rows.querySelectorAll('.mrow').length;
+    document.getElementById('status').textContent = `${n} match${n===1?'':'es'} · all on Mon, Jul 20 · 7:00 PM`;
+  }
+  document.getElementById('addbtn').onclick=()=>addRow();
+</script>
+</body>
+</html>
