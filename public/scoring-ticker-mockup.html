@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scoring Ticker · Mockups · Dink Society</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0e0e0e; --surface:#161616; --surface-2:#1e1e1e; --surface-3:#262626;
+    --border:rgba(255,255,255,0.08); --border-strong:rgba(255,255,255,0.14);
+    --text:#f0f0ec; --muted:#9a9e97; --faint:#5e625c;
+    --lime:#b8ff2c; --lime-active:#94d10b; --lime-dim:rgba(184,255,44,0.12);
+    --teal:#17d7b0; --teal-dim:rgba(23,215,176,0.12);
+    --red:#ff5c47; --gold:#f0c040; --gold-dim:rgba(240,192,64,0.12);
+    --font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:var(--font);
+    -webkit-font-smoothing:antialiased;line-height:1.4;padding-bottom:120px}
+  .display{font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-0.02em}
+
+  /* Page chrome */
+  .pagehead{max-width:1120px;margin:0 auto;padding:40px 24px 8px}
+  .kicker{color:var(--lime);font-size:12px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase}
+  .pagehead h1{font-size:clamp(2rem,1.2rem+2vw,3rem);margin:10px 0 6px}
+  .pagehead p{color:var(--muted);max-width:640px;font-size:15px}
+
+  .section{max-width:1120px;margin:0 auto;padding:44px 24px 0}
+  .sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .sec-head .num{color:var(--bg);background:var(--lime);font-weight:900;font-style:italic;
+    width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:16px}
+  .sec-head h2{font-size:24px}
+  .sec-head .tag{margin-left:auto;color:var(--faint);font-size:12px;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.1em}
+  .sec-desc{color:var(--muted);font-size:14px;margin:8px 0 22px;max-width:720px}
+  .sec-desc b{color:var(--text);font-weight:700}
+
+  .frame-label{font-size:11px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;
+    color:var(--faint);margin:26px 0 10px;display:flex;align-items:center;gap:8px}
+  .frame-label::before{content:"";width:20px;height:1px;background:var(--border-strong)}
+
+  /* Device frames */
+  .desktop-frame{border:1px solid var(--border-strong);border-radius:var(--radius);
+    overflow:hidden;background:#000;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .browserbar{height:34px;background:var(--surface-2);display:flex;align-items:center;
+    gap:7px;padding:0 12px;border-bottom:1px solid var(--border)}
+  .browserbar i{width:11px;height:11px;border-radius:50%;background:var(--surface-3)}
+  .browserbar .url{margin-left:12px;font-size:11px;color:var(--faint);
+    background:var(--bg);padding:3px 12px;border-radius:20px}
+
+  .phone{width:340px;margin:0 auto;border:9px solid #000;border-radius:38px;
+    overflow:hidden;background:var(--bg);box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative}
+  .phone .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:130px;height:22px;background:#000;border-radius:0 0 16px 16px;z-index:20}
+  .phone-scroll{height:600px;overflow-y:auto;overflow-x:hidden}
+  .phone-scroll::-webkit-scrollbar{width:0}
+
+  /* ============ Shared ticker atoms ============ */
+  .livedot{width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;
+    box-shadow:0 0 0 0 rgba(255,92,71,.6);animation:pulse 1.6s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(255,92,71,.55)}70%{box-shadow:0 0 0 7px rgba(255,92,71,0)}100%{box-shadow:0 0 0 0 rgba(255,92,71,0)}}
+  .score-num{font-variant-numeric:tabular-nums;font-weight:900;font-style:italic}
+
+  /* ============ OPTION A — Broadcast bottomline ============ */
+  .siteA{background:var(--bg);height:470px;position:relative;
+    background-image:radial-gradient(1200px 400px at 70% -10%,rgba(184,255,44,.06),transparent)}
+  .fakepage{padding:26px}
+  .fakepage .h{height:14px;width:190px;background:var(--surface-3);border-radius:6px}
+  .fakepage .b{height:9px;background:var(--surface-2);border-radius:5px;margin-top:12px}
+  .fakepage .row{display:flex;gap:14px;margin-top:22px}
+  .fakepage .card{flex:1;height:120px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
+
+  .bottomline{position:absolute;left:0;right:0;bottom:0;height:54px;
+    background:linear-gradient(180deg,#111,#0a0a0a);border-top:1px solid var(--border-strong);
+    display:flex;align-items:stretch;overflow:hidden}
+  .bl-brand{background:var(--lime);color:var(--bg);display:flex;align-items:center;gap:8px;
+    padding:0 18px;font-weight:900;font-style:italic;text-transform:uppercase;font-size:15px;
+    letter-spacing:-0.01em;flex-shrink:0;position:relative;z-index:3}
+  .bl-brand .live{background:var(--bg);color:var(--lime);font-size:10px;padding:2px 7px;
+    border-radius:5px;letter-spacing:0.1em}
+  .bl-track-wrap{flex:1;overflow:hidden;position:relative;display:flex;align-items:center}
+  .bl-track{display:flex;align-items:center;gap:0;white-space:nowrap;
+    animation:scrollLeft 38s linear infinite;padding-left:100%}
+  .siteA:hover .bl-track{animation-play-state:paused}
+  @keyframes scrollLeft{from{transform:translateX(0)}to{transform:translateX(-100%)}}
+  .bl-item{display:inline-flex;align-items:center;gap:10px;padding:0 22px;
+    border-right:1px solid var(--border);font-size:14px;height:26px}
+  .bl-item .ct{color:var(--faint);font-weight:800;font-size:11px;letter-spacing:0.06em}
+  .bl-item .nm{color:var(--text);font-weight:600}
+  .bl-item .win{color:var(--lime);font-weight:800}
+  .bl-item .sc{color:var(--text);font-weight:900;font-style:italic;font-variant-numeric:tabular-nums}
+  .bl-item.livegame .sc{color:var(--red)}
+  .bl-item .vs{color:var(--faint);font-size:11px;font-weight:700}
+  .bl-item .fin{color:var(--faint);font-size:10px;font-weight:800;letter-spacing:0.08em;
+    border:1px solid var(--border-strong);padding:1px 5px;border-radius:4px}
+
+  /* mobile A: ticker sits above bottom nav */
+  .mobA .bottomline{height:46px}
+  .mobA .bl-brand{padding:0 12px;font-size:13px}
+  .mobA .bl-item{font-size:12.5px;padding:0 14px}
+  .mnav{position:absolute;bottom:0;left:0;right:0;height:56px;background:#0a0a0a;
+    border-top:1px solid var(--border);display:flex}
+  .mnav div{flex:1;display:grid;place-items:center;gap:3px;color:var(--faint);font-size:9px;font-weight:700}
+  .mnav div span{width:18px;height:18px;border-radius:5px;background:var(--surface-3)}
+  .mnav div.on{color:var(--lime)} .mnav div.on span{background:var(--lime)}
+
+  /* ============ OPTION B — Venue big-screen scoreboard ============ */
+  .board{background:radial-gradient(1400px 700px at 50% -20%,rgba(184,255,44,.10),transparent),var(--bg);
+    padding:22px 24px;min-height:470px}
+  .board-top{display:flex;align-items:center;gap:14px;margin-bottom:18px}
+  .board-top .logo{font-size:22px}
+  .board-top .logo b{color:var(--lime)}
+  .board-top .meta{margin-left:auto;text-align:right}
+  .board-top .meta .wk{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
+  .board-top .live-pill{display:inline-flex;align-items:center;gap:7px;background:rgba(255,92,71,.14);
+    color:var(--red);font-weight:800;font-size:12px;padding:5px 11px;border-radius:20px;letter-spacing:0.08em}
+  .courts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+  .court{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px;position:relative;overflow:hidden}
+  .court.hot{border-color:rgba(255,92,71,.4);box-shadow:0 0 0 1px rgba(255,92,71,.15)}
+  .court .cname{font-size:11px;font-weight:900;font-style:italic;letter-spacing:0.1em;text-transform:uppercase;color:var(--lime);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .court .cname .st{margin-left:auto;color:var(--red);font-size:10px}
+  .court .cname .st.done{color:var(--faint)}
+  .teamline{display:flex;align-items:center;justify-content:space-between;padding:7px 0}
+  .teamline+.teamline{border-top:1px solid var(--divider,rgba(255,255,255,.05))}
+  .teamline .who{font-size:14px;font-weight:700}
+  .teamline.lead .who{color:var(--text)} .teamline.lead .pts{color:var(--lime)}
+  .teamline .pts{font-size:30px;font-weight:900;font-style:italic;font-variant-numeric:tabular-nums;color:var(--text);min-width:44px;text-align:right}
+  .teamline .serve{width:7px;height:7px;border-radius:50%;background:var(--gold);display:inline-block;margin-left:7px}
+  .feedwrap{background:var(--surface);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .feedwrap .fh{padding:10px 16px;border-bottom:1px solid var(--border);font-size:11px;font-weight:900;
+    font-style:italic;letter-spacing:0.12em;text-transform:uppercase;color:var(--muted);display:flex;align-items:center;gap:8px}
+  .feed{height:150px;overflow:hidden;position:relative}
+  .feed-track{display:flex;flex-direction:column}
+  .feedrow{display:flex;align-items:center;gap:14px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,.04);font-size:14px;animation:dropIn .5s ease}
+  @keyframes dropIn{from{opacity:0;transform:translateY(-10px);background:var(--lime-dim)}to{opacity:1;transform:none}}
+  .feedrow .ct{font-size:10px;font-weight:900;color:var(--faint);letter-spacing:0.08em;width:56px;flex-shrink:0}
+  .feedrow .desc{flex:1}
+  .feedrow .desc .w{color:var(--lime);font-weight:800}
+  .feedrow .desc .l{color:var(--muted)}
+  .feedrow .sc{font-weight:900;font-style:italic;font-variant-numeric:tabular-nums;font-size:16px}
+  .feedrow .badge{font-size:9px;font-weight:800;letter-spacing:0.08em;color:var(--bg);background:var(--gold);padding:2px 6px;border-radius:4px}
+
+  /* mobile B */
+  .mobB .courts{grid-template-columns:1fr;gap:10px}
+  .mobB .court .pts{font-size:26px}
+  .mobB .board{padding:16px 14px}
+  .mobB .board-top .logo{font-size:17px}
+
+  /* ============ OPTION C — Homepage live feed card ============ */
+  .siteC{padding:24px;background:radial-gradient(1000px 400px at 80% -10%,rgba(23,215,176,.06),transparent),var(--bg);min-height:470px}
+  .livecard{background:var(--surface);border:1px solid var(--border);border-radius:18px;overflow:hidden;max-width:440px}
+  .lc-head{padding:16px 18px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--border);
+    background:linear-gradient(180deg,rgba(184,255,44,.05),transparent)}
+  .lc-head .t{font-size:17px}
+  .lc-head .t b{color:var(--lime)}
+  .lc-head .livechip{margin-left:auto;display:inline-flex;align-items:center;gap:7px;font-size:11px;
+    font-weight:800;color:var(--red);letter-spacing:0.08em}
+  .lc-now{padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface-2)}
+  .lc-now .lbl{font-size:10px;font-weight:900;letter-spacing:0.12em;text-transform:uppercase;color:var(--faint);margin-bottom:9px}
+  .nowgame{display:flex;align-items:center;gap:12px}
+  .nowgame .ct{font-size:10px;font-weight:900;color:var(--lime);width:44px}
+  .nowgame .mid{flex:1;font-size:13px}
+  .nowgame .mid .r{display:flex;justify-content:space-between;padding:2px 0}
+  .nowgame .mid .r.lead{color:var(--lime);font-weight:800}
+  .nowgame .mid .r b{font-style:italic;font-variant-numeric:tabular-nums}
+  .lc-feed{max-height:270px;overflow:hidden}
+  .lcrow{padding:13px 18px;border-bottom:1px solid rgba(255,255,255,.04);animation:dropIn .55s ease}
+  .lcrow .top{display:flex;align-items:center;gap:9px;margin-bottom:5px}
+  .lcrow .ct{font-size:9px;font-weight:900;letter-spacing:0.08em;color:var(--bg);background:var(--surface-4,#2e2e2e);
+    color:var(--muted);padding:2px 7px;border-radius:5px}
+  .lcrow .ct.c1{background:var(--lime-dim);color:var(--lime)}
+  .lcrow .ct.c2{background:var(--teal-dim);color:var(--teal)}
+  .lcrow .ct.c3{background:var(--gold-dim);color:var(--gold)}
+  .lcrow .ago{margin-left:auto;font-size:11px;color:var(--faint)}
+  .lcrow .line{font-size:14.5px}
+  .lcrow .line .w{color:var(--text);font-weight:800}
+  .lcrow .line .beat{color:var(--faint);font-size:12px;font-weight:700;margin:0 6px}
+  .lcrow .line .l{color:var(--muted)}
+  .lcrow .line .sc{float:right;font-weight:900;font-style:italic;font-variant-numeric:tabular-nums;font-size:15px}
+  .lcrow .tags{margin-top:6px}
+  .lcrow .tags span{font-size:10px;font-weight:800;letter-spacing:0.04em;padding:2px 7px;border-radius:20px;
+    background:var(--gold-dim);color:var(--gold);margin-right:5px}
+
+  .caption{color:var(--faint);font-size:12.5px;margin-top:12px;display:flex;gap:8px}
+  .caption b{color:var(--muted);font-weight:800}
+  .footer{max-width:1120px;margin:60px auto 0;padding:28px 24px;border-top:1px solid var(--border);color:var(--faint);font-size:13px}
+  .footer b{color:var(--text)}
+</style>
+</head>
+<body>
+
+<div class="pagehead">
+  <div class="kicker">Game Night · Live Scoring</div>
+  <h1 class="display">Scoring Ticker</h1>
+  <p>Three ways to surface scores the moment the away team confirms a game. Each updates live from the same feed, scrolls on its own, and calls out results like <b style="color:var(--text)">Richard H. / Eli D. def. Annie C. / Ryan P. 11–4</b>. Hover any ticker to pause it.</p>
+</div>
+
+<!-- ===================== OPTION A ===================== -->
+<div class="section">
+  <div class="sec-head">
+    <span class="num">A</span>
+    <h2 class="display">Broadcast Bottomline</h2>
+    <span class="tag">Sits on every page</span>
+  </div>
+  <p class="sec-desc">An ESPN-style strip pinned to the bottom of the site. Confirmed results and live games scroll past continuously. <b>Lowest-effort</b> — always visible, never in the way. Best if you want scores to follow people around the whole site on game night.</p>
+
+  <div class="frame-label">Desktop</div>
+  <div class="desktop-frame">
+    <div class="browserbar"><i></i><i></i><i></i><span class="url">dinksociety.app</span></div>
+    <div class="siteA">
+      <div class="fakepage">
+        <div class="h"></div><div class="b" style="width:70%"></div><div class="b" style="width:55%"></div>
+        <div class="row"><div class="card"></div><div class="card"></div><div class="card"></div></div>
+      </div>
+      <div class="bottomline">
+        <div class="bl-brand"><span>Live</span><span class="live">SCORES</span></div>
+        <div class="bl-track-wrap"><div class="bl-track" id="blTrackD"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame-label">Mobile</div>
+  <div class="phone mobA">
+    <div class="notch"></div>
+    <div class="phone-scroll" style="height:520px">
+      <div class="siteA" style="height:520px">
+        <div class="fakepage" style="padding:34px 18px 18px">
+          <div class="h"></div><div class="b" style="width:80%"></div><div class="b" style="width:60%"></div>
+          <div class="card" style="height:120px;margin-top:20px"></div>
+          <div class="card" style="height:120px;margin-top:14px"></div>
+        </div>
+        <div class="bottomline" style="bottom:56px">
+          <div class="bl-brand"><span class="live" style="background:var(--bg);color:var(--lime)">LIVE</span></div>
+          <div class="bl-track-wrap"><div class="bl-track" id="blTrackM"></div></div>
+        </div>
+        <div class="mnav">
+          <div class="on"><span></span>Home</div><div><span></span>Standings</div>
+          <div><span></span>Score</div><div><span></span>Teams</div><div><span></span>Me</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="caption"><b>Note</b> Tap-to-expand could open the full night board (Option B).</div>
+</div>
+
+<!-- ===================== OPTION B ===================== -->
+<div class="section">
+  <div class="sec-head">
+    <span class="num">B</span>
+    <h2 class="display">Venue Scoreboard</h2>
+    <span class="tag">Big screen at the courts</span>
+  </div>
+  <p class="sec-desc">A full-screen board for a TV or projector at the venue. Top shows all <b>three courts live</b> with running scores and who's serving; below, a feed drops in each confirmed result with a green flash. Built to be read from across the room.</p>
+
+  <div class="frame-label">Desktop / TV</div>
+  <div class="desktop-frame">
+    <div class="browserbar"><i></i><i></i><i></i><span class="url">dinksociety.app/board</span></div>
+    <div class="board">
+      <div class="board-top">
+        <div class="logo display">DINK <b>SOCIETY</b></div>
+        <div class="meta">
+          <div class="wk">Season 1 · Week 5</div>
+          <div class="live-pill"><span class="livedot"></span> LIVE · 3 COURTS</div>
+        </div>
+      </div>
+      <div class="courts" id="courtsD"></div>
+      <div class="feedwrap">
+        <div class="fh"><span class="livedot"></span> Final &amp; Confirmed</div>
+        <div class="feed"><div class="feed-track" id="feedD"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame-label">Mobile</div>
+  <div class="phone mobB">
+    <div class="notch"></div>
+    <div class="phone-scroll">
+      <div class="board">
+        <div class="board-top">
+          <div class="logo display">DINK <b>SOCIETY</b></div>
+          <div class="meta"><div class="live-pill"><span class="livedot"></span> LIVE</div></div>
+        </div>
+        <div class="courts" id="courtsM"></div>
+        <div class="feedwrap">
+          <div class="fh"><span class="livedot"></span> Final &amp; Confirmed</div>
+          <div class="feed" style="height:200px"><div class="feed-track" id="feedM"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== OPTION C ===================== -->
+<div class="section">
+  <div class="sec-head">
+    <span class="num">C</span>
+    <h2 class="display">Homepage Live Card</h2>
+    <span class="tag">Embedded in the site</span>
+  </div>
+  <p class="sec-desc">A card that lives on the homepage or the live page. New confirmed results slide in at the top with a highlight flash and context tags (<b>upset</b>, <b>win streak</b>, <b>debut</b>). Most editorial of the three — closest to your "highlights as the night is played" idea.</p>
+
+  <div class="frame-label">Desktop</div>
+  <div class="desktop-frame">
+    <div class="browserbar"><i></i><i></i><i></i><span class="url">dinksociety.app</span></div>
+    <div class="siteC">
+      <div class="livecard">
+        <div class="lc-head">
+          <div class="t display">The <b>Night</b></div>
+          <div class="livechip"><span class="livedot"></span> LIVE · WEEK 5</div>
+        </div>
+        <div class="lc-now">
+          <div class="lbl">On court now</div>
+          <div class="nowgame" id="nowD"></div>
+        </div>
+        <div class="lc-feed" id="lcFeedD"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="frame-label">Mobile</div>
+  <div class="phone">
+    <div class="notch"></div>
+    <div class="phone-scroll">
+      <div class="siteC" style="padding:34px 14px 20px">
+        <div class="livecard" style="max-width:100%">
+          <div class="lc-head">
+            <div class="t display">The <b>Night</b></div>
+            <div class="livechip"><span class="livedot"></span> LIVE</div>
+          </div>
+          <div class="lc-now">
+            <div class="lbl">On court now</div>
+            <div class="nowgame" id="nowM"></div>
+          </div>
+          <div class="lc-feed" id="lcFeedM" style="max-height:340px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="footer">
+  Mockup · not wired to live data. All names, courts and scores are placeholders. <b>Dink Society</b> · Season 1.
+</div>
+
+<script>
+(function(){
+  // ---- Fake player pool (first name + last initial) ----
+  const P = ["Richard H.","Eli D.","Annie C.","Ryan P.","Marcus T.","Dana L.","Priya S.","Jordan K.",
+             "Sam R.","Noah B.","Kim W.","Leo M.","Tess V.","Owen G.","Mia F.","Cole A."];
+  const pick = arr => arr[Math.floor(Math.random()*arr.length)];
+  function pair(){ // returns two distinct players
+    let a=pick(P), b=pick(P); while(b===a) b=pick(P); return a+" / "+b;
+  }
+  const TAGS = ["Upset","3-game streak","Season debut","Comeback","Sweep"];
+
+  // ---- Seed confirmed results ----
+  function makeResult(){
+    let w=pair(), l=pair();
+    const ws = 11, ls = [3,4,5,6,7,8,9][Math.floor(Math.random()*7)];
+    return {court:1+Math.floor(Math.random()*3), win:w, lose:l, ws, ls,
+            tag: Math.random()<0.4 ? pick(TAGS):null };
+  }
+  let results = Array.from({length:6},makeResult);
+
+  // ---- Live courts state ----
+  let courts = [1,2,3].map(n=>({
+    n, A:pair(), B:pair(), sa:Math.floor(Math.random()*8), sb:Math.floor(Math.random()*8),
+    serve:Math.random()<0.5?'A':'B'
+  }));
+
+  // ============ OPTION A render ============
+  function itemHTML(r){
+    return '<span class="bl-item"><span class="ct">CT '+r.court+'</span>'+
+      '<span class="win">'+r.win+'</span><span class="vs">def.</span>'+
+      '<span class="nm">'+r.lose+'</span><span class="sc">'+r.ws+'–'+r.ls+'</span>'+
+      '<span class="fin">FINAL</span></span>';
+  }
+  function liveItemHTML(c){
+    const lead = c.sa>=c.sb?'A':'B';
+    return '<span class="bl-item livegame"><span class="ct">CT '+c.n+'</span>'+
+      '<span class="nm">'+c.A+'</span><span class="sc">'+c.sa+'</span>'+
+      '<span class="vs">–</span><span class="sc">'+c.sb+'</span>'+
+      '<span class="nm">'+c.B+'</span></span>';
+  }
+  function renderA(){
+    let html = courts.map(liveItemHTML).join('') + results.map(itemHTML).join('');
+    html = html + html; // duplicate for seamless loop
+    ['blTrackD','blTrackM'].forEach(id=>{const el=document.getElementById(id); if(el) el.innerHTML=html;});
+  }
+
+  // ============ OPTION B render ============
+  function courtHTML(c){
+    const lead = c.sa>=c.sb?'A':'B';
+    const done = (c.sa>=11||c.sb>=11)&&Math.abs(c.sa-c.sb)>=2;
+    return '<div class="court '+(done?'':'hot')+'">'+
+      '<div class="cname">Court '+c.n+
+        '<span class="st '+(done?'done':'')+'">'+(done?'CONFIRMING':'● LIVE')+'</span></div>'+
+      '<div class="teamline '+(lead==='A'?'lead':'')+'"><span class="who">'+c.A+
+        (c.serve==='A'?'<span class="serve"></span>':'')+'</span><span class="pts">'+c.sa+'</span></div>'+
+      '<div class="teamline '+(lead==='B'?'lead':'')+'"><span class="who">'+c.B+
+        (c.serve==='B'?'<span class="serve"></span>':'')+'</span><span class="pts">'+c.sb+'</span></div>'+
+    '</div>';
+  }
+  function feedRowHTML(r){
+    return '<div class="feedrow"><span class="ct">CT '+r.court+'</span>'+
+      '<span class="desc"><span class="w">'+r.win+'</span> def. <span class="l">'+r.lose+'</span></span>'+
+      (r.tag?'<span class="badge">'+r.tag+'</span>':'')+
+      '<span class="sc">'+r.ws+'–'+r.ls+'</span></div>';
+  }
+  function renderB(){
+    ['courtsD','courtsM'].forEach(id=>{const el=document.getElementById(id); if(el) el.innerHTML=courts.map(courtHTML).join('');});
+    ['feedD','feedM'].forEach(id=>{const el=document.getElementById(id); if(el) el.innerHTML=results.map(feedRowHTML).join('');});
+  }
+
+  // ============ OPTION C render ============
+  function nowHTML(c){
+    const lead=c.sa>=c.sb?'A':'B';
+    return '<span class="ct">CT '+c.n+'</span><div class="mid">'+
+      '<div class="r '+(lead==='A'?'lead':'')+'">'+c.A+' <b>'+c.sa+'</b></div>'+
+      '<div class="r '+(lead==='B'?'lead':'')+'">'+c.B+' <b>'+c.sb+'</b></div></div>';
+  }
+  function lcRowHTML(r,i){
+    const ago=['just now','1 min ago','3 min ago','6 min ago','9 min ago','12 min ago'][i]||'earlier';
+    return '<div class="lcrow"><div class="top"><span class="ct c'+r.court+'">Court '+r.court+'</span>'+
+      '<span class="ago">'+ago+'</span></div>'+
+      '<div class="line"><span class="sc">'+r.ws+'–'+r.ls+'</span>'+
+      '<span class="w">'+r.win+'</span><span class="beat">def.</span><span class="l">'+r.lose+'</span></div>'+
+      (r.tag?'<div class="tags"><span>'+r.tag+'</span></div>':'')+'</div>';
+  }
+  function renderC(){
+    const c=courts[0];
+    ['nowD','nowM'].forEach(id=>{const el=document.getElementById(id); if(el) el.innerHTML=nowHTML(c);});
+    ['lcFeedD','lcFeedM'].forEach(id=>{const el=document.getElementById(id); if(el) el.innerHTML=results.map(lcRowHTML).join('');});
+  }
+
+  function renderAll(){renderA();renderB();renderC();}
+  renderAll();
+
+  // ---- Tick live scores every ~1.4s ----
+  setInterval(()=>{
+    courts.forEach(c=>{
+      const done=(c.sa>=11||c.sb>=11)&&Math.abs(c.sa-c.sb)>=2;
+      if(done) return;
+      if(Math.random()<0.6){ if(Math.random()<0.5)c.sa++; else c.sb++; }
+      c.serve = Math.random()<0.5?'A':'B';
+    });
+    renderB(); renderC();
+  },1400);
+
+  // ---- A game "confirms" every ~4.5s: push new result, reset that court ----
+  setInterval(()=>{
+    const idx=Math.floor(Math.random()*3);
+    const c=courts[idx];
+    const win = c.sa>=c.sb ? c.A:c.B, lose = c.sa>=c.sb ? c.B:c.A;
+    const ws = Math.max(c.sa,c.sb,11), ls=Math.min(c.sa,c.sb);
+    results.unshift({court:c.n, win, lose, ws, ls: Math.min(ls, ws-2),
+      tag: Math.random()<0.4?pick(TAGS):null});
+    if(results.length>7) results.pop();
+    // reset court with new game
+    courts[idx]={n:c.n, A:pair(), B:pair(), sa:0, sb:0, serve:'A'};
+    renderAll();
+  },4500);
+})();
+</script>
+</body>
+</html>
