@@ -322,8 +322,12 @@
         .sort(function(a,b){return b.composite-a.composite;});
       var rankOf={};
       ranked.forEach(function(p,i){rankOf[p.playerId!=null?p.playerId:p.name]=i+1;});
+      var rkFor=function(p){return rankOf[p.playerId!=null?p.playerId:p.name]||Infinity;};
       return all.filter(function(p){return p.rankDelta!=null&&isFinite(p.rankDelta)&&p.rankDelta>0;})
-        .sort(function(a,b){return b.rankDelta-a.rankDelta;})
+        .sort(function(a,b){
+          if(b.rankDelta!==a.rankDelta) return b.rankDelta-a.rankDelta; // biggest jump first
+          return rkFor(a)-rkFor(b); // tie → higher current ranking (lower rank #) on top
+        })
         .map(function(p){var rk=rankOf[p.playerId!=null?p.playerId:p.name]||null;
           return {name:p.name,teamName:p.teamName,gender:p.gender,playerId:p.playerId,photoUrl:p.photoUrl,delta:p.rankDelta,rank:rk,fromRank:rk!=null?rk+p.rankDelta:null};});
     }

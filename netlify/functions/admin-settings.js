@@ -17,6 +17,10 @@ const DEFAULTS = {
   matchTime:      '7:00–9:00 PM',
   depositAmount:  100,
   balanceDueDate: '2026-06-01',
+  // Planned game-night date per week (league-wide), keyed by week number →
+  // ISO datetime. Lets admins publish a week's date before matchups exist;
+  // matches inherit it and the public schedule shows it. e.g. { "6": "2026-07-27T19:00:00.000Z" }
+  weekDates:      {},
   // Email appearance for league broadcasts/messages. Blank fields fall back to
   // built-in defaults (see lib/email.js EMAIL_TEMPLATE_DEFAULTS).
   emailTemplate: { accentColor: '#b8ff2c', headerText: 'THE DINK SOCIETY', buttonLabel: 'Open captain portal', footerText: 'The Dink Society · Southern California Pickleball League', logoUrl: '' },
@@ -111,6 +115,7 @@ export default async (req) => {
         matchTime:      body.matchTime      ?? prev.matchTime      ?? DEFAULTS.matchTime,
         depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
         balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
+        weekDates:      body.weekDates      ?? prev.weekDates      ?? {},
         emailTemplate:  body.emailTemplate
           ? { ...(prev.emailTemplate || DEFAULTS.emailTemplate), ...body.emailTemplate }
           : (prev.emailTemplate ?? DEFAULTS.emailTemplate),
