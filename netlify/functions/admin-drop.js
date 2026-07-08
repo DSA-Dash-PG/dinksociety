@@ -69,7 +69,11 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
   const subject = rec.kicker || `The Drop · Week ${rec.week}`;
   const teaser = rec.dek || htmlToPlain(rec.leadHtml || '').slice(0, 200);
   const text = `${rec.title}\n\n${teaser}\n\nRead the full Drop: ${link}`;
-  const bodyHtml = `<p><strong>${escapeHtml(rec.title)}</strong></p>`
+  const coverHtml = (rec.cover && rec.cover.id)
+    ? `<p><a href="${link}"><img src="${site}/.netlify/functions/drop-photo-serve?id=${encodeURIComponent(rec.cover.id)}" alt="" style="width:100%;max-width:560px;height:auto;border-radius:10px;"></a></p>`
+    : '';
+  const bodyHtml = coverHtml
+    + `<p><strong>${escapeHtml(rec.title)}</strong></p>`
     + (teaser ? `<p>${escapeHtml(teaser)}</p>` : '')
     + `<p><a href="${link}">Read the full Drop →</a></p>`;
 
@@ -177,7 +181,7 @@ export default async (req) => {
       const existing = await getDrop(code, body.week);
       if (!existing) return json({ error: 'No draft to publish for that week' }, 404);
       // If the composer sent edits, persist them first.
-      if (body.title || body.leadHtml || body.storylines) {
+      if (body.title || body.leadHtml || body.storylines || body.cover || body.gallery) {
         await saveDraft(code, body.week, body, admin.email);
       }
       const performers = await livePerformers(code);

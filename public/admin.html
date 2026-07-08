@@ -1090,6 +1090,21 @@
           .drop-pubbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--color-border);}
           .drop-ck{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);text-transform:none;letter-spacing:0;cursor:pointer;}
           .drop-ck input{width:auto;margin:0;}
+          /* Drop photos (cover / gallery / storyline thumb) */
+          .dp-drop{border:1.5px dashed var(--color-border-strong);border-radius:12px;background:var(--color-lime-ghost,rgba(184,255,44,.06));padding:16px;text-align:center;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--color-text-muted);line-height:1.5;}
+          .dp-drop:hover{border-color:var(--color-lime,#b8ff2c);color:var(--color-text);}
+          .dp-cover{position:relative;border:1px solid var(--color-border);border-radius:12px;overflow:hidden;}
+          .dp-cover img{width:100%;max-height:220px;object-fit:cover;display:block;}
+          .dp-cap{display:block;width:100%;margin-top:8px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:8px;color:var(--color-text);font:inherit;font-size:12px;padding:8px 10px;}
+          .dp-photorm{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.72);border:1px solid var(--color-border-strong);color:#fff;border-radius:8px;font-size:11px;font-weight:800;padding:5px 9px;cursor:pointer;}
+          .dp-gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;}
+          .dp-gal .cell{position:relative;border:1px solid var(--color-border);border-radius:10px;overflow:hidden;background:var(--color-surface-2);}
+          .dp-gal .cell img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;}
+          .dp-gal .cell .cap2{display:block;width:100%;border:none;border-top:1px solid var(--color-border);background:var(--color-surface-2);color:var(--color-text);font:inherit;font-size:11px;padding:6px 8px;}
+          .dp-gal .add{display:grid;place-items:center;min-height:110px;border:1.5px dashed var(--color-border-strong);border-radius:10px;cursor:pointer;color:var(--color-text-muted);font-size:12px;font-weight:800;text-align:center;}
+          .dp-gal .add:hover{border-color:var(--color-lime,#b8ff2c);color:var(--color-text);}
+          .sx-photo{margin-top:8px;}
+          .dp-busy{opacity:.55;pointer-events:none;}
         </style>
         <section class="admin-section" data-section="drop">
           <div class="am-head">
@@ -1120,6 +1135,11 @@
             <div class="af"><label for="drop-f-title">Lead headline</label><input type="text" id="drop-f-title" placeholder="The one storyline of the week" autocomplete="off"></div>
             <div class="af"><label for="drop-f-dek">Dek (sub-headline)</label><input type="text" id="drop-f-dek" placeholder="One line that sets up the lead" autocomplete="off"></div>
             <div class="af">
+              <label>Cover photo <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional hero image under the headline. No photo? The article just skips it.</span></label>
+              <div id="drop-cover-wrap"></div>
+              <input type="file" id="drop-cover-file" accept="image/jpeg,image/png,image/webp" style="display:none">
+            </div>
+            <div class="af">
               <label>Lead story <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— use the toolbar for bold, headings, lists, and links · paste keeps formatting</span></label>
               <div class="wv-toolbar" id="drop-lead-tb">
                 <button type="button" class="wv-tb" data-rtcmd="bold" title="Bold"><b>B</b></button>
@@ -1137,6 +1157,12 @@
             <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Around the League <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— a bright spot for every team. One per line: <b>Team Name :: blurb</b> · shows above the storylines</span></h2></div>
             <div class="af">
               <textarea id="drop-f-teams" rows="7" style="width:100%;font-family:inherit;line-height:1.6;" placeholder="Smash Society :: An 11–1 dismantling and both Players of the Week…&#10;Timog Cal :: Lost 11–1, but that one game came against the league's best — frame it."></textarea>
+            </div>
+
+            <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Week in Pictures <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional photo gallery at the foot of the article · add or remove freely, no photos means no gallery</span></h2></div>
+            <div class="af">
+              <div id="drop-gallery-wrap"></div>
+              <input type="file" id="drop-gallery-file" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
             </div>
 
             <div class="ac__h" style="margin-top:8px;"><h2 class="ac__t" style="font-size:12px;">Storylines <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— Claude picks 3–4; edit or reorder freely</span></h2></div>
@@ -5963,7 +5989,50 @@
   // ═══════════════════════════════════════════════════════════
   // THE DROP — weekly editorial composer (wired to admin-drop)
   // ═══════════════════════════════════════════════════════════
-  var DROP = { circuit: 'I', week: null, record: null, stories: [], live: null, wired: false };
+  var DROP = { circuit: 'I', week: null, record: null, stories: [], live: null, wired: false, cover: null, gallery: [] };
+  function dpUrl(id){ return '/.netlify/functions/drop-photo-serve?id='+encodeURIComponent(id); }
+  function dpUpload(file){
+    var fd=new FormData(); fd.append('file',file); fd.append('circuit',DROP.circuit); fd.append('week', DROP.week||$d('drop-f-week').value||'');
+    return fetch('/.netlify/functions/drop-photo-upload',{method:'POST',body:fd,credentials:'include'}).then(function(r){ return r.json(); });
+  }
+  function renderDropCover(){
+    var w=$d('drop-cover-wrap'); if(!w) return;
+    var c=DROP.cover;
+    if(c&&c.id){
+      w.innerHTML='<div class="dp-cover"><img src="'+dpUrl(c.id)+'" alt=""><button type="button" class="dp-photorm" id="drop-cover-rm">Remove</button></div>'
+        +'<input type="text" class="dp-cap" id="drop-cover-cap" placeholder="Caption (optional)" value="'+dEsc(c.caption||'')+'">'
+        +'<input type="text" class="dp-cap" id="drop-cover-credit" placeholder="Photo credit (optional)" value="'+dEsc(c.credit||'')+'">';
+      $d('drop-cover-rm').addEventListener('click',function(){ DROP.cover=null; renderDropCover(); });
+      $d('drop-cover-cap').addEventListener('input',function(e){ if(DROP.cover) DROP.cover.caption=e.target.value; });
+      $d('drop-cover-credit').addEventListener('input',function(e){ if(DROP.cover) DROP.cover.credit=e.target.value; });
+    } else {
+      w.innerHTML='<div class="dp-drop" id="drop-cover-drop">+ Add cover photo<br><span style="font-weight:400;color:var(--color-text-faint);">JPG / PNG / WebP · up to 6MB</span></div>';
+      $d('drop-cover-drop').addEventListener('click',function(){ $d('drop-cover-file').click(); });
+    }
+  }
+  function renderDropGallery(){
+    var w=$d('drop-gallery-wrap'); if(!w) return;
+    var g=DROP.gallery||[];
+    w.innerHTML='<div class="dp-gal">'
+      + g.map(function(im,i){ return '<div class="cell"><img src="'+dpUrl(im.id)+'" alt=""><button type="button" class="dp-photorm" data-grm="'+i+'">✕</button><input type="text" class="cap2" data-gcap="'+i+'" placeholder="Caption" value="'+dEsc(im.caption||'')+'"></div>'; }).join('')
+      + '<div class="add" id="drop-gallery-add">+ Add<br>photos</div></div>';
+    $d('drop-gallery-add').addEventListener('click',function(){ $d('drop-gallery-file').click(); });
+    w.querySelectorAll('[data-grm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.gallery.splice(+b.dataset.grm,1); renderDropGallery(); }); });
+    w.querySelectorAll('[data-gcap]').forEach(function(inp){ inp.addEventListener('input',function(){ DROP.gallery[+inp.dataset.gcap].caption=inp.value; }); });
+  }
+  function renderStoryImg(row,i){
+    var wrap=row.querySelector('.sx-imgwrap'); if(!wrap) return;
+    var im=DROP.stories[i]&&DROP.stories[i].image;
+    if(im&&im.id){
+      wrap.innerHTML='<div class="dp-cover"><img src="'+dpUrl(im.id)+'" alt=""><button type="button" class="dp-photorm" data-srm>Remove</button></div>'
+        +'<input type="text" class="dp-cap" data-scap placeholder="Caption (optional)" value="'+dEsc(im.caption||'')+'">';
+      wrap.querySelector('[data-srm]').addEventListener('click',function(){ DROP.stories[i].image=null; renderStoryImg(row,i); });
+      wrap.querySelector('[data-scap]').addEventListener('input',function(e){ if(DROP.stories[i].image) DROP.stories[i].image.caption=e.target.value; });
+    } else {
+      wrap.innerHTML='<div class="dp-drop" data-sadd>+ Add photo</div>';
+      wrap.querySelector('[data-sadd]').addEventListener('click',function(){ row.querySelector('.sx-imgfile').click(); });
+    }
+  }
   function $d(id){ return document.getElementById(id); }
   function dEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function dTextToHtml(t){
@@ -6027,8 +6096,11 @@
       $d('drop-f-dek').value=(rec&&rec.dek)||'';
       $d('drop-f-lead').innerHTML = (rec&&rec.leadHtml) || '';
       $d('drop-f-teams').value = (rec&&rec.teamReports) ? dFormatTeamReports(rec.teamReports) : '';
-      DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){ return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',bodyHtml:s.html||'',chips:s.chips||[]}; }) : [];
+      DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){ return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',bodyHtml:s.html||'',chips:s.chips||[],image:s.image||null}; }) : [];
+      DROP.cover = (rec&&rec.cover&&rec.cover.id)? {id:rec.cover.id,caption:rec.cover.caption||'',credit:rec.cover.credit||''} : null;
+      DROP.gallery = (rec&&Array.isArray(rec.gallery))? rec.gallery.filter(function(im){return im&&im.id;}).map(function(im){ return {id:im.id,caption:im.caption||''}; }) : [];
       renderStories();
+      renderDropCover(); renderDropGallery();
       // Drafts preview the CURRENT live stats (the snapshot only freezes at publish);
       // a published record shows its frozen snapshot, falling back to live if empty.
       renderPerformers(dPerfToShow(rec, DROP.live));
@@ -6095,6 +6167,8 @@
           +'<div class="wv-edit rt-content sx-body" contenteditable="true" data-placeholder="The storyline… use the toolbar to format.">'+(s.bodyHtml||'')+'</div></div>'
         +'<div class="af" style="margin-top:8px;"><label>Chips <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional stat pills · <b>label: value</b>, comma-separated (e.g. <b>Smash record: 4–0, Meeting: Week 2</b>)</span></label>'
           +'<input type="text" class="sx-chips" value="'+dEsc(dChipsToStr(s.chips))+'" placeholder="label: value, label: value"></div>'
+        +'<div class="af sx-photo"><label>Photo <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional card thumbnail</span></label>'
+          +'<div class="sx-imgwrap"></div><input type="file" class="sx-imgfile" accept="image/jpeg,image/png,image/webp" style="display:none"></div>'
         +'</div>';
     }).join('') || '<div class="empty" style="font-size:12px;">No storylines yet — add one or draft with Claude.</div>';
     box.querySelectorAll('.drop-story').forEach(function(row){
@@ -6104,6 +6178,12 @@
       var ed=row.querySelector('.sx-body');
       dRichWire(row.querySelector('.wv-toolbar'), ed, function(){ DROP.stories[i].bodyHtml=ed.innerHTML; });
       row.querySelector('.sx-chips').addEventListener('input',function(e){ DROP.stories[i].chips=dStrToChips(e.target.value); });
+      renderStoryImg(row,i);
+      row.querySelector('.sx-imgfile').addEventListener('change',function(e){
+        var f=e.target.files[0]; if(!f) return; var wrap=row.querySelector('.sx-imgwrap'); wrap.classList.add('dp-busy');
+        dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.stories[i].image={id:d.id,caption:(DROP.stories[i].image&&DROP.stories[i].image.caption)||''}; renderStoryImg(row,i); } else alert((d&&d.error)||'Upload failed'); })
+          .catch(function(){ alert('Upload failed'); }).finally(function(){ wrap.classList.remove('dp-busy'); e.target.value=''; });
+      });
     });
     box.querySelectorAll('[data-rm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.stories.splice(+b.dataset.rm,1); renderStories(); }); });
   }
@@ -6153,8 +6233,10 @@
       title: $d('drop-f-title').value.trim(),
       dek: $d('drop-f-dek').value.trim(),
       leadHtml: $d('drop-f-lead').innerHTML,
+      cover: DROP.cover && DROP.cover.id ? DROP.cover : null,
       teamReports: dParseTeamReports($d('drop-f-teams').value),
-      storylines: DROP.stories.map(function(s){ return { tag:s.tag, tagKind:s.tagKind||'note', title:s.title, html:s.bodyHtml||'', chips:s.chips||[] }; })
+      gallery: (DROP.gallery||[]).filter(function(im){ return im && im.id; }),
+      storylines: DROP.stories.map(function(s){ return { tag:s.tag, tagKind:s.tagKind||'note', title:s.title, html:s.bodyHtml||'', chips:s.chips||[], image:(s.image&&s.image.id)?s.image:null }; })
     };
   }
   function dropStatus(msg,ok){ var el=$d('drop-pub-status'); if(!el) return; el.style.display=''; el.textContent=msg; el.className='a-status '+(ok===false?'is-err':'is-ok'); }
@@ -6184,13 +6266,13 @@
   }
   function newDropWeek(){
     var w=prompt('Week number for the new Drop?'); if(!w) return; w=parseInt(w,10); if(!w) return;
-    DROP.week=w; DROP.record=null; DROP.stories=[];
+    DROP.week=w; DROP.record=null; DROP.stories=[]; DROP.cover=null; DROP.gallery=[];
     $d('drop-editor').style.display='';
     $d('drop-ed-week').textContent='Week '+w; var stEl=$d('drop-ed-status'); stEl.textContent='new'; stEl.className='drop-chip draft';
     $d('drop-ed-saved').textContent='Unsaved';
     $d('drop-f-week').value=w; $d('drop-f-kicker').value='The Drop · Week '+w; $d('drop-f-byline').value='By The Society Desk';
     $d('drop-f-title').value=''; $d('drop-f-dek').value=''; $d('drop-f-lead').innerHTML=''; $d('drop-f-teams').value='';
-    renderStories(); renderPerformers(null);
+    renderStories(); renderPerformers(null); renderDropCover(); renderDropGallery();
     $d('drop-publish-btn').textContent='Approve & Publish';
   }
   function wireDrop(){
@@ -6200,6 +6282,16 @@
     var nw=$d('drop-new-btn'); if(nw) nw.addEventListener('click',newDropWeek);
     var as=$d('drop-addstory-btn'); if(as) as.addEventListener('click',function(){ DROP.stories.push({tag:'',tagKind:'note',title:'',bodyHtml:'',chips:[]}); renderStories(); });
     dRichWire($d('drop-lead-tb'), $d('drop-f-lead'), null);
+    var cf=$d('drop-cover-file'); if(cf) cf.addEventListener('change',function(e){
+      var f=e.target.files[0]; if(!f) return; var w=$d('drop-cover-wrap'); if(w) w.classList.add('dp-busy');
+      dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.cover={id:d.id,caption:(DROP.cover&&DROP.cover.caption)||'',credit:(DROP.cover&&DROP.cover.credit)||''}; renderDropCover(); } else alert((d&&d.error)||'Upload failed'); })
+        .catch(function(){ alert('Upload failed'); }).finally(function(){ if(w) w.classList.remove('dp-busy'); e.target.value=''; });
+    });
+    var gf=$d('drop-gallery-file'); if(gf) gf.addEventListener('change',function(e){
+      var files=Array.prototype.slice.call(e.target.files||[]); if(!files.length) return; var w=$d('drop-gallery-wrap'); if(w) w.classList.add('dp-busy');
+      files.reduce(function(chain,f){ return chain.then(function(){ return dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.gallery.push({id:d.id,caption:''}); } else console.error('gallery upload:',d&&d.error); }); }); }, Promise.resolve())
+        .then(function(){ renderDropGallery(); }).catch(function(){ alert('Some uploads failed'); }).finally(function(){ if(w) w.classList.remove('dp-busy'); e.target.value=''; });
+    });
     var sv=$d('drop-save-btn'); if(sv) sv.addEventListener('click',saveDrop);
     var pb=$d('drop-publish-btn'); if(pb) pb.addEventListener('click',publishDropWeek);
     var pv=$d('drop-preview-btn'); if(pv) pv.addEventListener('click',function(){ if(DROP.week) window.open('/drop.html?week='+DROP.week+'&preview=1','_blank'); });

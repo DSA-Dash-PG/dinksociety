@@ -41,6 +41,28 @@ function cleanHtml(html) {
   return messageLooksHtml(html) ? sanitizeMessageHtml(html) : sanitizeMessageHtml(`<p>${html}</p>`);
 }
 
+// Normalize a photo reference. Photos live in the 'drop-photos' blob store,
+// keyed by an immutable id; the record only stores the id plus an optional
+// caption/credit. Returns null for anything without a valid id, so every photo
+// slot degrades cleanly to "no image" (the article renders text-only).
+const VALID_IMG_ID = /^[a-zA-Z0-9_-]{1,80}$/;
+function normImage(x) {
+  if (!x || typeof x !== 'object') return null;
+  const id = String(x.id || x.imageId || '').trim();
+  if (!id || !VALID_IMG_ID.test(id)) return null;
+  return {
+    id,
+    caption: x.caption ? String(x.caption).slice(0, 240) : null,
+    credit: x.credit ? String(x.credit).slice(0, 120) : null,
+  };
+}
+
+// A "Week in Pictures" gallery: an ordered list of photos (each id + caption).
+function normGallery(input) {
+  if (!Array.isArray(input)) return [];
+  return input.slice(0, 24).map(normImage).filter(Boolean);
+}
+
 // Normalize a storyline into the shape the article page + composer expect.
 function normStoryline(s = {}) {
   const tagKind = ['title', 'upset', 'streak', 'riser', 'note'].includes(s.tagKind) ? s.tagKind : 'note';
@@ -53,6 +75,7 @@ function normStoryline(s = {}) {
     title: String(s.title || '').slice(0, 200),
     html: cleanHtml(s.html),
     chips,
+    image: normImage(s.image), // optional card thumbnail
   };
 }
 
@@ -80,8 +103,10 @@ function normEditorial(input = {}) {
     byline: String(input.byline || 'By The Society Desk').slice(0, 120),
     readMins: Number.isFinite(+input.readMins) ? Math.max(1, Math.min(20, Math.round(+input.readMins))) : estimateReadMins(leadHtml, storylines),
     leadHtml,
+    cover: normImage(input.cover),      // optional hero photo under the headline
     teamReports: normTeamReports(input.teamReports),
     storylines,
+    gallery: normGallery(input.gallery), // optional "Week in Pictures" grid
   };
 }
 
@@ -240,8 +265,10 @@ export function toPublic(rec) {
     byline: rec.byline,
     readMins: rec.readMins,
     leadHtml: rec.leadHtml,
+    cover: rec.cover || null,
     teamReports: rec.teamReports || [],
     storylines: rec.storylines || [],
+    gallery: rec.gallery || [],
     performers: rec.performers || null,
     publishedAt: rec.publishedAt || null,
   };
