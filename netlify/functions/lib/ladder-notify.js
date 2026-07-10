@@ -75,6 +75,32 @@ export function venmoPayLink(ev) {
   };
 }
 
+/**
+ * Everything needed to let a player (or organizer) recruit a backfill for an open
+ * ladder spot: the public registration link plus prewritten share text and native
+ * share deep links (SMS / WhatsApp / email). One source of truth for the cancel
+ * success page, the organizer drop email, and the portal cancel response.
+ *
+ * `ref` is a harmless tag on the register URL (ignored by pages that don't read it)
+ * so a backfill arriving via a shared link can be attributed later.
+ */
+export function fillSpotShare(ev, { ref = 'fill' } = {}) {
+  const url = `${siteUrl()}/ladders.html?event=${encodeURIComponent(ev.id)}${ref ? `&ref=${encodeURIComponent(ref)}` : ''}`;
+  const when = dateLineOf(ev);
+  const text = `A spot just opened for ${ev?.name || 'a Dink Society ladder'}${when ? ` (${when})` : ''} — pickleball ladder night. Grab it here:`;
+  const full = `${text} ${url}`;
+  const subject = `Open spot: ${ev?.name || 'Dink Society ladder'}`;
+  return {
+    url,
+    text,
+    full,
+    subject,
+    smsUrl: `sms:?&body=${encodeURIComponent(full)}`,
+    waUrl: `https://wa.me/?text=${encodeURIComponent(full)}`,
+    mailUrl: `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(full)}`,
+  };
+}
+
 /** Tiny standalone HTML page returned by the one-tap link endpoints. */
 export function resultPage(title, message, accent = '#b8ff2c') {
   return new Response(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title>

@@ -20,7 +20,7 @@ import {
 import { earn, spend } from './lib/credits.js';
 import { createLadderToken } from './lib/ladder-token.js';
 import {
-  claimUrl, venmoConfirmUrl, venmoDeclineUrl, dateLineOf, organizerEmails, fmtCents, siteUrl,
+  claimUrl, venmoConfirmUrl, venmoDeclineUrl, dateLineOf, organizerEmails, fmtCents, siteUrl, fillSpotShare,
 } from './lib/ladder-notify.js';
 import {
   sendEmail, renderVenmoClaimToAdmin, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen,
@@ -85,7 +85,10 @@ export default async (req) => {
     if (next && next.fcfs) { await notifyFcfs(event, signups); opened = 'fcfs'; }
     else if (next) { await notifyPromoted(event, next); opened = next.name; }
 
-    return json({ ok: true, creditedCents: credited, opened });
+    // Spot genuinely open (no waitlister on a held claim)? Hand back a ready-to-share
+    // recruit link so the portal can offer "help fill your spot" right after cancel.
+    const share = (opened == null || opened === 'fcfs') ? fillSpotShare(event) : null;
+    return json({ ok: true, creditedCents: credited, opened, shareUrl: share?.url || null, shareText: share?.full || null });
   }
 
   // ── sign up ──
