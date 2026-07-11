@@ -536,9 +536,13 @@
     }
 
     function courtMeta(m, idx) {
-      if (m.courtSet && COURT_SET_META[m.courtSet]) return COURT_SET_META[m.courtSet];
-      const label = (m.courtA && m.courtB) ? `Courts ${m.courtA} & ${m.courtB}` : (m.court || `Court ${idx + 1}`);
-      return { label, color: FALLBACK_COLORS[idx % FALLBACK_COLORS.length] };
+      // Actual courts on the match always win; courtSet only supplies the
+      // color (and a fallback label for legacy matches without courts).
+      const setMeta = (m.courtSet && COURT_SET_META[m.courtSet]) || null;
+      const label = (m.courtA && m.courtB) ? `Courts ${m.courtA} & ${m.courtB}`
+        : (m.court || (setMeta && setMeta.label) || `Court ${idx + 1}`);
+      const color = setMeta ? setMeta.color : FALLBACK_COLORS[idx % FALLBACK_COLORS.length];
+      return { label, color };
     }
 
     /* ── Render matches for one week ─────────────────────────────── */

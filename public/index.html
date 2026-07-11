@@ -725,9 +725,12 @@
       return '<span class="dwc__logo dwc__logo--mono">'+esc(ini)+'</span>';
     }
     function courtMeta(m, idx){
-      if (m.courtSet && COURT_SET_META[m.courtSet]) return COURT_SET_META[m.courtSet];
-      var label = (m.courtA && m.courtB) ? ('Courts '+m.courtA+' & '+m.courtB) : (m.court ? ('Court '+m.court) : ('Court '+(idx+1)));
-      return { label: label, color: '#4a7c9e' };
+      // Actual courts on the match always win; courtSet only supplies the
+      // color (and a fallback label for legacy matches without courts).
+      var setMeta = (m.courtSet && COURT_SET_META[m.courtSet]) || null;
+      var label = (m.courtA && m.courtB) ? ('Courts '+m.courtA+' & '+m.courtB)
+        : (m.court || (setMeta && setMeta.label) || ('Court '+(idx+1)));
+      return { label: label, color: setMeta ? setMeta.color : '#4a7c9e' };
     }
     function startLabel(m){
       if (m && m.scheduledAt){ var d = new Date(m.scheduledAt); if (!isNaN(d)) return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
