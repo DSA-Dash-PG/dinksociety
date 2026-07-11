@@ -256,7 +256,7 @@ export default async (req) => {
       schedule.push({
         matchId: mt.id, week: w,
         opponent: { id: opp?.id || null, name: opp?.name || 'TBD', emoji: teamEmoji.get(opp?.id) || null },
-        home, court: mt.court || null, venue: mt.venue || null, scheduledAt: mt.scheduledAt || null, startTime: mt.startTime || null,
+        home, court: mt.court || null, venue: mt.venue || null, scheduledAt: mt.scheduledAt || null, startTime: mt.startTime || null, endTime: mt.endTime || null,
         championship: !!mt.championship,
         final, myMp, oppMp, result,
         myLocked, revealed, myGames, lineup, scores, availability,

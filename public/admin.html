@@ -1432,6 +1432,18 @@
           </div>
 
           <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Venues</h2><span class="ac__s">Feeds the venue dropdown on the Schedule tab</span></div>
+            <div id="venues-editors"></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:10px;flex-wrap:wrap;">
+              <button class="ab ab--outline ab--sm" id="venue-add-btn">＋ Add venue</button>
+              <div style="display:flex;align-items:center;gap:12px;flex:1;justify-content:flex-end;">
+                <div class="a-status" id="venues-status" style="margin:0;"></div>
+                <button class="ab ab--lime ab--sm" id="save-venues-btn">Save venues</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Liability waivers</h2><span class="ac__s">Players sign each on login · re-signs each season</span></div>
             <div id="waivers-editors"></div>
             <div class="a-status" id="waiver-status" style="margin:4px 0 0;"></div>
@@ -1773,6 +1785,7 @@
       $id('settings-saved-at').textContent = 'Saved ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
     }
     applyWaiverSettings();
+    renderVenueEditors();
   }
 
   async function saveSettings() {
@@ -1805,6 +1818,61 @@
     setTimeout(() => { status.style.display = 'none'; }, 4000);
   }
   $id('save-settings-btn').addEventListener('click', saveSettings);
+
+  // ─── Venues ───────────────────────────────────────────────
+  // League venues live in settings (SETTINGS.venues). Each has a name,
+  // optional address, and a free-text court list ("1–8" or "3A, 5D, 5E").
+  // The Schedule tab's venue dropdowns read from this list.
+  function venueRowHTML(v) {
+    return '<div class="arow venue-row" data-vid="' + h(v.id || '') + '" style="grid-template-columns:1fr 1.4fr 1fr 34px;align-items:flex-end;margin-bottom:10px;">' +
+      '<div class="af"><label>Venue name</label><input type="text" class="venue-name" value="' + h(v.name || '') + '" placeholder="Dink House"></div>' +
+      '<div class="af"><label>Address</label><input type="text" class="venue-address" value="' + h(v.address || '') + '" placeholder="123 Paddle Way, San Diego"></div>' +
+      '<div class="af"><label>Courts</label><input type="text" class="venue-courts" value="' + h(v.courts || '') + '" placeholder="1, 2, 3A, 5D"></div>' +
+      '<button class="ab ab--outline ab--sm venue-del" title="Remove venue" style="margin-bottom:2px;">✕</button>' +
+    '</div>';
+  }
+  function renderVenueEditors() {
+    const wrap = $id('venues-editors');
+    if (!wrap) return;
+    const venues = SETTINGS.venues || [];
+    wrap.innerHTML = venues.length
+      ? venues.map(venueRowHTML).join('')
+      : '<div class="empty" style="padding:14px;font-size:12px;">No venues yet — add one below. Courts you list here become suggestions when scheduling.</div>';
+    wrap.querySelectorAll('.venue-del').forEach(b => b.addEventListener('click', () => {
+      b.closest('.venue-row').remove();
+    }));
+  }
+  $id('venue-add-btn')?.addEventListener('click', () => {
+    const wrap = $id('venues-editors');
+    const empty = wrap.querySelector('.empty'); if (empty) empty.remove();
+    wrap.insertAdjacentHTML('beforeend', venueRowHTML({ id: '' }));
+    const row = wrap.lastElementChild;
+    row.querySelector('.venue-del').addEventListener('click', () => row.remove());
+    row.querySelector('.venue-name').focus();
+  });
+  $id('save-venues-btn')?.addEventListener('click', async () => {
+    const btn = $id('save-venues-btn'), status = $id('venues-status');
+    const venues = [...$id('venues-editors').querySelectorAll('.venue-row')].map(r => ({
+      id: r.dataset.vid || undefined,
+      name: r.querySelector('.venue-name').value.trim(),
+      address: r.querySelector('.venue-address').value.trim(),
+      courts: r.querySelector('.venue-courts').value.trim(),
+    })).filter(v => v.name);
+    btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-settings', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ venues }),
+      });
+      SETTINGS = { ...SETTINGS, ...data };
+      renderVenueEditors();
+      status.className = 'a-status is-ok'; status.textContent = 'Venues saved ✓'; status.style.display = 'block';
+    } catch (e) {
+      status.className = 'a-status is-err'; status.textContent = e.message || 'Failed to save'; status.style.display = 'block';
+    }
+    btn.disabled = false; btn.textContent = 'Save venues';
+    setTimeout(() => { status.style.display = 'none'; }, 4000);
+  });
 
   // ─── Liability waivers (multi) ────────────────────────────
   function waiverList() { return Array.isArray(SETTINGS.waivers) ? SETTINGS.waivers : []; }
@@ -4917,9 +4985,9 @@
       + fld('Home team', '<select id="am-home" style="width:100%;"><option value="">— pick —</option>' + teamOpts + '</select>')
       + fld('Away team', '<select id="am-away" style="width:100%;"><option value="">— pick —</option>' + teamOpts + '</select>')
       + '<div class="af"><label>Courts (two courts per match)</label><div style="display:flex;align-items:center;gap:8px;">'
-        + '<input type="number" id="am-ca" min="1" max="20" placeholder="Court A" style="flex:1;min-width:0;">'
+        + '<input type="text" id="am-ca" maxlength="8" placeholder="Court A (e.g. 3A)" style="flex:1;min-width:0;">'
         + '<span style="color:var(--color-text-faint);font-weight:700;">&amp;</span>'
-        + '<input type="number" id="am-cb" min="1" max="20" placeholder="Court B" style="flex:1;min-width:0;"></div></div>'
+        + '<input type="text" id="am-cb" maxlength="8" placeholder="Court B (e.g. 5D)" style="flex:1;min-width:0;"></div></div>'
       + fld('Date / time', '<input type="datetime-local" id="am-dt" style="width:100%;">')
       + fldFull('', '<button class="ab ab--lime ab--sm" id="am-add-btn">Add match</button>')
       + '</div><div id="am-status" style="font-size:11px;margin-top:8px;"></div></div>';
@@ -5215,7 +5283,8 @@
     let when;
     if (dObj) {
       const ds = dObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-      const ts = dObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const et = ((wk.matches || []).find(m => m.endTime) || {}).endTime;
+      const ts = dObj.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + (et ? '–' + et : '');
       when = '<b>' + h(ds) + '</b> · ' + h(ts) + ' · ' + nMatch;
     } else {
       when = 'No date set · ' + nMatch;
@@ -5289,7 +5358,7 @@
       '<select class="we-sel we-home">' + weTeamOpts(teams, m && m.teamA ? m.teamA.id : '') + '</select>' +
       '<div class="we-vs">VS</div>' +
       '<select class="we-sel we-away">' + weTeamOpts(teams, m && m.teamB ? m.teamB.id : '') + '</select>' +
-      '<div class="we-courts"><input type="number" min="1" max="20" class="we-ca" value="' + ca + '" placeholder="A"><span class="amp">&amp;</span><input type="number" min="1" max="20" class="we-cb" value="' + cb + '" placeholder="B"></div>' +
+      '<div class="we-courts"><input type="text" maxlength="8" class="we-ca" value="' + ca + '" placeholder="3A"><span class="amp">&amp;</span><input type="text" maxlength="8" class="we-cb" value="' + cb + '" placeholder="5D"></div>' +
       '<button class="we-del" title="Remove match">✕</button>' +
       '<div class="we-dupe" style="grid-column:1/-1;font-size:11px;color:#ef4444;display:none;">A team can’t play itself — pick a different away team.</div></div>';
   }
@@ -5303,6 +5372,10 @@
     const venues = spVenueList(weeks);
     const timeOpts = SP_TIMES.map(t => '<option' + (t === timeVal ? ' selected' : '') + '>' + t + '</option>').join('') +
       (SP_TIMES.includes(timeVal) ? '' : '<option selected>' + h(timeVal) + '</option>');
+    const endVal = ((wk.matches || []).find(m => m.endTime) || {}).endTime || '';
+    const endOpts = '<option value="">— none —</option>' +
+      SP_END_TIMES.map(t => '<option' + (t === endVal ? ' selected' : '') + '>' + t + '</option>').join('') +
+      (endVal && !SP_END_TIMES.includes(endVal) ? '<option selected>' + h(endVal) + '</option>' : '');
     const venueOpts = '<option value="">— none —</option>' +
       venues.map(v => '<option' + (v === venueVal ? ' selected' : '') + '>' + h(v) + '</option>').join('') +
       (venueVal && !venues.includes(venueVal) ? '<option selected>' + h(venueVal) + '</option>' : '');
@@ -5317,6 +5390,7 @@
       '<div class="we-defaults">' +
         '<div class="we-fld"><label>Week date</label><input type="date" id="we-date" value="' + h(dateVal) + '"></div>' +
         '<div class="we-fld"><label>Start time</label><select id="we-time">' + timeOpts + '</select></div>' +
+        '<div class="we-fld"><label>End time</label><select id="we-end">' + endOpts + '</select></div>' +
         '<div class="we-fld"><label>Venue</label><select id="we-venue">' + venueOpts + '</select></div>' +
         '<div class="we-hint">All matches in a week start at the same time. Courts are set per match below.</div>' +
       '</div>' +
@@ -5361,7 +5435,12 @@
 
     const dateStr = (card.querySelector('#we-date').value || '').trim();
     const timeStr = card.querySelector('#we-time').value;
+    const endStr = (card.querySelector('#we-end').value || '').trim() || null;
     const venue = (card.querySelector('#we-venue').value || '').trim() || null;
+    if (endStr) {
+      const st = parseTime12(timeStr), et = parseTime12(endStr);
+      if (st && et && (et.h * 60 + et.m) <= (st.h * 60 + st.m)) return setErr('End time must be after the start time.');
+    }
     let scheduledAt = null;
     if (dateStr) {
       const p = dateStr.split('-').map(Number);
@@ -5377,7 +5456,7 @@
       const ca = (r.querySelector('.we-ca').value || '').trim(), cb = (r.querySelector('.we-cb').value || '').trim();
       if (!home || !away) return setErr('Every match needs a home and away team.');
       if (home === away) return setErr('A team can’t play itself — check the highlighted row.');
-      if ((ca && !cb) || (!ca && cb)) return setErr('Enter both court numbers, or leave both blank.');
+      if ((ca && !cb) || (!ca && cb)) return setErr('Enter both courts, or leave both blank.');
       if (!teamById(home) || !teamById(away)) return setErr('Unknown team — reload and try again.');
       desired.push({ mid: r.dataset.mid || null, home, away, ca, cb });
     }
@@ -5409,7 +5488,7 @@
       }
       for (const d of desired) {
         const A = teamById(d.home), B = teamById(d.away);
-        const body = { teamA: { id: A.id, name: A.name }, teamB: { id: B.id, name: B.name }, venue };
+        const body = { teamA: { id: A.id, name: A.name }, teamB: { id: B.id, name: B.name }, venue, endTime: endStr };
         if (d.ca && d.cb) { body.courtA = d.ca; body.courtB = d.cb; body.court = courtStr(d.ca, d.cb); }
         else { body.courtA = null; body.courtB = null; body.court = null; }
         if (scheduledAt) { body.scheduledAt = scheduledAt; body.startTime = startTime; }
@@ -5502,6 +5581,7 @@
   // scheduledAt, which is exactly the conflict this replaces.
   // ════════════════════════════════════════════════════════════
   const SP_TIMES = ['6:00 PM', '6:30 PM', '7:00 PM', '7:30 PM', '8:00 PM'];
+  const SP_END_TIMES = ['8:00 PM', '8:30 PM', '9:00 PM', '9:30 PM', '10:00 PM'];
   let sp = null; // open-popover state
 
   function teamEditOptions(selId) {
@@ -5515,7 +5595,7 @@
     const d = new Date(m.scheduledAt);
     if (isNaN(d)) return 'Set date & time';
     const ds = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-    const ts = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    const ts = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + (m.endTime ? '–' + m.endTime : '');
     const loc = [m.venue, m.court].filter(Boolean).join(' · ');
     return h(ds + ' · ' + ts + (loc ? ' · ' + loc : '')) + ' <span style="opacity:0.6">✎</span>';
   }
@@ -5545,7 +5625,9 @@
   }
 
   function spVenueList(weeks) {
-    const set = new Set();
+    // League venues (Settings → Venues) first, then any venue already used
+    // on a match (covers legacy names not in the managed list).
+    const set = new Set((SETTINGS?.venues || []).map(v => v.name).filter(Boolean));
     for (const w of weeks) for (const m of (w.matches || [])) if (m.venue) set.add(m.venue);
     return [...set];
   }
@@ -5646,9 +5728,9 @@
           '<div class="spop__lbl">Venue</div><div class="spop__chips">' + venueChips + '</div>' +
           '<div class="spop__lbl">Courts <span style="letter-spacing:0;font-weight:400;text-transform:none;">(A: games 1·3·5 / B: 2·4·6)</span></div>' +
           '<div style="display:flex;gap:6px;align-items:center;">' +
-            '<input type="number" min="1" max="20" class="spop__ct" id="spop-ca" value="' + h(sp.courtA) + '">' +
+            '<input type="text" maxlength="8" placeholder="3A" class="spop__ct" id="spop-ca" value="' + h(sp.courtA) + '">' +
             '<span style="font-size:11px;color:var(--color-text-faint);">&amp;</span>' +
-            '<input type="number" min="1" max="20" class="spop__ct" id="spop-cb" value="' + h(sp.courtB) + '">' +
+            '<input type="text" maxlength="8" placeholder="5D" class="spop__ct" id="spop-cb" value="' + h(sp.courtB) + '">' +
           '</div>' +
         '</div>' +
       '</div>' +

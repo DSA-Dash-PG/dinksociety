@@ -17,6 +17,10 @@ const DEFAULTS = {
   matchTime:      '7:00–9:00 PM',
   depositAmount:  100,
   balanceDueDate: '2026-06-01',
+  // Venues the league plays at. Each: { id, name, address, courts } where
+  // courts is a free-text list of court labels (e.g. "1–8" or "3A, 5D, 5E").
+  // Feeds the venue dropdowns on the Schedule tab.
+  venues:         [],
   // Planned game-night date per week (league-wide), keyed by week number →
   // ISO datetime. Lets admins publish a week's date before matchups exist;
   // matches inherit it and the public schedule shows it. e.g. { "6": "2026-07-27T19:00:00.000Z" }
@@ -57,6 +61,7 @@ export default async (req) => {
         if (!s.waivers.some(w => w.id === seed.id)) s.waivers.push({ ...seed });
       }
       if (!s.emailTemplate) s.emailTemplate = { ...DEFAULTS.emailTemplate };
+      if (!Array.isArray(s.venues)) s.venues = [];
       return json(s);
     } catch (e) {
       console.error('settings GET error:', e);
@@ -102,6 +107,19 @@ export default async (req) => {
         });
       }
 
+      // Venues: sanitize to { id, name, address, courts } strings.
+      let venues = Array.isArray(prev.venues) ? prev.venues : [];
+      if (Array.isArray(body.venues)) {
+        venues = body.venues
+          .map(v => ({
+            id: String(v.id || ('v_' + Math.random().toString(36).slice(2, 8))),
+            name: String(v.name ?? '').trim(),
+            address: String(v.address ?? '').trim(),
+            courts: String(v.courts ?? '').trim(),
+          }))
+          .filter(v => v.name);
+      }
+
       const updated = {
         ...prev,
         circuitName:  body.circuitName  ?? prev.circuitName,
@@ -116,6 +134,7 @@ export default async (req) => {
         depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
         balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
         weekDates:      body.weekDates      ?? prev.weekDates      ?? {},
+        venues,
         emailTemplate:  body.emailTemplate
           ? { ...(prev.emailTemplate || DEFAULTS.emailTemplate), ...body.emailTemplate }
           : (prev.emailTemplate ?? DEFAULTS.emailTemplate),

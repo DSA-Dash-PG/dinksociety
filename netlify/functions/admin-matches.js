@@ -109,6 +109,8 @@ export default async (req) => {
       court: (courtA && courtB) ? `Courts ${courtA} & ${courtB}` : null,
       scheduledAt: body.scheduledAt || null,
       startTime: body.startTime || null,   // optional per-match override; blank = season default
+      endTime: body.endTime || null,       // optional; display-only
+      venue: body.venue || null,
       scoreA: null, scoreB: null, playedAt: null,
     };
     data.matches = [...(data.matches || []), match];
@@ -125,7 +127,7 @@ export default async (req) => {
 
     let body;
     try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
-    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'venue', 'notes', 'teamA', 'teamB'];
+    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'endTime', 'venue', 'notes', 'teamA', 'teamB'];
     const updates = {};
     for (const f of allowedFields) {
       if (f in body) updates[f] = body[f];
