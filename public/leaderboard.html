@@ -183,6 +183,10 @@
     .team-player__pct--low { background:var(--color-surface-3); color:var(--color-text-muted); }
 
     /* ── HOT STREAKS ──────────────────────────────────────────────── */
+    .ladder-chip { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:var(--radius-full); font-size:9px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; vertical-align:1px; }
+    .ladder-chip--team { background:var(--color-lime-dim); color:var(--color-lime); }
+    .ladder-chip--fa { background:var(--color-teal-dim); color:var(--color-teal); }
+    .ladder-cta-btn { display:inline-block; margin-top:14px; padding:10px 18px; border-radius:var(--radius-full); background:var(--color-teal); color:#06231d; font-size:12px; font-weight:800; text-decoration:none; }
     .streak-table { width:100%; border-collapse:collapse; font-size:12px; }
     .streak-table th { text-align:left; padding:8px; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; border-bottom:1px solid var(--color-border-strong); }
     .streak-table td { padding:10px 8px; border-bottom:1px solid var(--color-border); vertical-align:middle; }
@@ -244,6 +248,7 @@
       <button class="lb-tab is-active" data-top="rankings">🏆 Rankings</button>
       <button class="lb-tab" data-top="awards">🏅 Awards</button>
       <button class="lb-tab" data-top="nvz">📈 The NVZ</button>
+      <button class="lb-tab" data-top="ladder">🪜 Ladder</button>
     </nav>
 
     <!-- Rankings sub-toggle: Players vs Team Leaders -->
@@ -282,6 +287,11 @@
       <iframe id="nvz-frame" title="The NVZ — deep stats" loading="lazy" scrolling="no"></iframe>
     </section>
 
+    <!-- LADDER (open-play rankings) -->
+    <section class="lb-section" data-section="ladder">
+      <div id="ladder-content"><div class="empty-state">Loading…</div></div>
+    </section>
+
   </main>
 
   <div data-partial="footer"></div>
@@ -300,9 +310,9 @@
     playerStats:null, standings:null, potw:null
   };
   // Which top tab owns each content section.
-  const SECTION_TOP = { rankings:'rankings', leaders:'rankings', topchefs:'awards', streaks:'awards', nvz:'nvz' };
-  const TOP_DEFAULT = { rankings:'rankings', awards:'topchefs', nvz:'nvz' };
-  const KNOWN_SECTIONS = ['rankings','leaders','topchefs','streaks','nvz'];
+  const SECTION_TOP = { rankings:'rankings', leaders:'rankings', topchefs:'awards', streaks:'awards', nvz:'nvz', ladder:'ladder' };
+  const TOP_DEFAULT = { rankings:'rankings', awards:'topchefs', nvz:'nvz', ladder:'ladder' };
+  const KNOWN_SECTIONS = ['rankings','leaders','topchefs','streaks','nvz','ladder'];
   const LB_GENDER_COLOR = { M:'#6aa8ff', F:'#ff8fb3' };
   const lbGenderOf = p => /^f/i.test(p.gender||'') ? 'F' : /^m/i.test(p.gender||'') ? 'M' : null;
 
@@ -915,6 +925,64 @@
     </div>`;
   }
 
+  // ── LADDER (open-play rankings from public-ladder-stats) ─────────
+  // Ranked by the ladder rule: wins → point diff → Dink Rating. League
+  // players get their team chip (matched by name); everyone else shows
+  // as Free Agent — which doubles as a recruiting signal.
+  async function loadLadderTab() {
+    const el = $('ladder-content'); if (!el) return;
+    if (state.ladder) { renderLadder(); return; }
+    try {
+      const [r] = await Promise.all([
+        fetch('/.netlify/functions/public-ladder-stats'),
+        state.playerStats ? Promise.resolve() : loadPlayerStats(),
+      ]);
+      state.ladder = r.ok ? await r.json() : { hasData:false };
+    } catch { state.ladder = { hasData:false }; }
+    renderLadder();
+  }
+  function renderLadder() {
+    const el = $('ladder-content'); if (!el) return;
+    const rows = state.ladder?.leaderboard || [];
+    if (!rows.length) {
+      el.innerHTML = '<div class="lb-card" style="padding:28px;text-align:center;">' +
+        '<div style="font-size:28px;margin-bottom:6px;">🪜</div>' +
+        '<div style="font-weight:800;margin-bottom:4px;">No ladder results yet</div>' +
+        '<div style="font-size:12px;color:var(--color-text-muted);">Rankings appear after the first ladder night is scored.</div>' +
+        '<a class="ladder-cta-btn" href="/ladders.html">See upcoming ladder nights →</a></div>';
+      return;
+    }
+    // name → team chip map from league player stats (loaded alongside).
+    const teamByName = {};
+    playerList().forEach(p => { if (p.name) teamByName[p.name.trim().toLowerCase()] = p.teamName || ''; });
+    const rankColor = i => i === 0 ? 'var(--color-gold)' : 'var(--color-text-faint)';
+    const body = rows.map((r, i) => {
+      const team = teamByName[String(r.name || '').trim().toLowerCase()] || '';
+      const chip = team
+        ? '<span class="ladder-chip ladder-chip--team">' + esc(team) + '</span>'
+        : '<span class="ladder-chip ladder-chip--fa">Free agent</span>';
+      return '<tr>' +
+        '<td style="width:30px;font-weight:800;color:' + rankColor(i) + ';">' + (i + 1) + '</td>' +
+        '<td><b>' + esc(r.name || '') + '</b>' + chip + '</td>' +
+        '<td class="r">' + r.w + '–' + r.l + '</td>' +
+        '<td class="r col-opt">' + (r.diff > 0 ? '+' : '') + r.diff + '</td>' +
+        '<td class="r" style="color:var(--color-teal);font-weight:800;">' + (r.xp ?? 0) + '</td>' +
+        '<td class="r col-opt">' + (r.dr != null ? r.dr : '—') + '</td>' +
+        '<td class="r col-opt">' + (r.nights ?? '—') + '</td>' +
+      '</tr>';
+    }).join('');
+    el.innerHTML = '<div class="lb-card" style="padding:0;">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-bottom:1px solid var(--color-border);flex-wrap:wrap;gap:8px;">' +
+        '<span style="font-size:11px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-text-muted);">Ladder season · open play</span>' +
+        '<a href="/ladders.html" style="font-size:11px;font-weight:800;color:var(--color-teal);text-decoration:none;">JOIN THE NEXT LADDER →</a>' +
+      '</div>' +
+      '<div style="overflow-x:auto;"><table class="rank-table">' +
+        '<thead><tr><th>#</th><th>Player</th><th class="r">W–L</th><th class="r col-opt">Diff</th><th class="r">XP</th><th class="r col-opt">DR</th><th class="r col-opt">Nights</th></tr></thead>' +
+        '<tbody>' + body + '</tbody>' +
+      '</table></div></div>' +
+      '<p style="font-size:11px;color:var(--color-text-faint);margin-top:10px;">Ranked by wins, then point differential, then Dink Rating. Ladder nights are open to everyone — no team required.</p>';
+  }
+
   // ── ANALYTICS ────────────────────────────────────────────────────
   // ── The NVZ iframe (lazy, auto-sized via postMessage) ────────────
   function loadNvzFrame() {
@@ -943,13 +1011,14 @@
   function activate(section, skipWrite) {
     state.section = section;
     const top = SECTION_TOP[section] || 'rankings';
-    if (top !== 'nvz') state.lastSub[top] = section;
+    if (top !== 'nvz' && top !== 'ladder') state.lastSub[top] = section;
     document.querySelectorAll('.lb-tab').forEach(b => b.classList.toggle('is-active', b.dataset.top === top));
     document.querySelectorAll('.lb-subseg').forEach(s => s.classList.toggle('is-active', s.dataset.subfor === top));
     document.querySelectorAll('.lb-sub').forEach(b => b.classList.toggle('is-active', b.dataset.section === section));
     document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === section));
     if (!skipWrite) writeUrl();
     if (section === 'nvz') { loadNvzFrame(); return; }
+    if (section === 'ladder') { loadLadderTab(); return; }
     ensureDataThenRender();
   }
 
@@ -975,7 +1044,7 @@
   // ── Boot ─────────────────────────────────────────────────────────
   document.querySelectorAll('.lb-tab').forEach(b => b.addEventListener('click', () => {
     const top = b.dataset.top;
-    activate(top === 'nvz' ? 'nvz' : (state.lastSub[top] || TOP_DEFAULT[top]));
+    activate((top === 'nvz' || top === 'ladder') ? top : (state.lastSub[top] || TOP_DEFAULT[top]));
   }));
   document.querySelectorAll('.lb-sub').forEach(b => b.addEventListener('click', () => activate(b.dataset.section)));
   $('circuit-select').addEventListener('change', e => {
