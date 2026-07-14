@@ -21,6 +21,7 @@ import { earn, spend } from './lib/credits.js';
 import { createLadderToken } from './lib/ladder-token.js';
 import {
   claimUrl, venmoConfirmUrl, venmoDeclineUrl, dateLineOf, organizerEmails, fmtCents, siteUrl,
+  cancelLinkFor,
 } from './lib/ladder-notify.js';
 import {
   sendEmail, renderVenmoClaimToAdmin, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen,
@@ -57,6 +58,13 @@ export default async (req) => {
 
   // ── cancel ──
   if (req.method === 'DELETE') {
+    // Once the night is live (rounds generated), a roster player can't self-cancel —
+    // yanking them from the roster desyncs the already-built rounds in the scorer.
+    // Waitlisters can still drop out (they're not in any round).
+    const onRoster = !!findEntry(signups, email) && findEntry(signups, email).list !== 'waitlist';
+    if (onRoster && (event.status === 'live' || event.status === 'final')) {
+      return json({ error: 'This night has already started, so cancellations are closed — see the organizer at the courts to drop out.' }, 409);
+    }
     const removed = removeFromRoster(signups, { playerId, email });
     if (!removed) {
       // maybe they're only on the waitlist — drop them there
@@ -84,6 +92,13 @@ export default async (req) => {
     let opened = null;
     if (next && next.fcfs) { await notifyFcfs(event, signups); opened = 'fcfs'; }
     else if (next) { await notifyPromoted(event, next); opened = next.name; }
+
+    // Organizers get the same "player dropped" alert as the email-link cancel —
+    // including the one-tap "announce the open spot" button when nobody's waiting.
+    try {
+      const { notifyAdminDrop } = await import('./ladder-cancel.js');
+      await notifyAdminDrop(event, removed, credited, { opened }, signups, false);
+    } catch (e) { console.warn('[ladder-signup] admin drop notify failed:', e?.message || e); }
 
     return json({ ok: true, creditedCents: credited, opened });
   }
@@ -129,7 +144,7 @@ export default async (req) => {
       }
       entry.paymentMethod = 'credit'; entry.paymentStatus = 'paid'; entry.amountCents = 0; entry.heldUntil = null;
       await setSignups(signups);
-      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: person.name, eventName: event.name, dateLine: dateLineOf(event) }) }).catch(() => {});
+      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: person.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
       const cOrgs = organizerEmails(event);
       await Promise.allSettled(cOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup — paid</h2><p style="margin:0 0 4px"><b>${person.name}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Paid by ladder credit${email ? ' · ' + email : ''}</p></div>` })));
       return json({ ok: true, status: 'in', paid: 'credit' });
@@ -171,7 +186,7 @@ export default async (req) => {
 async function notifyPromoted(event, next) {
   try {
     if (next.autoClaimed) {
-      await sendEmail({ to: next.email, subject: `You're in — a spot opened for ${event.name}`, html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event) }) });
+      await sendEmail({ to: next.email, subject: `You're in — a spot opened for ${event.name}`, html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: next.playerId, email: next.email }) }) });
     } else {
       const tok = await createLadderToken({ type: 'claim', eventId: event.id, playerId: next.playerId, email: next.email, ttlMs: HOLD_MS });
       await sendEmail({ to: next.email, subject: `A spot opened for ${event.name}`, html: renderLadderSpotOpened({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), minutesLeft: 30, claimUrl: claimUrl(tok) }) });

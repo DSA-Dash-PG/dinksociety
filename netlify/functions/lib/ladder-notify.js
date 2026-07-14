@@ -12,6 +12,29 @@ export const claimUrl = (token) => fn('ladder-claim', token);
 export const venmoConfirmUrl = (token) => fn('ladder-confirm-venmo', token);
 export const venmoDeclineUrl = (token) => fn('ladder-confirm-venmo', token);
 
+/**
+ * One-tap cancel link for a player's spot on an event — same token the reminder
+ * emails use (type 'cancel', valid until the ladder starts + 1h buffer). Falls
+ * back to the ladder page if the token can't be created, so a confirmation
+ * email never goes out with a dead link.
+ */
+export async function cancelLinkFor(event, { playerId = null, email = null } = {}) {
+  const fallback = event?.id
+    ? `${siteUrl()}/ladders.html?event=${encodeURIComponent(event.id)}`
+    : `${siteUrl()}/ladders.html`;
+  if (!event?.id) return fallback;
+  try {
+    const { createLadderToken } = await import('./ladder-token.js');
+    const { eventStartMs } = await import('./ladder.js');
+    const start = eventStartMs(event);
+    const ttl = Math.max(3600000, (start || (Date.now() + 86400000)) - Date.now() + 3600000);
+    const tok = await createLadderToken({ type: 'cancel', eventId: event.id, playerId, email, ttlMs: ttl });
+    return `${siteUrl()}/.netlify/functions/ladder-cancel?t=${tok}`;
+  } catch {
+    return fallback;
+  }
+}
+
 /** "Sat, Jun 20 · 8:30 AM · SBTC" from an event record. */
 export function dateLineOf(ev) {
   const parts = [];

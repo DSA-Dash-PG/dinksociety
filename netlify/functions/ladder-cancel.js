@@ -44,15 +44,21 @@ a{color:#8a8a8a;font-size:.8rem;display:inline-block;margin-top:18px;text-decora
 }
 
 // Alert the organizers that someone dropped (and what happened to the spot).
-async function notifyAdminDrop(event, who, creditedCents, opened, signups, wasWaitlist) {
+// Exported — the profile-button cancel path (ladder-signup DELETE) reuses it.
+export async function notifyAdminDrop(event, who, creditedCents, opened, signups, wasWaitlist) {
   const to = organizerEmails(event);
   if (!to.length) return;
   const cap = effectiveCapacity(event);
   const rosterN = (signups.roster || []).length;
+  const spotIsOpen = !wasWaitlist && !(opened && opened.opened);
   const spotLine = wasWaitlist ? 'They were on the waitlist (no roster spot freed).'
     : opened && opened.opened === 'fcfs' ? 'Inside 24h — the whole waitlist was emailed first-come-first-served.'
     : opened && opened.opened ? `Promoted next in line: <b style="color:#fff">${esc(opened.opened)}</b> (emailed).`
     : 'No one on the waitlist — the spot is now open.';
+  // One tap → admin-ladders offers the "spot opened up" league blast for this event.
+  const announceBtn = spotIsOpen
+    ? `<div style="margin-top:16px"><a href="${siteUrl()}/admin-ladders.html?announce=${encodeURIComponent(event.id)}" style="display:inline-block;padding:13px 26px;background:#b8ff2c;color:#0e0e0e;font-size:13px;font-weight:800;text-decoration:none;border-radius:9999px;">Announce the open spot to the league →</a></div>`
+    : '';
   const html = `<div style="background:#0e0e0e;font-family:'Inter',-apple-system,sans-serif;color:#f5f5f5;max-width:520px;margin:0 auto;padding:32px 24px">
     <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#f5f5f5;margin-bottom:8px">THE DINK SOCIETY · LADDER</div>
     <h1 style="font-size:20px;font-weight:800;margin:0 0 6px">A player dropped from ${esc(event.name)}</h1>
@@ -62,6 +68,7 @@ async function notifyAdminDrop(event, who, creditedCents, opened, signups, wasWa
       Credit issued: <b style="color:#fff">${creditedCents ? fmtCents(creditedCents) : 'none'}</b><br>
       Roster now: <b style="color:#fff">${rosterN} / ${cap}</b> · waitlist: <b style="color:#fff">${(signups.waitlist || []).length}</b>
     </div>
+    ${announceBtn}
     <div style="margin-top:18px;font-size:11px;color:#555">Manage: ${siteUrl()}/admin-ladders.html</div>
   </div>`;
   await sendEmail({ to, subject: `🪜 ${who.name || who.email} dropped from ${event.name}`, html }).catch(() => {});
@@ -70,23 +77,38 @@ async function notifyAdminDrop(event, who, creditedCents, opened, signups, wasWa
 export default async (req) => {
   const url = new URL(req.url);
 
+  // Once rounds are generated, a roster player can't self-cancel — pulling them
+  // from the roster desyncs the already-built rounds in the scorer. Waitlisters
+  // may still drop (they're not seated anywhere).
+  const startedPage = (event) => resultPage('Night already started',
+    `${event.name} is underway, so cancellations are closed. See the organizer at the courts if you need to drop out.`, RED);
+
   if (req.method === 'GET') {
     const rec = await peekLadderToken(url.searchParams.get('t'));
     if (!rec || rec.type !== 'cancel') return resultPage('Link expired', 'This cancel link is no longer valid. It may have already been used.', RED);
     const event = await getEvent(rec.eventId);
     if (!event) return resultPage('Not found', 'We could not find that ladder.', RED);
     const signups = await getSignups(rec.eventId);
-    if (!onList(signups, rec)) return resultPage('Already off the list', `You're not registered for ${event.name} anymore.`, LIME);
+    const list = onList(signups, rec);
+    if (!list) return resultPage('Already off the list', `You're not registered for ${event.name} anymore.`, LIME);
+    if (list === 'roster' && (event.status === 'live' || event.status === 'final')) return startedPage(event);
     return confirmPage(url.searchParams.get('t'), rec, event);
   }
 
   if (req.method === 'POST') {
     let token = url.searchParams.get('t');
     try { const body = await req.text(); token = new URLSearchParams(body).get('t') || token; } catch {}
+    // Peek first — a blocked (night-started) attempt must NOT burn the token,
+    // since the player may legitimately need organizer help instead.
+    const peeked = await peekLadderToken(token);
+    if (!peeked || peeked.type !== 'cancel') return resultPage('Link expired', 'This cancel link is no longer valid or was already used.', RED);
+    const event = await getEvent(peeked.eventId);
+    if (!event) return resultPage('Not found', 'We could not find that ladder.', RED);
+    const preSignups = await getSignups(peeked.eventId);
+    if (onList(preSignups, peeked) === 'roster' && (event.status === 'live' || event.status === 'final')) return startedPage(event);
+
     const rec = await consumeLadderToken(token);
     if (!rec || rec.type !== 'cancel') return resultPage('Link expired', 'This cancel link is no longer valid or was already used.', RED);
-    const event = await getEvent(rec.eventId);
-    if (!event) return resultPage('Not found', 'We could not find that ladder.', RED);
 
     const signups = await getSignups(rec.eventId);
     const removed = removeFromRoster(signups, { playerId: rec.playerId, email: rec.email });

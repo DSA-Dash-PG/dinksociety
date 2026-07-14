@@ -471,12 +471,30 @@ export function renderLadderNudge({ playerName, eventName, minutesLeft = 5, clai
 }
 
 /** Confirmation once a spot is claimed / paid. */
-export function renderLadderConfirmed({ playerName, eventName, dateLine }) {
+export function renderLadderConfirmed({ playerName, eventName, dateLine, cancelUrl }) {
+  const cancelLine = cancelUrl
+    ? `<p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">It's on your profile now. Plans change? <a href="${cancelUrl}" style="color:#f0c040;font-weight:700;text-decoration:none;">Cancel your spot</a> — it reopens for the next player and you get ladder credit for a future night. This link works right up until the ladder starts.</p>`
+    : `<p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">It's on your profile now. Need to cancel? Open the ladder and tap cancel — you'll get ladder credit for a future night.</p>`;
   return _ladderShell(`
       <h1 style="font-size: 22px; font-weight: 800; color: #b8ff2c; margin: 0 0 14px; line-height: 1.25;">You're in!</h1>
       <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">See you at <b style="color:#fff;">${escapeBody(eventName)}</b>${playerName ? ', ' + escapeBody(playerName) : ''}.</p>
       ${_ladderEventCard(eventName, dateLine)}
-      <p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">It's on your profile now. Need to cancel? Open the ladder and tap cancel — you'll get ladder credit for a future night.</p>
+      ${cancelLine}
+  `);
+}
+
+/**
+ * Admin → player: a fresh one-tap cancel link, sent when the organizer knows a
+ * player intends to drop. Nothing happens until the player taps and confirms —
+ * so sending this never removes anyone by itself.
+ */
+export function renderLadderCancelLink({ playerName, eventName, dateLine, cancelUrl }) {
+  return _ladderShell(`
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">Need to cancel your spot?</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Hey ${escapeBody(playerName || 'there')}, here's a fresh cancel link for <b style="color:#fff;">${escapeBody(eventName)}</b>. If you can't make it, tap below — your spot reopens for the next player and you'll get ladder credit for a future night.</p>
+      ${_ladderEventCard(eventName, dateLine)}
+      <a href="${cancelUrl}" style="display:inline-block; width:100%; box-sizing:border-box; text-align:center; padding: 14px 28px; background: transparent; color: #ff5c47; font-size: 14px; font-weight: 800; text-decoration: none; border: 1px solid rgba(255,92,71,0.4); border-radius: 9999px;">I can't make it — cancel my spot</a>
+      <p style="font-size: 13px; color: #777; margin-top: 18px; line-height: 1.5;">Still planning to play? Just ignore this email — your spot is safe, and nothing happens unless you tap the button and confirm. The link works right up until the ladder starts.</p>
   `);
 }
 

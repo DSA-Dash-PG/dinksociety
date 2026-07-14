@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>League ↔ Ladder integration — 4 concepts (mockup)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --color-bg:#0e0e0e;--color-surface:#161616;--color-surface-2:#1e1e1e;--color-surface-3:#262626;
+  --color-border:rgba(255,255,255,0.08);--color-border-strong:rgba(255,255,255,0.14);
+  --color-text:#f0f0ec;--color-text-muted:#9a9e97;--color-text-faint:#5e625c;--color-text-inverse:#0e0e0e;
+  --color-lime:#b8ff2c;--color-lime-dim:rgba(184,255,44,0.12);
+  --color-teal:#17d7b0;--color-teal-dim:rgba(23,215,176,0.12);
+  --color-gold:#f0c040;--color-red:#ff5c47;
+  --r-sm:10px;--r-md:14px;--r-lg:20px;--r-full:9999px;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;background:#080808;color:var(--color-text);line-height:1.5;-webkit-font-smoothing:antialiased;padding:24px 16px 90px}
+a{color:inherit;text-decoration:none}
+.mute{color:var(--color-text-muted)}.faint{color:var(--color-text-faint)}
+
+.switch{position:sticky;top:0;z-index:60;max-width:1100px;margin:0 auto 10px;display:flex;flex-wrap:wrap;gap:6px;justify-content:center;background:#080808;padding:10px 0}
+.switch button{padding:10px 16px;border-radius:var(--r-full);font-size:.8rem;font-weight:700;color:var(--color-text-muted);background:var(--color-surface-2);border:1px solid var(--color-border);cursor:pointer;font-family:inherit}
+.switch button.on{color:var(--color-text-inverse);background:var(--color-lime);border-color:var(--color-lime)}
+.intro{max-width:640px;margin:0 auto 22px;text-align:center;color:var(--color-text-muted);font-size:.85rem}
+.screen{display:none}.screen.on{display:block}
+.scap{max-width:1100px;margin:0 auto 12px;font-size:.74rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint)}
+.frame{max-width:1100px;margin:0 auto 14px;background:var(--color-bg);border:1px solid var(--color-border-strong);border-radius:18px;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.5)}
+.notes{max-width:1100px;margin:0 auto 34px;display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.note{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--r-md);padding:13px 15px;font-size:.8rem;color:var(--color-text-muted)}
+.note b{display:block;font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;margin-bottom:5px}
+.note.pro b{color:var(--color-lime)}.note.con b{color:var(--color-red)}
+@media(max-width:720px){.notes{grid-template-columns:1fr}}
+
+/* shared site chrome */
+.nav{display:flex;align-items:center;gap:22px;padding:16px 26px;border-bottom:1px solid var(--color-border);background:var(--color-surface)}
+.nav .logo{font-weight:900;font-size:.82rem;letter-spacing:.05em;line-height:1.15}
+.nav .logo small{display:block;font-weight:700;font-size:.55rem;letter-spacing:.18em;color:var(--color-text-faint)}
+.nav .links{display:flex;gap:4px;margin-left:auto;flex-wrap:wrap}
+.nav .links a{font-size:.78rem;font-weight:600;color:var(--color-text-muted);padding:7px 11px;border-radius:var(--r-full)}
+.nav .links a.on{color:var(--color-text-inverse);background:var(--color-lime);font-weight:800}
+.nav .links a.hot{color:var(--color-teal);position:relative}
+.newpill{display:inline-block;margin-left:5px;padding:1px 6px;border-radius:var(--r-full);background:var(--color-teal);color:#06231d;font-size:.5rem;font-weight:900;letter-spacing:.08em;vertical-align:2px}
+.eyebrow{display:flex;align-items:center;gap:8px;font-size:.66rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--color-lime)}
+.eyebrow .dot{width:7px;height:7px;border-radius:50%;background:var(--color-lime);box-shadow:0 0 10px var(--color-lime)}
+.eyebrow.teal{color:var(--color-teal)}.eyebrow.teal .dot{background:var(--color-teal);box-shadow:0 0 10px var(--color-teal)}
+.btn{display:inline-block;padding:12px 22px;border-radius:var(--r-full);background:var(--color-lime);color:var(--color-text-inverse);font-weight:800;font-size:.8rem;letter-spacing:.04em}
+.btn.ghost{background:transparent;border:1px solid var(--color-border-strong);color:var(--color-text)}
+.btn.teal{background:var(--color-teal);color:#06231d}
+
+/* cards */
+.lcard{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--r-md);overflow:hidden}
+.lcard .lhead{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--color-border);font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-muted)}
+.badge{padding:3px 9px;border-radius:var(--r-full);font-size:.56rem;font-weight:900;letter-spacing:.08em}
+.badge.open{background:var(--color-teal-dim);color:var(--color-teal)}
+.badge.up{background:var(--color-lime-dim);color:var(--color-lime)}
+.badge.full{background:rgba(255,92,71,.12);color:var(--color-red)}
+.meter{height:6px;border-radius:3px;background:var(--color-surface-3);overflow:hidden}
+.meter i{display:block;height:100%;background:var(--color-teal)}
+.rowline{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--color-border);font-size:.8rem}
+.rk{width:22px;font-weight:900;color:var(--color-text-faint);font-size:.72rem}
+.rk.g{color:var(--color-gold)}
+.pillstat{margin-left:auto;font-weight:800;font-size:.76rem;color:var(--color-teal)}
+</style>
+</head>
+<body>
+
+<div class="switch" id="switch">
+  <button data-s="a" class="on">A · Nav + Ladder landing</button>
+  <button data-s="b">B · Homepage strip</button>
+  <button data-s="c">C · Leaderboard tab</button>
+  <button data-s="d">D · Unified game nights</button>
+</div>
+<p class="intro">Four ways to surface the ladder on the public league site. All reuse the existing <code>/ladders.html</code> page and public APIs — they differ in how much the two worlds blend.</p>
+
+<!-- ═══════════ CONCEPT A ═══════════ -->
+<section class="screen on" id="s-a">
+  <p class="scap">Concept A — “Ladder” joins the main nav; /ladders.html becomes a first-class public page</p>
+  <div class="frame">
+    <div class="nav">
+      <div class="logo">THE DINK<br>SOCIETY<small>SEASON 1</small></div>
+      <div class="links">
+        <a>Home</a><a>The Drop</a><a>Schedule</a><a>Standings</a><a>Leaderboard</a><a>Teams</a>
+        <a class="on">Ladder<span class="newpill">NEW</span></a>
+        <a>Rules</a><a class="faint">Player Login</a>
+      </div>
+    </div>
+    <div style="padding:34px 26px 30px;background:linear-gradient(180deg,rgba(23,215,176,.05),transparent)">
+      <div class="eyebrow teal"><span class="dot"></span>Open play · Every Thursday</div>
+      <h1 style="font-size:2.4rem;font-weight:900;letter-spacing:-.01em;margin:6px 0 2px">LADDER NIGHTS</h1>
+      <p class="mute" style="max-width:520px;font-size:.9rem">No team? No problem. Drop in, get matched by rating, climb the ladder. Open to everyone — league players earn crossover XP.</p>
+      <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:14px;margin-top:22px">
+        <div class="lcard">
+          <div class="lhead"><span>NEXT LADDER · THU JUL 16</span><span class="badge open">OPEN · 12/16</span></div>
+          <div style="padding:16px 14px">
+            <div style="font-size:1.15rem;font-weight:900">Thursday Night Ladder · 3.0–3.5</div>
+            <div class="mute" style="font-size:.8rem;margin:2px 0 12px">7:00–9:00 PM · SBTC · Courts 3A–3D · $15</div>
+            <div class="meter"><i style="width:75%"></i></div>
+            <div class="faint" style="font-size:.68rem;margin:6px 0 14px">4 spots left · 2 on waitlist last week</div>
+            <a class="btn teal">Claim a spot →</a>
+            <a class="btn ghost" style="margin-left:8px">How ladders work</a>
+          </div>
+        </div>
+        <div class="lcard">
+          <div class="lhead"><span>LAST THURSDAY · RESULTS</span><span class="faint">Jul 9</span></div>
+          <div class="rowline"><span class="rk g">1</span><b>Jesse Nicasio</b><span class="faint" style="font-size:.68rem">K'CHN</span><span class="pillstat">+42 XP</span></div>
+          <div class="rowline"><span class="rk">2</span><b>Maya Ramos</b><span class="faint" style="font-size:.68rem">Free agent</span><span class="pillstat">+35 XP</span></div>
+          <div class="rowline"><span class="rk">3</span><b>Danny Ferrer</b><span class="faint" style="font-size:.68rem">Smash Society</span><span class="pillstat">+31 XP</span></div>
+          <div style="padding:11px 14px;border-top:1px solid var(--color-border)"><a class="faint" style="font-size:.72rem;font-weight:700">FULL LADDER RECAP →</a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note pro"><b>Why it works</b>Cheapest win — the page exists, you're just linking it. The NEW pill drives discovery, and ladder gets equal billing with league so drop-ins become a funnel for Season 2 team signups.</div>
+    <div class="note con"><b>Watch out</b>Nav is already 8 items (9 with search). Something may need to consolidate — this mock assumes The NVZ link is gone (done) and Gallery stays hidden.</div>
+  </div>
+</section>
+
+<!-- ═══════════ CONCEPT B ═══════════ -->
+<section class="screen" id="s-b">
+  <p class="scap">Concept B — Ladder strip on the homepage, between The Drop and Up Next</p>
+  <div class="frame">
+    <div style="padding:26px;border-bottom:1px solid var(--color-border)">
+      <div class="faint" style="font-size:.72rem">… THE DROP · WEEK 4 RECAP ends here …</div>
+    </div>
+    <div style="padding:26px;background:linear-gradient(90deg,rgba(23,215,176,.06),transparent 60%)">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="eyebrow teal"><span class="dot"></span>Ladder Nights · Open Play</div>
+          <div class="mute" style="font-size:.8rem;margin-top:4px">Thursdays at SBTC · no team needed · $15 drop-in</div>
+        </div>
+        <a class="faint" style="font-size:.74rem;font-weight:800">ALL LADDERS →</a>
+      </div>
+      <div style="display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:12px;margin-top:16px">
+        <div class="lcard">
+          <div class="lhead"><span>THU JUL 16 · 7:00–9:00 PM</span><span class="badge open">12/16 IN</span></div>
+          <div style="padding:14px">
+            <div style="font-weight:900;font-size:1.02rem">Thursday Night Ladder</div>
+            <div class="mute" style="font-size:.76rem;margin-bottom:10px">SBTC · Courts 3A–3D · mixed 3.0–3.5</div>
+            <div class="meter"><i style="width:75%"></i></div>
+            <a class="btn teal" style="margin-top:13px;padding:10px 18px;font-size:.74rem">Claim a spot →</a>
+          </div>
+        </div>
+        <div class="lcard">
+          <div class="lhead"><span>LADDER TOP 3</span><span class="faint">SEASON</span></div>
+          <div class="rowline"><span class="rk g">1</span><b>Jesse Nicasio</b><span class="pillstat">318 XP</span></div>
+          <div class="rowline"><span class="rk">2</span><b>Maya Ramos</b><span class="pillstat">301 XP</span></div>
+          <div class="rowline"><span class="rk">3</span><b>Danny Ferrer</b><span class="pillstat">287 XP</span></div>
+        </div>
+        <div class="lcard" style="display:flex;flex-direction:column;justify-content:center;text-align:center;padding:18px 14px;background:var(--color-surface-2)">
+          <div style="font-size:1.6rem">🪜</div>
+          <div style="font-weight:900;font-size:.9rem;margin:4px 0 2px">New here?</div>
+          <div class="mute" style="font-size:.74rem;margin-bottom:10px">Ladder night is the front door to the league. Show up, get ranked, get recruited.</div>
+          <a class="btn ghost" style="font-size:.72rem;padding:9px 14px;align-self:center">How it works</a>
+        </div>
+      </div>
+    </div>
+    <div style="padding:26px;border-top:1px solid var(--color-border)">
+      <div class="eyebrow"><span class="dot"></span>Up Next · Week 5</div>
+      <div class="faint" style="font-size:.72rem;margin-top:6px">… league match cards continue here …</div>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note pro"><b>Why it works</b>Homepage is the highest-traffic page — the strip sells ladder as part of the league story ("front door to the league") and the spots-left meter creates urgency. Teal accent keeps ladder visually distinct from lime league content.</div>
+    <div class="note con"><b>Watch out</b>Homepage gets longer; needs the strip to collapse gracefully when there's no upcoming ladder (show last recap instead). Pairs best with Concept A so there's somewhere to click through to.</div>
+  </div>
+</section>
+
+<!-- ═══════════ CONCEPT C ═══════════ -->
+<section class="screen" id="s-c">
+  <p class="scap">Concept C — Ladder rankings as a Leaderboard view (alongside The NVZ)</p>
+  <div class="frame">
+    <div class="nav">
+      <div class="logo">THE DINK<br>SOCIETY<small>SEASON 1</small></div>
+      <div class="links"><a>Home</a><a>The Drop</a><a>Schedule</a><a>Standings</a><a class="on">Leaderboard</a><a>Teams</a><a>Rules</a></div>
+    </div>
+    <div style="padding:28px 26px">
+      <h1 style="font-size:2rem;font-weight:900;margin-bottom:14px">LEADERBOARD</h1>
+      <div style="display:flex;gap:6px;margin-bottom:18px">
+        <a class="btn ghost" style="padding:9px 16px;font-size:.74rem">League</a>
+        <a class="btn ghost" style="padding:9px 16px;font-size:.74rem">The NVZ</a>
+        <a class="btn teal" style="padding:9px 16px;font-size:.74rem">Ladder<span class="newpill" style="background:#06231d;color:var(--color-teal)">NEW</span></a>
+      </div>
+      <div class="lcard">
+        <div class="lhead"><span>LADDER SEASON · 6 NIGHTS PLAYED</span><span class="faint">XP · W–L · DR</span></div>
+        <div class="rowline" style="background:rgba(240,192,64,.05)"><span class="rk g">1</span><b>Jesse Nicasio</b><span class="badge up" style="font-size:.5rem">K'CHN</span><span class="mute" style="margin-left:auto;font-size:.74rem">14–4</span><span class="pillstat" style="margin-left:16px">318 XP</span><span class="faint" style="margin-left:16px;font-size:.74rem">DR 4.1</span></div>
+        <div class="rowline"><span class="rk">2</span><b>Maya Ramos</b><span class="badge open" style="font-size:.5rem">FREE AGENT</span><span class="mute" style="margin-left:auto;font-size:.74rem">13–5</span><span class="pillstat" style="margin-left:16px">301 XP</span><span class="faint" style="margin-left:16px;font-size:.74rem">DR 3.9</span></div>
+        <div class="rowline"><span class="rk">3</span><b>Danny Ferrer</b><span class="badge up" style="font-size:.5rem">SMASH SOCIETY</span><span class="mute" style="margin-left:auto;font-size:.74rem">12–6</span><span class="pillstat" style="margin-left:16px">287 XP</span><span class="faint" style="margin-left:16px;font-size:.74rem">DR 3.8</span></div>
+        <div class="rowline"><span class="rk">4</span><b>Alexis Cho</b><span class="badge open" style="font-size:.5rem">FREE AGENT</span><span class="mute" style="margin-left:auto;font-size:.74rem">11–7</span><span class="pillstat" style="margin-left:16px">262 XP</span><span class="faint" style="margin-left:16px;font-size:.74rem">DR 3.7</span></div>
+        <div class="rowline"><span class="rk">5</span><b>Ryan Hom</b><span class="badge up" style="font-size:.5rem">BIG DINK ENERGY</span><span class="mute" style="margin-left:auto;font-size:.74rem">10–8</span><span class="pillstat" style="margin-left:16px">240 XP</span><span class="faint" style="margin-left:16px;font-size:.74rem">DR 3.7</span></div>
+      </div>
+      <p class="faint" style="font-size:.7rem;margin-top:10px">Team chips link league players to their team page; free agents link to a "join the league" CTA. Powered by the existing <code>public-ladder-stats</code> endpoint.</p>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note pro"><b>Why it works</b>Puts ladder players and league players on the same stage — the team chip next to a free agent's name basically asks "who's recruiting this person?" Zero new pages; it's a third view on the leaderboard you already have.</div>
+    <div class="note con"><b>Watch out</b>Rankings alone don't drive signups — there's no event/join surface here. Best as a companion to A or B, not the sole integration.</div>
+  </div>
+</section>
+
+<!-- ═══════════ CONCEPT D ═══════════ -->
+<section class="screen" id="s-d">
+  <p class="scap">Concept D — Full merge: ladder nights live on the Schedule as game nights</p>
+  <div class="frame">
+    <div style="padding:28px 26px">
+      <h1 style="font-size:2rem;font-weight:900;margin-bottom:14px">SCHEDULE</h1>
+      <div class="faint" style="font-size:.64rem;font-weight:800;letter-spacing:.1em;margin-bottom:8px">GAME NIGHTS</div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:22px">
+        <a class="btn ghost" style="padding:8px 14px;font-size:.7rem">WK 4 · Jul 6</a>
+        <a class="btn ghost" style="padding:8px 14px;font-size:.7rem;border-color:var(--color-teal);color:var(--color-teal)">🪜 LADDER · Jul 9</a>
+        <a class="btn" style="padding:8px 14px;font-size:.7rem">WK 5 · Jul 13</a>
+        <a class="btn ghost" style="padding:8px 14px;font-size:.7rem;border-color:var(--color-teal);color:var(--color-teal)">🪜 LADDER · Jul 16</a>
+        <a class="btn ghost" style="padding:8px 14px;font-size:.7rem">WK 6 · Jul 20</a>
+      </div>
+      <div class="lcard" style="border-color:rgba(23,215,176,.35)">
+        <div class="lhead" style="background:rgba(23,215,176,.06)"><span style="color:var(--color-teal)">🪜 LADDER NIGHT · THURSDAY, JULY 16</span><span class="badge open">OPEN · 12/16</span></div>
+        <div style="display:grid;grid-template-columns:1.4fr 1fr;gap:0">
+          <div style="padding:16px 14px;border-right:1px solid var(--color-border)">
+            <div style="font-weight:900;font-size:1.05rem">Thursday Night Ladder · 3.0–3.5 mixed</div>
+            <div class="mute" style="font-size:.78rem;margin:2px 0 12px">7:00–9:00 PM · SBTC · Courts 3A–3D · $15 drop-in</div>
+            <div class="meter"><i style="width:75%"></i></div>
+            <div class="faint" style="font-size:.68rem;margin:6px 0 13px">4 spots left</div>
+            <a class="btn teal" style="padding:10px 18px;font-size:.74rem">Claim a spot →</a>
+          </div>
+          <div style="padding:12px 0">
+            <div class="faint" style="font-size:.58rem;font-weight:800;letter-spacing:.1em;padding:0 14px 6px">WHO'S IN</div>
+            <div class="rowline" style="border-top:none"><b>Jesse N.</b><span class="badge up" style="font-size:.5rem">K'CHN</span><span class="pillstat" style="font-size:.68rem">#1</span></div>
+            <div class="rowline"><b>Maya R.</b><span class="badge open" style="font-size:.5rem">FA</span><span class="pillstat" style="font-size:.68rem">#2</span></div>
+            <div class="rowline"><b>Ryan H.</b><span class="badge up" style="font-size:.5rem">BDE</span><span class="pillstat" style="font-size:.68rem">#5</span></div>
+            <div style="padding:9px 14px" class="faint">+ 9 more…</div>
+          </div>
+        </div>
+      </div>
+      <p class="faint" style="font-size:.7rem;margin-top:12px">League weeks keep lime; ladder nights get teal + 🪜. One calendar, two products.</p>
+    </div>
+  </div>
+  <div class="notes">
+    <div class="note pro"><b>Why it works</b>The deepest integration: one calendar of everything happening at the club. League players see ladder nights in their normal flow between match weeks — the natural "play more pickleball" upsell.</div>
+    <div class="note con"><b>Watch out</b>Most build effort — schedule.html currently only reads league weeks, so it needs a second fetch to <code>public-ladders</code> and a merged rail. Can clutter the schedule if ladder frequency grows; needs the teal/lime split to stay readable.</div>
+  </div>
+</section>
+
+<script>
+document.querySelectorAll('#switch button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('#switch button').forEach(function(x){x.classList.remove('on')});
+    document.querySelectorAll('.screen').forEach(function(x){x.classList.remove('on')});
+    b.classList.add('on');
+    document.getElementById('s-'+b.dataset.s).classList.add('on');
+    window.scrollTo({top:0});
+  });
+});
+</script>
+</body>
+</html>

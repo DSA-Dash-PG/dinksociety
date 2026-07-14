@@ -8,7 +8,7 @@
 import Stripe from 'stripe';
 import { normalizeEmail } from './lib/identity.js';
 import { getEvent, getSignups, setSignups } from './lib/ladder.js';
-import { dateLineOf } from './lib/ladder-notify.js';
+import { dateLineOf, cancelLinkFor } from './lib/ladder-notify.js';
 import { sendEmail, renderLadderConfirmed } from './lib/email.js';
 import { notifyOrganizersPaid } from './ladder-stripe-webhook.js';
 
@@ -55,7 +55,7 @@ export default async (req) => {
     await sendEmail({
       to: entry.email,
       subject: `You're in — ${ladderEvent?.name || 'your ladder'}`,
-      html: renderLadderConfirmed({ playerName: entry.name, eventName: ladderEvent?.name || 'your ladder', dateLine: dateLineOf(ladderEvent || {}) }),
+      html: renderLadderConfirmed({ playerName: entry.name, eventName: ladderEvent?.name || 'your ladder', dateLine: dateLineOf(ladderEvent || {}), cancelUrl: await cancelLinkFor(ladderEvent, { playerId: entry.playerId, email: entry.email }) }),
     }).catch(() => {});
   }
   await notifyOrganizersPaid(ladderEvent, entry).catch(() => {});

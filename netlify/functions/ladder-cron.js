@@ -15,7 +15,7 @@ import {
   nudgeDue, minutesLeft, HOLD_MS,
 } from './lib/ladder.js';
 import { createLadderToken } from './lib/ladder-token.js';
-import { claimUrl, dateLineOf, siteUrl, venmoPayLink } from './lib/ladder-notify.js';
+import { claimUrl, dateLineOf, siteUrl, venmoPayLink, cancelLinkFor } from './lib/ladder-notify.js';
 import { sendEmail, renderLadderNudge, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen, renderLadderPayReminder } from './lib/email.js';
 
 // Unpaid-spot reminders: first goes out 1h after signup, then once a day until
@@ -116,7 +116,7 @@ export default async () => {
             await sendEmail({
               to: next.email,
               subject: `You're in — a spot opened for ${ev.name}`,
-              html: renderLadderConfirmed({ playerName: next.name, eventName: ev.name, dateLine: dateLineOf(ev) }),
+              html: renderLadderConfirmed({ playerName: next.name, eventName: ev.name, dateLine: dateLineOf(ev), cancelUrl: await cancelLinkFor(ev, { playerId: next.playerId, email: next.email }) }),
             });
           } else {
             const token = await createLadderToken({ type: 'claim', eventId: ev.id, playerId: next.playerId, email: next.email, ttlMs: HOLD_MS });

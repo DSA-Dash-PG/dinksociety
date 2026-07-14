@@ -145,7 +145,7 @@
 <script src="/ladder-profile-view.js"></script>
 <script>
 const API='/.netlify/functions';
-let ACTIVE=[], COMPLETED=[], STATS=null, MYCREDIT=0, FT='all', FD='all';
+let ACTIVE=[], COMPLETED=[], STATS=null, MYCREDIT=0, FT='all', FD='all', MYREG={};
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 // Display names in ladder views as FIRST NAME only, to keep lists/boards clean.
 const firstName=s=>{ s=String(s||'').trim(); return s.split(/\s+/)[0]||s; };
@@ -198,6 +198,10 @@ async function init(){
   }
   try{ pl=await (await fetch(`${API}/public-ladders`,{credentials:'include'})).json(); }catch(e){}
   try{ st=await (await fetch(`${API}/public-ladder-stats`,{credentials:'include'})).json(); }catch(e){}
+  // Signed-in player's own signups → powers the "You're in ✓ / Cancel my spot"
+  // state on each card. 401 (not signed in) just leaves MYREG empty.
+  MYREG={};
+  try{ const r=await fetch(`${API}/player-ladder-events`,{credentials:'include'}); if(r.ok){ const me=await r.json(); (me.registered||[]).forEach(ev=>{ MYREG[ev.id]={list:ev.list,paymentStatus:ev.paymentStatus}; }); } }catch(e){}
   ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st; MYCREDIT=(st&&st.youCreditCents)||0;
   renderHomeLive(); renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats();
   route();
@@ -275,9 +279,34 @@ function ladderCard(l,i){
       ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${l.roster.map(initialDot).join('')}${(()=>{const pc=l.roster.filter(p=>p.paid).length;return pc?`<span style="margin-left:2px;font-size:.6rem;font-weight:800;color:#b8ff2c;background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.28);border-radius:9999px;padding:2px 8px">✓ ${pc} paid</span>`:'';})()}<button onclick="ladToggle('${l.id}')" style="margin-left:auto;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="margin-top:8px">${l.roster.map((p,k)=>`<div style="display:flex;align-items:center;gap:9px;padding:6px 2px;border-top:1px solid rgba(255,255,255,.05)"><span style="width:16px;text-align:center;color:#5e655a;font-weight:800;font-size:.68rem">${k+1}</span><span style="flex:1;min-width:0;font-weight:700;font-size:.8rem;color:#e7ebe0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(firstName(p.name))}</span>${p.paid?`<span style="display:inline-flex;align-items:center;gap:3px;font-size:.58rem;font-weight:800;color:#b8ff2c;background:rgba(184,255,44,.13);border:1px solid rgba(184,255,44,.32);border-radius:9999px;padding:2px 9px">✓ Paid</span>`:`<span style="font-size:.58rem;font-weight:800;color:#9aa094;background:var(--surf2);border:1px solid var(--bd);border-radius:9999px;padding:2px 9px">Pending</span>`}</div>`).join('')}</div>`:''}</div>`:''}
       ${l.status==='live'
         ? `<a class="btn btn-lime" href="/ladder-live?event=${encodeURIComponent(l.id)}" style="margin-top:11px;width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none"><span style="width:7px;height:7px;border-radius:50%;background:#06210f;margin-right:7px;animation:dspulse 1.1s infinite"></span>Watch live →</a>`
-        : `<button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fmt(l.feeCents)}</button>`}
+        : myRegBlock(l)||`<button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fmt(l.feeCents)}</button>`}
     </div>
   </div>`;
+}
+// Signed-in + registered → replace the Register button with your status and a
+// self-serve cancel. Returns '' (falsy) when not registered so the caller falls
+// back to the normal Register/waitlist button.
+function myRegBlock(l){
+  const my=MYREG[l.id]; if(!my) return '';
+  const wait=my.list==='waitlist';
+  const badge=wait
+    ? `<div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-top:11px;padding:11px;border-radius:11px;background:rgba(240,192,64,.12);border:1px solid rgba(240,192,64,.35);color:var(--gold);font-weight:800;font-size:.85rem">⏳ You're on the waitlist</div>`
+    : `<div style="display:flex;align-items:center;justify-content:center;gap:7px;margin-top:11px;padding:11px;border-radius:11px;background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.35);color:var(--lime);font-weight:800;font-size:.85rem">✓ You're in${my.paymentStatus==='paid'?' · paid':''}</div>`;
+  return badge+`<button onclick="cancelSpot('${l.id}',${wait})" style="display:block;width:100%;margin-top:7px;padding:8px;background:none;border:0;cursor:pointer;font:inherit;font-size:.74rem;font-weight:800;color:var(--red)">${wait?'Leave the waitlist':"Can't make it? Cancel my spot"}</button>`;
+}
+async function cancelSpot(id,wait){
+  const l=curLadder(id)||{};
+  const note=wait?'Leave the waitlist for '+(l.name||'this ladder')+'?'
+    :'Cancel your spot for '+(l.name||'this ladder')+'?\n\nYour spot reopens for the next player'+((l.feeCents||0)>0?' and you get ladder credit for what you paid (no refunds)':'')+'.';
+  if(!confirm(note)) return;
+  try{
+    const r=await fetch(`${API}/ladder-signup?event=${encodeURIComponent(id)}`,{method:'DELETE',credentials:'include'});
+    const d=await r.json().catch(()=>({}));
+    if(r.status===401){ alert('Please sign in first (Profile → sign in), then try again.'); return; }
+    if(!d.ok){ alert(d.error||'Could not cancel — try again or contact the organizer.'); return; }
+    alert(wait||d.was==='waitlist'?"You're off the waitlist.":"You're off the list. "+((d.creditedCents||0)>0?'A '+fmt(d.creditedCents)+' ladder credit is on your account for next time.':'Thanks for letting us know!'));
+    init();
+  }catch(e){ alert('Network problem — check your connection and try again.'); }
 }
 function renderFilters(){
   const f=document.getElementById('filters'); const types=[...new Set(ACTIVE.map(l=>l.type||'mixed'))]; const days=[...new Set(ACTIVE.map(l=>wdShort(l.date)).filter(Boolean))];

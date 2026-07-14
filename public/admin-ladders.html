@@ -637,7 +637,8 @@ async function openManage(id){
     const noEmail=p.email?'':'<span class="chip chip-gray" title="No email on file — they can\'t receive a confirmation">no email</span>';
     const emailBtn=p.email?'':`<button class="btn-out btn-sm" onclick="setEmailFor('${esc(p.playerId||'')}','')">✉ Add email</button>`;
     const resendBtn=(p.paymentStatus==='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="resendConfirm('${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`:'';
-    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${noEmail} ${venmoBtns} ${payEdit} ${linkBtn} ${emailBtn} ${resendBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
+    const cancelLinkBtn=p.email?`<button class="btn-out btn-sm" title="Email them a fresh one-tap cancel link — nothing happens unless they tap it and confirm" onclick="sendCancelLink('${esc(p.email)}','${esc(p.playerId||'')}')">✉ Cancel link</button>`:'';
+    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${noEmail} ${venmoBtns} ${payEdit} ${linkBtn} ${emailBtn} ${resendBtn} ${cancelLinkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
   }).join(''):'<div class="empty">No signups yet.</div>';
   h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(d.pendingClaim?` · held: ${esc(d.pendingClaim.name)}`:'')+'</div>';
   h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="promoteWait(${i})">Promote</button> <button class="btn-danger" onclick="removeWait(${i})">Remove</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
@@ -875,6 +876,33 @@ async function act(action,email,playerId,method){
     if(d.emailed) msg('mMsg','ok',who+' is paid ✓ — confirmation emailed.');
     else msg('mMsg','warn',who+' is paid ✓ — but there’s no email on file, so no confirmation was sent. Add an email to send it.');
   }
+  // Removing a player from a live night leaves them seated in the generated
+  // rounds — the backend tells us when a round rebuild is needed.
+  if(action==='remove'&&d.hint) msg('mMsg','warn',d.hint);
+  // Spot opened with nobody waiting → offer to announce it to the league
+  // (reuses the recruit blast: past players, minus anyone already signed up).
+  if(action==='remove'&&!d.opened&&(d.openSpots||0)>0){
+    const n=d.openSpots;
+    if(confirm((d.removed||'Player')+' is out and nobody is on the waitlist — '+n+' spot'+(n===1?'':'s')+' now open.\n\nEmail the league that '+(n===1?'a spot opened up':'there are '+n+' spots left')+'?')){
+      announceOpenSpot(n);
+    }
+  }
+}
+// Blast past ladder players that spots opened on the current ladder.
+async function announceOpenSpot(n){
+  if(!CURRENT)return;
+  msg('mMsg','ok','Sending announcement…');
+  const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'recruit',eventId:CURRENT.id,neededCount:n})});
+  if(d&&d.ok) msg('mMsg','ok','Announced to '+d.sent+' player'+(d.sent===1?'':'s')+' that '+(n===1?'a spot opened up':n+' spots are open')+' ✓');
+  else msg('mMsg','err',(d&&d.error)||'Could not send announcement ('+status+').');
+}
+// Email a player a fresh one-tap cancel link (valid until the ladder starts).
+// Harmless to send — their spot only opens if they tap the link and confirm.
+async function sendCancelLink(email,playerId){
+  if(!CURRENT)return;
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-cancel-link',email,playerId})});
+  if(d.ok) msg('mMsg','ok','Cancel link emailed to '+(d.email||'player')+' ✓ — their spot stays until they tap it and confirm.');
+  else msg('mMsg','err',d.error||'Could not send ('+status+').');
 }
 // Add or edit a player's email, then optionally send their paid confirmation.
 async function setEmailFor(playerId,email){
@@ -944,6 +972,23 @@ async function importOld(){
 function msg(id,cls,t){ document.getElementById(id).innerHTML=`<div class="msg ${cls}">${t}</div>`; }
 
 loadList();
+
+// Deep link from the "player dropped" organizer email: ?announce=<eventId>
+// opens that ladder and offers to blast the league that a spot opened up.
+(function(){
+  const evId=new URLSearchParams(location.search).get('announce');
+  if(!evId) return;
+  history.replaceState(null,'',location.pathname);
+  setTimeout(async function(){
+    const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(evId));
+    if(status===401){ alert('Sign in as admin first, then tap the link in the email again.'); return; }
+    if(!d||!d.event){ alert('Ladder not found — it may have been deleted.'); return; }
+    await openManage(evId);
+    const n=d.spotsLeft||0;
+    if(n<=0){ msg('mMsg','ok','This ladder is full again — nothing to announce.'); return; }
+    if(confirm(n+' spot'+(n===1?'':'s')+' open on '+(d.event.name||'this ladder')+'.\n\nEmail the league that '+(n===1?'a spot opened up':'there are '+n+' spots left')+'?')) announceOpenSpot(n);
+  },250);
+})();
 </script>
 </body>
 </html>

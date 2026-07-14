@@ -8,7 +8,7 @@ import { normalizeEmail } from './lib/identity.js';
 import { getEvent, getSignups, setSignups, removeFromRoster, promoteHead } from './lib/ladder.js';
 import { consumeLadderToken } from './lib/ladder-token.js';
 import { createLadderToken } from './lib/ladder-token.js';
-import { claimUrl, dateLineOf, resultPage } from './lib/ladder-notify.js';
+import { claimUrl, dateLineOf, resultPage, cancelLinkFor } from './lib/ladder-notify.js';
 import { sendEmail, renderLadderConfirmed, renderLadderSpotOpened } from './lib/email.js';
 import { HOLD_MS } from './lib/ladder.js';
 
@@ -34,7 +34,7 @@ export default async (req) => {
     await sendEmail({
       to: entry.email,
       subject: `You're in — ${event.name}`,
-      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event) }),
+      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }),
     }).catch(() => {});
     return resultPage('Confirmed ✓', `${escapeName(entry.name)} is in for ${escapeName(event.name)}. We emailed them the good news — nothing else to do.`);
   }

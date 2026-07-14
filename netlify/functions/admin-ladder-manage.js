@@ -23,8 +23,9 @@ import { findPlayerByEmail } from './lib/player-auth.js';
 import { createLitePlayer } from './lib/ladder-players.js';
 import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js';
 import { earn } from './lib/credits.js';
-import { dateLineOf } from './lib/ladder-notify.js';
-import { sendEmail, renderLadderConfirmed, renderLadderRemoved } from './lib/email.js';
+import { dateLineOf, cancelLinkFor } from './lib/ladder-notify.js';
+import { getPlay } from './lib/ladder-play.js';
+import { sendEmail, renderLadderConfirmed, renderLadderRemoved, renderLadderCancelLink } from './lib/email.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } });
@@ -159,7 +160,7 @@ export default async (req) => {
     await setSignups(signups);
     let emailed = false;
     if (entry.email) {
-      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event) }) }).catch(() => {});
+      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }) }).catch(() => {});
       emailed = true;
     }
     return json({ ok: true, paid: entry.name, name: entry.name, emailed });
@@ -183,7 +184,7 @@ export default async (req) => {
     await setSignups(signups);
     // Marking paid sends the player the same "you're in" confirmation as Confirm.
     if (action === 'mark-paid' && entry.email) {
-      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event) }) }).catch(() => {});
+      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }) }).catch(() => {});
     }
     return json({ ok: true, paid: action === 'mark-paid', method: entry.paymentMethod, name: entry.name, emailed: action === 'mark-paid' && !!entry.email });
   }
@@ -237,7 +238,19 @@ export default async (req) => {
     }
     const r = await promoteAndNotify(event, signups);
     await setSignups(signups);
-    return json({ ok: true, removed: removed.name, creditedCents: credited, emailed: emailedRemoved, opened: r.opened });
+    // If rounds are already generated, the removed player is still seated in
+    // them — surface a heads-up so the organizer rebuilds the current round.
+    let hint = null;
+    try {
+      const play = await getPlay(eventId);
+      if (play?.started && !play.finished) {
+        hint = `Night is live — ${removed.name} may still be seated in the current round. Use “Restart round” in the scorer to rebuild it from the updated roster.`;
+      }
+    } catch { /* best-effort */ }
+    // Tell the UI how the spot landed so it can offer the league announcement
+    // ("a spot opened up") when nobody on the waitlist took it.
+    const openSpots = spotsLeft(event, signups);
+    return json({ ok: true, removed: removed.name, creditedCents: credited, emailed: emailedRemoved, opened: r.opened, hint, openSpots, waitlistCount: (signups.waitlist || []).length });
   }
 
   // Add or edit a roster player's email (e.g. a manually-added player who had
@@ -262,7 +275,24 @@ export default async (req) => {
     await sendEmail({
       to: entry.email,
       subject: `You're in — ${event.name}`,
-      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event) }),
+      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }),
+    }).catch(() => {});
+    return json({ ok: true, name: entry.name, email: entry.email, emailed: true });
+  }
+
+  // Email a roster player a fresh one-tap cancel link (valid until the ladder
+  // starts). Use when a player says they can't make it but their original link
+  // expired or they never had one. Sending it does NOT remove them — nothing
+  // happens until they tap the link and confirm.
+  if (action === 'send-cancel-link') {
+    const entry = findRosterEntry(signups, body.playerId, body.email);
+    if (!entry) return json({ error: 'Player not on the roster' }, 404);
+    if (!entry.email) return json({ error: 'No email on file for this player — add one first.' }, 400);
+    const cancelUrl = await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email });
+    await sendEmail({
+      to: entry.email,
+      subject: `Can't make it? Cancel your spot — ${event.name}`,
+      html: renderLadderCancelLink({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl }),
     }).catch(() => {});
     return json({ ok: true, name: entry.name, email: entry.email, emailed: true });
   }

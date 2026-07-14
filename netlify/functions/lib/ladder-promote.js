@@ -6,7 +6,7 @@
 
 import { promoteHead, HOLD_MS } from './ladder.js';
 import { createLadderToken } from './ladder-token.js';
-import { claimUrl, dateLineOf, siteUrl } from './ladder-notify.js';
+import { claimUrl, dateLineOf, siteUrl, cancelLinkFor } from './ladder-notify.js';
 import { sendEmail, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen } from './email.js';
 import { sendNotify } from './notify-prefs.js';
 
@@ -26,7 +26,7 @@ export async function promoteAndNotify(event, signups) {
       await sendEmail({
         to: next.email,
         subject: `You're in — a spot opened for ${event.name}`,
-        html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event) }),
+        html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: next.playerId, email: next.email }) }),
       });
       return { opened: next.name };
     }
