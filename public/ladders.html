@@ -43,8 +43,16 @@
     .pane{ display:block!important; }
     #p-home{ grid-column:1; grid-row:1; }
     #p-leaderboard{ grid-column:1; grid-row:2; margin-top:34px; }
-    #p-rules{ grid-column:1; grid-row:3; margin-top:34px; }
-    #p-ladders{ grid-column:2; grid-row:1/span 3; position:sticky; top:80px; }
+    #p-completed{ grid-column:1; grid-row:3; margin-top:34px; }
+    #p-rules{ grid-column:1; grid-row:4; margin-top:34px; }
+    #p-ladders{ grid-column:2; grid-row:1/span 4; position:sticky; top:80px; }
+    /* The rail only registers on desktop — Completed gets its own full-width
+       section in the left column, so the sub-tab seg goes away. */
+    #ladSeg,#pastWrap{ display:none!important; }
+    #regWrap{ display:block!important; }
+    #pastWrapLeft{ display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
+    #pastWrapLeft>.empty{ grid-column:1/-1; }
+    #p-completed,#p-leaderboard,#p-rules{ scroll-margin-top:84px; }
     /* Home: the winners/upcoming toggle and its duplicates hide — the rail owns
        registration, the left column owns results. */
     #homeSeg,#homeUp,#filtersHome{ display:none!important; }
@@ -135,7 +143,7 @@
   <div class="content">
     <div class="pane on" id="p-home">
       <div id="homeLive"></div>
-      <div id="jumpLinks" class="jumps"><a href="#p-leaderboard">Leaderboard</a><a href="#p-rules">Rules</a><a href="#" onclick="jumpCompleted();return false">Completed ladders</a></div>
+      <div id="jumpLinks" class="jumps"><a href="#" onclick="jumpTo('p-leaderboard');return false">Leaderboard</a><a href="#" onclick="jumpTo('p-rules');return false">Rules</a><a href="#" onclick="jumpTo('p-completed');return false">Completed ladders</a></div>
       <div id="recapStrip"></div>
       <div class="h1" id="homeH1">Latest winners</div>
       <div class="sub" id="homeSub">Top 3 each event — tap to see the full field</div>
@@ -151,7 +159,7 @@
     <div class="pane" id="p-ladders">
       <div class="h1">Ladders</div>
       <div class="sub" id="ladSub">Open ladders — register and pay</div>
-      <div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px">
+      <div id="ladSeg" style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px">
         <button id="lt-register" onclick="ladTab('register')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--lime);color:#06210f">Register</button>
         <button id="lt-past" onclick="ladTab('completed')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Completed</button>
       </div>
@@ -163,6 +171,12 @@
       <div class="h1">Leaderboard</div>
       <div class="sub">Season standings · ranked by <b>wins → point diff → DR</b></div>
       <div id="statsBody"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="pane" id="p-completed">
+      <div class="h1">Completed ladders</div>
+      <div class="sub">Results, winners &amp; rounds from past ladders</div>
+      <div id="pastWrapLeft"><div class="empty">Loading…</div></div>
     </div>
 
     <div class="pane" id="p-rules">
@@ -415,8 +429,9 @@ function renderAvail(){
   const els=ACTIVE.filter(ladMatchesFilter).slice().sort((a,b)=>(startMsOf(a)||9e15)-(startMsOf(b)||9e15));
   document.getElementById('availList').innerHTML=els.length?els.map((l,i)=>'<div id="lad-'+l.id+'" style="scroll-margin-top:84px">'+ladderCard(l,i)+'</div>').join(''):'<div class="empty">No ladders match these filters.</div>';
 }
-// Jump pill: flip the rail to Completed and scroll to it.
-function jumpCompleted(){ try{ ladTab('completed'); }catch(e){} const el=document.getElementById('p-ladders'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+// Jump pills scroll WITHOUT touching the hash — a hash change fires the tab
+// router, which scrolls back to the top (that bug made the pills look dead).
+function jumpTo(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 // Game night: the featured slot becomes a self-updating live board — current
 // round pairings by court with live scores, refreshed every 20s.
 let LIVE_TIMER=null;
@@ -482,8 +497,11 @@ function pastCard(l,i){
   return evCard({ac,open,name:l.name,date:dateline,toggle:`pToggle('${l.id}')`,chips:top3.length?t3chips(top3):'',body});
 }
 function renderPast(){
-  const w=document.getElementById('pastWrap');
-  w.innerHTML=COMPLETED.length?COMPLETED.map(pastCard).join(''):'<div class="empty">No past ladders yet.</div>';
+  const h=COMPLETED.length?COMPLETED.map(pastCard).join(''):'<div class="empty">No past ladders yet.</div>';
+  // Two homes: the rail sub-tab on mobile, the full-width left-column section
+  // on desktop. Same cards, same expand-for-results behavior.
+  const w=document.getElementById('pastWrap'); if(w) w.innerHTML=h;
+  const wl=document.getElementById('pastWrapLeft'); if(wl) wl.innerHTML=h;
 }
 function ladTab(t){
   const reg=t==='register';
