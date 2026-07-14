@@ -581,7 +581,7 @@ function openSignup(id){
   document.getElementById('payOv').classList.add('on');
 }
 function payMsg(c,t){ document.getElementById('payMsg').innerHTML=`<div class="msg ${c}">${t}</div>`; }
-function needSignIn(){ payMsg('warn',`Please <a href="/me.html" style="color:var(--lime);font-weight:700">sign in or create a ladder account</a> to grab your spot, then come back. No team needed.`); }
+function needSignIn(){ payMsg('warn',`One quick step first:<br><b>New here?</b> <a href="/me.html#register" style="color:var(--lime);font-weight:700">Create your free account</a> — 10 seconds, no team needed.<br><b>Been here before?</b> <a href="/me.html" style="color:var(--lime);font-weight:700">Sign in</a>.<br>Tap the link we email you, then come back and grab your spot.`); }
 async function post(path,body){ const r=await fetch(`${API}${path}`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return {status:r.status,d:await r.json().catch(()=>({}))}; }
 async function payCredit(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit'}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
 async function payCard(id){ const {status,d}=await post(`/ladder-checkout?event=${id}`,{}); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payMsg('err',d.error||'Could not start checkout.'); }
