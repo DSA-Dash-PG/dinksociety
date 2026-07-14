@@ -23,6 +23,9 @@ export default async () => {
       name: e.name || 'Ladder',
       date: e.date || null,
       place: e.place || null,
+      courts: e.courts || null,
+      rounds: e.rounds || null,
+      playersCount: Array.isArray(r.recipients) ? r.recipients.length : null,
       title: r.recap.title || null,
       dek: r.recap.dek || null,
       podium: (r.recap.podium || []).slice(0, 3).map(p => ({

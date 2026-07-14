@@ -24,17 +24,38 @@
   /* ── Desktop: full site width (matches the 1200px container everywhere else).
        Mobile keeps the single 560px column untouched. ── */
   .lb-d{ display:none; }
-  .featroster{ display:none; }
+  .jumps{ display:none; }
+  .story{ padding:18px 0; border-bottom:1px solid var(--bd); }
+  .story .kick2{ font-size:.6rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
+  .story h3{ margin:0 0 2px; font-size:.98rem; font-weight:900; color:#f5f5f5; }
+  .story .rhead{ font-size:1.15rem; font-weight:900; line-height:1.22; color:var(--lime); margin:2px 0 9px; }
+  .story p{ font-size:.8rem; color:var(--mut); line-height:1.6; margin:0 0 10px; max-width:64ch; }
+  .story .rmeta{ font-size:.66rem; color:var(--fnt); font-weight:700; margin-bottom:9px; }
+  .story a.more{ font-size:.72rem; font-weight:800; color:var(--lime); text-decoration:none; }
+  /* ── Desktop: ONE-PAGER. Tabs disappear; every pane shows, laid out as an
+       editorial left column (live board, recaps, winners, leaderboard, rules)
+       with a sticky "play this week" register rail on the right.
+       Mobile (<900px) keeps the tabbed layout untouched. ── */
   @media(min-width:900px){
     .wrap{ max-width:var(--max-w,1200px); width:min(calc(100% - 2rem),var(--max-w,1200px)); }
-    .tabs{ max-width:560px; border-bottom:0; }
-    .content{ border-top:1px solid var(--bd); }
-    #homeUp,#homeWin{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:start; }
-    .featwrap{ display:grid; grid-template-columns:1.25fr .9fr; gap:18px; align-items:start; }
-    .featroster{ display:block; }
-    #pastWrap{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; align-items:start; }
-    #homeUp>.btn,#homeUp>.empty,#availList>.empty,#homeWin>.note,#pastWrap>.empty,#pastWrap>.note{ grid-column:1/-1; }
-    #recapStrip .rstrip{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; align-items:start; }
+    .tabs{ display:none; }
+    .content{ display:grid; grid-template-columns:minmax(0,1.35fr) 380px; gap:28px; align-items:start; border-top:1px solid var(--bd); padding-top:22px; }
+    .pane{ display:block!important; }
+    #p-home{ grid-column:1; grid-row:1; }
+    #p-leaderboard{ grid-column:1; grid-row:2; margin-top:34px; }
+    #p-rules{ grid-column:1; grid-row:3; margin-top:34px; }
+    #p-ladders{ grid-column:2; grid-row:1/span 3; position:sticky; top:80px; }
+    /* Home: the winners/upcoming toggle and its duplicates hide — the rail owns
+       registration, the left column owns results. */
+    #homeSeg,#homeUp,#filtersHome{ display:none!important; }
+    #homeWin{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+    #homeWin>.note{ grid-column:1/-1; }
+    #pastWrap{ display:block; }
+    .jumps{ display:flex; gap:8px; margin:0 0 20px; }
+    .jumps a{ font-size:.7rem; font-weight:800; color:var(--mut); text-decoration:none; border:1px solid var(--bd); border-radius:9999px; padding:8px 16px; }
+    .jumps a:hover{ color:var(--lime); border-color:rgba(184,255,44,.4); }
+    #p-leaderboard,#p-rules,#p-ladders{ scroll-margin-top:84px; }
+    .story.featured .rhead{ font-size:1.5rem; }
     #p-rules .card{ display:grid; grid-template-columns:1fr 1fr; gap:14px; background:transparent; border:0; padding:0; }
     #p-rules .rule{ background:var(--surf); border:1px solid var(--bd); border-radius:14px; padding:14px 16px; margin:0; }
     .lb-m{ display:none; }
@@ -114,9 +135,11 @@
   <div class="content">
     <div class="pane on" id="p-home">
       <div id="homeLive"></div>
+      <div id="jumpLinks" class="jumps"><a href="#p-leaderboard">Leaderboard</a><a href="#p-rules">Rules</a><a href="#" onclick="jumpCompleted();return false">Completed ladders</a></div>
+      <div id="recapStrip"></div>
       <div class="h1" id="homeH1">Latest winners</div>
       <div class="sub" id="homeSub">Top 3 each event — tap to see the full field</div>
-      <div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin:0 0 14px">
+      <div id="homeSeg" style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin:0 0 14px">
         <button id="hs-win" onclick="hSub('win')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--lime);color:#06210f">Latest winners</button>
         <button id="hs-up" onclick="hSub('up')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Upcoming</button>
       </div>
@@ -132,7 +155,7 @@
         <button id="lt-register" onclick="ladTab('register')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--lime);color:#06210f">Register</button>
         <button id="lt-past" onclick="ladTab('completed')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Completed</button>
       </div>
-      <div id="regWrap"><div id="filters"></div><div id="availList"><div class="empty">Loading…</div></div><div id="recapStrip"></div></div>
+      <div id="regWrap"><div id="filters"></div><div id="availList"><div class="empty">Loading…</div></div></div>
       <div id="pastWrap" style="display:none"></div>
     </div>
 
@@ -240,21 +263,25 @@ async function init(){
 }
 let RECAPS=[];
 const MEDC={0:'#f0c040',1:'#cfd3c8',2:'#d88a3a'};
+// Editorial recap feed — magazine-style stories on the Home tab (and the
+// desktop left column). Newest story runs featured-size.
 function renderRecaps(){
   const el=document.getElementById('recapStrip'); if(!el) return;
   if(!RECAPS.length){ el.innerHTML=''; return; }
-  const card=r=>{
-    const pods=(r.podium||[]).map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.68rem;font-weight:800;border-radius:9999px;padding:3px 10px 3px 4px;background:#000;border:1px solid var(--bd)"><span style="width:17px;height:17px;border-radius:50%;background:${MEDC[i]};color:#0b120b;font-size:.56rem;font-weight:900;text-align:center;line-height:17px">${i+1}</span>${esc(firstName(p.name))}${p.w!=null?` <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span>`:''}</span>`).join(' ');
-    return `<div style="background:var(--surf);border:1px solid var(--bd);border-radius:14px;padding:14px 16px;margin-bottom:12px">
-      <span style="display:inline-block;font-size:.54rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);background:rgba(240,192,64,.1);border:1px solid rgba(240,192,64,.3);border-radius:9999px;padding:3px 9px;margin-bottom:8px">Recap${r.date?' · '+wd(r.date):''}</span>
-      <div style="font-size:.88rem;font-weight:900;color:#f5f5f5">${esc(r.name)}</div>
-      ${r.title?`<div style="font-size:.76rem;font-weight:800;color:var(--lime);margin-top:3px">${esc(r.title)}</div>`:''}
-      ${(r.podium&&r.podium.length)?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${pods}</div>`:''}
-      ${r.dek?`<p style="font-size:.74rem;color:var(--mut);line-height:1.55;margin:9px 0 10px">${esc(r.dek)}</p>`:'<div style="height:9px"></div>'}
-      <a href="#" onclick="night('${r.eventId}');return false" style="font-size:.7rem;font-weight:800;color:var(--lime);text-decoration:none">Full results &amp; rounds →</a>
+  const story=(r,i)=>{
+    const pods=(r.podium||[]).map((p,k)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:800;border-radius:9999px;padding:3px 11px 3px 4px;background:#000;border:1px solid var(--bd)"><span style="width:17px;height:17px;border-radius:50%;background:${MEDC[k]};color:#0b120b;font-size:.56rem;font-weight:900;text-align:center;line-height:17px">${k+1}</span>${esc(firstName(p.name))}${p.w!=null?` <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span>`:''}</span>`).join(' ');
+    const meta=[r.playersCount?r.playersCount+' players':null,r.courts?r.courts+' courts':null,r.rounds?r.rounds+' rounds':null].filter(Boolean).join(' · ');
+    return `<div class="story${i===0?' featured':''}">
+      <div class="kick2">Recap${r.date?' · '+wd(r.date):''}</div>
+      <h3>${esc(r.name)}</h3>
+      ${r.title?`<div class="rhead">${esc(r.title)}</div>`:''}
+      ${(r.podium&&r.podium.length)?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px">${pods}</div>`:''}
+      ${r.dek?`<p>${esc(r.dek)}</p>`:''}
+      ${meta?`<div class="rmeta">${meta}</div>`:''}
+      <a class="more" href="#" onclick="night('${r.eventId}');return false">Full results &amp; rounds →</a>
     </div>`;
   };
-  el.innerHTML=`<div class="seclbl" style="margin-top:20px">Latest nights</div><div class="rstrip">${RECAPS.map(card).join('')}</div>`;
+  el.innerHTML=`<div class="seclbl">Latest ladders</div>${RECAPS.map(story).join('')}<div style="height:10px"></div>`;
 }
 
 /* ---- HOME ---- */
@@ -303,13 +330,10 @@ function renderHomeWeek(){
 function renderHomeLive(){
   const el=document.getElementById('homeLive'); if(!el) return;
   const live=ACTIVE.find(l=>l.status==='live');
-  if(!live){ el.innerHTML=''; return; }
-  el.innerHTML=`<a href="/ladder-live?event=${encodeURIComponent(live.id)}" style="display:block;text-decoration:none;background:linear-gradient(135deg,rgba(184,255,44,.16),rgba(23,215,176,.08));border:1px solid rgba(184,255,44,.42);border-radius:16px;padding:15px 16px;margin-bottom:16px">
-    <div style="display:inline-flex;align-items:center;gap:6px;font-size:.62rem;font-weight:900;letter-spacing:.09em;text-transform:uppercase;color:#06210f;background:var(--lime);border-radius:999px;padding:4px 10px"><span style="width:7px;height:7px;border-radius:50%;background:#06210f;animation:dspulse 1.1s infinite"></span> Dink Society Ladder · Live now</div>
-    <div style="font-size:1.18rem;font-weight:900;margin:9px 0 2px;color:var(--tx)">${esc(live.name)}</div>
-    <div style="font-size:.76rem;color:var(--mut);margin-bottom:12px">Tap to see your court, the pairings &amp; live scores</div>
-    <div style="text-align:center;padding:12px;border-radius:11px;background:var(--lime);color:#06210f;font-weight:900;font-size:.92rem">See the live board →</div>
-  </a>`;
+  if(!live){ stopLivePoll(); el.innerHTML=''; return; }
+  // Game night: the full self-updating live board (round, court pairings,
+  // scores) sits at the top of Home — desktop left column AND the mobile tab.
+  el.innerHTML=`<div style="margin-bottom:18px">${liveBoardCard(live)}</div>`;
 }
 function gotab(name){ RT.main=name; document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.t===name)); show(name); writeHash(); }
 
@@ -384,33 +408,15 @@ function renderFilters(){
 }
 function ladMatchesFilter(l){ return (FT==='all'||(l.type||'mixed')===FT)&&(FD==='all'||wdShort(l.date)===FD); }
 function setType(t){ FT=t; renderFilters(); renderAvail(); renderHomeWeek(); } function setDay(d){ FD=d; renderFilters(); renderAvail(); renderHomeWeek(); }
-// ── Option C: the next night (or tonight's LIVE night) gets the featured slot
-//    on the left; everything else stacks on the right. Mobile flows normally. ──
+// Register list (the desktop right rail / the mobile Ladders tab):
+// chronological, soonest first, so the week reads Sunday → Saturday and the
+// next ladder always leads.
 function renderAvail(){
-  const els=ACTIVE.filter(ladMatchesFilter);
-  const box=document.getElementById('availList');
-  if(!els.length){ stopLivePoll(); box.innerHTML='<div class="empty">No ladders match these filters.</div>'; return; }
-  // Chronological, soonest first — the week reads Sunday → Saturday, so the
-  // next night always leads and the register list never opens on a far-out date.
-  const byStart=els.slice().sort((a,b)=>(startMsOf(a)||9e15)-(startMsOf(b)||9e15));
-  const feat=els.find(l=>l.status==='live')||byStart[0];
-  const rest=byStart.filter(l=>l.id!==feat.id);
-  if(feat.status!=='live') stopLivePoll();
-  const featHtml=feat.status==='live'?liveBoardCard(feat):featCard(feat);
-  box.innerHTML=`<div class="featwrap">
-    <div class="featL" id="lad-${feat.id}" style="scroll-margin-top:84px">${featHtml}</div>
-    <div class="featR">${rest.length?rest.map((l,i)=>`<div id="lad-${l.id}" style="scroll-margin-top:84px">${ladderCard(l,i+1)}</div>`).join(''):'<div class="note">No other ladders open right now — new nights land here.</div>'}</div>
-  </div>`;
+  const els=ACTIVE.filter(ladMatchesFilter).slice().sort((a,b)=>(startMsOf(a)||9e15)-(startMsOf(b)||9e15));
+  document.getElementById('availList').innerHTML=els.length?els.map((l,i)=>'<div id="lad-'+l.id+'" style="scroll-margin-top:84px">'+ladderCard(l,i)+'</div>').join(''):'<div class="empty">No ladders match these filters.</div>';
 }
-// Featured upcoming night: the normal card plus (desktop only) the full
-// two-column roster, so the field is visible without a tap.
-function featCard(l){
-  let h=ladderCard(l,0);
-  if(l.roster&&l.roster.length){
-    h+=`<div class="featroster"><div class="seclbl" style="margin:16px 2px 8px">Who's in · ${l.roster.length} registered</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px">${ladRosterRows(l.roster)}</div></div>`;
-  }
-  return h;
-}
+// Jump pill: flip the rail to Completed and scroll to it.
+function jumpCompleted(){ try{ ladTab('completed'); }catch(e){} const el=document.getElementById('p-ladders'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
 // Game night: the featured slot becomes a self-updating live board — current
 // round pairings by court with live scores, refreshed every 20s.
 let LIVE_TIMER=null;
