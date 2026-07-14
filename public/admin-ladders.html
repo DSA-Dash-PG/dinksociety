@@ -95,6 +95,13 @@
     .sheet{ background:#161914;border:1px solid rgba(255,255,255,.14);border-radius:16px;max-width:560px;height:auto;max-height:88vh;padding:20px; }
     .x{ position:absolute;top:14px;right:16px;width:auto;height:auto;background:none;border:0;font-size:1.4rem; }
   }
+  /* Native <select> popups follow the OS light theme by default, which made the
+     payment-method options unreadable on the dark admin UI. color-scheme tells
+     the browser to render the popup dark; the option rule covers browsers that
+     style options directly. */
+  select{ color-scheme:dark; }
+  select option{ background:#161616; color:#f5f5f5; }
+  select option:checked{ background:#2a2a2a; }
 </style>
 </head>
 <body>
@@ -167,6 +174,8 @@
             <div><label class="l">League Venmo</label><input class="i" id="f-venmo" value="@DinkSociety"></div>
             <div><label class="l">Organizer emails (Venmo confirm)</label><input class="i" id="f-org" placeholder="you@email.com, treasurer@…"></div>
           </div>
+          <div class="frow"><label class="l">Payment methods</label><div class="seg" id="seg-pay"><button class="on" data-v="card,venmo">Card + Venmo</button><button data-v="venmo">Venmo only</button><button data-v="card">Card only</button></div></div>
+          <div class="help" style="margin:-2px 0 13px">Venmo only skips Stripe entirely — no card option, no 10% card fee. Ladder credit always works regardless.</div>
           <div class="frow"><label class="l">When a spot opens</label><div class="seg" id="seg-spot"><button class="on" data-v="hold">Hold &amp; confirm (30m)</button><button data-v="auto">Auto-claim</button></div></div>
           <div class="frow"><label class="l">When a player cancels</label><div class="seg" id="seg-cancel"><button class="on" data-v="auto_credit">Auto credit</button><button data-v="credit_if_refilled">If refilled</button><button data-v="no_credit">No credit</button></div></div>
           <button class="btn btn-lime" onclick="createLadder()">Create &amp; open signups</button>
@@ -283,6 +292,7 @@
   </div>
   <div class="frow"><label class="l">Court names (top to bottom)</label><div id="m-courtnames" style="display:flex;flex-wrap:wrap;gap:8px"></div></div>
   <div class="frow"><label class="l">League Venmo</label><input class="i" id="m-venmo"></div>
+  <div class="frow"><label class="l">Payment methods</label><div class="seg" id="mseg-pay"><button class="on" data-v="card,venmo">Card + Venmo</button><button data-v="venmo">Venmo only</button><button data-v="card">Card only</button></div><div class="help" style="margin-top:4px">Changing this applies immediately — players who already paid keep their spot either way.</div></div>
   <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
   <div id="mEditMsg"></div>
 
@@ -603,6 +613,7 @@ async function createLadder(){
     fee:parseFloat(document.getElementById('f-fee').value)||0,
     venmoHandle:document.getElementById('f-venmo').value.trim(),
     organizers:document.getElementById('f-org').value.split(',').map(s=>s.trim()).filter(Boolean),
+    paymentMethods:seg('seg-pay').split(','),
     spotOpenPolicy:seg('seg-spot'),
     cancelPolicy:seg('seg-cancel'),
     type:seg('seg-type'),
@@ -625,6 +636,11 @@ async function openManage(id){
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
   setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-type',d.event.type||'mixed');
   setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
+  // Reflect the ladder's payment methods in the edit segment (credit is implicit).
+  { const pm=((d.event.paymentMethods&&d.event.paymentMethods.length?d.event.paymentMethods:['card','venmo']).filter(m=>m!=='credit').sort().join(','))||'card,venmo';
+    const el=document.getElementById('mseg-pay');
+    if(el){ let hit=false; el.querySelectorAll('button').forEach(b=>{ const on=b.dataset.v.split(',').sort().join(',')===pm; b.classList.toggle('on',on); if(on)hit=true; });
+      if(!hit) el.querySelector('button').classList.add('on'); } }
   setv('m-rounds',d.event.rounds||6); setv('m-roundmin',d.event.roundMin||12); setv('m-score',d.event.scoreMode||'points'); renderCourtNames('m-courtnames', d.event.courts, d.event.courtNames||[]);
   document.getElementById('mEditMsg').innerHTML='';
   let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
@@ -823,7 +839,7 @@ async function saveEdit(){
     name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(),
     courts:parseInt(g('m-courts'))||0, courtNames:courtNamesOf('m-courtnames'), rounds:parseInt(g('m-rounds'))||6, roundMin:parseInt(g('m-roundmin'))||12, scoreMode:g('m-score'), capacity:parseInt(g('m-cap'))||0,
     feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(), type:g('m-type'),
-    paymentMethods:CURRENT.paymentMethods, organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
+    paymentMethods:seg('mseg-pay').split(','), organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
     spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,
     fcfsWindowHours:CURRENT.fcfsWindowHours, status:CURRENT.status,
   };
@@ -937,7 +953,7 @@ const PAY_METHODS=['cash','venmo','zelle','card','other'];
 function payCtl(p){
   const em=esc(p.email), pid=esc(p.playerId||'');
   const opt=sel=>PAY_METHODS.map(m=>`<option value="${m}" ${sel===m?'selected':''}>${m[0].toUpperCase()+m.slice(1)}</option>`).join('');
-  const selStyle='font:inherit;font-size:.72rem;font-weight:700;background:var(--surf2);color:var(--tx);border:1px solid var(--bd);border-radius:7px;padding:4px 6px;cursor:pointer';
+  const selStyle='font:inherit;font-size:.72rem;font-weight:700;background:var(--surf2);color:var(--tx);border:1px solid var(--bd);border-radius:7px;padding:4px 6px;cursor:pointer;color-scheme:dark';
   if(p.paymentStatus==='paid')
     return `<select title="Edit payment method" style="${selStyle}" onchange="act('set-method','${em}','${pid}',this.value)">${opt(p.paymentMethod||'cash')}</select> <button class="btn-out btn-sm" onclick="act('mark-unpaid','${em}','${pid}')">Mark unpaid</button>`;
   return `<select title="Mark paid" style="${selStyle}" onchange="if(this.value)act('mark-paid','${em}','${pid}',this.value)"><option value="">✓ Mark paid…</option>${opt('')}</select>`;

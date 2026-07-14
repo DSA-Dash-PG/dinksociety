@@ -107,6 +107,13 @@ export default async (req) => {
   if (req.method === 'POST') {
     const body = await req.json().catch(() => ({}));
     const method = ['credit', 'venmo', 'card'].includes(body.paymentMethod) ? body.paymentMethod : null;
+    // Respect the ladder's payment settings (credit is always allowed — it's
+    // already the league's money).
+    const allowedMethods = Array.isArray(event.paymentMethods) && event.paymentMethods.length
+      ? event.paymentMethods : ['card', 'venmo'];
+    if (method && method !== 'credit' && !allowedMethods.includes(method)) {
+      return json({ error: `${method === 'card' ? 'Card' : 'Venmo'} payments are turned off for this ladder.` }, 400);
+    }
     if (body.invitedBy) person.invitedBy = String(body.invitedBy).slice(0, 80);
 
     // Already in (roster/pending)? nothing to do. On the waitlist? Grab the open

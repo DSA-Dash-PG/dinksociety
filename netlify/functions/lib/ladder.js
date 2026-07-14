@@ -98,14 +98,34 @@ export function minutesLeft(pendingClaim, now = Date.now()) {
   return Math.max(1, Math.round(ms / 60000));
 }
 
-/** Parse "8:30 AM" / "6:30 PM" / "18:30" into { h, m }, or null. */
+/**
+ * Parse a start time into { h, m }, or null. Accepts the formats admins
+ * actually type: "8:30 AM", "6:30 PM", "18:30", "6.30pm", "630pm", "6pm",
+ * "1830". The old colon-only regex silently failed on "630pm", which made
+ * eventStartMs fall back to MIDNIGHT — so the "3 hours out" reminder fired
+ * at 9pm the night before.
+ */
 export function parseTime(s) {
   if (!s) return null;
-  const m = String(s).trim().match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/i);
+  const str = String(s).trim().toLowerCase().replace(/\s+/g, '');
+  // "6:30pm" / "6.30pm" / "18:30"
+  let m = str.match(/^(\d{1,2})[:.](\d{2})(am|pm)?$/);
+  // "630pm" / "1130am" — am/pm required (a bare "630" is ambiguous)
+  if (!m) m = str.match(/^(\d{1,2})(\d{2})(am|pm)$/);
+  // "6pm" / "11am"
+  if (!m) {
+    const m2 = str.match(/^(\d{1,2})(am|pm)$/);
+    if (m2) m = [m2[0], m2[1], '00', m2[2]];
+  }
+  // "1830" — 24h military, no am/pm
+  if (!m) {
+    const m3 = str.match(/^(\d{2})(\d{2})$/);
+    if (m3 && +m3[1] <= 23) m = [m3[0], m3[1], m3[2], undefined];
+  }
   if (!m) return null;
   let h = parseInt(m[1], 10);
   const min = parseInt(m[2], 10);
-  const ap = m[3] && m[3].toLowerCase();
+  const ap = m[3];
   if (ap === 'pm' && h < 12) h += 12;
   if (ap === 'am' && h === 12) h = 0;
   if (h > 23 || min > 59) return null;

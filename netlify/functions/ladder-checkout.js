@@ -39,6 +39,14 @@ export default async (req) => {
   const event = await getEvent(eventId);
   if (!event) return json({ error: 'Ladder not found' }, 404);
 
+  // Respect the ladder's payment settings — a Venmo-only ladder must never
+  // reach Stripe, even via a direct API call.
+  const allowedMethods = Array.isArray(event.paymentMethods) && event.paymentMethods.length
+    ? event.paymentMethods : ['card', 'venmo'];
+  if (!allowedMethods.includes('card')) {
+    return json({ error: 'Card payments are turned off for this ladder — pay by Venmo instead.' }, 400);
+  }
+
   const signups = await getSignups(eventId);
 
   // Ensure the player holds a roster spot (this endpoint can also be the entry

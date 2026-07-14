@@ -29,8 +29,11 @@ export default async (req) => {
   const courts = Math.max(0, Math.floor(Number(b.courts) || 0));
   const feeCents = b.feeCents != null ? Math.round(Number(b.feeCents)) : Math.round((Number(b.fee) || 0) * 100);
   const capacity = b.capacity != null && +b.capacity > 0 ? Math.floor(+b.capacity) : capacityFromCourts(courts);
+  // On update, an omitted paymentMethods must KEEP the existing setting — the old
+  // default here silently re-enabled card on every edit of a Venmo-only ladder.
   const methods = Array.isArray(b.paymentMethods) && b.paymentMethods.length
-    ? b.paymentMethods.filter(m => ['card', 'venmo', 'credit'].includes(m)) : ['card', 'venmo'];
+    ? b.paymentMethods.filter(m => ['card', 'venmo', 'credit'].includes(m))
+    : (existing?.paymentMethods?.length ? existing.paymentMethods : ['card', 'venmo']);
 
   // Play format (merged from the old PickleLadder create form):
   // per-court names (top→bottom; index 0 = championship court), round count,

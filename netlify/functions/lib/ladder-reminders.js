@@ -17,7 +17,7 @@
 import { getStore } from '@netlify/blobs';
 import { sendNotify } from './notify-prefs.js';
 import { siteUrl, dateLineOf, fmtCents } from './ladder-notify.js';
-import { listEvents, getSignups, eventStartMs, effectiveCapacity, zonedTimeMs } from './ladder.js';
+import { listEvents, getSignups, eventStartMs, effectiveCapacity, zonedTimeMs, parseTime } from './ladder.js';
 import { buildLadderProfile } from './profile-data.js';
 import { createLadderToken } from './ladder-token.js';
 
@@ -49,6 +49,11 @@ function morningMs(event) {
 
 /** The moment a given reminder kind should first fire for this event (epoch ms). */
 export function triggerMs(event, kind) {
+  // Safety: if a start time IS set but can't be parsed, eventStartMs silently
+  // falls back to midnight — which once fired "3 hours out" at 9 PM the night
+  // before. Better to skip start-relative reminders than send them at midnight.
+  // (The morning reminder is date-based, so it stays safe either way.)
+  if (event?.startTime && !parseTime(event.startTime) && kind !== 'morning') return null;
   const start = eventStartMs(event);
   if (start == null) return null;
   if (kind === 'two_day') return start - 48 * HOUR;
@@ -75,6 +80,9 @@ export function isDue(event, kind, now = Date.now()) {
 async function markerExists(eventId, kind) {
   const m = await markers().get(markerKey(eventId, kind), { type: 'json' }).catch(() => null);
   return !!m;
+}
+async function getMarker(eventId, kind) {
+  return markers().get(markerKey(eventId, kind), { type: 'json' }).catch(() => null);
 }
 async function setMarker(eventId, kind, info) {
   await markers().setJSON(markerKey(eventId, kind), { eventId, kind, at: new Date().toISOString(), ...info });
@@ -269,10 +277,21 @@ export async function runDueReminders(circuit = 'I') {
     if (start == null || start <= now) continue;
     for (const kind of REMINDER_KINDS) {
       if (!isDue(event, kind, now)) continue;
-      if (await markerExists(event.id, kind)) continue;
+      // A marker normally means "already sent" — but a marker written BEFORE its
+      // own trigger time means the send was mis-timed (the "630pm" parse bug
+      // fired 3-hours-out at 9 PM the night before). Re-send those once, at the
+      // right time. Never second-guess a manual/forced push.
+      const m = await getMarker(event.id, kind);
+      let resendMisfire = false;
+      if (m) {
+        const trig = triggerMs(event, kind);
+        const sentAt = new Date(m.at || 0).getTime();
+        resendMisfire = !m.forced && trig != null && sentAt < trig - 60000;
+        if (!resendMisfire) continue;
+      }
       const signups = await getSignups(event.id);
-      const res = await sendEventReminder(event, signups, kind);
-      out.push({ event: event.name, ...res });
+      const res = await sendEventReminder(event, signups, kind, { force: resendMisfire });
+      out.push({ event: event.name, ...res, ...(resendMisfire ? { resentMisfire: true } : {}) });
     }
   }
   return out;
