@@ -7,7 +7,7 @@ import { allowRequest } from './lib/rate-limit.js';
 
 const GENERIC = {
   ok: true,
-  message: "If that email is on a team roster, we just sent a sign-in link. Check your inbox.",
+  message: "If we know that email, a sign-in link is on the way — check your inbox. New to Dink Society? Create a ladder account instead (no team needed).",
 };
 
 export default async (req) => {
