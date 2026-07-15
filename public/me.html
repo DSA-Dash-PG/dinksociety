@@ -1954,21 +1954,15 @@
     const methods = ev.paymentMethods || ['card', 'venmo'];
     if (!ev.venmoHandle || !methods.includes('venmo') || !ev.feeCents) return '';
     const amt = (ev.feeCents / 100).toFixed(2);
-    return `<button class="venmo-btn" data-h="${esc(String(ev.venmoHandle).replace(/^@/, ''))}" data-a="${amt}" data-n="${esc(ev.name || 'Ladder entry')}" onclick="payVenmo(this)">Pay $${amt} with Venmo</button>`;
-  }
-  function payVenmo(btn) {
-    const h = encodeURIComponent(btn.dataset.h || ''), a = btn.dataset.a || '', n = encodeURIComponent(btn.dataset.n || 'Ladder entry');
-    const deep = `venmo://paycharge?txn=pay&recipients=${h}&amount=${a}&note=${n}`;
-    const web = `https://venmo.com/${h}?txn=pay&amount=${a}&note=${n}`;
-    // Fallback to the web page only if the app didn't take over. iOS Safari
-    // doesn't reliably fire blur when an app opens, so watch pagehide +
-    // visibilitychange too — otherwise the fallback yanks users OUT of Venmo.
-    const t = setTimeout(() => { location.href = web; }, 1200);
-    const cancel = () => clearTimeout(t);
-    window.addEventListener('blur', cancel, { once: true });
-    window.addEventListener('pagehide', cancel, { once: true });
-    document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); }, { once: true });
-    location.href = deep;
+    // Venmo only opens from a REAL anchor tap on iOS (JS navigation is silently
+    // dropped). Phones get the venmo://paycharge deep link — app opens with
+    // recipient, amount, AND note prefilled. Desktop gets the web profile.
+    const h = encodeURIComponent(String(ev.venmoHandle).replace(/^@/, ''));
+    const mobile = /android|iphone|ipad|ipod/i.test(navigator.userAgent);
+    const deep = `venmo://paycharge?txn=pay&recipients=${h}&amount=${amt}&note=${encodeURIComponent(ev.name || 'Ladder entry')}`;
+    const web = `https://venmo.com/u/${h}`;
+    return `<a class="venmo-btn" href="${mobile ? deep : web}" ${mobile ? '' : 'target="_blank" rel="noopener"'} style="text-decoration:none;display:inline-block;text-align:center">Pay $${amt} with Venmo →</a>`
+      + (mobile ? ` <a href="${web}" target="_blank" rel="noopener" style="font-size:10px;color:var(--color-text-faint);text-decoration:underline">no app?</a>` : '');
   }
 
   // A single upcoming ladder night, for the merged Games schedule.
