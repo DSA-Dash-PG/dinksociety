@@ -92,7 +92,10 @@ export function venmoPayLink(ev) {
   const note = ev?.name || 'Ladder entry';
   return {
     venmoHandle: handle,
-    venmoUrl: `https://venmo.com/${encodeURIComponent(handle)}?txn=pay&amount=${dollars}&note=${encodeURIComponent(note)}`,
+    // /u/<handle> is a Venmo universal link — on phones it opens the APP
+    // directly (the old ?txn=pay web URL just landed on venmo.com's website).
+    // No amount prefill, but the email copy above the button spells it out.
+    venmoUrl: `https://venmo.com/u/${encodeURIComponent(handle)}`,
     venmoAmountLabel: fmtCents(feeCents),
     venmoNote: note,
   };

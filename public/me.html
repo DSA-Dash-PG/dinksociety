@@ -1960,8 +1960,14 @@
     const h = encodeURIComponent(btn.dataset.h || ''), a = btn.dataset.a || '', n = encodeURIComponent(btn.dataset.n || 'Ladder entry');
     const deep = `venmo://paycharge?txn=pay&recipients=${h}&amount=${a}&note=${n}`;
     const web = `https://venmo.com/${h}?txn=pay&amount=${a}&note=${n}`;
-    const t = setTimeout(() => { location.href = web; }, 700);
-    window.addEventListener('blur', () => clearTimeout(t), { once: true });
+    // Fallback to the web page only if the app didn't take over. iOS Safari
+    // doesn't reliably fire blur when an app opens, so watch pagehide +
+    // visibilitychange too — otherwise the fallback yanks users OUT of Venmo.
+    const t = setTimeout(() => { location.href = web; }, 1200);
+    const cancel = () => clearTimeout(t);
+    window.addEventListener('blur', cancel, { once: true });
+    window.addEventListener('pagehide', cancel, { once: true });
+    document.addEventListener('visibilitychange', () => { if (document.hidden) cancel(); }, { once: true });
     location.href = deep;
   }
 

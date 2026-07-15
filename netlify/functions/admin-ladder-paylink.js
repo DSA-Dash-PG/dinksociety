@@ -90,9 +90,9 @@ export default async (req) => {
   const wantVenmo = methods.includes('venmo') && event.venmoHandle;
   if (wantVenmo) {
     venmoHandle = String(event.venmoHandle).replace(/^@/, '');
-    const dollars = (feeCents / 100).toFixed(2);
-    const note = event.name || 'Ladder entry';
-    venmoUrl = `https://venmo.com/${encodeURIComponent(venmoHandle)}?txn=pay&amount=${dollars}&note=${encodeURIComponent(note)}`;
+    // Universal link — opens the Venmo app on phones (the ?txn=pay web URL
+    // didn't). Amount + note are written out in the email body.
+    venmoUrl = `https://venmo.com/u/${encodeURIComponent(venmoHandle)}`;
   }
 
   if (!cardUrl && !venmoUrl) {

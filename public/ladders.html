@@ -747,7 +747,21 @@ function needSignIn(){ payMsg('warn',`One quick step first:<br><b>New here?</b> 
 async function post(path,body){ const r=await fetch(`${API}${path}`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return {status:r.status,d:await r.json().catch(()=>({}))}; }
 async function payCredit(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit'}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
 async function payCard(id){ const {status,d}=await post(`/ladder-checkout?event=${id}`,{}); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payMsg('err',d.error||'Could not start checkout.'); }
-async function payVenmo(id){ const l=curLadder(id); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo'}); if(status===401)return needSignIn(); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const amt=((l.feeCents||0)/100).toFixed(2); const link=`https://venmo.com/${handle}?txn=pay&amount=${amt}&note=${encodeURIComponent(l.name)}`; payMsg('ok',`Spot held. Send <b>${fmt(l.feeCents)}</b> to <b>@${handle}</b> — <a href="${link}" target="_blank" style="color:var(--lime);font-weight:700">Open Venmo</a>. An organizer confirms and you'll get a "you're in" email.`); return; } payMsg('err',d.error||'Something went wrong.'); }
+// Open the Venmo APP with the payment prefilled (venmo:// scheme); if the app
+// isn't installed the timer falls through to the venmo.com web page instead.
+function openVenmoApp(handle,amt,note){
+  const h=encodeURIComponent(String(handle||'').replace(/^@/,'')), n=encodeURIComponent(note||'Ladder entry');
+  const deep=`venmo://paycharge?txn=pay&recipients=${h}&amount=${amt}&note=${n}`;
+  const web=`https://venmo.com/${h}?txn=pay&amount=${amt}&note=${n}`;
+  if(!/android|iphone|ipad|ipod/i.test(navigator.userAgent)){ window.open(web,'_blank'); return; }
+  const t=setTimeout(()=>{ location.href=web; },1200);
+  const cancel=()=>clearTimeout(t);
+  window.addEventListener('blur',cancel,{once:true});
+  window.addEventListener('pagehide',cancel,{once:true});
+  document.addEventListener('visibilitychange',()=>{ if(document.hidden) cancel(); },{once:true});
+  location.href=deep;
+}
+async function payVenmo(id){ const l=curLadder(id); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo'}); if(status===401)return needSignIn(); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const amt=((l.feeCents||0)/100).toFixed(2); payMsg('ok',`Spot held. Send <b>${fmt(l.feeCents)}</b> to <b>@${handle}</b> — <a href="#" onclick="openVenmoApp('${esc(handle)}','${amt}','${esc(l.name)}');return false" style="color:var(--lime);font-weight:700">Open Venmo</a>. An organizer confirms and you'll get a "you're in" email.`); return; } payMsg('err',d.error||'Something went wrong.'); }
 async function joinWaitlist(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{}); if(status===401)return needSignIn(); if(d.status==='waitlist'){ payMsg('ok',"You're on the waitlist — we'll email you the moment a spot opens."); } else payMsg('info',d.message||'Done.'); }
 
 init();
