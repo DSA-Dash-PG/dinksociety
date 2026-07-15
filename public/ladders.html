@@ -456,10 +456,14 @@ async function pollLive(id){
   if(!p||!p.started){ el.innerHTML='<div class="note">Round 1 is being set — pairings appear here the moment play starts.</div>'; return; }
   const rd=p.rounds[p.currentRound]||p.rounds[p.rounds.length-1];
   if(!rd){ el.innerHTML='<div class="note">Waiting for the first round…</div>'; return; }
-  const cname=i=>{ const n=p.courtNames; return (n&&n[i-1])?n[i-1]:('Court '+i); };
+  // Match the scorer's mapping exactly: the engine's HIGHEST court number is
+  // the king court; courtNames[0] is the top court. Label = names[tC - num],
+  // and courts render king-first (descending) like the scorer and live page.
+  const tC=(p.rounds[0]&&p.rounds[0].courts&&p.rounds[0].courts.length)||(rd.courts||[]).length;
+  const cname=num=>{ const n=p.courtNames; const idx=tC-num; return (Array.isArray(n)&&idx>=0&&idx<n.length&&String(n[idx]||'').trim())?n[idx]:('Court '+num); };
   const team=t=>(t||[]).map(x=>esc(firstName(x.name))).join(' + ')||'—';
   el.innerHTML=`<div style="font-size:.62rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin-bottom:6px">Round ${rd.round} of ${p.totalRounds}${p.finished?' · Final':''}</div>`+
-    (rd.courts||[]).map(c=>{
+    [...(rd.courts||[])].sort((a,b)=>(b.court||0)-(a.court||0)).map(c=>{
       const s=c.score, has=!!(s&&(s.t1!=null||s.t2!=null));
       const w1=has&&(s.t1||0)>(s.t2||0), w2=has&&(s.t2||0)>(s.t1||0);
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">

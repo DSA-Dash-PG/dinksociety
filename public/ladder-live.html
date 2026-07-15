@@ -314,7 +314,10 @@ function render(){
     if(r){
       const isLive = viewRound===ci && st==='live';
       h+=`<div class="seclbl" style="margin-top:4px">Round ${r.round} ${isLive?'· in play':'· final'} — all courts</div>`;
-      h+=(r.courts||[]).map(c=>courtCard(c,isLive)).join('');
+      // King court on TOP — same descending order as the admin scorer. The
+      // engine's highest court number IS the championship court; raw array
+      // order put it at the bottom and made the public view contradict the app.
+      h+=[...(r.courts||[])].sort((a,b)=>(b.court||0)-(a.court||0)).map(c=>courtCard(c,isLive)).join('');
     } else { h+=`<div class="note">No rounds yet.</div>`; }
   } else if(tab==='standings'){
     h+=`<div class="seclbl" style="margin-top:4px">Night standings ${st==='final'?'· final':'· live'}</div>`+standingsTable();
