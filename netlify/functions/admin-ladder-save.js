@@ -41,7 +41,7 @@ export default async (req) => {
   const courtNames = Array.isArray(b.courtNames)
     ? b.courtNames.map(s => String(s).trim()).filter(Boolean).slice(0, 20)
     : (existing?.courtNames || []);
-  const rounds = Number.isFinite(+b.rounds) && +b.rounds > 0 ? Math.min(20, Math.floor(+b.rounds)) : (existing?.rounds ?? 6);
+  const rounds = Number.isFinite(+b.rounds) && +b.rounds > 0 ? Math.min(20, Math.floor(+b.rounds)) : (existing?.rounds ?? 10);
   const roundMin = Number.isFinite(+b.roundMin) && +b.roundMin > 0 ? Math.min(60, Math.floor(+b.roundMin)) : (existing?.roundMin ?? 12);
   const scoreMode = ['points', 'winby2', 'to11', 'to15'].includes(b.scoreMode) ? b.scoreMode : (existing?.scoreMode || 'points');
 

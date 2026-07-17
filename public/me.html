@@ -12,6 +12,7 @@
 <script src="/js/short-name.js"></script>
 <script src="/js/live-poll.js"></script>
 <script src="/ladder-profile-view.js"></script>
+<script src="/js/ds-ui.js"></script>
 <script src="/badges.js?v=2"></script>
 <script src="/js/universal-search.js" defer></script>
 <style>
@@ -1660,7 +1661,7 @@
 
     // Sign out
     $('ds-drawer-signout').addEventListener('click', async () => {
-      if (!confirm('Sign out?')) return;
+      if (!(await dsConfirm({ title: 'Sign out?', confirmLabel: 'Sign out', cancelLabel: 'Stay' }))) return;
       try { await fetch(API + '/player-logout', { method: 'POST', credentials: 'include' }); } catch {}
       location.href = '/me.html';
     });
@@ -1861,9 +1862,9 @@
     try {
       const res = await fetch(API + '/admin-bootstrap', { method: 'POST', credentials: 'include' });
       if (res.ok) { location.href = '/admin.html'; return; }
-      alert('Admin access not found for your account. If this looks wrong, ask the league office.');
+      dsToast({ type: 'error', title: 'No admin access', message: 'Admin access not found for your account. If this looks wrong, ask the league office.' });
     } catch (e) {
-      alert('Could not open admin tools — please try again.');
+      dsToast({ type: 'error', message: 'Could not open admin tools — please try again.' });
     } finally {
       if (lbl) lbl.textContent = orig;
       adminOpening = false;
@@ -1880,9 +1881,9 @@
       const res = await fetch(API + '/captain-bootstrap', { method: 'POST', credentials: 'include' });
       if (res.ok) { location.href = '/captain.html'; return; }
       if (res.status === 401) { location.href = '/me.html'; return; }
-      alert('Captain access not found for your account. If this looks wrong, ask the league office.');
+      dsToast({ type: 'error', title: 'No captain access', message: 'Captain access not found for your account. If this looks wrong, ask the league office.' });
     } catch (e) {
-      alert('Could not open captain tools — please try again.');
+      dsToast({ type: 'error', message: 'Could not open captain tools — please try again.' });
     } finally {
       if (lbl) lbl.textContent = orig;
       capOpening = false;
@@ -2530,12 +2531,12 @@
         body: JSON.stringify({ status, reason }),
       });
       const d = await r.json().catch(() => ({}));
-      if (!r.ok) { alert(d.error || 'Could not update availability.'); return; }
+      if (!r.ok) { dsToast({ type: 'error', message: d.error || 'Could not update availability.' }); return; }
       const item = (DATA.schedule || []).find(m => m.matchId === matchId);
       if (item) item.availability = { ...(item.availability || {}), status: d.status, reason: d.reason, byRole: 'player', editable: true };
       renderSchedule();
       try { renderHome(); } catch {}
-    } catch { alert('Could not update availability.'); }
+    } catch { dsToast({ type: 'error', message: 'Could not update availability.' }); }
   }
 
   // ── Game-by-game scores (Results toggle) ─────────────────────────

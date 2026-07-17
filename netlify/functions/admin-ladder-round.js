@@ -78,7 +78,7 @@ export default async (req) => {
     if (players.length < 4) return json({ error: 'Need at least 4 players on the roster to start.' }, 400);
     // Default the format from what was set at ladder creation (the merged form);
     // an explicit value in the start request still wins.
-    const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || event.rounds || 6));
+    const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || event.rounds || 10));
     const strength = await strengthFor(eventId, players);
     const r1 = genR1(players, event.courts || 1, strength);
     const roundMin = Math.max(1, Math.min(60, parseInt(body.roundMin) || event.roundMin || 12));

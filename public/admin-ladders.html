@@ -102,6 +102,10 @@
   select{ color-scheme:dark; }
   select option{ background:#161616; color:#f5f5f5; }
   select option:checked{ background:#2a2a2a; }
+  .rfbar{ display:flex;gap:7px;flex-wrap:wrap;margin:8px 0 4px; }
+  .rfin{ flex:1;min-width:92px;min-height:38px;padding:0 10px;border-radius:9px;border:1px solid rgba(255,255,255,.1);background:#1c1f18;color:#f0f2ec;font:inherit;font-size:.8rem; }
+  .kebab{ margin-left:auto;background:#1c1f18;border:1px solid rgba(255,255,255,.14);color:#f0f2ec;border-radius:8px;width:32px;height:32px;font-size:1.15rem;line-height:1;cursor:pointer;flex-shrink:0; }
+  .kebab:hover{ border-color:var(--lime);color:var(--lime); }
 </style>
 </head>
 <body>
@@ -164,7 +168,7 @@
             <div><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" value="7"></div>
           </div>
           <div class="frow row2">
-            <div><label class="l">Rounds</label><input class="i" id="f-rounds" type="number" value="6"></div>
+            <div><label class="l">Rounds</label><input class="i" id="f-rounds" type="number" value="10"></div>
             <div><label class="l">Round time (min)</label><input class="i" id="f-roundmin" type="number" value="12"></div>
             <div><label class="l">Scoring</label><select class="i" id="f-score"><option value="points">Points</option><option value="winby2">Win by 2</option><option value="to11">Games to 11</option><option value="to15">Rally to 15</option></select></div>
           </div>
@@ -355,6 +359,7 @@
   </div>
 </div></div>
 
+<script src="/js/ds-ui.js"></script>
 <script>
 const API='/.netlify/functions';
 let CURRENT=null;
@@ -606,7 +611,7 @@ async function createLadder(){
     place:document.getElementById('f-place').value.trim(),
     courts:parseInt(document.getElementById('f-courts').value)||0,
     courtNames:courtNamesOf('f-courtnames'),
-    rounds:parseInt(document.getElementById('f-rounds').value)||6,
+    rounds:parseInt(document.getElementById('f-rounds').value)||10,
     roundMin:parseInt(document.getElementById('f-roundmin').value)||12,
     scoreMode:document.getElementById('f-score').value,
     capacity:parseInt(document.getElementById('f-cap').value)||0,
@@ -627,7 +632,7 @@ async function createLadder(){
 
 async function openManage(id){
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(id));
-  if(status!==200){ alert('Could not load ('+status+').'); return; }
+  if(status!==200){ dsToast({ type:'error', message:'Could not load ('+status+').' }); return; }
   CURRENT=d.event; MROSTER=(d.roster||[]).map(p=>p.playerId);
   const rs=document.getElementById('ros-search'); if(rs)rs.value=''; const rr=document.getElementById('rosResults'); if(rr)rr.innerHTML='';
   document.getElementById('mTitle').textContent=d.event.name;
@@ -641,24 +646,17 @@ async function openManage(id){
     const el=document.getElementById('mseg-pay');
     if(el){ let hit=false; el.querySelectorAll('button').forEach(b=>{ const on=b.dataset.v.split(',').sort().join(',')===pm; b.classList.toggle('on',on); if(on)hit=true; });
       if(!hit) el.querySelector('button').classList.add('on'); } }
-  setv('m-rounds',d.event.rounds||6); setv('m-roundmin',d.event.roundMin||12); setv('m-score',d.event.scoreMode||'points'); renderCourtNames('m-courtnames', d.event.courts, d.event.courtNames||[]);
+  setv('m-rounds',d.event.rounds||10); setv('m-roundmin',d.event.roundMin||12); setv('m-score',d.event.scoreMode||'points'); renderCourtNames('m-courtnames', d.event.courts, d.event.courtNames||[]);
   document.getElementById('mEditMsg').innerHTML='';
-  let h='<div class="sec" style="margin:8px 0 6px">Roster</div>';
-  h+= d.roster.length? d.roster.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''))).map(p=>{
-    const pay=p.paymentStatus==='paid'?`<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${p.paymentMethod||'?'}</span>`
-      :p.paymentStatus==='venmo_pending'?'<span class="chip chip-gold">Venmo pending</span>':'<span class="chip chip-gray">pending</span>';
-    const venmoBtns=p.paymentStatus==='venmo_pending'?`<button class="btn-out btn-sm" onclick="act('confirm-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Confirm</button> <button class="btn-danger" onclick="act('decline-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Decline</button>`:'';
-    const payEdit=p.paymentStatus==='venmo_pending'?'':payCtl(p);
-    const linkBtn=(p.paymentStatus!=='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="sendPaylink('${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send link</button>`:'';
-    const noEmail=p.email?'':'<span class="chip chip-gray" title="No email on file — they can\'t receive a confirmation">no email</span>';
-    const emailBtn=p.email?'':`<button class="btn-out btn-sm" onclick="setEmailFor('${esc(p.playerId||'')}','')">✉ Add email</button>`;
-    const resendBtn=(p.paymentStatus==='paid'&&p.email)?`<button class="btn-out btn-sm" onclick="resendConfirm('${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`:'';
-    const cancelLinkBtn=p.email?`<button class="btn-out btn-sm" title="Email them a fresh one-tap cancel link — nothing happens unless they tap it and confirm" onclick="sendCancelLink('${esc(p.email)}','${esc(p.playerId||'')}')">✉ Cancel link</button>`:'';
-    return `<div class="prow"><span class="pn">${esc(p.name)}</span>${pay} ${noEmail} ${venmoBtns} ${payEdit} ${linkBtn} ${emailBtn} ${resendBtn} ${cancelLinkBtn} <button class="btn-danger" onclick="act('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove</button></div>`;
-  }).join(''):'<div class="empty">No signups yet.</div>';
-  h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(d.pendingClaim?` · held: ${esc(d.pendingClaim.name)}`:'')+'</div>';
-  h+= d.waitlist.length? d.waitlist.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="promoteWait(${i})">Promote</button> <button class="btn-danger" onclick="removeWait(${i})">Remove</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
-  document.getElementById('mBody').innerHTML=h;
+  _MROSTER=(d.roster||[]).slice(); _MWAIT=(d.waitlist||[]).slice(); _MCLAIM=d.pendingClaim||null;
+  let h='<div class="rfbar">'
+    +'<input id="rfq" class="rfin" type="text" placeholder="Search name" oninput="renderRosterList()">'
+    +'<select id="rfstatus" class="rfin" onchange="renderRosterList()"><option value="">All statuses</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="venmo_pending">Venmo pending</option></select>'
+    +'<select id="rfpay" class="rfin" onchange="renderRosterList()"><option value="">All payments</option>'+PAY_METHODS.map(m=>`<option value="${m}">${m[0].toUpperCase()+m.slice(1)}</option>`).join('')+'<option value="unpaid">Unpaid</option></select>'
+    +'</div>';
+  h+='<div class="sec" style="margin:6px 0 2px">Roster <span id="rcount" style="color:#5e655a;font-weight:700;text-transform:none;letter-spacing:0"></span></div><div id="rosterList"></div>';
+  h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(_MCLAIM?` · held: ${esc(_MCLAIM.name)}`:'')+'</div><div id="waitList"></div>';
+  document.getElementById('mBody').innerHTML=h; renderRosterList(); renderWaitList();
   document.getElementById('mMsg').innerHTML='';
   { const pl=document.getElementById('ap-paylink'), pd=document.getElementById('ap-paid'); if(pl)pl.checked=false; if(pd)pd.checked=false; }
   mTab((d.event.status==='final')?'info':'roster');
@@ -759,7 +757,7 @@ async function genRecap(force,engine){
   else msg('rcMsg','err',(d&&d.error)||'Could not draft ('+status+').');
 }
 async function sendRecap(){
-  if(!confirm('Email this recap to everyone who played?')) return;
+  if(!(await dsConfirm({ title:'Send recap email?', message:'Email this recap to everyone who played.', confirmLabel:'Send to all', cancelLabel:'Cancel' }))) return;
   document.getElementById('rcMsg').innerHTML='<div style="color:#9aa094;font-size:.78rem;margin-top:8px">Sending…</div>';
   const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send'})});
   if(d&&d.ok){ recapSendResult(d); loadRecap(); }
@@ -792,7 +790,7 @@ async function resendRecapOne(btn,playerId,email){
   const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-one',playerId:playerId||null,email:email||null})});
   if(d&&d.ok&&d.skipped){ btn.textContent='Opted out'; btn.style.color='#9aa094'; }
   else if(d&&d.ok){ btn.textContent='Sent ✓'; btn.style.color='#b8ff2c'; btn.style.borderColor='#b8ff2c'; }
-  else { btn.disabled=false; btn.textContent=old; alert((d&&d.error)||'Resend failed ('+status+').'); }
+  else { btn.disabled=false; btn.textContent=old; dsToast({ type:'error', message:(d&&d.error)||('Resend failed ('+status+').') }); }
 }
 let MROSTER=[];
 function rosterSearch(){
@@ -810,9 +808,9 @@ function wantPaylink(){ const el=document.getElementById('ap-paylink'); return e
 async function addExisting(i){
   const p=(window.__ROS||[])[i]; if(!p||!CURRENT) return;
   const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:false);
-  if(link&&!p.email){ alert('That player has no email on file — add one first or untick the email-link option.'); return; }
+  if(link&&!p.email){ dsToast({ type:'warn', message:'That player has no email on file — add one first or untick the email-link option.' }); return; }
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',playerId:p.id,name:p.name,gender:p.gender||null,email:p.email||'',paid})});
-  if(d.ok){ if(link) await sendPaylink(p.id,p.email); openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
+  if(d.ok){ if(link) await sendPaylink(p.id,p.email); openManage(CURRENT.id); } else dsToast({ type:'error', message:d.error||('Could not add ('+status+').') });
 }
 async function addNewFromSearch(){
   if(!CURRENT) return;
@@ -820,9 +818,9 @@ async function addNewFromSearch(){
   const gender=(document.getElementById('ap-gender')||{}).value||'';
   const email=(document.getElementById('ap-email')||{}).value||'';
   const link=wantPaylink(); const paidEl=document.getElementById('ap-paid'); const paid=link?false:(paidEl?paidEl.checked:false);
-  if(link&&!email){ alert('Enter an email above to send a payment link.'); return; }
+  if(link&&!email){ dsToast({ type:'warn', message:'Enter an email above to send a payment link.' }); return; }
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add',name,gender,email,paid})});
-  if(d.ok){ if(link) await sendPaylink('',email); openManage(CURRENT.id); } else alert(d.error||'Could not add ('+status+').');
+  if(d.ok){ if(link) await sendPaylink('',email); openManage(CURRENT.id); } else dsToast({ type:'error', message:d.error||('Could not add ('+status+').') });
 }
 async function sendPaylink(playerId,email){
   if(!CURRENT) return;
@@ -837,7 +835,7 @@ async function saveEdit(){
   const body={
     id:CURRENT.id, circuit:CURRENT.circuit,
     name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(),
-    courts:parseInt(g('m-courts'))||0, courtNames:courtNamesOf('m-courtnames'), rounds:parseInt(g('m-rounds'))||6, roundMin:parseInt(g('m-roundmin'))||12, scoreMode:g('m-score'), capacity:parseInt(g('m-cap'))||0,
+    courts:parseInt(g('m-courts'))||0, courtNames:courtNamesOf('m-courtnames'), rounds:parseInt(g('m-rounds'))||10, roundMin:parseInt(g('m-roundmin'))||12, scoreMode:g('m-score'), capacity:parseInt(g('m-cap'))||0,
     feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(), type:g('m-type'),
     paymentMethods:seg('mseg-pay').split(','), organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
     spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,
@@ -854,7 +852,7 @@ async function sendReminder(){
   if(!CURRENT) return;
   const sel=document.getElementById('m-remkind');
   const kind=sel.value, label=sel.selectedOptions[0].text;
-  if(!confirm('Send the "'+label+'" reminder email to everyone registered for '+(CURRENT.name||'this ladder')+' right now?')) return;
+  if(!(await dsConfirm({ title:'Send reminder?', message:'Send the "'+label+'" reminder email to everyone registered for '+(CURRENT.name||'this ladder')+' right now?', confirmLabel:'Send now', cancelLabel:'Cancel' }))) return;
   const box=document.getElementById('mRemMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
   const {status,d}=await api('/admin-ladder-remind',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:CURRENT.id,kind:kind,force:true})});
   if(status===401){ msg('mRemMsg','err','Sign in as admin first.'); return; }
@@ -865,7 +863,7 @@ async function sendReminder(){
 async function blastRecruit(){
   if(!CURRENT) return;
   const needed=parseInt(document.getElementById('m-needed').value)||0;
-  if(!confirm('Email ALL past ladder players that you need '+(needed||'more')+' for '+(CURRENT.name||'this ladder')+'? (Skips anyone already registered for it.)')) return;
+  if(!(await dsConfirm({ title:'Email past players?', message:'Email all past ladder players that you need '+(needed||'more')+' for '+(CURRENT.name||'this ladder')+'. (Skips anyone already registered.)', confirmLabel:'Send blast', cancelLabel:'Cancel' }))) return;
   const box=document.getElementById('mBlastMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
   const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'recruit',eventId:CURRENT.id,neededCount:needed||undefined})});
   if(status===401){ msg('mBlastMsg','err','Sign in as admin first.'); return; }
@@ -873,7 +871,7 @@ async function blastRecruit(){
   else msg('mBlastMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }
 async function blastOpen(){
-  if(!confirm('Announce all OPEN upcoming ladders to every past player?')) return;
+  if(!(await dsConfirm({ title:'Announce open ladders?', message:'Announce all open upcoming ladders to every past player.', confirmLabel:'Announce all', cancelLabel:'Cancel' }))) return;
   const box=document.getElementById('mBlastMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
   const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'open'})});
   if(status===401){ msg('mBlastMsg','err','Sign in as admin first.'); return; }
@@ -899,7 +897,7 @@ async function act(action,email,playerId,method){
   // (reuses the recruit blast: past players, minus anyone already signed up).
   if(action==='remove'&&!d.opened&&(d.openSpots||0)>0){
     const n=d.openSpots;
-    if(confirm((d.removed||'Player')+' is out and nobody is on the waitlist — '+n+' spot'+(n===1?'':'s')+' now open.\n\nEmail the league that '+(n===1?'a spot opened up':'there are '+n+' spots left')+'?')){
+    if(await dsConfirm({ title:'Spot opened up', message:(d.removed||'Player')+' is out and nobody is on the waitlist — '+n+' spot'+(n===1?'':'s')+' now open. Email the league that '+(n===1?'a spot opened up':'there are '+n+' spots left')+'?', confirmLabel:'Email the league', cancelLabel:'Not now' })){
       announceOpenSpot(n);
     }
   }
@@ -928,7 +926,7 @@ async function setEmailFor(playerId,email){
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-email',playerId,email,value:v.trim()})});
   if(!d.ok){ msg('mMsg','err',d.error||'Failed ('+status+').'); return; }
   await openManage(CURRENT.id); loadList();
-  if(d.email && confirm('Email saved. Send '+(d.name||'them')+' the “you’re in” confirmation now?')){
+  if(d.email && await dsConfirm({ title:'Send confirmation?', message:'Email saved. Send '+(d.name||'them')+' the “you’re in” confirmation now?', confirmLabel:'Send it', cancelLabel:'Not now' })){
     await resendConfirm(d.email,playerId);
   } else { msg('mMsg','ok','Email saved'+(d.name?' for '+d.name:'')+'.'); }
 }
@@ -950,6 +948,61 @@ async function removeWait(index){
   if(d.ok){ openManage(CURRENT.id); loadList(); } else msg('mMsg','err',d.error||'Failed ('+status+').');
 }
 const PAY_METHODS=['cash','venmo','zelle','card','other'];
+let _MROSTER=[], _MWAIT=[], _MCLAIM=null;
+function _statusChip(p){
+  if(p.paymentStatus==='paid') return `<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${esc(p.paymentMethod||'?')}</span>`;
+  if(p.paymentStatus==='venmo_pending') return '<span class="chip chip-gold">Venmo pending</span>';
+  return '<span class="chip chip-gray">pending</span>';
+}
+function _payItems(p){
+  const cur=p.paymentMethod||'', a=p.paymentStatus==='paid'?'set-method':'mark-paid';
+  return PAY_METHODS.map(m=>`<button onclick="rmAct('${a}','${esc(p.email)}','${esc(p.playerId||'')}','${m}')">${m[0].toUpperCase()+m.slice(1)}${cur===m?' ·✓':''}</button>`).join('');
+}
+function _rosterMenu(p,i){
+  let b='';
+  if(p.paymentStatus==='venmo_pending'){
+    b+='<div class="ph">Venmo</div>';
+    b+=`<button onclick="rmAct('confirm-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Confirm payment</button>`;
+    b+=`<button style="color:var(--red)" onclick="rmAct('decline-venmo','${esc(p.email)}','${esc(p.playerId||'')}')">Decline</button>`;
+  } else if(p.paymentStatus==='paid'){
+    b+='<div class="ph">Change payment method</div>'+_payItems(p);
+    b+=`<button onclick="rmAct('mark-unpaid','${esc(p.email)}','${esc(p.playerId||'')}')">Mark unpaid</button>`;
+  } else {
+    b+='<div class="ph">Mark paid as…</div>'+_payItems(p);
+  }
+  b+='<div class="ph">Actions</div>';
+  if(p.paymentStatus!=='paid'&&p.email) b+=`<button onclick="rmCall(sendPaylink,'${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send payment link</button>`;
+  if(p.paymentStatus==='paid'&&p.email) b+=`<button onclick="rmCall(resendConfirm,'${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`;
+  if(!p.email) b+=`<button onclick="rmCall(setEmailFor,'${esc(p.playerId||'')}','')">✉ Add email</button>`;
+  if(p.email) b+=`<button onclick="rmCall(sendCancelLink,'${esc(p.email)}','${esc(p.playerId||'')}')">✉ Cancel link</button>`;
+  b+=`<button style="color:var(--red)" onclick="rmAct('remove','${esc(p.email)}','${esc(p.playerId||'')}')">Remove from roster</button>`;
+  return `<div class="rowpop" id="rpop${i}" style="top:100%;right:0">${b}</div>`;
+}
+function renderRosterList(){
+  const q=(document.getElementById('rfq')?document.getElementById('rfq').value:'').toLowerCase();
+  const fs=document.getElementById('rfstatus')?document.getElementById('rfstatus').value:'';
+  const fp=document.getElementById('rfpay')?document.getElementById('rfpay').value:'';
+  const sTest=p=> fs===''||(fs==='paid'&&p.paymentStatus==='paid')||(fs==='venmo_pending'&&p.paymentStatus==='venmo_pending')||(fs==='pending'&&p.paymentStatus!=='paid'&&p.paymentStatus!=='venmo_pending');
+  const pTest=p=> fp===''||(fp==='unpaid'&&p.paymentStatus!=='paid')||(p.paymentStatus==='paid'&&(p.paymentMethod||'')===fp);
+  const rows=_MROSTER.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''))).filter(p=>String(p.name||'').toLowerCase().includes(q)&&sTest(p)&&pTest(p));
+  const paid=_MROSTER.filter(p=>p.paymentStatus==='paid').length;
+  const cc=document.getElementById('rcount'); if(cc) cc.textContent=`· ${rows.length} shown · ${paid}/${_MROSTER.length} paid`;
+  const el=document.getElementById('rosterList'); if(!el) return;
+  el.innerHTML= rows.length? rows.map((p,i)=>{
+    const noEmail=p.email?'':'<span class="chip chip-gray" title="No email on file">no email</span>';
+    return `<div class="prow" style="position:relative"><span class="pn">${esc(p.name)}</span>${_statusChip(p)} ${noEmail}<button class="kebab" aria-label="Actions" onclick="toggleRowMenu(event,${i})">⋯</button>${_rosterMenu(p,i)}</div>`;
+  }).join(''):'<div class="empty">No players match these filters.</div>';
+}
+function renderWaitList(){
+  const el=document.getElementById('waitList'); if(!el) return;
+  el.innerHTML=_MWAIT.length? _MWAIT.map((p,i)=>`<div class="prow"><span style="width:20px;color:#9aa094;font-weight:800">${i+1}</span><span class="pn">${esc(p.name)}</span><button class="btn-out btn-sm" onclick="promoteWait(${i})">Promote</button> <button class="btn-danger" onclick="removeWait(${i})">Remove</button></div>`).join(''):'<div class="empty">Nobody waiting.</div>';
+}
+function toggleRowMenu(e,i){ e.stopPropagation(); const el=document.getElementById('rpop'+i); if(!el) return; const open=el.classList.contains('on'); document.querySelectorAll('.rowpop.on').forEach(m=>m.classList.remove('on')); if(!open) el.classList.add('on'); }
+function _closeRowMenus(){ document.querySelectorAll('.rowpop.on').forEach(m=>m.classList.remove('on')); }
+function rmAct(a,email,pid,method){ _closeRowMenus(); act(a,email,pid,method); }
+function rmCall(fn,a,b){ _closeRowMenus(); fn(a,b); }
+document.addEventListener('click',_closeRowMenus);
+
 function payCtl(p){
   const em=esc(p.email), pid=esc(p.playerId||'');
   const opt=sel=>PAY_METHODS.map(m=>`<option value="${m}" ${sel===m?'selected':''}>${m[0].toUpperCase()+m.slice(1)}</option>`).join('');
@@ -960,7 +1013,7 @@ function payCtl(p){
 }
 // status segment → set-status
 async function delLadder(){
-  if(!CURRENT||!confirm('Delete this ladder and its signups?'))return;
+  if(!CURRENT||!(await dsConfirm({ title:'Delete this ladder?', message:'This deletes the ladder and all its signups. This cannot be undone.', confirmLabel:'Delete ladder', cancelLabel:'Cancel', danger:true })))return;
   const {d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'DELETE'});
   if(d.ok){ closeManage(); loadList(); }
 }
@@ -978,7 +1031,7 @@ async function addPlayer(){
   else msg('apMsg','err',d.error||'Could not add.');
 }
 async function importOld(){
-  if(!confirm('Import all past ladders from the old Pickleladder site?'))return;
+  if(!(await dsConfirm({ title:'Import past ladders?', message:'Import all past ladders from the old Pickleladder site?', confirmLabel:'Import', cancelLabel:'Cancel' })))return;
   msg('importMsg','ok','Importing… this can take a moment.');
   const {status,d}=await api('/admin-ladder-import',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
   if(status===401){ msg('importMsg','err','Sign in as admin first.'); return; }
@@ -997,12 +1050,12 @@ loadList();
   history.replaceState(null,'',location.pathname);
   setTimeout(async function(){
     const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(evId));
-    if(status===401){ alert('Sign in as admin first, then tap the link in the email again.'); return; }
-    if(!d||!d.event){ alert('Ladder not found — it may have been deleted.'); return; }
+    if(status===401){ dsToast({ type:'warn', title:'Sign in needed', message:'Sign in as admin first, then tap the link in the email again.' }); return; }
+    if(!d||!d.event){ dsToast({ type:'error', message:'Ladder not found — it may have been deleted.' }); return; }
     await openManage(evId);
     const n=d.spotsLeft||0;
     if(n<=0){ msg('mMsg','ok','This ladder is full again — nothing to announce.'); return; }
-    if(confirm(n+' spot'+(n===1?'':'s')+' open on '+(d.event.name||'this ladder')+'.\n\nEmail the league that '+(n===1?'a spot opened up':'there are '+n+' spots left')+'?')) announceOpenSpot(n);
+    if(await dsConfirm({ title:'Spots open', message:n+' spot'+(n===1?'':'s')+' open on '+(d.event.name||'this ladder')+'. Email the league that '+(n===1?'a spot opened up':'there are '+n+' spots left')+'?', confirmLabel:'Email the league', cancelLabel:'Not now' })) announceOpenSpot(n);
   },250);
 })();
 </script>

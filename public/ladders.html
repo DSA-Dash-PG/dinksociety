@@ -209,6 +209,7 @@
 
 <div data-partial="footer"></div>
 <script src="/js/partials.js"></script>
+<script src="/js/ds-ui.js"></script>
 <script src="/ladder-profile-view.js"></script>
 <script>
 const API='/.netlify/functions';
@@ -398,17 +399,20 @@ function myRegBlock(l){
 }
 async function cancelSpot(id,wait){
   const l=curLadder(id)||{};
-  const note=wait?'Leave the waitlist for '+(l.name||'this ladder')+'?'
-    :'Cancel your spot for '+(l.name||'this ladder')+'?\n\nYour spot reopens for the next player'+((l.feeCents||0)>0?' and you get ladder credit for what you paid (no refunds)':'')+'.';
-  if(!confirm(note)) return;
+  const nm=l.name||'this ladder';
+  const paid=(l.feeCents||0)>0;
+  const ok = wait
+    ? await dsConfirm({ title:'Leave the waitlist?', message:"You'll drop off the waitlist for "+nm+".", confirmLabel:'Leave waitlist', cancelLabel:'Stay on' })
+    : await dsConfirm({ title:'Cancel your spot?', message:"Your spot for "+nm+" reopens for the next player"+(paid?", and you get ladder credit for what you paid (no refunds)":"")+".", confirmLabel:'Cancel my spot', cancelLabel:'Keep my spot', danger:true });
+  if(!ok) return;
   try{
     const r=await fetch(`${API}/ladder-signup?event=${encodeURIComponent(id)}`,{method:'DELETE',credentials:'include'});
     const d=await r.json().catch(()=>({}));
-    if(r.status===401){ alert('Please sign in first (Profile → sign in), then try again.'); return; }
-    if(!d.ok){ alert(d.error||'Could not cancel — try again or contact the organizer.'); return; }
-    alert(wait||d.was==='waitlist'?"You're off the waitlist.":"You're off the list. "+((d.creditedCents||0)>0?'A '+fmt(d.creditedCents)+' ladder credit is on your account for next time.':'Thanks for letting us know!'));
+    if(r.status===401){ dsToast({ type:'warn', title:'Sign in needed', message:'Sign in on your Profile, then try again.' }); return; }
+    if(!d.ok){ dsToast({ type:'error', message:d.error||'Could not cancel — try again or contact the organizer.' }); return; }
+    if(wait||d.was==='waitlist'){ dsCelebrate({ glyph:'🎟', title:"You're off the waitlist", message:'Your waitlist spot has been released.' }); } else { dsCelebrate({ glyph:'🎟', title:"You're off the list", html:true, message:((d.creditedCents||0)>0?'A <b>'+fmt(d.creditedCents)+'</b> ladder credit is on your account for next time.':'Thanks for letting us know!') }); }
     init();
-  }catch(e){ alert('Network problem — check your connection and try again.'); }
+  }catch(e){ dsToast({ type:'error', message:'Network problem — check your connection and try again.' }); }
 }
 function renderFilters(){
   const DAYORD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];

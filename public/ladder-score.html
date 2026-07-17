@@ -70,6 +70,11 @@
   @media(min-width:560px){ .sheet{ border-radius:18px; } }
   .x{ position:absolute;top:12px;right:14px;background:none;border:0;color:var(--mut);font-size:1.4rem;cursor:pointer; }
   .benchp{ display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 11px;border:1px solid var(--bd);border-radius:10px;margin-bottom:7px;cursor:pointer; } .benchp:hover{ border-color:var(--lime); } .benchp .g{ font-size:.56rem;font-weight:800;color:var(--mut); }
+  #timeup{ position:fixed; inset:0; z-index:9999; background:#ff2a1a; display:none; align-items:center; justify-content:center; text-align:center; cursor:pointer; }
+  #timeup.on{ display:flex; animation:tuFlash .7s steps(1,end) infinite; }
+  #timeup .tu-big{ font-size:28vw; font-weight:900; color:#fff; line-height:.85; letter-spacing:.02em; }
+  #timeup .tu-sub{ font-size:1rem; font-weight:800; color:rgba(255,255,255,.92); text-transform:uppercase; letter-spacing:.12em; margin-top:16px; }
+  @keyframes tuFlash{ 0%,100%{ background:#ff2a1a; } 50%{ background:#7a0d05; } }
 </style>
 </head>
 <body>
@@ -99,6 +104,7 @@
   <div style="font-size:.7rem;color:var(--fnt);margin-top:9px">Matching this to their league roster email links their Ladder profile and League profile automatically. Leave blank to clear.</div>
 </div></div>
 
+<script src="/js/ds-ui.js"></script>
 <script>
 const API='/.netlify/functions';
 // Scorer mode: opened via a shareable per-night link (?t=token). Locks the page
@@ -202,11 +208,17 @@ async function scRemove(playerId,email){ const {d}=await api('/admin-ladder-mana
 
 /* ---------- timer (client only) ---------- */
 function roundSecs(){ return ((STATE&&STATE.play&&STATE.play.config&&STATE.play.config.roundMin)||12)*60; }
-function startTimer(){ if(timer===0)timer=roundSecs(); timerOn=true; clearInterval(timerInt); timerInt=setInterval(()=>{ timer--; if(timer<=0){ timer=0;timerOn=false;clearInterval(timerInt);} tick(); },1000); render(); }
+function startTimer(){ if(timer===0)timer=roundSecs(); timerOn=true; unlockAudio(); clearInterval(timerInt); timerInt=setInterval(()=>{ timer--; if(timer<=0){ timer=0;timerOn=false;clearInterval(timerInt); timeUp(); } tick(); },1000); render(); }
 function pauseTimer(){ timerOn=false; clearInterval(timerInt); render(); }
 function endTimer(){ timerOn=false; clearInterval(timerInt); timer=0; render(); }
-function resetTimer(){ clearInterval(timerInt); timerOn=false; timer=0; }
+function resetTimer(){ clearInterval(timerInt); timerOn=false; timer=0; dismissTimeUp(); }
 function tick(){ const el=document.getElementById('td'); if(el){ el.textContent=fmtT(timer); el.classList.toggle('urgent',timer<=60); } const f=document.getElementById('tf'); if(f){ const r=roundSecs(); f.style.width=(timer/r*100)+'%'; f.style.background=timer<=60?'#ff5c47':timer<=180?'#ffcc00':'#b8ff2c'; } }
+
+let audioCtx=null;
+function unlockAudio(){ try{ audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)(); if(audioCtx.state==='suspended')audioCtx.resume(); }catch(e){} }
+function beep(){ try{ unlockAudio(); if(!audioCtx)return; const now=audioCtx.currentTime; [0,0.55,1.1].forEach(t=>{ const o=audioCtx.createOscillator(),g=audioCtx.createGain(); o.type='square'; o.frequency.value=880; o.connect(g); g.connect(audioCtx.destination); g.gain.setValueAtTime(0.0001,now+t); g.gain.exponentialRampToValueAtTime(0.6,now+t+0.02); g.gain.exponentialRampToValueAtTime(0.0001,now+t+0.45); o.start(now+t); o.stop(now+t+0.5); }); }catch(e){} }
+function timeUp(){ beep(); try{ if(navigator.vibrate)navigator.vibrate([400,150,400,150,400]); }catch(e){} const el=document.getElementById('timeup'); if(el)el.classList.add('on'); }
+function dismissTimeUp(){ const el=document.getElementById('timeup'); if(el)el.classList.remove('on'); }
 
 /* ---------- helpers ---------- */
 function topCourt(round){ return Math.max(1,...round.courts.map(c=>c.court)); }
@@ -261,7 +273,7 @@ function render(){
     let bh=`<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">Add players, then start rounds. ${n} player${n===1?'':'s'} in${n<4?' — need at least 4.':''}</div>`;
     bh+='<label class="seclbl" style="margin-top:6px;display:block">Add from master roster</label><input class="i" id="sc-search" placeholder="Search players…" autocomplete="off" oninput="scSearch()"><div id="sc-res" style="margin-top:6px"></div>';
     bh+='<label class="seclbl" style="margin-top:12px;display:block">Or add a new player</label><div class="brow" style="gap:6px"><input class="i" id="sc-name" placeholder="Name" style="flex:2"><select class="i" id="sc-gender" style="flex:1;max-width:78px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select></div><div class="brow" style="gap:6px;margin-top:6px"><input class="i" id="sc-email" placeholder="Email (optional)" style="flex:1"><button class="btn b-out" style="flex:0 0 auto;width:auto;padding:0 14px" onclick="scAddNew()">Add</button></div>';
-    bh+='<div style="border-top:1px solid var(--bd);margin:14px 0 10px"></div><div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="'+((STATE.event&&STATE.event.rounds)||6)+'"></div><div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="'+((STATE.event&&STATE.event.roundMin)||12)+'"></div></div><button class="btn b-lime" '+(n<4?'disabled':'')+' onclick="act(\'start\')">Enter event</button>';
+    bh+='<div style="border-top:1px solid var(--bd);margin:14px 0 10px"></div><div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="'+((STATE.event&&STATE.event.rounds)||10)+'"></div><div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="'+((STATE.event&&STATE.event.roundMin)||12)+'"></div></div><button class="btn b-lime" '+(n<4?'disabled':'')+' onclick="act(\'start\')">Enter event</button>';
     if(roster.length) bh+='<label class="seclbl" style="margin-top:18px;display:block">Players in tonight ('+n+')</label>'+roster.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:9px;margin-bottom:6px"><span style="font-size:.84rem;font-weight:700">${esc(p.name)}</span><button onclick="scRemove('${esc(p.playerId||'')}','${esc(p.email||'')}')" style="font-size:.62rem;font-weight:800;color:var(--red);background:none;border:1px solid rgba(255,92,71,.3);border-radius:9999px;padding:4px 10px;cursor:pointer">Remove</button></div>`).join('');
     b.innerHTML=bh; return;
   }
@@ -422,7 +434,7 @@ async function subSend(player){
   if(d.ok){ STATE.play=d.play; closeSub(); render(); } else msg('err',d.error||'Sub failed.');
 }
 function subPick(p){ subSend(p); }
-function subNew(temp){ const name=document.getElementById('subName').value.trim(); if(!name){ alert('Enter a name'); return; } subSend({name,gender:document.getElementById('subGender').value,temp}); }
+function subNew(temp){ const name=document.getElementById('subName').value.trim(); if(!name){ dsToast({ type:'warn', message:'Enter a name.' }); return; } subSend({name,gender:document.getElementById('subGender').value,temp}); }
 function subRemove(){ subSend(null); }
 
 /* ---------- email editor ---------- */
@@ -452,9 +464,9 @@ async function saveEmail(){
 
 /* ---------- round actions ---------- */
 async function act(action,confirmFirst){
-  if(confirmFirst && !confirm('Are you sure?')) return;
+  if(confirmFirst && !(await dsConfirm({ title:'Are you sure?', confirmLabel:'Yes, continue', cancelLabel:'Cancel' }))) return;
   const body={action};
-  if(action==='start'){ body.rounds=parseInt(document.getElementById('nr').value)||6; body.roundMin=parseInt(document.getElementById('nm').value)||12; }
+  if(action==='start'){ body.rounds=parseInt(document.getElementById('nr').value)||10; body.roundMin=parseInt(document.getElementById('nm').value)||12; }
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   if(d.ok){ msg(''); STATE.play=d.play; if(action==='start'||action==='next'){ VR=d.play.currentRound; resetTimer(); } render(); }
@@ -465,7 +477,7 @@ async function act(action,confirmFirst){
 // the latest roster / courts / settings can be re-pulled. Does NOT regenerate
 // pairings — the organizer reviews the roster and taps "Enter event" to start.
 async function scRestart(){
-  if(!confirm('Restart the night?\n\nThis erases all rounds and scores and returns to the roster screen, where it re-pulls the latest roster, courts, and settings.\n\nIt does NOT regenerate pairings — review the roster, then tap "Enter event" when you\'re ready. This cannot be undone.')) return;
+  if(!(await dsConfirm({ title:"Restart the night?", message:"This erases all rounds and scores and returns to the roster screen (re-pulls the latest roster, courts, and settings). It does not regenerate pairings — review the roster, then tap \"Enter event\". This cannot be undone.", confirmLabel:"Restart night", cancelLabel:"Keep playing", danger:true }))) return;
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart'})});
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   if(d.ok){ STATE.play=d.play; VR=0; resetTimer(); render(); msg('ok','Night reset. Review the roster below, then tap “Enter event” to regenerate Round 1.'); }
@@ -475,7 +487,7 @@ async function scRestart(){
 // Restart ONLY the current round: clears its scores and rebuilds its pairings
 // from the latest roster (picks up adds/removes). Other rounds are untouched.
 async function scRestartRound(){
-  if(!confirm('Restart this round?\n\nClears THIS round’s scores and rebuilds its pairings from the latest roster (picks up anyone added or removed). Other rounds are untouched.')) return;
+  if(!(await dsConfirm({ title:"Restart this round?", message:"Clears this round's scores and rebuilds its pairings from the latest roster (picks up anyone added or removed). Other rounds are untouched.", confirmLabel:"Restart round", cancelLabel:"Cancel", danger:true }))) return;
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart-round'})});
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   if(d.ok){ STATE.play=d.play; resetTimer(); render(); msg('ok','Round rebuilt from the latest roster.'); }
@@ -491,5 +503,6 @@ async function scAddRound(){
 }
 loadPicker();
 </script>
+<div id="timeup" onclick="dismissTimeUp()"><div><div class="tu-big">TIME</div><div class="tu-sub">Tap anywhere to dismiss</div></div></div>
 </body>
 </html>
