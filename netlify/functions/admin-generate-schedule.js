@@ -83,9 +83,28 @@ export default async (req) => {
       const key = `schedule/${circuit}/${division}/week-${week}.json`;
       // Non-destructive on bracketOnly: keep an existing bracket week as-is so we
       // never clobber locked teams or admin-set court/time.
+      //
+      // Distinguish two very different "week already has matches" cases:
+      //   a) it already holds bracket placeholders (m.phase set) -> nothing to do.
+      //   b) it holds ONLY plain matches someone added by hand -> writing here
+      //      would either clobber them or leave the week showing both the manual
+      //      rows AND the seeded ones (the public page synthesizes the bracket
+      //      when no blob exists, so these read as duplicates). Report it instead
+      //      of silently skipping, so the admin knows to clear the strays first.
       if (bracketOnly) {
         const existing = await store.get(key, { type: 'json' }).catch(() => null);
-        if (existing?.matches?.length) { summary.push({ week, matchCount: existing.matches.length, phase: matches[0]?.phase, skipped: true }); continue; }
+        const rows = existing?.matches || [];
+        if (rows.length) {
+          const hasBracket = rows.some(m => m.phase);
+          summary.push({
+            week,
+            matchCount: rows.length,
+            phase: matches[0]?.phase,
+            skipped: true,
+            ...(hasBracket ? {} : { conflict: true, strayCount: rows.length }),
+          });
+          continue;
+        }
       }
       await store.setJSON(key, { circuit, division, week, phase: matches[0]?.phase || null, bracket: true, matches, generatedAt: now, generatedBy: admin.email });
       summary.push({ week, matchCount: matches.length, phase: matches[0]?.phase });

@@ -178,7 +178,8 @@ export default async (req) => {
           data.updatedAt = new Date().toISOString();
           data.updatedBy = admin.email;
           await store.setJSON(b.key, data);
-          return json({ ok: true, deleted: matchId });
+          const purged = await purgeMatchArtifacts([matchId]);
+          return json({ ok: true, deleted: matchId, purged });
         }
       }
       return json({ error: 'match not found' }, 404);
@@ -191,12 +192,52 @@ export default async (req) => {
       return json({ error: 'division and week required' }, 400);
     }
     const key = `schedule/${circuit}/${division}/week-${week}.json`;
+    // Collect the match ids first so their lineup/score blobs go with the week.
+    const doomed = await store.get(key, { type: 'json' }).catch(() => null);
+    const ids = (doomed?.matches || []).map(m => m.id).filter(Boolean);
     await store.delete(key).catch(() => null);
-    return json({ ok: true });
+    const purged = await purgeMatchArtifacts(ids);
+    return json({ ok: true, purged });
   }
 
   return new Response('Method not allowed', { status: 405 });
 };
+
+// Delete every per-match artifact that would otherwise be orphaned when a match
+// is removed: locked/draft lineups (`lineup/<matchId>/<teamId>.json` in the
+// `lineups` store) and any saved score (`score/<matchId>.json` in `scores`).
+// Leaving these behind makes a re-created match inherit stale locks and scores.
+async function purgeMatchArtifacts(matchIds) {
+  const ids = (matchIds || []).filter(Boolean);
+  if (!ids.length) return { lineups: 0, scores: 0 };
+
+  const lineupStore = getStore('lineups');
+  const scoreStore = getStore('scores');
+  let lineups = 0, scores = 0;
+
+  for (const id of ids) {
+    try {
+      const { blobs } = await lineupStore.list({ prefix: `lineup/${id}/` });
+      for (const b of blobs) {
+        await lineupStore.delete(b.key).catch(() => null);
+        lineups++;
+      }
+    } catch (e) {
+      console.error('purgeMatchArtifacts: lineup sweep failed for', id, e);
+    }
+    try {
+      const key = `score/${id}.json`;
+      const existing = await scoreStore.get(key, { type: 'json' }).catch(() => null);
+      if (existing) {
+        await scoreStore.delete(key).catch(() => null);
+        scores++;
+      }
+    } catch (e) {
+      console.error('purgeMatchArtifacts: score delete failed for', id, e);
+    }
+  }
+  return { lineups, scores };
+}
 
 // Overlay resolved seed previews onto the bracket weeks (Wk6–8). Display-only:
 // projected teams + seed labels + lock state for the admin schedule tab. Leaves

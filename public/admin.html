@@ -5937,7 +5937,21 @@
         body: JSON.stringify({ circuit: 'I', division: div, teams: divTeams.map(t => ({ id: t.id, name: t.name })), bracketOnly: true }),
       });
       const added = (res.summary || []).filter(s => s.phase && !s.skipped).length;
-      alert(added ? ('Playoffs ready — added ' + added + ' bracket week(s).') : 'Bracket weeks already set up.');
+      const conflicts = (res.summary || []).filter(s => s.conflict);
+      if (conflicts.length) {
+        // A bracket week holds hand-added matches, so the seeded rows were not
+        // written. The public page synthesizes the bracket whenever the blob is
+        // missing — that is what shows up as duplicate cards.
+        alert(
+          'Bracket not fully set up.\n\n' +
+          conflicts.map(c => 'Week ' + c.week + ' has ' + c.strayCount +
+            ' manually added match(es) and no seeded rows.').join('\n') +
+          '\n\nDelete those matches in the week editor, then run this again. ' +
+          (added ? ('Added ' + added + ' other bracket week(s).') : '')
+        );
+      } else {
+        alert(added ? ('Playoffs ready — added ' + added + ' bracket week(s).') : 'Bracket weeks already set up.');
+      }
       renderSched();
     } catch (e) {
       alert('Playoff setup failed: ' + e.message);
