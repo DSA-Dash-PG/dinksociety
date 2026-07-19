@@ -1139,7 +1139,13 @@
           .drop-story textarea{width:100%;font-family:inherit;line-height:1.55;}
           .drop-story .sx-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
           .drop-story .sx-head .grip{color:var(--color-text-faint);font-size:12px;font-weight:800;}
-          .drop-story .sx-rm{margin-left:auto;background:none;border:none;color:var(--color-red);cursor:pointer;font-size:12px;font-weight:700;}
+          .drop-story .sx-mv{margin-left:auto;display:flex;gap:4px;}
+          .drop-story .sx-mv button{background:none;border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-text-muted);cursor:pointer;font-size:11px;line-height:1;width:26px;height:22px;padding:0;}
+          .drop-story .sx-mv button:hover:not(:disabled){background:var(--color-surface-2);color:var(--color-text);}
+          .drop-story .sx-mv button:disabled{opacity:.3;cursor:default;}
+          .drop-story .sx-rm{background:none;border:none;color:var(--color-red);cursor:pointer;font-size:12px;font-weight:700;}
+          .drop-story.sx-moved{animation:sxMoved 900ms ease-out;}
+          @keyframes sxMoved{0%{background:var(--color-lime-dim);}100%{background:transparent;}}
           .drop-perf{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;font-size:12px;color:var(--color-text-muted);}
           .drop-perf .pf{border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:10px;background:var(--color-surface-2);}
           .drop-perf .pf h6{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 6px;}
@@ -6732,6 +6738,10 @@
     box.innerHTML = DROP.stories.map(function(s,i){
       return '<div class="drop-story" data-i="'+i+'">'
         +'<div class="sx-head"><span class="grip">Storyline '+(i+1)+'</span>'
+          +'<span class="sx-mv">'
+            +'<button type="button" data-mv-up="'+i+'" title="Move up"'+(i===0?' disabled':'')+'>&#9650;</button>'
+            +'<button type="button" data-mv-dn="'+i+'" title="Move down"'+(i===DROP.stories.length-1?' disabled':'')+'>&#9660;</button>'
+          +'</span>'
           +'<button type="button" class="sx-rm" data-rm="'+i+'">Remove</button></div>'
         +'<div class="arow"><div class="af" style="max-width:170px;"><label>Tag</label><input type="text" class="sx-tag" value="'+dEsc(s.tag)+'" placeholder="e.g. Upset"></div>'
           +'<div class="af"><label>Headline</label><input type="text" class="sx-title" value="'+dEsc(s.title)+'"></div></div>'
@@ -6758,6 +6768,26 @@
       });
     });
     box.querySelectorAll('[data-rm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.stories.splice(+b.dataset.rm,1); renderStories(); }); });
+    box.querySelectorAll('[data-mv-up],[data-mv-dn]').forEach(function(b){
+      b.addEventListener('click',function(){
+        var up = b.hasAttribute('data-mv-up');
+        var from = +(up ? b.dataset.mvUp : b.dataset.mvDn);
+        dMoveStory(from, up ? from-1 : from+1);
+      });
+    });
+  }
+  function dMoveStory(from, to){
+    if(!DROP.stories || to<0 || to>=DROP.stories.length || from===to) return;
+    DROP.stories.splice(to, 0, DROP.stories.splice(from, 1)[0]);
+    renderStories();
+    var box=$d('drop-stories'); if(!box) return;
+    var row=box.querySelectorAll('.drop-story')[to];
+    if(row){
+      row.classList.add('sx-moved');
+      row.scrollIntoView({block:'nearest', behavior:'smooth'});
+      var btn=row.querySelector(from<to ? '[data-mv-dn]' : '[data-mv-up]');
+      if(btn && !btn.disabled) btn.focus();
+    }
   }
   function dHasPerf(p){ return !!(p && ((p.potw&&(p.potw.men||p.potw.women)) || p.teamOfWeek || (p.topPerformers&&(p.topPerformers.men||p.topPerformers.women)) || (p.climbers&&p.climbers.length) || (p.risers&&p.risers.length))); }
   function dPerfToShow(rec, live){
