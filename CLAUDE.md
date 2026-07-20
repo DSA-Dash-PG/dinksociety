@@ -47,13 +47,22 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   Bare keys are a legacy bug. `findTeamByCaptainEmail` must scan the `registrations`
   store with `prefix: 'confirmed/'`, matching `reg.team.players[0].email`.
 - The Stripe webhook already converts cents to dollars — do not divide by 100 downstream.
+- **Bracket weeks (Rivalry / playoff / championship) are real match records**, not hardcoded
+  page JS. `netlify/functions/lib/bracket.js` defines the phases and, for 6 teams, three
+  rivalry slots (`rank 1v2`, `3v4`, `5v6`); `lib/courts.js` supplies `COURT_SETS`.
+  `public-schedule.js` uses persisted bracket blobs when they exist and otherwise
+  synthesizes them via `buildBracketWeeks()`, so the bracket always renders. Matches carry
+  real `courtA`/`courtB` — **per-match court values always win** over the `COURT_SET_META`
+  labels in `schedule.html` / `index.html`, which are only a color source and a legacy
+  fallback. (That's why live courts read `5A & 5B` rather than the default `1 & 2`.)
+- **Scores go public per game, not per match.** `captain-score.js`: home captain enters,
+  away captain confirms; a game is CONFIRMED only when away's confirmation matches home's
+  entry, and a home edit clears the confirmation. `public-match.js` exposes only confirmed
+  games — canonical `home`/`away` stay `null` until entries agree, so nothing unconfirmed
+  is ever publicly visible. Note `matchPoints` (`scoreA`/`scoreB`) is written **only at
+  finalize**; for a running score use games-won across confirmed games.
 
 ## Known open issues
 
-- **Rivalry Week (Week 6) cards on the schedule are hardcoded in the page JS**, not real
-  match records — courts `1 & 2`, `3 & 6`, `5 & 7` are literal strings and the pairings are
-  derived client-side from standings. Admin can't see or edit them. Fix: create real match
-  rows and render Week 6 from the DB like every other week, applying seed badges from
-  standings at render time.
 - Partner impact on leaderboard/player detail shows only 3 partners — likely a `slice` limit.
 - `ANTHROPIC_API_KEY` in Netlify env is invalid, so automated recap generation is broken.

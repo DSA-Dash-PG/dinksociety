@@ -1,0 +1,33 @@
+<!-- public/partials/ticker.html
+     Site-wide live game-night bottomline.
+
+     Usage: drop <div data-partial="ticker"></div> on any page (or nest the
+     slot inside partials/footer.html to get it everywhere for free).
+     partials.js re-creates inline scripts on inject, so the block below runs.
+
+     Requires in the host page <head>:
+       <link rel="stylesheet" href="/css/ticker.css">
+     and before /js/partials.js:
+       <script src="/js/live-poll.js"></script>
+       <script src="/js/ds-ticker.js"></script>
+-->
+<div class="ds-tick" id="ds-ticker" hidden role="region" aria-label="Live scores"></div>
+
+<script>
+(function () {
+  function boot() {
+    if (!window.DSTicker) return;
+    window.DSTicker.mount({
+      strip: document.getElementById('ds-ticker'),
+      card: document.getElementById('ds-livecard'),   // null on pages without one
+
+      source: { url: '/.netlify/functions/public-gameday?season=circuit-i' }
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', boot);
+  } else {
+    boot();
+  }
+})();
+</script>

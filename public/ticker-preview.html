@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Ticker · Preview · Dink Society</title>
+<link rel="icon" href="/img/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/shared.css">
+<link rel="stylesheet" href="/css/shared-nav.css">
+<link rel="stylesheet" href="/css/ticker.css">
+<script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+<style>
+  body{background:var(--color-bg);color:var(--color-text);font-family:var(--font-display);
+    -webkit-font-smoothing:antialiased;line-height:1.4;margin:0;padding-bottom:140px}
+  .wrap{max-width:1120px;margin:0 auto;padding:40px 24px}
+  .kicker{color:var(--color-lime);font-size:12px;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+  h1{font-size:clamp(2rem,1.2rem + 2vw,3rem);font-weight:900;font-style:italic;
+    text-transform:uppercase;letter-spacing:-.02em;margin:10px 0 8px}
+  .lede{color:var(--color-text-muted);max-width:640px;font-size:15px}
+
+  .sec{margin-top:44px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .sec-head .num{color:var(--color-bg);background:var(--color-lime);font-weight:900;font-style:italic;
+    width:34px;height:34px;border-radius:9px;display:grid;place-items:center;font-size:16px}
+  .sec-head h2{font-size:24px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;margin:0}
+  .sec-desc{color:var(--color-text-muted);font-size:14px;margin:10px 0 22px;max-width:760px}
+  .sec-desc b{color:var(--color-text);font-weight:700}
+  .sec-desc code{background:var(--color-surface-2);padding:2px 6px;border-radius:5px;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;color:var(--color-lime)}
+
+  .controls{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 22px}
+  .controls button{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+    padding:10px 16px;border:1px solid var(--color-border-strong);border-radius:9999px;
+    background:var(--color-surface-2);color:var(--color-text-muted);cursor:pointer;transition:all 160ms}
+  .controls button:hover{color:var(--color-text);border-color:var(--color-text-faint)}
+  .controls button.on{background:var(--color-lime);color:var(--color-text-inverse);border-color:var(--color-lime)}
+
+  /* phone frame for the mobile read */
+  .phone{width:360px;border:9px solid #000;border-radius:38px;overflow:hidden;background:var(--color-bg);
+    box-shadow:0 20px 60px rgba(0,0,0,.5);position:relative}
+  .phone .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:130px;height:22px;
+    background:#000;border-radius:0 0 16px 16px;z-index:20}
+  .phone-scroll{height:560px;overflow-y:auto;padding:34px 12px 12px}
+  .phone-scroll::-webkit-scrollbar{width:0}
+  .cols{display:flex;gap:30px;flex-wrap:wrap;align-items:flex-start}
+  .col{flex:1;min-width:320px}
+  .lbl{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--color-text-faint);margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .lbl::before{content:"";width:20px;height:1px;background:var(--color-border-strong)}
+
+  .note{border:1px solid var(--color-border);border-left:3px solid var(--color-teal);
+    background:var(--color-surface);border-radius:12px;padding:16px 18px;margin-top:26px;
+    font-size:13.5px;color:var(--color-text-muted);line-height:1.6}
+  .note b{color:var(--color-text)}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="kicker">Internal preview</div>
+  <h1>Live game-night ticker</h1>
+  <p class="lede">Both surfaces below run the real component — <code>/js/ds-ticker.js</code> and
+    <code>/css/ticker.css</code> — against a stub payload shaped exactly like the proposed
+    <code>public-gameday</code> response. Wiring the backend is a one-line source swap.</p>
+
+  <div class="sec">
+    <div class="sec-head"><span class="num">1</span><h2>Bottomline</h2></div>
+    <p class="sec-desc">Fixed to the bottom of every page, above a mobile nav if one exists.
+      Auto-hides when it isn't a game night. Dismissable — the tuck is remembered for the session.
+      Hover to pause the scroll. Scroll duration is computed from content width, so three matches
+      and eight matches move at the same speed.</p>
+
+    <div class="controls">
+      <button id="bLive" class="on">All live</button>
+      <button id="bMixed">Mixed states</button>
+      <button id="bOne">One match left</button>
+      <button id="bOff">Not a game night</button>
+      <button id="bSim">▶ Simulate scoring</button>
+    </div>
+    <p class="sec-desc" style="margin-top:-8px">↓ It's pinned to the bottom of this window.</p>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="num">2</span><h2>Homepage card</h2></div>
+    <p class="sec-desc">Drops into <code>index.html</code> as
+      <code>&lt;div class="ds-livecard" id="ds-livecard" hidden&gt;&lt;/div&gt;</code>.
+      Same payload, same state handling — hides itself on non-game-nights.</p>
+
+    <div class="cols">
+      <div class="col">
+        <div class="lbl">Desktop</div>
+        <div class="ds-livecard" id="ds-livecard" hidden></div>
+      </div>
+      <div class="col" style="flex:0 0 auto">
+        <div class="lbl">Mobile</div>
+        <div class="phone">
+          <div class="notch"></div>
+          <div class="phone-scroll">
+            <div class="ds-livecard" id="ds-livecard-m" hidden></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="note">
+      <b>Still to decide:</b> the data source. Option A is a new public
+      <code>public-gameday.js</code> — one blob scan, one ETag, one poll.
+      Option B fans out the existing <code>public-match.js</code> per match with no backend work,
+      at the cost of a season-blob scan per match per cycle. The component doesn't care either way;
+      both adapt into the payload shape documented at the top of <code>ds-ticker.js</code>.
+      <br><br>
+      <b>Also pending:</b> K'CHN is rendered as an Inter wordmark. Drop the real asset at
+      <code>/img/kchn-mark.svg</code> and swap the <code>kchn()</code> helper to an <code>&lt;img&gt;</code>.
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-head"><span class="num">3</span><h2>Venue board</h2></div>
+    <p class="sec-desc">Lives at <code>/live</code> — its own kiosk page, no nav or footer, everything
+      sized off <code>vmin</code> so it fills a 1080p or 4K TV without tuning. Court cards up top,
+      results feed below, the same bottomline strip along the bottom. Requests a screen wake lock and
+      nudges layout every 10 minutes to avoid burn-in. Shows a "see you next week" card when it isn't
+      a game night.</p>
+    <p class="sec-desc"><a href="/live" target="_blank" style="color:var(--color-lime);font-weight:800">Open /live →</a>
+      &nbsp;·&nbsp;
+      <a href="/live?demo=1" target="_blank" style="color:var(--color-lime);font-weight:800">Open /live?demo=1 (simulated scoring) →</a></p>
+  </div>
+  </div>
+</div>
+
+<!-- the real bottomline element, exactly as partials/ticker.html ships it -->
+<div class="ds-tick" id="ds-ticker" hidden role="region" aria-label="Live scores"></div>
+
+<script src="/js/live-poll.js"></script>
+<script src="/js/ds-ticker.js"></script>
+<script>
+(function () {
+  var base = JSON.parse(JSON.stringify(DSTicker.STUB));
+  var confirmNextGame = DSTicker.demoConfirm;   // shared with /live
+
+  function clone() { return JSON.parse(JSON.stringify(base)); }
+
+  // all 12 games confirmed → match points (0-4 scale, sum of the two rounds)
+  function finalize(m, mpH, mpA) {
+    m.status = 'final';
+    m.gamesConfirmed = m.gamesTotal;
+    m.round1 = { homeGames: 4, awayGames: 2, homePoints: mpH >= 2 ? 2 : 0, awayPoints: mpH >= 2 ? 0 : 2, scoredGames: 6 };
+    m.round2 = { homeGames: 3, awayGames: 3,
+                 homePoints: mpH - (m.round1.homePoints), awayPoints: mpA - (m.round1.awayPoints), scoredGames: 6 };
+    m.mpHome = mpH; m.mpAway = mpA;
+  }
+
+  // mount once against the strip + desktop card
+  DSTicker.mount({
+    strip: document.getElementById('ds-ticker'),
+    card: document.getElementById('ds-livecard'),
+    source: 'stub'
+  });
+
+  // render, then mirror the desktop card into the phone frame
+  function paint(d) {
+    d.updatedAt = new Date().toISOString();
+    DSTicker.render(d);
+    var main = document.getElementById('ds-livecard');
+    var m = document.getElementById('ds-livecard-m');
+    m.hidden = main.hidden;
+    m.innerHTML = main.innerHTML;
+  }
+
+  var scenarios = {
+    bLive: function () { var d = clone(); return d; },
+    bMixed: function () {
+      var d = clone();
+      finalize(d.matches[0], 3, 1);
+      var m = d.matches[2];
+      m.status = 'awaiting'; m.gamesHome = 0; m.gamesAway = 0; m.gamesConfirmed = 0;
+      m.games = []; m.round1 = null; m.round2 = null;
+      return d;
+    },
+    bOne: function () {
+      var d = clone();
+      finalize(d.matches[0], 4, 0);
+      finalize(d.matches[1], 1, 3);
+      return d;
+    },
+    bOff: function () { var d = clone(); d.gameNight = false; d.matches = []; return d; }
+  };
+
+  var ids = ['bLive', 'bMixed', 'bOne', 'bOff'];
+  ids.forEach(function (id) {
+    document.getElementById(id).addEventListener('click', function () {
+      ids.forEach(function (x) { document.getElementById(x).classList.remove('on'); });
+      this.classList.add('on');
+      stopSim();
+      paint(scenarios[id]());
+    });
+  });
+
+  // live-scoring simulator — random walk on the running match points
+  var simTimer = null, simData = null;
+  function stopSim() {
+    if (simTimer) { clearInterval(simTimer); simTimer = null; }
+    document.getElementById('bSim').classList.remove('on');
+    document.getElementById('bSim').textContent = '▶ Simulate scoring';
+  }
+  document.getElementById('bSim').addEventListener('click', function () {
+    if (simTimer) { stopSim(); return; }
+    this.classList.add('on');
+    this.textContent = '❚❚ Stop simulation';
+    simData = clone();
+    paint(simData);
+    simTimer = setInterval(function () {
+      // each tick = the away captain confirming one more game
+      simData.matches.forEach(confirmNextGame);
+      paint(simData);
+    }, 1800);
+  });
+
+  paint(clone());
+})();
+</script>
+</body>
+</html>

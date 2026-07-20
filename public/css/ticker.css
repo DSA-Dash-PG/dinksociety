@@ -1,0 +1,270 @@
+/* public/css/ticker.css
+   Live game-night ticker — bottomline strip + homepage "now playing" card.
+   Depends on tokens from shared.css. Load AFTER shared.css.
+
+   Two surfaces, one stylesheet:
+     .ds-tick        → fixed bottomline (site-wide, via partials/ticker.html)
+     .ds-livecard    → homepage card (index.html)
+   Both hide themselves when there's nothing live (`hidden` attribute).
+*/
+
+/* ============================================================
+   Shared atoms
+   ============================================================ */
+.ds-livedot{
+  width:8px;height:8px;border-radius:50%;background:var(--color-red);
+  display:inline-block;flex:0 0 auto;
+  box-shadow:0 0 0 0 rgba(255,92,71,.6);
+  animation:ds-tick-pulse 1.6s infinite;
+}
+@keyframes ds-tick-pulse{
+  0%{box-shadow:0 0 0 0 rgba(255,92,71,.55)}
+  70%{box-shadow:0 0 0 7px rgba(255,92,71,0)}
+  100%{box-shadow:0 0 0 0 rgba(255,92,71,0)}
+}
+@media (prefers-reduced-motion:reduce){ .ds-livedot{animation:none} }
+
+/* house display face: Inter 900 italic uppercase */
+.ds-tick-name,
+.ds-lc-name{
+  font-weight:800;font-style:italic;text-transform:uppercase;letter-spacing:-.01em;
+}
+.ds-tick-score,
+.ds-lc-score{ font-variant-numeric:tabular-nums;font-weight:900;font-style:italic }
+
+.ds-tick-seed{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:17px;height:17px;flex:0 0 auto;border-radius:5px;
+  background:rgba(255,255,255,.08);color:var(--color-text-muted);
+  font-size:10px;font-weight:900;font-style:normal;
+}
+
+/* K'CHN sponsor lockup — swap the span for <img src="/img/kchn-mark.svg"> */
+.ds-kchn{
+  font-weight:900;text-transform:uppercase;letter-spacing:.08em;
+  color:var(--color-lime);white-space:nowrap;font-size:var(--kchn-size,13px);
+}
+.ds-presented{
+  font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--color-text-faint);white-space:nowrap;
+}
+
+/* ============================================================
+   SURFACE 1 — bottomline strip
+   ============================================================ */
+.ds-tick{
+  position:fixed;left:0;right:0;bottom:0;z-index:800;
+  height:54px;display:flex;align-items:stretch;overflow:hidden;
+  background:linear-gradient(180deg,#111,#0a0a0a);
+  border-top:1px solid var(--color-border-strong);
+  transform:translateY(0);transition:transform 220ms cubic-bezier(.16,1,.3,1);
+}
+.ds-tick[hidden]{display:none}
+.ds-tick.is-tucked{transform:translateY(100%)}
+/* keep page content clear of the strip */
+body.has-ds-tick{padding-bottom:54px}
+
+.ds-tick-brand{
+  flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 18px;
+  background:var(--color-lime);color:var(--color-text-inverse);
+  font-size:15px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.01em;
+}
+.ds-tick-brand .lbl{
+  background:var(--color-text-inverse);color:var(--color-lime);
+  font-size:10px;padding:3px 7px;border-radius:5px;letter-spacing:.1em;font-style:normal;
+}
+.ds-tick-brand .ds-livedot{background:var(--color-text-inverse)}
+
+.ds-tick-meta{
+  flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 16px;
+  border-right:1px solid var(--color-border);
+  font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--color-text-muted);
+}
+.ds-tick-meta .rival{color:var(--color-teal)}
+
+.ds-tick-viewport{
+  flex:1;min-width:0;overflow:hidden;position:relative;display:flex;align-items:center;
+  -webkit-mask-image:linear-gradient(90deg,transparent,#000 36px,#000 calc(100% - 36px),transparent);
+  mask-image:linear-gradient(90deg,transparent,#000 36px,#000 calc(100% - 36px),transparent);
+}
+.ds-tick-track{
+  display:flex;align-items:center;width:max-content;
+  animation:ds-tick-scroll var(--ds-tick-speed,52s) linear infinite;
+}
+.ds-tick-viewport:hover .ds-tick-track,
+.ds-tick-track:focus-within{animation-play-state:paused}
+@keyframes ds-tick-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){
+  .ds-tick-track{animation:none}
+  .ds-tick-viewport{overflow-x:auto;-webkit-mask-image:none;mask-image:none}
+}
+
+.ds-tick-item{
+  display:inline-flex;align-items:center;gap:10px;flex:0 0 auto;
+  height:54px;padding:0 22px;white-space:nowrap;
+  border-right:1px solid var(--color-border);
+  font-size:14px;color:var(--color-text);text-decoration:none;
+}
+a.ds-tick-item:hover{background:rgba(255,255,255,.03)}
+.ds-tick-item .ct{
+  color:var(--color-text-faint);font-weight:800;font-size:11px;letter-spacing:.06em;text-transform:uppercase;
+}
+.ds-tick-item .win{color:var(--color-lime)}
+.ds-tick-item .lose{color:var(--color-text-faint)}
+.ds-tick-item .dash{color:var(--color-text-faint);margin:0 5px;font-weight:600;font-style:normal}
+.ds-tick-item .emoji{font-size:15px;line-height:1;flex:0 0 auto}
+.ds-tick-item.is-live .ds-tick-score{color:var(--color-red)}
+.ds-tick-item .fin{
+  color:var(--color-text-faint);font-size:10px;font-weight:800;letter-spacing:.08em;
+  border:1px solid var(--color-border-strong);padding:2px 6px;border-radius:4px;
+}
+.ds-tick-item .up{color:var(--color-lime);font-weight:900}
+.ds-tick-item .down{color:var(--color-red);font-weight:900}
+.ds-tick-item .note{
+  font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);
+}
+/* live match-points chip — steps up as each round of 6 pays out */
+.ds-tick-item .mp,
+.ds-lc-mid .mp{
+  font-size:10px;font-weight:900;letter-spacing:.08em;font-variant-numeric:tabular-nums;
+  color:var(--color-teal);background:var(--color-teal-dim);
+  padding:3px 7px;border-radius:5px;white-space:nowrap;
+}
+.ds-tick-item.is-sponsor{background:var(--color-lime-ghost);border-right-color:var(--color-lime-dim)}
+.ds-tick-item.is-sponsor .ds-kchn{--kchn-size:16px}
+.ds-tick-item.is-sponsor .msg{font-size:12px;font-weight:700;color:var(--color-text-muted)}
+.ds-tick-item.is-sponsor .msg b{color:var(--color-text);font-weight:800}
+
+.ds-tick-close{
+  flex:0 0 auto;width:42px;border:0;border-left:1px solid var(--color-border);
+  background:transparent;color:var(--color-text-faint);cursor:pointer;
+  font-size:16px;line-height:1;transition:color 160ms;
+}
+.ds-tick-close:hover{color:var(--color-text)}
+
+@media (max-width:760px){
+  .ds-tick{height:46px}
+  body.has-ds-tick{padding-bottom:46px}
+  .ds-tick-item{height:46px;padding:0 14px;font-size:12.5px;gap:8px}
+  .ds-tick-brand{padding:0 12px;font-size:13px}
+  .ds-tick-brand .lbl{display:none}
+  .ds-tick-meta{display:none}
+  .ds-tick-close{width:34px}
+}
+/* sits above a mobile bottom nav if one is present */
+@media (max-width:760px){
+  body.has-mobile-nav .ds-tick{bottom:56px}
+}
+
+/* ============================================================
+   SURFACE 2 — homepage "now playing" card
+   ============================================================ */
+.ds-livecard{
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:var(--radius-lg,20px);overflow:hidden;
+}
+.ds-livecard[hidden]{display:none}
+.ds-lc-head{
+  display:flex;align-items:center;gap:12px;padding:16px 20px;
+  border-bottom:1px solid var(--color-border);
+}
+.ds-lc-head h3{
+  font-size:14px;font-weight:900;font-style:italic;text-transform:uppercase;
+  letter-spacing:.04em;margin:0;
+}
+.ds-lc-head .wk{
+  font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);
+}
+.ds-lc-head .rival{color:var(--color-teal)}
+.ds-lc-head .spon{margin-left:auto;display:flex;align-items:center;gap:8px}
+.ds-lc-head .spon .ds-kchn{--kchn-size:15px}
+
+.ds-lc-rows{display:flex;flex-direction:column}
+.ds-lc-row{
+  display:flex;align-items:center;gap:14px;padding:14px 20px;text-decoration:none;color:inherit;
+  border-bottom:1px solid var(--color-divider);position:relative;
+}
+.ds-lc-row:last-child{border-bottom:0}
+.ds-lc-row:hover{background:rgba(255,255,255,.02)}
+.ds-lc-row::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--accent,transparent)}
+.ds-lc-side{flex:1;display:flex;align-items:center;gap:10px;min-width:0}
+.ds-lc-side.r{justify-content:flex-end;text-align:right}
+.ds-lc-name{
+  font-size:15px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.ds-lc-row .win .ds-lc-name,
+.ds-lc-row .win .ds-lc-score{color:var(--color-lime)}
+.ds-lc-emoji{font-size:18px;line-height:1;flex:0 0 auto}
+.ds-lc-score{font-size:22px;flex:0 0 auto}
+.ds-lc-mid{
+  flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:3px;padding:0 4px;
+}
+.ds-lc-mid .ct{
+  font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);
+}
+.ds-lc-mid .st{font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.ds-lc-mid .st.live{color:var(--color-red)}
+.ds-lc-mid .st.final{color:var(--color-text-faint)}
+.ds-lc-mid .st.deck{color:var(--color-teal)}
+
+/* sub-row under each match: round tallies + who's on court */
+.ds-lc-sub{
+  display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:0 20px 12px;margin-top:-4px;
+}
+/* round chip: "R1 4–2 5/6"  →  "R1 4–2 2–0" once the round pays out */
+.ds-lc-sub .rc{
+  display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:900;font-variant-numeric:tabular-nums;
+  color:var(--color-text-muted);background:var(--color-surface-2);
+  border:1px solid var(--color-border);border-radius:6px;padding:4px 7px;
+}
+.ds-lc-sub .rc i{font-style:normal;font-size:9px;letter-spacing:.1em;color:var(--color-text-faint)}
+.ds-lc-sub .rc u{text-decoration:none;font-size:9px;font-weight:700;color:var(--color-text-faint)}
+.ds-lc-sub .rc b{
+  font-size:11px;font-weight:900;color:var(--color-teal);
+  background:var(--color-teal-dim);border-radius:4px;padding:2px 5px;
+}
+.ds-lc-sub .rc.done{border-color:rgba(23,215,176,.28)}
+
+/* players line */
+.ds-lc-players{
+  display:inline-flex;align-items:center;gap:6px;flex-wrap:wrap;
+  font-size:12px;font-weight:700;color:var(--color-text);
+}
+.ds-lc-players .lbl{
+  font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--color-lime);background:var(--color-lime-ghost);
+  border-radius:4px;padding:3px 6px;
+}
+.ds-lc-players .v{font-size:9px;font-weight:800;color:var(--color-text-faint);text-transform:uppercase}
+.ds-lc-players .amp{color:var(--color-text-faint);margin:0 1px}
+.ds-lc-players .pn b{font-weight:800}
+.ds-lc-players .pn i{font-style:normal;font-weight:700;color:var(--color-text-muted)}
+
+.ds-lc-foot{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:12px 20px;border-top:1px solid var(--color-border);background:var(--color-surface-2);
+}
+.ds-lc-foot a{
+  font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--color-lime);text-decoration:none;
+}
+.ds-lc-foot .ts{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint)}
+
+@media (max-width:560px){
+  .ds-lc-row{gap:8px;padding:12px 14px}
+  .ds-lc-name{font-size:13px}
+  .ds-lc-score{font-size:19px}
+  .ds-lc-emoji{display:none}
+  .ds-lc-head{padding:14px}
+  .ds-lc-head .spon{display:none}
+
+  /* Phones: drop surnames so first names still fit — "Philip / Shay",
+     not "Philip R. / Shay C." Keeps the fun part, loses the filler. */
+  .ds-lc-sub{padding:0 14px 12px;gap:7px}
+  .ds-lc-players .pn i{display:none}
+  .ds-lc-players{font-size:12.5px}
+  .ds-lc-players .lbl{padding:2px 5px}
+}

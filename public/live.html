@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LIVE · Dink Society</title>
+<link rel="icon" href="/img/favicon.svg">
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/shared.css">
+<link rel="stylesheet" href="/css/ticker.css">
+<script>(function(){document.documentElement.setAttribute("data-theme","dark")})()</script>
+<style>
+/* ============================================================
+   dinksociety.app/live — venue big-screen scoreboard.
+   Kiosk surface: no nav, no footer, no scroll. Everything scales
+   off vmin so it fills a 1080p or 4K TV without tuning.
+   ============================================================ */
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{
+  background:radial-gradient(1400px 700px at 50% -20%,rgba(184,255,44,.10),transparent),var(--color-bg);
+  color:var(--color-text);font-family:var(--font-display);-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;cursor:none;
+}
+.display{font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em}
+
+/* ---------- header ---------- */
+.bhead{
+  flex:0 0 auto;display:flex;align-items:center;gap:clamp(12px,1.6vw,26px);
+  padding:clamp(14px,1.8vh,26px) clamp(20px,2.4vw,44px);
+  border-bottom:1px solid var(--color-border);
+}
+.bhead .logo{font-size:clamp(20px,2.3vw,38px)}
+.bhead .logo b{color:var(--color-lime)}
+.rival-chip{
+  padding:.5em 1em;border-radius:9999px;background:var(--color-teal-dim);color:var(--color-teal);
+  font-size:clamp(10px,.95vw,15px);font-weight:900;letter-spacing:.18em;text-transform:uppercase;
+}
+.bhead .wk{
+  font-size:clamp(10px,.95vw,15px);font-weight:800;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--color-text-faint);
+}
+.bhead .right{margin-left:auto;display:flex;align-items:center;gap:clamp(12px,1.5vw,24px)}
+.spon{display:flex;align-items:center;gap:clamp(8px,.9vw,14px)}
+.spon .ds-presented{font-size:clamp(8px,.7vw,12px);line-height:1.3;text-align:right}
+.spon .ds-kchn{--kchn-size:clamp(18px,2.1vw,36px)}
+.live-pill{
+  display:inline-flex;align-items:center;gap:.6em;background:var(--color-red-dim);color:var(--color-red);
+  font-weight:900;font-size:clamp(10px,1vw,16px);padding:.55em 1.1em;border-radius:9999px;letter-spacing:.16em;
+  text-transform:uppercase;
+}
+.clock{
+  font-size:clamp(14px,1.5vw,26px);font-weight:800;color:var(--color-text-muted);font-variant-numeric:tabular-nums;
+}
+
+/* ---------- court grid ---------- */
+.courts{
+  flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);
+  gap:clamp(10px,1.1vw,20px);padding:clamp(14px,1.8vh,26px) clamp(20px,2.4vw,44px);
+}
+@media (max-aspect-ratio:1/1){ .courts{grid-template-columns:1fr;grid-auto-rows:1fr} }
+
+.court{
+  position:relative;overflow:hidden;display:flex;flex-direction:column;
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:clamp(12px,1.1vw,20px);padding:clamp(14px,1.5vw,26px);
+}
+.court::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--accent,var(--color-text-faint))}
+.court.hot{border-color:rgba(255,92,71,.4);box-shadow:0 0 0 1px rgba(255,92,71,.15)}
+.court .cname{
+  display:flex;align-items:center;gap:.6em;margin-bottom:clamp(10px,1.3vh,20px);
+  font-size:clamp(11px,1vw,17px);font-weight:900;font-style:italic;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--color-lime);
+}
+.court .cname .st{margin-left:auto;font-size:clamp(9px,.8vw,13px);color:var(--color-red);font-style:normal;letter-spacing:.14em}
+.court .cname .st.done{color:var(--color-text-faint)}
+.court .cname .st.deck{color:var(--color-teal)}
+
+.teamline{display:flex;align-items:center;gap:clamp(8px,.9vw,16px);padding:clamp(7px,1vh,14px) 0;flex:1}
+.teamline + .teamline{border-top:1px solid var(--color-divider)}
+.teamline .seedno{
+  flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  width:1.9em;height:1.9em;border-radius:.45em;background:rgba(255,255,255,.08);
+  color:var(--color-text-muted);font-size:clamp(11px,1vw,17px);font-weight:900;
+}
+.teamline.lead .seedno{background:var(--color-lime-dim);color:var(--color-lime)}
+.teamline .emo{font-size:clamp(18px,1.9vw,34px);line-height:1;flex:0 0 auto}
+.teamline .who{
+  flex:1;min-width:0;font-size:clamp(15px,1.6vw,30px);font-weight:800;font-style:italic;
+  text-transform:uppercase;letter-spacing:-.01em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.teamline.lead .who{color:var(--color-lime)}
+.teamline .pts{
+  flex:0 0 auto;font-size:clamp(30px,4.4vw,86px);font-weight:900;font-style:italic;
+  font-variant-numeric:tabular-nums;letter-spacing:-.04em;line-height:.9;min-width:1.5em;text-align:right;
+}
+.teamline.lead .pts{color:var(--color-lime)}
+.teamline .pts.tbd{font-size:clamp(14px,1.4vw,24px);color:var(--color-text-faint)}
+
+/* per-game strip */
+.rounds{display:flex;flex-direction:column;gap:clamp(4px,.6vh,8px);margin-top:clamp(8px,1vh,14px)}
+.rd{display:flex;align-items:center;gap:clamp(6px,.7vw,12px)}
+.rd .rl{
+  flex:0 0 auto;font-size:clamp(8px,.7vw,12px);font-weight:900;letter-spacing:.1em;
+  color:var(--color-lime);background:var(--color-lime-dim);padding:.3em .5em;border-radius:.3em;
+}
+.rd .gms{flex:1;display:grid;grid-template-columns:repeat(6,1fr);gap:clamp(3px,.35vw,6px);min-width:0}
+.rd .gm{
+  display:flex;align-items:center;justify-content:center;
+  font-size:clamp(8px,.72vw,13px);font-weight:800;font-variant-numeric:tabular-nums;
+  padding:.35em .2em;border-radius:.3em;background:var(--color-surface-2);color:var(--color-text-muted);
+}
+.rd .gm i{font-style:normal;opacity:.45;margin:0 .15em}
+.rd .gm.h{background:var(--color-lime-dim);color:var(--color-lime)}
+.rd .gm.a{background:rgba(255,255,255,.06);color:var(--color-text)}
+.rd .gm.pend{background:rgba(255,255,255,.03);min-height:1.9em}
+/* games won in this round so far — always on */
+.rd .rg{
+  flex:0 0 auto;min-width:2.4em;text-align:right;
+  font-size:clamp(9px,.85vw,15px);font-weight:900;font-variant-numeric:tabular-nums;
+  color:var(--color-text);
+}
+/* round points — appears only once all 6 games are confirmed */
+.rd .rp{
+  flex:0 0 auto;min-width:2.6em;text-align:center;
+  font-size:clamp(9px,.8vw,14px);font-weight:900;font-variant-numeric:tabular-nums;
+  color:var(--color-teal);background:var(--color-teal-dim);
+  border-radius:.3em;padding:.25em .4em;
+}
+.rd .rp.pend{color:var(--color-text-faint);font-weight:700;background:transparent}
+
+.court .cfoot{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  margin-top:clamp(8px,1vh,16px);padding-top:clamp(8px,1vh,14px);border-top:1px solid var(--color-border);
+  font-size:clamp(8px,.72vw,12px);font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--color-text-faint);
+}
+.court .cfoot .ds-kchn{--kchn-size:clamp(8px,.72vw,12px)}
+
+/* on-court-now strip: who is playing this game right now */
+.oncourt{
+  display:flex;align-items:center;gap:clamp(6px,.7vw,12px);flex-wrap:wrap;
+  margin-top:clamp(8px,1vh,14px);padding:clamp(6px,.8vh,11px) clamp(8px,.9vw,14px);
+  background:var(--color-lime-ghost);border:1px solid var(--color-lime-dim);
+  border-radius:clamp(8px,.7vw,12px);
+}
+.oncourt .ocl{
+  font-size:clamp(7px,.62vw,11px);font-weight:900;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--color-lime);
+}
+.oncourt .ocg{
+  font-size:clamp(7px,.62vw,11px);font-weight:900;letter-spacing:.1em;color:var(--color-text-faint);
+  background:rgba(255,255,255,.06);padding:.25em .5em;border-radius:.3em;
+}
+.oncourt .ocp{
+  font-size:clamp(12px,1.2vw,22px);font-weight:800;color:var(--color-text);white-space:nowrap;
+}
+.oncourt .ocv{font-size:clamp(8px,.7vw,12px);font-weight:700;color:var(--color-text-faint);text-transform:uppercase}
+
+/* ---------- rotating panel (results / charts) ---------- */
+.panelwrap{
+  flex:0 0 auto;margin:0 clamp(20px,2.4vw,44px) clamp(10px,1.2vh,18px);
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:clamp(12px,1.1vw,20px);overflow:hidden;
+}
+.panelwrap .ph{
+  display:flex;align-items:center;gap:.7em;
+  padding:clamp(8px,1vh,14px) clamp(14px,1.5vw,24px);border-bottom:1px solid var(--color-border);
+  font-size:clamp(9px,.82vw,14px);font-weight:900;font-style:italic;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--color-text-muted);
+}
+.panelwrap .ph .dots{margin-left:auto;display:flex;gap:6px}
+.panelwrap .ph .dots i{
+  width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.16);display:block;
+  transition:background 240ms;
+}
+.panelwrap .ph .dots i.on{background:var(--color-lime)}
+.panel{display:none;animation:fadeIn .45s ease}
+.panel.on{display:block}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@media (prefers-reduced-motion:reduce){.panel{animation:none}}
+
+/* horizontal bar chart — season match-point race */
+.chart{padding:clamp(10px,1.3vh,18px) clamp(14px,1.5vw,24px);display:flex;flex-direction:column;
+  gap:clamp(6px,.8vh,11px)}
+.bar{display:flex;align-items:center;gap:clamp(8px,.9vw,15px)}
+.bar .rk{
+  flex:0 0 auto;width:1.7em;text-align:center;font-size:clamp(9px,.8vw,14px);font-weight:900;
+  color:var(--color-text-faint);
+}
+.bar .em{font-size:clamp(13px,1.2vw,22px);line-height:1;flex:0 0 auto}
+.bar .nm{
+  flex:0 0 clamp(90px,10vw,190px);font-size:clamp(10px,1vw,18px);font-weight:800;font-style:italic;
+  text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.bar .trk{flex:1;height:clamp(12px,1.5vh,22px);background:rgba(255,255,255,.05);border-radius:9999px;overflow:hidden;min-width:0}
+.bar .fill{height:100%;border-radius:9999px;background:var(--c,var(--color-lime));
+  transition:width 600ms cubic-bezier(.16,1,.3,1)}
+.bar .vl{
+  flex:0 0 auto;min-width:2.4em;text-align:right;font-size:clamp(11px,1.05vw,20px);
+  font-weight:900;font-style:italic;font-variant-numeric:tabular-nums;
+}
+.bar.tonight .nm{color:var(--color-lime)}
+
+/* diverging rally-point bars */
+.dv{display:flex;align-items:center;gap:clamp(8px,.9vw,15px)}
+.dv .side{
+  flex:0 0 clamp(80px,9vw,170px);font-size:clamp(10px,.95vw,17px);font-weight:800;font-style:italic;
+  text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.dv .side.r{text-align:right}
+.dv .mid{flex:1;display:flex;align-items:center;height:clamp(12px,1.5vh,22px);min-width:0}
+.dv .mid .l,.dv .mid .rr{height:100%;transition:width 600ms cubic-bezier(.16,1,.3,1)}
+.dv .mid .l{margin-left:auto;border-radius:9999px 0 0 9999px}
+.dv .mid .rr{border-radius:0 9999px 9999px 0}
+.dv .n{flex:0 0 auto;min-width:2.6em;font-size:clamp(10px,.95vw,17px);font-weight:900;
+  font-variant-numeric:tabular-nums;color:var(--color-text-muted)}
+.dv .n.r{text-align:right}
+
+/* head-to-head panel */
+.h2h{padding:clamp(10px,1.3vh,18px) clamp(14px,1.5vw,24px);display:flex;flex-direction:column;gap:clamp(8px,1vh,14px)}
+.h2hrow{display:flex;align-items:center;gap:clamp(8px,1vw,16px);font-size:clamp(11px,1.05vw,19px)}
+.h2hrow .ct{flex:0 0 auto;width:6.5em;font-size:clamp(8px,.72vw,12px);font-weight:900;
+  letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint)}
+.h2hrow .tm{font-weight:800;font-style:italic;text-transform:uppercase}
+.h2hrow .prev{margin-left:auto;font-size:clamp(9px,.82vw,14px);font-weight:700;color:var(--color-text-faint)}
+.h2hrow .prev b{color:var(--color-lime);font-weight:900}
+
+/* ---------- results feed ---------- */
+.feedwrap{
+  flex:0 0 auto;margin:0 clamp(20px,2.4vw,44px) clamp(10px,1.2vh,18px);
+  background:var(--color-surface);border:1px solid var(--color-border);
+  border-radius:clamp(12px,1.1vw,20px);overflow:hidden;
+}
+.feedwrap .fh{
+  padding:clamp(8px,1vh,14px) clamp(14px,1.5vw,24px);border-bottom:1px solid var(--color-border);
+  font-size:clamp(9px,.82vw,14px);font-weight:900;font-style:italic;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--color-text-muted);display:flex;align-items:center;gap:.7em;
+}
+.feed{display:flex;flex-direction:column}
+.feedrow{
+  display:flex;align-items:center;gap:clamp(10px,1.2vw,22px);
+  padding:clamp(8px,1.05vh,15px) clamp(14px,1.5vw,24px);
+  border-bottom:1px solid rgba(255,255,255,.04);font-size:clamp(12px,1.15vw,21px);
+  animation:dropIn .5s ease;
+}
+.feedrow:last-child{border-bottom:0}
+@keyframes dropIn{from{opacity:0;transform:translateY(-10px);background:var(--color-lime-dim)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.feedrow{animation:none}}
+.feedrow .ct{
+  flex:0 0 auto;width:5em;font-size:clamp(9px,.8vw,14px);font-weight:900;
+  color:var(--color-text-faint);letter-spacing:.08em;text-transform:uppercase;
+}
+.feedrow .desc{flex:1;min-width:0;display:flex;flex-direction:column;gap:.2em}
+/* players: the headline */
+.feedrow .desc .players{
+  font-size:clamp(14px,1.4vw,26px);font-weight:800;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.feedrow .desc .players .w{color:var(--color-lime);font-weight:900;font-style:normal;text-transform:none}
+.feedrow .desc .players .l{color:var(--color-text);font-weight:700;font-style:normal;text-transform:none}
+.feedrow .desc .players .beat{
+  color:var(--color-text-faint);font-size:.58em;font-weight:800;margin:0 .55em;
+  letter-spacing:.12em;text-transform:uppercase;
+}
+/* teams: the sub-line */
+.feedrow .desc .teams{
+  font-size:clamp(9px,.78vw,14px);font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--color-text-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.feedrow .desc .w{color:var(--color-lime);font-weight:800;font-style:italic;text-transform:uppercase}
+.feedrow .desc .beat{color:var(--color-text-faint);font-size:.72em;font-weight:700;margin:0 .5em;
+  letter-spacing:.1em;text-transform:uppercase}
+.feedrow .desc .l{color:var(--color-text-muted);font-style:italic;text-transform:uppercase}
+.feedrow .badge{
+  flex:0 0 auto;font-size:clamp(8px,.7vw,12px);font-weight:800;letter-spacing:.08em;
+  color:var(--color-bg);background:var(--color-gold);padding:.25em .6em;border-radius:.35em;
+}
+.feedrow .sc{flex:0 0 auto;font-weight:900;font-style:italic;font-variant-numeric:tabular-nums;
+  font-size:clamp(13px,1.25vw,23px)}
+
+/* ---------- bottom ticker strip ---------- */
+.livestrip{
+  flex:0 0 auto;position:static;height:clamp(46px,5.4vh,76px);
+  display:flex;align-items:stretch;overflow:hidden;
+  background:var(--color-surface-2);border-top:1px solid var(--color-border-strong);
+}
+.livestrip .ds-tick-brand{font-size:clamp(13px,1.25vw,22px);padding:0 clamp(14px,1.6vw,28px)}
+.livestrip .ds-tick-item{height:100%;font-size:clamp(12px,1.15vw,20px);padding:0 clamp(14px,1.6vw,30px)}
+.livestrip .ds-tick-item .emoji{font-size:clamp(14px,1.3vw,24px)}
+.livestrip .ds-tick-close{display:none}
+.livestrip .ds-tick-meta{display:none}
+
+/* ---------- offline / not a game night ---------- */
+.idle{
+  position:fixed;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;
+  gap:clamp(14px,2vh,28px);text-align:center;padding:6vw;
+  background:radial-gradient(1200px 600px at 50% 0%,rgba(184,255,44,.10),transparent),var(--color-bg);
+}
+body.is-idle .idle{display:flex}
+body.is-idle > *:not(.idle){display:none}
+.idle h1{font-size:clamp(32px,7vw,120px);font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.04em}
+.idle h1 b{color:var(--color-lime)}
+.idle p{font-size:clamp(13px,1.5vw,26px);color:var(--color-text-muted);font-weight:600;letter-spacing:.04em}
+.idle .spon{justify-content:center;margin-top:2vh}
+.idle .spon .ds-kchn{--kchn-size:clamp(26px,3.4vw,60px)}
+</style>
+</head>
+<body>
+
+<div class="bhead">
+  <div class="logo display">Dink<b>Society</b></div>
+  <span class="rival-chip" id="phaseChip" hidden></span>
+  <span class="wk" id="wkLabel"></span>
+  <div class="right">
+    <div class="spon">
+      <span class="ds-presented">Game night<br>presented by</span>
+      <span class="ds-kchn">K’CHN</span>
+    </div>
+    <span class="live-pill"><span class="ds-livedot"></span> Live</span>
+    <span class="clock" id="clock"></span>
+  </div>
+</div>
+
+<div class="courts" id="courts"></div>
+
+<div class="panelwrap">
+  <div class="ph"><span class="ds-livedot"></span><span id="panelTitle">Latest results</span>
+    <span class="dots" id="panelDots"><i class="on"></i><i></i><i></i></span>
+  </div>
+  <div class="panel on" id="panel-0"><div class="feed" id="feed"></div></div>
+  <div class="panel" id="panel-1"><div class="chart" id="chartMP"></div></div>
+  <div class="panel" id="panel-2"><div class="chart" id="chartPts"></div></div>
+</div>
+
+<div class="livestrip ds-tick" id="ds-ticker"></div>
+
+<!-- shown when it isn't a game night -->
+<div class="idle">
+  <h1>See you<br><b>next week.</b></h1>
+  <p id="idleSub">No matches tonight.</p>
+  <div class="spon">
+    <span class="ds-presented">Presented by</span>
+    <span class="ds-kchn">K’CHN</span>
+  </div>
+</div>
+
+<script src="/js/live-poll.js"></script>
+<script src="/js/ds-ticker.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var FEED_ROWS = 4;          // results that fit without scrolling
+  var PANEL_MS  = 14000;      // how long each rotating panel holds
+  var sn   = DSTicker.shortName;
+  var pair = DSTicker.pair;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function courtLabel(m) {
+    if (m.courtA && m.courtB) return 'Courts ' + m.courtA + ' & ' + m.courtB;
+    return m.court || '';
+  }
+
+  // Per-game strip: 6 slots per round. Confirmed games show their real score
+  // (11-7); pending slots stay as empty pips. A round pays out match points
+  // only when all 6 are confirmed, so the strip doubles as the payout clock.
+  function roundGrid(m) {
+    var byRound = { 1: [], 2: [] };
+    (m.games || []).forEach(function (g) { if (byRound[g.round]) byRound[g.round][g.gameNum - 1] = g; });
+
+    function strip(rn) {
+      var r = (rn === 1 ? m.round1 : m.round2) || {};
+      var done = r.scoredGames === 6;
+      var cells = '';
+      for (var i = 0; i < 6; i++) {
+        var g = byRound[rn][i];
+        if (!g) { cells += '<span class="gm pend"></span>'; continue; }
+        var w = g.home > g.away ? 'h' : (g.away > g.home ? 'a' : '');
+        cells += '<span class="gm ' + w + '">' + g.home + '<i>–</i>' + g.away + '</span>';
+      }
+      // Running games tally is always visible; the round-point payout appears
+      // the moment all 6 games are confirmed.
+      return '<div class="rd">' +
+        '<span class="rl">R' + rn + '</span>' +
+        '<span class="gms">' + cells + '</span>' +
+        '<span class="rg">' + (r.homeGames || 0) + '–' + (r.awayGames || 0) + '</span>' +
+        (done ? '<span class="rp">' + (r.homePoints || 0) + '–' + (r.awayPoints || 0) + '</span>'
+              : '<span class="rp pend">' + (r.scoredGames || 0) + '/6</span>') +
+      '</div>';
+    }
+    return '<div class="rounds">' + strip(1) + strip(2) + '</div>';
+  }
+
+  // ---------- rotating panels: results → season race → tonight's rally pts ----------
+  var PANEL_TITLES = ['Latest results', 'Season match points', 'Tonight · rally points'];
+  var panelIdx = 0;
+
+  function renderPanels(d) {
+    // 1) season match-point race (real standings through last completed week)
+    var st = (d.standings || []).slice().sort(function (a, b) { return b.mp - a.mp; });
+    var maxMp = Math.max.apply(null, st.map(function (t) { return t.mp; }).concat([1]));
+    var tonight = {};
+    (d.matches || []).forEach(function (m) { tonight[m.home.id] = 1; tonight[m.away.id] = 1; });
+
+    document.getElementById('chartMP').innerHTML = st.map(function (t, i) {
+      return '<div class="bar' + (tonight[t.teamId] ? ' tonight' : '') + '">' +
+        '<span class="rk">' + (i + 1) + '</span>' +
+        '<span class="em">' + esc(t.emoji || '') + '</span>' +
+        '<span class="nm">' + esc(t.name) + '</span>' +
+        '<span class="trk"><span class="fill" style="width:' +
+          Math.round((t.mp / maxMp) * 100) + '%;--c:' + (t.color || 'var(--color-lime)') + '"></span></span>' +
+        '<span class="vl">' + t.mp + '</span>' +
+      '</div>';
+    }).join('');
+
+    // 2) tonight's rally points, diverging from centre
+    document.getElementById('chartPts').innerHTML = (d.matches || []).map(function (m) {
+      var h = m.pointsHome || 0, a = m.pointsAway || 0, tot = Math.max(h + a, 1);
+      return '<div class="dv">' +
+        '<span class="side r">' + esc(m.home.name) + '</span>' +
+        '<span class="n r">' + h + '</span>' +
+        '<span class="mid">' +
+          '<span class="l" style="width:' + ((h / tot) * 50).toFixed(1) + '%;background:' + (m.home.color || '#b8ff2c') + '"></span>' +
+          '<span class="rr" style="width:' + ((a / tot) * 50).toFixed(1) + '%;background:' + (m.away.color || '#17d7b0') + '"></span>' +
+        '</span>' +
+        '<span class="n">' + a + '</span>' +
+        '<span class="side">' + esc(m.away.name) + '</span>' +
+      '</div>';
+    }).join('');
+  }
+
+  function rotatePanel() {
+    panelIdx = (panelIdx + 1) % 3;
+    for (var i = 0; i < 3; i++) {
+      document.getElementById('panel-' + i).classList.toggle('on', i === panelIdx);
+      document.getElementById('panelDots').children[i].classList.toggle('on', i === panelIdx);
+    }
+    document.getElementById('panelTitle').textContent = PANEL_TITLES[panelIdx];
+  }
+
+  // ---- demo helper: model one away-captain confirmation ----
+  // Mirrors lib/score-helpers.js: a round pays 2 pts to its winner (1-1 on a
+  // 3-3 split) only once all 6 of its games are confirmed; match points are
+  // the sum of the two rounds.
+  function confirmNextGame(m) {
+    if (m.status !== 'live') return;
+    var n = m.gamesConfirmed || 0;
+    if (n >= (m.gamesTotal || 12)) return;
+
+    var round = n < 6 ? 1 : 2;
+    var gameNum = (n % 6) + 1;
+    var homeWins = Math.random() < 0.5;
+    var win = 11, lose = Math.floor(Math.random() * 9) + 2;
+
+    m.games = m.games || [];
+    m.games.push({ slot: 'r' + round + 'g' + gameNum, round: round, gameNum: gameNum,
+                   type: ['MX', 'WD', 'MD'][gameNum % 3],
+                   home: homeWins ? win : lose, away: homeWins ? lose : win });
+
+    if (homeWins) m.gamesHome = (m.gamesHome || 0) + 1;
+    else m.gamesAway = (m.gamesAway || 0) + 1;
+    m.gamesConfirmed = n + 1;
+
+    var key = round === 1 ? 'round1' : 'round2';
+    var r = m[key] || (m[key] = { homeGames: 0, awayGames: 0, homePoints: 0, awayPoints: 0, scoredGames: 0 });
+    if (homeWins) r.homeGames++; else r.awayGames++;
+    r.scoredGames++;
+    if (r.scoredGames === 6) {                       // round pays out
+      if (r.homeGames > r.awayGames) { r.homePoints = 2; r.awayPoints = 0; }
+      else if (r.awayGames > r.homeGames) { r.homePoints = 0; r.awayPoints = 2; }
+      else { r.homePoints = 1; r.awayPoints = 1; }
+    }
+    if (m.gamesConfirmed >= (m.gamesTotal || 12)) {  // all 12 confirmed → final
+      m.status = 'final';
+      m.mpHome = (m.round1.homePoints || 0) + (m.round2.homePoints || 0);
+      m.mpAway = (m.round1.awayPoints || 0) + (m.round2.awayPoints || 0);
+    }
+  }
+  window.DSDemoConfirm = confirmNextGame;
+
+  // Who is on court right now. public-match.js releases player names once
+  // both lineups are locked and isRevealTime() has passed, so this is safe
+  // to show publicly — it just isn't available before reveal.
+  function onCourt(m) {
+    var g = m.current;
+    if (!g || m.status !== 'live') return '';
+    var h = pair(g.homePlayers), a = pair(g.awayPlayers);
+    if (!h && !a) return '';
+    return '<div class="oncourt">' +
+      '<span class="ocl">On court</span>' +
+      '<span class="ocg">R' + g.round + 'G' + g.gameNum + (g.type ? ' · ' + g.type : '') + '</span>' +
+      '<span class="ocp">' + esc(h) + '</span>' +
+      '<span class="ocv">v</span>' +
+      '<span class="ocp">' + esc(a) + '</span>' +
+    '</div>';
+  }
+
+  function renderBoard(d) {
+    document.body.classList.toggle('is-idle', !(d && d.gameNight && (d.matches || []).length));
+    if (document.body.classList.contains('is-idle')) return;
+
+    // header
+    var chip = document.getElementById('phaseChip');
+    if (d.phase === 'rivalry') { chip.hidden = false; chip.textContent = d.phaseLabel || 'Rivalry Week'; }
+    else { chip.hidden = true; }
+    document.getElementById('wkLabel').textContent =
+      'Week ' + d.week + (d.venue ? ' · ' + d.venue : '');
+
+    // courts
+    document.getElementById('courts').innerHTML = (d.matches || []).map(function (m, i) {
+      var live = m.status === 'live', fin = m.status === 'final', deck = m.status === 'awaiting';
+      // running score = games won across CONFIRMED games (away captain has
+      // confirmed home's entry); final match points only once finalized
+      // Match points, live: score-helpers awards a round 2 pts (or 1-1) once
+      // all 6 of its games are confirmed, so these accrue during play —
+      // finalize only persists them. Headline is games-won while playing,
+      // match points once done (the number standings speak in).
+      var r1 = m.round1 || {}, r2 = m.round2 || {};
+      var mpH = m.mpHome != null ? m.mpHome : (r1.homePoints || 0) + (r2.homePoints || 0);
+      var mpA = m.mpAway != null ? m.mpAway : (r1.awayPoints || 0) + (r2.awayPoints || 0);
+      var sh = fin ? mpH : (m.gamesHome || 0);
+      var sa = fin ? mpA : (m.gamesAway || 0);
+      var hLead = sh > sa, aLead = sa > sh;
+      var prog = fin ? 'Final · match points'
+        : (m.gamesConfirmed != null && m.gamesTotal
+            ? m.gamesConfirmed + ' of ' + m.gamesTotal + ' games · MP ' + mpH + '–' + mpA : '');
+      var st = live ? '<span class="st">● Live</span>'
+             : fin ? '<span class="st done">Final</span>'
+                   : '<span class="st deck">On deck</span>';
+      function line(t, pts, lead) {
+        return '<div class="teamline' + (lead ? ' lead' : '') + '">' +
+          (t.seedLabel ? '<span class="seedno">' + esc(String(t.seedLabel).replace('#', '')) + '</span>' : '') +
+          '<span class="emo">' + esc(t.emoji || '') + '</span>' +
+          '<span class="who">' + esc(t.name) + '</span>' +
+          (deck ? '<span class="pts tbd">—</span>' : '<span class="pts">' + pts + '</span>') +
+        '</div>';
+      }
+      return '<div class="court' + (live ? ' hot' : '') + '" style="--accent:' + (m.home.color || '#5e625c') + '">' +
+        '<div class="cname">' + esc(courtLabel(m)) + st + '</div>' +
+        line(m.home, sh, hLead) +
+        line(m.away, sa, aLead) +
+        onCourt(m) +
+        roundGrid(m) +
+        '<div class="cfoot"><span>' + (prog || (d.phase === 'rivalry' ? 'Seeded · locked' : esc(m.division || ''))) + '</span>' +
+          '<span>Scoring by <span class="ds-kchn">K’CHN</span></span></div>' +
+      '</div>';
+    }).join('');
+
+    // results feed
+    document.getElementById('feed').innerHTML = (d.feed || []).slice(0, FEED_ROWS).map(function (f) {
+      var wp = pair(f.winnerPlayers), lp = pair(f.loserPlayers);
+      return '<div class="feedrow">' +
+        '<span class="ct">' + esc(f.courtLabel || '') + '</span>' +
+        '<span class="desc">' +
+          // players lead — they are the reason people watch this board
+          '<span class="players"><span class="w">' + esc(wp || f.winner) + '</span>' +
+            '<span class="beat">def.</span><span class="l">' + esc(lp || f.loser) + '</span></span>' +
+          '<span class="teams">' + esc(f.winner) + ' over ' + esc(f.loser) + '</span>' +
+        '</span>' +
+        (f.tag ? '<span class="badge">' + esc(f.tag) + '</span>' : '') +
+        '<span class="sc">' + esc(f.score) + '</span>' +
+      '</div>';
+    }).join('');
+
+    renderPanels(d);
+  }
+
+  // the bottom strip is the shared component; the board is this page's own render
+  DSTicker.mount({
+    strip: document.getElementById('ds-ticker'),
+    card: null,
+
+    // ?demo=1 runs the simulator against the stub; otherwise go live
+    source: new URLSearchParams(location.search).has('demo')
+      ? 'stub'
+      : { url: '/.netlify/functions/public-gameday?season=circuit-i' }
+  });
+
+  var origRender = DSTicker.render;
+  function paint(d) { origRender(d); renderBoard(d); }
+  DSTicker.render = paint;
+  paint(DSTicker.data || DSTicker.STUB);
+
+  // clock
+  function tick() {
+    document.getElementById('clock').textContent =
+      new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  }
+  tick(); setInterval(tick, 20000);
+
+  // cycle the panel so the board never goes static
+  setInterval(rotatePanel, PANEL_MS);
+
+  // ---- kiosk niceties ----
+  // keep the TV awake if the browser allows it
+  if ('wakeLock' in navigator) {
+    var lock = null;
+    var request = function () {
+      navigator.wakeLock.request('screen').then(function (l) { lock = l; }).catch(function () {});
+    };
+    request();
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden && !lock) request();
+    });
+  }
+  // nudge layout every 10 min to avoid static burn-in on the same pixels
+  setInterval(function () {
+    document.body.style.transform = 'translateY(' + (Math.random() * 3 - 1.5).toFixed(2) + 'px)';
+  }, 600000);
+
+  // ---- preview affordance: /live?demo=1 simulates scoring ----
+  if (new URLSearchParams(location.search).has('demo')) {
+    document.body.style.cursor = 'auto';
+    var sim = JSON.parse(JSON.stringify(DSTicker.STUB));
+    setInterval(function () {
+      sim.matches.forEach(confirmNextGame);
+      sim.updatedAt = new Date().toISOString();
+      paint(sim);
+    }, 1800);
+  }
+})();
+</script>
+</body>
+</html>

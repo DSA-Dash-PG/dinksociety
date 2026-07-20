@@ -11,37 +11,51 @@
 window.DS_SETTINGS = fetch('/.netlify/functions/admin-settings').then(r => r.json()).catch(() => ({}));
 
 (async function loadPartials() {
-  const slots = document.querySelectorAll('[data-partial]');
-  if (!slots.length) return;
+  // Partials may themselves contain [data-partial] slots (footer.html nests
+  // the live ticker), so fill recursively rather than scanning once. `seen`
+  // guards against a partial that includes itself.
+  const seen = new Set();
 
-  await Promise.all(
-    Array.from(slots).map(async (slot) => {
-      const name = slot.getAttribute('data-partial');
-      if (!name) return;
-      try {
-        const res = await fetch(`/partials/${name}.html`);
-        if (!res.ok) return; // Silently skip missing partials
-        const html = await res.text();
-        slot.innerHTML = html;
+  async function fillAll(root) {
+    const slots = root.querySelectorAll('[data-partial]');
+    if (!slots.length) return;
+    await Promise.all(Array.from(slots).map(fill));
+  }
 
-        // Re-run any <script> tags inside the partial so event
-        // listeners (hamburger, drawer, etc.) get wired up.
-        slot.querySelectorAll('script').forEach((oldScript) => {
-          const newScript = document.createElement('script');
-          for (const attr of oldScript.attributes) {
-            newScript.setAttribute(attr.name, attr.value);
-          }
-          newScript.textContent = oldScript.textContent;
-          oldScript.parentNode.replaceChild(newScript, oldScript);
-        });
+  async function fill(slot) {
+    const name = slot.getAttribute('data-partial');
+    if (!name || slot.dataset.partialLoaded) return;
+    if (seen.has(name)) return;
+    seen.add(name);
+    slot.dataset.partialLoaded = '1';
 
-        // Single source of truth for the active nav link.
-        if (name === 'nav') highlightNav();
-      } catch (err) {
-        console.warn(`[partials] Could not load "${name}":`, err);
-      }
-    })
-  );
+    try {
+      const res = await fetch(`/partials/${name}.html`);
+      if (!res.ok) return; // Silently skip missing partials
+      slot.innerHTML = await res.text();
+
+      // Nested slots first, so any scripts we run below see a complete DOM.
+      await fillAll(slot);
+
+      // Re-run any <script> tags inside the partial so event
+      // listeners (hamburger, drawer, etc.) get wired up.
+      slot.querySelectorAll('script').forEach((oldScript) => {
+        const newScript = document.createElement('script');
+        for (const attr of oldScript.attributes) {
+          newScript.setAttribute(attr.name, attr.value);
+        }
+        newScript.textContent = oldScript.textContent;
+        oldScript.parentNode.replaceChild(newScript, oldScript);
+      });
+
+      // Single source of truth for the active nav link.
+      if (name === 'nav') highlightNav();
+    } catch (err) {
+      console.warn(`[partials] Could not load "${name}":`, err);
+    }
+  }
+
+  await fillAll(document);
 })();
 
 // ═══════════════════════════════════════════════════════════════
