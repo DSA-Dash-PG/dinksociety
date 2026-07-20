@@ -366,12 +366,18 @@
   }
 
   // ---------- public API ----------
-  var state = { strip: null, card: null, data: null, poller: null };
+  var state = { strip: null, card: null, data: null, poller: null, onData: null };
 
   function render(data) {
     state.data = data;
     renderStrip(state.strip, data);
     renderCard(state.card, data);
+    // Host pages (e.g. /live) add their own surfaces. This must be a real
+    // hook — reassigning DSTicker.render after mount() does NOT work, because
+    // the poller closes over this function directly.
+    if (typeof state.onData === 'function') {
+      try { state.onData(data); } catch (e) { console.error('[ds-ticker] onData:', e); }
+    }
   }
 
   // mount({ strip: el, card: el, source: 'stub' | {url, interval} })
@@ -379,6 +385,7 @@
     opts = opts || {};
     state.strip = opts.strip || document.getElementById('ds-ticker');
     state.card = opts.card || document.getElementById('ds-livecard');
+    state.onData = opts.onData || null;
 
     var src = opts.source || 'stub';
 

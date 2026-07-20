@@ -40,7 +40,10 @@ const SLOT_TYPE = {
 const SLOT_KEYS = Object.keys(SLOT_TYPE);
 const GAMES_TOTAL = SLOT_KEYS.length;
 
-const RECENT_MS = 6 * 60 * 60 * 1000;   // a match still counts as "tonight" 6h after start
+// A match reads as LIVE for 6h after first serve...
+const RECENT_MS = 6 * 60 * 60 * 1000;
+// ...but the board stays publicly up with final scores for a full 24h.
+const PUBLIC_MS = 24 * 60 * 60 * 1000;
 const FEED_MAX = 12;
 
 export default async (req) => {
@@ -174,7 +177,7 @@ export default async (req) => {
       // finalized must not sit on the ticker as LIVE for days — once it falls
       // out of the recent window we present whatever was confirmed as done.
       const started = m.scheduledAt ? Date.parse(m.scheduledAt) <= Date.now() : false;
-      const inWindow = isTonight(m.scheduledAt);
+      const inWindow = inLiveWindow(m.scheduledAt);
       const status = final ? 'final'
         : (inWindow && (gamesConfirmed > 0 || (started && lineupsVisible))) ? 'live'
         : gamesConfirmed > 0 ? 'final'
@@ -278,13 +281,23 @@ function pickWeek(weeks) {
   return byWeek.get(last);
 }
 
+// Public window: from 12h before first serve until 24h after, so results
+// stay on screen (and on the site) for the day after game night.
 function isTonight(iso) {
   if (!iso) return false;
   const t = Date.parse(iso);
   if (Number.isNaN(t)) return false;
   const now = Date.now();
-  // within the next 12h or the last 6h
-  return t - now < 12 * 60 * 60 * 1000 && now - t < RECENT_MS;
+  return t - now < 12 * 60 * 60 * 1000 && now - t < PUBLIC_MS;
+}
+
+// Narrower window that governs the LIVE badge specifically.
+function inLiveWindow(iso) {
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return false;
+  const now = Date.now();
+  return t <= now && now - t < RECENT_MS;
 }
 
 function pairNames(slot) {

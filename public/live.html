@@ -55,6 +55,19 @@ body{
 .clock{
   font-size:clamp(14px,1.5vw,26px);font-weight:800;color:var(--color-text-muted);font-variant-numeric:tabular-nums;
 }
+.countdown{
+  display:inline-flex;align-items:baseline;gap:.6em;padding:.45em 1em;border-radius:9999px;
+  background:var(--color-lime-dim);border:1px solid rgba(184,255,44,.28);
+}
+.countdown[hidden]{display:none}
+.countdown .cdv{
+  font-size:clamp(16px,1.9vw,32px);font-weight:900;font-style:italic;color:var(--color-lime);
+  font-variant-numeric:tabular-nums;letter-spacing:-.02em;
+}
+.countdown .cdl{
+  font-size:clamp(8px,.7vw,12px);font-weight:800;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--color-text-faint);
+}
 
 /* ---------- court grid ---------- */
 .courts{
@@ -375,6 +388,9 @@ body.is-idle > *:not(.idle){display:none}
       <span class="ds-presented">Game night<br>presented by</span>
       <span class="ds-kchn">K’CHN</span>
     </div>
+    <span class="countdown" id="countdown" hidden>
+      <span class="cdv">–:––</span><span class="cdl">until first serve</span>
+    </span>
     <span class="live-pill"><span class="ds-livedot"></span> Live</span>
     <span class="clock" id="clock"></span>
   </div>
@@ -396,7 +412,7 @@ body.is-idle > *:not(.idle){display:none}
 <!-- shown when it isn't a game night -->
 <div class="idle">
   <h1>See you<br><b>next week.</b></h1>
-  <p id="idleSub">No matches tonight.</p>
+  <p id="idleSub">No matches scheduled.</p>
   <div class="spon">
     <span class="ds-presented">Presented by</span>
     <span class="ds-kchn">K’CHN</span>
@@ -573,9 +589,36 @@ body.is-idle > *:not(.idle){display:none}
     '</div>';
   }
 
+  // Countdown to first serve — shown until the first match starts, so the
+  // board is useful (and correct) in the hours before 7pm rather than
+  // claiming there's nothing on.
+  var countdownTo = null;
+  function firstServe(d) {
+    var ts = (d.matches || [])
+      .map(function (m) { return Date.parse(m.scheduledAt); })
+      .filter(function (t) { return !Number.isNaN(t); });
+    return ts.length ? Math.min.apply(null, ts) : null;
+  }
+  function tickCountdown() {
+    var el = document.getElementById('countdown');
+    if (!el) return;
+    if (!countdownTo || Date.now() >= countdownTo) { el.hidden = true; return; }
+    var left = Math.max(0, countdownTo - Date.now());
+    var h = Math.floor(left / 3600000),
+        m = Math.floor((left % 3600000) / 60000),
+        sec = Math.floor((left % 60000) / 1000);
+    el.hidden = false;
+    el.querySelector('.cdv').textContent =
+      (h > 0 ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(sec).padStart(2, '0');
+    el.querySelector('.cdl').textContent = h > 0 ? 'until first serve' : 'until first serve';
+  }
+
   function renderBoard(d) {
     document.body.classList.toggle('is-idle', !(d && d.gameNight && (d.matches || []).length));
     if (document.body.classList.contains('is-idle')) return;
+
+    countdownTo = firstServe(d);
+    tickCountdown();
 
     // header
     var chip = document.getElementById('phaseChip');
@@ -685,12 +728,11 @@ body.is-idle > *:not(.idle){display:none}
     card: null,
 
     // ?demo=1 runs the simulator against the stub; otherwise go live
-    source: DEMO ? 'stub' : { url: ENDPOINT }
+    source: DEMO ? 'stub' : { url: ENDPOINT },
+    onData: renderBoard          // real hook — see render() in ds-ticker.js
   });
 
-  var origRender = DSTicker.render;
-  function paint(d) { origRender(d); renderBoard(d); }
-  DSTicker.render = paint;
+  function paint(d) { DSTicker.render(d); }
 
   // Paint the stub ONLY in demo mode. On the real board we show a waiting
   // state until live data actually arrives — a screen that looks live while
@@ -729,6 +771,7 @@ body.is-idle > *:not(.idle){display:none}
       new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
   }
   tick(); setInterval(tick, 20000);
+  setInterval(tickCountdown, 1000);
 
   // cycle the panel so the board never goes static
   setInterval(rotatePanel, PANEL_MS);
