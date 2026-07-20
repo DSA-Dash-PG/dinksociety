@@ -1083,6 +1083,19 @@
     };
     const SLOT_KEYS = Object.keys(SLOT_RULES);
 
+    // ── Game numbering ───────────────────────────────────────────
+    // Games are DISPLAYED 1-12 continuously across the night: Round 1 is
+    // Games 1-6, Round 2 is Games 7-12. The `game` field in SLOT_RULES stays
+    // per-round (1-6) because the set-pairing math depends on it — always run
+    // it through gno() before showing it to anyone. Mirrors gameNo() in
+    // lib/lineup-helpers.js.
+    const GAMES_PER_ROUND = 6;
+    const gno = (round, gameInRound) => (round - 1) * GAMES_PER_ROUND + gameInRound;
+    const gnoOf = (slotKey) => {
+      const s = SLOT_RULES[slotKey];
+      return s ? gno(s.round, s.game) : null;
+    };
+
     // ── Set pairing ──────────────────────────────────────────────
     // Two games share each court window: g1+g2, g3+g4, g5+g6 within a round
     // are played SIMULTANEOUSLY on two courts, so one player can't be in both
@@ -2268,7 +2281,7 @@
           return `
             <div class="lineup-game">
               <div class="lineup-game__type">
-                <span class="lineup-game__type-num">G${slot.game}</span>${slot.label}
+                <span class="lineup-game__type-num">G${gno(slot.round, slot.game)}</span>${slot.label}
               </div>
               <div style="font-size: 14px; font-weight: 500;">${escapeHtml(p1Name ? shortName(p1Name) : '—')}</div>
               <div style="font-size: 14px; font-weight: 500;">${escapeHtml(p2Name ? shortName(p2Name) : '—')}</div>
@@ -2280,7 +2293,7 @@
         // Players already in the OTHER game of this set (played simultaneously
         // on the other court) are grayed out with the reason.
         const pairedKey = pairedSlotKey(slotKey);
-        const pairedGameNum = SLOT_RULES[pairedKey].game;
+        const pairedGameNum = gnoOf(pairedKey);
         const busy = playersInDraftSlot(pairedKey);
         const optHtml = (pos) => options.map(p => {
           const cur = picks[pos];
@@ -2290,7 +2303,7 @@
         return `
           <div class="lineup-game">
             <div class="lineup-game__type">
-              <span class="lineup-game__type-num">G${slot.game}</span>${slot.label}
+              <span class="lineup-game__type-num">G${gno(slot.round, slot.game)}</span>${slot.label}
             </div>
             <select data-slot="${slotKey}" data-pos="p1">
               <option value="">&mdash; Player 1 &mdash;</option>
@@ -2307,7 +2320,7 @@
       // Games grouped into ringed "sets" — each pair plays at the same time.
       const setBlock = (r, g) => `
         <div class="cap-set">
-          <span class="cap-set__pill">Set ${Math.ceil(g / 2)} · G${g} + G${g + 1}</span>
+          <span class="cap-set__pill">G${gno(r, g)} + G${gno(r, g + 1)}</span>
           <span class="cap-set__hint">same time, two courts</span>
           ${renderGame(`r${r}g${g}`)}${renderGame(`r${r}g${g + 1}`)}
         </div>`;
@@ -2368,7 +2381,7 @@
               ${escapeHtml(mineText || '—')}
             </div>
             <div class="reveal-matchup__vs">
-              R${slot.round}G${slot.game} · ${slot.type}
+              Game ${gno(slot.round, slot.game)} · ${slot.type}
             </div>
             <div class="reveal-matchup__side reveal-matchup__right">
               <div class="reveal-matchup__label">${escapeHtml(oppName)}</div>
@@ -2520,7 +2533,7 @@
 
             rows.push(`
               <tr class="${rowClass}">
-                <td><span class="ss-type">G${g}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span> ${courtTag(g)}</td>
+                <td><span class="ss-type">G${gno(round, g)}</span> <span class="ss-type-label">${SLOT_TYPE_LABEL[slot]}</span> ${courtTag(g)}</td>
                 <td class="ss-pair">${escapeHtml(homePair)}</td>
                 <td>${scoreCell('home', hv)}</td>
                 <td>${scoreCell('away', av)}</td>
@@ -2866,8 +2879,7 @@
     }
 
     function prettySlotShort(slot) {
-      const round = slot.startsWith('r1') ? 'R1' : 'R2';
-      return `${round}G${slot.slice(-1)}`;
+      return `G${gnoOf(slot)}`;
     }
 
     // ===== Save flow =====
@@ -3093,7 +3105,7 @@
         const g = sc.games[slot] || {};
         const r = slot.startsWith('r1') ? 1 : 2;
         return `<tr>
-          <td>R${r} G${slot.slice(-1)} <span style="color:var(--color-text-faint);font-size:10px;">${SLOT_TYPE_LABEL[slot] || ''}</span></td>
+          <td>Game ${gnoOf(slot)} <span style="color:var(--color-text-faint);font-size:10px;">${SLOT_TYPE_LABEL[slot] || ''}</span></td>
           <td class="num">${g.home ?? '—'}</td>
           <td class="num">${g.away ?? '—'}</td>
         </tr>`;
@@ -4120,7 +4132,7 @@
         const pairs = [];
         for (let i = 0; i < keys.length; i += 2) {
           const a = SLOT_RULES[keys[i]], b = SLOT_RULES[keys[i + 1]];
-          pairs.push(`<div class="lmob-set"><span class="lmob-set__pill">Set ${Math.ceil(a.game / 2)} · G${a.game} + G${b.game}</span><span class="lmob-set__hint">same time</span>${mobGameHTML(keys[i])}${mobGameHTML(keys[i + 1])}</div>`);
+          pairs.push(`<div class="lmob-set"><span class="lmob-set__pill">G${gno(a.round, a.game)} + G${gno(b.round, b.game)}</span><span class="lmob-set__hint">same time</span>${mobGameHTML(keys[i])}${mobGameHTML(keys[i + 1])}</div>`);
         }
         return `<div class="lmob-round"><div class="lmob-round__head"><span>Round ${r}</span><span class="lmob-round__tally">${done}/${keys.length} set</span></div>${pairs.join('')}</div>`;
       };
@@ -4133,7 +4145,7 @@
     function mobGameHTML(slotKey) {
       const slot = SLOT_RULES[slotKey];
       const badge = slot.type === 'WOMENS' ? 'w' : slot.type === 'MENS' ? 'm' : 'x';
-      return `<div class="lmob-game"><div class="lmob-game__top"><span class="lmob-badge is-${badge}">${slot.label}</span><span class="lmob-g">G${slot.game}</span></div><div class="lmob-slots">${mobSlotHTML(slotKey, 0)}${mobSlotHTML(slotKey, 1)}</div></div>`;
+      return `<div class="lmob-game"><div class="lmob-game__top"><span class="lmob-badge is-${badge}">${slot.label}</span><span class="lmob-g">G${gno(slot.round, slot.game)}</span></div><div class="lmob-slots">${mobSlotHTML(slotKey, 0)}${mobSlotHTML(slotKey, 1)}</div></div>`;
     }
     function mobSlotHTML(slotKey, pos) {
       const slot = SLOT_RULES[slotKey];
@@ -4160,7 +4172,7 @@
       const busyAcrossSet = playersInDraftSlot(pairedKey);
       capSheetCtx = { slotKey, pos };
       $id('cap-sheet-title').textContent = `${slot.label} · ${allow === 'F' ? 'Woman' : 'Man'}`;
-      $id('cap-sheet-sub').textContent = `Round ${slot.round}, Game ${slot.game} · same time as G${pairedGame.game} · max ${LINEUP_MAX_GAMES} games/night`;
+      $id('cap-sheet-sub').textContent = `Round ${slot.round} · Game ${gno(slot.round, slot.game)} · same time as G${gno(pairedGame.round, pairedGame.game)} · max ${LINEUP_MAX_GAMES} games/night`;
       const elig = availableRoster().filter(p => p.gender === allow);
       let rows;
       if (!elig.length) {
@@ -4172,7 +4184,7 @@
           const atCap = (counts[p.id] || 0) >= LINEUP_MAX_GAMES && p.id !== current;
           const disabled = isPartner || onOtherCourt || atCap;
           const note = isPartner ? 'Already in this game'
-            : onOtherCourt ? `Playing G${pairedGame.game} (other court)`
+            : onOtherCourt ? `Playing G${gno(pairedGame.round, pairedGame.game)} (other court)`
             : atCap ? `At ${LINEUP_MAX_GAMES}-game limit`
             : p.id === current ? 'Currently selected'
             : `${counts[p.id] || 0}/${LINEUP_MAX_GAMES} games`;
@@ -4261,7 +4273,7 @@
             </div>`
           : `<div class="bgm__status"><span class="bgm__pill is-${pillCls}">${pillTxt}</span></div>`;
         return `<div class="bgm ${cardCls}">
-          <div class="bgm__top"><span class="lmob-badge is-${badgeOf(slot_t.type)}">${slot_t.label}</span><span class="bgm__court">G${g}${courtOf(g) ? ' · Court ' + escapeHtml(String(courtOf(g))) : ''}</span></div>
+          <div class="bgm__top"><span class="lmob-badge is-${badgeOf(slot_t.type)}">${slot_t.label}</span><span class="bgm__court">G${gno(round, g)}${courtOf(g) ? ' · Court ' + escapeHtml(String(courtOf(g))) : ''}</span></div>
           <div class="bgm__pairs"><div class="bgm__pair bgm__pair--us">${escapeHtml(usPair)}</div><div class="bgm__vs">VS</div><div class="bgm__pair">${escapeHtml(themPair)}</div></div>
           <div class="bgm__scores">${sideStep(slot, mySide, true)}${sideStep(slot, oppSide, false)}</div>
           ${confirmRow}
@@ -4271,11 +4283,11 @@
       // inherits the "worst" state of its two games: red if either
       // mismatches, solid teal once both are confirmed.
       const statusOfSlot = (slot) => (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
-      const setBlock = (round, setNum, g1, g2) => {
+      const setBlock = (round, g1, g2) => {
         const sts = [statusOfSlot(`r${round}g${g1}`), statusOfSlot(`r${round}g${g2}`)];
         const ring = sts.includes('mismatch') ? ' lmob-set--mismatch' : sts.every(s => s === 'confirmed') ? ' lmob-set--done' : '';
         return `<div class="lmob-set${ring}">
-          <span class="lmob-set__pill">Set ${setNum} · G${g1} + G${g2}</span>
+          <span class="lmob-set__pill">G${gno(round, g1)} + G${gno(round, g2)}</span>
           <span class="lmob-set__hint">same time, two courts</span>
           ${gameCard(g1, round)}${gameCard(g2, round)}</div>`;
       };
@@ -4357,9 +4369,9 @@
         <div class="scoresheet ${bar ? 'ssm-pad' : ''}" style="padding:0;border:none;background:none;">
           ${renderScoresheetBanner(data)}
           ${roundTitle(1)}
-          ${setBlock(1, 1, 1, 2)}${setBlock(1, 2, 3, 4)}${setBlock(1, 3, 5, 6)}
+          ${setBlock(1, 1, 2)}${setBlock(1, 3, 4)}${setBlock(1, 5, 6)}
           ${roundTitle(2)}
-          ${setBlock(2, 1, 1, 2)}${setBlock(2, 2, 3, 4)}${setBlock(2, 3, 5, 6)}
+          ${setBlock(2, 1, 2)}${setBlock(2, 3, 4)}${setBlock(2, 5, 6)}
           ${mathBlock}
           ${submissions}
           <div class="cap-status" id="ss-status"></div>

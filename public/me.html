@@ -1895,6 +1895,10 @@
   // leads; other days the last result + season tiles lead. Built entirely
   // from the player-me payload — no extra fetches.
   const HOME_SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
+  // Games display 1-12 continuously: Round 1 is Games 1-6, Round 2 is 7-12.
+  // Slot keys stay r1g1..r2g6. Mirrors gno() in captain.html.
+  const gno = (round, gameInRound) => (Number(round) - 1) * 6 + Number(gameInRound);
+  const gnoOf = (slot) => { const m = /^r(\d+)g(\d+)$/.exec(slot || ''); return m ? gno(m[1], m[2]) : null; };
   function fmtCountdown(iso) {
     if (!iso) return null;
     const ms = new Date(iso).getTime() - Date.now();
@@ -2104,7 +2108,7 @@
               stateEl = '';
             }
             return `<div class="yn__row${liveCls}">
-              <div class="yn__slot">R${r} · G${gNo}<br><span class="${t.cls}">${t.label}</span></div>
+              <div class="yn__slot">Game ${gno(r, gNo)}<br><span class="${t.cls}">${t.label}</span></div>
               <div class="yn__body">${partner ? 'with ' + esc(shortName(partner)) : '—'}${oppPair ? `<div class="yn__sub">vs ${esc(oppPair)}</div>` : ''}</div>
               ${stateEl}
             </div>`;
@@ -2128,7 +2132,7 @@
           if (myPts > oppPts) myW++; else if (oppPts > myPts) oppW++;
         }
         const done = myW + oppW;
-        const nowLbl = liveSlot ? `R${liveSlot[1]} G${liveSlot.slice(-1)}` : null;
+        const nowLbl = liveSlot ? `Game ${gnoOf(liveSlot)}` : null;
         live += `<div class="livestrip hcard-tap" data-go="schedule">
           <span class="livestrip__live"><span class="pulse"></span> Live${multiNight ? ' vs ' + esc(nm.opponent.name) : ''}${nowLbl ? ' · ' + nowLbl : ''}</span>
           <span class="livestrip__tally">${myW} – ${oppW}</span>
@@ -2656,7 +2660,7 @@
           ? `<div class="g__pair g__pair--right">${nameEl(lu.opp[s], 'p1', false)}${nameEl(lu.opp[s], 'p2', false)}</div>`
           : `<div class="g__pair g__pair--right g__hidden">Hidden</div>`;
         return `<div class="g${mePos ? ' is-mine' : ''}">
-          <div class="g__no">G${gi}<small class="${t.cls}">${t.label}</small></div>
+          <div class="g__no">G${gno(r, gi)}<small class="${t.cls}">${t.label}</small></div>
           <div class="g__pair">${nameEl(mineSide, 'p1', mePos === 'p1')}${nameEl(mineSide, 'p2', mePos === 'p2')}</div>
           <div class="g__vs">vs</div>
           ${oppCol}
@@ -2710,14 +2714,14 @@
           ? `<div class="g__pair g__pair--right">${nameEl(lu.opp[slot], 'p1', false)}${nameEl(lu.opp[slot], 'p2', false)}</div>`
           : phCell;
         return `<div class="g${mePos ? ' is-mine' : ''}">
-          <div class="g__no">G${gi}<small class="${t.cls}">${t.label}</small></div>
+          <div class="g__no">G${gno(r, gi)}<small class="${t.cls}">${t.label}</small></div>
           <div class="g__pair">${nameEl(mineSide, 'p1', mePos === 'p1')}${nameEl(mineSide, 'p2', mePos === 'p2')}</div>
           <div class="g__vs">vs</div>
           ${oppCol}
         </div>`;
       }).join('');
       return `<div class="lus__set">
-        <span class="lus__pill">Set ${s} · G${2 * s - 1} + G${2 * s}</span>
+        <span class="lus__pill">G${gno(r, 2 * s - 1)} + G${gno(r, 2 * s)}</span>
         <span class="lus__snote">same time, two courts</span>
         ${rows}
       </div>`;

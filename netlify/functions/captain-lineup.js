@@ -22,6 +22,7 @@ import {
 } from './lib/lineup-helpers.js';
 import { logActivity } from './lib/activity-log.js';
 import { getTeamAvailability, unavailableIds } from './lib/availability.js';
+import { notifyTeamOfLock } from './lib/lineup-notify.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -284,6 +285,11 @@ export default async (req) => {
       updatedBy: ctx.user.email,
       lockedAt: action === 'lock' ? new Date().toISOString() : null,
       lockedBy: action === 'lock' ? ctx.user.email : null,
+      // Snapshot of what was last EMAILED to the team. Carried across saves and
+      // unlocks so a re-lock diffs against what players actually received, not
+      // against the previous lock. Updated below once the mail goes out.
+      notifiedGames: existing?.notifiedGames || null,
+      notifiedAt: existing?.notifiedAt || null,
     };
 
     await lineupStore.setJSON(myKey, record);
@@ -296,6 +302,26 @@ export default async (req) => {
         matchId, week: match.week, circuit: circuitCode(ctx.team.circuit),
         details: `${ctx.team.name} locked their Week ${match.week} lineup`,
       });
+
+      // Tell the team. Best-effort: the lineup is already saved, and a mail
+      // failure must not turn a successful lock into an error for the captain.
+      // Only re-persist the snapshot if something was actually sent, so a
+      // failed send is retried on the next lock rather than being swallowed.
+      try {
+        const res = await notifyTeamOfLock({
+          team: ctx.team, match, games: denormalizedGames,
+          notifiedGames: record.notifiedGames,
+          lockedByEmail: ctx.user.email,
+          lockOffsetMin: LINEUP_LOCK_OFFSET_MIN,
+        });
+        if (res.sent > 0) {
+          record.notifiedGames = res.notifiedGames;
+          record.notifiedAt = new Date().toISOString();
+          await lineupStore.setJSON(myKey, record);
+        }
+      } catch (err) {
+        console.error('lineup lock notify failed', err);
+      }
     }
 
     // Re-check reveal status after save (both locked AND inside the reveal window)

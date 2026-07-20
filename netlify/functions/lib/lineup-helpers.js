@@ -177,14 +177,40 @@ export function formatOffset(min) {
   return `${min} minutes`;
 }
 
-export function prettySlot(slot) {
-  const round = slot.startsWith('r1') ? 'Round 1' : 'Round 2';
-  const gameNum = slot.slice(-1);
+export const GAMES_PER_ROUND = 6;
+
+/**
+ * Display game number, 1-12 continuous across the night.
+ * Round 1 is Games 1-6, Round 2 is Games 7-12.
+ *
+ * Storage keys stay `r1g1`..`r2g6` — this is presentation only. Never persist
+ * the 1-12 number or key anything by it.
+ *
+ * Deliberately NO optional gamesPerRound parameter: these get used point-free
+ * (`SLOT_KEYS.map(gameNoOf)`), and Array.map passes the index as the second
+ * argument, which would silently corrupt every number after the first. The
+ * slot grid is fixed at 6 games per round by SLOT_RULES regardless.
+ */
+export function gameNo(round, gameInRound) {
+  return (Number(round) - 1) * GAMES_PER_ROUND + Number(gameInRound);
+}
+
+/** Same, straight from a slot key: gameNoOf('r2g4') === 10. */
+export function gameNoOf(slot) {
+  const m = /^r(\d+)g(\d+)$/.exec(String(slot || ''));
+  return m ? gameNo(m[1], m[2]) : null;
+}
+
+/** Human slot type: "Women's doubles" | "Men's doubles" | "Mixed doubles". */
+export function slotTypeLabel(slot) {
   const type = SLOT_RULES[slot];
-  const typeLabel = type === 'WOMENS' ? 'Women’s doubles'
+  return type === 'WOMENS' ? 'Women’s doubles'
     : type === 'MENS' ? 'Men’s doubles'
     : 'Mixed doubles';
-  return `${round} Game ${gameNum} (${typeLabel})`;
+}
+
+export function prettySlot(slot) {
+  return `Game ${gameNoOf(slot)} (${slotTypeLabel(slot)})`;
 }
 
 export function sanitizeRevealedLineup(lineup) {

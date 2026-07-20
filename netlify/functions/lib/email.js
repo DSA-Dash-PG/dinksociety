@@ -673,3 +673,190 @@ export function renderLadderFcfsOpen({ eventName, dateLine, openUrl }) {
       <p style="font-size: 13px; color: #777; margin-top: 18px; line-height: 1.5;">You're getting this because you're on the waitlist. Be quick — it's open to everyone waiting.</p>
   `);
 }
+
+// ── Lineup emails ────────────────────────────────────────────────────────
+// Sent when a captain LOCKS a lineup (and again if a re-lock changes someone's
+// games). Four shapes, all built from the same pieces:
+//   renderLineupPlaying  → a player with games
+//   renderLineupNotIn    → an available player who wasn't selected
+//   renderLineupChanged  → a player whose games changed after a previous send
+//   renderLineupReceipt  → captain + co-captains, a record of what went out
+//
+// Games are numbered 1-12 continuously (Round 1 = 1-6, Round 2 = 7-12) to match
+// the portal — callers pass pre-numbered rows, so the numbering lives in one
+// place (gameNo() in lineup-helpers.js).
+//
+// NOTE: never include the opponent's lineup here. Locking can happen days ahead
+// and the matchup is blind until the T-15 reveal.
+
+const _LU_ACCENT = '#b8ff2c';
+
+/** Shared "Team vs Opponent / date line" card. */
+function _lineupMatchCard({ teamName, teamEmoji, opponentName, oppEmoji, dateLine }) {
+  return `
+      <div style="background:#161616;border-radius:8px;padding:14px 16px;margin:0 0 18px;">
+        <div style="font-size:14px;font-weight:700;color:#f5f5f5;">
+          ${teamEmoji ? escapeBody(teamEmoji) + ' ' : ''}${escapeBody(teamName)}
+          <span style="color:#666;font-weight:700;margin:0 6px;">vs</span>
+          ${oppEmoji ? escapeBody(oppEmoji) + ' ' : ''}${escapeBody(opponentName)}
+        </div>
+        ${dateLine ? `<div style="font-size:12px;color:#8a8a8a;margin-top:9px;padding-top:9px;border-top:1px solid #2a2a2a;">${escapeBody(dateLine)}</div>` : ''}
+      </div>`;
+}
+
+/**
+ * Full 12-game grid, split by round.
+ * @param {Array<{no:number, round:number, typeLabel:string, pair:string, mine?:boolean}>} rows
+ */
+function _lineupGrid(rows, heading = 'Full team lineup') {
+  const byRound = new Map();
+  for (const r of rows || []) {
+    if (!byRound.has(r.round)) byRound.set(r.round, []);
+    byRound.get(r.round).push(r);
+  }
+  let body = '';
+  let first = true;
+  for (const [round, rs] of [...byRound.entries()].sort((a, b) => a[0] - b[0])) {
+    body += `<tr><td colspan="2" style="padding:${first ? '6px' : '12px'} 0 4px;color:#666;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;${first ? '' : 'border-top:1px solid #2a2a2a;'}">Round ${escapeBody(String(round))}</td></tr>`;
+    first = false;
+    for (const r of rs) {
+      body += `<tr>
+        <td style="padding:5px 0;color:#8a8a8a;width:78px;">G${escapeBody(String(r.no))} ${escapeBody(r.typeLabel)}</td>
+        <td style="padding:5px 0;color:${r.mine ? _LU_ACCENT : '#cfcfcf'};${r.mine ? 'font-weight:700;' : ''}">${escapeBody(r.pair)}</td>
+      </tr>`;
+    }
+  }
+  return `
+  <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#8a8a8a;margin:0 0 10px;">${escapeBody(heading)}</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;border-collapse:collapse;font-size:12px;">${body}</table>`;
+}
+
+/** Stacked cards for "your games" / "what changed". */
+function _lineupCards(items) {
+  const n = (items || []).length;
+  if (!n) return '';
+  return `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 22px;border-collapse:collapse;">` +
+    items.map((it, i) => {
+      const radius = n === 1 ? 'border-radius:6px;'
+        : i === 0 ? 'border-radius:6px 6px 0 0;'
+        : i === n - 1 ? 'border-radius:0 0 6px 6px;' : '';
+      const spacer = i ? `<tr><td style="height:4px;"></td></tr>` : '';
+      return `${spacer}<tr><td style="padding:10px 12px;background:#161616;border-left:3px solid ${it.color || _LU_ACCENT};${radius}">
+        <div style="font-size:13px;font-weight:700;color:#f5f5f5;">${escapeBody(it.title)}</div>
+        <div style="font-size:12px;color:#8a8a8a;margin-top:3px;">${it.subHtml || escapeBody(it.sub || '')}</div></td></tr>`;
+    }).join('') + `</table>`;
+}
+
+function _lineupShell({ accent, h1, bodyHtml, teamName }) {
+  return `
+    <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
+      <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${accent};margin-bottom:26px;">THE DINK SOCIETY</div>
+      <h1 style="font-size:22px;font-weight:800;color:#f5f5f5;margin:0 0 14px;line-height:1.25;">${escapeBody(h1)}</h1>
+      ${bodyHtml}
+      <div style="margin-top:34px;padding-top:20px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;">
+        ${teamName ? 'Sent to ' + escapeBody(teamName) + ' · ' : ''}The Dink Society · Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}
+
+function _luBtn(url, label, primary = true) {
+  const style = primary
+    ? `background:${_LU_ACCENT};color:#0e0e0e;font-weight:800;`
+    : 'background:transparent;border:1px solid #3a3a3a;color:#f5f5f5;font-weight:700;';
+  return `<a href="${url}" style="display:inline-block;padding:14px 32px;${style}font-size:14px;text-decoration:none;border-radius:9999px;">${escapeBody(label)}</a>`;
+}
+
+/** A player who's in the lineup. `myGames` and `grid` rows are pre-numbered 1-12. */
+export function renderLineupPlaying({ playerName, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, myGames, grid, portalUrl, lockLine }) {
+  const first = String(playerName || '').trim().split(/\s+/)[0] || playerName || 'there';
+  const cards = _lineupCards((myGames || []).map(g => ({
+    title: `Game ${g.no} — ${g.typeLabel}`,
+    sub: g.partner ? `with ${g.partner}` : 'partner TBD',
+  })));
+  const body = `
+  <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">Hi ${escapeBody(first)} — your captain locked the lineup. You're in <b>${escapeBody(String((myGames || []).length))} game${(myGames || []).length === 1 ? '' : 's'}</b>.</p>
+  ${_lineupMatchCard({ teamName, teamEmoji, opponentName, oppEmoji, dateLine })}
+  <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${_LU_ACCENT};margin:0 0 10px;">Your games</div>
+  ${cards}
+  ${_lineupGrid(grid)}
+  ${_luBtn(portalUrl, 'See the full night')}
+  <p style="font-size:13px;color:#777;margin-top:22px;line-height:1.5;">Can't make it after all? Tell your captain as soon as you can.${lockLine ? ' ' + escapeBody(lockLine) : ''}</p>`;
+  return _lineupShell({ accent: '#17d7b0', h1: `You're in for Week ${week}`, bodyHtml: body, teamName });
+}
+
+/** An available player who wasn't selected. Deliberately a plain FYI. */
+export function renderLineupNotIn({ playerName, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, grid, portalUrl }) {
+  const first = String(playerName || '').trim().split(/\s+/)[0] || playerName || 'there';
+  const body = `
+  <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">Hi ${escapeBody(first)} — you're not in this one. Here's the team's lineup for the night.</p>
+  ${_lineupMatchCard({ teamName, teamEmoji, opponentName, oppEmoji, dateLine })}
+  ${_lineupGrid(grid, 'The lineup')}
+  ${_luBtn(portalUrl, 'See the full night', false)}`;
+  return _lineupShell({ accent: '#17d7b0', h1: `You're not in the Week ${week} lineup`, bodyHtml: body, teamName });
+}
+
+/**
+ * A player whose games changed after a previous send.
+ * @param {Array<{kind:'added'|'dropped'|'partner', no:number, typeLabel:string, partner?:string, wasPartner?:string}>} changes
+ */
+export function renderLineupChanged({ playerName, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, changes, myGames, reasonLine, portalUrl, lockLine }) {
+  const first = String(playerName || '').trim().split(/\s+/)[0] || playerName || 'there';
+  const cards = _lineupCards((changes || []).map(c => {
+    if (c.kind === 'dropped') {
+      return { color: '#ff5c47', title: `Game ${c.no} — ${c.typeLabel}`, subHtml: `<b style="color:#ff5c47;">Dropped</b> — you're no longer in this game` };
+    }
+    if (c.kind === 'added') {
+      return { color: _LU_ACCENT, title: `Game ${c.no} — ${c.typeLabel}`, subHtml: `<b style="color:${_LU_ACCENT};">Added</b>${c.partner ? ' — with ' + escapeBody(c.partner) : ''}` };
+    }
+    return {
+      color: '#f5a623', title: `Game ${c.no} — ${c.typeLabel}`,
+      subHtml: `New partner: <span style="color:#ff5c47;text-decoration:line-through;">${escapeBody(c.wasPartner || '—')}</span> → <b style="color:${_LU_ACCENT};">${escapeBody(c.partner || '—')}</b>`,
+    };
+  }));
+  const nowRows = (myGames || []).map(g => `<tr>
+      <td style="padding:5px 0;color:#8a8a8a;width:78px;">Game ${escapeBody(String(g.no))}</td>
+      <td style="padding:5px 0;color:#cfcfcf;">${escapeBody(g.typeLabel)}${g.partner ? ' — with ' + escapeBody(g.partner) : ''}</td>
+    </tr>`).join('');
+  const body = `
+  <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">Hi ${escapeBody(first)} — your captain reworked the lineup${reasonLine ? ' ' + escapeBody(reasonLine) : ''}. Here's what's different <b>for you</b>.${(myGames || []).length ? ` You're in <b>${(myGames || []).length} game${myGames.length === 1 ? '' : 's'}</b>.` : ' You&rsquo;re not in the lineup any more.'}</p>
+  ${_lineupMatchCard({ teamName, teamEmoji, opponentName, oppEmoji, dateLine })}
+  <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5a623;margin:0 0 10px;">What changed for you</div>
+  ${cards}
+  ${nowRows ? `<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#8a8a8a;margin:0 0 10px;">Your games now</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 20px;border-collapse:collapse;font-size:12px;">${nowRows}</table>` : ''}
+  ${_luBtn(portalUrl, 'See the full lineup')}
+  <p style="font-size:13px;color:#777;margin-top:22px;line-height:1.5;">This replaces what you were sent earlier.${lockLine ? ' ' + escapeBody(lockLine) : ''}</p>`;
+  return _lineupShell({ accent: '#f5a623', h1: `Your Week ${week} lineup changed`, bodyHtml: body, teamName });
+}
+
+/** Captain + co-captain receipt: who got what, plus the lineup itself. */
+export function renderLineupReceipt({ teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, lockedByName, playing, notIn, skipped, noEmail, grid, portalUrl, changed }) {
+  const line = (n, label, names) => !n ? '' : `<tr>
+      <td style="padding:7px 0;color:#cfcfcf;border-top:1px solid #2a2a2a;"><b style="color:${label === 'playing' ? _LU_ACCENT : '#8a8a8a'};">${n}</b> ${escapeBody(label)}</td>
+      <td style="padding:7px 0;color:#8a8a8a;font-size:12px;text-align:right;border-top:1px solid #2a2a2a;">${escapeBody((names || []).join(', '))}</td>
+    </tr>`;
+  const rows = [
+    playing?.length ? `<tr><td style="padding:7px 0;color:#cfcfcf;"><b style="color:${_LU_ACCENT};">${playing.length}</b> playing</td><td style="padding:7px 0;color:#8a8a8a;font-size:12px;text-align:right;">${escapeBody(playing.join(', '))}</td></tr>` : '',
+    line((notIn || []).length, 'not in', notIn),
+    line((skipped || []).length, 'skipped (out)', skipped),
+  ].filter(Boolean).join('');
+  const warn = (noEmail || []).length
+    ? `<div style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;padding:12px 14px;background:#161616;border-left:3px solid #f5a623;border-radius:6px;">
+         <span style="color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;">${noEmail.length} player${noEmail.length === 1 ? '' : 's'} with no email on file</span>
+         <b style="color:#f5f5f5;">${escapeBody(noEmail.join(', '))}</b> ${noEmail.length === 1 ? 'is' : 'are'} in the lineup but didn't get an email. Add an address on the Roster tab.</div>`
+    : '';
+  const body = `
+  <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">${lockedByName ? 'Locked by ' + escapeBody(lockedByName) + '. ' : ''}Here's exactly what went out to the team.</p>
+  ${_lineupMatchCard({ teamName, teamEmoji, opponentName, oppEmoji, dateLine })}
+  <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${_LU_ACCENT};margin:0 0 10px;">Emails sent</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 18px;border-collapse:collapse;font-size:13px;">${rows}</table>
+  ${warn}
+  ${_lineupGrid(grid, 'The lineup')}
+  ${_luBtn(portalUrl, 'Open the lineup', false)}`;
+  return _lineupShell({
+    accent: '#f5f5f5',
+    h1: changed ? `Week ${week} lineup updated` : `Week ${week} lineup is locked`,
+    bodyHtml: body, teamName: `${teamName} captains`,
+  });
+}
