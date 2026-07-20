@@ -180,21 +180,28 @@
     #avail-panel { margin: 6px 0 18px; padding:14px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); }
     .av-grp { margin-top:14px; }
     .av-grp__l { font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--color-text-faint); margin:0 0 7px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
-    .av-prow { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-2); margin-bottom:6px; }
+    .av-prow { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--color-border); border-radius:var(--radius-sm); background:var(--color-surface-2); margin-bottom:6px; flex-wrap:wrap; }
     .av-prow.pending { border-color:rgba(245,166,35,.35); }
     .av-prow__nm { flex:1; min-width:0; font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .av-prow__meta { font-size:10px; color:var(--color-text-faint); font-weight:500; }
-    .av-st { font-size:10px; font-weight:800; text-transform:uppercase; padding:3px 9px; border-radius:var(--radius-full); white-space:nowrap; }
-    .av-st.in { background:var(--color-lime-dim); color:var(--color-lime); }
-    .av-st.out { background:var(--color-red-dim); color:var(--color-red); }
+    /* Status is PLAIN TEXT, never a pill — only actual buttons are pill-shaped, so
+       nothing on a row looks tappable unless it is. */
+    .av-st { font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; white-space:nowrap; padding:0; background:none; }
+    .av-st.in { color:var(--color-lime); }
+    .av-st.out { color:var(--color-red); }
     .av-nudge { font-size:11px; font-weight:800; color:#0b0b0b; background:#f5a623; border:none; border-radius:var(--radius-full); padding:6px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
     .av-nudge:disabled { opacity:.6; cursor:default; }
     .av-nudgeall { font-size:10px; font-weight:800; color:#f5a623; background:none; border:1px solid rgba(245,166,35,.45); border-radius:var(--radius-full); padding:4px 10px; cursor:pointer; text-transform:uppercase; letter-spacing:.04em; }
-    /* Captain marks a player out on their behalf (they texted "can't make it"). */
-    .av-out { font-size:11px; font-weight:800; color:var(--color-red); background:none; border:1px solid rgba(255,90,90,.4); border-radius:var(--radius-full); padding:5px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; font-family:inherit; }
+    /* Captain sets a player's status on their behalf (they texted "can't make it").
+       Every row carries an explicit button for the states it isn't already in — no
+       hidden tap targets. */
+    .av-out, .av-in { font-size:11px; font-weight:800; background:none; border-radius:var(--radius-full); padding:5px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; font-family:inherit; }
+    .av-out { color:var(--color-red); border:1px solid rgba(255,90,90,.4); }
     .av-out:hover { background:var(--color-red-dim); }
-    .av-out:disabled { opacity:.6; cursor:default; }
-    .av-rowbtns { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+    .av-in { color:var(--color-lime); border:1px solid rgba(184,255,44,.4); }
+    .av-in:hover { background:var(--color-lime-dim); }
+    .av-out:disabled, .av-in:disabled { opacity:.6; cursor:default; }
+    .av-rowbtns { display:flex; align-items:center; gap:6px; flex-shrink:0; margin-left:auto; }
 
     /* ── Reveal box ──────────────────────────────────────────── */
     .reveal-box { background: var(--color-lime-ghost, rgba(184,255,44,0.04)); border: 1px solid rgba(184,255,44,0.12); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 16px; }
@@ -3338,49 +3345,48 @@
       const outList = regs.filter(p => stOf(p) === 'out');
       const pend = regs.filter(p => !stOf(p));
 
+      // One row shape everywhere: name · reason · status text · action buttons for
+      // the states this player ISN'T in. Nothing else on the row is clickable, so a
+      // captain can't flip someone by brushing the row.
+      const inBtn  = p => `<button class="av-in" onclick="setAvail('${p.id}', 'in', this)" title="Mark ${nm(p)} available for this match">In</button>`;
+      const outBtn = p => `<button class="av-out" onclick="setAvail('${p.id}', 'out', this)" title="Mark ${nm(p)} out for this match">Out</button>`;
+      const nudgeBtn = p => `<button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button>`;
+      const avRow = (p, st, btns, cls) => {
+        const r = st === 'out' ? avail[p.id]?.reason : '';
+        const status = st ? `<span class="av-st ${st}">${st === 'in' ? '✓ In' : 'Out'}</span>` : '';
+        return `<div class="av-prow${cls ? ' ' + cls : ''}">
+          <span class="av-prow__nm">${nm(p)}${r ? ` <span class="av-prow__meta">— ${escapeHtml(r)}</span>` : ''}</span>
+          <span class="av-rowbtns">${status}${btns}</span></div>`;
+      };
+
       let html = `<div class="av-head"><span class="av-head__t">Availability</span>
-        <span class="av-head__h">${inList.length} in · ${outList.length} out · ${pend.length} no reply · tap a name to set it for them</span></div>`;
+        <span class="av-head__h">${inList.length} in · ${outList.length} out · ${pend.length} no reply · set it for them with the In / Out buttons</span></div>`;
 
       if (pend.length) {
         html += `<div class="av-grp"><div class="av-grp__l"><span>Not confirmed · ${pend.length}</span>
           <span class="av-nudgeall" onclick="nudgeAllAvail(this)">Nudge all</span></div>` +
-          pend.map(p => `<div class="av-prow pending">
-            <span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span>
-            <span class="av-rowbtns">
-              <button class="av-out" onclick="setAvail('${p.id}', 'out', this)" title="Mark ${nm(p)} out for this match">Out</button>
-              <button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button>
-            </span></div>`).join('') +
+          pend.map(p => avRow(p, null, inBtn(p) + outBtn(p) + nudgeBtn(p), 'pending')).join('') +
           `</div>`;
       }
       if (inList.length) {
         html += `<div class="av-grp"><div class="av-grp__l"><span>Confirmed in · ${inList.length}</span></div>` +
-          inList.map(p => `<div class="av-prow">
-            <span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span>
-            <span class="av-rowbtns"><span class="av-st in">✓ In</span>
-              <button class="av-out" onclick="setAvail('${p.id}', 'out', this)" title="Mark ${nm(p)} out for this match">Out</button>
-            </span></div>`).join('') +
+          inList.map(p => avRow(p, 'in', outBtn(p))).join('') +
           `</div>`;
       }
       if (outList.length) {
         html += `<div class="av-grp"><div class="av-grp__l"><span>Out · ${outList.length}</span></div>` +
-          outList.map(p => {
-            const r = avail[p.id]?.reason;
-            return `<div class="av-prow" style="cursor:pointer" onclick="toggleAvail('${p.id}')">
-              <span class="av-prow__nm">${nm(p)}${r ? ` <span class="av-prow__meta">— ${escapeHtml(r)}</span>` : ''}</span>
-              <span class="av-st out">Out</span></div>`;
-          }).join('') + `</div>`;
+          outList.map(p => avRow(p, 'out', inBtn(p))).join('') +
+          `</div>`;
       }
       if (subs.length) {
         html += `<div class="av-grp"><div class="av-grp__l"><span>Subs · ${subs.length}</span>
           <span class="av-prow__meta">not auto-reminded</span></div>` +
           subs.map(p => {
             const st = stOf(p);
-            const outBtn = st === 'out' ? ''
-              : `<button class="av-out" onclick="setAvail('${p.id}', 'out', this)" title="Mark ${nm(p)} out for this match">Out</button>`;
-            const right = st
-              ? `<span class="av-st ${st}">${st === 'in' ? '✓ In' : 'Out'}</span>${outBtn}`
-              : `${outBtn}<button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button>`;
-            return `<div class="av-prow"><span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span><span class="av-rowbtns">${right}</span></div>`;
+            const btns = st === 'in' ? outBtn(p)
+                       : st === 'out' ? inBtn(p)
+                       : inBtn(p) + outBtn(p) + nudgeBtn(p);
+            return avRow(p, st, btns);
           }).join('') + `</div>`;
       }
       html += `<div class="av-head__h" style="display:block;margin-top:12px;line-height:1.5;">Players who haven't replied get an email automatically — 4 days before, then daily until they confirm or the lineup locks. Nudge only if you want to send one now. Anyone marked <b style="color:var(--color-red)">out</b> is removed from the picker below.</div>`;
@@ -3414,15 +3420,11 @@
         if (btn) btn.textContent = `Sent to ${d.sent}`;
       } catch { alert('Could not send reminders.'); if (btn) { btn.disabled = false; btn.textContent = 'Nudge all'; } }
     }
-    // Tapping a name flips the player between in and out.
-    function toggleAvail(playerId) {
-      const cur = state.lineupAvail?.[playerId]?.status;
-      return setAvail(playerId, cur === 'out' ? 'in' : 'out');
-    }
-    // Set a player's availability on their behalf. The explicit "Out" button on
-    // each row calls this directly so a captain doesn't have to know that the
-    // name is tappable. The player gets an email telling them what happened,
-    // with a one-tap link to correct it.
+    // Set a player's availability on their behalf, from the explicit In / Out
+    // buttons on each row. Deliberately NOT a toggle bound to the row or the
+    // name — an invisible tap target meant captains flipped players by accident.
+    // The player gets an email telling them what happened, with a one-tap link
+    // to correct it.
     async function setAvail(playerId, status, btn) {
       if (!state.currentMatch) return;
       const next = status === 'out' ? 'out' : 'in';
