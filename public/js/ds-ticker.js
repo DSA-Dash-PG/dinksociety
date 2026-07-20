@@ -384,10 +384,12 @@
 
     if (src === 'stub') { render(DSTicker.STUB); return; }
 
-    // live source — requires /js/live-poll.js
+    // Live source — requires /js/live-poll.js. If it's missing we render
+    // NOTHING. Never fall back to STUB on a public surface: fabricated scores
+    // and player pairings that look authoritative are worse than a blank bar.
     if (!window.DSLivePoll) {
-      console.warn('[ds-ticker] live-poll.js not loaded; falling back to stub');
-      render(DSTicker.STUB);
+      console.error('[ds-ticker] live-poll.js not loaded — ticker disabled');
+      render({ gameNight: false, matches: [] });
       return;
     }
     state.poller = window.DSLivePoll.create({

@@ -217,6 +217,18 @@ export default async (req) => {
     // ---- 5. season standings for the charts ----
     const standings = await loadStandings(circuitLetter, divisionFilter, teamMeta);
 
+    // Bracket blobs often carry no seedLabel (it's synthesized at render time
+    // by public-schedule). Rivalry pairings ARE the seeding, so fall back to
+    // each team's standings rank rather than showing a blank badge.
+    const rankById = Object.fromEntries(standings.map(t => [t.teamId, t.rank]));
+    for (const m of enriched) {
+      for (const side of [m.home, m.away]) {
+        if (!side.seedLabel && side.id && rankById[side.id]) {
+          side.seedLabel = '#' + rankById[side.id] + ' Seed';
+        }
+      }
+    }
+
     // gameNight drives whether the ticker shows at all. Tie it to the clock,
     // not to match status, so nothing can strand it on-screen.
     const anyToday = enriched.some(m => isTonight(m.scheduledAt));
