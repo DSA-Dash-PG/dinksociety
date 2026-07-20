@@ -190,6 +190,11 @@
     .av-nudge { font-size:11px; font-weight:800; color:#0b0b0b; background:#f5a623; border:none; border-radius:var(--radius-full); padding:6px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; }
     .av-nudge:disabled { opacity:.6; cursor:default; }
     .av-nudgeall { font-size:10px; font-weight:800; color:#f5a623; background:none; border:1px solid rgba(245,166,35,.45); border-radius:var(--radius-full); padding:4px 10px; cursor:pointer; text-transform:uppercase; letter-spacing:.04em; }
+    /* Captain marks a player out on their behalf (they texted "can't make it"). */
+    .av-out { font-size:11px; font-weight:800; color:var(--color-red); background:none; border:1px solid rgba(255,90,90,.4); border-radius:var(--radius-full); padding:5px 12px; cursor:pointer; text-transform:uppercase; letter-spacing:.03em; white-space:nowrap; font-family:inherit; }
+    .av-out:hover { background:var(--color-red-dim); }
+    .av-out:disabled { opacity:.6; cursor:default; }
+    .av-rowbtns { display:flex; align-items:center; gap:6px; flex-shrink:0; }
 
     /* ── Reveal box ──────────────────────────────────────────── */
     .reveal-box { background: var(--color-lime-ghost, rgba(184,255,44,0.04)); border: 1px solid rgba(184,255,44,0.12); border-radius: var(--radius-lg); padding: 18px; margin-bottom: 16px; }
@@ -3341,13 +3346,19 @@
           <span class="av-nudgeall" onclick="nudgeAllAvail(this)">Nudge all</span></div>` +
           pend.map(p => `<div class="av-prow pending">
             <span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span>
-            <button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button></div>`).join('') +
+            <span class="av-rowbtns">
+              <button class="av-out" onclick="setAvail('${p.id}', 'out', this)" title="Mark ${nm(p)} out for this match">Out</button>
+              <button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button>
+            </span></div>`).join('') +
           `</div>`;
       }
       if (inList.length) {
         html += `<div class="av-grp"><div class="av-grp__l"><span>Confirmed in · ${inList.length}</span></div>` +
-          inList.map(p => `<div class="av-prow" style="cursor:pointer" onclick="toggleAvail('${p.id}')">
-            <span class="av-prow__nm">${nm(p)}</span><span class="av-st in">✓ In</span></div>`).join('') +
+          inList.map(p => `<div class="av-prow">
+            <span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span>
+            <span class="av-rowbtns"><span class="av-st in">✓ In</span>
+              <button class="av-out" onclick="setAvail('${p.id}', 'out', this)" title="Mark ${nm(p)} out for this match">Out</button>
+            </span></div>`).join('') +
           `</div>`;
       }
       if (outList.length) {
@@ -3364,10 +3375,12 @@
           <span class="av-prow__meta">not auto-reminded</span></div>` +
           subs.map(p => {
             const st = stOf(p);
+            const outBtn = st === 'out' ? ''
+              : `<button class="av-out" onclick="setAvail('${p.id}', 'out', this)" title="Mark ${nm(p)} out for this match">Out</button>`;
             const right = st
-              ? `<span class="av-st ${st}">${st === 'in' ? '✓ In' : 'Out'}</span>`
-              : `<button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button>`;
-            return `<div class="av-prow"><span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span>${right}</div>`;
+              ? `<span class="av-st ${st}">${st === 'in' ? '✓ In' : 'Out'}</span>${outBtn}`
+              : `${outBtn}<button class="av-nudge" onclick="nudgeAvail('${p.id}', this)">Nudge</button>`;
+            return `<div class="av-prow"><span class="av-prow__nm" style="cursor:pointer" onclick="toggleAvail('${p.id}')">${nm(p)}</span><span class="av-rowbtns">${right}</span></div>`;
           }).join('') + `</div>`;
       }
       html += `<div class="av-head__h" style="display:block;margin-top:12px;line-height:1.5;">Players who haven't replied get an email automatically — 4 days before, then daily until they confirm or the lineup locks. Nudge only if you want to send one now. Anyone marked <b style="color:var(--color-red)">out</b> is removed from the picker below.</div>`;
@@ -3401,24 +3414,45 @@
         if (btn) btn.textContent = `Sent to ${d.sent}`;
       } catch { alert('Could not send reminders.'); if (btn) { btn.disabled = false; btn.textContent = 'Nudge all'; } }
     }
-    async function toggleAvail(playerId) {
-      if (!state.currentMatch) return;
+    // Tapping a name flips the player between in and out.
+    function toggleAvail(playerId) {
       const cur = state.lineupAvail?.[playerId]?.status;
-      const next = cur === 'out' ? 'in' : 'out';
+      return setAvail(playerId, cur === 'out' ? 'in' : 'out');
+    }
+    // Set a player's availability on their behalf. The explicit "Out" button on
+    // each row calls this directly so a captain doesn't have to know that the
+    // name is tappable. The player gets an email telling them what happened,
+    // with a one-tap link to correct it.
+    async function setAvail(playerId, status, btn) {
+      if (!state.currentMatch) return;
+      const next = status === 'out' ? 'out' : 'in';
+      if (state.lineupAvail?.[playerId]?.status === next) return;
       let reason = '';
-      if (next === 'out') reason = window.prompt('Reason (optional) — e.g. "away", "injured":', state.lineupAvail?.[playerId]?.reason || '') || '';
+      if (next === 'out') {
+        reason = window.prompt('Reason (optional) — e.g. "away", "injured":', state.lineupAvail?.[playerId]?.reason || '');
+        if (reason === null) return;   // cancelled — don't touch their status
+        reason = reason || '';
+      }
+      if (btn) { btn.disabled = true; btn.textContent = '…'; }
       try {
         const res = await fetch(`/.netlify/functions/captain-availability?match=${encodeURIComponent(state.currentMatch.id)}`, {
           method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ playerId, status: next, reason }),
         });
         const d = await res.json().catch(() => ({}));
-        if (!res.ok) { alert(d.error || 'Could not update availability.'); return; }
+        if (!res.ok) {
+          alert(d.error || 'Could not update availability.');
+          if (btn) { btn.disabled = false; btn.textContent = next === 'out' ? 'Out' : 'In'; }
+          return;
+        }
         state.lineupAvail = d.players || {};
         if (next === 'out') removePlayerFromDraft(playerId);
-        renderAvailPanel(false, false);
+        renderAvailPanel(false, false);   // re-renders the row, replacing btn
         renderLineupBuilder(false, false);
-      } catch { alert('Could not update availability.'); }
+      } catch {
+        alert('Could not update availability.');
+        if (btn) { btn.disabled = false; btn.textContent = next === 'out' ? 'Out' : 'In'; }
+      }
     }
     function archivedRoster() { return (state.roster || []).filter(p => p.archived); }
     function rosterSorted() {

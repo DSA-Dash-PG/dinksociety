@@ -14,6 +14,7 @@ import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { getTeamAvailability, setPlayerAvailability } from './lib/availability.js';
 import { logActivity } from './lib/activity-log.js';
+import { notifyPlayerOfCaptainChange } from './lib/availability-notify.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -46,10 +47,29 @@ export default async (req) => {
     const status = body.status === 'out' ? 'out' : body.status === 'in' ? 'in' : null;
     if (!status) return json({ error: "status must be 'in' or 'out'" }, 400);
 
+    const before = await getTeamAvailability(matchId, teamId);
+    const prev = before.players?.[playerId]?.status || null;
+
     const updated = await setPlayerAvailability({
       matchId, teamId, playerId, status, reason: body.reason,
       byEmail: ctx.user.email, byRole: 'captain',
     });
+
+    // Tell the player their captain moved them — they'd otherwise find out at the
+    // court. Only on a real change, never for the captain's own record, and never
+    // fatal to the write that already succeeded.
+    if (prev !== status) {
+      const actor = (ctx.team.roster || []).find(
+        p => (p.email || '').trim().toLowerCase() === (ctx.user.email || '').trim().toLowerCase());
+      try {
+        await notifyPlayerOfCaptainChange({
+          team: ctx.team, player: rp, match, status,
+          reason: updated.players?.[playerId]?.reason,
+          actingEmail: ctx.user.email,
+          byName: actor?.name || ctx.team.name,
+        });
+      } catch { /* best-effort */ }
+    }
 
     await logActivity({
       type: 'availability.set',

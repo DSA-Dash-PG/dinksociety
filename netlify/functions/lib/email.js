@@ -311,6 +311,62 @@ export function renderAvailabilityNotify({ playerName, status, teamName, teamEmo
 }
 
 /**
+ * Render the PLAYER-facing notice sent when their CAPTAIN set their availability
+ * for them (e.g. the player texted "can't make it" instead of using the portal).
+ * Carries a one-tap link to flip it back, so a mistaken entry is self-service to
+ * fix — no login, same signed-token mechanism as the reminder email.
+ * @param {{ playerName:string, status:'out'|'in', teamName:string, teamEmoji?:string,
+ *           opponentName:string, oppEmoji?:string, week:(number|string),
+ *           dateLine?:string, reason?:string, byName?:string, fixUrl:string }} opts
+ */
+export function renderAvailabilitySetByCaptain({ playerName, status, teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, reason, byName, fixUrl }) {
+  const first = String(playerName || '').trim().split(/\s+/)[0] || playerName || 'there';
+  const out = status === 'out';
+  const who = byName ? escapeBody(byName) : 'Your captain';
+  const h1 = out ? `You're marked out for Week ${escapeBody(String(week))}`
+                 : `You're marked in for Week ${escapeBody(String(week))}`;
+  const lead = out
+    ? `${who} marked you <b>unavailable</b> for this match, so you've been left out of the lineup.`
+    : `${who} marked you <b>available</b> for this match, so you're back in the lineup picker.`;
+
+  const matchCard = `
+      <div style="background:#161616;border-radius:8px;padding:14px 16px;margin:0 0 18px;">
+        <div style="font-size:14px;font-weight:700;color:#f5f5f5;">
+          ${teamEmoji ? escapeBody(teamEmoji) + ' ' : ''}${escapeBody(teamName)}
+          <span style="color:#666;font-weight:700;margin:0 6px;">vs</span>
+          ${oppEmoji ? escapeBody(oppEmoji) + ' ' : ''}${escapeBody(opponentName)}
+        </div>
+        ${dateLine ? `<div style="font-size:12px;color:#8a8a8a;margin-top:9px;padding-top:9px;border-top:1px solid #2a2a2a;">${escapeBody(dateLine)}</div>` : ''}
+      </div>`;
+
+  const reasonBlock = (out && reason)
+    ? `<div style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;padding:12px 14px;background:#161616;border-left:3px solid #ff5c47;border-radius:6px;">
+         <span style="color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;">Reason given</span>${escapeBody(reason)}</div>`
+    : '';
+
+  const cta = out ? '✓ Actually, I’m in' : 'Can’t make it';
+  const ctaStyle = out
+    ? 'background:#b8ff2c;color:#0e0e0e;border:none;'
+    : 'background:transparent;border:1px solid #3a3a3a;color:#f5f5f5;';
+
+  return `
+    <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
+      <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#17d7b0;margin-bottom:26px;">THE DINK SOCIETY</div>
+      <h1 style="font-size:22px;font-weight:800;color:#f5f5f5;margin:0 0 14px;line-height:1.25;">${h1}</h1>
+      <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">Hi ${escapeBody(first)} — ${lead}</p>
+      ${matchCard}
+      ${reasonBlock}
+      <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">If that's not right, one tap fixes it:</p>
+      <a href="${fixUrl}" style="display:inline-block;padding:14px 30px;${ctaStyle}font-size:14px;font-weight:800;text-decoration:none;border-radius:9999px;">${cta}</a>
+      <p style="font-size:13px;color:#777;margin-top:22px;line-height:1.5;">One tap — no login needed. Otherwise there's nothing to do.</p>
+      <div style="margin-top:34px;padding-top:20px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;">
+        ${teamName ? 'Sent to ' + escapeBody(teamName) + ' · ' : ''}The Dink Society · Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Render the one-tap "confirm your availability" reminder email sent to players
  * who haven't responded yet. Two buttons ("I'm in" / "Can't make it") link to
  * pre-signed, no-login confirm URLs. Deliberately short — it's a quick ask.
