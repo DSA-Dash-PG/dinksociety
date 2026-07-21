@@ -263,13 +263,14 @@ test('photos without a focal point centre, and focal points are applied', async 
   assert.match(out, /id=img_s1[^>]*object-position:30% 20%/, 'storyline focal should apply');
 });
 
-test('Week in Pictures shows the whole gallery and sits before Around the League', async () => {
+test('Week in Pictures shows the whole gallery and closes the article', async () => {
   const out = await renderFixture(RECORD, PLAYERS);
   assert.match(out, /Week in Pictures/);
   assert.match(out, /5 photos/);
   for (let i = 0; i < 5; i++) assert.ok(out.includes(`img_g${i}`), `gallery photo ${i} missing from mosaic`);
-  assert.ok(out.indexOf('Week in Pictures') < out.indexOf('Around the League'), 'gallery should precede Around the League');
-  assert.ok(out.indexOf('Week in Pictures') < out.indexOf('Also This Week'), 'gallery should precede the storylines');
+  // Now the closing section: after the storylines and the climbers band.
+  assert.ok(out.indexOf('Week in Pictures') > out.indexOf('Also This Week'), 'gallery should follow the storylines');
+  assert.ok(out.indexOf('Week in Pictures') > out.indexOf('Around the League'), 'gallery should follow Around the League');
 });
 
 test('storylines alternate sides and photoless ones run full width', async () => {

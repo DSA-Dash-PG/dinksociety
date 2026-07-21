@@ -1182,6 +1182,14 @@
           .dp-gal .cell.islead .dp-leadtag{display:block;}
           .dp-gal .add{display:grid;place-items:center;min-height:110px;border:1.5px dashed var(--color-border-strong);border-radius:10px;cursor:pointer;color:var(--color-text-muted);font-size:12px;font-weight:800;text-align:center;}
           .dp-gal .add:hover{border-color:var(--color-lime,#b8ff2c);color:var(--color-text);}
+          /* drag-to-reorder */
+          .dp-gal .cell{cursor:grab;}
+          .dp-gal .cell img{cursor:grab;}
+          .dp-gal .cell.dragging{opacity:.4;cursor:grabbing;}
+          .dp-gal .cell.dragover{outline:2px dashed var(--color-lime,#b8ff2c);outline-offset:-2px;}
+          .dp-draghint{position:absolute;top:8px;right:8px;background:rgba(0,0,0,.72);border:1px solid var(--color-border-strong);color:#fff;border-radius:7px;font-size:11px;padding:3px 6px;pointer-events:none;}
+          .dp-gal .cell input,.dp-gal .cell label,.dp-gal .cell button{cursor:auto;}
+          .dp-gal .cell .dp-lead{cursor:pointer;}
           .sx-photo{margin-top:8px;}
           .dp-busy{opacity:.55;pointer-events:none;}
           /* Focal-point picker — click the photo to set what the crop keeps in frame */
@@ -6698,7 +6706,8 @@
     w.innerHTML='<div class="dp-gal">'
       + g.map(function(im,i){
           var fx=(im.focal&&isFinite(im.focal.x))?im.focal.x:50, fy=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
-          return '<div class="cell'+(im.lead?' islead':'')+'"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+          return '<div class="cell'+(im.lead?' islead':'')+'" draggable="true" data-gi="'+i+'"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+            + '<span class="dp-draghint">'+(i+1)+' · drag</span>'
             + '<span class="dp-leadtag">In lead</span>'
             + dpFocalBtn('data-gfoc="'+i+'"')
             + '<button type="button" class="dp-photorm" data-grm="'+i+'">✕</button>'
@@ -6706,12 +6715,28 @@
             + '<label class="dp-lead"><input type="checkbox" data-glead="'+i+'"'+(im.lead?' checked':'')+'> Show in lead story</label></div>';
         }).join('')
       + '<div class="add" id="drop-gallery-add">+ Add<br>photos</div></div>'
-      + '<p style="font-size:11px;color:var(--color-text-faint);margin:8px 0 0;line-height:1.5;">Every photo shows in the mosaic. Tick <b>Show in lead story</b> on one or two to float them into the opening copy. Photo 1 becomes the hero when no cover is set. Use <b>⤢ Crop</b> to keep faces in frame.</p>';
+      + '<p style="font-size:11px;color:var(--color-text-faint);margin:8px 0 0;line-height:1.5;"><b>Drag photos to reorder.</b> Photo 1 becomes the hero when no cover is set; the order carries through the mosaic. Tick <b>Show in lead story</b> on one or two to float them into the opening copy. Use <b>⤢ Crop</b> to keep faces in frame.</p>';
     $d('drop-gallery-add').addEventListener('click',function(){ $d('drop-gallery-file').click(); });
     w.querySelectorAll('[data-grm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.gallery.splice(+b.dataset.grm,1); renderDropGallery(); }); });
     w.querySelectorAll('[data-gcap]').forEach(function(inp){ inp.addEventListener('input',function(){ DROP.gallery[+inp.dataset.gcap].caption=inp.value; }); });
     w.querySelectorAll('[data-gfoc]').forEach(function(b){ b.addEventListener('click',function(){ dpFocalOpen(DROP.gallery[+b.dataset.gfoc], renderDropGallery); }); });
     w.querySelectorAll('[data-glead]').forEach(function(cb){ cb.addEventListener('change',function(){ DROP.gallery[+cb.dataset.glead].lead=cb.checked; renderDropGallery(); }); });
+    dpWireDragReorder(w, DROP.gallery, renderDropGallery);
+  }
+  // Drag-to-reorder for a photo grid. Reorders the backing array in place and
+  // re-renders. Shared by Week in Pictures and (below) storyline photos.
+  function dpWireDragReorder(container, arr, rerender){
+    var from=-1;
+    container.querySelectorAll('.cell[draggable="true"]').forEach(function(cell){
+      cell.addEventListener('dragstart',function(e){ from=+cell.dataset.gi; cell.classList.add('dragging'); try{e.dataTransfer.effectAllowed='move';e.dataTransfer.setData('text/plain',String(from));}catch(_){} });
+      cell.addEventListener('dragend',function(){ from=-1; container.querySelectorAll('.cell').forEach(function(c){ c.classList.remove('dragging','dragover'); }); });
+      cell.addEventListener('dragover',function(e){ e.preventDefault(); try{e.dataTransfer.dropEffect='move';}catch(_){} cell.classList.add('dragover'); });
+      cell.addEventListener('dragleave',function(){ cell.classList.remove('dragover'); });
+      cell.addEventListener('drop',function(e){ e.preventDefault(); var to=+cell.dataset.gi; cell.classList.remove('dragover');
+        if(from<0||from===to||isNaN(to)) return;
+        arr.splice(to,0,arr.splice(from,1)[0]); from=-1; rerender();
+      });
+    });
   }
   function renderStoryImgs(row,i){
     var wrap=row.querySelector('.sx-imgwrap'); if(!wrap) return;
@@ -6719,7 +6744,8 @@
     wrap.innerHTML='<div class="dp-gal">'
       + imgs.map(function(im,j){
           var fx=(im.focal&&isFinite(im.focal.x))?im.focal.x:50, fy=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
-          return '<div class="cell"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+          return '<div class="cell" draggable="true" data-gi="'+j+'"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+            + (imgs.length>1?'<span class="dp-draghint">'+(j+1)+' · drag</span>':'')
             + dpFocalBtn('data-sfoc="'+j+'"')
             + '<button type="button" class="dp-photorm" data-srm="'+j+'">✕</button>'
             + '<input type="text" class="cap2" data-scap="'+j+'" placeholder="Caption" value="'+dEsc(im.caption||'')+'"></div>';
@@ -6729,6 +6755,7 @@
     wrap.querySelectorAll('[data-srm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.stories[i].images.splice(+b.dataset.srm,1); renderStoryImgs(row,i); }); });
     wrap.querySelectorAll('[data-scap]').forEach(function(inp){ inp.addEventListener('input',function(){ DROP.stories[i].images[+inp.dataset.scap].caption=inp.value; }); });
     wrap.querySelectorAll('[data-sfoc]').forEach(function(b){ b.addEventListener('click',function(){ dpFocalOpen(DROP.stories[i].images[+b.dataset.sfoc], function(){ renderStoryImgs(row,i); }); }); });
+    dpWireDragReorder(wrap, DROP.stories[i].images, function(){ renderStoryImgs(row,i); });
   }
   function $d(id){ return document.getElementById(id); }
   function dEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
