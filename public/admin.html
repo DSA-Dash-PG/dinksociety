@@ -1268,15 +1268,15 @@
               <textarea id="drop-f-teams" rows="7" style="width:100%;font-family:inherit;line-height:1.6;" placeholder="Smash Society :: An 11–1 dismantling and both Players of the Week…&#10;Timog Cal :: Lost 11–1, but that one game came against the league's best — frame it."></textarea>
             </div>
 
-            <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Week in Pictures <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional photo gallery at the foot of the article · add or remove freely, no photos means no gallery</span></h2></div>
+            <div class="ac__h" style="margin-top:8px;"><h2 class="ac__t" style="font-size:12px;">Storylines <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— Claude picks 3–4; edit or reorder freely</span></h2></div>
+            <div id="drop-stories"></div>
+            <button class="ab ab--outline ab--sm" id="drop-addstory-btn" style="margin-top:4px;">+ Add storyline</button>
+
+            <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Week in Pictures <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— closing photo section at the foot of the article · drag to reorder · add or remove freely, no photos means no gallery</span></h2></div>
             <div class="af">
               <div id="drop-gallery-wrap"></div>
               <input type="file" id="drop-gallery-file" accept="image/jpeg,image/png,image/webp" multiple style="display:none">
             </div>
-
-            <div class="ac__h" style="margin-top:8px;"><h2 class="ac__t" style="font-size:12px;">Storylines <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— Claude picks 3–4; edit or reorder freely</span></h2></div>
-            <div id="drop-stories"></div>
-            <button class="ab ab--outline ab--sm" id="drop-addstory-btn" style="margin-top:4px;">+ Add storyline</button>
 
             <div class="ac__h" style="margin-top:18px;"><h2 class="ac__t" style="font-size:12px;">Performers rail <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— auto-filled from this week's stats, snapshotted at publish</span></h2></div>
             <div id="drop-performers" class="drop-perf"><div class="loading">Loading…</div></div>
@@ -1284,6 +1284,7 @@
             <div class="drop-pubbar">
               <label class="drop-ck"><input type="checkbox" id="drop-ch-portal" checked> Portal announcement</label>
               <label class="drop-ck"><input type="checkbox" id="drop-ch-email" checked> Email players</label>
+              <span id="drop-channels-hint" style="display:none;font-size:11px;color:var(--color-text-faint);">↳ only used by Re-publish</span>
               <div style="flex:1;"></div>
               <span class="a-status" id="drop-pub-status" style="display:none;"></span>
               <button class="ab ab--outline ab--sm" id="drop-regen-btn" title="Re-draft this week with Claude (replaces the current draft)">↻ Regenerate</button>
@@ -6832,7 +6833,10 @@
       // Drafts preview the CURRENT live stats (the snapshot only freezes at publish);
       // a published record shows its frozen snapshot, falling back to live if empty.
       renderPerformers(dPerfToShow(rec, DROP.live));
-      $d('drop-publish-btn').textContent = stt==='published'?'Re-publish':'Approve & Publish';
+      // Button labels reflect whether this week is already live. For a published
+      // week, "Save changes" updates the article in place WITHOUT notifying the
+      // league; "Re-publish" is the only path that re-emails/re-posts.
+      dSetActionLabels(stt==='published');
       $d('drop-editor').scrollIntoView({behavior:'smooth',block:'start'});
     }).catch(function(e){ alert('Could not load week: '+(e.message||e)); });
   }
@@ -6993,10 +6997,26 @@
     };
   }
   function dropStatus(msg,ok){ var el=$d('drop-pub-status'); if(!el) return; el.style.display=''; el.textContent=msg; el.className='a-status '+(ok===false?'is-err':'is-ok'); }
+  // Toggle the save/publish button copy + the channel checkboxes based on whether
+  // the open week is already published. On a published week, saving updates the
+  // live article silently; the channels only matter for a re-publish.
+  function dSetActionLabels(isPublished){
+    var sv=$d('drop-save-btn'), pub=$d('drop-publish-btn');
+    if(sv){
+      sv.textContent = isPublished ? 'Save changes · no notify' : 'Save draft';
+      sv.title = isPublished
+        ? 'Update the live article in place. The league is NOT emailed or notified.'
+        : 'Save your edits. Nothing is visible to the league until you publish.';
+    }
+    if(pub) pub.textContent = isPublished ? 'Re-publish + notify' : 'Approve & Publish';
+    var cw=$d('drop-channels-hint'); if(cw) cw.style.display = isPublished ? '' : 'none';
+  }
   function saveDrop(){
-    var btn=$d('drop-save-btn'); if(!btnBusy(btn,'Saving…')) return;
+    var isPub = !!(DROP.record && DROP.record.status==='published');
+    if(isPub && !confirm('Update the live Week '+DROP.week+' article now?\n\nThe changes go public immediately. The league is NOT emailed or notified.')) return;
+    var btn=$d('drop-save-btn'); if(!btnBusy(btn, isPub?'Updating…':'Saving…')) return;
     apiJSON('/.netlify/functions/admin-drop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:'save-draft'},collectDrop()))})
-      .then(function(){ dropStatus('✓ Draft saved'); $d('drop-ed-saved').textContent='Saved '+new Date().toLocaleString(); renderDrop(); })
+      .then(function(){ dropStatus(isPub ? '✓ Updated live — league not notified' : '✓ Draft saved'); $d('drop-ed-saved').textContent='Saved '+new Date().toLocaleString(); renderDrop(); })
       .catch(function(e){ dropStatus(e.message||'Save failed',false); })
       .finally(function(){ btnDone(btn); });
   }
@@ -7026,7 +7046,7 @@
     $d('drop-f-week').value=w; $d('drop-f-kicker').value='The Drop · Week '+w; $d('drop-f-byline').value='By The Society Desk';
     $d('drop-f-title').value=''; $d('drop-f-dek').value=''; $d('drop-f-lead').innerHTML=''; $d('drop-f-teams').value='';
     renderStories(); renderPerformers(null); renderDropCover(); renderDropGallery();
-    $d('drop-publish-btn').textContent='Approve & Publish';
+    dSetActionLabels(false);
   }
   function wireDrop(){
     DROP.wired=true;
