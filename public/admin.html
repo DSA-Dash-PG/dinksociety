@@ -1173,6 +1173,13 @@
           .dp-gal .cell{position:relative;border:1px solid var(--color-border);border-radius:10px;overflow:hidden;background:var(--color-surface-2);}
           .dp-gal .cell img{width:100%;aspect-ratio:4/3;object-fit:cover;display:block;}
           .dp-gal .cell .cap2{display:block;width:100%;border:none;border-top:1px solid var(--color-border);background:var(--color-surface-2);color:var(--color-text);font:inherit;font-size:11px;padding:6px 8px;}
+          /* "Show in lead" toggle on a gallery cell */
+          .dp-lead{display:flex;align-items:center;gap:6px;width:100%;border:none;border-top:1px solid var(--color-border);background:var(--color-surface-2);color:var(--color-text-muted);font:inherit;font-size:10.5px;font-weight:700;letter-spacing:.02em;padding:6px 8px;cursor:pointer;text-transform:uppercase;}
+          .dp-lead input{width:auto;margin:0;accent-color:var(--color-lime,#b8ff2c);}
+          .dp-gal .cell.islead{border-color:var(--color-lime,#b8ff2c);}
+          .dp-gal .cell.islead .dp-lead{color:var(--color-lime,#b8ff2c);}
+          .dp-leadtag{position:absolute;top:8px;right:34px;background:var(--color-lime,#b8ff2c);color:#0e0e0e;border-radius:6px;font-size:9px;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:3px 6px;display:none;}
+          .dp-gal .cell.islead .dp-leadtag{display:block;}
           .dp-gal .add{display:grid;place-items:center;min-height:110px;border:1.5px dashed var(--color-border-strong);border-radius:10px;cursor:pointer;color:var(--color-text-muted);font-size:12px;font-weight:800;text-align:center;}
           .dp-gal .add:hover{border-color:var(--color-lime,#b8ff2c);color:var(--color-text);}
           .sx-photo{margin-top:8px;}
@@ -6691,34 +6698,37 @@
     w.innerHTML='<div class="dp-gal">'
       + g.map(function(im,i){
           var fx=(im.focal&&isFinite(im.focal.x))?im.focal.x:50, fy=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
-          return '<div class="cell"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+          return '<div class="cell'+(im.lead?' islead':'')+'"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+            + '<span class="dp-leadtag">In lead</span>'
             + dpFocalBtn('data-gfoc="'+i+'"')
             + '<button type="button" class="dp-photorm" data-grm="'+i+'">✕</button>'
-            + '<input type="text" class="cap2" data-gcap="'+i+'" placeholder="Caption" value="'+dEsc(im.caption||'')+'"></div>';
+            + '<input type="text" class="cap2" data-gcap="'+i+'" placeholder="Caption" value="'+dEsc(im.caption||'')+'">'
+            + '<label class="dp-lead"><input type="checkbox" data-glead="'+i+'"'+(im.lead?' checked':'')+'> Show in lead story</label></div>';
         }).join('')
       + '<div class="add" id="drop-gallery-add">+ Add<br>photos</div></div>'
-      + '<p style="font-size:11px;color:var(--color-text-faint);margin:8px 0 0;line-height:1.5;">Order matters: photo 1 becomes the hero when no cover is set, and the next one or two are woven into the lead story. All of them appear in the mosaic.</p>';
+      + '<p style="font-size:11px;color:var(--color-text-faint);margin:8px 0 0;line-height:1.5;">Every photo shows in the mosaic. Tick <b>Show in lead story</b> on one or two to float them into the opening copy. Photo 1 becomes the hero when no cover is set. Use <b>⤢ Crop</b> to keep faces in frame.</p>';
     $d('drop-gallery-add').addEventListener('click',function(){ $d('drop-gallery-file').click(); });
     w.querySelectorAll('[data-grm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.gallery.splice(+b.dataset.grm,1); renderDropGallery(); }); });
     w.querySelectorAll('[data-gcap]').forEach(function(inp){ inp.addEventListener('input',function(){ DROP.gallery[+inp.dataset.gcap].caption=inp.value; }); });
     w.querySelectorAll('[data-gfoc]').forEach(function(b){ b.addEventListener('click',function(){ dpFocalOpen(DROP.gallery[+b.dataset.gfoc], renderDropGallery); }); });
+    w.querySelectorAll('[data-glead]').forEach(function(cb){ cb.addEventListener('change',function(){ DROP.gallery[+cb.dataset.glead].lead=cb.checked; renderDropGallery(); }); });
   }
-  function renderStoryImg(row,i){
+  function renderStoryImgs(row,i){
     var wrap=row.querySelector('.sx-imgwrap'); if(!wrap) return;
-    var im=DROP.stories[i]&&DROP.stories[i].image;
-    if(im&&im.id){
-      var fx=(im.focal&&isFinite(im.focal.x))?im.focal.x:50, fy=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
-      wrap.innerHTML='<div class="dp-cover"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
-        +dpFocalBtn('data-sfoc')
-        +'<button type="button" class="dp-photorm" data-srm>Remove</button></div>'
-        +'<input type="text" class="dp-cap" data-scap placeholder="Caption (optional)" value="'+dEsc(im.caption||'')+'">';
-      wrap.querySelector('[data-srm]').addEventListener('click',function(){ DROP.stories[i].image=null; renderStoryImg(row,i); });
-      wrap.querySelector('[data-sfoc]').addEventListener('click',function(){ dpFocalOpen(DROP.stories[i].image, function(){ renderStoryImg(row,i); }); });
-      wrap.querySelector('[data-scap]').addEventListener('input',function(e){ if(DROP.stories[i].image) DROP.stories[i].image.caption=e.target.value; });
-    } else {
-      wrap.innerHTML='<div class="dp-drop" data-sadd>+ Add photo</div>';
-      wrap.querySelector('[data-sadd]').addEventListener('click',function(){ row.querySelector('.sx-imgfile').click(); });
-    }
+    var imgs=(DROP.stories[i]&&DROP.stories[i].images)||[];
+    wrap.innerHTML='<div class="dp-gal">'
+      + imgs.map(function(im,j){
+          var fx=(im.focal&&isFinite(im.focal.x))?im.focal.x:50, fy=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
+          return '<div class="cell"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+            + dpFocalBtn('data-sfoc="'+j+'"')
+            + '<button type="button" class="dp-photorm" data-srm="'+j+'">✕</button>'
+            + '<input type="text" class="cap2" data-scap="'+j+'" placeholder="Caption" value="'+dEsc(im.caption||'')+'"></div>';
+        }).join('')
+      + '<div class="add" data-sadd>+ Add<br>photo'+(imgs.length?'s':'')+'</div></div>';
+    wrap.querySelector('[data-sadd]').addEventListener('click',function(){ row.querySelector('.sx-imgfile').click(); });
+    wrap.querySelectorAll('[data-srm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.stories[i].images.splice(+b.dataset.srm,1); renderStoryImgs(row,i); }); });
+    wrap.querySelectorAll('[data-scap]').forEach(function(inp){ inp.addEventListener('input',function(){ DROP.stories[i].images[+inp.dataset.scap].caption=inp.value; }); });
+    wrap.querySelectorAll('[data-sfoc]').forEach(function(b){ b.addEventListener('click',function(){ dpFocalOpen(DROP.stories[i].images[+b.dataset.sfoc], function(){ renderStoryImgs(row,i); }); }); });
   }
   function $d(id){ return document.getElementById(id); }
   function dEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -6783,9 +6793,13 @@
       $d('drop-f-dek').value=(rec&&rec.dek)||'';
       $d('drop-f-lead').innerHTML = (rec&&rec.leadHtml) || '';
       $d('drop-f-teams').value = (rec&&rec.teamReports) ? dFormatTeamReports(rec.teamReports) : '';
-      DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){ return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',bodyHtml:s.html||'',chips:s.chips||[],image:s.image||null}; }) : [];
+      DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){
+        var imgs = (s.images&&s.images.length)? s.images : (s.image? [s.image] : []);
+        imgs = imgs.filter(function(im){return im&&im.id;}).map(function(im){ return {id:im.id,caption:im.caption||'',credit:im.credit||'',focal:im.focal||null}; });
+        return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',bodyHtml:s.html||'',chips:s.chips||[],images:imgs};
+      }) : [];
       DROP.cover = (rec&&rec.cover&&rec.cover.id)? {id:rec.cover.id,caption:rec.cover.caption||'',credit:rec.cover.credit||'',focal:rec.cover.focal||null} : null;
-      DROP.gallery = (rec&&Array.isArray(rec.gallery))? rec.gallery.filter(function(im){return im&&im.id;}).map(function(im){ return {id:im.id,caption:im.caption||'',focal:im.focal||null}; }) : [];
+      DROP.gallery = (rec&&Array.isArray(rec.gallery))? rec.gallery.filter(function(im){return im&&im.id;}).map(function(im){ return {id:im.id,caption:im.caption||'',focal:im.focal||null,lead:im.lead===true}; }) : [];
       renderStories();
       renderDropCover(); renderDropGallery();
       // Drafts preview the CURRENT live stats (the snapshot only freezes at publish);
@@ -6858,8 +6872,8 @@
           +'<div class="wv-edit rt-content sx-body" contenteditable="true" data-placeholder="The storyline… use the toolbar to format.">'+(s.bodyHtml||'')+'</div></div>'
         +'<div class="af" style="margin-top:8px;"><label>Chips <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional stat pills · <b>label: value</b>, comma-separated (e.g. <b>Smash record: 4–0, Meeting: Week 2</b>)</span></label>'
           +'<input type="text" class="sx-chips" value="'+dEsc(dChipsToStr(s.chips))+'" placeholder="label: value, label: value"></div>'
-        +'<div class="af sx-photo"><label>Photo <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional card thumbnail</span></label>'
-          +'<div class="sx-imgwrap"></div><input type="file" class="sx-imgfile" accept="image/jpeg,image/png,image/webp" style="display:none"></div>'
+        +'<div class="af sx-photo"><label>Photos <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— float beside the story; the copy wraps around them. Add more than one to stack.</span></label>'
+          +'<div class="sx-imgwrap"></div><input type="file" class="sx-imgfile" accept="image/jpeg,image/png,image/webp" multiple style="display:none"></div>'
         +'</div>';
     }).join('') || '<div class="empty" style="font-size:12px;">No storylines yet — add one or draft with Claude.</div>';
     box.querySelectorAll('.drop-story').forEach(function(row){
@@ -6869,11 +6883,12 @@
       var ed=row.querySelector('.sx-body');
       dRichWire(row.querySelector('.wv-toolbar'), ed, function(){ DROP.stories[i].bodyHtml=ed.innerHTML; });
       row.querySelector('.sx-chips').addEventListener('input',function(e){ DROP.stories[i].chips=dStrToChips(e.target.value); });
-      renderStoryImg(row,i);
+      renderStoryImgs(row,i);
       row.querySelector('.sx-imgfile').addEventListener('change',function(e){
-        var f=e.target.files[0]; if(!f) return; var wrap=row.querySelector('.sx-imgwrap'); wrap.classList.add('dp-busy');
-        dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.stories[i].image={id:d.id,caption:(DROP.stories[i].image&&DROP.stories[i].image.caption)||''}; renderStoryImg(row,i); } else alert((d&&d.error)||'Upload failed'); })
-          .catch(function(){ alert('Upload failed'); }).finally(function(){ wrap.classList.remove('dp-busy'); e.target.value=''; });
+        var files=[].slice.call(e.target.files); if(!files.length) return; var wrap=row.querySelector('.sx-imgwrap'); wrap.classList.add('dp-busy');
+        if(!DROP.stories[i].images) DROP.stories[i].images=[];
+        files.reduce(function(chain,f){ return chain.then(function(){ return dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.stories[i].images.push({id:d.id,caption:'',credit:'',focal:null}); } else console.error('story upload:',d&&d.error); }); }); }, Promise.resolve())
+          .catch(function(){ alert('Upload failed'); }).finally(function(){ wrap.classList.remove('dp-busy'); e.target.value=''; renderStoryImgs(row,i); });
       });
     });
     box.querySelectorAll('[data-rm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.stories.splice(+b.dataset.rm,1); renderStories(); }); });
@@ -6947,7 +6962,7 @@
       cover: DROP.cover && DROP.cover.id ? DROP.cover : null,
       teamReports: dParseTeamReports($d('drop-f-teams').value),
       gallery: (DROP.gallery||[]).filter(function(im){ return im && im.id; }),
-      storylines: DROP.stories.map(function(s){ return { tag:s.tag, tagKind:s.tagKind||'note', title:s.title, html:s.bodyHtml||'', chips:s.chips||[], image:(s.image&&s.image.id)?s.image:null }; })
+      storylines: DROP.stories.map(function(s){ var imgs=(s.images||[]).filter(function(im){return im&&im.id;}); return { tag:s.tag, tagKind:s.tagKind||'note', title:s.title, html:s.bodyHtml||'', chips:s.chips||[], images:imgs, image:imgs[0]||null }; })
     };
   }
   function dropStatus(msg,ok){ var el=$d('drop-pub-status'); if(!el) return; el.style.display=''; el.textContent=msg; el.className='a-status '+(ok===false?'is-err':'is-ok'); }
@@ -6991,7 +7006,7 @@
     var g=$d('drop-generate-btn'); if(g) g.addEventListener('click',function(){ generateDrop(false); });
     var rg=$d('drop-regen-btn'); if(rg) rg.addEventListener('click',function(){ if(confirm('Regenerate this week with Claude? Replaces the current draft text.')) generateDrop(true); });
     var nw=$d('drop-new-btn'); if(nw) nw.addEventListener('click',newDropWeek);
-    var as=$d('drop-addstory-btn'); if(as) as.addEventListener('click',function(){ DROP.stories.push({tag:'',tagKind:'note',title:'',bodyHtml:'',chips:[]}); renderStories(); });
+    var as=$d('drop-addstory-btn'); if(as) as.addEventListener('click',function(){ DROP.stories.push({tag:'',tagKind:'note',title:'',bodyHtml:'',chips:[],images:[]}); renderStories(); });
     dRichWire($d('drop-lead-tb'), $d('drop-f-lead'), null);
     var cf=$d('drop-cover-file'); if(cf) cf.addEventListener('change',function(e){
       var f=e.target.files[0]; if(!f) return; var w=$d('drop-cover-wrap'); if(w) w.classList.add('dp-busy');
@@ -7000,7 +7015,7 @@
     });
     var gf=$d('drop-gallery-file'); if(gf) gf.addEventListener('change',function(e){
       var files=Array.prototype.slice.call(e.target.files||[]); if(!files.length) return; var w=$d('drop-gallery-wrap'); if(w) w.classList.add('dp-busy');
-      files.reduce(function(chain,f){ return chain.then(function(){ return dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.gallery.push({id:d.id,caption:'',focal:null}); } else console.error('gallery upload:',d&&d.error); }); }); }, Promise.resolve())
+      files.reduce(function(chain,f){ return chain.then(function(){ return dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.gallery.push({id:d.id,caption:'',focal:null,lead:false}); } else console.error('gallery upload:',d&&d.error); }); }); }, Promise.resolve())
         .then(function(){ renderDropGallery(); }).catch(function(){ alert('Some uploads failed'); }).finally(function(){ if(w) w.classList.remove('dp-busy'); e.target.value=''; });
     });
     var sv=$d('drop-save-btn'); if(sv) sv.addEventListener('click',saveDrop);

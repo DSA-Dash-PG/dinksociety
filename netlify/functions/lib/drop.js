@@ -68,6 +68,10 @@ function normImage(x) {
     caption: x.caption ? String(x.caption).slice(0, 240) : null,
     credit: x.credit ? String(x.credit).slice(0, 120) : null,
     focal: normFocal(x.focal),
+    // Gallery photos only: when true, the photo is also floated into the lead
+    // story (it still appears in the Week in Pictures mosaic). Ignored for the
+    // cover and storyline thumbnails, which have their own fixed slots.
+    lead: x.lead === true,
   };
 }
 
@@ -83,13 +87,18 @@ function normStoryline(s = {}) {
   const chips = Array.isArray(s.chips)
     ? s.chips.slice(0, 4).map(c => ({ label: String(c.label || '').slice(0, 40), value: String(c.value ?? '').slice(0, 40) }))
     : [];
+  // A storyline can carry multiple photos (images[]), which the article floats
+  // and wraps the copy around. Backward-compatible with the old single `image`.
+  const rawImgs = Array.isArray(s.images) ? s.images : (s.image ? [s.image] : []);
+  const images = rawImgs.slice(0, 4).map(normImage).filter(Boolean);
   return {
     tag: String(s.tag || '').slice(0, 40),
     tagKind,
     title: String(s.title || '').slice(0, 200),
     html: cleanHtml(s.html),
     chips,
-    image: normImage(s.image), // optional card thumbnail
+    images,
+    image: images[0] || null, // legacy field: first photo, for older readers
   };
 }
 

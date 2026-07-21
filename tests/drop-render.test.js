@@ -43,11 +43,11 @@ const RECORD = {
     { tag: 'Late Bloom', tagKind: 'riser', title: 'A fortnight', html: '<p>Body C.</p>', chips: [], image: null }, // photoless storyline
   ],
   gallery: [
-    { id: 'img_g0', caption: 'Hero shot', credit: 'R. Hak', focal: { x: 62, y: 18 } },
-    { id: 'img_g1', caption: 'Inline one', credit: null, focal: null },
-    { id: 'img_g2', caption: 'Inline two', credit: null, focal: { x: 10, y: 90 } },
-    { id: 'img_g3', caption: null, credit: null, focal: null },
-    { id: 'img_g4', caption: null, credit: null, focal: null },
+    { id: 'img_g0', caption: 'Hero shot', credit: 'R. Hak', focal: { x: 62, y: 18 }, lead: false },
+    { id: 'img_g1', caption: 'Inline one', credit: null, focal: null, lead: false },
+    { id: 'img_g2', caption: 'Inline two', credit: null, focal: { x: 10, y: 90 }, lead: true },
+    { id: 'img_g3', caption: null, credit: null, focal: null, lead: true },
+    { id: 'img_g4', caption: null, credit: null, focal: null, lead: false },
   ],
   performers: {
     potw: {
@@ -191,7 +191,7 @@ test('renders the article without losing any performers-rail content', async () 
 
 test('hero falls back to the first gallery photo when no cover is set', async () => {
   const out = await renderFixture(RECORD, PLAYERS);
-  assert.match(out, /class="dp-hero"/);
+  assert.match(out, /class="dp-cover-hero"/);
   assert.match(out, /drop-photo-serve\?id=img_g0/);
   // ...and the hero honours its focal point rather than centring blindly.
   assert.match(out, /id=img_g0[^>]*object-position:62% 18%/);
@@ -200,17 +200,60 @@ test('hero falls back to the first gallery photo when no cover is set', async ()
 test('a cover photo takes precedence over the gallery', async () => {
   const withCover = { ...RECORD, cover: { id: 'img_cov', caption: 'Cover', credit: null, focal: { x: 40, y: 25 } } };
   const out = await renderFixture(withCover, PLAYERS);
-  assert.match(out, /class="dp-hero"[\s\S]{0,200}img_cov/);
+  assert.match(out, /class="dp-cover-hero"[\s\S]{0,240}img_cov/);
   assert.match(out, /object-position:40% 25%/);
 });
 
-test('gallery photos are woven into the lead copy, not stacked after it', async () => {
+test('the headline is overlaid on the hero, not repeated in the lead', async () => {
+  const out = await renderFixture(RECORD, PLAYERS);
+  const hero = out.slice(out.indexOf('dp-cover-hero'), out.indexOf('class="lead"'));
+  assert.match(hero, /<h1>[\s\S]*Rivalry Week ends in three straight sweeps/, 'headline should be in the hero');
+  assert.match(hero, /class="hk"/, 'kicker should be in the hero');
+  assert.match(hero, /class="hby"/, 'byline should be in the hero');
+  // The lead no longer carries its own H2 headline or "The Lead" kicker.
+  const lead = out.slice(out.indexOf('class="lead"'), out.indexOf('gallery-sec'));
+  assert.ok(!/<h2>/.test(lead), 'lead should not repeat the headline as an h2');
+});
+
+test('with no hero photo, the centred masthead and in-column headline return', async () => {
+  const bare = { ...RECORD, cover: null, gallery: [] };
+  const out = await renderFixture(bare, PLAYERS);
+  assert.match(out, /class="masthead"/, 'masthead should render when there is no hero');
+  assert.ok(!out.includes('dp-cover-hero'), 'no overlaid hero without a photo');
+  const lead = out.slice(out.indexOf('class="lead"'), out.indexOf('Around the League'));
+  assert.match(lead, /<h2>[\s\S]*Rivalry Week/, 'headline falls back into the lead');
+});
+
+test('only photos flagged "Show in lead" are woven into the lead copy', async () => {
   const out = await renderFixture(RECORD, PLAYERS);
   const lead = out.slice(out.indexOf('class="lead"'), out.indexOf('gallery-sec'));
   assert.match(lead, /class="dp-float"/, 'expected a right-floated photo inside the lead');
   assert.match(lead, /class="dp-float left land"/, 'expected a left-floated photo further down the lead');
+  // The two flagged photos (g2, g3) float in; the unflagged ones do not.
+  assert.ok(lead.includes('img_g2'), 'flagged photo g2 should be inline');
+  assert.ok(lead.includes('img_g3'), 'flagged photo g3 should be inline');
+  assert.ok(!lead.includes('img_g1'), 'unflagged photo g1 should NOT be inline');
+  assert.ok(!lead.includes('img_g4'), 'unflagged photo g4 should NOT be inline');
   // The float must land between paragraphs, not before the first one.
   assert.ok(lead.indexOf('<p>Block one.</p>') < lead.indexOf('dp-float'), 'photo should follow the opening paragraph');
+});
+
+test('with no photos flagged, the lead falls back to the first two gallery photos', async () => {
+  const noFlags = { ...RECORD, cover: { id: 'img_cov', caption: null, credit: null, focal: null },
+    gallery: RECORD.gallery.map((im) => ({ ...im, lead: false })) };
+  const out = await renderFixture(noFlags, PLAYERS);
+  const lead = out.slice(out.indexOf('class="lead"'), out.indexOf('gallery-sec'));
+  // Cover is the hero, so nothing is excluded; first two gallery photos float in.
+  assert.ok(lead.includes('img_g0') && lead.includes('img_g1'), 'fallback should use the first two gallery photos');
+});
+
+test('the hero photo is never also floated into the lead', async () => {
+  // No cover → gallery[0] becomes the hero; flag it for lead too and confirm
+  // it appears once (as hero) and is not duplicated inline.
+  const g = RECORD.gallery.map((im, i) => ({ ...im, lead: i === 0 }));
+  const out = await renderFixture({ ...RECORD, cover: null, gallery: g }, PLAYERS);
+  const lead = out.slice(out.indexOf('class="lead"'), out.indexOf('gallery-sec'));
+  assert.ok(!lead.includes('dp-float'), 'the only lead-flagged photo is the hero, so nothing floats');
 });
 
 test('photos without a focal point centre, and focal points are applied', async () => {
