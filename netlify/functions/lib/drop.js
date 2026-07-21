@@ -41,10 +41,23 @@ function cleanHtml(html) {
   return messageLooksHtml(html) ? sanitizeMessageHtml(html) : sanitizeMessageHtml(`<p>${html}</p>`);
 }
 
+// Focal point for a photo, as percentages of the image box: { x, y } where
+// 0/0 is top-left and 100/100 is bottom-right. The article crops photos to
+// several fixed aspect ratios (hero, floated portrait, mosaic tiles), so the
+// focal point is what keeps a subject's head in frame instead of centring
+// blindly. null means "no preference" and the renderer falls back to 50/50.
+function normFocal(f) {
+  if (!f || typeof f !== 'object') return null;
+  const x = Number(f.x), y = Number(f.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  const clamp = (n) => Math.max(0, Math.min(100, Math.round(n)));
+  return { x: clamp(x), y: clamp(y) };
+}
+
 // Normalize a photo reference. Photos live in the 'drop-photos' blob store,
 // keyed by an immutable id; the record only stores the id plus an optional
-// caption/credit. Returns null for anything without a valid id, so every photo
-// slot degrades cleanly to "no image" (the article renders text-only).
+// caption/credit/focal point. Returns null for anything without a valid id, so
+// every photo slot degrades cleanly to "no image" (the article renders text-only).
 const VALID_IMG_ID = /^[a-zA-Z0-9_-]{1,80}$/;
 function normImage(x) {
   if (!x || typeof x !== 'object') return null;
@@ -54,6 +67,7 @@ function normImage(x) {
     id,
     caption: x.caption ? String(x.caption).slice(0, 240) : null,
     credit: x.credit ? String(x.credit).slice(0, 120) : null,
+    focal: normFocal(x.focal),
   };
 }
 

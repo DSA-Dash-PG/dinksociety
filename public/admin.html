@@ -1177,6 +1177,28 @@
           .dp-gal .add:hover{border-color:var(--color-lime,#b8ff2c);color:var(--color-text);}
           .sx-photo{margin-top:8px;}
           .dp-busy{opacity:.55;pointer-events:none;}
+          /* Focal-point picker — click the photo to set what the crop keeps in frame */
+          .dp-focalbtn{position:absolute;top:8px;left:8px;background:rgba(0,0,0,.72);border:1px solid var(--color-border-strong);color:#fff;border-radius:8px;font-size:11px;font-weight:800;padding:5px 9px;cursor:pointer;}
+          .dp-focalbtn:hover{border-color:var(--color-lime,#b8ff2c);color:var(--color-lime,#b8ff2c);}
+          .dp-fmodal{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.86);display:none;align-items:center;justify-content:center;padding:24px;}
+          .dp-fmodal.on{display:flex;}
+          .dp-fbox{background:var(--color-surface);border:1px solid var(--color-border);border-radius:14px;padding:18px;max-width:940px;width:100%;max-height:92vh;overflow:auto;}
+          .dp-fbox h3{font-size:13px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;margin:0 0 4px;}
+          .dp-fbox .hint{font-size:11.5px;color:var(--color-text-faint);margin:0 0 14px;line-height:1.5;}
+          .dp-fstage{position:relative;border:1px solid var(--color-border);border-radius:10px;overflow:hidden;cursor:crosshair;background:var(--color-surface-2);}
+          .dp-fstage img{width:100%;display:block;max-height:52vh;object-fit:contain;}
+          .dp-fdot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 2px rgba(0,0,0,.6),0 0 12px rgba(0,0,0,.5);pointer-events:none;background:rgba(184,255,44,.35);}
+          .dp-fdot::after{content:'';position:absolute;inset:9px;border-radius:50%;background:var(--color-lime,#b8ff2c);}
+          .dp-fprev{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:14px;}
+          .dp-fprev figure{margin:0;}
+          .dp-fprev .pv{overflow:hidden;border-radius:8px;border:1px solid var(--color-border);background:var(--color-surface-2);}
+          .dp-fprev .pv img{width:100%;height:100%;object-fit:cover;display:block;}
+          .dp-fprev .r219 .pv{aspect-ratio:21/9;} .dp-fprev .r45 .pv{aspect-ratio:4/5;}
+          .dp-fprev .r43 .pv{aspect-ratio:4/3;} .dp-fprev .r11 .pv{aspect-ratio:1/1;}
+          .dp-fprev figcaption{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);margin-top:6px;text-align:center;}
+          .dp-frow{display:flex;align-items:center;gap:10px;margin-top:16px;flex-wrap:wrap;}
+          .dp-frow .sp{flex:1;}
+          @media(max-width:680px){ .dp-fprev{grid-template-columns:repeat(2,1fr);} }
         </style>
         <section class="admin-section" data-section="drop">
           <div class="am-head">
@@ -6573,18 +6595,93 @@
     var fd=new FormData(); fd.append('file',file); fd.append('circuit',DROP.circuit); fd.append('week', DROP.week||$d('drop-f-week').value||'');
     return fetch('/.netlify/functions/drop-photo-upload',{method:'POST',body:fd,credentials:'include'}).then(function(r){ return r.json(); });
   }
+  // ── Focal point picker ────────────────────────────────────────────────
+  // The article crops each photo to several fixed ratios (21:9 hero, 4:5 floated
+  // portrait, 4:3 storyline, 1:1 mosaic tile). Centre-cropping decapitates people
+  // in the tall ratios, so each photo carries a focal point — the spot the crop
+  // must keep. Click the photo to move it; the four previews are the real ratios.
+  var DPF = { el:null, im:null, x:50, y:50, onSave:null };
+  function dpFocalEl(){
+    if(DPF.el) return DPF.el;
+    var m=document.createElement('div');
+    m.className='dp-fmodal'; m.id='dp-fmodal';
+    m.innerHTML='<div class="dp-fbox">'
+      +'<h3>Adjust crop</h3>'
+      +'<p class="hint">Click the point that must stay in frame — usually a face. The previews below are the exact crops the article uses.</p>'
+      +'<div class="dp-fstage" id="dp-fstage"><img id="dp-fimg" src="" alt=""><div class="dp-fdot" id="dp-fdot"></div></div>'
+      +'<div class="dp-fprev">'
+        +'<figure class="r219"><div class="pv"><img id="dp-pv1" src="" alt=""></div><figcaption>Hero 21:9</figcaption></figure>'
+        +'<figure class="r45"><div class="pv"><img id="dp-pv2" src="" alt=""></div><figcaption>In-text 4:5</figcaption></figure>'
+        +'<figure class="r43"><div class="pv"><img id="dp-pv3" src="" alt=""></div><figcaption>Storyline 4:3</figcaption></figure>'
+        +'<figure class="r11"><div class="pv"><img id="dp-pv4" src="" alt=""></div><figcaption>Mosaic 1:1</figcaption></figure>'
+      +'</div>'
+      +'<div class="dp-frow">'
+        +'<span style="font-size:11px;color:var(--color-text-faint);" id="dp-fval"></span>'
+        +'<span class="sp"></span>'
+        +'<button class="ab ab--outline ab--sm" type="button" id="dp-freset">Reset to centre</button>'
+        +'<button class="ab ab--outline ab--sm" type="button" id="dp-fcancel">Cancel</button>'
+        +'<button class="ab ab--lime ab--sm" type="button" id="dp-fsave">Save crop</button>'
+      +'</div></div>';
+    document.body.appendChild(m); DPF.el=m;
+    function setFrom(e){
+      var st=$d('dp-fstage'), img=$d('dp-fimg');
+      var r=img.getBoundingClientRect();
+      var x=((e.clientX-r.left)/r.width)*100, y=((e.clientY-r.top)/r.height)*100;
+      DPF.x=Math.max(0,Math.min(100,Math.round(x))); DPF.y=Math.max(0,Math.min(100,Math.round(y)));
+      dpFocalPaint();
+    }
+    $d('dp-fstage').addEventListener('click',setFrom);
+    $d('dp-freset').addEventListener('click',function(){ DPF.x=50; DPF.y=50; dpFocalPaint(); });
+    $d('dp-fcancel').addEventListener('click',dpFocalClose);
+    $d('dp-fsave').addEventListener('click',function(){
+      if(DPF.im){
+        // 50/50 is the default, so store null rather than a redundant object.
+        DPF.im.focal = (DPF.x===50 && DPF.y===50) ? null : { x:DPF.x, y:DPF.y };
+      }
+      var cb=DPF.onSave; dpFocalClose(); if(cb) cb();
+    });
+    m.addEventListener('click',function(e){ if(e.target===m) dpFocalClose(); });
+    document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&DPF.el&&DPF.el.classList.contains('on')) dpFocalClose(); });
+    return m;
+  }
+  function dpFocalPaint(){
+    var pos=DPF.x+'% '+DPF.y+'%';
+    var dot=$d('dp-fdot'), img=$d('dp-fimg');
+    if(dot&&img){ dot.style.left=(img.offsetLeft+img.offsetWidth*DPF.x/100)+'px'; dot.style.top=(img.offsetTop+img.offsetHeight*DPF.y/100)+'px'; }
+    ['dp-pv1','dp-pv2','dp-pv3','dp-pv4'].forEach(function(id){ var e=$d(id); if(e) e.style.objectPosition=pos; });
+    var v=$d('dp-fval'); if(v) v.textContent='Focal point '+DPF.x+'% / '+DPF.y+'%'+((DPF.x===50&&DPF.y===50)?' (centre)':'');
+  }
+  function dpFocalClose(){ if(DPF.el) DPF.el.classList.remove('on'); DPF.im=null; DPF.onSave=null; }
+  function dpFocalOpen(im, onSave){
+    if(!im||!im.id) return;
+    dpFocalEl();
+    DPF.im=im; DPF.onSave=onSave;
+    DPF.x=(im.focal&&isFinite(im.focal.x))?im.focal.x:50;
+    DPF.y=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
+    var src=dpUrl(im.id);
+    ['dp-fimg','dp-pv1','dp-pv2','dp-pv3','dp-pv4'].forEach(function(id){ var e=$d(id); if(e) e.src=src; });
+    DPF.el.classList.add('on');
+    var img=$d('dp-fimg');
+    if(img.complete) dpFocalPaint(); else img.onload=dpFocalPaint;
+  }
+  // Shorthand for the "Adjust crop" button that sits on every photo thumbnail.
+  function dpFocalBtn(attr){ return '<button type="button" class="dp-focalbtn" '+attr+' title="Adjust crop">⤢ Crop</button>'; }
+
   function renderDropCover(){
     var w=$d('drop-cover-wrap'); if(!w) return;
     var c=DROP.cover;
     if(c&&c.id){
-      w.innerHTML='<div class="dp-cover"><img src="'+dpUrl(c.id)+'" alt=""><button type="button" class="dp-photorm" id="drop-cover-rm">Remove</button></div>'
+      w.innerHTML='<div class="dp-cover"><img src="'+dpUrl(c.id)+'" alt="" style="object-position:'+((c.focal&&isFinite(c.focal.x))?c.focal.x:50)+'% '+((c.focal&&isFinite(c.focal.y))?c.focal.y:50)+'%">'
+        +dpFocalBtn('id="drop-cover-focal"')
+        +'<button type="button" class="dp-photorm" id="drop-cover-rm">Remove</button></div>'
         +'<input type="text" class="dp-cap" id="drop-cover-cap" placeholder="Caption (optional)" value="'+dEsc(c.caption||'')+'">'
         +'<input type="text" class="dp-cap" id="drop-cover-credit" placeholder="Photo credit (optional)" value="'+dEsc(c.credit||'')+'">';
       $d('drop-cover-rm').addEventListener('click',function(){ DROP.cover=null; renderDropCover(); });
+      $d('drop-cover-focal').addEventListener('click',function(){ dpFocalOpen(DROP.cover, renderDropCover); });
       $d('drop-cover-cap').addEventListener('input',function(e){ if(DROP.cover) DROP.cover.caption=e.target.value; });
       $d('drop-cover-credit').addEventListener('input',function(e){ if(DROP.cover) DROP.cover.credit=e.target.value; });
     } else {
-      w.innerHTML='<div class="dp-drop" id="drop-cover-drop">+ Add cover photo<br><span style="font-weight:400;color:var(--color-text-faint);">JPG / PNG / WebP · up to 6MB</span></div>';
+      w.innerHTML='<div class="dp-drop" id="drop-cover-drop">+ Add cover photo<br><span style="font-weight:400;color:var(--color-text-faint);">JPG / PNG / WebP · up to 6MB · optional — the first Week in Pictures photo becomes the hero if you skip it</span></div>';
       $d('drop-cover-drop').addEventListener('click',function(){ $d('drop-cover-file').click(); });
     }
   }
@@ -6592,19 +6689,31 @@
     var w=$d('drop-gallery-wrap'); if(!w) return;
     var g=DROP.gallery||[];
     w.innerHTML='<div class="dp-gal">'
-      + g.map(function(im,i){ return '<div class="cell"><img src="'+dpUrl(im.id)+'" alt=""><button type="button" class="dp-photorm" data-grm="'+i+'">✕</button><input type="text" class="cap2" data-gcap="'+i+'" placeholder="Caption" value="'+dEsc(im.caption||'')+'"></div>'; }).join('')
-      + '<div class="add" id="drop-gallery-add">+ Add<br>photos</div></div>';
+      + g.map(function(im,i){
+          var fx=(im.focal&&isFinite(im.focal.x))?im.focal.x:50, fy=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
+          return '<div class="cell"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+            + dpFocalBtn('data-gfoc="'+i+'"')
+            + '<button type="button" class="dp-photorm" data-grm="'+i+'">✕</button>'
+            + '<input type="text" class="cap2" data-gcap="'+i+'" placeholder="Caption" value="'+dEsc(im.caption||'')+'"></div>';
+        }).join('')
+      + '<div class="add" id="drop-gallery-add">+ Add<br>photos</div></div>'
+      + '<p style="font-size:11px;color:var(--color-text-faint);margin:8px 0 0;line-height:1.5;">Order matters: photo 1 becomes the hero when no cover is set, and the next one or two are woven into the lead story. All of them appear in the mosaic.</p>';
     $d('drop-gallery-add').addEventListener('click',function(){ $d('drop-gallery-file').click(); });
     w.querySelectorAll('[data-grm]').forEach(function(b){ b.addEventListener('click',function(){ DROP.gallery.splice(+b.dataset.grm,1); renderDropGallery(); }); });
     w.querySelectorAll('[data-gcap]').forEach(function(inp){ inp.addEventListener('input',function(){ DROP.gallery[+inp.dataset.gcap].caption=inp.value; }); });
+    w.querySelectorAll('[data-gfoc]').forEach(function(b){ b.addEventListener('click',function(){ dpFocalOpen(DROP.gallery[+b.dataset.gfoc], renderDropGallery); }); });
   }
   function renderStoryImg(row,i){
     var wrap=row.querySelector('.sx-imgwrap'); if(!wrap) return;
     var im=DROP.stories[i]&&DROP.stories[i].image;
     if(im&&im.id){
-      wrap.innerHTML='<div class="dp-cover"><img src="'+dpUrl(im.id)+'" alt=""><button type="button" class="dp-photorm" data-srm>Remove</button></div>'
+      var fx=(im.focal&&isFinite(im.focal.x))?im.focal.x:50, fy=(im.focal&&isFinite(im.focal.y))?im.focal.y:50;
+      wrap.innerHTML='<div class="dp-cover"><img src="'+dpUrl(im.id)+'" alt="" style="object-position:'+fx+'% '+fy+'%">'
+        +dpFocalBtn('data-sfoc')
+        +'<button type="button" class="dp-photorm" data-srm>Remove</button></div>'
         +'<input type="text" class="dp-cap" data-scap placeholder="Caption (optional)" value="'+dEsc(im.caption||'')+'">';
       wrap.querySelector('[data-srm]').addEventListener('click',function(){ DROP.stories[i].image=null; renderStoryImg(row,i); });
+      wrap.querySelector('[data-sfoc]').addEventListener('click',function(){ dpFocalOpen(DROP.stories[i].image, function(){ renderStoryImg(row,i); }); });
       wrap.querySelector('[data-scap]').addEventListener('input',function(e){ if(DROP.stories[i].image) DROP.stories[i].image.caption=e.target.value; });
     } else {
       wrap.innerHTML='<div class="dp-drop" data-sadd>+ Add photo</div>';
@@ -6675,8 +6784,8 @@
       $d('drop-f-lead').innerHTML = (rec&&rec.leadHtml) || '';
       $d('drop-f-teams').value = (rec&&rec.teamReports) ? dFormatTeamReports(rec.teamReports) : '';
       DROP.stories = (rec&&rec.storylines)? rec.storylines.map(function(s){ return {tag:s.tag||'',tagKind:s.tagKind||'note',title:s.title||'',bodyHtml:s.html||'',chips:s.chips||[],image:s.image||null}; }) : [];
-      DROP.cover = (rec&&rec.cover&&rec.cover.id)? {id:rec.cover.id,caption:rec.cover.caption||'',credit:rec.cover.credit||''} : null;
-      DROP.gallery = (rec&&Array.isArray(rec.gallery))? rec.gallery.filter(function(im){return im&&im.id;}).map(function(im){ return {id:im.id,caption:im.caption||''}; }) : [];
+      DROP.cover = (rec&&rec.cover&&rec.cover.id)? {id:rec.cover.id,caption:rec.cover.caption||'',credit:rec.cover.credit||'',focal:rec.cover.focal||null} : null;
+      DROP.gallery = (rec&&Array.isArray(rec.gallery))? rec.gallery.filter(function(im){return im&&im.id;}).map(function(im){ return {id:im.id,caption:im.caption||'',focal:im.focal||null}; }) : [];
       renderStories();
       renderDropCover(); renderDropGallery();
       // Drafts preview the CURRENT live stats (the snapshot only freezes at publish);
@@ -6886,12 +6995,12 @@
     dRichWire($d('drop-lead-tb'), $d('drop-f-lead'), null);
     var cf=$d('drop-cover-file'); if(cf) cf.addEventListener('change',function(e){
       var f=e.target.files[0]; if(!f) return; var w=$d('drop-cover-wrap'); if(w) w.classList.add('dp-busy');
-      dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.cover={id:d.id,caption:(DROP.cover&&DROP.cover.caption)||'',credit:(DROP.cover&&DROP.cover.credit)||''}; renderDropCover(); } else alert((d&&d.error)||'Upload failed'); })
+      dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.cover={id:d.id,caption:(DROP.cover&&DROP.cover.caption)||'',credit:(DROP.cover&&DROP.cover.credit)||'',focal:null}; renderDropCover(); } else alert((d&&d.error)||'Upload failed'); })
         .catch(function(){ alert('Upload failed'); }).finally(function(){ if(w) w.classList.remove('dp-busy'); e.target.value=''; });
     });
     var gf=$d('drop-gallery-file'); if(gf) gf.addEventListener('change',function(e){
       var files=Array.prototype.slice.call(e.target.files||[]); if(!files.length) return; var w=$d('drop-gallery-wrap'); if(w) w.classList.add('dp-busy');
-      files.reduce(function(chain,f){ return chain.then(function(){ return dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.gallery.push({id:d.id,caption:''}); } else console.error('gallery upload:',d&&d.error); }); }); }, Promise.resolve())
+      files.reduce(function(chain,f){ return chain.then(function(){ return dpUpload(f).then(function(d){ if(d&&d.ok){ DROP.gallery.push({id:d.id,caption:'',focal:null}); } else console.error('gallery upload:',d&&d.error); }); }); }, Promise.resolve())
         .then(function(){ renderDropGallery(); }).catch(function(){ alert('Some uploads failed'); }).finally(function(){ if(w) w.classList.remove('dp-busy'); e.target.value=''; });
     });
     var sv=$d('drop-save-btn'); if(sv) sv.addEventListener('click',saveDrop);

@@ -46,9 +46,9 @@
   #drop .masthead .meta .dot{ color:var(--color-text-faint); }
   #drop .masthead .tagline{ font-family:var(--serif); font-style:italic; font-size:17px; color:var(--color-text-muted); margin-top:12px; }
 
-  /* layout */
-  #drop .layout{ display:grid; grid-template-columns:1fr 312px; gap:46px; padding:40px 0 80px; }
-  @media(max-width:880px){ #drop .layout{ grid-template-columns:1fr; gap:36px; } }
+  /* layout — single measured column; stats ride as full-width bands between sections */
+  #drop .layout{ padding:34px 0 70px; }
+  #drop .col{ max-width:700px; margin:0 auto; }
 
   /* lead */
   #drop .kicker{ display:inline-block; font-size:11px; letter-spacing:.16em; text-transform:uppercase; font-weight:800; color:var(--color-lime); border:1px solid var(--color-lime-active); padding:4px 11px; border-radius:999px; margin-bottom:16px; }
@@ -70,8 +70,17 @@
   #drop .sec-head h3{ font-family:var(--serif); font-size:14px; letter-spacing:.04em; font-weight:600; text-transform:uppercase; color:var(--color-text); }
   #drop .sec-head .rule{ flex:1; height:1px; background:var(--color-border); }
   #drop .sec-head .count{ font-size:12px; color:var(--color-text-faint); font-weight:700; }
-  #drop .story{ display:grid; grid-template-columns:40px 1fr; gap:18px; padding:24px 0; border-bottom:1px solid var(--color-border); }
-  #drop .story .num{ font-family:var(--serif); font-size:28px; font-weight:600; color:var(--color-text-faint); line-height:1; }
+  /* text-led, photo alongside, alternating sides down the page */
+  #drop .story{ display:grid; grid-template-columns:1fr 330px; gap:32px; padding:30px 0; border-top:1px solid var(--color-border); align-items:start; }
+  #drop .story:first-of-type{ border-top:none; }
+  #drop .story.flip{ grid-template-columns:330px 1fr; }
+  #drop .story.flip .story-photo{ order:-1; }
+  #drop .story.nophoto{ grid-template-columns:1fr; }
+  @media(max-width:780px){
+    #drop .story, #drop .story.flip{ grid-template-columns:1fr; gap:16px; }
+    #drop .story .story-photo, #drop .story.flip .story-photo{ order:-1; }
+  }
+  #drop .story .num{ font-family:var(--serif); font-size:22px; font-weight:600; color:var(--color-text-faint); line-height:1; margin-bottom:10px; }
   #drop .story h4{ font-family:var(--serif); font-size:23px; font-weight:600; line-height:1.15; margin:8px 0 8px; letter-spacing:-.01em; }
   #drop .story .bodycopy{ color:var(--color-text-muted); font-size:15.5px; line-height:1.6; }
   #drop .story .bodycopy p{ margin:0 0 10px; }
@@ -195,24 +204,64 @@
   #drop .climb .cdelta::before{ content:'▲ '; font-size:11px; }
   #drop .climb .crank{ font-size:10px; color:var(--color-text-faint); font-weight:700; margin-top:3px; white-space:nowrap; }
 
-  /* ── photos (all optional — absent photos render nothing) ── */
+  /* ── photos (all optional — absent photos render nothing) ──
+     Every <img> takes object-position from its focal point so the crop keeps
+     faces in frame across the several aspect ratios used below. */
   #drop figure{ margin:0; }
-  #drop figcaption{ font-size:12px; color:var(--color-text-faint); padding:8px 2px 0; display:flex; gap:10px; line-height:1.4; }
-  #drop figcaption .credit{ margin-left:auto; font-style:italic; white-space:nowrap; }
-  /* cover / hero */
-  #drop .dp-hero{ margin:0 0 8px; }
-  #drop .dp-hero img{ width:100%; height:auto; max-height:460px; object-fit:cover; display:block; border-radius:var(--radius-md); border:1px solid var(--color-border); }
-  /* storyline thumbnail */
-  #drop .story .story-photo{ margin:2px 0 12px; }
-  #drop .story .story-photo img{ width:100%; height:auto; max-height:320px; object-fit:cover; display:block; border-radius:var(--radius-sm); border:1px solid var(--color-border); }
-  /* Week in Pictures */
-  #drop .gallery-sec{ margin:44px 0 0; }
-  #drop .gallery{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:16px; }
-  @media(max-width:680px){ #drop .gallery{ grid-template-columns:repeat(2,1fr); } }
-  #drop .gallery .gimg{ padding:0; border:1px solid var(--color-border); background:none; border-radius:var(--radius-sm); overflow:hidden; cursor:pointer; display:block; width:100%; }
+  #drop figcaption{ font-size:12.5px; color:var(--color-text-muted); padding:9px 2px 0; display:flex; gap:10px; line-height:1.5; }
+  #drop figcaption .credit{ margin-left:auto; font-style:italic; white-space:nowrap; color:var(--color-text-faint); }
+
+  /* hero — cover, else the first gallery photo */
+  #drop .dp-hero{ position:relative; margin:0 0 30px; border-radius:var(--radius-md); overflow:hidden; border:1px solid var(--color-border); }
+  #drop .dp-hero img{ width:100%; aspect-ratio:21/9; max-height:520px; object-fit:cover; display:block; }
+  #drop .dp-hero figcaption{ padding:9px 14px 12px; }
+  @media(max-width:680px){ #drop .dp-hero img{ aspect-ratio:4/3; } }
+
+  /* floated in-prose photos — body copy wraps alongside */
+  #drop .dp-float{ width:47%; float:right; margin:6px 0 20px 30px; }
+  #drop .dp-float.left{ float:left; margin:6px 30px 20px 0; }
+  #drop .dp-float .fr{ overflow:hidden; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-surface-2); aspect-ratio:4/5; }
+  #drop .dp-float.land .fr{ aspect-ratio:4/3; }
+  #drop .dp-float img{ width:100%; height:100%; object-fit:cover; display:block; }
+  @media(max-width:680px){
+    #drop .dp-float, #drop .dp-float.left{ width:100%; float:none; margin:24px 0; }
+    #drop .dp-float .fr{ aspect-ratio:4/3; }
+  }
+
+  /* storyline photo — sits alongside the copy, alternating sides */
+  #drop .story .story-photo .fr{ overflow:hidden; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-surface-2); aspect-ratio:4/3; }
+  #drop .story .story-photo img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  /* Week in Pictures — promoted to mid-article, mosaic */
+  #drop .gallery-sec{ margin:56px 0; padding:48px 0; border-top:1px solid var(--color-border); border-bottom:1px solid var(--color-border); background:linear-gradient(180deg,var(--color-lime-ghost),transparent 58%); }
+  #drop .gallery{ display:grid; grid-template-columns:repeat(4,1fr); grid-auto-rows:168px; gap:10px; margin-top:20px; }
+  #drop .gallery .cellwrap{ position:relative; }
+  #drop .gallery .cellwrap.a{ grid-column:span 2; grid-row:span 2; }
+  #drop .gallery .cellwrap.b{ grid-column:span 2; }
+  #drop .gallery .gimg{ padding:0; border:1px solid var(--color-border); background:none; border-radius:var(--radius-sm); overflow:hidden; cursor:zoom-in; display:block; width:100%; height:100%; }
   #drop .gallery .gimg:hover{ border-color:var(--color-lime); }
-  #drop .gallery img{ width:100%; aspect-ratio:4/3; object-fit:cover; display:block; }
-  #drop .gallery figcaption{ padding:6px 2px 0; }
+  #drop .gallery img{ width:100%; height:100%; object-fit:cover; display:block; }
+  @media(max-width:680px){
+    #drop .gallery{ grid-template-columns:repeat(2,1fr); grid-auto-rows:126px; }
+    #drop .gallery .cellwrap.a{ grid-column:span 2; grid-row:span 2; }
+    #drop .gallery .cellwrap.b{ grid-column:span 2; }
+  }
+
+  /* ── stat bands (the old rail, split into three moments) ── */
+  #drop .band{ margin:52px 0; padding:44px 0; border-top:1px solid var(--color-border); border-bottom:1px solid var(--color-border); }
+  #drop .band.potwband{ background:linear-gradient(180deg,rgba(240,192,64,.05),transparent 60%); }
+  #drop .band.climbband{ background:linear-gradient(180deg,var(--color-teal-dim),transparent 60%); }
+  #drop .band .sec-head{ margin:0 0 22px; }
+  #drop .bandgrid{ display:grid; grid-template-columns:1fr 300px; gap:16px; align-items:stretch; }
+  #drop .bandgrid.notow{ grid-template-columns:1fr; }
+  @media(max-width:980px){ #drop .bandgrid{ grid-template-columns:1fr; } }
+  #drop .band .card{ margin:0; }
+  #drop .band .potwcards{ grid-template-columns:1fr 1fr; gap:14px; }
+  @media(max-width:680px){ #drop .band .potwcards{ grid-template-columns:1fr; } }
+  /* two-up columns for the performer/climber tables inside a band */
+  #drop .band .dp-perfpanel.on{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  @media(max-width:680px){ #drop .band .dp-perfpanel.on{ grid-template-columns:1fr; } }
+  #drop .band .perftabs{ max-width:340px; }
   /* lightbox */
   #dp-lightbox{ position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.92); display:none; align-items:center; justify-content:center; padding:24px; }
   #dp-lightbox.on{ display:flex; }
@@ -364,77 +413,159 @@
         + '</div></div>';
     }
 
-    function performerHtml(perf){
+    // ── The performers rail, split into three full-width bands so each gets its
+    //    own moment in the article instead of being stacked in a 312px column.
+    //    Nothing is dropped: POTW + Team of the Week, Top Performers (DSR/Diff/
+    //    Pts), and Top Movers all still render — Movers is simply promoted out
+    //    of the tab strip into its own band.
+    function bandHead(title, sub){
+      return '<div class="sec-head"><h3>'+esc(title)+'</h3><span class="rule"></span>'
+        + (sub?'<span class="count">'+esc(sub)+'</span>':'')+'</div>';
+    }
+
+    // Band 1 — Players of the Week + Team of the Week, straight after the lead.
+    function potwBandHtml(perf){
       if(!perf) return '';
-      var html = '';
-      // K'CHN Players of the Week — home-style cards
       var pm = perf.potw && perf.potw.men, pf = perf.potw && perf.potw.women;
+      var t  = perf.teamOfWeek;
+      if(!pm && !pf && !(t && t.name)) return '';
+      var cards = '';
       if(pm || pf){
-        html += '<div class="card"><div class="cardhd"><h5><span class="kchnlbl">K\'CHN</span>Players of the Week</h5></div><div class="potwcards">';
-        if(pm) html += pcard(pm,'m','Male · POTW');
-        if(pf) html += pcard(pf,'f','Female · POTW');
-        html += '</div></div>';
+        cards += '<div class="card"><div class="cardhd"><h5><span class="kchnlbl">K\'CHN</span>Players of the Week</h5></div><div class="potwcards">';
+        if(pm) cards += pcard(pm,'m','Male · POTW');
+        if(pf) cards += pcard(pf,'f','Female · POTW');
+        cards += '</div></div>';
       }
-      // Team of the Week
-      var t = perf.teamOfWeek;
+      var tow = '';
       if(t && t.name){
-        html += '<div class="card"><div class="cardhd"><h5>Team of the Week</h5></div><div class="totw">'
+        tow = '<div class="card"><div class="cardhd"><h5>Team of the Week</h5></div><div class="totw">'
           + '<div class="crest">'+(t.emoji?esc(t.emoji):esc(initials(t.name)))+'</div>'
           + '<div><div class="nm">'+entTeam(t.name)+'</div>'
           + (t.record?'<div class="rec2">'+esc(t.record)+'</div>':'')
           + (t.note?'<div class="note">'+esc(t.note)+'</div>':'')
           + '</div></div></div>';
       }
-      // Top Performers — tabbed: DSR / Best Diff / Most Pts, top 6 M & F
-      var tp = perf.topPerformers;
-      if(tp && (tp.men || tp.women)){
-        html += '<div class="card"><div class="cardhd"><h5>Top Performers</h5><a class="cardmore" href="/leaderboard.html">Leaderboard →</a></div>'
-          + '<div class="dp-perf">'
-          + '<div class="perftabs"><button class="on" data-k="dsr">DSR</button><button data-k="diff">Diff</button><button data-k="pts">Pts</button><button data-k="moving">Movers</button></div>'
-          + perfPanel(tp,'dsr',true) + perfPanel(tp,'diff',false) + perfPanel(tp,'pts',false) + movingPanel(false)
-          + '</div></div>';
-      }
-      html += '<a class="minilink" href="/standings.html">View full standings →</a>';
-      return html;
+      return '<section class="band potwband"><div class="wrap">'
+        + bandHead('Players of the Week','This week\'s Chefs')
+        + '<div class="bandgrid'+(tow?'':' notow')+'">'
+        + '<div>'+cards+'</div>' + (tow?'<div>'+tow+'</div>':'')
+        + '</div></div></section>';
+    }
+
+    // Band 2 — Top Performers, tabbed DSR / Diff / Pts.
+    function topPerfBandHtml(perf){
+      var tp = perf && perf.topPerformers;
+      if(!tp || (!tp.men && !tp.women)) return '';
+      return '<section class="band"><div class="wrap">'
+        + bandHead('Top Performers','Top 6 by category')
+        + '<div class="card"><div class="cardhd"><h5>This week</h5><a class="cardmore" href="/leaderboard.html">Leaderboard →</a></div>'
+        + '<div class="dp-perf">'
+        + '<div class="perftabs"><button class="on" data-k="dsr">DSR</button><button data-k="diff">Diff</button><button data-k="pts">Pts</button></div>'
+        + perfPanel(tp,'dsr',true) + perfPanel(tp,'diff',false) + perfPanel(tp,'pts',false)
+        + '</div></div></div></section>';
+    }
+
+    // Band 3 — Top Movers, promoted out of the tab strip. Computed live from the
+    // players aggregate, exactly as before.
+    function climbersBandHtml(){
+      var cl = computeClimbers();
+      if(!cl.length) return '';
+      return '<section class="band climbband"><div class="wrap">'
+        + bandHead('Top Climbers','Biggest moves on the board')
+        + '<div class="card"><div class="dp-perf">' + movingPanel(true) + '</div></div>'
+        + '<a class="minilink" style="margin-top:16px;" href="/standings.html">View full standings →</a>'
+        + '</div></section>';
     }
 
     // ── Photos (all optional; a missing photo renders nothing) ──
     function dpImg(id){ return '/.netlify/functions/drop-photo-serve?id='+encodeURIComponent(id); }
+    // Focal point → object-position. Defaults to dead centre when unset, which is
+    // exactly how every pre-existing photo behaved, so nothing shifts on old weeks.
+    function focalStyle(im){
+      var f = im && im.focal;
+      var x = (f && isFinite(f.x)) ? f.x : 50, y = (f && isFinite(f.y)) ? f.y : 50;
+      return ' style="object-position:'+x+'% '+y+'%"';
+    }
     function figcap(im){
       if(!im || (!im.caption && !im.credit)) return '';
       return '<figcaption>'+(im.caption?'<span>'+esc(im.caption)+'</span>':'<span></span>')
         + (im.credit?'<span class="credit">'+esc(im.credit)+'</span>':'')+'</figcaption>';
     }
-    function heroHtml(cover){
-      if(!cover || !cover.id) return '';
-      return '<div class="dp-hero"><figure><img src="'+dpImg(cover.id)+'" alt="'+esc(cover.caption||'')+'" loading="eager">'
-        + figcap(cover) + '</figure></div>';
+    // Hero: the cover when set, otherwise the first gallery photo, so the article
+    // never opens on a wall of text.
+    function heroPhoto(drop){
+      if(drop.cover && drop.cover.id) return drop.cover;
+      var g = drop.gallery || [];
+      return (g.length && g[0] && g[0].id) ? g[0] : null;
     }
+    function heroHtml(im){
+      if(!im || !im.id) return '';
+      return '<figure class="dp-hero"><img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="eager"'+focalStyle(im)+'>'
+        + figcap(im) + '</figure>';
+    }
+    // Split rendered lead HTML into top-level blocks so figures can be dropped
+    // between paragraphs rather than bolted above or below the whole story.
+    function splitBlocks(html){
+      var s = String(html||''), out = [], re = /[\s\S]*?<\/(?:p|blockquote|h3|h4|ul|ol)>/g, m, last = 0;
+      while((m = re.exec(s))){ out.push(m[0]); last = re.lastIndex; }
+      var tail = s.slice(last); if(tail.trim()) out.push(tail);
+      return out.length ? out : [s];
+    }
+    function floatFig(im, side, land){
+      if(!im || !im.id) return '';
+      return '<figure class="dp-float'+(side==='left'?' left':'')+(land?' land':'')+'">'
+        + '<div class="fr"><img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="lazy"'+focalStyle(im)+'></div>'
+        + figcap(im) + '</figure>';
+    }
+    // Weave up to two gallery photos into the lead copy, alternating sides.
+    // `skip` is how many gallery photos the hero already consumed.
+    function leadWithPhotos(html, gallery, skip){
+      var blocks = splitBlocks(html);
+      var pool = (gallery||[]).slice(skip).filter(function(im){ return im && im.id; });
+      if(!pool.length || blocks.length < 2) return html;
+      // After the 1st block, and after the 3rd if the story is long enough.
+      var slots = [{at:1, side:'right', land:false}];
+      if(blocks.length >= 5 && pool.length > 1) slots.push({at:4, side:'left', land:true});
+      var out = blocks.slice(), added = 0;
+      slots.forEach(function(sl, i){
+        if(!pool[i]) return;
+        out.splice(sl.at + added, 0, floatFig(pool[i], sl.side, sl.land));
+        added++;
+      });
+      return out.join('');
+    }
+    // Week in Pictures — mosaic, promoted to sit mid-article. The first tile runs
+    // 2×2 and the fourth spans two columns, giving the grid some rhythm.
     function galleryHtml(g){
-      g = g || [];
+      g = (g||[]).filter(function(im){ return im && im.id; });
       if(!g.length) return '';
-      return '<section class="gallery-sec"><div class="sec-head"><h3>Week in Pictures</h3><span class="rule"></span>'
+      return '<section class="gallery-sec"><div class="wrap">'
+        + '<div class="sec-head"><h3>Week in Pictures</h3><span class="rule"></span>'
         + '<span class="count">'+g.length+' photo'+(g.length>1?'s':'')+'</span></div><div class="gallery">'
-        + g.map(function(im){
-            return '<figure><button type="button" class="gimg" data-full="'+dpImg(im.id)+'" data-cap="'+esc(im.caption||'')+'">'
-              + '<img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="lazy"></button>'
-              + (im.caption?'<figcaption>'+esc(im.caption)+'</figcaption>':'')+'</figure>';
+        + g.map(function(im,i){
+            var cls = (i===0?' a':(i===3?' b':''));
+            return '<div class="cellwrap'+cls+'"><button type="button" class="gimg" data-full="'+dpImg(im.id)+'" data-cap="'+esc(im.caption||'')+'">'
+              + '<img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="lazy"'+focalStyle(im)+'></button></div>';
           }).join('')
-        + '</div></section>';
+        + '</div></div></section>';
     }
 
+    // Text-led: copy first, photo alongside at a fixed column, alternating sides
+    // down the page. Photoless storylines simply run full width.
     function storyHtml(s, i){
       var chips = (s.chips||[]).map(function(c){ return '<span class="chip"><span>'+esc(c.label)+'</span>'+(c.value!=null&&c.value!==''?'<b>'+esc(c.value)+'</b>':'')+'</span>'; }).join('');
-      var photo = (s.image && s.image.id)
-        ? '<figure class="story-photo"><img src="'+dpImg(s.image.id)+'" alt="'+esc(s.image.caption||'')+'" loading="lazy">'+figcap(s.image)+'</figure>'
+      var hasPhoto = !!(s.image && s.image.id);
+      var photo = hasPhoto
+        ? '<figure class="story-photo"><div class="fr"><img src="'+dpImg(s.image.id)+'" alt="'+esc(s.image.caption||'')+'" loading="lazy"'+focalStyle(s.image)+'></div>'+figcap(s.image)+'</figure>'
         : '';
-      return '<article class="story"><div class="num">'+('0'+(i+2)).slice(-2)+'</div><div>'
+      var cls = 'story' + (hasPhoto ? (i%2 ? ' flip' : '') : ' nophoto');
+      return '<article class="'+cls+'"><div class="sbody">'
+        + '<div class="num">'+('0'+(i+2)).slice(-2)+'</div>'
         + (s.tag?'<span class="kicker '+storyTagClass(s.tagKind)+'">'+esc(s.tag)+'</span>':'')
         + (s.title?'<h4>'+L(s.title)+'</h4>':'')
-        + photo
         + '<div class="bodycopy">'+Lhtml(s.html)+'</div>'
         + (chips?'<div class="chips">'+chips+'</div>':'')
-        + '</div></article>';
+        + '</div>' + photo + '</article>';
     }
 
     // Lightbox for gallery photos (delegated so it survives root re-renders).
@@ -452,12 +583,19 @@
 
     function render(drop){
       var root = document.getElementById('dp-root');
+
+      // Hero comes from the cover, or falls back to the first gallery photo; the
+      // lead then weaves in the next photos so copy and pictures interleave.
+      var hero = heroPhoto(drop);
+      var usedFromGallery = (drop.cover && drop.cover.id) ? 0 : (hero ? 1 : 0);
+      var leadBody = leadWithPhotos(Lhtml(drop.leadHtml), drop.gallery, usedFromGallery);
+
       var lead = '<article class="lead">'
         + '<span class="kicker">The Lead</span>'
         + '<h2>'+L(drop.title)+'</h2>'
         + (drop.dek?'<p class="dek">'+L(drop.dek)+'</p>':'')
         + '<div class="byline"><div class="badge">D</div><div>'+esc(drop.byline||'By The Society Desk')+' · Dink Society editorial</div></div>'
-        + '<div class="bodycopy">'+Lhtml(drop.leadHtml)+'</div></article>';
+        + '<div class="bodycopy">'+leadBody+'</div></article>';
 
       var rest = (drop.storylines||[]).slice(0);
       var stories = '';
@@ -476,8 +614,6 @@
           + '</div>';
       }
 
-      var aside = '<aside><div class="rail">'+performerHtml(drop.performers)+'</div></aside>';
-
       var tease = '<div class="tease"><div class="eyebrow">Next Drop · Tuesday</div><h3>The week after never waits</h3>'
         + '<p>New results, new storylines. We\'ll have the word the morning after game night.</p>'
         + '<a class="cta" href="/">Back to Weekly Recap</a></div>';
@@ -487,7 +623,19 @@
         + '<div class="meta"><span>'+esc(drop.kicker||('Week '+drop.week))+'</span><span class="dot">·</span>'
         + '<span>'+esc(dateStr(drop.publishedAt))+'</span><span class="dot">·</span><span>'+esc((drop.readMins||4)+' min read')+'</span></div></header>';
 
-      root.innerHTML = head + '<div class="wrap">'+heroHtml(drop.cover)+'<div class="layout"><main>'+lead+league+stories+galleryHtml(drop.gallery)+'</main>'+aside+'</div>'+tease+'</div>';
+      // Order: hero → lead (photos woven in) → Players of the Week → Week in
+      // Pictures → Around the League → Top Performers → storylines → Climbers.
+      root.innerHTML = head
+        + '<div class="wrap">' + heroHtml(hero) + '</div>'
+        + '<div class="layout"><div class="wrap"><div class="col">' + lead + '</div></div></div>'
+        + potwBandHtml(drop.performers)
+        + galleryHtml(drop.gallery)
+        + '<div class="wrap"><div class="col">' + league + '</div></div>'
+        + topPerfBandHtml(drop.performers)
+        + '<div class="wrap"><div class="col">' + stories + '</div></div>'
+        + climbersBandHtml()
+        + '<div class="wrap"><div class="col">' + tease + '</div></div>';
+
       document.title = 'The Drop · '+(drop.kicker||('Week '+drop.week))+' — The Dink Society';
       if(window.DSEntity && IDX) window.DSEntity.mount(root, IDX);
     }
