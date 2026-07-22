@@ -70,6 +70,13 @@ export default async (req) => {
     type: ['mixed', 'mens', 'womens'].includes(b.type) ? b.type : (existing?.type || 'mixed'),
     fcfsWindowHours: Number.isFinite(+b.fcfsWindowHours) ? +b.fcfsWindowHours : (existing?.fcfsWindowHours ?? 24),
     organizers: Array.isArray(b.organizers) ? b.organizers.filter(Boolean) : (existing?.organizers || []),
+    // Ladder ownership (organizer portal). Admin-created ladders have no owner
+    // (null); editing an organizer's ladder here preserves their ownership.
+    ownerEmail: existing?.ownerEmail || null,
+    // Running-leaderboard inclusion. Admin ladders default 'included' (unchanged
+    // behavior); organizer ladders arrive 'pending' and are preserved on edit
+    // unless the admin explicitly passes a new value.
+    leaderboard: ['included', 'pending', 'excluded'].includes(b.leaderboard) ? b.leaderboard : (existing?.leaderboard || 'included'),
     status: b.status || existing?.status || 'open',
     createdAt: existing?.createdAt || new Date().toISOString(),
     createdBy: existing?.createdBy || v.payload?.email || null,

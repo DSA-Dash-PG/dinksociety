@@ -98,11 +98,19 @@ export default async (req) => {
   }
 
   // ── season-wide ──
-  // Drop plays whose event has been deleted — otherwise a removed ladder's scored
-  // night lingers as a nameless "Ladder" in winners and still counts in standings.
-  const existingIds = new Set((await listEvents().catch(() => [])).map(e => e.id));
+  // Only ladders that count toward the running leaderboard. Two exclusions:
+  //   1. Deleted events — a removed ladder's scored night would otherwise linger
+  //      as a nameless "Ladder" in winners and still count in standings.
+  //   2. Held-out ladders — an organizer-run ladder whose `leaderboard` field is
+  //      'pending' (awaiting the admin's approval) or 'excluded' (admin declined)
+  //      stays on its own board but is kept OUT of the aggregate. A missing field
+  //      counts as 'included', so every pre-existing/admin ladder is unaffected.
+  const allEvents = await listEvents().catch(() => []);
+  const eligibleIds = new Set(
+    allEvents.filter(e => e.leaderboard !== 'pending' && e.leaderboard !== 'excluded').map(e => e.id)
+  );
   const plays = applyDirectory(applyMerges(await listPlay(), await getMergeMap()), await getDirectory())
-    .filter(p => existingIds.has(p.eventId));
+    .filter(p => eligibleIds.has(p.eventId));
   const sessions = plays.map(toSession);
   const players = playersFromPlay(plays);
   const { rows, stats: allStats, dr: allDr, bonus: allBonus, mvp: allMvp } = buildRows(sessions, players);
