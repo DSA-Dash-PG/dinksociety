@@ -761,6 +761,11 @@
     </div>
     <div id="login-step2" class="hidden">
       <div class="login__sent"><b>✉️ Check your inbox.</b><br>A one-tap sign-in link is on the way. It expires in 15 minutes.</div>
+      <div style="margin-top:18px;text-align:left">
+        <p class="login__p" style="margin:0 0 10px">Opened us as an app from your home screen? The email link opens your browser, not the app — enter the 6-digit code from that email here instead:</p>
+        <input class="login__in" id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code">
+        <button class="login__btn" id="login-code-btn" style="margin-top:10px">Sign in with code</button>
+      </div>
       <p class="login__note" style="margin-top:14px">Nothing after a minute or two? If you're new to Dink Society, <a href="#" id="show-register-2" style="color:var(--color-lime)">create a ladder account</a> instead — sign-in links only go to emails we already know.</p>
     </div>
     <p class="login__note" id="login-foot">New here? Use “Create a ladder account” above. On a league team but no link arrives? Ask your captain to add your email to the roster.</p>
@@ -1542,9 +1547,11 @@
   }
 
   // ---- login submit ----
+  let lastLoginEmail = '';
   $('login-btn').addEventListener('click', async () => {
     const email = $('login-email').value.trim();
     if (!email) return;
+    lastLoginEmail = email;
     const btn = $('login-btn'); btn.disabled = true; btn.textContent = 'Sending…';
     try {
       await fetch(API + '/player-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
@@ -1556,6 +1563,27 @@
     }
   });
   $('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+
+  // ---- sign in with the emailed code (for home-screen PWA users) ----
+  const codeBtn = $('login-code-btn');
+  if (codeBtn) codeBtn.addEventListener('click', async () => {
+    const code = ($('login-code').value || '').trim();
+    const email = lastLoginEmail || $('login-email').value.trim();
+    const err = $('login-err');
+    if (!/^\d{6}$/.test(code)) { err.textContent = 'Enter the 6-digit code from your email.'; err.classList.remove('hidden'); return; }
+    codeBtn.disabled = true; codeBtn.textContent = 'Signing in…';
+    try {
+      const res = await fetch(API + '/player-verify-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ email, code }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || 'That code is invalid or expired.');
+      location.href = '/me.html';
+    } catch (e) {
+      codeBtn.disabled = false; codeBtn.textContent = 'Sign in with code';
+      err.textContent = e.message; err.classList.remove('hidden');
+    }
+  });
+  const codeInput = $('login-code');
+  if (codeInput) codeInput.addEventListener('keydown', e => { if (e.key === 'Enter') $('login-code-btn').click(); });
 
   // ---- register (ladder-only / no team) ----
   (function setupRegister() {
@@ -1578,6 +1606,7 @@
     if (regBtn) regBtn.addEventListener('click', async () => {
       const name = $('reg-name').value.trim();
       const email = $('reg-email').value.trim();
+      lastLoginEmail = email;
       if (!name || !email) { $('login-err').textContent = 'Name and email are required.'; $('login-err').classList.remove('hidden'); return; }
       regBtn.disabled = true; regBtn.textContent = 'Creating…';
       try {

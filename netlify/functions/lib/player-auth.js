@@ -49,12 +49,57 @@ export async function deletePlayerSession(sessionId) {
 // ===== Magic-link tokens =====
 export async function createPlayerToken({ email, playerId, teamId }) {
   const token = randomId(24);
-  await getStore('player-tokens').setJSON(`token/${token}.json`, {
-    token, email: email.toLowerCase(), playerId, teamId,
+  const code = genLoginCode();
+  const normEmail = (email || '').toLowerCase();
+  const expiresAt = new Date(Date.now() + TOKEN_MINUTES * 60 * 1000).toISOString();
+  const store = getStore('player-tokens');
+  await store.setJSON(`token/${token}.json`, {
+    token, email: normEmail, playerId, teamId, code,
     createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + TOKEN_MINUTES * 60 * 1000).toISOString(),
+    expiresAt,
   });
-  return token;
+  // Reverse index: a typed 6-digit code resolves back to this token. A magic
+  // link opens the system browser, not an installed PWA (separate cookie jar),
+  // so home-screen app users sign in by typing the code inside the app instead.
+  await store.setJSON(codeIndexKey(normEmail, code), { token, expiresAt });
+  return { token, code };
+}
+
+// 6-digit numeric login code (zero-padded), paired with the requesting email.
+function genLoginCode() {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+  return String(n).padStart(6, '0');
+}
+
+// Non-reversible per-email key so the emailed code never appears in a blob key.
+function emailHash(normEmail) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < normEmail.length; i++) { h ^= normEmail.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+  return h.toString(16).padStart(8, '0');
+}
+function codeIndexKey(normEmail, code) {
+  return `code/${emailHash(normEmail)}-${code}.json`;
+}
+
+// Verify an emailed 6-digit code for a given email. Returns the same shape as
+// consumePlayerToken ({ email, playerId, teamId }) or null. Single-use: the
+// underlying token is consumed, so the code and the magic link die together.
+export async function verifyPlayerCode(rawEmail, rawCode) {
+  const normEmail = (rawEmail || '').toString().trim().toLowerCase();
+  const code = (rawCode || '').toString().trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normEmail) || !/^\d{6}$/.test(code)) return null;
+  const store = getStore('player-tokens');
+  const idxKey = codeIndexKey(normEmail, code);
+  const idx = await store.get(idxKey, { type: 'json' }).catch(() => null);
+  if (!idx || !idx.token) return null;
+  if (idx.expiresAt && new Date(idx.expiresAt).getTime() < Date.now()) return null;
+  // Defense-in-depth vs. a code collision overwriting the index: confirm the
+  // token record still matches this email + code before consuming it.
+  const rec = await store.get(`token/${idx.token}.json`, { type: 'json' }).catch(() => null);
+  if (!rec || rec.email !== normEmail || rec.code !== code) return null;
+  const consumed = await consumePlayerToken(idx.token);
+  await store.delete(idxKey).catch(() => {});
+  return consumed;
 }
 export async function consumePlayerToken(token) {
   if (!token || !/^[a-f0-9]{48}$/.test(token)) return null;

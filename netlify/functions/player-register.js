@@ -52,14 +52,14 @@ export default async (req) => {
       found = { playerId: record.playerId, teamId: null, name: record.name };
     }
 
-    const token = await createPlayerToken({ email: normalized, playerId: found.playerId, teamId: found.teamId || null });
+    const { token, code } = await createPlayerToken({ email: normalized, playerId: found.playerId, teamId: found.teamId || null });
     const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
     const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}`;
 
     await sendEmail({
       to: normalized,
       subject: 'Your Dink Society sign-in link',
-      html: renderPlayerMagicLink(magicUrl, found.name || name),
+      html: renderPlayerMagicLink(magicUrl, found.name || name, code),
     });
 
     return json(GENERIC);

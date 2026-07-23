@@ -410,7 +410,7 @@ export function renderAvailabilityReminder({ playerName, teamName, teamEmoji, op
  * @param {string} playerName - The player's name
  * @returns {string} HTML email body
  */
-export function renderPlayerMagicLink(magicUrl, playerName) {
+export function renderPlayerMagicLink(magicUrl, playerName, code) {
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
       <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
@@ -422,6 +422,11 @@ export function renderPlayerMagicLink(magicUrl, playerName) {
       <a href="${magicUrl}" style="display: inline-block; padding: 14px 32px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
         Open my portal
       </a>
+      ${code ? `
+      <div style="margin-top: 28px; padding: 18px; border: 1px solid #2a2a2a; border-radius: 12px; background: #141414;">
+        <p style="font-size: 12px; color: #8a8a8a; margin: 0 0 10px; line-height: 1.5;">Saved the app to your home screen? The button opens your browser instead — open the Dink Society app and enter this code:</p>
+        <div style="font-size: 30px; font-weight: 800; letter-spacing: 0.3em; color: #b8ff2c; text-align: center; font-family: 'Courier New', monospace;">${code}</div>
+      </div>` : ''}
       <p style="font-size: 13px; color: #555; margin-top: 28px; line-height: 1.5;">
         This link expires in 15 minutes and can only be used once. If you didn't request it, you can safely ignore this email.
       </p>

@@ -38,14 +38,14 @@ export default async (req) => {
       return json(GENERIC);
     }
 
-    const token = await createPlayerToken({ email: normalized, playerId: found.playerId, teamId: found.teamId });
+    const { token, code } = await createPlayerToken({ email: normalized, playerId: found.playerId, teamId: found.teamId });
     const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
     const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}`;
 
     await sendEmail({
       to: normalized,
       subject: 'Your Dink Society sign-in link',
-      html: renderPlayerMagicLink(magicUrl, found.name),
+      html: renderPlayerMagicLink(magicUrl, found.name, code),
     });
 
     return json(GENERIC);
