@@ -13,6 +13,7 @@
 // cost is cheap (~60 blob reads). Keeps the logic simple and idempotent.
 
 import { getStore } from '@netlify/blobs';
+import { loadPhotoIndex, buildPhotoUrl } from './player-photos.js';
 import { circuitCode } from './circuit.js';
 import { normalizeScore } from './score-helpers.js';
 import { resolveBracketDisplay } from './bracket.js';
@@ -68,6 +69,11 @@ export async function rebuildStandings(circuit) {
     const t = await teamsStore.get(b.key, { type: 'json' });
     if (t) teamsById.set(t.id, t);
   }
+
+  // Authoritative avatar index: playerIds that actually have an approved photo
+  // binary. Used below to stamp photoUrl on every player so avatars render on
+  // every surface even when the per-roster `photo` stamp is missing.
+  const photoIndex = await loadPhotoIndex();
 
   // Initialize division buckets
   const divisionBuckets = {};
@@ -363,6 +369,17 @@ export async function rebuildStandings(circuit) {
     rankByField(Array.from(playerStats.values()).filter(p => normGender(p.gender) === gflag && p.dsrGenderQualified), 'dsrGender', 'dsrGenderRank');
   }
   rankByField(Array.from(playerStats.values()).filter(p => p.dsrMixedQualified), 'dsrMixed', 'dsrMixedRank');
+
+  // Stamp authoritative photo URLs from the binary index (overrides the
+  // stamp-derived value seeded in ensurePlayer). Only override when the index
+  // loaded — on a blob hiccup keep the stamp-based value rather than blanking.
+  if (photoIndex instanceof Map) {
+    for (const p of playerStats.values()) {
+      p.photoUrl = photoIndex.has(p.playerId)
+        ? buildPhotoUrl(p.playerId, photoIndex.get(p.playerId))
+        : null;
+    }
+  }
 
   // ── Weekly Player of the Week (gender-split, by that week's DSR) + rank movement ──
   const weeklyTopPerformers = buildWeeklyTopPerformers(weeklyPlayers, weekMeta);

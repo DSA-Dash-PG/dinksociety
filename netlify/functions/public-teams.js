@@ -10,6 +10,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { publicProfile } from './lib/profile.js';
+import { loadPhotoIndex, photoUrlFor } from './lib/player-photos.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
 
 export default async (req) => {
@@ -25,6 +26,8 @@ export default async (req) => {
     const store = getStore('teams');
     const { blobs } = await store.list();
     const teams = [];
+    // Authoritative avatar index (playerIds with an approved photo binary).
+    const photoIndex = await loadPhotoIndex();
 
     for (const blob of blobs) {
       const raw = await store.get(blob.key);
@@ -81,9 +84,7 @@ export default async (req) => {
               plays: prof.plays,
               city: prof.city,
               homeCourt: prof.homeCourt,
-              photoUrl: p.photo?.updatedAt
-                ? `/.netlify/functions/player-photo-serve?id=${encodeURIComponent(p.id)}&v=${encodeURIComponent(p.photo.updatedAt)}`
-                : null,
+              photoUrl: photoUrlFor(photoIndex, p.id, p.photo?.updatedAt),
             };
           }),
         });
