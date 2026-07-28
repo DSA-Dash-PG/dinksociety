@@ -2325,7 +2325,19 @@
       '</div>' +
       '<div class="arow">' +
         '<div class="af"><label>Max roster size</label><input type="number" id="se-max-roster" min="2" max="20" value="' + h(s.maxRosterSize != null ? s.maxRosterSize : 10) + '"></div>' +
-        '<div class="af"></div>' +
+        '<div class="af"><label>Hero tagline (landing page)</label><input type="text" id="se-tagline" value="' + h(s.tagline || '') + '" placeholder="e.g. The rematch is on." autocomplete="off"></div>' +
+      '</div>' +
+      '<div class="arow">' +
+        '<div class="af" style="flex:1 1 100%;"><label>Hero image (landing page)</label>' +
+          (s.image ? '<div style="margin-bottom:8px;"><img src="' + h(s.image) + '" alt="" style="max-height:90px;border-radius:8px;border:1px solid var(--color-border);"></div>' : '') +
+          '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+            '<input type="file" id="se-image-file" accept="image/jpeg,image/png,image/webp" style="flex:1;min-width:180px;font-size:11px;padding:7px;background:var(--color-surface-2);border-radius:8px;cursor:pointer;">' +
+            '<button class="ab ab--teal ab--sm" type="button" data-act="season-image-upload" data-season="' + h(s.id) + '">Upload image</button>' +
+          '</div>' +
+          '<div id="se-image-status" style="font-size:10px;color:var(--color-text-faint);margin-top:5px;min-height:12px;"></div>' +
+          '<input type="text" id="se-image" value="' + h(s.image || '') + '" placeholder="…or paste an image URL" autocomplete="off" style="margin-top:4px;">' +
+          '<div style="font-size:10px;color:var(--color-text-faint);margin-top:4px;">Upload a file or paste a URL, then click <b>Save details</b>. Leave blank to use the Site Images “Register” hero.</div>' +
+        '</div>' +
       '</div>' +
       '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
         '<button class="ab ab--outline ab--sm" data-act="season-edit-cancel">Cancel</button>' +
@@ -2416,6 +2428,28 @@
     try {
       if (act === 'season-edit') { seasonReset(); seasonUI.editSeasonId = seasonId; renderSeasons(); return; }
       if (act === 'season-edit-cancel') { seasonReset(); renderSeasons(); return; }
+      if (act === 'season-image-upload') {
+        const fileEl = $id('se-image-file'), statusEl = $id('se-image-status');
+        const file = fileEl && fileEl.files && fileEl.files[0];
+        const setSt = (t) => { if (statusEl) statusEl.textContent = t; };
+        if (!file) { setSt('Pick an image file first.'); return; }
+        setSt('Compressing…');
+        try {
+          let up = file;
+          try { if (window.compressImage) up = await window.compressImage(file); } catch (e) { up = file; }
+          if (up.size > 10 * 1024 * 1024) { setSt('Still over 10MB after compressing — pick a smaller image.'); return; }
+          setSt('Uploading… (' + (up.size / 1024 / 1024).toFixed(1) + 'MB)');
+          const fd = new FormData();
+          fd.append('file', up); fd.append('slot', 'register'); fd.append('label', 'Season hero · ' + seasonId);
+          const r = await fetch('/.netlify/functions/site-images-upload', { method: 'POST', body: fd, credentials: 'include' });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok) throw new Error(data.error || 'Upload failed');
+          const url = '/.netlify/functions/site-images-serve?id=' + data.id;
+          const urlEl = $id('se-image'); if (urlEl) urlEl.value = url;
+          setSt('Uploaded ✓ — click “Save details” to apply it to this season.');
+        } catch (e) { setSt(e.message || 'Upload failed'); }
+        return;
+      }
       if (act === 'season-edit-save') {
         const name = $id('se-name').value.trim();
         if (!name) { seasonsMsg('Season name cannot be empty', 'err'); return; }
@@ -2432,6 +2466,8 @@
           roundsPerMatch: parseInt($id('se-rounds').value) || 2,
           gamesPerRound: parseInt($id('se-games').value) || 6,
           maxRosterSize: parseInt($id('se-max-roster').value) || 10,
+          image: $id('se-image') ? ($id('se-image').value.trim() || null) : undefined,
+          tagline: $id('se-tagline') ? ($id('se-tagline').value.trim() || null) : undefined,
         });
         await afterSeasonChange('Season details saved ✓');
         return;
@@ -6480,6 +6516,8 @@
     while (blob.size > COMPRESS_TARGET && q > 0.6) { q -= 0.05; blob = await new Promise(function(r) { c.toBlob(r, 'image/jpeg', q); }); }
     return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
   }
+  // Expose so other admin modules (e.g. the Seasons hero uploader) can reuse it.
+  window.compressImage = compressImage;
 
   (function() {
     var btn = $id('up-btn');
