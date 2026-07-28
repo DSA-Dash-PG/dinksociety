@@ -1,12 +1,13 @@
 // =============================================================
 // GET /api/public-seasons
 //
-// Returns seasons with open registration for the public
-// registration page. No auth required.
+// Returns seasons for the public registration / league landing page. No auth.
 //
-// Response: { seasons: [{ id, name, label, divisions, registration }] }
-// Only returns seasons where registration !== 'closed'.
-// Strips Stripe IDs and internal fields.
+// Response: { seasons: [{ id, name, label, status, registration, image, ... }] }
+// Returns every non-archived, non-test season (so the landing page can still
+// show a featured/upcoming season while its registration is closed — the page
+// decides open-vs-closed from each season's `registration` flag). Strips Stripe
+// IDs and internal fields.
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
@@ -26,10 +27,9 @@ export default async (req) => {
       if (!raw) continue;
       try {
         const season = JSON.parse(raw);
-        // Never surface test/demo seasons on the public registration page.
+        // Never surface test/demo or archived seasons publicly.
         if (season.isTest === true) continue;
-        // Only return seasons with open or paused registration
-        if (season.registration === 'closed' || season.status === 'archived') continue;
+        if (season.status === 'archived') continue;
 
         seasons.push({
           id: season.id,
@@ -37,6 +37,8 @@ export default async (req) => {
           label: season.label,
           status: season.status,
           registration: season.registration,
+          image: season.image || null,
+          tagline: season.tagline || null,
           startDate: season.startDate,
           weeks: season.weeks || 8,
           matchTime: season.matchTime || '7:00–9:00 PM',
