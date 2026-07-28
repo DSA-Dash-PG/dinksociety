@@ -90,7 +90,10 @@ export default async (req) => {
       `Max-Age=${24 * 60 * 60}`, 'SameSite=Lax', ...(isLocal ? [] : ['Secure']),
     ].join('; ');
 
-    return new Response(null, { status: 302, headers: { Location: redirectBase, 'Set-Cookie': cookie } });
+    // Land on the unified admin console (league + ladders in one shell). The
+    // standalone /admin.html still works if visited directly. Error paths above
+    // stay on /admin.html so the login form can surface the message.
+    return new Response(null, { status: 302, headers: { Location: '/console.html', 'Set-Cookie': cookie } });
   } catch (err) {
     console.error('admin-link error:', err);
     return redirect(`${redirectBase}?error=server`);
