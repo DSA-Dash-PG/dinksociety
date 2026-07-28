@@ -517,12 +517,27 @@
       return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
+    function setHero(el, url) {
+      if (!el || !url) return;
+      el.classList.remove('ln-ph');
+      el.style.backgroundImage = 'url("' + String(url).replace(/"/g, '%22') + '")';
+    }
+
     // ── Hero image, tagline, fact chips, and division preview cards ──
     function renderLanding(s) {
       const hero = document.getElementById('ln-hero-img');
-      if (hero && s.image) {
-        hero.classList.remove('ln-ph');
-        hero.style.backgroundImage = 'url("' + String(s.image).replace(/"/g, '%22') + '")';
+      if (s.image) {
+        // Per-season override set in the admin Seasons editor.
+        setHero(hero, s.image);
+      } else if (hero) {
+        // Fall back to the site-wide "Register" hero slot (admin → Site Images).
+        fetch('/.netlify/functions/site-images-list')
+          .then(r => r.json())
+          .then(slots => {
+            const imgs = slots && slots.register;
+            if (Array.isArray(imgs) && imgs.length && imgs[0].url) setHero(hero, imgs[0].url);
+          })
+          .catch(() => {});
       }
       if (s.tagline) {
         const sub = document.getElementById('ln-hero-sub');

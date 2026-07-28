@@ -138,6 +138,13 @@ export default async (req) => {
         if (payload.roundsPerMatch !== undefined) season.roundsPerMatch = payload.roundsPerMatch;
         if (payload.gamesPerRound !== undefined) season.gamesPerRound = payload.gamesPerRound;
         if (payload.maxRosterSize !== undefined) season.maxRosterSize = payload.maxRosterSize;
+        // Landing-page hero image (URL) + tagline. Empty string clears the field.
+        if (payload.image !== undefined) {
+          season.image = typeof payload.image === 'string' && payload.image.trim() ? payload.image.trim() : null;
+        }
+        if (payload.tagline !== undefined) {
+          season.tagline = typeof payload.tagline === 'string' && payload.tagline.trim() ? payload.tagline.trim() : null;
+        }
         break;
       }
 
