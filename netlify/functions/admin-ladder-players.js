@@ -17,7 +17,9 @@ function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, 
 export default async (req) => {
   const auth = await authScoreAccess(req, null); // event-agnostic read for roster search
   if (!auth.ok) return unauthResponse('Unauthorized');
-  if (auth.scorer && req.method !== 'GET') return unauthResponse('Scorer access is read-only here.');
+  // Scorers and organizers get READ access to the master roster (to add players
+  // without minting duplicates), but only admins may merge/rename globally.
+  if ((auth.scorer || auth.organizer) && req.method !== 'GET') return unauthResponse('Read-only access here.');
 
   if (req.method === 'GET') {
     const plays = await listPlay();                 // RAW — duplicates intact so they can be merged
