@@ -150,7 +150,7 @@ function renderHome(){
       <h1 style="font-size:1.5rem;text-transform:uppercase">My Ladders</h1>
       <button class="btn btn-lime" onclick="newLadder()">+ New ladder</button>
     </div>
-    <div class="note note-lime" style="margin-bottom:14px">${ic('trophy')}<div>You collect entry fees your own way — <b>Venmo or cash</b>. New ladders show as <b>Pending</b> until an admin approves them into the league-wide leaderboard; your ladder's own board is always live.</div></div>
+    <div class="note note-lime" style="margin-bottom:14px">${ic('trophy')}<div>You collect entry fees your own way — <b>Venmo or cash</b>. Your ladder's own board is always live; a <b>Pending</b> tag just means it isn't in the league-wide leaderboard yet (an admin includes it — your own ladders are added automatically).</div></div>
     ${LADDERS.length?cards:'<div class="card"><div class="empty">No ladders yet. Create your first one.</div></div>'}`;
 }
 
@@ -182,6 +182,7 @@ function editForm(l){
         <div class="field"><label>Fee per player ($)</label><input id="f-fee" type="number" min="0" step="0.01" value="${l&&l.feeCents!=null?(l.feeCents/100):9}"></div>
         <div class="field"><label>Your Venmo</label><input id="f-venmo" value="${esc(v('venmoHandle'))}" placeholder="@your-name"></div>
       </div>
+      <div class="field"><label>Court names (optional)</label><input id="f-courtnames" value="${esc((v('courtNames',[])||[]).join(', '))}" placeholder="Leave blank to number them 1–N (e.g. 3A, 3B, 3C)"></div>
       <div class="note note-info" style="margin:4px 0 12px">${ic('dollar')}<div>Payments are <b>Venmo / cash only</b> — no card processing. The app tracks who's paid; you collect and confirm.</div></div>
       <div style="display:flex;gap:8px;justify-content:flex-end">
         <button class="btn btn-ghost" onclick="renderHome()">Cancel</button>
@@ -197,6 +198,7 @@ async function saveLadder(id){
     startTime:$('f-time').value.trim(), type:$('f-type').value,
     courts:+$('f-courts').value||0, rounds:+$('f-rounds').value||0, capacity:+$('f-cap').value||0,
     fee:+$('f-fee').value||0, venmoHandle:$('f-venmo').value.trim(),
+    courtNames:($('f-courtnames').value||'').split(',').map(s=>s.trim()).filter(Boolean),
   };
   if(id) body.id=id;
   if(!body.name||!body.date){ m.style.color='var(--red)'; m.textContent='Name and date are required.'; return; }
@@ -206,12 +208,16 @@ async function saveLadder(id){
 }
 
 /* ── Manage: sign-ups & payments (uses admin-ladder-manage, unlocked for owners) ── */
+let MASTER=[], ROSTER_IDS=new Set();
 async function manage(id){
   const l=LADDERS.find(x=>x.id===id);
   $('app').innerHTML=`<div class="back" onclick="renderHome()">← My ladders</div><div class="empty">Loading roster…</div>`;
   let d; try{ d=await api('/admin-ladder-manage?event='+encodeURIComponent(id)); }
   catch(e){ $('app').innerHTML=`<div class="back" onclick="renderHome()">← My ladders</div><div class="card"><div class="empty">${esc(e.message)}</div></div>`; return; }
+  // Master roster for de-duped adds (best-effort; add-new still works if it fails).
+  try{ const mr=await api('/admin-ladder-players'); MASTER=(mr.players||[]).filter(p=>!p.mergedInto); }catch{ MASTER=[]; }
   const roster=d.roster||[], wait=d.waitlist||[];
+  ROSTER_IDS=new Set(roster.map(p=>p.playerId).filter(Boolean));
   const paid=roster.filter(p=>p.paymentStatus==='paid').length;
   const rows=roster.map(p=>{
     const isPaid=p.paymentStatus==='paid';
@@ -231,23 +237,47 @@ async function manage(id){
       ${l?`<span class="venmo">Venmo ${esc(l.venmoHandle||'@unset')}</span>`:''}
     </div>
     <div class="card">
+      <h2>Add players</h2>
+      <div class="sub" style="margin-bottom:8px">Search the Dink Society roster first so a returning player keeps their stats — don't create a duplicate.</div>
+      <input id="mr-q" placeholder="Search players…" autocomplete="off" oninput="mrSearch('${esc(id)}')">
+      <div id="mr-res" style="margin-top:6px"></div>
+      <div class="divider"></div>
+      <div class="sub" style="margin-bottom:6px">Or add someone brand new</div>
+      <div class="grid2"><input id="np-name" placeholder="Name"><select id="np-gender"><option value="">Gender —</option><option value="M">M</option><option value="F">F</option></select></div>
+      <div style="display:flex;gap:8px;margin-top:8px"><input id="np-email" placeholder="Email (optional)"><button class="btn btn-lime btn-sm" style="flex:0 0 auto" onclick="addNew('${esc(id)}')">Add</button></div>
+    </div>
+    <div class="card">
       <h2>Payments · ${paid}/${roster.length} paid</h2>
       <div class="note note-info" style="margin-bottom:12px">${ic('info')}<div>Money never flows through Dink Society — you collect via Venmo/cash and mark players paid here. Marking paid emails them a "you're in" confirmation.</div></div>
-      <div style="margin-bottom:12px"><button class="btn btn-out btn-sm" onclick="addP('${esc(id)}')">+ Add player</button></div>
       ${rows||'<div class="empty">No sign-ups yet.</div>'}
       ${wait.length?`<div class="divider"></div><div class="sub" style="margin-bottom:6px">Waitlist (${wait.length})</div>`+wait.map(w=>`<div class="rrow"><div style="flex:1">${esc(w.name)}</div><button class="btn btn-lime btn-sm" onclick="promote('${esc(id)}')">Promote next</button></div>`).join(''):''}
     </div>`;
 }
+function mrSearch(id){
+  const q=($('mr-q').value||'').trim().toLowerCase(), el=$('mr-res');
+  if(!q){ el.innerHTML=''; return; }
+  const hits=MASTER.filter(p=>!ROSTER_IDS.has(p.id) && String(p.name||'').toLowerCase().includes(q)).slice(0,8);
+  if(!hits.length){ el.innerHTML='<div class="faint" style="font-size:11px;padding:6px 2px">No roster match — add them as new below.</div>'; return; }
+  // playerId only in the onclick (names can contain apostrophes → would break inline JS).
+  el.innerHTML=hits.map(p=>`<div class="rrow" style="padding:7px 0">
+    <div style="flex:1"><span style="font-weight:600">${esc(p.name)}</span>${p.gender?` <span class="faint" style="font-size:10px">${esc(p.gender)}</span>`:''}${p.nights?` <span class="faint" style="font-size:10px">· ${p.nights} night${p.nights>1?'s':''}</span>`:''}</div>
+    <button class="btn btn-out btn-sm" onclick="addFromMaster('${esc(id)}','${esc(p.id)}')">Add</button>
+  </div>`).join('');
+}
+async function addFromMaster(id,pid){
+  const p=MASTER.find(x=>x.id===pid)||{};
+  try{ await api('/admin-ladder-manage?event='+encodeURIComponent(id),{method:'POST',body:JSON.stringify({action:'add',playerId:pid,name:p.name,gender:p.gender||undefined,force:true})}); manage(id); }
+  catch(e){ alert(e.message); }
+}
+async function addNew(id){
+  const name=($('np-name').value||'').trim(); if(!name){ alert('Enter a name.'); return; }
+  const gender=$('np-gender').value||undefined, email=($('np-email').value||'').trim()||undefined;
+  try{ await api('/admin-ladder-manage?event='+encodeURIComponent(id),{method:'POST',body:JSON.stringify({action:'add',name,gender,email,force:true})}); manage(id); }
+  catch(e){ alert(e.message); }
+}
 async function pay(id,pid,email,action){ try{ await api('/admin-ladder-manage?event='+encodeURIComponent(id),{method:'POST',body:JSON.stringify({action,playerId:pid||undefined,email:email||undefined})}); manage(id); }catch(e){ alert(e.message); } }
 async function removeP(id,pid,email){ if(!confirm('Remove this player?'))return; try{ await api('/admin-ladder-manage?event='+encodeURIComponent(id),{method:'POST',body:JSON.stringify({action:'remove',playerId:pid||undefined,email:email||undefined})}); manage(id); }catch(e){ alert(e.message); } }
 async function promote(id){ try{ await api('/admin-ladder-manage?event='+encodeURIComponent(id),{method:'POST',body:JSON.stringify({action:'promote'})}); manage(id); }catch(e){ alert(e.message); } }
-async function addP(id){
-  const name=prompt('Player name?'); if(!name)return;
-  const email=(prompt('Email (optional)')||'').trim();
-  const g=(prompt('Gender M/F (optional)')||'').toUpperCase().startsWith('F')?'F':(prompt?'M':'M');
-  const paid=confirm('Mark them paid now? (OK = paid, Cancel = unpaid)');
-  try{ await api('/admin-ladder-manage?event='+encodeURIComponent(id),{method:'POST',body:JSON.stringify({action:'add',name,email:email||undefined,gender:g,paid,force:true})}); manage(id); }catch(e){ alert(e.message); }
-}
 
 /* ── Recap (uses admin-ladder-recap, unlocked for owners) ── */
 async function manageRecap(id){

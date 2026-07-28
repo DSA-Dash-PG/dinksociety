@@ -9,7 +9,7 @@
 
 import crypto from 'crypto';
 import { verifyAdminSession } from './auth.js';
-import { isOrganizerOwner } from './organizer-auth.js';
+import { isOrganizerOwner, isActiveOrganizerReq } from './organizer-auth.js';
 
 function secret() {
   const env = (k) => (typeof Netlify !== 'undefined' && Netlify.env.get(k)) || process.env[k];
@@ -60,6 +60,10 @@ export async function authScoreAccess(req, eventId = null) {
   const v = await verifyAdminSession(req);
   if (v.valid) return { ok: true, admin: true };
   if (eventId && await isOrganizerOwner(req, eventId)) return { ok: true, organizer: true, eventId };
+  // Event-agnostic reads (eventId null) — e.g. the shared master roster used to add
+  // players without creating duplicates. Any ACTIVE organizer gets read access;
+  // endpoints treat this like a scorer (read-only), see admin-ladder-players.
+  if (!eventId && await isActiveOrganizerReq(req)) return { ok: true, organizer: true };
   const rec = readScorerToken(tokenFromReq(req));
   if (rec && (!eventId || rec.eventId === eventId)) return { ok: true, scorer: true, eventId: rec.eventId };
   return { ok: false };

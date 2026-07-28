@@ -82,6 +82,11 @@ export async function isOrganizerOwner(req, eventId) {
   return !!event && normalizeEmail(event.ownerEmail) === org.email;
 }
 
+/** True when the request carries an active-organizer session (any organizer). */
+export async function isActiveOrganizerReq(req) {
+  return (await requireOrganizer(req)).ok;
+}
+
 /** Standard error Response for a failed organizer/ownership check. */
 export function orgErr(res) {
   return new Response(JSON.stringify({ error: res.error || 'Unauthorized' }), {

@@ -13,6 +13,7 @@
 
 import crypto from 'crypto';
 import { requireOrganizer } from './lib/organizer-auth.js';
+import { isAdminEmail } from './lib/admin-auth.js';
 import { getEvent, setEvent, capacityFromCourts } from './lib/ladder.js';
 import { normalizeEmail } from './lib/identity.js';
 
@@ -42,9 +43,12 @@ export default async (req) => {
   const courts = Math.max(0, Math.floor(Number(b.courts) || 0));
   const feeCents = b.feeCents != null ? Math.round(Number(b.feeCents)) : Math.round((Number(b.fee) || 0) * 100);
   const capacity = b.capacity != null && +b.capacity > 0 ? Math.floor(+b.capacity) : capacityFromCourts(courts);
-  const courtNames = Array.isArray(b.courtNames)
+  let courtNames = Array.isArray(b.courtNames)
     ? b.courtNames.map(s => String(s).trim()).filter(Boolean).slice(0, 20)
     : (existing?.courtNames || []);
+  // Default court names to 1..N from the court count, so the public ladder card
+  // shows court chips (organizers usually don't name courts by hand).
+  if (!courtNames.length && courts > 0) courtNames = Array.from({ length: courts }, (_, i) => String(i + 1));
   const rounds = Number.isFinite(+b.rounds) && +b.rounds > 0 ? Math.min(20, Math.floor(+b.rounds)) : (existing?.rounds ?? 10);
   const roundMin = Number.isFinite(+b.roundMin) && +b.roundMin > 0 ? Math.min(60, Math.floor(+b.roundMin)) : (existing?.roundMin ?? 12);
   const scoreMode = ['points', 'winby2', 'to11', 'to15'].includes(b.scoreMode) ? b.scoreMode : (existing?.scoreMode || 'points');
@@ -78,8 +82,11 @@ export default async (req) => {
     // Venmo-claim confirmations and drop notices go to the organizer.
     organizers: [org.email],
     ownerEmail: org.email,
-    // Held out of the running leaderboard until an admin approves. Preserved on update.
-    leaderboard: existing?.leaderboard || 'pending',
+    // Leaderboard inclusion. A ladder created by an ADMIN (e.g. the league owner
+    // running their own night) is auto-approved — no self-approval dance. An
+    // outside organizer's ladder starts 'pending' until an admin approves it.
+    // Preserved on update.
+    leaderboard: existing?.leaderboard || (isAdminEmail(org.email) ? 'included' : 'pending'),
     status: b.status || existing?.status || 'open',
     createdAt: existing?.createdAt || new Date().toISOString(),
     createdBy: existing?.createdBy || org.email,
