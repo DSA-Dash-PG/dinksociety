@@ -9,6 +9,7 @@
 
 import crypto from 'crypto';
 import { verifyAdminSession } from './auth.js';
+import { isOrganizerOwner } from './organizer-auth.js';
 
 function secret() {
   const env = (k) => (typeof Netlify !== 'undefined' && Netlify.env.get(k)) || process.env[k];
@@ -49,11 +50,16 @@ function tokenFromReq(req) {
  * Authorize a scoring request. An admin session always wins. Otherwise a valid
  * scorer token grants access, scoped to its event: pass the request's eventId to
  * require a match, or null for event-agnostic reads (e.g. the master roster).
- * @returns {Promise<{ ok:boolean, admin?:boolean, scorer?:boolean, eventId?:string }>}
+ * An active ORGANIZER who owns `eventId` also passes — as { organizer:true }, NOT
+ * { scorer:true } — so endpoints that restrict the scorer role (e.g. admin-ladder-
+ * manage limits scorers to roster subs) give an organizer full control of their
+ * OWN ladder while still walling off everyone else's.
+ * @returns {Promise<{ ok:boolean, admin?:boolean, organizer?:boolean, scorer?:boolean, eventId?:string }>}
  */
 export async function authScoreAccess(req, eventId = null) {
   const v = await verifyAdminSession(req);
   if (v.valid) return { ok: true, admin: true };
+  if (eventId && await isOrganizerOwner(req, eventId)) return { ok: true, organizer: true, eventId };
   const rec = readScorerToken(tokenFromReq(req));
   if (rec && (!eventId || rec.eventId === eventId)) return { ok: true, scorer: true, eventId: rec.eventId };
   return { ok: false };

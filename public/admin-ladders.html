@@ -223,6 +223,19 @@
       </div>
     </section>
 
+    <section class="ssec" id="s-organizers">
+      <h1 style="margin:0 0 4px">Organizers</h1>
+      <div class="sec">Grant or deny people permission to run their own ladders</div>
+      <div class="card">
+        <div style="font-size:.82rem;color:#9aa094;line-height:1.55;margin-bottom:10px">An organizer runs their <b>own</b> Venmo/cash ladder nights and never sees the rest of the league. Denying access is instant — their next request is rejected. Role tags show when a host also plays or captains in the league.</div>
+        <div class="row2"><input class="i" id="org-name" placeholder="Name (e.g. Jordan Blake)"><input class="i" id="org-email" type="email" placeholder="jordan@email.com"></div>
+        <div style="margin-top:8px"><button class="btn btn-lime" onclick="inviteOrg()" style="max-width:150px">Send invite</button></div>
+        <div id="orgInviteMsg" style="margin-top:8px;font-size:.8rem"></div>
+      </div>
+      <div class="card" style="margin-top:12px" id="orgListCard"><div class="empty">Loading…</div></div>
+      <div class="card" style="margin-top:12px;display:none" id="orgPendingCard"></div>
+    </section>
+
     <section class="ssec" id="s-settings">
       <h1 style="margin:0 0 4px">Settings</h1>
       <div class="card"><div style="font-size:.84rem;color:#9aa094;line-height:1.6">Divisions (Mixed / Men's / Women's) are set per ladder when you create one, and a division only appears on the public leaderboard once it's been played. Default fee, Venmo handle, and organizer emails are also set per ladder.</div></div>
@@ -393,10 +406,75 @@ async function checkPayCfg(){
 }
 
 /* ---- admin shell: sidebar nav + mobile drawer ---- */
-const SECS=[['dash','Dashboard'],['ladders','Ladders'],['players','Players'],['scoring','Scoring'],['xp','XP & rewards'],['credits','Credits'],['import','Import'],['settings','Settings']];
+const SECS=[['dash','Dashboard'],['ladders','Ladders'],['players','Players'],['scoring','Scoring'],['xp','XP & rewards'],['credits','Credits'],['organizers','Organizers'],['import','Import'],['settings','Settings']];
 let CURSEC='dash';
 function renderNav(){ const n=document.getElementById('nav'); if(n) n.innerHTML=SECS.map(([k,l])=>`<div class="navi${k===CURSEC?' on':''}" onclick="showSec('${k}')">${l}</div>`).join(''); }
-function showSec(k){ CURSEC=k; document.querySelectorAll('.ssec').forEach(s=>s.classList.toggle('on',s.id==='s-'+k)); renderNav(); if(k==='dash') renderDash(); if(k==='ladders') ladSub('all'); closeDrawer(); window.scrollTo({top:0}); }
+function showSec(k){ CURSEC=k; document.querySelectorAll('.ssec').forEach(s=>s.classList.toggle('on',s.id==='s-'+k)); renderNav(); if(k==='dash') renderDash(); if(k==='ladders') ladSub('all'); if(k==='organizers') loadOrganizers(); closeDrawer(); window.scrollTo({top:0}); }
+
+// ── Organizers tab ──────────────────────────────────────────────
+function orgEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+const ORG_ROLE={ leaguePlayer:['League player','#17d7b0'], captain:['Captain','#f0c040'], admin:['Admin','#b8ff2c'] };
+async function loadOrganizers(){
+  const listEl=document.getElementById('orgListCard'), pendEl=document.getElementById('orgPendingCard');
+  listEl.innerHTML='<div class="empty">Loading…</div>';
+  try{
+    const r=await fetch(API+'/admin-organizers',{credentials:'include'});
+    if(r.status===401){ const ab=document.getElementById('authBanner'); if(ab) ab.style.display='block'; listEl.innerHTML='<div class="empty">Sign in as admin first.</div>'; return; }
+    const d=await r.json(); const orgs=d.organizers||[];
+    if(!orgs.length){ listEl.innerHTML='<div class="empty">No organizers yet. Invite one above.</div>'; }
+    else{
+      listEl.innerHTML=orgs.map(o=>{
+        const roles=Object.keys(ORG_ROLE).filter(k=>o.roles&&o.roles[k])
+          .map(k=>`<span class="badge" style="background:${ORG_ROLE[k][1]}22;color:${ORG_ROLE[k][1]};border-color:transparent">${ORG_ROLE[k][0]}</span>`).join(' ')
+          || '<span style="font-size:.7rem;color:#5e625c">ladder host only</span>';
+        const lad=(o.ladders||[]).length?`<span style="font-size:.72rem;color:#9aa094">${(o.ladders||[]).length} ladder${o.ladders.length>1?'s':''}</span>`:'<span style="font-size:.72rem;color:#5e625c">no ladders</span>';
+        const active=o.status==='active';
+        const stColor=active?'#17d7b0':'#ff5c47';
+        const act=active
+          ? `<button class="btn btn-danger btn-sm" onclick="setOrgStatus('${orgEsc(o.email)}','suspend')">Deny</button>`
+          : `<button class="btn btn-out btn-sm" onclick="setOrgStatus('${orgEsc(o.email)}','activate')">Restore</button>`;
+        return `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">
+          <div style="flex:1;min-width:160px"><div style="font-weight:800">${orgEsc(o.name||'—')}</div><div style="font-size:.72rem;color:#9aa094">${orgEsc(o.email)}</div><div style="margin-top:3px">${lad}</div></div>
+          <div style="min-width:140px">${roles}</div>
+          <div><span class="badge" style="background:${stColor}22;color:${stColor};border-color:transparent">${orgEsc(o.status)}</span></div>
+          <div>${act}</div>
+        </div>`;
+      }).join('');
+    }
+    const pend=d.pendingLadders||[];
+    if(pend.length){
+      pendEl.style.display='block';
+      pendEl.innerHTML=`<div style="font-weight:800;margin-bottom:2px">Awaiting your approval</div><div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">Approve to aggregate the ladder into the running leaderboard, or keep it on its own board.</div>`+
+        pend.map(e=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">
+          <div style="flex:1;min-width:160px"><div style="font-weight:700">${orgEsc(e.name)}</div><div style="font-size:.72rem;color:#9aa094">${orgEsc(e.ownerEmail)} · ${orgEsc(e.date||'')}</div></div>
+          <div><button class="btn btn-lime btn-sm" onclick="approveLadder('${orgEsc(e.id)}')">Approve</button> <button class="btn btn-out btn-sm" onclick="denyLadder('${orgEsc(e.id)}')">Keep own board</button></div>
+        </div>`).join('');
+    } else { pendEl.style.display='none'; pendEl.innerHTML=''; }
+  }catch(e){ listEl.innerHTML='<div class="empty">Failed to load organizers.</div>'; }
+}
+async function inviteOrg(){
+  const name=document.getElementById('org-name').value.trim(), email=document.getElementById('org-email').value.trim();
+  const msg=document.getElementById('orgInviteMsg');
+  if(!email){ msg.style.color='#ff5c47'; msg.textContent='Enter an email.'; return; }
+  msg.style.color='#9aa094'; msg.textContent='Sending…';
+  try{
+    const r=await fetch(API+'/admin-organizers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'invite',name,email})});
+    const d=await r.json(); if(!r.ok) throw new Error(d.error||'Failed');
+    msg.style.color='#17d7b0'; msg.textContent='Organizer added — they sign in with the normal player magic-link.';
+    document.getElementById('org-name').value=''; document.getElementById('org-email').value='';
+    loadOrganizers();
+  }catch(e){ msg.style.color='#ff5c47'; msg.textContent=e.message; }
+}
+async function setOrgStatus(email,action){
+  try{ await fetch(API+'/admin-organizers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,email})}); loadOrganizers(); }
+  catch(e){ alert('Failed: '+e.message); }
+}
+async function approveLadder(id){ await ladderLb('approve-ladder',id); }
+async function denyLadder(id){ await ladderLb('deny-ladder',id); }
+async function ladderLb(action,eventId){
+  try{ await fetch(API+'/admin-organizers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,eventId})}); loadOrganizers(); }
+  catch(e){ alert('Failed: '+e.message); }
+}
 function ladSub(v){
   const all=document.getElementById('ladAll'), cr=document.getElementById('ladCreate');
   if(all) all.style.display=(v==='create')?'none':'';

@@ -8,7 +8,7 @@
 // Drafting/sending are separate so AI copy is never emailed without review,
 // mirroring The Drop and the POTW mailer. Sends from dink@dinksociety.app.
 
-import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { requireLadderOwner, orgErr } from './lib/organizer-auth.js';
 import { getRecap, markRecapSent, updateRecapDraft } from './lib/ladder-recap.js';
 import { generateLadderRecapDraft } from './lib/ladder-recap-generate.js';
 import { renderLadderRecapEmail } from './lib/ladder-recap-email.js';
@@ -43,11 +43,12 @@ async function sendInBatches(items, worker, { size = 5, gapMs = 1100 } = {}) {
 }
 
 export default async (req) => {
-  const v = await verifyAdminSession(req);
-  if (!v.valid) return unauthResponse(v.error);
-
   const eventId = new URL(req.url).searchParams.get('event');
   if (!eventId) return json({ error: 'event id required' }, 400);
+
+  // Admin, or the organizer who owns this ladder, may draft/send its recap.
+  const auth = await requireLadderOwner(req, eventId);
+  if (!auth.ok) return orgErr(auth);
 
   if (req.method === 'GET') {
     const rec = await getRecap(eventId);
