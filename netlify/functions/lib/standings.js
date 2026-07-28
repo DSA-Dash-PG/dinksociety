@@ -114,106 +114,83 @@ export async function rebuildStandings(circuit) {
 
     for (const match of weekFile.matches) {
       if (!match.finalizedAt) continue;
-      // Playoffs & Championship are post-season — they must not feed the regular
-      // standings table or player season stats. Rivalry Week DOES count (it is
-      // the last week of the regular season).
-      if (match.phase === 'playoff' || match.phase === 'championship') continue;
+      // Playoffs & Championship are post-season. They do NOT feed the regular
+      // standings table (team W/L, match points, PS/PA, seeding) — that stays
+      // frozen at the regular season (round-robin + Rivalry Week). They DO now
+      // count toward individual player season stats + weekly performers, so
+      // players earn leaderboard credit for playoff games. See the guarded
+      // block below (team accrual) and accumulatePlayerStats (runs for all
+      // finalized matches, with null team rows in the post-season so playoff
+      // rally points never touch the frozen team PS/PA totals).
+      const isPostSeason = match.phase === 'playoff' || match.phase === 'championship';
 
+      // Week display date (used by weekly performers) — track for every
+      // finalized week, incl. post-season.
       if (match.scheduledAt && (!weekMeta[week] || new Date(match.scheduledAt) < new Date(weekMeta[week].date))) {
         weekMeta[week] = { date: match.scheduledAt };
       }
-      finalizedWeeks.add(week);
+      // Ranking-qualification counts REGULAR-season weeks only, so playoff
+      // games are bonus credit and never raise the games-needed threshold.
+      if (!isPostSeason) finalizedWeeks.add(week);
 
       const teamA = match.teamA;
       const teamB = match.teamB;
       const matchPointsA = match.scoreA ?? 0;
       const matchPointsB = match.scoreB ?? 0;
 
-      // Ensure team buckets exist
+      // Ensure both team rows exist (they're pre-seeded from rosters above,
+      // but a team could first appear here). Regular + post-season both need them.
       for (const t of [teamA, teamB]) {
         if (!divisionBuckets[div].teams.has(t.id)) {
           divisionBuckets[div].teams.set(t.id, newTeamRow(t.id, t.name, div));
         }
       }
-
       const a = divisionBuckets[div].teams.get(teamA.id);
       const b = divisionBuckets[div].teams.get(teamB.id);
 
-      a.matchesPlayed++;
-      b.matchesPlayed++;
-      a.matchPointsFor += matchPointsA;
-      a.matchPointsAgainst += matchPointsB;
-      b.matchPointsFor += matchPointsB;
-      b.matchPointsAgainst += matchPointsA;
-
-      // Head-to-head
-      if (!a.headToHead[teamB.id]) a.headToHead[teamB.id] = { for: 0, against: 0 };
-      if (!b.headToHead[teamA.id]) b.headToHead[teamA.id] = { for: 0, against: 0 };
-      a.headToHead[teamB.id].for += matchPointsA;
-      a.headToHead[teamB.id].against += matchPointsB;
-      b.headToHead[teamA.id].for += matchPointsB;
-      b.headToHead[teamA.id].against += matchPointsA;
-
-      // Games won from round1/round2
+      // Games won from round1/round2 (used by the core accrual + tiebreakers).
       const r1 = match.round1 || { homeGames: 0, awayGames: 0 };
       const r2 = match.round2 || { homeGames: 0, awayGames: 0 };
-      a.totalGamesWon += (r1.homeGames || 0) + (r2.homeGames || 0);
-      a.totalGamesLost += (r1.awayGames || 0) + (r2.awayGames || 0);
-      b.totalGamesWon += (r1.awayGames || 0) + (r2.awayGames || 0);
-      b.totalGamesLost += (r1.homeGames || 0) + (r2.homeGames || 0);
 
-      // W/L/T are tallied per ROUND (2 rounds per match), not per match — so a
-      // single match can produce 2-0, 1-0-1, 0-1-1, etc. Each round is won
-      // (2 league pts), tied (1 pt), or lost (0 pts) by games taken, exactly
-      // mirroring how PTS (matchPoints = round1 pts + round2 pts) accrues.
-      // Read each round's own home/away points; fall back to the games count
-      // for any legacy record written before points were stored.
-      for (const r of [r1, r2]) {
-        let hp = r.homePoints, ap = r.awayPoints;
-        if (hp == null || ap == null) {
-          const hg = r.homeGames || 0, ag = r.awayGames || 0;
-          if (hg === 0 && ag === 0) continue;            // round not played
-          hp = hg > ag ? 2 : hg < ag ? 0 : 1;
-          ap = ag > hg ? 2 : ag < hg ? 0 : 1;
-        }
-        if (hp === 0 && ap === 0) continue;              // round not completed
-        if (hp > ap) { a.wins++; b.losses++; }
-        else if (ap > hp) { b.wins++; a.losses++; }
-        else { a.ties++; b.ties++; }
-      }
-
-      // Match-win bonus (Society Circuit points) is still awarded at the match
-      // level, based on total match points.
-      if (matchPointsA > matchPointsB) {
-        a.weeklyBonusPoints += BONUS_MATCH_WIN;
-      } else if (matchPointsB > matchPointsA) {
-        b.weeklyBonusPoints += BONUS_MATCH_WIN;
+      if (isPostSeason) {
+        // ── Post-season: accrue into each team's PLAYOFF-ONLY bucket. This
+        //    feeds the standings-page "Playoffs" + "Overall" toggle; the flat
+        //    row (regular season) is left untouched so seeding stays frozen. ──
+        accrueTeamCore(a.post, b.post, matchPointsA, matchPointsB, r1, r2);
       } else {
-        a.weeklyBonusPoints += BONUS_MATCH_TIE;
-        b.weeklyBonusPoints += BONUS_MATCH_TIE;
+        // ── Regular season: the flat row IS the regular-season table. ──
+        accrueTeamCore(a, b, matchPointsA, matchPointsB, r1, r2);
+
+        // Head-to-head (regular season only — seeds the bracket)
+        if (!a.headToHead[teamB.id]) a.headToHead[teamB.id] = { for: 0, against: 0 };
+        if (!b.headToHead[teamA.id]) b.headToHead[teamA.id] = { for: 0, against: 0 };
+        a.headToHead[teamB.id].for += matchPointsA;
+        a.headToHead[teamB.id].against += matchPointsB;
+        b.headToHead[teamA.id].for += matchPointsB;
+        b.headToHead[teamA.id].against += matchPointsA;
+
+        // Society-Circuit bonuses (match win / tie / sweep) — regular season only.
+        if (matchPointsA > matchPointsB) a.weeklyBonusPoints += BONUS_MATCH_WIN;
+        else if (matchPointsB > matchPointsA) b.weeklyBonusPoints += BONUS_MATCH_WIN;
+        else { a.weeklyBonusPoints += BONUS_MATCH_TIE; b.weeklyBonusPoints += BONUS_MATCH_TIE; }
+        if (matchPointsA === 4 && matchPointsB === 0) a.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
+        else if (matchPointsB === 4 && matchPointsA === 0) b.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
+
+        // Track week's match-point totals for top-team-of-week computation
+        divisionBuckets[div].weekly[week].push({ teamId: teamA.id, matchPoints: matchPointsA });
+        divisionBuckets[div].weekly[week].push({ teamId: teamB.id, matchPoints: matchPointsB });
       }
 
-      // Sweep bonus (4-0)
-      if (matchPointsA === 4 && matchPointsB === 0) {
-        a.sweeps++;
-        a.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
-      } else if (matchPointsB === 4 && matchPointsA === 0) {
-        b.sweeps++;
-        b.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
-      }
-
-      // Track week's match-point totals for top-team-of-week computation
-      divisionBuckets[div].weekly[week].push({ teamId: teamA.id, matchPoints: matchPointsA });
-      divisionBuckets[div].weekly[week].push({ teamId: teamB.id, matchPoints: matchPointsB });
-
-      // ========== Player stats ==========
-      // Need the lineup to know who played, then cross-reference scores
+      // ========== Player stats (regular season + post-season) ==========
+      // Players earn credit for every game. PS/PA land in the matching team
+      // bucket: the flat row for regular season, the playoff bucket for
+      // post-season — so the toggle's Playoffs/Overall slices get PS/PA too.
       const acc = await accumulatePlayerStats({
         matchId: match.id,
         teamAId: teamA.id,
         teamBId: teamB.id,
-        teamRowA: a,
-        teamRowB: b,
+        teamRowA: isPostSeason ? a.post : a,
+        teamRowB: isPostSeason ? b.post : b,
         teamsById,
         lineupStore,
         playerStats,
@@ -285,10 +262,35 @@ export async function rebuildStandings(circuit) {
 
     // Apply placement bonus based on sorted position (projected until Circuit done)
     teams.forEach((t, idx) => {
-      t.rank = idx + 1;
+      t.rank = idx + 1;                       // regular-season rank = seeding
       t.placementBonus = PLACEMENT_BONUS[idx] ?? 0;
       t.societyCircuitPoints = t.weeklyBonusPoints + t.placementBonus;
-      t.pointDiff = t.pointsScored - t.pointsAgainst;  // DIFF = PS − PA
+      t.pointDiff = t.pointsScored - t.pointsAgainst;  // DIFF = PS − PA (regular)
+
+      // Playoff-only + combined "overall" slices for the standings-page toggle.
+      const po = t.post || newPostBucket();
+      t.playoff = {
+        matchesPlayed: po.matchesPlayed,
+        wins: po.wins, losses: po.losses, ties: po.ties,
+        matchPointsFor: po.matchPointsFor, matchPointsAgainst: po.matchPointsAgainst,
+        pointsScored: po.pointsScored, pointsAgainst: po.pointsAgainst,
+        pointDiff: po.pointsScored - po.pointsAgainst,
+        totalGamesWon: po.totalGamesWon, totalGamesLost: po.totalGamesLost,
+        sweeps: po.sweeps,
+      };
+      t.overall = {
+        matchesPlayed: t.matchesPlayed + po.matchesPlayed,
+        wins: t.wins + po.wins, losses: t.losses + po.losses, ties: t.ties + po.ties,
+        matchPointsFor: t.matchPointsFor + po.matchPointsFor,
+        matchPointsAgainst: t.matchPointsAgainst + po.matchPointsAgainst,
+        pointsScored: t.pointsScored + po.pointsScored,
+        pointsAgainst: t.pointsAgainst + po.pointsAgainst,
+        pointDiff: (t.pointsScored + po.pointsScored) - (t.pointsAgainst + po.pointsAgainst),
+        totalGamesWon: t.totalGamesWon + po.totalGamesWon,
+        totalGamesLost: t.totalGamesLost + po.totalGamesLost,
+        sweeps: t.sweeps + po.sweeps,
+      };
+      delete t.post; // internal accumulator — keep it out of the serialized blob
     });
 
     divisions[div] = {
@@ -545,7 +547,10 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
   return { pointsA: matchPointsScoredA, pointsB: matchPointsScoredB };
 }
 
-// A fresh standings row for a team (all counters zeroed).
+// A fresh standings row for a team (all counters zeroed). The flat fields are
+// the REGULAR-season standings; `post` accumulates playoff/championship results
+// separately so the standings page can offer a Regular / Playoffs / Overall
+// toggle without disturbing the (frozen) regular-season seeding table.
 function newTeamRow(teamId, teamName, division) {
   return {
     teamId,
@@ -560,7 +565,50 @@ function newTeamRow(teamId, teamName, division) {
     totalGamesWon: 0, totalGamesLost: 0,
     weeklyBonusPoints: 0,
     headToHead: {}, // { opponentId: { for, against } }
+    post: newPostBucket(), // playoff-only counters (see accrueTeamCore)
   };
+}
+
+// Playoff-only counter bucket (mirrors the regular flat counters). No
+// head-to-head or Society-Circuit bonus — those are regular-season concepts.
+function newPostBucket() {
+  return {
+    matchesPlayed: 0,
+    wins: 0, losses: 0, ties: 0,
+    matchPointsFor: 0, matchPointsAgainst: 0,
+    pointsScored: 0, pointsAgainst: 0,
+    totalGamesWon: 0, totalGamesLost: 0,
+    sweeps: 0,
+  };
+}
+
+// Accrue one finalized match into a pair of counter targets — either the flat
+// regular-season rows, or the two teams' playoff buckets. W/L/T are per ROUND
+// (2 rounds per match); reads each round's own points, falling back to the
+// games count for legacy records written before points were stored.
+function accrueTeamCore(A, B, mpA, mpB, r1, r2) {
+  A.matchesPlayed++; B.matchesPlayed++;
+  A.matchPointsFor += mpA; A.matchPointsAgainst += mpB;
+  B.matchPointsFor += mpB; B.matchPointsAgainst += mpA;
+  A.totalGamesWon += (r1.homeGames || 0) + (r2.homeGames || 0);
+  A.totalGamesLost += (r1.awayGames || 0) + (r2.awayGames || 0);
+  B.totalGamesWon += (r1.awayGames || 0) + (r2.awayGames || 0);
+  B.totalGamesLost += (r1.homeGames || 0) + (r2.homeGames || 0);
+  for (const r of [r1, r2]) {
+    let hp = r.homePoints, ap = r.awayPoints;
+    if (hp == null || ap == null) {
+      const hg = r.homeGames || 0, ag = r.awayGames || 0;
+      if (hg === 0 && ag === 0) continue;
+      hp = hg > ag ? 2 : hg < ag ? 0 : 1;
+      ap = ag > hg ? 2 : ag < hg ? 0 : 1;
+    }
+    if (hp === 0 && ap === 0) continue;
+    if (hp > ap) { A.wins++; B.losses++; }
+    else if (ap > hp) { B.wins++; A.losses++; }
+    else { A.ties++; B.ties++; }
+  }
+  if (mpA === 4 && mpB === 0) A.sweeps++;
+  else if (mpB === 4 && mpA === 0) B.sweeps++;
 }
 
 function ensurePlayer(map, pid, player, team) {

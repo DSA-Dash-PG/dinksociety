@@ -86,6 +86,10 @@ export default async (req) => {
             totalGamesWon:       t.totalGamesWon  ?? t.gw ?? 0,
             totalGamesLost:      t.totalGamesLost ?? t.gl ?? 0,
             h2h:                 t.headToHead ?? {},
+            // Regular / Playoffs / Overall slices for the standings-page toggle
+            // (null on pre-toggle blobs; the page falls back to regular-only).
+            playoff:             t.playoff ?? null,
+            overall:             t.overall ?? null,
           };
         });
 

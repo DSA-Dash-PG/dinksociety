@@ -263,6 +263,7 @@
   // ── State ────────────────────────────────────────────────────────
   let standingsData = null, teamsData = null, scheduleData = null, activeDivision = '', isPreseason = false, divCount = 0;
   let selectedWeek = 'current'; // 'current' or a week number (snapshot through that week)
+  let standingsView = 'overall'; // 'overall' | 'regular' | 'playoff' — Regular/Playoffs/Overall toggle
   let dsrByTeam = {}; // teamId / lowercased teamName → summed Team DSR
   const CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
 
@@ -487,11 +488,47 @@
       el.innerHTML = '<div class="empty-state">No standings for this division yet.</div>';
       return;
     }
-    const weeksPlayedLive = Math.max(0, ...divData.teams.map(t => t.matchesPlayed || 0));
     const divLabel = divData.divisionLabel
       || (teamsData?.teams || []).find(t => t.division === activeDivision)?.divisionLabel
       || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
 
+    // The Regular / Playoffs / Overall toggle only appears once playoffs are in.
+    const hasPlayoffs = divData.teams.some(t => t.playoff && t.playoff.matchesPlayed > 0);
+    if (!hasPlayoffs) standingsView = 'regular';
+
+    // ── Playoffs-only or Overall (combined) slice ────────────────────
+    if (standingsView !== 'regular') {
+      const key = standingsView === 'playoff' ? 'playoff' : 'overall';
+      const teams = divData.teams.map(t => {
+        const s = t[key] || {};
+        return { ...t, status: null,
+          matchesPlayed: s.matchesPlayed || 0,
+          wins: s.wins || 0, losses: s.losses || 0, ties: s.ties || 0,
+          matchPointsFor: s.matchPointsFor || 0, matchPointsAgainst: s.matchPointsAgainst || 0,
+          pointsScored: s.pointsScored || 0, pointsAgainst: s.pointsAgainst || 0,
+          pointDiff: s.pointDiff || 0,
+          totalGamesWon: s.totalGamesWon || 0, totalGamesLost: s.totalGamesLost || 0,
+          sweeps: s.sweeps || 0 };
+      }).sort((a, b) =>
+        (b.matchPointsFor - a.matchPointsFor)
+        || (b.totalGamesWon - a.totalGamesWon)
+        || (b.pointDiff - a.pointDiff)
+        || String(a.teamName).localeCompare(String(b.teamName)));
+      teams.forEach(t => { t.maxPts = t.matchPointsFor; });
+      const note = standingsView === 'playoff'
+        ? '<div class="wk-note">Playoffs only · Week 7 bracket. Regular-season seeding is on the <b>Regular season</b> tab.</div>'
+        : '<div class="wk-note">Overall · regular season and playoffs combined.</div>';
+      el.innerHTML = viewToggleHtml(hasPlayoffs) + note
+        + standingsCardHtml(teams, false, '', divLabel, false)
+        + playoffResultsHtml()
+        + legendCardHtml(false)
+        + moreViewsCardHtml();
+      wireViewToggle(el);
+      return;
+    }
+
+    // ── Regular season (with week snapshots) ─────────────────────────
+    const weeksPlayedLive = Math.max(0, ...divData.teams.map(t => t.matchesPlayed || 0));
     let teams, hunt, updated = '', preTable = '';
     if (selectedWeek === 'current') {
       teams = divData.teams.map(t => {
@@ -516,11 +553,73 @@
 
     if (hunt) computeStatus(teams); else teams.forEach(t => { t.status = null; });
 
-    el.innerHTML = weekChipsHtml() + preTable
+    el.innerHTML = viewToggleHtml(hasPlayoffs) + weekChipsHtml() + preTable
       + standingsCardHtml(teams, false, updated, divLabel, hunt)
       + legendCardHtml(hunt)
       + moreViewsCardHtml();
     wireWeekChips(el);
+    wireViewToggle(el);
+  }
+
+  // ── Regular / Playoffs / Overall toggle ──────────────────────────
+  // Reuses the .div-tabs / .div-tab pill styling. Only shown once playoffs
+  // exist; switching resets any week-snapshot selection.
+  function viewToggleHtml(hasPlayoffs) {
+    if (!hasPlayoffs) return '';
+    const opts = [['overall', 'Overall'], ['regular', 'Regular season'], ['playoff', 'Playoffs']];
+    return '<nav class="div-tabs" style="margin-top:2px">'
+      + opts.map(o => '<button class="div-tab' + (standingsView === o[0] ? ' is-active' : '')
+          + '" data-view="' + o[0] + '">' + o[1] + '</button>').join('')
+      + '</nav>';
+  }
+  function wireViewToggle(el) {
+    el.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => {
+      standingsView = b.dataset.view;
+      selectedWeek = 'current';
+      render();
+    }));
+  }
+
+  // ── Playoff / Championship results (Week 7+) ─────────────────────
+  // The regular-season table above stays frozen at Week 6. This block
+  // surfaces the finalized post-season bracket results (semifinals,
+  // consolation, championship) for the active division — current view
+  // only. Renders nothing until a post-season match is finalized.
+  function playoffResultsHtml() {
+    if (selectedWeek !== 'current') return '';
+    const weeks = (scheduleData && scheduleData.weeks) || [];
+    const postWeeks = weeks
+      .filter(w => w.phase === 'playoff' || w.phase === 'championship')
+      .sort((a, b) => (a.week || 0) - (b.week || 0));
+    const cards = [];
+    for (const w of postWeeks) {
+      const ms = (w.matches || []).filter(m =>
+        (!activeDivision || m.division === activeDivision) && m.finalizedAt && m.homeRoundPts != null);
+      if (!ms.length) continue;
+      const rows = ms.map(m => {
+        const aWin = m.homeRoundPts > m.awayRoundPts, bWin = m.awayRoundPts > m.homeRoundPts;
+        const grp  = m.bracketGroup || m.gameLabel || '';
+        const tag  = m.medal ? m.medal + ' ' : (m.placeLabel ? m.placeLabel + ' · ' : '');
+        const games = (m.gamesA != null && m.gamesB != null) ? (m.gamesA + '–' + m.gamesB + ' games') : '';
+        const side = (name, seed, win) => '<div style="' + (win ? 'font-weight:800;' : 'color:var(--color-text-faint);') + '">'
+          + esc(name || seed || 'TBD') + (win ? ' <span style="color:var(--color-lime)">▸</span>' : '') + '</div>';
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--color-border);">'
+          + '<div style="flex:0 0 auto;min-width:92px;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-text-faint);">' + esc(tag + grp) + '</div>'
+          + '<div style="flex:1 1 auto;display:flex;flex-direction:column;gap:2px;min-width:0;">' + side(m.teamA, m.seedLabelA, aWin) + side(m.teamB, m.seedLabelB, bWin) + '</div>'
+          + '<div style="flex:0 0 auto;text-align:right;">'
+          + '<div style="font-size:18px;font-weight:800;font-variant-numeric:tabular-nums;"><span style="' + (aWin ? 'color:var(--color-lime);' : '') + '">' + m.homeRoundPts + '</span>–<span style="' + (bWin ? 'color:var(--color-lime);' : '') + '">' + m.awayRoundPts + '</span></div>'
+          + (games ? '<div style="font-size:10px;color:var(--color-text-faint);">' + esc(games) + '</div>' : '')
+          + '</div>'
+          + '</div>';
+      }).join('');
+      const label = w.phaseLabel || (w.phase === 'championship' ? 'Championship' : 'Playoffs');
+      cards.push('<div class="stand-card" style="margin-top:var(--space-4);">'
+        + '<div class="stand-card__hd"><h2 class="stand-card__title">' + esc(label) + ' · Week ' + w.week + '</h2></div>'
+        + '<div style="padding:2px 4px 0;">' + rows + '</div>'
+        + '<div class="pts-note"><span>Playoff results don’t change the regular-season table above — seeding locked after Week ' + RIVALRY_WEEK + '.</span></div>'
+        + '</div>');
+    }
+    return cards.join('');
   }
 
   // ── Standings card ───────────────────────────────────────────────
