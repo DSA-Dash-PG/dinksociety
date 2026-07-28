@@ -235,10 +235,16 @@
     </div>
   </header>
 
-  <!-- ── Live stat bar (placeholder — wire to league data) ── -->
+  <!-- ── Live stat bar (dynamic — built from the season in renderLanding) ── -->
   <div class="ln-marquee"><div class="ln-wrap ln-marquee__in" id="ln-marquee">
-    <div><b>24</b> <span>Teams</span></div><div><b>210</b> <span>Players</span></div><div><b>1,400+</b> <span>Games played</span></div><div><b>18</b> <span>Gold medals</span></div>
+    <div><b>🥇</b> <span>Gold medals &amp; bragging rights up for grab</span></div>
   </div></div>
+
+  <!-- ── Divisions preview (dynamic from the season record) ── -->
+  <section class="ln-sec"><div class="ln-wrap">
+    <div class="ln-eyebrow" id="ln-divs-eye">Divisions</div><h2 id="ln-divs-h">Pick your bracket.</h2><p class="ln-lede" id="ln-divs-lede">Team fee covers the full season. Register as a team, or sign up solo and get drafted.</p>
+    <div class="ln-divs" id="ln-divs" style="margin-top:26px"><div style="color:var(--color-text-faint);font-size:13px">Loading divisions…</div></div>
+  </div></section>
 
   <!-- ── Why join ── -->
   <section class="ln-sec ln-why"><div class="ln-wrap">
@@ -247,7 +253,7 @@
       <div class="ln-card"><div class="ic">🏆</div><h3>Gold on the line</h3><p>Champions crowned each division. Medals, bragging rights, and a spot in league history.</p></div>
       <div class="ln-card"><div class="ic">📊</div><h3>Tracked &amp; ranked</h3><p>Every game scored. Standings, player stats, and ratings that follow you season to season.</p></div>
       <div class="ln-card"><div class="ic">🎯</div><h3>Your level</h3><p>Skill divisions from 3.0 to 3.5+. Real matches against teams in your bracket — not a mixer.</p></div>
-      <div class="ln-card"><div class="ic">🍻</div><h3>The after-court</h3><p>Post-match hangs, rivalries, and a community that shows up. The league is the excuse.</p></div>
+      <div class="ln-card"><div class="ic">📰</div><h3>The whole story</h3><p>Player profiles, match write-ups, photo galleries, live scores, and season stats — your league, documented on the site.</p></div>
     </div>
   </div></section>
 
@@ -270,8 +276,8 @@
     </div>
   </div></section>
 
-  <!-- ── Sponsors (placeholder — wire to sponsors config) ── -->
-  <section class="ln-sec alt"><div class="ln-wrap" style="text-align:center">
+  <!-- ── Sponsors (hidden until sponsors are configured; shown by renderLanding) ── -->
+  <section class="ln-sec alt" id="ln-sponsors-sec" style="display:none"><div class="ln-wrap" style="text-align:center">
     <div class="ln-eyebrow" style="justify-content:center">Presented by</div><h2>Backed by the community.</h2>
     <div class="ln-sponsors" id="ln-sponsors" style="margin:26px 0 18px">
       <div class="ln-slogo">Sponsor</div><div class="ln-slogo">Sponsor</div><div class="ln-slogo">Sponsor</div><div class="ln-slogo">Sponsor</div><div class="ln-slogo">Sponsor</div>
@@ -279,10 +285,10 @@
     <a class="ln-btn ln-btn--out" href="mailto:hello@dinksociety.com?subject=Sponsorship">Become a sponsor</a>
   </div></section>
 
-  <!-- ── Divisions preview (dynamic from the season record) ── -->
-  <section class="ln-sec"><div class="ln-wrap">
-    <div class="ln-eyebrow">Divisions</div><h2>Pick your bracket.</h2><p class="ln-lede">Team fee covers the full season. Register as a team, or sign up solo and get drafted.</p>
-    <div class="ln-divs" id="ln-divs" style="margin-top:26px"><div style="color:var(--color-text-faint);font-size:13px">Loading divisions…</div></div>
+  <!-- ── Tentative schedule (above registration) ── -->
+  <section class="ln-sec" id="ln-sched-sec" style="display:none"><div class="ln-wrap">
+    <div class="ln-eyebrow">Tentative schedule</div><h2>Mark your calendar.</h2>
+    <div class="reg-schedule" id="season-schedule" style="display:none;margin-top:22px"></div>
   </div></section>
 
   <!-- ── Registration ── -->
@@ -327,8 +333,6 @@
         <h2 class="reg-h2">Team details</h2>
         <p class="reg-lede">Confirm your division, name the team, and enter the captain's info. You'll build your roster (6–12 players) through the Captain Portal after checkout.</p>
         <p class="reg-note" id="deposit-note" data-deposit-note>The full <strong><span data-team-fee>$650</span> team fee</strong> is due at registration to confirm your spot.</p>
-
-        <div class="reg-schedule" id="season-schedule" style="display:none"></div>
 
         <div class="reg-field" id="division-field">
           <div class="reg-field__label">Division</div>
@@ -463,9 +467,11 @@
     // The match day is simply the weekday of the start date (weekly cadence).
     function renderSchedule(s) {
       const el = document.getElementById('season-schedule');
+      const sec = document.getElementById('ln-sched-sec');
       if (!el) return;
       const start = s && s.startDate ? new Date(s.startDate + 'T00:00:00') : null;
-      if (!start || isNaN(start.getTime())) { el.style.display = 'none'; return; }
+      // No start date set → hide the whole schedule section.
+      if (!start || isNaN(start.getTime())) { el.style.display = 'none'; if (sec) sec.style.display = 'none'; return; }
       const weeks = Math.max(1, Math.min(20, parseInt(s.weeks) || 8));
       const dayName = start.toLocaleDateString('en-US', { weekday: 'long' });
       const chips = [];
@@ -473,9 +479,10 @@
         const d = new Date(start); d.setDate(start.getDate() + i * 7);
         chips.push('<span class="reg-wk">W' + (i + 1) + ' · ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + '</span>');
       }
+      if (sec) sec.style.display = 'block';
       el.style.display = 'block';
       el.innerHTML =
-        '<div class="reg-schedule__t">Season schedule</div>' +
+        '<div class="reg-schedule__t">Tentative schedule</div>' +
         '<div class="reg-schedule__d"><b style="color:var(--color-text)">' + weeks + ' weeks</b> of ' + esc(dayName) +
         ' play' + (s.matchTime ? ' · ' + esc(s.matchTime) : '') + ', starting <b style="color:var(--color-text)">' + fmtDate(s.startDate) + '</b>.</div>' +
         '<div class="reg-schedule__wks">' + chips.join('') + '</div>';
@@ -568,6 +575,59 @@
               '</div>'
             ).join('')
           : '<div style="color:var(--color-text-faint);font-size:13px">Divisions announced soon.</div>';
+      }
+
+      // Adapt the divisions heading so a single-division season doesn't imply
+      // "pick" between multiple brackets.
+      const divTeams = divs.reduce((sum, d) => sum + (parseInt(d.capacity) || 0), 0);
+      const oneDiv = divs.length === 1;
+      const dEye = document.getElementById('ln-divs-eye');
+      const dH = document.getElementById('ln-divs-h');
+      const dLede = document.getElementById('ln-divs-lede');
+      if (divs.length) {
+        if (dEye) dEye.textContent = oneDiv ? 'Division' : 'Divisions';
+        if (dH) dH.textContent = oneDiv
+          ? (divTeams ? 'One bracket, ' + divTeams + ' teams.' : 'One bracket.')
+          : 'Pick your bracket.';
+        if (dLede) dLede.textContent = oneDiv
+          ? ('Team fee covers the full season — grab one of the ' + (divTeams || 'open') + ' team spots in ' + divs[0].name + '.')
+          : 'Team fee covers the full season. Register as a team, or sign up solo and get drafted.';
+      }
+
+      // Neon stat bar — honest, season-driven. No invented totals.
+      const mq = document.getElementById('ln-marquee');
+      if (mq) {
+        const items = [];
+        const totalTeams = divs.reduce((sum, d) => sum + (parseInt(d.capacity) || 0), 0);
+        if (totalTeams > 0) items.push('<div><b>' + totalTeams + '</b> <span>Team' + (totalTeams === 1 ? '' : 's') + '</span></div>');
+        if (s.weeks) items.push('<div><b>' + s.weeks + '</b> <span>Weeks of play</span></div>');
+        const md = s.startDate ? new Date(s.startDate + 'T00:00:00') : null;
+        if (md && !isNaN(md.getTime())) items.push('<div><b>' + md.toLocaleDateString('en-US', { weekday: 'short' }) + '</b> <span>Match nights</span></div>');
+        items.push('<div><b>🥇</b> <span>Gold medals &amp; bragging rights up for grab</span></div>');
+        mq.innerHTML = items.join('');
+      }
+
+      // Sponsors: only reveal the section when the season actually has sponsors.
+      const sponsors = Array.isArray(s.sponsors) ? s.sponsors : [];
+      const spSec = document.getElementById('ln-sponsors-sec');
+      const spBox = document.getElementById('ln-sponsors');
+      if (spSec) {
+        if (sponsors.length) {
+          spSec.style.display = '';
+          if (spBox) spBox.innerHTML = sponsors.map(sp => {
+            const name = typeof sp === 'string' ? sp : (sp.name || '');
+            const logo = sp && sp.logo ? sp.logo : '';
+            const link = sp && sp.url ? sp.url : '';
+            const inner = logo
+              ? '<img src="' + esc(logo) + '" alt="' + esc(name) + '" style="max-height:100%;max-width:100%;object-fit:contain">'
+              : '<span>' + esc(name) + '</span>';
+            return link
+              ? '<a class="ln-slogo" href="' + esc(link) + '" target="_blank" rel="noopener">' + inner + '</a>'
+              : '<div class="ln-slogo">' + inner + '</div>';
+          }).join('');
+        } else {
+          spSec.style.display = 'none';
+        }
       }
     }
 
