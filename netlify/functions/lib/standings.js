@@ -351,9 +351,10 @@ export async function rebuildStandings(circuit) {
     }
   }
   // Ranking qualification: a player holds a rank once they've averaged at
-  // least 2 games per week for the weeks played so far — i.e. 2 × weeks
-  // (Wk1 = 2, Wk2 = 4, Wk3 = 6, …). Unqualified players keep their rating
-  // (shown "unqualified") but are excluded from every rank pool.
+  // least 2 games per week for the weeks played so far — i.e. 2 × weeks,
+  // capped at a 10-game minimum for the full season (Wk1 = 2 … Wk5+ = 10).
+  // Unqualified players keep their rating (shown "unqualified") but are
+  // excluded from every rank pool.
   const weeksPlayed = finalizedWeeks.size;
   const needGames = qualifyThreshold(weeksPlayed);
 
@@ -731,10 +732,11 @@ function compositeScore(p, maxGames) {
 function normGender(g) { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; }
 
 // Ranking qualification threshold: a player must average at least 2 games per
-// week for the weeks played so far — i.e. 2 × weeks (Wk1 = 2, Wk2 = 4,
-// Wk3 = 6, …). No cap. Below this a player keeps a DSR but is listed unranked.
+// week for the weeks played so far — i.e. 2 × weeks (Wk1 = 2, Wk2 = 4, Wk3 = 6,
+// Wk4 = 8, Wk5+ = 10), capped at a 10-game minimum for the full season. Below
+// this a player keeps a DSR but is listed unranked.
 function qualifyThreshold(weeksPlayed) {
-  return 2 * Math.max(0, weeksPlayed);
+  return Math.min(10, 2 * Math.max(0, weeksPlayed));
 }
 
 // Composite for one discipline split ({played, won, diff, gameDiffs, clutch*}).
