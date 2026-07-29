@@ -1171,13 +1171,21 @@
   // exposed client-side; clamped so a partial reconstruction never overflows.
   function _phBars(pl) {
     const gp = pl.gamesPlayed || 0;
-    const winPct = gp ? (pl.gamesWon || 0) / gp : 0;
-    const avgDiff = gp ? (pl.diff || 0) / gp : 0;
-    const clutch = pl.clutchPct != null ? pl.clutchPct : winPct;
-    const cons = pl.consistency != null ? pl.consistency : 0;
-    const winB = winPct * 60, avgB = (avgDiff / 11) * 15, clB = clutch * 10, coB = cons * 5;
-    const comp = pl.composite != null ? pl.composite : (winB + avgB + clB + coB);
-    let volB = comp - (winB + avgB + clB + coB); if (volB < 0) volB = 0; if (volB > 10) volB = 10;
+    let winB, avgB, clB, volB, coB;
+    const bd = pl.dsrBreakdown;
+    if (bd) {
+      // Exact per-component points from the server (Volume included, not derived).
+      winB = bd.win; avgB = bd.avgDiff; clB = bd.clutch; volB = bd.volume; coB = bd.consistency;
+    } else {
+      // Fallback for data predating the breakdown field — Volume is derived.
+      const winPct = gp ? (pl.gamesWon || 0) / gp : 0;
+      const avgDiff = gp ? (pl.diff || 0) / gp : 0;
+      const clutch = pl.clutchPct != null ? pl.clutchPct : winPct;
+      const cons = pl.consistency != null ? pl.consistency : 0;
+      winB = winPct * 60; avgB = (avgDiff / 11) * 15; clB = clutch * 10; coB = cons * 5;
+      const comp = pl.composite != null ? pl.composite : (winB + avgB + clB + coB);
+      volB = comp - (winB + avgB + clB + coB); if (volB < 0) volB = 0; if (volB > 10) volB = 10;
+    }
     const rows = [['Win %', winB, 60, 'var(--color-lime)'], ['Avg Diff', avgB, 15, 'var(--color-teal)'],
       ['Clutch', clB, 10, '#a78bfa'], ['Volume', volB, 10, 'var(--color-gold)'], ['Consistency', coB, 5, '#5b9dff']];
     return rows.map(r => {

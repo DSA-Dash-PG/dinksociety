@@ -396,7 +396,7 @@
   // else is unranked (→ "—"), so there's no fake ranking at season start.
   function dsrRankMap() {
     const ranked = playerList()
-      .filter(p => p.composite != null)
+      .filter(p => p.composite != null && p.dsrQualified !== false)
       .sort((a, b) => (b.composite - a.composite)
         || ((b.gamesWon || 0) - (a.gamesWon || 0))
         || (a.name || '').localeCompare(b.name || ''));
@@ -409,7 +409,7 @@
     const m = new Map();
     ['M','F'].forEach(g => {
       playerList()
-        .filter(p => p.composite != null && lbGenderOf(p) === g)
+        .filter(p => p.composite != null && p.dsrQualified !== false && lbGenderOf(p) === g)
         .sort((a, b) => (b.composite - a.composite) || ((b.gamesWon||0)-(a.gamesWon||0)) || (a.name||'').localeCompare(b.name||''))
         .forEach((p, i) => m.set(p.playerId, i + 1));
     });
@@ -487,6 +487,27 @@
   }
 
   // ── RANKINGS ─────────────────────────────────────────────────────
+  // ── DSR explainer card (transparency) ────────────────────────────
+  function dsrExplainerHtml() {
+    const cards = [
+      ['60','Win %','var(--color-lime)','Games won ÷ games played. Winning is king — even a scrappy 11–10 win counts.'],
+      ['15','Avg Diff','var(--color-teal)','Average point differential per game, normalized. Margin matters, but doesn’t dominate.'],
+      ['10','Clutch','#a78bfa','Win rate in close games only (margin ≤ 3 pts). Rewards players who perform under pressure.'],
+      ['10','Volume','#e8b33a','Games played vs the most active player. Showing up counts — but doesn’t overpower skill.'],
+      ['5','Consistency','#5b9dff','Low variance in game-to-game performance. Reliable players score higher than streaky ones.'],
+    ].map(c => `<div style="background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:8px;padding:12px;">
+        <div style="font-size:22px;font-weight:900;line-height:1;color:${c[2]}">${c[0]}</div>
+        <div style="font-size:12px;font-weight:800;margin:3px 0 5px;">${c[1]}</div>
+        <div style="font-size:11px;line-height:1.5;color:var(--color-text-faint);">${c[3]}</div>
+      </div>`).join('');
+    return `<details style="margin-top:14px;border-top:1px solid var(--color-border);padding-top:12px;">
+      <summary style="cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-lime);">How the Composite Score (DSR) works</summary>
+      <p style="font-size:12.5px;line-height:1.6;color:var(--color-text-muted);margin:10px 0 12px;">Players are ranked by a <b style="color:var(--color-text)">Composite Score</b> out of 100 that measures five dimensions of performance — not just point differential. A player who wins close games consistently ranks higher than one who blows out weak opponents but folds under pressure.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">${cards}</div>
+      <p style="font-size:11px;color:var(--color-text-faint);margin:12px 0 0;">Max 100 points. To hold a rank, a player must average 2 games per week (2 × weeks played); others are rated but listed under “Not yet qualified.”</p>
+    </details>`;
+  }
+
   function renderRankings() {
     const el = $('rankings-content');
     const filters = ['all','womens','mens','mixed'];
@@ -525,7 +546,9 @@
     const rankById = dsrRankMap();
     const gRankById = genderRankMap();
     const gf = state.genderFilter || 'all';
-    const rows = players.map((p, i) => {
+    const isRanked = (p) => p._dsr != null && p.dsrQualified !== false;
+    const unqTag = ' <span style="display:inline-block;padding:1px 6px;border-radius:9999px;font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border:1px solid rgba(232,179,58,.45);color:#e8b33a;background:rgba(232,179,58,.10);vertical-align:middle;">Unqualified</span>';
+    const rowHtml = (p) => {
       // Overall DSR rank + within-gender DSR rank, both stable across filters.
       const oR = rankById.get(p.playerId) ?? '—';
       const gOf = lbGenderOf(p);
@@ -539,6 +562,7 @@
       }
       const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
       const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
+      const tag = (!isRanked(p) && p._dsr != null) ? unqTag : '';
       return `<tr>
         <td>${rankCell}</td>
         <td class="col-opt">${mvCell(p.rankDelta)}</td>
@@ -546,7 +570,7 @@
         <td>
           <div class="player-cell">
             <div class="player-avatar ${avCls}">${avInner(p)}</div>
-            <div class="player-name">${playerLinkHtml(p.name, p.teamName)}</div>
+            <div class="player-name">${playerLinkHtml(p.name, p.teamName)}${tag}</div>
           </div>
         </td>
         <td><span class="player-team" style="font-size:11px">${teamLinkHtml(p.teamName, p.teamId)}</span></td>
@@ -560,7 +584,16 @@
         <td class="r col-opt"><span class="val-zero">${p._apa.toFixed(1)}</span></td>
         <td class="r"><span class="${diffCls(p._avgDiff)}">${sign1(p._avgDiff)}</span></td>
       </tr>`;
-    }).join('');
+    };
+    const rankedPlayers = players.filter(isRanked);
+    const unqPlayers = players.filter(p => !isRanked(p));
+    const need = state.playerStats && state.playerStats.needGames;
+    const dividerSub = need ? `Under ${need} games (2 × ${state.playerStats.weeksPlayed || ''} weeks played) — rated, not yet ranked` : 'Rated, not yet ranked';
+    let rows = rankedPlayers.map(rowHtml).join('');
+    if (unqPlayers.length) {
+      rows += `<tr class="rank-divider"><td colspan="14" style="padding:9px 8px;background:var(--color-surface-2);border-top:1px solid var(--color-border-strong);border-bottom:1px solid var(--color-border-strong);"><span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#e8b33a;">Not yet qualified</span> <span style="font-size:11px;color:var(--color-text-faint);margin-left:8px;">${dividerSub}</span></td></tr>`;
+      rows += unqPlayers.map(rowHtml).join('');
+    }
 
     // Sortable header cell
     const th = (key, label, opt) => {
@@ -597,6 +630,7 @@
           <tbody>${rows || '<tr><td colspan="14">' + noData('No players match this filter.') + '</td></tr>'}</tbody>
         </table>
       </div>
+      ${dsrExplainerHtml()}
     </div>`;
     wireRankingsControls(el);
   }

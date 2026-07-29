@@ -311,7 +311,7 @@ export async function rebuildStandings(circuit) {
   const maxGames = Math.max(1, ...activePlayers.map(p => p.gamesPlayed));
 
   for (const p of playerStats.values()) {
-    if (p.gamesPlayed === 0) { p.composite = null; continue; }
+    if (p.gamesPlayed === 0) { p.composite = null; p.dsrBreakdown = null; continue; }
     const winPct    = p.gamesWon / p.gamesPlayed;
     const avgDiff   = p.diff / p.gamesPlayed;          // ~-11 to +11
     const volume    = p.gamesPlayed / maxGames;         // 0–1
@@ -327,6 +327,16 @@ export async function rebuildStandings(circuit) {
     p.composite   = (winPct * 60) + (clutchPct * 10) + ((avgDiff / 11) * 15) + (consistency * 5) + (volume * 10);
     p.clutchPct   = clutchPct;
     p.consistency = consistency;
+    // Per-component DSR points (each rounded, out of its weight) for the
+    // profile breakdown bars. Same weights as the composite above.
+    p.dsrBreakdown = {
+      win:         Math.round(winPct * 60 * 10) / 10,
+      avgDiff:     Math.round((avgDiff / 11) * 15 * 10) / 10,
+      clutch:      Math.round(clutchPct * 10 * 10) / 10,
+      volume:      Math.round(volume * 10 * 10) / 10,
+      consistency: Math.round(consistency * 5 * 10) / 10,
+      weights: { win: 60, avgDiff: 15, clutch: 10, volume: 10, consistency: 5 },
+    };
     // True per-game Avg Points %: mean of each game's (points won / points played).
     p.avgPointsPct = p.gamesScored ? Math.round((p.sumGamePct / p.gamesScored) * 1000) / 10 : null;
   }
@@ -340,11 +350,10 @@ export async function rebuildStandings(circuit) {
       maxByType[t] = Math.max(maxByType[t], p.byType?.[t]?.played || 0);
     }
   }
-  // Ranking qualification: a player holds a rank once they've played MORE
-  // than 6 games total, OR at least 50% of the games possible so far (~3 per
-  // night → ceil(1.5 × weeks)): Wk1 = 2, Wk2 = 3, Wk3 = 5, Wk4 = 6, Wk5+ = 7.
-  // Unqualified players keep their rating (shown "unqualified") but are
-  // excluded from every rank pool.
+  // Ranking qualification: a player holds a rank once they've averaged at
+  // least 2 games per week for the weeks played so far — i.e. 2 × weeks
+  // (Wk1 = 2, Wk2 = 4, Wk3 = 6, …). Unqualified players keep their rating
+  // (shown "unqualified") but are excluded from every rank pool.
   const weeksPlayed = finalizedWeeks.size;
   const needGames = qualifyThreshold(weeksPlayed);
 
@@ -403,6 +412,8 @@ export async function rebuildStandings(circuit) {
   const playerStatsOut = {
     circuit,
     lastUpdated: new Date().toISOString(),
+    weeksPlayed,
+    needGames,
     players: Object.fromEntries(playerStats),
   };
 
@@ -719,10 +730,11 @@ function compositeScore(p, maxGames) {
 
 function normGender(g) { const s = String(g || '').trim().toLowerCase(); return s[0] === 'f' ? 'F' : s[0] === 'm' ? 'M' : ''; }
 
-// Ranking qualification threshold: more than 6 games total OR at least 50% of
-// possible games so far (~3 per night). ceil(1.5 × weeks), capped at 7.
+// Ranking qualification threshold: a player must average at least 2 games per
+// week for the weeks played so far — i.e. 2 × weeks (Wk1 = 2, Wk2 = 4,
+// Wk3 = 6, …). No cap. Below this a player keeps a DSR but is listed unranked.
 function qualifyThreshold(weeksPlayed) {
-  return Math.min(7, Math.ceil(1.5 * Math.max(0, weeksPlayed)));
+  return 2 * Math.max(0, weeksPlayed);
 }
 
 // Composite for one discipline split ({played, won, diff, gameDiffs, clutch*}).
