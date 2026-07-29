@@ -499,7 +499,12 @@
     // ── Playoffs-only or Overall (combined) slice ────────────────────
     if (standingsView !== 'regular') {
       const key = standingsView === 'playoff' ? 'playoff' : 'overall';
-      const teams = divData.teams.map(t => {
+      const cmp = (a, b) =>
+        (b.matchPointsFor - a.matchPointsFor)
+        || (b.totalGamesWon - a.totalGamesWon)
+        || (b.pointDiff - a.pointDiff)
+        || String(a.teamName).localeCompare(String(b.teamName));
+      const mapped = divData.teams.map(t => {
         const s = t[key] || {};
         return { ...t, status: null,
           matchesPlayed: s.matchesPlayed || 0,
@@ -509,17 +514,29 @@
           pointDiff: s.pointDiff || 0,
           totalGamesWon: s.totalGamesWon || 0, totalGamesLost: s.totalGamesLost || 0,
           sweeps: s.sweeps || 0 };
-      }).sort((a, b) =>
-        (b.matchPointsFor - a.matchPointsFor)
-        || (b.totalGamesWon - a.totalGamesWon)
-        || (b.pointDiff - a.pointDiff)
-        || String(a.teamName).localeCompare(String(b.teamName)));
+      });
+
+      // Playoffs view: only the top seeds reached the bracket. The consolation
+      // teams (didn't qualify) drop below a dashed cutline — mirroring the
+      // regular-season playoff line — regardless of the consolation points they
+      // earned, so a consolation win never ranks above a semifinalist.
+      let teams, cut = null;
+      if (standingsView === 'playoff') {
+        const spots  = SEASON.playoffSpots;
+        const made   = mapped.filter(t => (t.rank || 99) <= spots).sort(cmp);
+        const missed = mapped.filter(t => (t.rank || 99) >  spots).sort(cmp);
+        teams = made.concat(missed);
+        if (made.length && missed.length) cut = { at: made.length, label: 'CONSOLATION · DIDN’T MAKE THE BRACKET' };
+      } else {
+        teams = mapped.sort(cmp);
+      }
       teams.forEach(t => { t.maxPts = t.matchPointsFor; });
+
       const note = standingsView === 'playoff'
         ? '<div class="wk-note">Playoffs only · Week 7 bracket. Regular-season seeding is on the <b>Regular season</b> tab.</div>'
         : '<div class="wk-note">Overall · regular season and playoffs combined.</div>';
       el.innerHTML = viewToggleHtml(hasPlayoffs) + note
-        + standingsCardHtml(teams, false, '', divLabel, false)
+        + standingsCardHtml(teams, false, '', divLabel, false, cut)
         + playoffResultsHtml()
         + legendCardHtml(false)
         + moreViewsCardHtml();
@@ -626,7 +643,7 @@
   // `hunt` = playoff-picture mode: ONLY during/after Rivalry Week (Week 6,
   // the last week of the regular season). Weeks 1–5 render a plain table —
   // no badges, no cutline, no playoff math.
-  function standingsCardHtml(teams, preseason, updatedHtml, divLabel, hunt) {
+  function standingsCardHtml(teams, preseason, updatedHtml, divLabel, hunt, cut) {
     updatedHtml = updatedHtml || '';
     divLabel = divLabel || DIV_LABELS[activeDivision] || activeDivision || 'Mixed Doubles';
     const spots = SEASON.playoffSpots;
@@ -651,6 +668,11 @@
       if (showPlayoffLine && idx === spots) {
         rows += '<tr class="cutline-row"><td colspan="' + cols + '" style="padding:0 8px">'
               + '<div class="cutline-inner">PLAYOFF LINE · TOP ' + spots + '</div></td></tr>';
+      }
+      // Generic cutline (e.g. Playoffs view: consolation teams below the line)
+      if (cut && idx === cut.at) {
+        rows += '<tr class="cutline-row"><td colspan="' + cols + '" style="padding:0 8px">'
+              + '<div class="cutline-inner">' + cut.label + '</div></td></tr>';
       }
 
       const rankCls = !seasonStarted ? '' : idx===0 ? 'col-rank--1' : idx===1 ? 'col-rank--2' : idx===2 ? 'col-rank--3' : '';

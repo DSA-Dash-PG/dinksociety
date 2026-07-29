@@ -51,6 +51,9 @@ function miniRow(label, value, sub, color) {
 export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
   const first = String(pr.name || 'there').split(' ')[0];
   const place = pr.rank ? ord(pr.rank) : '—';
+  // The header already renders the finish ("1st of 10"). Never echo a sub that
+  // just restates it (e.g. "1st of 10" / "#4 of 10") — that reads twice.
+  const subOk = pr.sub && !/^\s*#?\d+(?:st|nd|rd|th)?\s+of\s+\d+\s*$/i.test(String(pr.sub));
   const climb = pr.delta == null ? '—' : pr.delta > 0 ? `▲ ${pr.delta}` : pr.delta < 0 ? `▼ ${Math.abs(pr.delta)}` : 'even';
   const climbColor = pr.delta > 0 ? C.lime : pr.delta < 0 ? C.red : C.mut;
   const diffColor = pr.diff > 0 ? C.lime : pr.diff < 0 ? C.red : C.tx;
@@ -81,6 +84,12 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
   minis = minis ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:10px 0 4px">${minis}</table>` : '';
 
   const url = (siteUrl || 'https://dinksociety.app').replace(/\/$/, '');
+  // Each ladder night is directly linkable: /ladders#ladders/<eventId> opens that
+  // night's full results + rounds. The season leaderboard aggregates every
+  // completed ladder at /ladders#leaderboard.
+  const eid = encodeURIComponent(event.id || '');
+  const nightUrl = eid ? `${url}/ladders#ladders/${eid}` : `${url}/ladders`;
+  const boardUrl = `${url}/ladders#leaderboard`;
 
   return `<div style="background:${C.bg};margin:0;padding:0">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000;padding:20px 8px"><tr><td align="center">
@@ -98,7 +107,7 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
     <div style="font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:${C.fnt}">① Your Night</div>
     <div style="font-size:13px;color:${C.mut};font-weight:700;margin-top:12px">${esc(pr.hi || `Nice work, ${first}.`)}</div>
     <div style="font-size:38px;font-weight:900;font-style:italic;text-transform:uppercase;line-height:1;margin:6px 0 2px"><span style="color:${C.lime}">${place}</span> <span style="font-size:15px;color:${C.mut};font-style:normal;font-weight:700">of ${pr.count}</span></div>
-    ${pr.sub ? `<div style="font-size:13px;color:${C.mut};font-weight:600">${esc(pr.sub)}</div>` : ''}
+    ${subOk ? `<div style="font-size:13px;color:${C.mut};font-weight:600">${esc(pr.sub)}</div>` : ''}
     ${tiles}
     <div style="font-size:14px;line-height:1.68;color:#dcdfd7;padding-top:8px">${paras(pr.story)}</div>
     ${call}
@@ -116,12 +125,13 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
     <div style="font-size:14px;line-height:1.68;color:#dcdfd7;padding-top:10px">${safeHtml(recap.html)}</div>
     ${minis}
     ${recap.seasonNote ? `<div style="background:rgba(184,255,44,.1);border:1px solid rgba(184,255,44,.22);border-radius:10px;padding:13px 15px;margin-top:12px;font-size:13.5px;line-height:1.55;color:#eef3e4">${safeHtml(recap.seasonNote)}</div>` : ''}
-    <a href="${url}/ladders.html" style="display:block;text-align:center;margin:16px 0 0;background:${C.lime};color:${C.inv};font-weight:900;font-size:13px;padding:13px;border-radius:9999px;text-decoration:none">See full results & the live ladder →</a>
+    <a href="${nightUrl}" style="display:block;text-align:center;margin:16px 0 0;background:${C.lime};color:${C.inv};font-weight:900;font-size:13px;padding:13px;border-radius:9999px;text-decoration:none">See tonight's full results & rounds →</a>
+    <a href="${boardUrl}" style="display:block;text-align:center;margin:8px 0 0;background:transparent;color:${C.tx};font-weight:800;font-size:12.5px;padding:11px;border:1px solid ${C.bd};border-radius:9999px;text-decoration:none">Season leaderboard · every completed ladder →</a>
   </td></tr>
 
   <tr><td style="padding:18px 24px 24px;border-top:1px solid ${C.bd};margin-top:18px">
     <div style="font-size:11px;color:${C.fnt};line-height:1.6">You're getting this because you played the ${esc(event.name)} ladder.<br>
-    <a href="${url}/ladders.html" style="color:${C.lime};text-decoration:none;font-weight:700">View the ladder</a> · <a href="${url}/me.html" style="color:${C.lime};text-decoration:none;font-weight:700">Your profile</a></div>
+    <a href="${nightUrl}" style="color:${C.lime};text-decoration:none;font-weight:700">Tonight's results</a> · <a href="${boardUrl}" style="color:${C.lime};text-decoration:none;font-weight:700">Season leaderboard</a> · <a href="${url}/me.html" style="color:${C.lime};text-decoration:none;font-weight:700">Your profile</a></div>
   </td></tr>
 </table>
 </td></tr></table></div>`;

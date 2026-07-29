@@ -27,38 +27,41 @@ function basicPlayer(p, count) {
   const fn = firstName(p.name);
   let hi, sub, story = [], call = null, streak = null;
 
+  // NOTE: `sub` is a short tagline that sits under the big finish number in the
+  // email. It must NOT restate the rank (the header already shows "1st of 10"),
+  // otherwise the finish reads twice. Keep these as flavor lines.
   switch (p.angle) {
     case 'won':
-      hi = `Wire to wire, ${fn}.`; sub = `1st of ${count}`;
+      hi = `Wire to wire, ${fn}.`; sub = `Top of the board.`;
       story.push(`You won the night, ${fn}. ${rec(p)} with a ${dff(p)} differential is the kind of line that ends with your name on top.`);
       break;
     case 'first_podium':
-      hi = `Podium debut, ${fn}.`; sub = `${ordinal(p.rank)} of ${count}`;
+      hi = `Podium debut, ${fn}.`; sub = `First trip to the podium.`;
       story.push(`Your first time on the podium, ${fn}, and you earned every bit of it at ${rec(p)}.`);
       break;
     case 'podium':
-      hi = `On the podium, ${fn}.`; sub = `${ordinal(p.rank)} of ${count}`;
+      hi = `On the podium, ${fn}.`; sub = `In the title mix all night.`;
       story.push(`${ordinal(p.rank)} place at ${rec(p)}. Sharp all night and right in the title mix.`);
       break;
     case 'big_climb':
     case 'climb':
-      hi = `Climbing, ${fn}.`; sub = `#${p.rank} of ${count}`;
+      hi = `Climbing, ${fn}.`; sub = `Trending up the ladder.`;
       story.push(`You moved up ${p.delta} spot${p.delta === 1 ? '' : 's'} to #${p.rank} tonight, ${fn}. ${rec(p)}, ${dff(p)}, and trending the right way.`);
       break;
     case 'best_finish':
-      hi = `New high, ${fn}.`; sub = `#${p.rank} of ${count}`;
+      hi = `New high, ${fn}.`; sub = `A new personal best.`;
       story.push(`That is your best finish yet, ${fn}. #${p.rank} at ${rec(p)} and still climbing.`);
       break;
     case 'streak':
-      hi = `On a heater, ${fn}.`; sub = `#${p.rank} of ${count}`;
+      hi = `On a heater, ${fn}.`; sub = `Rode a ${p.maxStreak}-game run.`;
       story.push(`You stacked a ${p.maxStreak}-game win streak tonight. ${rec(p)} with a ${dff(p)} differential.`);
       break;
     case 'tough':
-      hi = `Battled all night, ${fn}.`; sub = `#${p.rank} of ${count}`;
+      hi = `Battled all night, ${fn}.`; sub = `Every game a battle.`;
       story.push(`The record (${rec(p)}) does not show how close it was. A ${dff(p)} differential says the games were tight and you were in every one.`);
       break;
     default:
-      hi = `Solid night, ${fn}.`; sub = `#${p.rank} of ${count}`;
+      hi = `Solid night, ${fn}.`; sub = `Quietly reliable.`;
       story.push(`${rec(p)} with a ${dff(p)} differential. Quietly reliable, exactly the kind of night that adds up over a season.`);
   }
 
