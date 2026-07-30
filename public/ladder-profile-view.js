@@ -34,6 +34,30 @@
     h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' + kc(L.w + '-' + L.l, 'Record') + kc((L.winPct != null ? L.winPct : 0) + '%', 'Win%', LIME) + kc(L.avg != null ? L.avg : '—', 'Avg') + kc('#' + (L.rank || '–'), 'Rank') + '</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px">' + kc(L.pf != null ? L.pf : '—', 'PS') + kc(L.pa != null ? L.pa : '—', 'PA') + kc((L.diff > 0 ? '+' : '') + (L.diff || 0), 'Diff', (L.diff >= 0 ? LIME : RED)) + kc(skS, 'Streak', (sk > 0 ? LIME : sk < 0 ? RED : '')) + '</div>';
     h += '<div style="display:flex;align-items:center;gap:11px;background:rgba(184,255,44,.08);border:1px solid rgba(184,255,44,.3);border-radius:11px;padding:11px 13px;margin-top:10px"><div style="font-size:21px;font-weight:900;color:' + LIME + '">' + (L.xp != null ? L.xp : '—') + '</div><div><div style="font-weight:800;font-size:13px;color:' + LIME + '">XP · ' + (L.xpTier || '—') + '</div><div style="font-size:11px;color:' + GR + '">' + (L.ladders != null ? L.ladders : (L.nights != null ? L.nights : '—')) + ' ladders · ' + (L.podiums || 0) + ' podiums · ' + (L.mvp || 0) + '× top</div></div></div>';
+    // Per-format breakdown — Society (Mixed), Queen (Women's), King (Men's).
+    // Overall = sum of every format (a player's games accumulate across all ladders).
+    var _pf = L.perLadder || [];
+    if (_pf.length) {
+      var FMT = { mixed: { w: 0, l: 0, d: 0, n: 0 }, womens: { w: 0, l: 0, d: 0, n: 0 }, mens: { w: 0, l: 0, d: 0, n: 0 } };
+      var OV = { w: 0, l: 0, d: 0, n: 0 };
+      _pf.forEach(function (p) {
+        var t = (p.type === 'womens' || p.type === 'mens') ? p.type : 'mixed';
+        var diff = (p.rounds || []).reduce(function (a, r) { return a + ((r.pf || 0) - (r.pa || 0)); }, 0);
+        FMT[t].w += p.w || 0; FMT[t].l += p.l || 0; FMT[t].d += diff; FMT[t].n += 1;
+        OV.w += p.w || 0; OV.l += p.l || 0; OV.d += diff; OV.n += 1;
+      });
+      var frow = function (label, sub, ac, s, crown) {
+        return '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;margin-bottom:6px;border:1px solid ' + ac + '44;background:' + ac + '12">'
+          + '<div style="flex:1;min-width:0"><div style="font-weight:800;font-size:12.5px">' + (crown ? crown + ' ' : '') + label + '</div><div style="font-size:10px;color:' + GR + ';margin-top:1px">' + sub + '</div></div>'
+          + '<div style="text-align:right"><div style="font-weight:900;font-size:13px;color:' + ac + '">' + s.w + '<span style="color:' + GR + ';font-weight:600;font-size:10px">–' + s.l + '</span></div>'
+          + '<div style="font-size:10px;color:' + GR + ';margin-top:1px">' + (s.d > 0 ? '+' : '') + s.d + ' diff · ' + s.n + ' night' + (s.n === 1 ? '' : 's') + '</div></div></div>';
+      };
+      h += lab('By format');
+      h += frow('Overall', 'Every ladder, all formats', '#cfd3c8', OV, '');
+      if (FMT.mixed.n) h += frow('Mixed', 'Society board', LIME, FMT.mixed, '');
+      if (FMT.womens.n) h += frow("Women's", 'Queen board', '#ff7bb0', FMT.womens, '👑');
+      if (FMT.mens.n) h += frow("Men's", 'King board', '#4aa3e0', FMT.mens, '👑');
+    }
     var last = L.last10 || [];
     if (last.length) {
       var mx = Math.max.apply(null, last.map(function (r) { return Math.abs(r.margin || 0); }).concat([1]));

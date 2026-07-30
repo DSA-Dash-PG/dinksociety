@@ -6,7 +6,7 @@
 <title>Ladders · The Dink Society</title>
 <meta name="theme-color" content="#0b0d0a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/css/shared.css">
 <link rel="stylesheet" href="/css/shared-nav.css">
 <style>
@@ -202,6 +202,7 @@
   <div id="payBody"></div><div id="payMsg"></div>
 </div></div>
 <div class="ov" id="nightOv"><div class="sheet"><button class="x" onclick="closeOv('nightOv')">×</button>
+  <div id="nightLogo"></div>
   <h3 id="nightTitle" style="margin:0 0 3px;font-size:1.05rem;font-weight:800">Night results</h3>
   <div class="sub" id="nightSub" style="margin-bottom:12px"></div><div id="nightBody"></div>
 </div></div>
@@ -223,6 +224,16 @@ const firstLast=s=>{ const p=String(s||'').trim().split(/\s+/); return p.length>
 const fmt=c=>'$'+((Number(c)||0)/100%1===0?(Number(c)||0)/100:((Number(c)||0)/100).toFixed(2));
 const cardTotal=c=>(Number(c)||0)+Math.round((Number(c)||0)*0.10);
 const TL={mixed:'Mixed',mens:"Men's",womens:"Women's"};
+// Queen of the Court wordmark (dark-bg version) — shown on Women's-division
+// ladders. Inlined so it uses the page's Cormorant + Inter fonts.
+const QOTC=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 264" style="height:100%;width:auto;display:block">
+  <g transform="translate(240,60)" fill="#E8B542"><path d="M-40 20 L-27 -14 L-9 8 L0 -24 L9 8 L27 -14 L40 20 Z"/><rect x="-40" y="20" width="80" height="9" rx="2.5"/><circle cx="0" cy="-24" r="4.5"/><circle cx="-27" cy="-14" r="3.5"/><circle cx="27" cy="-14" r="3.5"/></g>
+  <text x="240" y="150" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-style="italic" font-weight="600" font-size="62" fill="#F5EBD4">Queen</text>
+  <text x="240" y="184" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="16.5" letter-spacing="9" fill="#E8B542">OF THE COURT</text>
+  <g stroke="#E8B542" stroke-width="2"><line x1="150" y1="203" x2="206" y2="203"/><line x1="274" y1="203" x2="330" y2="203"/></g>
+  <circle cx="240" cy="203" r="4" fill="#E8B542"/>
+  <text x="240" y="230" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="10" letter-spacing="4.5" fill="#b9ac8e">THE DINK SOCIETY</text>
+</svg>`;
 const wd=s=>{ if(!s)return''; const d=new Date(s+'T12:00:00'); return isNaN(d)?'':d.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'}); };
 const wdShort=s=>{ if(!s)return''; const d=new Date(s+'T12:00:00'); return isNaN(d)?'':d.toLocaleDateString('en-US',{weekday:'short'}); };
 
@@ -377,6 +388,7 @@ function ladderCard(l,i){
   const ac=PAL[(i||0)%PAL.length], barCol=full?'var(--red)':(pct>=80?'var(--gold)':ac);
   return `<div style="border:1px solid ${hexA(ac,.32)};border-radius:13px;overflow:hidden;background:#000;margin-bottom:10px">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-left:3px solid ${ac};background-color:${hexA(ac,.12)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.14)} 0 9px,transparent 9px 20px)"><div style="flex:1;min-width:0"><div style="font-size:.92rem;font-weight:900;color:${ac};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div><div style="font-size:.66rem;color:var(--mut);font-weight:700">${[wd(l.date),time].filter(Boolean).join(' · ')}</div>${ladMaps(l)}${ladCourts(l,ac)}</div><span class="ttag ${tt}">${TL[tt]||'Mixed'}</span></div>
+    ${tt==='womens'?`<div style="display:flex;justify-content:center;padding:12px 12px 2px;background:#000"><div style="height:56px">${QOTC}</div></div>`:''}
     ${ladCountdown(l,ac)}
     <div style="padding:11px 12px;background:#000">
       <div class="evc-meta" style="margin-bottom:8px">${cap} players · ${fmt(l.feeCents)}</div>
@@ -568,6 +580,17 @@ let lbTab='wins', lbInfo=null, lbGender='all';
 const LB_GC={M:'#6aa8ff',F:'#ff8fb3'};
 const lbNormG=p=>{ const c=String(p&&p.gender||'').toUpperCase()[0]; return c==='M'?'M':c==='F'?'F':null; };
 function lbSetGender(g){ lbGender=g; renderStats(); }
+// Leaderboard boards = a filter by ladder type. Society = Mixed (everyone),
+// Queen = Women's-only, King = Men's-only. A player's games accumulate per board.
+let lbBrd='society';
+const LB_BOARDS={
+  society:{div:'mixed', accent:'#b8ff2c', label:'Society', sub:'Mixed'},
+  queen:{div:'womens', accent:'#ff7bb0', label:'Queen', sub:"Women's"},
+  king:{div:'mens', accent:'#4aa3e0', label:'King', sub:"Men's"},
+};
+function lbSetBoard(b){ lbBrd=b; if(b!=='society') lbGender='all'; renderStats(); }
+// King wordmark: the Queen mark recolored (teal crown/rules, light-blue word).
+const KOTC=QOTC.replace('>Queen<','>King<').replace(/#F5EBD4/g,'#eaf4ff').replace(/#E8B542/g,'#17d7b0');
 const LBINFO={wins:'<b>Wins</b> — the official season standings, ranked by wins → point differential → DR. The big number is total wins.',points:'<b>Points</b> — total points scored across the season. The big number is points scored.',xp:'<b>XP</b> — an engagement score. Earn it every event you play: showing up, game wins, placing, round MVP, and comebacks. Rewards playing more, not just winning.',dr:'<b>DR (Dink Rating)</b> — a 0–100 skill rating from your results. Ranks players by rating; also used to balance teams.'};
 const LBSUB={wins:'Season standings · ranked by wins → diff → DR',points:'Most points scored this season',xp:'Engagement · most XP earned',dr:'Skill rating · ranked by DR'};
 function lbSetTab(t){ lbTab=t; renderStats(); writeHash(); }
@@ -579,13 +602,35 @@ function renderStats(){
   // before ranking on the SEASON leaderboard — keeps small-sample ratings (e.g.
   // a 2-0 night) from topping the DR board. Single-night results are unaffected.
   const MIN_LB_GAMES=10;
-  const rowsAll=((j.divisions&&j.divisions.all)||j.leaderboard).filter(p=>((p.w||0)+(p.l||0))>=MIN_LB_GAMES);
+  // Pick the board's division rows. Society = Mixed (falls back to the combined
+  // set for legacy ladders that predate the type field); Queen/King read their own.
+  const activeD=j.activeDivisions||['all'];
+  const boardOn=b=>b==='society'?true:activeD.includes(LB_BOARDS[b].div);
+  if(!boardOn(lbBrd)) lbBrd='society';
+  const BRD=LB_BOARDS[lbBrd], divKey=BRD.div;
+  let src=(j.divisions&&j.divisions[divKey])||[];
+  if(lbBrd==='society' && !src.length) src=(j.divisions&&j.divisions.all)||j.leaderboard||[];
+  const rowsAll=src.filter(p=>((p.w||0)+(p.l||0))>=MIN_LB_GAMES);
+  let h='';
+  // Board switch — only boards that have a played ladder show up.
+  const boards=['society','queen','king'].filter(boardOn);
+  if(boards.length>1){
+    const boardBtn=b=>{const on=lbBrd===b,ac=LB_BOARDS[b].accent;return `<button onclick="lbSetBoard('${b}')" style="flex:1;padding:9px 4px;border:0;border-radius:9999px;font:inherit;font-size:.74rem;font-weight:800;cursor:pointer;display:flex;flex-direction:column;align-items:center;line-height:1.1;gap:1px;background:${on?ac:'transparent'};color:${on?'#0b0d0a':'var(--mut)'}">${LB_BOARDS[b].label}<span style="font-size:.56rem;font-weight:700;opacity:.85">${LB_BOARDS[b].sub}</span></button>`;};
+    h+=`<div style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:5px;margin-bottom:10px">${boards.map(boardBtn).join('')}</div>`;
+  }
+  // Branded header for the standalone King/Queen boards.
+  if(lbBrd!=='society'){
+    h+=`<div style="text-align:center;padding:4px 0 12px"><div style="height:50px;display:flex;justify-content:center;margin-bottom:6px">${lbBrd==='queen'?QOTC:KOTC}</div><div style="font-size:.62rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;color:${BRD.accent}">${BRD.sub} Ladder · its own board</div></div>`;
+  }
   const tabBtn=(k,label)=>`<button onclick="lbSetTab('${k}')" style="flex:1;padding:8px 4px;border:0;border-radius:9999px;font:inherit;font-size:.76rem;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;background:${lbTab===k?'var(--lime)':'transparent'};color:${lbTab===k?'#06210f':'var(--mut)'}">${label} <span onclick="event.stopPropagation();lbToggleInfo('${k}')" style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;border:1px solid currentColor;font-size:.56rem;opacity:.7">i</span></button>`;
-  let h=`<div style="display:flex;gap:4px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:6px">${tabBtn('wins','Wins')}${tabBtn('points','Points')}${tabBtn('xp','XP')}${tabBtn('dr','DR')}</div>`;
-  const gChip=(k,label)=>`<button onclick="lbSetGender('${k}')" style="padding:6px 13px;border-radius:9999px;border:1px solid ${lbGender===k?'var(--lime)':'var(--bd)'};background:${lbGender===k?'rgba(184,255,44,.08)':'var(--surf)'};color:${lbGender===k?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">${label}</button>`;
-  h+=`<div style="display:flex;gap:7px;margin:0 2px 8px">${gChip('all','All')}${gChip('M',"Men's")}${gChip('F',"Women's")}</div>`;
+  h+=`<div style="display:flex;gap:4px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:6px">${tabBtn('wins','Wins')}${tabBtn('points','Points')}${tabBtn('xp','XP')}${tabBtn('dr','DR')}</div>`;
+  // Gender filter stays on the Society (Mixed) board only — King/Queen are single-gender.
+  if(lbBrd==='society'){
+    const gChip=(k,label)=>`<button onclick="lbSetGender('${k}')" style="padding:6px 13px;border-radius:9999px;border:1px solid ${lbGender===k?'var(--lime)':'var(--bd)'};background:${lbGender===k?'rgba(184,255,44,.08)':'var(--surf)'};color:${lbGender===k?'var(--lime)':'var(--mut)'};font:inherit;font-size:.7rem;font-weight:800;cursor:pointer">${label}</button>`;
+    h+=`<div style="display:flex;gap:7px;margin:0 2px 8px">${gChip('all','All')}${gChip('M',"Men's")}${gChip('F',"Women's")}</div>`;
+  } else { lbGender='all'; }
   if(lbInfo) h+=`<div style="font-size:.72rem;color:#cdd2c6;background:var(--surf);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:10px;line-height:1.5">${LBINFO[lbInfo]}</div>`;
-  h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">${LBSUB[lbTab]} · overall + gender rank · tap a player for their card</div>`;
+  h+=`<div style="font-size:.66rem;color:var(--fnt);margin:0 2px 10px">${LBSUB[lbTab]}${lbBrd==='society'?' · overall + gender rank':''} · tap a player for their card</div>`;
   let rows;
   if(lbTab==='xp') rows=[...rowsAll].sort((a,b)=>(b.xp||0)-(a.xp||0));
   else if(lbTab==='dr') rows=[...rowsAll].sort((a,b)=>((b.dr??-1)-(a.dr??-1)));
@@ -595,7 +640,7 @@ function renderStats(){
   const genderRank={}; ['M','F'].forEach(g=>{ rows.filter(p=>lbNormG(p)===g).forEach((p,i)=>{ genderRank[p.id]=i+1; }); });
   let view = lbGender==='all' ? rows : rows.filter(p=>lbNormG(p)===lbGender);
   view = view.map(p=>{ const g=lbNormG(p); let sec='';
-    if(lbGender==='all'){ if(g) sec=`<span style="color:${LB_GC[g]}">${g==='M'?'M':'W'}#${genderRank[p.id]}</span>`; }
+    if(lbGender==='all'){ if(g && lbBrd==='society') sec=`<span style="color:${LB_GC[g]}">${g==='M'?'M':'W'}#${genderRank[p.id]}</span>`; }
     else sec=`<span style="color:var(--fnt)">#${overallRank[p.id]} ov</span>`;
     return Object.assign({}, p, {_sec:sec}); });
   const lbM = lbTab==='wins'?'wins':lbTab==='points'?'total':lbTab;
@@ -607,7 +652,7 @@ function renderStats(){
     const podium=top.length>=3?`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px;max-width:640px">${lbPodium(top[0],1,lbM)}${lbPodium(top[1],2,lbM)}${lbPodium(top[2],3,lbM)}</div>`:'';
     h+=`<div class="lb-m">${lbBoard(view, lbM)}</div><div class="lb-d">${podium}${lbTable(view, lbM)}</div>`;
   }
-  if(lbTab==='wins' && lbGender==='all'){
+  if(lbBrd==='society' && lbTab==='wins' && lbGender==='all'){
     if(j.mvpLeaders&&j.mvpLeaders.length) h+=`<div class="seclbl">🏅 Top performers</div>`+lbCard('#f0c040', j.mvpLeaders.map((x,i)=>lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:1rem;font-weight:900;color:#f0c040;text-shadow:0 0 12px rgba(240,192,64,.4)">${x.count}<span style="font-size:.6rem;color:#5e655a">×</span></span>`)).join(''));
     if(j.hotStreaks&&j.hotStreaks.length) h+=`<div class="seclbl">🔥 Hot streaks</div>`+lbCard('#ff7a3c', j.hotStreaks.map((x,i)=>lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:.78rem;font-weight:900;color:var(--lime);background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.26);border-radius:7px;padding:3px 9px;text-shadow:0 0 10px rgba(184,255,44,.4)">W${x.streak}</span>`)).join(''));
     if(j.partnerships&&j.partnerships.length){ let pr=j.partnerships.filter(p=>(p.w+p.l)>=3); if(!pr.length) pr=j.partnerships; h+=`<div class="seclbl">🤝 Best partnerships</div>`+lbCard('#17d7b0', pr.map((p,i)=>lbRow(i,`${esc(firstName(p.a))} &amp; ${esc(firstName(p.b))}`,`<span style="width:46px;height:5px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden;flex-shrink:0;display:inline-block"><span style="display:block;height:100%;background:#17d7b0;width:${p.pct}%"></span></span><span style="font-size:.72rem;color:#9aa094;font-weight:700;white-space:nowrap">${p.w}-${p.l} · ${p.pct}%</span>`)).join('')); }
@@ -625,6 +670,7 @@ async function night(id){
   const c=COMPLETED.find(x=>x.id===id)||{};
   document.getElementById('nightTitle').textContent=c.name||'Night results';
   document.getElementById('nightSub').textContent=[wd(c.date),c.place].filter(Boolean).join(' · ');
+  document.getElementById('nightLogo').innerHTML=(c.type==='womens')?`<div style="height:50px;margin:0 0 12px;display:flex;justify-content:center">${QOTC}</div>`:'';
   document.getElementById('nightBody').innerHTML='<div class="empty">Loading…</div>';
   document.getElementById('nightOv').classList.add('on');
   let j={}; try{ j=await (await fetch(`${API}/public-ladder-stats?event=${encodeURIComponent(id)}`)).json(); }catch(e){}

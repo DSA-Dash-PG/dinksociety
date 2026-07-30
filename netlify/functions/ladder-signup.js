@@ -105,6 +105,21 @@ export default async (req) => {
 
   // ── sign up ──
   if (req.method === 'POST') {
+    // Gender-locked ladder: a Men's or Women's division only accepts that gender.
+    // Enforced here so it covers every payment path (credit / venmo / card) and
+    // waitlist joins. A player with no gender set is blocked (strict) — the
+    // organizer can still add them manually from the manage panel.
+    const genderLock = event.type === 'mens' ? 'M' : event.type === 'womens' ? 'F' : null;
+    if (genderLock) {
+      const g = String(person.gender || '').trim().toUpperCase().charAt(0);
+      if (g !== genderLock) {
+        const who = genderLock === 'F' ? "women's" : "men's";
+        return json({ error: g
+          ? `This is a ${who}-only ladder, so it isn't open for your registration.`
+          : `This is a ${who}-only ladder and your player profile doesn't have a gender set yet, so we can't confirm you're eligible. Ask the organizer to add you, or have your gender set on your profile first.` }, 403);
+      }
+    }
+
     const body = await req.json().catch(() => ({}));
     const method = ['credit', 'venmo', 'card'].includes(body.paymentMethod) ? body.paymentMethod : null;
     // Respect the ladder's payment settings (credit is always allowed — it's

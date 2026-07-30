@@ -428,6 +428,28 @@ function showSec(k){ CURSEC=k; document.querySelectorAll('.ssec').forEach(s=>s.c
 // ── Organizers tab ──────────────────────────────────────────────
 function orgEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 const ORG_ROLE={ leaguePlayer:['League player','#17d7b0'], captain:['Captain','#f0c040'], admin:['Admin','#b8ff2c'] };
+// Per-ladder leaderboard toggle for each organizer's ladders. This is the always-
+// available control: "Keep own board" only lived in the pending card, so once a
+// ladder was excluded there was no way back. Every ladder now shows its status
+// plus a one-click flip (included <-> excluded), reversible any time.
+function orgLadderRows(ladders){
+  if(!ladders||!ladders.length) return '';
+  return `<div style="margin:8px 0 2px;padding:6px 10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);border-radius:10px">`+
+    ladders.map(l=>{
+      const st=l.leaderboard||'included', inc=st==='included';
+      const chip=inc
+        ? `<span class="badge" style="background:#b8ff2c22;color:#b8ff2c;border-color:transparent">On leaderboard</span>`
+        : (st==='pending'
+          ? `<span class="badge" style="background:#f0c04022;color:#f0c040;border-color:transparent">Awaiting</span>`
+          : `<span class="badge" style="background:#5e625c33;color:#9aa094;border-color:transparent">Own board only</span>`);
+      const btn=inc
+        ? `<button class="btn btn-out btn-sm" onclick="denyLadder('${orgEsc(l.id)}')">Keep own board</button>`
+        : `<button class="btn btn-lime btn-sm" onclick="approveLadder('${orgEsc(l.id)}')">Move onto leaderboard</button>`;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:5px 0;flex-wrap:wrap">
+        <div style="flex:1;min-width:150px;font-size:.78rem"><span style="font-weight:700">${orgEsc(l.name||'Ladder')}</span> <span style="color:#5e625c">${orgEsc(l.date||'')}</span></div>
+        <div>${chip}</div><div>${btn}</div></div>`;
+    }).join('')+`</div>`;
+}
 async function loadOrganizers(){
   const listEl=document.getElementById('orgListCard'), pendEl=document.getElementById('orgPendingCard');
   listEl.innerHTML='<div class="empty">Loading…</div>';
@@ -447,11 +469,14 @@ async function loadOrganizers(){
         const act=active
           ? `<button class="btn btn-danger btn-sm" onclick="setOrgStatus('${orgEsc(o.email)}','suspend')">Deny</button>`
           : `<button class="btn btn-out btn-sm" onclick="setOrgStatus('${orgEsc(o.email)}','activate')">Restore</button>`;
-        return `<div style="display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap">
-          <div style="flex:1;min-width:160px"><div style="font-weight:800">${orgEsc(o.name||'—')}</div><div style="font-size:.72rem;color:#9aa094">${orgEsc(o.email)}</div><div style="margin-top:3px">${lad}</div></div>
-          <div style="min-width:140px">${roles}</div>
-          <div><span class="badge" style="background:${stColor}22;color:${stColor};border-color:transparent">${orgEsc(o.status)}</span></div>
-          <div>${act}</div>
+        return `<div style="padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:160px"><div style="font-weight:800">${orgEsc(o.name||'—')}</div><div style="font-size:.72rem;color:#9aa094">${orgEsc(o.email)}</div><div style="margin-top:3px">${lad}</div></div>
+            <div style="min-width:140px">${roles}</div>
+            <div><span class="badge" style="background:${stColor}22;color:${stColor};border-color:transparent">${orgEsc(o.status)}</span></div>
+            <div>${act}</div>
+          </div>
+          ${orgLadderRows(o.ladders)}
         </div>`;
       }).join('');
     }
