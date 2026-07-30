@@ -9,10 +9,11 @@
 // Recruit excludes anyone already registered/waitlisted for that event.
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { listEvents, getEvent, getSignups, eventStartMs, spotsLeft } from './lib/ladder.js';
+import { listEvents, getEvent, getSignups, eventStartMs, spotsLeft, effectiveCapacity } from './lib/ladder.js';
 import { sendNotify } from './lib/notify-prefs.js';
 import { dateLineOf, siteUrl } from './lib/ladder-notify.js';
 import { normalizeEmail } from './lib/identity.js';
+import { divisionBadge, divisionLabel, divisionTitle, courtsLabel, spotsModule, ctaButton, inviteButton } from './lib/ladder-email-ui.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -44,41 +45,49 @@ function shell(inner) {
     <div style="margin-top:30px;padding-top:16px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6"><b style="color:#8a8a8a;font-weight:700">THE DINK SOCIETY · LADDER</b> · Open play, round-robin nights.</div>
   </div>`;
 }
-function btn(url, label, bg = '#b8ff2c', fg = '#0e0e0e') {
-  return `<a href="${esc(url)}" style="display:inline-block;padding:13px 30px;background:${bg};color:${fg};font-size:14px;font-weight:800;text-decoration:none;border-radius:9999px;margin:6px 0">${esc(label)}</a>`;
-}
+
 function evCard(ev, site) {
-  const courts = ev.courtNumbers ? esc(ev.courtNumbers) : `${ev.courts || 0} courts`;
-  const spots = ev.spotsLeft != null ? ev.spotsLeft : '';
-  return `<div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 12px">
-    <div style="font-size:15px;font-weight:800">${esc(ev.name)}</div>
+  const cap = effectiveCapacity(ev);
+  const left = ev.spotsLeft != null ? ev.spotsLeft : '';
+  const badgeUrl = `${site}/.netlify/functions/public-ladder-badge?event=${encodeURIComponent(ev.id)}`;
+  const openTxt = left !== '' ? `${left} spot${left === 1 ? '' : 's'} open` : '';
+  return `<div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 14px">
+    <span style="display:inline-block;font-size:10px;font-weight:800;letter-spacing:.08em;color:#0e0e0e;background:#b8ff2c;padding:3px 9px;border-radius:9999px">${esc(divisionLabel(ev.type))}</span>
+    <div style="font-size:15px;font-weight:800;margin-top:8px">${esc(ev.name)}</div>
     <div style="font-size:12.5px;color:#17d7b0;font-weight:700;margin-top:4px">${esc(dateLineOf(ev))}</div>
-    <div style="font-size:12px;color:#8a8a8a;margin-top:6px">📍 ${esc(ev.place || '')} · ${courts}${spots !== '' ? ` · ${spots} spot${spots === 1 ? '' : 's'} open` : ''}</div>
-    <div style="margin-top:10px">${btn(`${site}/ladders.html?event=${encodeURIComponent(ev.id)}`, 'Register →')}</div>
+    <a href="${site}/ladders.html?event=${encodeURIComponent(ev.id)}" style="text-decoration:none;display:block"><img src="${esc(badgeUrl)}" width="300" alt="${esc(left)} of ${esc(cap)} spots left" style="display:block;border:0;outline:none;width:100%;max-width:300px;height:auto;margin:10px 0 4px"></a>
+    <div style="font-size:12px;color:#8a8a8a;margin-top:2px">📍 ${esc(ev.place || '')} · ${esc(courtsLabel(ev))}${openTxt ? ` · <span style="color:#b8ff2c;font-weight:700">${esc(openTxt)}</span>` : ''}</div>
+    <div style="margin-top:12px">${ctaButton(`${site}/ladders.html?event=${encodeURIComponent(ev.id)}`, 'Lock My Spot →')}</div>
   </div>`;
 }
 
-function renderRecruit({ name, event, needed, site }) {
-  const courts = event.courtNumbers ? esc(event.courtNumbers) : `${event.courts || 0} courts`;
+function renderRecruit({ name, event, needed, left, cap, site }) {
   return shell(`
-    <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#b8ff2c;background:rgba(184,255,44,.10);border:1px solid rgba(184,255,44,.30);padding:6px 12px;border-radius:9999px;margin-bottom:14px">Players wanted</span>
+    ${divisionBadge(event.type)}
     <h1 style="font-size:26px;font-weight:800;line-height:1.15;margin:0 0 12px">We need <span style="color:#b8ff2c">${esc(needed)}</span> more, ${esc(firstName(name))}.</h1>
-    <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 16px">A spot (or ${esc(needed)}) just opened up for an upcoming ladder. If you're free, jump in — it fills fast.</p>
-    <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 16px">
+    <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 20px">A spot (or ${esc(needed)}) just opened up for an upcoming ${esc(divisionTitle(event.type))} ladder. If you're free, jump in — it fills fast.</p>
+    ${spotsModule({ event, left, cap, site })}
+    <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 18px">
       <div style="font-size:16px;font-weight:800">${esc(event.name)}</div>
       <div style="font-size:13px;color:#17d7b0;font-weight:700;margin-top:5px">${esc(dateLineOf(event))}</div>
-      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${esc(event.place || '')} · ${courts} · ${esc(event.type || 'mixed')}</div>
+      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${esc(event.place || '')} · ${esc(courtsLabel(event))} · ${esc(divisionTitle(event.type))}</div>
     </div>
-    ${btn(`${site}/ladders.html?event=${encodeURIComponent(event.id)}`, `Grab a spot →`)}
+    ${ctaButton(`${site}/ladders.html?event=${encodeURIComponent(event.id)}`, 'Grab a Spot →')}
+    ${inviteButton(event, site)}
     <p style="font-size:12.5px;color:#777;margin-top:16px">Not this time? No worries — you'll always get first look at the next one.</p>
   `);
 }
 function renderOpen({ name, events, site }) {
+  const single = events.length === 1;
+  const header = single
+    ? divisionBadge(events[0].type)
+    : `<span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#17d7b0;background:rgba(23,215,176,.10);border:1px solid rgba(23,215,176,.30);padding:6px 12px;border-radius:9999px;margin-bottom:14px">🪜 New ladders open</span>`;
   return shell(`
-    <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#17d7b0;background:rgba(23,215,176,.10);border:1px solid rgba(23,215,176,.30);padding:6px 12px;border-radius:9999px;margin-bottom:14px">🪜 New ladders open</span>
-    <h1 style="font-size:26px;font-weight:800;line-height:1.15;margin:0 0 12px">Fresh ladders are up, ${esc(firstName(name))}.</h1>
-    <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 18px">New ladder nights just opened for registration. Pick one and lock your spot:</p>
+    ${header}
+    <h1 style="font-size:26px;font-weight:800;line-height:1.15;margin:0 0 12px">Fresh ladder${single ? '' : 's'} ${single ? 'is' : 'are'} up, ${esc(firstName(name))}.</h1>
+    <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 18px">New ladder night${single ? '' : 's'} just opened for registration. ${single ? 'Lock your spot before it fills:' : 'Pick one and lock your spot:'}</p>
     ${events.map(ev => evCard(ev, site)).join('')}
+    ${single ? inviteButton(events[0], site) : ''}
     <p style="font-size:12.5px;color:#777;margin-top:6px">See everything anytime at <a href="${site}/ladders.html" style="color:#17d7b0;text-decoration:none">the ladder page</a>.</p>
   `);
 }
@@ -109,7 +118,7 @@ export default async (req) => {
     const open = spotsLeft(event, signups);
     const needed = (b.neededCount != null && +b.neededCount > 0) ? Math.floor(+b.neededCount) : (open || 1);
     subject = `${needed} spot${needed === 1 ? '' : 's'} open — ${event.name}`;
-    htmlFor = (name) => renderRecruit({ name, event, needed, site });
+    htmlFor = (name) => renderRecruit({ name, event, needed, left: open, cap: effectiveCapacity(event), site });
   } else {
     const now = Date.now();
     const events = (await listEvents({ circuit }))

@@ -8,10 +8,11 @@
 // `announcedAt` flag on the event so a later edit (same save endpoint) never
 // re-blasts. Test seasons are skipped.
 
-import { listEvents, getSignups } from './ladder.js';
+import { listEvents, getSignups, spotsLeft, effectiveCapacity } from './ladder.js';
 import { sendNotify } from './notify-prefs.js';
 import { dateLineOf, siteUrl } from './ladder-notify.js';
 import { normalizeEmail } from './identity.js';
+import { divisionBadge, divisionTitle, courtsLabel, spotsModule, ctaButton, inviteButton } from './ladder-email-ui.js';
 
 function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 function firstName(n) { return String(n || '').trim().split(/\s+/)[0] || 'there'; }
@@ -47,23 +48,21 @@ function shell(inner) {
     <div style="margin-top:30px;padding-top:16px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6"><b style="color:#8a8a8a;font-weight:700">THE DINK SOCIETY · LADDER</b> · Open play, round-robin nights.</div>
   </div>`;
 }
-function btn(url, label, bg = '#b8ff2c', fg = '#0e0e0e') {
-  return `<a href="${esc(url)}" style="display:inline-block;padding:13px 30px;background:${bg};color:${fg};font-size:14px;font-weight:800;text-decoration:none;border-radius:9999px;margin:6px 0">${esc(label)}</a>`;
-}
 
-function renderNewLadder({ name, event, site }) {
-  const courts = event.courtNumbers ? esc(event.courtNumbers) : `${event.courts || 0} courts`;
-  const spots = event.capacity != null ? `${event.capacity} spots` : '';
+function renderNewLadder({ name, event, left, cap, site }) {
+  const capacity = cap != null ? cap : effectiveCapacity(event);
   return shell(`
-    <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#17d7b0;background:rgba(23,215,176,.10);border:1px solid rgba(23,215,176,.30);padding:6px 12px;border-radius:9999px;margin-bottom:14px">🪜 New ladder open</span>
-    <h1 style="font-size:26px;font-weight:800;line-height:1.15;margin:0 0 12px">Fresh ladder is up, ${esc(firstName(name))}.</h1>
-    <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 16px">A new ladder night just opened for registration. Lock your spot before it fills:</p>
-    <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 16px">
+    ${divisionBadge(event.type)}
+    <h1 style="font-size:28px;font-weight:800;line-height:1.12;margin:0 0 12px">A fresh <span style="color:#b8ff2c">${esc(divisionTitle(event.type))} Ladder</span> just dropped, ${esc(firstName(name))}.</h1>
+    <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 20px">${esc(courtsLabel(event))}, ${esc(capacity)} spots, one night of round-robin — lock your spot before the regulars claim it.</p>
+    ${spotsModule({ event, left, cap: capacity, site })}
+    <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 18px">
       <div style="font-size:16px;font-weight:800">${esc(event.name)}</div>
       <div style="font-size:13px;color:#17d7b0;font-weight:700;margin-top:5px">${esc(dateLineOf(event))}</div>
-      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${esc(event.place || '')} · ${courts}${spots ? ` · ${spots}` : ''} · ${esc(event.type || 'mixed')}</div>
+      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${esc(event.place || '')} · ${esc(courtsLabel(event))} · ${esc(divisionTitle(event.type))}</div>
     </div>
-    ${btn(`${site}/ladders.html?event=${encodeURIComponent(event.id)}`, 'Register →')}
+    ${ctaButton(`${site}/ladders.html?event=${encodeURIComponent(event.id)}`, 'Lock My Spot →')}
+    ${inviteButton(event, site)}
     <p style="font-size:12.5px;color:#777;margin-top:16px">See everything anytime at <a href="${site}/ladders.html" style="color:#17d7b0;text-decoration:none">the ladder page</a>.</p>
   `);
 }
@@ -83,14 +82,19 @@ export async function announceNewLadder(event) {
     const from = blastFrom();
     const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+    // Send-time spots snapshot (usually full capacity at create, but be exact).
+    const su = await getSignups(event.id);
+    const left = spotsLeft(event, su);
+    const cap = effectiveCapacity(event);
+
     const people = await pastParticipants(event.circuit || 'I', event.id);
     if (!people.size) return { sent: 0, recipients: 0, note: 'no past participants yet' };
 
-    const subject = `🪜 New ladder open: ${event.name}`;
+    const subject = `🪜 New ${divisionTitle(event.type)} ladder open: ${event.name}`;
     let sent = 0, failed = 0, skipped = 0;
     for (const [email, name] of people) {
       try {
-        const r = await sendNotify({ to: email, from, replyTo: from, category: 'new_ladders', subject, html: renderNewLadder({ name, event, site }) });
+        const r = await sendNotify({ to: email, from, replyTo: from, category: 'new_ladders', subject, html: renderNewLadder({ name, event, left, cap, site }) });
         if (r && r.skipped) { skipped++; } else { sent++; await sleep(80); }
       } catch { failed++; }
     }
