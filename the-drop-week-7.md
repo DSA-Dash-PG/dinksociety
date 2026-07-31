@@ -49,8 +49,8 @@ CHIPS: 4–0 nights: 4, Shay C: 25–3 overall, Matt P.: 4–0 in the semi
 **Storyline 3**
 TAG: The Climb
 HEADLINE: Kaithlyn R keeps rising, and the ratings that held all season
-BODY: The DSR board rewards trend as much as talent, and Kaithlyn R has the trend — up seven spots in the overall rankings, from the back half of the top twenty at the end of the regular season to knocking on the top five, and now a 4–0 in the semifinal to underline it. She isn't alone in the numbers: Kyle U still owns the league's #1 mixed rating, and captain Ryan Hom carries the #2 men's-line mark into the final. The counter-note is Lara P, who finished the regular season as the single highest-rated mixed player in the division and then had the rare off night — 1–3 in the semi. One evening won't dent a season that good, but it's the reminder that even the metronomes miss a beat.
-CHIPS: Kaithlyn R: +7 overall, Kyle U: #1 mixed DSR, Lara P: reg-season #1 rated
+BODY: The DSR board rewards trend as much as talent, and Kaithlyn R has the trend — up seven spots in the overall rankings, from the back half of the top twenty at the end of the regular season to knocking on the top five, and now a 4–0 in the semifinal to underline it. She isn't alone inside the ZERO ZERO TWO numbers: teammate Kyle U still owns the league's #1 mixed rating, while Lara P — the division's single highest-rated mixed player at the end of the regular season — had the rare off night, 1–3 in the semi. One evening won't dent a season that good, but it's the reminder that even the metronomes miss a beat. Across the net, the man they'll have to solve for gold — Smash captain Ryan Hom — carries the #2 men's-line rating of his own into Monday.
+CHIPS: Kaithlyn R: +7 overall, Kyle U: #1 mixed DSR (ZZT), Ryan Hom: #2 men's DSR (Smash)
 
 **Storyline 4**
 TAG: Bronze on the Line
@@ -65,7 +65,13 @@ BODY: The 5-versus-6 match is easy to overlook and this one earned a second look
 CHIPS: Consolation: WTD def. Timog 3–1, Ryan Yeung: 3–1, Teddie Liu: 3–1
 
 **Storyline 6**
+TAG: Now Official
+HEADLINE: The Dink Society is now an official DUPR club
+BODY: Some news that outlasts any single Monday: the Society is now an official DUPR club. Starting with Season 2 and carrying into the Ladder Challenges, the matches you play here will feed your DUPR — the Dynamic Universal Pickleball Rating that travels with you to any club, tournament, or open-play run in the country. It means a win at SBTC stops living only on our leaderboard and starts counting on the sport's global ledger. Our own DSR isn't going anywhere; think of it as the house lens on form, matchups and momentum. But now it runs alongside a number the whole sport recognizes — so every game at the Society builds a rating that follows you everywhere.
+CHIPS: New: Official DUPR club, Rolling out: Season 2 + Ladder, Ratings: DUPR + in-house DSR
+
+**Storyline 7**
 TAG: What's Next
 HEADLINE: The Circuit ends Monday — and Season 2 registration is open
-BODY: One more league night decides everything: gold between ZERO ZERO TWO and Smash Society, bronze between K'CHN and Big Dink Energy. And whatever happens under the lights, the next Circuit is already taking shape — Season 2 registration is open now at dinksociety.app/register, a fresh table, a clean slate, and a standings page that resets to zero for everybody, unbeaten and winless alike. [Richard — confirm the Season 2 deadline / any early-bird or roster details you want in this chip.]
-CHIPS: Register: dinksociety.app/register, Season 2: open now, Deadline: TBD
+BODY: One more league night decides everything: gold between ZERO ZERO TWO and Smash Society, bronze between K'CHN and Big Dink Energy. And whatever happens under the lights, the next Circuit is already taking shape — Season 2 registration is open now at dinksociety.app/register, a fresh table, a clean slate, a standings page that resets to zero for everybody, and for the first time, every result feeding your official DUPR. [Richard — confirm the Season 2 deadline / any early-bird or roster details you want in this chip.]
+CHIPS: Register: dinksociety.app/register, Season 2: open now · DUPR-rated, Deadline: TBD

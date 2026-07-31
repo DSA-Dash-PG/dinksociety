@@ -93,6 +93,38 @@ export function adjust(email, cents, reason, { eventId, key } = {}) {
   return append(email, entry({ delta: Math.round(cents), type: 'adjustment', reason, eventId, key }));
 }
 
+/**
+ * Void a single ledger entry by id. Appends a REVERSING adjustment (history is
+ * never mutated) so the balance nets that entry out. Idempotent — keyed by
+ * `void:<entryId>`, so re-voiding the same entry is a no-op.
+ * Returns { record, voided?, alreadyVoided?, notFound? }.
+ */
+export async function voidEntry(email, entryId, reason) {
+  const rec = await getCredit(email);
+  const target = (rec.ledger || []).find((e) => e.id === entryId);
+  if (!target) return { record: rec, notFound: true };
+  const voidKey = `void:${entryId}`;
+  if (rec.ledger.some((e) => e.key === voidKey)) return { record: rec, alreadyVoided: true };
+  const delta = -Math.round(Number(target.delta) || 0);
+  if (!delta) return { record: rec, alreadyVoided: true }; // nothing to reverse
+  const label = reason || `Voided: ${target.reason || target.type || 'entry'}`;
+  const updated = await append(email, entry({ delta, type: 'adjustment', reason: label, eventId: target.eventId, key: voidKey }));
+  return { record: updated, voided: true };
+}
+
+/**
+ * Zero out a player's ENTIRE balance with a single reversing adjustment.
+ * No-op when the balance is already zero. Returns { record, voided?, noop? }.
+ */
+export async function voidAll(email, reason) {
+  const rec = await getCredit(email);
+  const bal = Number(rec.balanceCents) || 0;
+  if (!bal) return { record: rec, noop: true };
+  const norm = normalizeEmail(email);
+  const updated = await append(email, entry({ delta: -bal, type: 'adjustment', reason: reason || 'Balance voided by admin', key: `voidall:${norm}:${Date.now()}` }));
+  return { record: updated, voided: true };
+}
+
 function randomId(bytes) {
   const arr = new Uint8Array(bytes);
   crypto.getRandomValues(arr);
