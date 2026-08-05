@@ -347,6 +347,13 @@
   <div class="help" style="margin:-4px 0 6px">Emails everyone registered right now — the field, each player's last-ladder line, court #s, a cancel link, and the next ladder. Auto-sends also fire 2 days out, 5am day-of, and 3 hours out.</div>
   <div id="mRemMsg"></div>
 
+  <div class="sec" style="margin:22px 0 8px">Message the roster</div>
+  <div class="frow"><label class="l">Subject (optional)</label><input class="i" id="m-msg-subject" placeholder="Defaults to the ladder name"></div>
+  <div class="frow"><label class="l">Message</label><textarea class="i" id="m-msg-body" rows="4" placeholder="e.g. Courts have moved to 5A &amp; 5B tonight — see you there!" style="resize:vertical;min-height:90px"></textarea></div>
+  <button class="btn btn-lime" style="width:100%" onclick="sendLadderMessage()">Send to roster now</button>
+  <div class="help" style="margin:6px 0 4px">Goes to everyone currently confirmed on this ladder's roster (not the waitlist). Always delivers — this is an operational message, not subject to email preference opt-outs.</div>
+  <div id="mMsgMsg"></div>
+
   <div class="sec" style="margin:22px 0 8px">Recruit players</div>
   <div class="frow row2">
     <div><label class="l">Players still needed (optional)</label><input class="i" id="m-needed" type="number" placeholder="auto = open spots"></div>
@@ -1017,6 +1024,22 @@ async function sendReminder(){
   if(status===401){ msg('mRemMsg','err','Sign in as admin first.'); return; }
   if(d&&d.ok){ msg('mRemMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); }
   else { msg('mRemMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').')); }
+}
+
+async function sendLadderMessage(){
+  if(!CURRENT) return;
+  const subject=document.getElementById('m-msg-subject').value.trim();
+  const message=document.getElementById('m-msg-body').value.trim();
+  if(!message){ msg('mMsgMsg','err','Write a message first.'); return; }
+  if(!(await dsConfirm({ title:'Send message?', message:'Send this message to everyone on the roster for '+(CURRENT.name||'this ladder')+'?', confirmLabel:'Send', cancelLabel:'Cancel' }))) return;
+  const box=document.getElementById('mMsgMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
+  const {status,d}=await api('/admin-ladder-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:CURRENT.id,subject,message})});
+  if(status===401){ msg('mMsgMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){
+    msg('mMsgMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.');
+    document.getElementById('m-msg-body').value='';
+  }
+  else msg('mMsgMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }
 
 async function blastRecruit(){
