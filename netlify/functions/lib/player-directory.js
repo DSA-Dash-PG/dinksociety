@@ -2,15 +2,24 @@
 //
 // A master directory of ladder-player details keyed by playerId — the single
 // place to set a player's email (which links their ladder profile to their league
-// profile), and to correct their display name / gender across every ladder at once.
+// profile), to correct their display name / gender across every ladder at once,
+// and to cross-reference their DUPR account.
 // Email lived only on per-event signups before; this lets an admin set it once.
 //
-//   ladder-players  directory.json → { [playerId]: { email, name, gender } }
+//   ladder-players  directory.json → { [playerId]: { email, name, gender, duprId } }
 
 import { getStore } from '@netlify/blobs';
 
 const STORE = 'ladder-players';
 function store() { return getStore({ name: STORE, consistency: 'strong' }); }
+
+// DUPR profile pages live at dashboard.dupr.com/dashboard/player/<id> — build a
+// direct link from a stored id so an admin can jump straight to a player's
+// DUPR profile to verify/compare ratings.
+export function duprProfileUrl(duprId) {
+  const id = String(duprId || '').trim();
+  return id ? `https://dashboard.dupr.com/dashboard/player/${encodeURIComponent(id)}` : null;
+}
 
 export async function getDirectory() {
   const d = await store().get('directory.json', { type: 'json' }).catch(() => null);
@@ -24,6 +33,7 @@ export async function setPlayerInfo(id, info = {}) {
   if ('email' in info) next.email = String(info.email || '').trim().toLowerCase();
   if ('name' in info && info.name) next.name = String(info.name).trim().slice(0, 60);
   if ('gender' in info && info.gender) next.gender = info.gender === 'F' ? 'F' : 'M';
+  if ('duprId' in info) next.duprId = String(info.duprId || '').trim().slice(0, 30);
   dir[id] = next;
   await store().setJSON('directory.json', dir);
   return next;

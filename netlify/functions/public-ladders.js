@@ -12,6 +12,7 @@ function pub(e, s) {
     id: e.id, name: e.name, date: e.date, startTime: e.startTime, endTime: e.endTime, place: e.place,
     courts: e.courts, courtNames: e.courtNames || [], courtNumbers: e.courtNumbers || null,
     type: e.type || 'mixed', feeCents: e.feeCents, status: e.status || 'open',
+    cancelPolicy: e.cancelPolicy || 'auto_credit',
     capacity: effectiveCapacity(e), spotsLeft: p.spotsLeft,
     rosterCount: p.rosterCount, waitlistCount: p.waitlistCount,
     paymentMethods: e.paymentMethods || ['card', 'venmo'],

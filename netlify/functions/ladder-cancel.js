@@ -28,6 +28,10 @@ function onList(signups, rec) {
 }
 
 function confirmPage(token, rec, event) {
+  const policy = event.cancelPolicy || 'auto_credit';
+  const afterDrop = policy === 'auto_credit'
+    ? " You'll get a ladder credit for what you paid, and the next person on the waitlist takes your place."
+    : ' The next person on the waitlist takes your place — no refunds, no credit.';
   return new Response(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Cancel your ladder spot</title>
 <style>body{font-family:'Inter',system-ui,sans-serif;background:#0e0e0e;color:#f5f5f5;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:24px}
 .box{max-width:430px;text-align:center}.tag{font-size:.7rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#17d7b0;margin-bottom:10px}
@@ -36,7 +40,7 @@ button{font-family:inherit;font-size:.95rem;font-weight:800;border:0;cursor:poin
 a{color:#8a8a8a;font-size:.8rem;display:inline-block;margin-top:18px;text-decoration:none}.wm{font-size:.7rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5e625c;margin-top:26px}</style></head>
 <body><div class="box"><div class="tag">🪜 The Dink Society Ladder</div>
 <h1>Cancel your spot, ${esc(firstName(rec.name || rec.email))}?</h1>
-<p>This drops you from <b style="color:#fff">${esc(event.name)}</b> (${esc(dateLineOf(event))}). You'll get a ladder credit for what you paid, and the next person on the waitlist takes your place.</p>
+<p>This drops you from <b style="color:#fff">${esc(event.name)}</b> (${esc(dateLineOf(event))}).${afterDrop}</p>
 <form method="POST"><input type="hidden" name="t" value="${esc(token)}"><button type="submit">Yes, cancel my spot</button></form>
 <a href="${siteUrl()}/ladders.html?event=${encodeURIComponent(event.id)}">Never mind, keep my spot</a>
 <div class="wm">The Dink Society</div></div></body></html>`,

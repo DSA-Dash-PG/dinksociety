@@ -195,7 +195,7 @@
           <div class="frow"><label class="l">Payment methods</label><div class="seg" id="seg-pay"><button class="on" data-v="card,venmo">Card + Venmo</button><button data-v="venmo">Venmo only</button><button data-v="card">Card only</button></div></div>
           <div class="help" style="margin:-2px 0 13px">Venmo only skips Stripe entirely — no card option, no 10% card fee. Ladder credit always works regardless.</div>
           <div class="frow"><label class="l">When a spot opens</label><div class="seg" id="seg-spot"><button class="on" data-v="hold">Hold &amp; confirm (30m)</button><button data-v="auto">Auto-claim</button></div></div>
-          <div class="frow"><label class="l">When a player cancels</label><div class="seg" id="seg-cancel"><button class="on" data-v="auto_credit">Auto credit</button><button data-v="credit_if_refilled">If refilled</button><button data-v="no_credit">No credit</button></div></div>
+          <div class="frow"><label class="l">When a player cancels</label><div class="seg" id="seg-cancel"><button data-v="auto_credit">Auto credit</button><button data-v="credit_if_refilled">If refilled</button><button class="on" data-v="no_credit">No credit</button></div></div>
           <button class="btn btn-lime" onclick="createLadder()">Create &amp; open signups</button>
           <div id="createMsg"></div>
         </div>
@@ -673,15 +673,17 @@ async function viewAsPlayer(){
   if(d&&d.ok){ location.href=d.redirect||'/me.html'; return; }
   msg('vaMsg','err',(d&&d.error)||('Could not start ('+status+').'));
 }
+function duprUrl(id){ return id?('https://dashboard.dupr.com/dashboard/player/'+encodeURIComponent(id)):''; }
 function plRosterHtml(d){
-  let h='<div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">Set a player\'s email (links their league profile) or fix name/gender. Changes apply across every ladder.</div>';
+  let h='<div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">Set a player\'s email (links their league profile), DUPR ID (cross-references their DUPR account), or fix name/gender. Changes apply across every ladder.</div>';
   h+='<label class="l">Find a player</label><input class="i" id="pl-search" placeholder="Search players by name…" autocomplete="off" oninput="plSearch()"><div id="plResults" style="margin-top:6px"></div>';
   h+='<input type="hidden" id="ed-player">';
   h+='<div id="ed-selected" style="font-size:.78rem;color:#5e655a;margin:12px 0 6px">No player selected — search above, or tap one in the list.</div>';
   h+='<input class="i" id="ed-email" type="email" placeholder="Email (links league profile)"><div class="row2" style="margin-top:8px"><input class="i" id="ed-name" placeholder="Name"><select class="i" id="ed-gender" style="max-width:90px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select></div>';
+  h+='<input class="i" id="ed-dupr" placeholder="DUPR ID (e.g. 4549099018)" style="margin-top:8px" oninput="renderDuprLink(this.value)"><div id="ed-dupr-link" style="margin-top:4px"></div>';
   h+='<button class="btn btn-lime" style="margin-top:8px" onclick="savePlayer()">Save player</button><div id="edMsg"></div>';
   h+='<div class="sec" style="margin:18px 0 8px">All players ('+d.players.length+')</div>';
-  h+='<div style="max-height:300px;overflow:auto">'+d.players.map(p=>`<div onclick="plPickById('${p.id}')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.05);font-size:.78rem;cursor:pointer;${p.mergedInto?'opacity:.5':''}"><span class="pn">${esc(p.name)} <span style="color:#5e655a">${p.gender||''}</span></span><span style="color:#9aa094">${p.nights} ladders${p.email?' · ✉':''}${p.mergedInto?' · merged':''}</span></div>`).join('')+'</div>';
+  h+='<div style="max-height:300px;overflow:auto">'+d.players.map(p=>`<div onclick="plPickById('${p.id}')" style="display:flex;justify-content:space-between;gap:8px;padding:7px 4px;border-bottom:1px solid rgba(255,255,255,.05);font-size:.78rem;cursor:pointer;${p.mergedInto?'opacity:.5':''}"><span class="pn">${esc(p.name)} <span style="color:#5e655a">${p.gender||''}</span></span><span style="color:#9aa094">${p.nights} ladders${p.email?' · ✉':''}${p.duprId?' · DUPR':''}${p.mergedInto?' · merged':''}</span></div>`).join('')+'</div>';
   return h;
 }
 function plMergeHtml(d){
@@ -738,14 +740,20 @@ function plApply(p){
   document.getElementById('ed-email').value=p.email||'';
   document.getElementById('ed-name').value=p.name||'';
   document.getElementById('ed-gender').value=p.gender||'';
-  const s=document.getElementById('ed-selected'); if(s) s.innerHTML='Editing <b style="color:#f5f5f5">'+esc(p.name)+'</b> · '+(p.nights||0)+' ladders'+(p.email?' · ✉':'');
+  document.getElementById('ed-dupr').value=p.duprId||'';
+  renderDuprLink(p.duprId);
+  const s=document.getElementById('ed-selected'); if(s) s.innerHTML='Editing <b style="color:#f5f5f5">'+esc(p.name)+'</b> · '+(p.nights||0)+' ladders'+(p.email?' · ✉':'')+(p.duprId?' · DUPR':'');
   const sb=document.getElementById('pl-search'); if(sb) sb.value=''; const r=document.getElementById('plResults'); if(r) r.innerHTML='';
   document.getElementById('ed-email').focus();
+}
+function renderDuprLink(id){
+  const el=document.getElementById('ed-dupr-link'); if(!el) return;
+  el.innerHTML=id?('<a href="'+esc(duprUrl(id))+'" target="_blank" rel="noopener" style="font-size:.74rem;color:var(--lime);text-decoration:none">↗ Open DUPR profile</a>'):'';
 }
 async function doMerge(){ const from=document.getElementById('mg-from').value,to=document.getElementById('mg-to').value,name=(document.getElementById('mg-name').value||'').trim(); const M=document.getElementById('mgMsg'); if(!from||!to||from===to){ M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick two different players.</div>'; return; } const {d}=await plPost({action:'merge',from,to,name:name||null}); if(d.ok){ loadPlayers(); loadXp(); M.innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Merged.</div>'; } else M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
 async function undoMerge(from){ const {d}=await plPost({action:'unmerge',from}); if(d.ok) loadPlayers(); }
 async function mergeGroup(i){ const g=(window.__DUPS||[])[i]; if(!g||g.length<2) return; const keeper=g.slice().sort((a,b)=>b.nights-a.nights)[0]; for(const p of g){ if(p.id===keeper.id) continue; await plPost({action:'merge',from:p.id,to:keeper.id,name:keeper.name}); } loadPlayers(); }
-async function savePlayer(){ const id=document.getElementById('ed-player').value; const M=document.getElementById('edMsg'); if(!id){ M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick a player.</div>'; return; } const email=(document.getElementById('ed-email').value||'').trim(); const name=(document.getElementById('ed-name').value||'').trim(); const gender=document.getElementById('ed-gender').value; const {d}=await plPost({action:'update',id,email,name,gender}); if(d.ok){ loadPlayers(); M.innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Saved.</div>'; } else M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
+async function savePlayer(){ const id=document.getElementById('ed-player').value; const M=document.getElementById('edMsg'); if(!id){ M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">Pick a player.</div>'; return; } const email=(document.getElementById('ed-email').value||'').trim(); const name=(document.getElementById('ed-name').value||'').trim(); const gender=document.getElementById('ed-gender').value; const duprId=(document.getElementById('ed-dupr').value||'').trim(); const {d}=await plPost({action:'update',id,email,name,gender,duprId}); if(d.ok){ loadPlayers(); M.innerHTML='<div style="color:#b8ff2c;font-size:.76rem;margin-top:6px">Saved.</div>'; } else M.innerHTML='<div style="color:#ff5c47;font-size:.76rem;margin-top:6px">'+(d.error||'Failed')+'</div>'; }
 loadPlayers();
 
 async function loadList(){
@@ -1124,7 +1132,7 @@ async function renameFor(playerId,name){
   const val=v.trim();
   if(!val){ msg('mMsg','err','Name cannot be empty.'); return; }
   const existing=((PLDATA&&PLDATA.players)||[]).find(x=>x.id===playerId);
-  const {status,d}=await plPost({action:'update',id:playerId,name:val,email:existing?existing.email:'',gender:existing?existing.gender:''});
+  const {status,d}=await plPost({action:'update',id:playerId,name:val,email:existing?existing.email:'',gender:existing?existing.gender:'',duprId:existing?existing.duprId:''});
   if(status===401){ msg('mMsg','err','Sign in as admin first.'); return; }
   if(d&&d.ok){ msg('mMsg','ok','Renamed to '+val+' — updates on every ladder.'); loadPlayers(); await openManage(CURRENT.id); }
   else msg('mMsg','err',(d&&d.error)||'Could not rename ('+status+').');

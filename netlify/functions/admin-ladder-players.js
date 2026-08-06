@@ -68,7 +68,7 @@ export default async (req) => {
     // silently hid emails that were entered at signup but never separately
     // re-typed into the directory editor.
     const list = Object.values(universe)
-      .map(p => ({ id: p.id, name: (dir[p.id]?.name) || p.name, gender: (dir[p.id]?.gender) || p.gender, email: dir[p.id]?.email || rosterPlayers[p.id]?.email || '', nights: ladderIds[p.id] ? ladderIds[p.id].size : 0, mergedInto: map[p.id] ? map[p.id].to : null }))
+      .map(p => ({ id: p.id, name: (dir[p.id]?.name) || p.name, gender: (dir[p.id]?.gender) || p.gender, email: dir[p.id]?.email || rosterPlayers[p.id]?.email || '', duprId: dir[p.id]?.duprId || '', nights: ladderIds[p.id] ? ladderIds[p.id].size : 0, mergedInto: map[p.id] ? map[p.id].to : null }))
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const merges = Object.entries(map).map(([from, val]) => ({ from, to: val.to, name: val.name || null }));
     return json({ players: list, merges });
@@ -79,7 +79,7 @@ export default async (req) => {
   try {
     if (body.action === 'merge') { await setMerge(body.from, body.to, body.name); return json({ ok: true }); }
     if (body.action === 'unmerge') { await removeMerge(body.from); return json({ ok: true }); }
-    if (body.action === 'update') { const info = await setPlayerInfo(body.id, { email: body.email, name: body.name, gender: body.gender }); return json({ ok: true, info }); }
+    if (body.action === 'update') { const info = await setPlayerInfo(body.id, { email: body.email, name: body.name, gender: body.gender, duprId: body.duprId }); return json({ ok: true, info }); }
     return json({ error: 'unknown action' }, 400);
   } catch (e) {
     return json({ error: e.message || 'failed' }, 400);
