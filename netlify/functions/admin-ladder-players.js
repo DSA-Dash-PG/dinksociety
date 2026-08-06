@@ -38,8 +38,11 @@ export default async (req) => {
     });
 
     // Pull players off every ladder's roster + waitlist (each entry has a stable
-    // playerId — a linked lp_/team id, or a manual_ id for no-email adds).
-    const rosterPlayers = {};                        // id -> {id,name,gender}
+    // playerId — a linked lp_/team id, or a manual_ id for no-email adds). Also
+    // capture the email typed in at signup time — that's the only place an
+    // admin-added player's email actually lives unless someone separately sets
+    // it via the directory (see the email fallback below).
+    const rosterPlayers = {};                        // id -> {id,name,gender,email}
     const events = await listEvents().catch(() => []);
     await Promise.all(events.map(async (ev) => {
       const sg = await getSignups(ev.id).catch(() => null);
@@ -47,7 +50,8 @@ export default async (req) => {
       [...(sg.roster || []), ...(sg.waitlist || [])].forEach((pl) => {
         if (!pl || !pl.playerId) return;
         addEvt(pl.playerId, ev.id);
-        if (!rosterPlayers[pl.playerId]) rosterPlayers[pl.playerId] = { id: pl.playerId, name: pl.name, gender: pl.gender || 'M' };
+        if (!rosterPlayers[pl.playerId]) rosterPlayers[pl.playerId] = { id: pl.playerId, name: pl.name, gender: pl.gender || 'M', email: pl.email || '' };
+        else if (!rosterPlayers[pl.playerId].email && pl.email) rosterPlayers[pl.playerId].email = pl.email;
       });
     }));
 
@@ -58,8 +62,13 @@ export default async (req) => {
 
     const map = await getMergeMap();
     const dir = await getDirectory();
+    // Email: an explicit directory override wins (that's what the Master Roster
+    // editor writes); otherwise fall back to whatever email was captured on
+    // their roster/waitlist signup — previously this fell back to '' and
+    // silently hid emails that were entered at signup but never separately
+    // re-typed into the directory editor.
     const list = Object.values(universe)
-      .map(p => ({ id: p.id, name: (dir[p.id]?.name) || p.name, gender: (dir[p.id]?.gender) || p.gender, email: dir[p.id]?.email || '', nights: ladderIds[p.id] ? ladderIds[p.id].size : 0, mergedInto: map[p.id] ? map[p.id].to : null }))
+      .map(p => ({ id: p.id, name: (dir[p.id]?.name) || p.name, gender: (dir[p.id]?.gender) || p.gender, email: dir[p.id]?.email || rosterPlayers[p.id]?.email || '', nights: ladderIds[p.id] ? ladderIds[p.id].size : 0, mergedInto: map[p.id] ? map[p.id].to : null }))
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const merges = Object.entries(map).map(([from, val]) => ({ from, to: val.to, name: val.name || null }));
     return json({ players: list, merges });

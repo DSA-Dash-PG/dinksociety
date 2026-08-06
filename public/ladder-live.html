@@ -131,7 +131,20 @@ let viewRound = 0;
 let pollTimer = null;
 
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const first = n => String(n||'').split(' ')[0];
+// Court cards + the "who am I" picker show first name only — EXCEPT for anyone
+// who shares a first name with someone else on this night's roster, who gets
+// their full name instead. (First-name-only caused real confusion once: a
+// night with 5 different players all named "Lisa".)
+let DUP_FIRST = new Set();
+function computeDupFirst(){
+  const counts={};
+  ((DATA&&DATA.roster)||[]).forEach(p=>{
+    const f=String((p&&p.name)||'').trim().split(/\s+/)[0];
+    if(f) counts[f.toLowerCase()]=(counts[f.toLowerCase()]||0)+1;
+  });
+  DUP_FIRST=new Set(Object.keys(counts).filter(k=>counts[k]>1));
+}
+const first = n => { const s=String(n||'').trim(); const f=s.split(/\s+/)[0]||s; return DUP_FIRST.has(f.toLowerCase())?s:f; };
 // Ranked standings use first name + last initial; tight court cards use first only.
 const firstLast = n => { const p=String(n||'').trim().split(/\s+/); return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}`:(p[0]||String(n||'')); };
 
@@ -339,6 +352,7 @@ async function load(initial){
     if(d.error) throw new Error(d.error);
     const wasLen = DATA?.play?.rounds?.length || 0;
     DATA=d;
+    computeDupFirst();
     if(initial || viewRound>=(DATA.play?.rounds?.length||0)) viewRound=currentIdx();
     else if((DATA.play?.rounds?.length||0)>wasLen) viewRound=currentIdx(); // jump to a freshly-posted round
     render();

@@ -1113,6 +1113,22 @@ async function setEmailFor(playerId,email){
   } else { msg('mMsg','ok','Email saved'+(d.name?' for '+d.name:'')+'.'); }
 }
 // Send (or resend) the paid confirmation email on demand.
+// Rename a player right from their roster row — writes to the shared player
+// directory (same as the Players → Master Roster editor), so it updates their
+// name on every ladder, not just this one. Keeps their directory email/gender
+// intact by reading the currently-loaded PLDATA rather than blanking them.
+async function renameFor(playerId,name){
+  if(!CURRENT)return;
+  const v=prompt('Full name for this player:',name||'');
+  if(v==null)return;
+  const val=v.trim();
+  if(!val){ msg('mMsg','err','Name cannot be empty.'); return; }
+  const existing=((PLDATA&&PLDATA.players)||[]).find(x=>x.id===playerId);
+  const {status,d}=await plPost({action:'update',id:playerId,name:val,email:existing?existing.email:'',gender:existing?existing.gender:''});
+  if(status===401){ msg('mMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){ msg('mMsg','ok','Renamed to '+val+' — updates on every ladder.'); loadPlayers(); await openManage(CURRENT.id); }
+  else msg('mMsg','err',(d&&d.error)||'Could not rename ('+status+').');
+}
 async function resendConfirm(email,playerId){
   if(!CURRENT)return;
   const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-confirmation',email,playerId})});
@@ -1153,6 +1169,7 @@ function _rosterMenu(p,i){
     b+='<div class="ph">Mark paid as…</div>'+_payItems(p);
   }
   b+='<div class="ph">Actions</div>';
+  b+=`<button onclick="rmCall(renameFor,'${esc(p.playerId||'')}','${esc(p.name||'').replace(/'/g,"\\'")}')">✏️ Edit name</button>`;
   if(p.paymentStatus!=='paid'&&p.email) b+=`<button onclick="rmCall(sendPaylink,'${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send payment link</button>`;
   if(p.paymentStatus==='paid'&&p.email) b+=`<button onclick="rmCall(resendConfirm,'${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`;
   if(!p.email) b+=`<button onclick="rmCall(setEmailFor,'${esc(p.playerId||'')}','')">✉ Add email</button>`;
