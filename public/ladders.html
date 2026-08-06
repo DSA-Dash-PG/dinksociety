@@ -143,10 +143,10 @@
 
   <div class="content">
     <div id="dtabs">
-      <button class="on" data-d="overview" onclick="dtab('overview')">Overview</button>
-      <button data-d="results" onclick="dtab('results')">Results</button>
-      <button data-d="standings" onclick="dtab('standings')">Standings</button>
-      <button data-d="rules" onclick="dtab('rules')">Rules</button>
+      <button class="on" data-d="overview" onclick="dtabClick('overview')">Overview</button>
+      <button data-d="results" onclick="dtabClick('results')">Results</button>
+      <button data-d="standings" onclick="dtabClick('standings')">Standings</button>
+      <button data-d="rules" onclick="dtabClick('rules')">Rules</button>
     </div>
     <div class="pane on" id="p-home">
       <div id="homeLive"></div>
@@ -262,6 +262,13 @@ function route(){
   else if(m==='ladders'){ ladTab((sub==='completed'||sub==='past')?'completed':'register'); if(sub && sub!=='register' && sub!=='completed' && sub!=='past') focusLadder(sub); }
   else if(m==='leaderboard'){ if(['wins','points','xp','dr'].includes(sub)) lbSetTab(sub); else writeHash(); }
   else writeHash();
+  // Desktop #dtabs mirrors the same hash — one link deep-links both layouts.
+  // Visual-only (see dtab()) so a #ladders/<eventId> link never gets its hash
+  // rewritten out from under it just because Results happens to be showing.
+  if(m==='home') dtab('overview');
+  else if(m==='leaderboard') dtab('standings');
+  else if(m==='rules') dtab('rules');
+  else if(m==='ladders') dtab((sub==='completed'||sub==='past'||(COMPLETED||[]).some(x=>x.id===sub))?'results':'overview');
 }
 window.addEventListener('hashchange', route);
 // Deep link: #ladders/<eventId> opens the ladders tab and scrolls/highlights that event.
@@ -294,8 +301,7 @@ async function init(){
   try{ const r=await fetch(`${API}/player-ladder-events`,{credentials:'include'}); if(r.ok){ const me=await r.json(); (me.registered||[]).forEach(ev=>{ MYREG[ev.id]={list:ev.list,paymentStatus:ev.paymentStatus}; }); } }catch(e){}
   ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st; MYCREDIT=(st&&st.youCreditCents)||0;
   renderHomeLive(); renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats();
-  route();
-  dtab('overview'); // desktop-only default; harmless no-op under 900px
+  route(); // also sets the initial desktop dtab, from the hash (defaults to Overview)
   // Recap teasers for the register tab (best-effort, renders whenever it lands)
   try{ const rr=await fetch(`${API}/public-ladder-recaps`); if(rr.ok){ RECAPS=(await rr.json()).recaps||[]; renderRecaps(); } }catch(e){}
 }
@@ -462,13 +468,26 @@ function renderAvail(){
   document.getElementById('availList').innerHTML=els.length?els.map((l,i)=>'<div id="lad-'+l.id+'" style="scroll-margin-top:84px">'+ladderCard(l,i)+'</div>').join(''):'<div class="empty">No ladders match these filters.</div>';
 }
 // Desktop sub-nav (#dtabs): Overview / Results / Standings / Rules — one
-// section visible at a time (mirrors the mobile tab pattern), independent of
-// the mobile hash router. No-op below 900px, where #dtabs is hidden.
+// section visible at a time (mirrors the mobile tab pattern). Kept hash-agnostic
+// (called by route() too) so showing Results under a #ladders/<eventId> deep
+// link never rewrites the hash out from under that link. No-op below 900px,
+// where #dtabs is hidden.
 function dtab(name){
   document.querySelectorAll('#dtabs button').forEach(b=>b.classList.toggle('on',b.dataset.d===name));
   const c=document.querySelector('.content');
   ['overview','results','standings','rules'].forEach(n=>c.classList.toggle('dtab-'+n,n===name));
   window.scrollTo({top:0});
+}
+// Button click (as opposed to route()): also make the URL a shareable deep
+// link to that tab. Results reuses the existing Ladders/Completed route since
+// it's the same content; Overview/Standings/Rules reuse Home/Leaderboard/Rules.
+function dtabClick(name){
+  dtab(name);
+  if(name==='overview') RT.main='home';
+  else if(name==='results'){ RT.main='ladders'; RT.ladders='completed'; }
+  else if(name==='standings') RT.main='leaderboard';
+  else if(name==='rules') RT.main='rules';
+  writeHash();
 }
 // Game night: the featured slot becomes a self-updating live board — current
 // round pairings by court with live scores, refreshed every 20s.
