@@ -24,7 +24,7 @@
   /* ── Desktop: full site width (matches the 1200px container everywhere else).
        Mobile keeps the single 560px column untouched. ── */
   .lb-d{ display:none; }
-  .jumps{ display:none; }
+  #dtabs{ display:none; }
   .story{ padding:18px 0; border-bottom:1px solid var(--bd); }
   .story .kick2{ font-size:.6rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; color:var(--gold); margin-bottom:6px; }
   .story h3{ margin:0 0 2px; font-size:.98rem; font-weight:900; color:#f5f5f5; }
@@ -32,37 +32,38 @@
   .story p{ font-size:.8rem; color:var(--mut); line-height:1.6; margin:0 0 10px; max-width:64ch; }
   .story .rmeta{ font-size:.66rem; color:var(--fnt); font-weight:700; margin-bottom:9px; }
   .story a.more{ font-size:.72rem; font-weight:800; color:var(--lime); text-decoration:none; }
-  /* ── Desktop: ONE-PAGER. Tabs disappear; every pane shows, laid out as an
-       editorial left column (live board, recaps, winners, leaderboard, rules)
-       with a sticky "play this week" register rail on the right.
-       Mobile (<900px) keeps the tabbed layout untouched. ── */
+  /* ── Desktop: TABBED DASHBOARD. Tabs disappear; a second sub-nav (#dtabs)
+       takes over — Overview / Results / Standings / Rules — one section shown
+       at a time in the left column, same idea as the mobile tab bar rather
+       than one long stacked scroll. A sticky "play this week" register rail
+       sits on the right throughout. Mobile (<900px) keeps the tabbed layout
+       untouched. ── */
   @media(min-width:900px){
     .wrap{ max-width:var(--max-w,1200px); width:min(calc(100% - 2rem),var(--max-w,1200px)); }
     .tabs{ display:none; }
     .content{ display:grid; grid-template-columns:minmax(0,1.35fr) 380px; gap:28px; align-items:start; border-top:1px solid var(--bd); padding-top:22px; }
-    .pane{ display:block!important; }
-    #p-home{ grid-column:1; grid-row:1; }
-    #p-leaderboard{ grid-column:1; grid-row:2; margin-top:34px; }
-    #p-completed{ grid-column:1; grid-row:3; margin-top:34px; }
-    #p-rules{ grid-column:1; grid-row:4; margin-top:34px; }
-    #p-ladders{ grid-column:2; grid-row:1/span 4; position:sticky; top:80px; }
-    /* The rail only registers on desktop — Completed gets its own full-width
-       section in the left column, so the sub-tab seg goes away. */
+    #dtabs{ grid-column:1; grid-row:1; display:flex; gap:8px; margin:0 0 22px; }
+    #dtabs button{ font:inherit; font-size:.76rem; font-weight:800; padding:10px 18px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); cursor:pointer; }
+    #dtabs button.on{ background:var(--lime); color:#06210f; border-color:var(--lime); }
+    #p-home,#p-leaderboard,#p-completed,#p-rules{ grid-column:1; grid-row:2; display:none; }
+    .content.dtab-overview #p-home,
+    .content.dtab-results #p-completed,
+    .content.dtab-standings #p-leaderboard,
+    .content.dtab-rules #p-rules{ display:block; }
+    #p-ladders{ grid-column:2; grid-row:1/span 2; position:sticky; top:80px; display:block; }
+    /* The rail only registers on desktop — Completed is its own tab, so the
+       Ladders pane's internal register/completed sub-toggle goes away. */
     #ladSeg,#pastWrap{ display:none!important; }
     #regWrap{ display:block!important; }
-    #pastWrapLeft{ display:grid; grid-template-columns:1fr 1fr; gap:14px; align-items:start; }
-    #pastWrapLeft>.empty{ grid-column:1/-1; }
-    #p-completed,#p-leaderboard,#p-rules{ scroll-margin-top:84px; }
-    /* Home: the winners/upcoming toggle and its duplicates hide — the rail owns
-       registration, the left column owns results. */
-    #homeSeg,#homeUp,#filtersHome{ display:none!important; }
-    #homeWin{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
-    #homeWin>.note{ grid-column:1/-1; }
-    #pastWrap{ display:block; }
-    .jumps{ display:flex; gap:8px; margin:0 0 20px; }
-    .jumps a{ font-size:.7rem; font-weight:800; color:var(--mut); text-decoration:none; border:1px solid var(--bd); border-radius:9999px; padding:8px 16px; }
-    .jumps a:hover{ color:var(--lime); border-color:rgba(184,255,44,.4); }
-    #p-leaderboard,#p-rules,#p-ladders{ scroll-margin-top:84px; }
+    /* Single column — a 2-col outer grid here (or in #homeWin below) doubled up
+       with evBody's own inner 2-col grid for ranks 4+, squeezing names/scores
+       into a quarter of the page width and clipping them at the edge. */
+    #pastWrapLeft{ display:block; }
+    /* #recapStrip is the mobile Home container; on desktop the same recaps
+       render into #recapStripD instead, placed after Completed ladders in the
+       Results tab (so recaps follow completed ladders, not lead the page). */
+    #recapStrip{ display:none; }
+    #homeWin{ display:block; }
     .story.featured .rhead{ font-size:1.5rem; }
     #p-rules .card{ display:grid; grid-template-columns:1fr 1fr; gap:14px; background:transparent; border:0; padding:0; }
     #p-rules .rule{ background:var(--surf); border:1px solid var(--bd); border-radius:14px; padding:14px 16px; margin:0; }
@@ -141,9 +142,14 @@
   </div>
 
   <div class="content">
+    <div id="dtabs">
+      <button class="on" data-d="overview" onclick="dtab('overview')">Overview</button>
+      <button data-d="results" onclick="dtab('results')">Results</button>
+      <button data-d="standings" onclick="dtab('standings')">Standings</button>
+      <button data-d="rules" onclick="dtab('rules')">Rules</button>
+    </div>
     <div class="pane on" id="p-home">
       <div id="homeLive"></div>
-      <div id="jumpLinks" class="jumps"><a href="#" onclick="jumpTo('p-leaderboard');return false">Leaderboard</a><a href="#" onclick="jumpTo('p-rules');return false">Rules</a><a href="#" onclick="jumpTo('p-completed');return false">Completed ladders</a></div>
       <div id="recapStrip"></div>
       <div class="h1" id="homeH1">Latest winners</div>
       <div class="sub" id="homeSub">Top 3 each event — tap to see the full field</div>
@@ -177,6 +183,7 @@
       <div class="h1">Completed ladders</div>
       <div class="sub">Results, winners &amp; rounds from past ladders</div>
       <div id="pastWrapLeft"><div class="empty">Loading…</div></div>
+      <div id="recapStripD" style="margin-top:8px"></div>
     </div>
 
     <div class="pane" id="p-rules">
@@ -288,6 +295,7 @@ async function init(){
   ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st; MYCREDIT=(st&&st.youCreditCents)||0;
   renderHomeLive(); renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats();
   route();
+  dtab('overview'); // desktop-only default; harmless no-op under 900px
   // Recap teasers for the register tab (best-effort, renders whenever it lands)
   try{ const rr=await fetch(`${API}/public-ladder-recaps`); if(rr.ok){ RECAPS=(await rr.json()).recaps||[]; renderRecaps(); } }catch(e){}
 }
@@ -296,8 +304,11 @@ const MEDC={0:'#f0c040',1:'#cfd3c8',2:'#d88a3a'};
 // Editorial recap feed — magazine-style stories on the Home tab (and the
 // desktop left column). Newest story runs featured-size.
 function renderRecaps(){
-  const el=document.getElementById('recapStrip'); if(!el) return;
-  if(!RECAPS.length){ el.innerHTML=''; return; }
+  // Two homes: #recapStrip is the mobile Home tab; #recapStripD is the desktop
+  // Results tab, positioned after Completed ladders. Same cards, either place.
+  const el=document.getElementById('recapStrip'), elD=document.getElementById('recapStripD');
+  if(!el&&!elD) return;
+  if(!RECAPS.length){ if(el)el.innerHTML=''; if(elD)elD.innerHTML=''; return; }
   const story=(r,i)=>{
     const pods=(r.podium||[]).map((p,k)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:800;border-radius:9999px;padding:3px 11px 3px 4px;background:#000;border:1px solid var(--bd)"><span style="width:17px;height:17px;border-radius:50%;background:${MEDC[k]};color:#0b120b;font-size:.56rem;font-weight:900;text-align:center;line-height:17px">${k+1}</span>${esc(firstName(p.name))}${p.w!=null?` <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span>`:''}</span>`).join(' ');
     return `<div class="story${i===0?' featured':''}">
@@ -309,7 +320,9 @@ function renderRecaps(){
       <a class="more" href="#" onclick="night('${r.eventId}');return false">Full results &amp; rounds →</a>
     </div>`;
   };
-  el.innerHTML=`<div class="seclbl">Latest ladders</div>${RECAPS.map(story).join('')}<div style="height:10px"></div>`;
+  const html=`<div class="seclbl">Latest ladders</div>${RECAPS.map(story).join('')}<div style="height:10px"></div>`;
+  if(el) el.innerHTML=html;
+  if(elD) elD.innerHTML=html;
 }
 
 /* ---- HOME ---- */
@@ -448,9 +461,15 @@ function renderAvail(){
   const els=ACTIVE.filter(ladMatchesFilter).slice().sort((a,b)=>(startMsOf(a)||9e15)-(startMsOf(b)||9e15));
   document.getElementById('availList').innerHTML=els.length?els.map((l,i)=>'<div id="lad-'+l.id+'" style="scroll-margin-top:84px">'+ladderCard(l,i)+'</div>').join(''):'<div class="empty">No ladders match these filters.</div>';
 }
-// Jump pills scroll WITHOUT touching the hash — a hash change fires the tab
-// router, which scrolls back to the top (that bug made the pills look dead).
-function jumpTo(id){ const el=document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+// Desktop sub-nav (#dtabs): Overview / Results / Standings / Rules — one
+// section visible at a time (mirrors the mobile tab pattern), independent of
+// the mobile hash router. No-op below 900px, where #dtabs is hidden.
+function dtab(name){
+  document.querySelectorAll('#dtabs button').forEach(b=>b.classList.toggle('on',b.dataset.d===name));
+  const c=document.querySelector('.content');
+  ['overview','results','standings','rules'].forEach(n=>c.classList.toggle('dtab-'+n,n===name));
+  window.scrollTo({top:0});
+}
 // Game night: the featured slot becomes a self-updating live board — current
 // round pairings by court with live scores, refreshed every 20s.
 let LIVE_TIMER=null;
