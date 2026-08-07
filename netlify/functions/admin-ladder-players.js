@@ -1,17 +1,25 @@
 // netlify/functions/admin-ladder-players.js
-// Admin (or scoring PIN) — global ladder player roster + duplicate merging.
+// Admin (or scoring PIN, or organizer) — global ladder player roster + duplicate
+// merging. Also folds in the LEAGUE roster (every team's players, active teams
+// only) so an organizer searching to add someone finds their real player
+// record even if that person has never played a ladder before — critical so
+// stats land on the one identity that already exists instead of minting a
+// second, disconnected one. League entries carry `teamName` so the search
+// result makes it visibly obvious it's a real league player.
 //
-//   GET                       → { players:[{id,name,gender,nights,mergedInto}], merges:[{from,to,name}] }
+//   GET                       → { players:[{id,name,gender,nights,teamName,mergedInto}], merges:[{from,to,name}] }
 //   POST { action }
 //     'merge'   { from, to, name? }   alias player `from` onto canonical `to`
 //     'unmerge' { from }              undo a merge
 
+import { getStore } from '@netlify/blobs';
 import { unauthResponse } from './lib/auth.js';
 import { authScoreAccess } from './lib/ladder-scorer.js';
 import { listPlay, playersFromPlay } from './lib/ladder-play.js';
 import { getMergeMap, setMerge, removeMerge } from './lib/player-merge.js';
 import { getDirectory, setPlayerInfo } from './lib/player-directory.js';
 import { listEvents, getSignups } from './lib/ladder.js';
+import { isTestTeam } from './lib/circuit.js';
 
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
 
@@ -55,20 +63,49 @@ export default async (req) => {
       });
     }));
 
-    // Union of scored-play players and roster players.
+    // League roster — every active team's players (test seasons and archived
+    // players excluded; an archived player isn't someone you'd want to
+    // resurface in an "add to my ladder" search). Same playerId (`p.id`) the
+    // rest of the site already uses for that person, so adding them here
+    // attaches stats to their real, existing identity — no duplicate created.
+    const teamsStore = getStore('teams');
+    const { blobs: teamBlobs } = await teamsStore.list({ prefix: 'team/' }).catch(() => ({ blobs: [] }));
+    const teams = (await Promise.all(teamBlobs.map(b => teamsStore.get(b.key, { type: 'json' }).catch(() => null)))).filter(t => t && !isTestTeam(t));
+    const leagueRosterPlayers = {};
+    for (const t of teams) {
+      for (const p of (t.roster || [])) {
+        if (!p?.id || p.archived) continue;
+        leagueRosterPlayers[p.id] = { id: p.id, name: p.name, gender: p.gender || 'M', email: p.email || '', teamName: t.name || '' };
+      }
+    }
+
+    // Union of scored-play players, ladder roster/waitlist players, and the
+    // league roster. League entries fill in ONLY where a ladder-derived record
+    // doesn't already exist — a player active in both worlds keeps whichever
+    // richer record (ladder history) was already there, just gains teamName.
     const universe = {};
     playPlayers.forEach(p => { universe[p.id] = { id: p.id, name: p.name, gender: p.gender }; });
     Object.values(rosterPlayers).forEach(p => { if (!universe[p.id]) universe[p.id] = p; });
+    Object.values(leagueRosterPlayers).forEach(p => {
+      if (!universe[p.id]) universe[p.id] = p;
+      else universe[p.id].teamName = p.teamName;
+    });
 
     const map = await getMergeMap();
     const dir = await getDirectory();
     // Email: an explicit directory override wins (that's what the Master Roster
     // editor writes); otherwise fall back to whatever email was captured on
-    // their roster/waitlist signup — previously this fell back to '' and
-    // silently hid emails that were entered at signup but never separately
-    // re-typed into the directory editor.
+    // their roster/waitlist signup, or their league roster email — previously
+    // this fell back to '' and silently hid emails that were entered at signup
+    // but never separately re-typed into the directory editor.
     const list = Object.values(universe)
-      .map(p => ({ id: p.id, name: (dir[p.id]?.name) || p.name, gender: (dir[p.id]?.gender) || p.gender, email: dir[p.id]?.email || rosterPlayers[p.id]?.email || '', duprId: dir[p.id]?.duprId || '', nights: ladderIds[p.id] ? ladderIds[p.id].size : 0, mergedInto: map[p.id] ? map[p.id].to : null }))
+      .map(p => ({
+        id: p.id, name: (dir[p.id]?.name) || p.name, gender: (dir[p.id]?.gender) || p.gender,
+        email: dir[p.id]?.email || rosterPlayers[p.id]?.email || leagueRosterPlayers[p.id]?.email || '',
+        duprId: dir[p.id]?.duprId || '',
+        teamName: leagueRosterPlayers[p.id]?.teamName || null,
+        nights: ladderIds[p.id] ? ladderIds[p.id].size : 0, mergedInto: map[p.id] ? map[p.id].to : null,
+      }))
       .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
     const merges = Object.entries(map).map(([from, val]) => ({ from, to: val.to, name: val.name || null }));
     return json({ players: list, merges });
