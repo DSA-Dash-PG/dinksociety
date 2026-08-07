@@ -7,10 +7,13 @@
 // blast/announce sends — it always delivers and does not respect the
 // optional notify-prefs unsubscribe categories.
 //
-// Body: { eventId, subject, message }
+// Body: { eventId, subject, message, format? }
 //   subject  optional — defaults to the ladder name
-//   message  required, plain text (newlines are preserved as line breaks;
-//            everything else is HTML-escaped, so it's safe to paste anything)
+//   message  required.
+//   format   'html' (the roster-message rich text editor's innerHTML — the
+//            normal path) or omitted/'text' (plain text; newlines become line
+//            breaks and everything else is HTML-escaped, kept for any older
+//            caller that still posts plain text).
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { getEvent, getSignups } from './lib/ladder.js';
@@ -34,6 +37,41 @@ function textToHtml(text) {
   return String(text || '').trim().split(/\n{2,}/).map(block =>
     `<p style="margin:0 0 14px">${esc(block).replace(/\n/g, '<br>')}</p>`
   ).join('');
+}
+
+// True when the HTML has no visible content (contenteditable often leaves
+// behind an empty <div><br></div> even when the admin typed nothing).
+function isBlankHtml(html) {
+  return !String(html || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim();
+}
+
+// Minimal allowlist HTML sanitizer for the roster-message rich text editor.
+// This endpoint is admin-only (verifyAdminSession, above), so the threat model
+// isn't a hostile stranger — it's making sure whatever a contenteditable div
+// happened to produce can't carry a stray <script>, inline event handler, or
+// javascript: link into an email we send to the whole roster. No DOM parser is
+// available in this runtime, so this is a conservative regex pass: strip
+// script/style blocks outright, unwrap (not delete — keep the text) any tag
+// that isn't on the allowlist, and drop every attribute except a
+// scheme-checked href on <a>.
+const ALLOWED_TAGS = new Set(['B', 'STRONG', 'I', 'EM', 'U', 'UL', 'OL', 'LI', 'BR', 'P', 'DIV', 'SPAN', 'A', 'BLOCKQUOTE']);
+function sanitizeMessageHtml(html) {
+  return String(html || '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, '')
+    .replace(/<\/?([a-zA-Z0-9]+)([^>]*)>/g, (m, tag, attrs) => {
+      const T = tag.toUpperCase();
+      const closing = m.startsWith('</');
+      if (!ALLOWED_TAGS.has(T)) return ''; // drop the tag, keep its text content
+      if (closing) return `</${T.toLowerCase()}>`;
+      if (T === 'A') {
+        const hrefMatch = attrs.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)')/i);
+        const raw = ((hrefMatch && (hrefMatch[1] || hrefMatch[2])) || '').trim();
+        if (!/^(https?:|mailto:)/i.test(raw)) return '<a>'; // unsafe/relative/js: scheme — drop the link, keep it as plain wrapper
+        return `<a href="${raw.replace(/"/g, '&quot;')}" target="_blank" rel="noopener noreferrer">`;
+      }
+      return `<${T.toLowerCase()}>`;
+    });
 }
 
 function shell(inner) {
@@ -61,9 +99,12 @@ export default async (req) => {
 
   const b = await req.json().catch(() => ({}));
   const eventId = b.eventId;
-  const message = (b.message || '').toString().trim();
+  const format = b.format === 'html' ? 'html' : 'text';
+  const message = (b.message || '').toString();
   if (!eventId) return json({ error: 'eventId required' }, 400);
-  if (!message) return json({ error: 'A message is required.' }, 400);
+  if (format === 'html' ? isBlankHtml(message) : !message.trim()) {
+    return json({ error: 'A message is required.' }, 400);
+  }
 
   const event = await getEvent(eventId);
   if (!event) return json({ error: 'Event not found' }, 404);
@@ -80,7 +121,7 @@ export default async (req) => {
   const site = siteUrl();
   const from = messageFrom();
   const subject = (b.subject || '').toString().trim() || `About ${event.name}`;
-  const bodyHtml = textToHtml(message);
+  const bodyHtml = format === 'html' ? sanitizeMessageHtml(message) : textToHtml(message);
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
   let sent = 0, failed = 0;
@@ -101,11 +142,15 @@ export default async (req) => {
     }
   }
 
-  // Audit trail — who sent what, to which ladder, when.
+  // Audit trail — who sent what, to which ladder, when. `message` is kept as
+  // a plain-text preview (HTML stripped) so any future send-history view
+  // doesn't need to render rich text; `messageHtml` has the actual sanitized
+  // content that was mailed.
   try {
     const id = 'lm_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    const plainPreview = bodyHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
     await getStore('ladder-messages').setJSON(`message/${id}.json`, {
-      id, eventId, eventName: event.name, subject, message,
+      id, eventId, eventName: event.name, subject, format, message: plainPreview, messageHtml: bodyHtml,
       recipients: byEmail.size, sent, failed,
       sentBy: v.payload?.email || null, sentAt: new Date().toISOString(),
     });

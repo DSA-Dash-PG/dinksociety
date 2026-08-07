@@ -99,6 +99,20 @@
   .foot{ text-align:center; font-size:11px; color:var(--fnt); margin-top:18px; }
   .hide{ display:none !important; }
   .loading{ text-align:center; color:var(--mut); padding:50px 20px; font-size:14px; }
+
+  /* Kitchen — fun stat categories, live during the night */
+  .kit-grid{ display:flex; flex-direction:column; gap:10px; }
+  .kit-card{ background:var(--surf); border:1px solid var(--bd); border-radius:13px; padding:12px 13px; }
+  .kit-h{ display:flex; align-items:baseline; gap:7px; margin-bottom:2px; }
+  .kit-h .e{ font-size:1rem; } .kit-h .t{ font-size:13.5px; font-weight:900; }
+  .kit-sub{ font-size:11px; color:var(--mut); margin-bottom:9px; }
+  .kit-row{ display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px solid rgba(255,255,255,.06); }
+  .kit-row:first-of-type{ border-top:0; }
+  .kit-rk{ width:16px; font-size:11px; font-weight:900; color:var(--fnt); flex-shrink:0; } .kit-rk.top{ color:var(--gold); }
+  .kit-nm{ flex:1; font-size:13px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kit-xt{ font-size:10.5px; color:var(--fnt); font-weight:700; }
+  .kit-vl{ font-size:13.5px; font-weight:900; color:var(--lime); font-variant-numeric:tabular-nums; }
+  .kit-empty{ font-size:11.5px; color:var(--fnt); padding:4px 0; }
 </style>
 </head>
 <body>
@@ -124,6 +138,7 @@ const EID = new URLSearchParams(location.search).get('event') || '';
 const ME_KEY = 'dsLiveMe:'+EID, SKIP_KEY = 'dsLiveSkip:'+EID;
 
 let DATA = null;          // { event, roster, play }
+let KITCHEN = null;       // fun stat categories for tonight (lazy-loaded, cached)
 let me = localStorage.getItem(ME_KEY) || null;   // playerId, remembered
 let idSkipped = localStorage.getItem(SKIP_KEY)==='1';
 let tab = 'board';
@@ -288,6 +303,53 @@ function rosterList(){
       <div class="tag">${p.gender}</div></div>`).join('');
 }
 
+/* ---------------- kitchen (fun stats, live during the night) ---------------- */
+const KIT_CATS=[
+  {k:'oneNightWonder',e:'🍳',t:'One-Night Wonder',s:'most pts in a single ladder'},
+  {k:'kingOfTheCourt',e:'👑',t:'King of the Court',s:'wins on the top court'},
+  {k:'perRoundTop',e:'📈',t:'Per-Round Top',s:'highest avg pts (min 6 games)'},
+  {k:'mostPoints',e:'🏆',t:'Most Points',s:'season total incl. bonus'},
+  {k:'hotStreak',e:'🔥',t:'Hot Streak',s:'longest run of wins'},
+  {k:'bestDuo',e:'🤝',t:'Best Duo',s:'win % (min 3 games together)'},
+  {k:'theWall',e:'🛡️',t:'The Wall',s:'lowest avg pts allowed (min 6 games)'},
+  {k:'ironPlayer',e:'⚓',t:'Iron Player',s:'most ladders attended'},
+  {k:'bigMover',e:'📊',t:'Big Mover',s:'biggest court climb in a ladder'},
+  {k:'beatDown',e:'💥',t:'Beat Down',s:'biggest single-game margin'},
+  {k:'comebackKid',e:'🎢',t:'Comeback Kid',s:'wins after a loss'},
+  {k:'highestSingleGame',e:'🎯',t:'Highest Single Game',s:'most pts in one round'},
+];
+function kitRowHtml(cat,r,i){
+  const rk=`<span class="kit-rk${i<3?' top':''}">${i+1}</span>`;
+  let nm,xt='',vl;
+  switch(cat.k){
+    case 'bestDuo': nm=`${esc(r.a)} + ${esc(r.b)}`; xt=`${r.w}-${r.l}`; vl=`${r.pct}%`; break;
+    case 'oneNightWonder': nm=esc(r.name); xt=r.date; vl=r.pts; break;
+    case 'kingOfTheCourt': nm=esc(r.name); vl=`${r.wins} W`; break;
+    case 'perRoundTop': nm=esc(r.name); xt=`${r.games}g`; vl=r.avg; break;
+    case 'mostPoints': nm=esc(r.name)+(r.crownStr?' '+r.crownStr:''); vl=r.total; break;
+    case 'hotStreak': nm=esc(r.name); vl=`W${r.streak}`; break;
+    case 'theWall': nm=esc(r.name); vl=r.avg; break;
+    case 'ironPlayer': nm=esc(r.name); vl=r.nights; break;
+    case 'bigMover': nm=esc(r.name); xt=r.date; vl=`+${r.climb}`; break;
+    case 'beatDown': nm=esc(r.name); xt=`Rd ${r.round}`; vl=`+${r.margin}`; break;
+    case 'comebackKid': nm=esc(r.name); vl=r.count; break;
+    case 'highestSingleGame': nm=esc(r.name); xt=`Rd ${r.round}`; vl=r.pts; break;
+  }
+  return `<div class="kit-row">${rk}<div class="kit-nm">${nm}</div>${xt?`<div class="kit-xt">${xt}</div>`:''}<div class="kit-vl">${vl}</div></div>`;
+}
+function renderKitchenTab(){
+  if(!KITCHEN) return '<div class="kit-empty">Loading tonight’s fun stats…</div>';
+  return '<div class="kit-grid">'+KIT_CATS.map(cat=>{
+    const rows=KITCHEN[cat.k]||[];
+    return `<div class="kit-card"><div class="kit-h"><span class="e">${cat.e}</span><span class="t">${esc(cat.t)}</span></div><div class="kit-sub">${esc(cat.s)}</div>`+
+      (rows.length?rows.map((r,i)=>kitRowHtml(cat,r,i)).join(''):'<div class="kit-empty">Not enough games yet tonight.</div>')+
+      `</div>`;
+  }).join('')+'</div>';
+}
+async function loadKitchen(){
+  try{ const r=await fetch(`${API}/public-ladder-stats?event=${encodeURIComponent(EID)}`); if(!r.ok) return; const d=await r.json(); KITCHEN=d.kitchen||{}; if(tab==='kitchen') render(); }catch(e){}
+}
+
 /* ---------------- render ---------------- */
 function render(){
   if(!DATA){ return; }
@@ -320,6 +382,7 @@ function render(){
   let h=`<div class="tabs">
       <button class="${tab==='board'?'on':''}" onclick="tab='board';render()">Courts</button>
       <button class="${tab==='standings'?'on':''}" onclick="tab='standings';render()">Standings</button>
+      <button class="${tab==='kitchen'?'on':''}" onclick="tab='kitchen';if(!KITCHEN)loadKitchen();render()">🍳 Kitchen</button>
       <button class="${tab==='roster'?'on':''}" onclick="tab='roster';render()">Roster</button>
     </div>`;
   if(tab==='board'){
@@ -335,6 +398,8 @@ function render(){
     } else { h+=`<div class="note">No rounds yet.</div>`; }
   } else if(tab==='standings'){
     h+=`<div class="seclbl" style="margin-top:4px">Night standings ${st==='final'?'· final':'· live'}</div>`+standingsTable();
+  } else if(tab==='kitchen'){
+    h+=`<div class="seclbl" style="margin-top:4px">🍳 The Kitchen — tonight's fun stats</div>`+renderKitchenTab();
   } else {
     h+=`<div class="seclbl" style="margin-top:4px">Roster · ${(DATA.roster||[]).length} players</div>`+rosterList();
   }
@@ -360,7 +425,7 @@ async function load(initial){
     if(initial) document.getElementById('body').innerHTML=`<div class="note">Couldn't load this ladder. <a href="/ladders" style="color:var(--lime)">See all ladders →</a></div>`;
   }
 }
-function startPolling(){ clearInterval(pollTimer); pollTimer=setInterval(()=>{ if(!document.hidden) load(false); }, 15000); }
+function startPolling(){ clearInterval(pollTimer); pollTimer=setInterval(()=>{ if(!document.hidden){ load(false); if(tab==='kitchen') loadKitchen(); } }, 15000); }
 document.addEventListener('visibilitychange',()=>{ if(!document.hidden) load(false); });
 
 load(true).then(startPolling);

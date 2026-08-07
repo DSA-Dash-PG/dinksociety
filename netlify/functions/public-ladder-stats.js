@@ -12,6 +12,7 @@ import { verifyPlayerSession } from './lib/auth.js';
 import { getEvent, listEvents } from './lib/ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './lib/ladder-play.js';
 import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier, getRoundMVPs } from './lib/ladder-scoring.js';
+import { buildKitchen } from './lib/ladder-kitchen.js';
 import { getXpConfig, getXpGrants, grantTotals } from './lib/xp-config.js';
 import { getMergeMap, applyMerges } from './lib/player-merge.js';
 import { getDirectory, applyDirectory } from './lib/player-directory.js';
@@ -77,7 +78,8 @@ export default async (req) => {
     if (!raw) return json({ event: event ? { id: event.id, name: event.name } : null, standings: [], winners: [], history: [] });
     const play = applyDirectory(applyMerges([raw], await getMergeMap()), await getDirectory())[0];
     const players = playersFromPlay([play]);
-    const { rows } = buildRows([toSession(play)], players);
+    const nightSessions = [toSession(play)];
+    const { rows } = buildRows(nightSessions, players);
     // Round-by-round history: pairings, scores, movement context + round MVPs.
     const history = (play.rounds || []).map((rd, ri) => {
       const tC = Math.max(1, ...(rd.courts || []).map(c => c.court));
@@ -94,7 +96,10 @@ export default async (req) => {
       const mp = x => x ? { name: x.p.name, diff: x.diff, court: x.court } : null;
       return { round: ri + 1, tC, courts, mvps: { male: mv.male.map(mp), female: mv.female.map(mp) } };
     });
-    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type } : null, standings: rows, winners: winnersFrom(rows), history });
+    // Kitchen for just this one night — fun stats that build live as courts wrap,
+    // same categories as the season-wide Kitchen but scoped to tonight only.
+    const kitchen = buildKitchen(nightSessions, players);
+    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type } : null, standings: rows, winners: winnersFrom(rows), history, kitchen });
   }
 
   // ── season-wide ──
@@ -153,6 +158,7 @@ export default async (req) => {
   const attachXP = arr => arr.forEach(r => { r.xp = xp[r.id] || 0; });
   attachXP(rows); Object.values(divisions).forEach(attachXP);
 
+  const kitchen = buildKitchen(sessions, players, allStats, allBonus);
   const mvpLeaders = rows.filter(r => r.mvp > 0).sort((a, b) => b.mvp - a.mvp).slice(0, 6).map(r => ({ id: r.id, name: r.name, count: r.mvp }));
   const hotStreaks = rows.filter(r => r.maxStreak > 0).sort((a, b) => b.maxStreak - a.maxStreak).slice(0, 6).map(r => ({ id: r.id, name: r.name, streak: r.maxStreak }));
   const partnerships = calcPartners(sessions, players).slice(0, 8).map(p => ({ a: p.p1.name, b: p.p2.name, w: p.w, l: p.l, pct: (p.w + p.l) ? Math.round(100 * p.w / (p.w + p.l)) : 0 }));
@@ -184,7 +190,7 @@ export default async (req) => {
   }
 
   // Per-user fields (you / youCreditCents) → keep this response browser-private.
-  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, hotStreaks, partnerships, recentWinners, winnersByEvent, you, youCreditCents, hasData: rows.length > 0 }, 'private, max-age=10');
+  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, hotStreaks, partnerships, kitchen, recentWinners, winnersByEvent, you, youCreditCents, hasData: rows.length > 0 }, 'private, max-age=10');
 };
 
 export const config = { path: '/.netlify/functions/public-ladder-stats' };

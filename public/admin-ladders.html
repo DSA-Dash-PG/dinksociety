@@ -24,9 +24,24 @@
   .row2{ display:flex;gap:12px;flex-wrap:wrap; } .row2>*{ flex:1;min-width:120px; }
   label.l{ display:block;font-size:.6rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#9aa094;margin:0 0 5px; }
   .frow{ margin-bottom:13px; }
-  input.i,select.i{ width:100%;min-height:44px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#1c1f18;color:#f0f2ec;font:inherit;font-size:.88rem;box-sizing:border-box; }
-  input.i:focus,select.i:focus{ outline:none;border-color:var(--lime); }
+  input.i,select.i,textarea.i{ width:100%;min-height:44px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#1c1f18;color:#f0f2ec;font:inherit;font-size:.88rem;box-sizing:border-box; }
+  textarea.i{ padding:12px 13px;line-height:1.5; }
+  input.i:focus,select.i:focus,textarea.i:focus{ outline:none;border-color:var(--lime); }
   .help{ font-size:.64rem;color:#5e655a;margin-top:5px; }
+  /* Rich text editor (roster message) — same dark/lime language as .i inputs, sized to match the rest of the panel. */
+  .rte{ border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#1c1f18;overflow:hidden; }
+  .rte:focus-within{ border-color:var(--lime); }
+  .rte-tb{ display:flex;align-items:center;gap:3px;flex-wrap:wrap;padding:7px 8px;background:#161814;border-bottom:1px solid rgba(255,255,255,.08); }
+  .rte-tb button{ min-width:30px;height:30px;padding:0 9px;border-radius:7px;border:1px solid transparent;background:transparent;color:#c9cdc3;font:inherit;font-size:.8rem;font-weight:700;cursor:pointer; }
+  .rte-tb button:hover{ background:rgba(255,255,255,.07);color:#f0f2ec; }
+  .rte-tb button.on{ background:rgba(184,255,44,.16);border-color:rgba(184,255,44,.35);color:var(--lime); }
+  .rte-sep{ width:1px;align-self:stretch;margin:4px 3px;background:rgba(255,255,255,.1); }
+  .rte-body{ min-height:220px;max-height:440px;overflow-y:auto;padding:14px;font-size:.88rem;line-height:1.6;color:#f0f2ec; }
+  .rte-body:focus{ outline:none; }
+  .rte-body:empty:before{ content:attr(data-placeholder);color:#5e655a; }
+  .rte-body a{ color:var(--lime); }
+  .rte-body ul,.rte-body ol{ margin:6px 0;padding-left:22px; }
+  .rte-body p{ margin:0 0 10px; }
   .btn{ display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:9999px;border:1px solid transparent;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer; }
   .btn-lime{ background:var(--lime);color:#000; } .btn-out{ border-color:rgba(255,255,255,.18);color:#f0f2ec;background:transparent; }
   .btn-sm{ min-height:32px;font-size:.72rem;padding:0 12px; } .btn-danger{ border:1px solid rgba(255,92,71,.3);color:var(--red);background:transparent;min-height:32px;font-size:.72rem;padding:0 12px;border-radius:9999px;cursor:pointer; }
@@ -349,7 +364,23 @@
 
   <div class="sec" style="margin:22px 0 8px">Message the roster</div>
   <div class="frow"><label class="l">Subject (optional)</label><input class="i" id="m-msg-subject" placeholder="Defaults to the ladder name"></div>
-  <div class="frow"><label class="l">Message</label><textarea class="i" id="m-msg-body" rows="4" placeholder="e.g. Courts have moved to 5A &amp; 5B tonight — see you there!" style="resize:vertical;min-height:90px"></textarea></div>
+  <div class="frow">
+    <label class="l">Message</label>
+    <div class="rte">
+      <div class="rte-tb" id="m-msg-tb">
+        <button type="button" data-cmd="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button type="button" data-cmd="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button type="button" data-cmd="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+        <span class="rte-sep"></span>
+        <button type="button" data-cmd="insertUnorderedList" title="Bullet list">☰•</button>
+        <button type="button" data-cmd="insertOrderedList" title="Numbered list">☰1.</button>
+        <span class="rte-sep"></span>
+        <button type="button" data-cmd="link" title="Add link">🔗</button>
+        <button type="button" data-cmd="removeFormat" title="Clear formatting">Tx</button>
+      </div>
+      <div class="rte-body" id="m-msg-body" contenteditable="true" data-placeholder="e.g. Courts have moved to 5A &amp; 5B tonight — see you there!"></div>
+    </div>
+  </div>
   <button class="btn btn-lime" style="width:100%" onclick="sendLadderMessage()">Send to roster now</button>
   <div class="help" style="margin:6px 0 4px">Goes to everyone currently confirmed on this ladder's roster (not the waitlist). Always delivers — this is an operational message, not subject to email preference opt-outs.</div>
   <div id="mMsgMsg"></div>
@@ -1034,18 +1065,47 @@ async function sendReminder(){
   else { msg('mRemMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').')); }
 }
 
+// Rich text toolbar for the roster-message editor. mousedown+preventDefault
+// keeps the caret/selection inside the contenteditable body so execCommand
+// acts on what the admin actually had selected, not wherever focus lands.
+(function(){
+  const tb=document.getElementById('m-msg-tb'); if(!tb) return;
+  const body=document.getElementById('m-msg-body');
+  tb.addEventListener('mousedown', e=>e.preventDefault());
+  tb.addEventListener('click', e=>{
+    const btn=e.target.closest('button[data-cmd]'); if(!btn) return;
+    const cmd=btn.dataset.cmd;
+    body.focus();
+    if(cmd==='link'){
+      const url=(prompt('Link URL (https://…)')||'').trim();
+      if(url) document.execCommand('createLink', false, /^https?:|^mailto:/i.test(url)?url:('https://'+url));
+    } else {
+      document.execCommand(cmd, false, null);
+    }
+    rteSyncToolbar();
+  });
+  document.addEventListener('selectionchange', ()=>{ if(document.activeElement===body) rteSyncToolbar(); });
+  function rteSyncToolbar(){
+    tb.querySelectorAll('button[data-cmd]').forEach(b=>{
+      const cmd=b.dataset.cmd; if(cmd==='link'||cmd==='removeFormat') return;
+      try{ b.classList.toggle('on', document.queryCommandState(cmd)); }catch(e){}
+    });
+  }
+})();
+
 async function sendLadderMessage(){
   if(!CURRENT) return;
   const subject=document.getElementById('m-msg-subject').value.trim();
-  const message=document.getElementById('m-msg-body').value.trim();
-  if(!message){ msg('mMsgMsg','err','Write a message first.'); return; }
+  const rte=document.getElementById('m-msg-body');
+  const message=rte.innerHTML.trim();
+  if(!rte.textContent.trim()){ msg('mMsgMsg','err','Write a message first.'); return; }
   if(!(await dsConfirm({ title:'Send message?', message:'Send this message to everyone on the roster for '+(CURRENT.name||'this ladder')+'?', confirmLabel:'Send', cancelLabel:'Cancel' }))) return;
   const box=document.getElementById('mMsgMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
-  const {status,d}=await api('/admin-ladder-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:CURRENT.id,subject,message})});
+  const {status,d}=await api('/admin-ladder-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:CURRENT.id,subject,message,format:'html'})});
   if(status===401){ msg('mMsgMsg','err','Sign in as admin first.'); return; }
   if(d&&d.ok){
     msg('mMsgMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.');
-    document.getElementById('m-msg-body').value='';
+    rte.innerHTML='';
   }
   else msg('mMsgMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }

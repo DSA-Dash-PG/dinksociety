@@ -24,17 +24,17 @@ export function crownStr(wins) {
   return '👑×' + wins;
 }
 
-// Coed pairing: gender balance > no-repeat-partner > snake-draft for strength.
-// `strength` is (playerId)=>number; falsy/missing → 0.
-export function makeCoed(group, pp, strength) {
-  const str = typeof strength === 'function' ? strength : (() => 0);
+// Coed pairing: gender balance > no-repeat-partner > uniformly random choice
+// among the valid team combos for this foursome. No skill/strength weighting —
+// every valid pairing has an equal chance of being picked, and who plays with
+// whom is otherwise just luck of the draw (the `strength` param some callers
+// still pass is accepted but intentionally ignored).
+export function makeCoed(group, pp) {
   const g = group.filter(Boolean);
   if (g.length < 2) return { t1: [g[0] || null, null], t2: [null, null] };
-  const males = g.filter(p => p.gender === 'M').slice().sort((a, b) => str(b.id) - str(a.id));
-  const females = g.filter(p => p.gender === 'F').slice().sort((a, b) => str(b.id) - str(a.id));
+  const males = g.filter(p => p.gender === 'M');
+  const females = g.filter(p => p.gender === 'F');
   const noRepeat = (a, b, c, d) => { if (!pp) return true; return pp[a?.id] !== b?.id && pp[b?.id] !== a?.id && pp[c?.id] !== d?.id && pp[d?.id] !== c?.id; };
-  const teamStr = (a, b) => str(a?.id) + str(b?.id);
-  const balanceScore = ([a, b]) => Math.abs(teamStr(a[0], a[1]) - teamStr(b[0], b[1]));
 
   const pairings = [];
   if (males.length === 2 && females.length === 2) {
@@ -64,13 +64,11 @@ export function makeCoed(group, pp, strength) {
     }
   }
 
+  // Prefer pairings that don't repeat last round's partners, but among
+  // whichever pool applies, pick uniformly at random — no strength ranking.
   const noRepeatOpts = pairings.filter(([a, b]) => noRepeat(a[0], a[1], b[0], b[1]));
-  let chosen;
-  if (noRepeatOpts.length) {
-    chosen = noRepeatOpts.slice().sort((x, y) => balanceScore(x) - balanceScore(y))[0];
-  } else if (pairings.length) {
-    chosen = pairings.slice().sort((x, y) => balanceScore(x) - balanceScore(y))[0];
-  }
+  const pool = noRepeatOpts.length ? noRepeatOpts : pairings;
+  const chosen = pool.length ? pool[Math.floor(Math.random() * pool.length)] : null;
   if (!chosen) return { t1: [g[0] || null, g[1] || null], t2: [g[2] || null, g[3] || null] };
   return { t1: [chosen[0][0] || null, chosen[0][1] || null], t2: [chosen[1][0] || null, chosen[1][1] || null] };
 }
