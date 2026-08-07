@@ -18,7 +18,7 @@
   .topbar{ display:flex; align-items:center; justify-content:space-between; padding:16px 0 10px; }
   .brand{ display:flex; align-items:center; gap:10px; }
   .brand .mk{ width:32px;height:32px;border-radius:9px;background:var(--lime);color:#000;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px; }
-  .brand small{ display:block;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--teal);font-weight:800; }
+  .brand small{ display:block;font-size:.58rem;letter-spacing:.16em;text-transform:uppercase;color:var(--lime);font-weight:800; }
   .brand b{ font-size:.92rem;font-weight:900;font-style:italic;text-transform:uppercase; }
   .badge{ font-size:.6rem;font-weight:800;padding:4px 10px;border-radius:9999px;background:rgba(184,255,44,.14);color:var(--lime);text-transform:uppercase;letter-spacing:.06em; }
   .who{ font-size:.72rem;color:#9aa094; }
@@ -32,6 +32,8 @@
   .frow{ margin-bottom:13px; }
   input.i,select.i{ width:100%;min-height:44px;padding:0 13px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#1c1f18;color:#f0f2ec;font:inherit;font-size:.88rem;box-sizing:border-box; }
   input.i:focus,select.i:focus{ outline:none;border-color:var(--lime); }
+  input.i[type="time"]::-webkit-calendar-picker-indicator{ filter:invert(1); cursor:pointer; }
+  input.i[type="date"]::-webkit-calendar-picker-indicator{ filter:invert(1); cursor:pointer; }
   .help{ font-size:.64rem;color:#5e655a;margin-top:5px; }
   .btn{ display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:9999px;border:1px solid transparent;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer; }
   .btn-lime{ background:var(--lime);color:#000; } .btn-out{ border-color:rgba(255,255,255,.18);color:#f0f2ec;background:transparent; }
@@ -77,7 +79,7 @@
 <body>
 <div class="wrap">
   <div class="topbar">
-    <div class="brand"><div class="mk">DS</div><div><small>The Dink Society</small><b>Organizer</b></div></div>
+    <div class="brand"><div class="mk">DS</div><div><small>Dink Society</small><b>Ladder Organizer</b></div></div>
     <span class="who" id="who"></span>
   </div>
   <div id="app"><div class="empty">Loading…</div></div>
@@ -185,7 +187,7 @@ function renderManage(){
     <div class="back" onclick="loadLadders()">← My ladders</div>
     <h2 class="mh">${title}</h2>
     <div class="help" style="margin:2px 0 14px;font-size:.76rem">${meta}</div>
-    <div class="mtabbar" id="mtabs">${tabs.map(t=>`<button class="${t[0]===TAB?'on':''}" onclick="mtab('${t[0]}')">${t[1]}</button>`).join('')}</div>
+    ${tabs.length>1?`<div class="mtabbar" id="mtabs">${tabs.map(t=>`<button class="${t[0]===TAB?'on':''}" onclick="mtab('${t[0]}')">${t[1]}</button>`).join('')}</div>`:''}
     <div id="mbody"></div>`;
   renderTab();
 }
@@ -199,6 +201,22 @@ function renderTab(){
 }
 
 /* Ladder Info form (mirrors admin edit form) */
+// Native <input type="time"> works in 24h "HH:MM" — convert to/from the
+// "6:30 PM"-style string stored on the event (and used everywhere else it's
+// displayed: cards, emails, admin panel) so a mistyped "6.30" or missing
+// AM/PM is impossible — the mobile OS supplies its own picker instead.
+function to24h(s){
+  s=String(s||'').trim(); if(!s) return '';
+  let m=s.match(/^(\d{1,2}):(\d{2})$/); if(m) return String(+m[1]).padStart(2,'0')+':'+m[2];
+  m=s.match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/); if(!m) return '';
+  let h=(+m[1])%12; if(/pm/i.test(m[3])) h+=12;
+  return String(h).padStart(2,'0')+':'+m[2];
+}
+function to12h(s){
+  s=String(s||'').trim(); const m=s.match(/^(\d{1,2}):(\d{2})$/); if(!m) return '';
+  let h=+m[1]; const mm=m[2], ap=h>=12?'PM':'AM'; h=h%12; if(h===0)h=12;
+  return h+':'+mm+' '+ap;
+}
 let FREE=false, VIS='public';
 function infoPanel(){
   const e=CUR||{}, v=(k,d)=>e[k]!=null?e[k]:(d==null?'':d);
@@ -209,11 +227,19 @@ function infoPanel(){
   FREE=!!e.free; VIS=e.visibility||'public';
   const site=location.origin;
   return `<div class="card">
+    <div class="frow"><label class="l">Visibility</label>
+      <div class="row2" style="gap:8px">
+        <button type="button" id="f-vis-btn-public" class="btn ${VIS==='public'?'btn-lime':'btn-out'}" style="flex:1" onclick="setVis('public')">🌐 Public</button>
+        <button type="button" id="f-vis-btn-private" class="btn ${VIS==='private'?'btn-lime':'btn-out'}" style="flex:1" onclick="setVis('private')">🔒 Private (invite-only)</button>
+      </div>
+      <div class="help" id="f-vis-help" style="margin-top:9px">${VIS==='private'?VIS_HELP.private:VIS_HELP.public}</div>
+    </div>
+    ${CUR&&VIS==='private'?`<div class="frow"><label class="l">Share this link with your group</label><input class="i" readonly value="${esc(site+'/ladders.html?event='+CUR.id)}" onclick="this.select()"><button class="btn btn-out btn-sm" style="margin-top:8px" onclick="copyInviteLink(this)">Copy link</button></div>`:''}
     <div class="frow"><label class="l">Name</label><input class="i" id="f-name" value="${esc(v('name'))}" placeholder="Thursday Night Ladder"></div>
     <div class="row3">
       <div class="frow"><label class="l">Date</label><input class="i" id="f-date" type="date" value="${esc(v('date'))}"></div>
-      <div class="frow"><label class="l">Start time</label><input class="i" id="f-time" value="${esc(v('startTime'))}" placeholder="6:30 PM"></div>
-      <div class="frow"><label class="l">End time</label><input class="i" id="f-end" value="${esc(v('endTime'))}" placeholder="9:00 PM"></div>
+      <div class="frow"><label class="l">Start time</label><input class="i" id="f-time" type="time" value="${to24h(v('startTime'))}"></div>
+      <div class="frow"><label class="l">End time</label><input class="i" id="f-end" type="time" value="${to24h(v('endTime'))}"></div>
     </div>
     <div class="frow"><label class="l">Location</label><input class="i" id="f-place" value="${esc(v('place'))}" placeholder="SBTC - 25924 Rolling Hills Rd"></div>
     <div class="frow"><label class="l">Division</label><select class="i" id="f-type">
@@ -242,14 +268,6 @@ function infoPanel(){
     <div class="frow" id="f-venmo-row" style="display:${FREE?'none':'block'}"><label class="l">Your Venmo</label><input class="i" id="f-venmo" value="${esc(v('venmoHandle'))}" placeholder="@your-name">
       <div class="lock" style="margin-top:8px">🔒 Venmo / cash only — you collect entry fees yourself; Dink Society never touches the money.</div>
     </div>
-    <div class="frow"><label class="l">Visibility</label>
-      <div class="row2" style="gap:8px">
-        <button type="button" id="f-vis-btn-public" class="btn ${VIS==='public'?'btn-lime':'btn-out'}" style="flex:1" onclick="setVis('public')">🌐 Public</button>
-        <button type="button" id="f-vis-btn-private" class="btn ${VIS==='private'?'btn-lime':'btn-out'}" style="flex:1" onclick="setVis('private')">🔒 Private (invite-only)</button>
-      </div>
-      <div class="help" id="f-vis-help" style="margin-top:9px">${VIS==='private'?VIS_HELP.private:VIS_HELP.public}</div>
-    </div>
-    ${CUR&&VIS==='private'?`<div class="frow"><label class="l">Share this link with your group</label><input class="i" readonly value="${esc(site+'/ladders.html?event='+CUR.id)}" onclick="this.select()"><button class="btn btn-out btn-sm" style="margin-top:8px" onclick="copyInviteLink(this)">Copy link</button></div>`:''}
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
       ${CUR?`<button class="btn btn-out" onclick="loadLadders()">Done</button>`:''}
       <button class="btn btn-lime" onclick="saveLadder()">${CUR?'Save changes':'Create ladder'}</button>
@@ -289,7 +307,7 @@ function recalcCourts(){
 async function saveLadder(){
   const courtNames=Array.from($('f-courtnames').querySelectorAll('input')).map(i=>i.value.trim()).filter(Boolean);
   const body={
-    name:$('f-name').value.trim(), date:$('f-date').value, startTime:$('f-time').value.trim(), endTime:$('f-end').value.trim(),
+    name:$('f-name').value.trim(), date:$('f-date').value, startTime:to12h($('f-time').value), endTime:to12h($('f-end').value),
     place:$('f-place').value.trim(), type:$('f-type').value, courts:+$('f-courts').value||0, capacity:+$('f-cap').value||0,
     fee:FREE?0:(+$('f-fee').value||0), rounds:+$('f-rounds').value||0, roundMin:+$('f-roundmin').value||0, scoreMode:$('f-score').value,
     venmoHandle:FREE?'':$('f-venmo').value.trim(), courtNames,
