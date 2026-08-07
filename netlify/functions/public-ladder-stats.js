@@ -12,7 +12,7 @@ import { verifyPlayerSession } from './lib/auth.js';
 import { getEvent, listEvents } from './lib/ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './lib/ladder-play.js';
 import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier, getRoundMVPs } from './lib/ladder-scoring.js';
-import { buildKitchen } from './lib/ladder-kitchen.js';
+import { buildKitchen, limitWithTies, MIN_KITCHEN_GAMES, MIN_KITCHEN_NIGHTS } from './lib/ladder-kitchen.js';
 import { getXpConfig, getXpGrants, grantTotals } from './lib/xp-config.js';
 import { getMergeMap, applyMerges } from './lib/player-merge.js';
 import { getDirectory, applyDirectory } from './lib/player-directory.js';
@@ -159,9 +159,18 @@ export default async (req) => {
   attachXP(rows); Object.values(divisions).forEach(attachXP);
 
   const kitchen = buildKitchen(sessions, players, allStats, allBonus);
-  const mvpLeaders = rows.filter(r => r.mvp > 0).sort((a, b) => b.mvp - a.mvp).slice(0, 6).map(r => ({ id: r.id, name: r.name, count: r.mvp }));
-  const hotStreaks = rows.filter(r => r.maxStreak > 0).sort((a, b) => b.maxStreak - a.maxStreak).slice(0, 6).map(r => ({ id: r.id, name: r.name, streak: r.maxStreak }));
-  const partnerships = calcPartners(sessions, players).slice(0, 8).map(p => ({ a: p.p1.name, b: p.p2.name, w: p.w, l: p.l, pct: (p.w + p.l) ? Math.round(100 * p.w / (p.w + p.l)) : 0 }));
+  // These three "season leader" cards now live in the Kitchen tab alongside
+  // the categories above, so they share the same 10-game/2-night bar and the
+  // same top-10-with-tie-line treatment (limitWithTies) as everything else there.
+  const qualifiedIds = new Set(rows.filter(r => (r.w + r.l) >= MIN_KITCHEN_GAMES && (r.nights || 0) >= MIN_KITCHEN_NIGHTS).map(r => r.id));
+  const mvpSorted = rows.filter(r => r.mvp > 0 && qualifiedIds.has(r.id)).sort((a, b) => b.mvp - a.mvp).map(r => ({ id: r.id, name: r.name, count: r.mvp }));
+  const mvpLeaders = limitWithTies(mvpSorted, r => r.count);
+  const hsSorted = rows.filter(r => r.maxStreak > 0 && qualifiedIds.has(r.id)).sort((a, b) => b.maxStreak - a.maxStreak).map(r => ({ id: r.id, name: r.name, streak: r.maxStreak }));
+  const hotStreaks = limitWithTies(hsSorted, r => r.streak);
+  const partnerSorted = calcPartners(sessions, players)
+    .filter(p => qualifiedIds.has(p.p1.id) && qualifiedIds.has(p.p2.id))
+    .map(p => ({ a: p.p1.name, b: p.p2.name, w: p.w, l: p.l, pct: (p.w + p.l) ? Math.round(100 * p.w / (p.w + p.l)) : 0 }));
+  const partnerships = limitWithTies(partnerSorted, r => r.pct);
 
   // recent events' results (newest first, up to 4). Includes the FULL field so the
   // Home tab can show the top-3 podium plus an expandable full standings.

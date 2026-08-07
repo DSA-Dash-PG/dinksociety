@@ -103,9 +103,14 @@ export async function buildLadderProfile(id) {
   const myXp = ((calcXP(sessions, players, dr, _xpCfg.amounts).xp[id]) || 0) + (grantTotals(await getXpGrants())[id] || 0);
   const gp = me.w + me.l;
 
-  const ranked = stats.filter(s => s.w + s.l > 0)
+  // Same 10-game floor as the public Leaderboard's "Not Yet Ranked" cutoff
+  // (ladders.html MIN_LB_GAMES) — a player under threshold gets rank:null here
+  // too, so this card and the Leaderboard never disagree about who's ranked.
+  const MIN_RANKED_GAMES = 10;
+  const ranked = stats.filter(s => s.w + s.l >= MIN_RANKED_GAMES)
     .sort((a, b) => (b.w - a.w) || ((b.pf - b.pa) - (a.pf - a.pa)) || ((dr[b.id] ?? -1) - (dr[a.id] ?? -1)));
-  const rank = ranked.findIndex(s => s.id === id) + 1;
+  const rankIdx = ranked.findIndex(s => s.id === id);
+  const rank = (gp >= MIN_RANKED_GAMES && rankIdx >= 0) ? rankIdx + 1 : null;
 
   const { perLadder, movement } = walk(plays, id);
   const resByEvent = {}; (bonus.ladderResults || []).forEach(r => { if (r.sessId) resByEvent[r.sessId] = r; });

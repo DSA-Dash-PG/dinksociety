@@ -111,18 +111,29 @@
     if (loading) return loading;
     loading = Promise.all([
       fetch('/.netlify/functions/public-leaderboard?view=players' + SUF).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/.netlify/functions/public-ladder-stats').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]).then(function (res) {
-      var pj = res[0], tj = res[1], teams = (tj && tj.teams) || [];
+      var pj = res[0], tj = res[1], lj = res[2], teams = (tj && tj.teams) || [];
       var emojiBy = {}, capBy = {};
       teams.forEach(function (t) { emojiBy[t.name] = t.emoji || '🏓'; capBy[t.name] = t.captain || ((t.roster || []).find(function (r) { return r.isCaptain; }) || {}).name || ''; });
       var raw = (pj && (pj.players || pj.rows || pj)) || [];
       var arr = Array.isArray(raw) ? raw : Object.keys(raw || {}).map(function (k) { return raw[k]; });
       var players = arr.map(function (p) {
-        return { name: p.name, team: p.teamName, gender: p.gender, dsr: (p.composite != null ? Number(p.composite) : (p.dsr != null ? Number(p.dsr) : null)), cap: (capBy[p.teamName] === p.name) };
+        return { name: p.name, team: p.teamName, gender: p.gender, dsr: (p.composite != null ? Number(p.composite) : (p.dsr != null ? Number(p.dsr) : null)), cap: (capBy[p.teamName] === p.name), href: '/player?name=' + encodeURIComponent(p.name) + '&team=' + slugify(p.teamName) + SUF };
       }).filter(function (p) { return p.name && p.team; });
       players.filter(function (p) { return p.dsr != null; }).sort(function (a, b) { return b.dsr - a.dsr; }).forEach(function (p, i) { p.rank = i + 1; });
-      idx = { players: players, teams: teams.map(function (t) { return { name: t.name, emoji: emojiBy[t.name], cap: capBy[t.name], players: (t.roster || []).length }; }), emojiBy: emojiBy };
+      // Ladder Challengers players (no league team, e.g. manually-added ladder-only
+      // participants) — searchable site-wide too, not just league rosters. Deduped
+      // against league players by exact name match so a player in both isn't listed
+      // twice; no rank badge here since the Leaderboard's own ranked/NQ split is
+      // computed separately (10-game floor) and we don't want a second value that
+      // could drift out of sync with it.
+      var leagueNames = {}; players.forEach(function (p) { leagueNames[p.name.toLowerCase()] = true; });
+      var lraw = (lj && lj.leaderboard) || [];
+      var ladderPlayers = lraw.filter(function (p) { return p.name && !leagueNames[String(p.name).toLowerCase()]; })
+        .map(function (p) { return { name: p.name, gender: p.gender, dr: (p.dr != null ? Number(p.dr) : null), isLadder: true, href: '/profile?ladderId=' + encodeURIComponent(p.id) }; });
+      idx = { players: players, ladderPlayers: ladderPlayers, teams: teams.map(function (t) { return { name: t.name, emoji: emojiBy[t.name], cap: capBy[t.name], players: (t.roster || []).length }; }), emojiBy: emojiBy };
       return idx;
     });
     return loading;
@@ -133,8 +144,11 @@
   function search(q) {
     q = (q || '').trim().toLowerCase(); var players = [], teams = [];
     if (!idx) return { players: [], teams: [] };
+    // Default (empty-query) suggestions stay league-only — ranked by DSR, which
+    // ladder players don't have. Typed queries search across both pools.
     if (!q) { if (SCOPE !== 'teams') players = idx.players.filter(function (p) { return p.dsr != null; }).slice(0, 6); if (SCOPE !== 'players') teams = idx.teams.slice(0, 6); return { players: players, teams: teams, sug: true }; }
-    if (SCOPE !== 'teams') players = idx.players.map(function (p) { return { p: p, s: score(p.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s || ((b.p.dsr || 0) - (a.p.dsr || 0)); }).slice(0, 8).map(function (x) { return x.p; });
+    var allPlayers = idx.players.concat(idx.ladderPlayers || []);
+    if (SCOPE !== 'teams') players = allPlayers.map(function (p) { return { p: p, s: score(p.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s || ((b.p.dsr || 0) - (a.p.dsr || 0)); }).slice(0, 8).map(function (x) { return x.p; });
     if (SCOPE !== 'players') teams = idx.teams.map(function (t) { return { t: t, s: score(t.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 4).map(function (x) { return x.t; });
     return { players: players, teams: teams, sug: false };
   }
@@ -148,11 +162,20 @@
       r.players.forEach(function (p) {
         var i = flat.length; flat.push({ kind: 'player', item: p });
         var g = p.gender === 'F' ? "Women's" : p.gender === 'M' ? "Men's" : '';
-        html += '<div class="ds-srch-row" data-i="' + i + '">' +
-          '<div class="ds-srch-av" style="background:' + color(p.team) + '">' + esc(initials(p.name)) + '</div>' +
-          '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(p.name, q) + '</div><div class="ds-srch-sub">' + teamEmoji(p.team) + ' ' + esc(p.team) + (g ? ' · ' + g : '') + (p.cap ? ' · <span class="cp">Captain</span>' : '') + '</div></div>' +
-          (p.dsr != null ? '<div class="ds-srch-dsr' + (p.gender === 'F' ? ' teal' : '') + '">' + p.dsr.toFixed(1) + ' <small>DSR</small></div>' : '') +
-          (p.rank != null ? '<div class="ds-srch-rank">#' + p.rank + '</div>' : '') + '</div>';
+        if (p.isLadder) {
+          // Ladder Challengers player — no team/captain, no DSR rank (see load()'s
+          // note on why we don't compute one here). Show what we do have.
+          html += '<div class="ds-srch-row" data-i="' + i + '">' +
+            '<div class="ds-srch-av" style="background:' + color(p.name) + '">' + esc(initials(p.name)) + '</div>' +
+            '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(p.name, q) + '</div><div class="ds-srch-sub">🏓 Ladder player' + (g ? ' · ' + g : '') + '</div></div>' +
+            (p.dr != null ? '<div class="ds-srch-dsr' + (p.gender === 'F' ? ' teal' : '') + '">' + p.dr.toFixed(2) + ' <small>DR</small></div>' : '') + '</div>';
+        } else {
+          html += '<div class="ds-srch-row" data-i="' + i + '">' +
+            '<div class="ds-srch-av" style="background:' + color(p.team) + '">' + esc(initials(p.name)) + '</div>' +
+            '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(p.name, q) + '</div><div class="ds-srch-sub">' + teamEmoji(p.team) + ' ' + esc(p.team) + (g ? ' · ' + g : '') + (p.cap ? ' · <span class="cp">Captain</span>' : '') + '</div></div>' +
+            (p.dsr != null ? '<div class="ds-srch-dsr' + (p.gender === 'F' ? ' teal' : '') + '">' + p.dsr.toFixed(1) + ' <small>DSR</small></div>' : '') +
+            (p.rank != null ? '<div class="ds-srch-rank">#' + p.rank + '</div>' : '') + '</div>';
+        }
       });
     }
     if (r.teams.length) {
@@ -171,7 +194,11 @@
     });
   }
   function paint() { Array.prototype.forEach.call(resEl.querySelectorAll('.ds-srch-row'), function (row) { var on = (+row.dataset.i === SEL); row.classList.toggle('is-sel', on); if (on) row.scrollIntoView({ block: 'nearest' }); }); }
-  function go() { var e = FLAT[SEL]; if (!e) return; location.href = e.kind === 'player' ? '/player?name=' + encodeURIComponent(e.item.name) + '&team=' + slugify(e.item.team) + SUF : '/team?id=' + slugify(e.item.name) + SUF; }
+  function go() {
+    var e = FLAT[SEL]; if (!e) return;
+    if (e.item.href) { location.href = e.item.href; return; } // ladder players (and now league players too) carry their own URL
+    location.href = e.kind === 'player' ? '/player?name=' + encodeURIComponent(e.item.name) + '&team=' + slugify(e.item.team) + SUF : '/team?id=' + slugify(e.item.name) + SUF;
+  }
 
   function open() {
     if (!overlay) return;

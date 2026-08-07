@@ -428,6 +428,7 @@ const KIT_CATS=[
   {k:'highestSingleGame',e:'🎯',t:'Highest Single Game',s:'most pts in one round'},
 ];
 function kitRowHtml(cat,r,i){
+  if(r.tie) return `<div class="kit-row" style="justify-content:center;color:var(--fnt);font-size:11px;font-weight:700;font-style:italic">${r.count} players tied for the last spot</div>`;
   const rk=`<span class="kit-rk${i<3?' top':''}">${i+1}</span>`;
   let nm,xt='',vl;
   switch(cat.k){
@@ -446,16 +447,27 @@ function kitRowHtml(cat,r,i){
   }
   return `<div class="kit-row">${rk}<div class="kit-nm">${nm}</div>${xt?`<div class="kit-xt">${xt}</div>`:''}<div class="kit-vl">${vl}</div></div>`;
 }
+// Tie-line for the lbCard/lbRow-style cards (Top performers / Hot streaks /
+// Best partnerships) — same idea as kitRowHtml's tie branch, just styled to
+// match lbRow's layout instead of the kit-row grid.
+function tieRow(n){ return `<div style="display:flex;align-items:center;justify-content:center;padding:9px 12px;font-size:.74rem;font-weight:700;font-style:italic;color:var(--fnt)">${n} players tied for the last spot</div>`; }
 function renderKitchen(){
   const el=document.getElementById('kitchenBody'); if(!el) return;
   const kitchen=(STATS&&STATS.kitchen)||null;
   if(!kitchen){ el.innerHTML='<div class="empty">Fun stats show up once a ladder or two has been scored.</div>'; return; }
-  el.innerHTML='<div class="kit-grid">'+KIT_CATS.map(cat=>{
+  let h='<div class="kit-grid">'+KIT_CATS.map(cat=>{
     const rows=kitchen[cat.k]||[];
     return `<div class="kit-card"><div class="kit-h"><span class="e">${cat.e}</span><span class="t">${esc(cat.t)}</span></div><div class="kit-sub">${esc(cat.s)}</div>`+
       (rows.length?rows.map((r,i)=>kitRowHtml(cat,r,i)).join(''):'<div class="kit-empty">Not enough games yet.</div>')+
       `</div>`;
   }).join('')+'</div>';
+  // Season leader cards — moved here from the Leaderboard tab (they're fun
+  // stats, not rankings). Same top-10 + "N players tied" treatment as above.
+  const j=STATS||{};
+  if(j.mvpLeaders&&j.mvpLeaders.length) h+=`<div class="seclbl">🏅 Top performers</div>`+lbCard('#f0c040', j.mvpLeaders.map((x,i)=>x.tie?tieRow(x.count):lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:1rem;font-weight:900;color:#f0c040;text-shadow:0 0 12px rgba(240,192,64,.4)">${x.count}<span style="font-size:.6rem;color:#5e655a">×</span></span>`)).join(''));
+  if(j.hotStreaks&&j.hotStreaks.length) h+=`<div class="seclbl">🔥 Hot streaks</div>`+lbCard('#ff7a3c', j.hotStreaks.map((x,i)=>x.tie?tieRow(x.count):lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:.78rem;font-weight:900;color:var(--lime);background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.26);border-radius:7px;padding:3px 9px;text-shadow:0 0 10px rgba(184,255,44,.4)">W${x.streak}</span>`)).join(''));
+  if(j.partnerships&&j.partnerships.length){ let pr=j.partnerships.filter(p=>p.tie||(p.w+p.l)>=3); if(!pr.filter(p=>!p.tie).length) pr=j.partnerships; h+=`<div class="seclbl">🤝 Best partnerships</div>`+lbCard('#17d7b0', pr.map((p,i)=>p.tie?tieRow(p.count):lbRow(i,`${esc(firstName(p.a))} &amp; ${esc(firstName(p.b))}`,`<span style="width:46px;height:5px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden;flex-shrink:0;display:inline-block"><span style="display:block;height:100%;background:#17d7b0;width:${p.pct}%"></span></span><span style="font-size:.72rem;color:#9aa094;font-weight:700;white-space:nowrap">${p.w}-${p.l} · ${p.pct}%</span>`)).join('')); }
+  el.innerHTML=h;
 }
 
 /* ---- HOME ---- */
@@ -852,11 +864,9 @@ function renderStats(){
     h+=`<div class="seclbl">🆕 Not yet ranked <span style="font-weight:600;color:var(--fnt);text-transform:none;letter-spacing:0">— under ${MIN_LB_GAMES} games played</span></div>`;
     h+=`<div class="lb-m" style="display:flex;flex-direction:column;gap:7px">${uview.map(p=>lbCell(Object.assign({},p,{_sec:''}),'NQ',lbM)).join('')}</div><div class="lb-d">${lbTableUnq(uview,lbM)}</div>`;
   }
-  if(lbBrd==='society' && lbTab==='wins' && lbGender==='all'){
-    if(j.mvpLeaders&&j.mvpLeaders.length) h+=`<div class="seclbl">🏅 Top performers</div>`+lbCard('#f0c040', j.mvpLeaders.map((x,i)=>lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:1rem;font-weight:900;color:#f0c040;text-shadow:0 0 12px rgba(240,192,64,.4)">${x.count}<span style="font-size:.6rem;color:#5e655a">×</span></span>`)).join(''));
-    if(j.hotStreaks&&j.hotStreaks.length) h+=`<div class="seclbl">🔥 Hot streaks</div>`+lbCard('#ff7a3c', j.hotStreaks.map((x,i)=>lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:.78rem;font-weight:900;color:var(--lime);background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.26);border-radius:7px;padding:3px 9px;text-shadow:0 0 10px rgba(184,255,44,.4)">W${x.streak}</span>`)).join(''));
-    if(j.partnerships&&j.partnerships.length){ let pr=j.partnerships.filter(p=>(p.w+p.l)>=3); if(!pr.length) pr=j.partnerships; h+=`<div class="seclbl">🤝 Best partnerships</div>`+lbCard('#17d7b0', pr.map((p,i)=>lbRow(i,`${esc(firstName(p.a))} &amp; ${esc(firstName(p.b))}`,`<span style="width:46px;height:5px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden;flex-shrink:0;display:inline-block"><span style="display:block;height:100%;background:#17d7b0;width:${p.pct}%"></span></span><span style="font-size:.72rem;color:#9aa094;font-weight:700;white-space:nowrap">${p.w}-${p.l} · ${p.pct}%</span>`)).join('')); }
-  }
+  // Top performers / Hot streaks / Best partnerships moved to the Kitchen tab
+  // (renderKitchen) — they're fun season stats, not a ranking, and don't
+  // belong mixed into the Leaderboard.
   body.innerHTML=h;
 }
 function lbRank(i){ return i<3?`<span style="width:20px;height:20px;border-radius:50%;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;font-size:.62rem;font-weight:900;color:#0b0d0a;background:${POD3[i+1]}">${i+1}</span>`:`<span style="width:20px;text-align:center;flex-shrink:0;color:#5e655a;font-weight:900;font-size:.7rem">${i+1}</span>`; }

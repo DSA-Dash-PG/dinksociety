@@ -31,7 +31,8 @@
     var ns = 'ldp' + (++SEQ);
     var sk = L.streak || 0, skS = sk > 0 ? 'W' + sk : sk < 0 ? 'L' + Math.abs(sk) : '–';
     var h = '';
-    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' + kc(L.w + '-' + L.l, 'Record') + kc((L.winPct != null ? L.winPct : 0) + '%', 'Win%', LIME) + kc(L.avg != null ? L.avg : '—', 'Avg') + kc('#' + (L.rank || '–'), 'Rank') + '</div>';
+    var rankVal = L.rank ? ('#' + L.rank) : (((L.w || 0) + (L.l || 0)) > 0 ? 'NQ' : '–');
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">' + kc(L.w + '-' + L.l, 'Record') + kc((L.winPct != null ? L.winPct : 0) + '%', 'Win%', LIME) + kc(L.avg != null ? L.avg : '—', 'Avg') + kc(rankVal, 'Rank', L.rank ? null : FA) + '</div>';
     h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:6px">' + kc(L.pf != null ? L.pf : '—', 'PS') + kc(L.pa != null ? L.pa : '—', 'PA') + kc((L.diff > 0 ? '+' : '') + (L.diff || 0), 'Diff', (L.diff >= 0 ? LIME : RED)) + kc(skS, 'Streak', (sk > 0 ? LIME : sk < 0 ? RED : '')) + '</div>';
     h += '<div style="display:flex;align-items:center;gap:11px;background:rgba(184,255,44,.08);border:1px solid rgba(184,255,44,.3);border-radius:11px;padding:11px 13px;margin-top:10px"><div style="font-size:21px;font-weight:900;color:' + LIME + '">' + (L.xp != null ? L.xp : '—') + '</div><div><div style="font-weight:800;font-size:13px;color:' + LIME + '">XP · ' + (L.xpTier || '—') + '</div><div style="font-size:11px;color:' + GR + '">' + (L.ladders != null ? L.ladders : (L.nights != null ? L.nights : '—')) + ' ladders · ' + (L.podiums || 0) + ' podiums · ' + (L.mvp || 0) + '× top</div></div></div>';
     // Per-format breakdown — Society (Mixed), Queen (Women's), King (Men's).
