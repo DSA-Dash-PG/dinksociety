@@ -32,25 +32,57 @@
   .story p{ font-size:.8rem; color:var(--mut); line-height:1.6; margin:0 0 10px; max-width:64ch; }
   .story .rmeta{ font-size:.66rem; color:var(--fnt); font-weight:700; margin-bottom:9px; }
   .story a.more{ font-size:.72rem; font-weight:800; color:var(--lime); text-decoration:none; }
+  /* Kitchen — season-wide fun stat categories (same shape as ladder-live.html's
+     per-night Kitchen tab, reused here for the whole-season numbers already
+     returned as STATS.kitchen by public-ladder-stats.js). */
+  .kit-grid{ display:flex; flex-direction:column; gap:10px; }
+  .kit-card{ background:var(--surf); border:1px solid var(--bd); border-radius:13px; padding:12px 13px; }
+  .kit-h{ display:flex; align-items:baseline; gap:7px; margin-bottom:2px; }
+  .kit-h .e{ font-size:1rem; } .kit-h .t{ font-size:13.5px; font-weight:900; }
+  .kit-sub{ font-size:11px; color:var(--mut); margin-bottom:9px; }
+  .kit-row{ display:flex; align-items:center; gap:8px; padding:6px 0; border-top:1px solid rgba(255,255,255,.06); }
+  .kit-row:first-of-type{ border-top:0; }
+  .kit-rk{ width:16px; font-size:11px; font-weight:900; color:var(--fnt); flex-shrink:0; } .kit-rk.top{ color:var(--gold); }
+  .kit-nm{ flex:1; font-size:13px; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kit-xt{ font-size:10.5px; color:var(--fnt); font-weight:700; }
+  .kit-vl{ font-size:13.5px; font-weight:900; color:var(--lime); font-variant-numeric:tabular-nums; }
+  .kit-empty{ font-size:11.5px; color:var(--fnt); padding:4px 0; }
+  /* Recaps tab — every completed night, newest first, linking out to its recap article. */
+  .rec-card{ display:block; text-decoration:none; color:inherit; border:1px solid var(--bd); border-left:3px solid var(--lime); border-radius:13px; padding:14px; margin-bottom:10px; background:#000; }
+  .rec-card.soon{ opacity:.55; }
+  .rec-kick{ font-size:.6rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+  .rec-nm{ font-size:.95rem; font-weight:900; margin-top:2px; }
+  .rec-cta{ margin-top:10px; font-size:.72rem; font-weight:800; }
   /* ── Desktop: TABBED DASHBOARD. Tabs disappear; a second sub-nav (#dtabs)
-       takes over — Overview / Results / Standings / Rules — one section shown
-       at a time in the left column, same idea as the mobile tab bar rather
-       than one long stacked scroll. A sticky "play this week" register rail
-       sits on the right throughout. Mobile (<900px) keeps the tabbed layout
-       untouched. ── */
+       takes over — Overview / Results / Standings / Recaps / Kitchen / Rules —
+       one section shown at a time in the left column, same idea as the mobile
+       tab bar rather than one long stacked scroll. A sticky "play this week"
+       register rail sits on the right throughout. Mobile (<900px) keeps the
+       tabbed layout untouched. ── */
+  /* #dtabCol wraps #dtabs + every dtab pane as ONE grid item (grid-column:1;
+     grid-row:1) so they're plain stacked block children instead of two
+     separately-tracked grid rows. #p-ladders (the rail) is a normal, un-spanned
+     grid-column:2 item in that same single row — a plain 2-column, 1-row grid,
+     so there's no shared spanned track for Grid to inflate. (Previously #dtabs
+     sat in row 1 and each pane in row 2, with #p-ladders spanning both rows —
+     when the rail was taller than #dtabs + a short pane combined, Grid had to
+     inflate row 1 to fit the rail, leaving dead space below the tab buttons.) */
   @media(min-width:900px){
     .wrap{ max-width:var(--max-w,1200px); width:min(calc(100% - 2rem),var(--max-w,1200px)); }
     .tabs{ display:none; }
     .content{ display:grid; grid-template-columns:minmax(0,1.35fr) 380px; gap:28px; align-items:start; border-top:1px solid var(--bd); padding-top:22px; }
-    #dtabs{ grid-column:1; grid-row:1; display:flex; gap:8px; margin:0 0 22px; }
+    #dtabCol{ grid-column:1; grid-row:1; min-width:0; }
+    #dtabs{ display:flex; gap:8px; margin:0 0 22px; flex-wrap:wrap; }
     #dtabs button{ font:inherit; font-size:.76rem; font-weight:800; padding:10px 18px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); cursor:pointer; }
     #dtabs button.on{ background:var(--lime); color:#06210f; border-color:var(--lime); }
-    #p-home,#p-leaderboard,#p-completed,#p-rules{ grid-column:1; grid-row:2; display:none; }
+    #p-home,#p-leaderboard,#p-completed,#p-recaps,#p-kitchen,#p-rules{ display:none; }
     .content.dtab-overview #p-home,
     .content.dtab-results #p-completed,
     .content.dtab-standings #p-leaderboard,
+    .content.dtab-recaps #p-recaps,
+    .content.dtab-kitchen #p-kitchen,
     .content.dtab-rules #p-rules{ display:block; }
-    #p-ladders{ grid-column:2; grid-row:1/span 2; position:sticky; top:80px; display:block; }
+    #p-ladders{ grid-column:2; grid-row:1; position:sticky; top:80px; display:block; }
     /* The rail only registers on desktop — Completed is its own tab, so the
        Ladders pane's internal register/completed sub-toggle goes away. */
     #ladSeg,#pastWrap{ display:none!important; }
@@ -74,6 +106,7 @@
     table.lbt td{ font-size:.8rem; font-weight:700; padding:10px; border-bottom:1px solid rgba(255,255,255,.05); }
     table.lbt td.num,table.lbt th.num{ text-align:right; font-variant-numeric:tabular-nums; }
     table.lbt tr[onclick]:hover td{ background:rgba(255,255,255,.03); }
+    .kit-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   }
   .tabs button{ flex:1; padding:9px 6px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); font:inherit; font-size:.78rem; font-weight:800; cursor:pointer; }
   .tabs button.on{ background:var(--lime); color:#000; border-color:var(--lime); }
@@ -138,14 +171,19 @@
     <button class="on" data-t="home" onclick="tab(this)">Home</button>
     <button data-t="ladders" onclick="tab(this)">Ladders</button>
     <button data-t="leaderboard" onclick="tab(this)">Leaderboard</button>
+    <button data-t="recaps" onclick="tab(this)">Recaps</button>
+    <button data-t="kitchen" onclick="tab(this)">🍳 Kitchen</button>
     <button data-t="rules" onclick="tab(this)">Rules</button>
   </div>
 
   <div class="content">
+   <div id="dtabCol">
     <div id="dtabs">
       <button class="on" data-d="overview" onclick="dtabClick('overview')">Overview</button>
       <button data-d="results" onclick="dtabClick('results')">Results</button>
       <button data-d="standings" onclick="dtabClick('standings')">Standings</button>
+      <button data-d="recaps" onclick="dtabClick('recaps')">Recaps</button>
+      <button data-d="kitchen" onclick="dtabClick('kitchen')">🍳 Kitchen</button>
       <button data-d="rules" onclick="dtabClick('rules')">Rules</button>
     </div>
     <div class="pane on" id="p-home">
@@ -162,17 +200,6 @@
       <div id="homeUp" style="display:none"></div>
     </div>
 
-    <div class="pane" id="p-ladders">
-      <div class="h1">Ladders</div>
-      <div class="sub" id="ladSub">Open ladders — register and pay</div>
-      <div id="ladSeg" style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px">
-        <button id="lt-register" onclick="ladTab('register')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--lime);color:#06210f">Register</button>
-        <button id="lt-past" onclick="ladTab('completed')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Completed</button>
-      </div>
-      <div id="regWrap"><div id="filters"></div><div id="availList"><div class="empty">Loading…</div></div></div>
-      <div id="pastWrap" style="display:none"></div>
-    </div>
-
     <div class="pane" id="p-leaderboard">
       <div class="h1">Leaderboard</div>
       <div class="sub">Season standings · ranked by <b>wins → point diff → DR</b></div>
@@ -184,6 +211,18 @@
       <div class="sub">Results, winners &amp; rounds from past ladders</div>
       <div id="pastWrapLeft"><div class="empty">Loading…</div></div>
       <div id="recapStripD" style="margin-top:8px"></div>
+    </div>
+
+    <div class="pane" id="p-recaps">
+      <div class="h1">Recaps</div>
+      <div class="sub">Every night, written up — tap in to read the full story</div>
+      <div id="recapsBody"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="pane" id="p-kitchen">
+      <div class="h1">🍳 The Kitchen</div>
+      <div class="sub">Season fun stats — bragging rights, updated after every ladder</div>
+      <div id="kitchenBody"><div class="empty">Loading…</div></div>
     </div>
 
     <div class="pane" id="p-rules">
@@ -200,6 +239,18 @@
         <div class="rule"><div class="ic">🎟️</div><div><div class="t">Cancellations</div><div class="d">Cancel and your spot reopens for the next player — no refunds, no credit.</div></div></div>
         <div class="rule"><div class="ic">⏳</div><div><div class="t">Waitlist</div><div class="d">If full, join the waitlist — the next person gets 30 min to claim an opening. Inside 24 hours it's first-come-first-served.</div></div></div>
       </div>
+    </div>
+   </div>
+
+    <div class="pane" id="p-ladders">
+      <div class="h1">Ladders</div>
+      <div class="sub" id="ladSub">Open ladders — register and pay</div>
+      <div id="ladSeg" style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin-bottom:12px">
+        <button id="lt-register" onclick="ladTab('register')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:var(--lime);color:#06210f">Register</button>
+        <button id="lt-past" onclick="ladTab('completed')" style="flex:1;padding:8px;border:0;border-radius:9999px;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;background:transparent;color:var(--mut)">Completed</button>
+      </div>
+      <div id="regWrap"><div id="filters"></div><div id="availList"><div class="empty">Loading…</div></div></div>
+      <div id="pastWrap" style="display:none"></div>
     </div>
   </div>
 </div>
@@ -252,7 +303,7 @@ function closeOv(id){ document.getElementById(id).classList.remove('on'); }
 function writeHash(){ const m=RT.main; let sub=''; if(m==='home')sub=RT.home; else if(m==='ladders')sub=RT.ladders; else if(m==='leaderboard')sub=(typeof lbTab!=='undefined'?lbTab:'points'); const h=sub?`${m}/${sub}`:m; if(location.hash.replace(/^#/,'')!==h) history.replaceState(null,'',`#${h}`); }
 function route(){
   const parts=(location.hash||'').replace(/^#/,'').split('/');
-  const m=['home','ladders','leaderboard','rules'].includes(parts[0])?parts[0]:'home';
+  const m=['home','ladders','leaderboard','recaps','kitchen','rules'].includes(parts[0])?parts[0]:'home';
   const sub=parts[1]||'';
   RT.main=m;
   const btn=document.querySelector('#tabs button[data-t="'+m+'"]');
@@ -267,6 +318,8 @@ function route(){
   // rewritten out from under it just because Results happens to be showing.
   if(m==='home') dtab('overview');
   else if(m==='leaderboard') dtab('standings');
+  else if(m==='recaps') dtab('recaps');
+  else if(m==='kitchen') dtab('kitchen');
   else if(m==='rules') dtab('rules');
   else if(m==='ladders') dtab((sub==='completed'||sub==='past'||(COMPLETED||[]).some(x=>x.id===sub))?'results':'overview');
 }
@@ -300,7 +353,7 @@ async function init(){
   MYREG={};
   try{ const r=await fetch(`${API}/player-ladder-events`,{credentials:'include'}); if(r.ok){ const me=await r.json(); (me.registered||[]).forEach(ev=>{ MYREG[ev.id]={list:ev.list,paymentStatus:ev.paymentStatus}; }); } }catch(e){}
   ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st; MYCREDIT=(st&&st.youCreditCents)||0;
-  renderHomeLive(); renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats();
+  renderHomeLive(); renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats(); renderKitchen(); renderRecapsTab();
   route(); // also sets the initial desktop dtab, from the hash (defaults to Overview)
   // Recap teasers for the register tab (best-effort, renders whenever it lands)
   try{ const rr=await fetch(`${API}/public-ladder-recaps`); if(rr.ok){ RECAPS=(await rr.json()).recaps||[]; renderRecaps(); } }catch(e){}
@@ -331,6 +384,80 @@ function renderRecaps(){
   if(elD) elD.innerHTML=html;
 }
 
+/* ---- RECAPS TAB ---- */
+// Every completed night, newest first, linking straight out to its recap
+// article (see RECAP_URLS below). Distinct from the Home-tab "Latest ladders"
+// story strip above — this tab is the full browsable archive, not just teasers.
+function renderRecapsTab(){
+  const el=document.getElementById('recapsBody'); if(!el) return;
+  const list=(COMPLETED||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
+  if(!list.length){ el.innerHTML='<div class="empty">No completed ladders yet.</div>'; return; }
+  el.innerHTML=list.map((l,i)=>{
+    const ac=PAL[i%PAL.length];
+    const url=l.date&&RECAP_URLS[l.date];
+    const top3=(STATS&&STATS.winnersByEvent&&STATS.winnersByEvent[l.id])||[];
+    const pods=top3.slice(0,3).map((p,k)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:800;border-radius:9999px;padding:3px 11px 3px 4px;background:#000;border:1px solid var(--bd)"><span style="width:17px;height:17px;border-radius:50%;background:${MEDC[k]};color:#0b120b;font-size:.56rem;font-weight:900;text-align:center;line-height:17px">${k+1}</span>${esc(firstName(p.name))} <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span></span>`).join(' ');
+    const inner=`<div class="rec-kick" style="color:${ac}">${wd(l.date)}</div>
+      <div class="rec-nm">${esc(l.name)}</div>
+      ${pods?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:9px">${pods}</div>`:''}
+      <div class="rec-cta" style="color:${url?ac:'var(--fnt)'}">${url?'Read the full recap →':'Recap coming soon'}</div>`;
+    return url
+      ? `<a class="rec-card" href="${url}" target="_blank" rel="noopener" style="border-left-color:${ac}">${inner}</a>`
+      : `<div class="rec-card soon" style="border-left-color:${ac}">${inner}</div>`;
+  }).join('');
+}
+
+/* ---- KITCHEN TAB ---- */
+// Season-wide fun stat categories. Data is already in STATS.kitchen (the
+// no-?event= public-ladder-stats response computes it over every included
+// ladder) — no extra fetch needed, just render whenever STATS lands. Category
+// list, row shapes and CSS classes mirror ladder-live.html's per-night Kitchen
+// tab so the two stay visually/behaviorally consistent.
+const KIT_CATS=[
+  {k:'oneNightWonder',e:'🍳',t:'One-Night Wonder',s:'most pts in a single ladder'},
+  {k:'kingOfTheCourt',e:'👑',t:'King of the Court',s:'wins on the top court'},
+  {k:'perRoundTop',e:'📈',t:'Per-Round Top',s:'highest avg pts (min 6 games)'},
+  {k:'mostPoints',e:'🏆',t:'Most Points',s:'season total incl. bonus'},
+  {k:'hotStreak',e:'🔥',t:'Hot Streak',s:'longest run of wins'},
+  {k:'bestDuo',e:'🤝',t:'Best Duo',s:'win % (min 3 games together)'},
+  {k:'theWall',e:'🛡️',t:'The Wall',s:'lowest avg pts allowed (min 6 games)'},
+  {k:'ironPlayer',e:'⚓',t:'Iron Player',s:'most ladders attended'},
+  {k:'bigMover',e:'📊',t:'Big Mover',s:'biggest court climb in a ladder'},
+  {k:'beatDown',e:'💥',t:'Beat Down',s:'biggest single-game margin'},
+  {k:'comebackKid',e:'🎢',t:'Comeback Kid',s:'wins after a loss'},
+  {k:'highestSingleGame',e:'🎯',t:'Highest Single Game',s:'most pts in one round'},
+];
+function kitRowHtml(cat,r,i){
+  const rk=`<span class="kit-rk${i<3?' top':''}">${i+1}</span>`;
+  let nm,xt='',vl;
+  switch(cat.k){
+    case 'bestDuo': nm=`${esc(r.a)} + ${esc(r.b)}`; xt=`${r.w}-${r.l}`; vl=`${r.pct}%`; break;
+    case 'oneNightWonder': nm=esc(r.name); xt=r.date; vl=r.pts; break;
+    case 'kingOfTheCourt': nm=esc(r.name); vl=`${r.wins} W`; break;
+    case 'perRoundTop': nm=esc(r.name); xt=`${r.games}g`; vl=r.avg; break;
+    case 'mostPoints': nm=esc(r.name)+(r.crownStr?' '+r.crownStr:''); vl=r.total; break;
+    case 'hotStreak': nm=esc(r.name); vl=`W${r.streak}`; break;
+    case 'theWall': nm=esc(r.name); vl=r.avg; break;
+    case 'ironPlayer': nm=esc(r.name); vl=r.nights; break;
+    case 'bigMover': nm=esc(r.name); xt=r.date; vl=`+${r.climb}`; break;
+    case 'beatDown': nm=esc(r.name); xt=`Rd ${r.round}`; vl=`+${r.margin}`; break;
+    case 'comebackKid': nm=esc(r.name); vl=r.count; break;
+    case 'highestSingleGame': nm=esc(r.name); xt=`Rd ${r.round}`; vl=r.pts; break;
+  }
+  return `<div class="kit-row">${rk}<div class="kit-nm">${nm}</div>${xt?`<div class="kit-xt">${xt}</div>`:''}<div class="kit-vl">${vl}</div></div>`;
+}
+function renderKitchen(){
+  const el=document.getElementById('kitchenBody'); if(!el) return;
+  const kitchen=(STATS&&STATS.kitchen)||null;
+  if(!kitchen){ el.innerHTML='<div class="empty">Fun stats show up once a ladder or two has been scored.</div>'; return; }
+  el.innerHTML='<div class="kit-grid">'+KIT_CATS.map(cat=>{
+    const rows=kitchen[cat.k]||[];
+    return `<div class="kit-card"><div class="kit-h"><span class="e">${cat.e}</span><span class="t">${esc(cat.t)}</span></div><div class="kit-sub">${esc(cat.s)}</div>`+
+      (rows.length?rows.map((r,i)=>kitRowHtml(cat,r,i)).join(''):'<div class="kit-empty">Not enough games yet.</div>')+
+      `</div>`;
+  }).join('')+'</div>';
+}
+
 /* ---- HOME ---- */
 const HEXP={};
 const PAL=['#b8ff2c','#17d7b0','#a78bfa','#f0c040','#5b9fff','#ff7bb0','#ff8c5a'];
@@ -338,7 +465,8 @@ const hexA=(c,a)=>{const n=parseInt(c.slice(1),16);return `rgba(${n>>16&255},${n
 // One-off recap articles, keyed by the ladder night's date (YYYY-MM-DD, same
 // string evBody()/pastCard() already have as ev.date / l.date). Not tied into
 // the old recap-story system (removed 8/6) — just a manual link per night.
-const RECAP_URLS={'2026-08-06':'/ladders/recaps/2026-08-06-thursday-night-ladder-dupr-rated.html'};
+// Also the source list for the dedicated Recaps tab (renderRecapsTab()).
+const RECAP_URLS={'2026-08-06':'/ladders/recaps/2026-08-06-thursday-night-ladder-dupr-rated.html','2026-07-23':'/ladders/recaps/2026-07-23-thursday-night-ladder.html','2026-07-16':'/ladders/recaps/2026-07-16-thursday-night-ladder.html','2026-07-14':'/ladders/recaps/2026-07-14-aloha-night-ladder.html'};
 const RANKC={1:'#f0c040',2:'#cfd3c8',3:'#d88a3a'};
 function crown(color,size){ size=size||13; color=color||'#b8ff2c'; return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:-2px;flex-shrink:0;filter:drop-shadow(0 0 4px rgba(184,255,44,.85)) drop-shadow(0 0 1.5px rgba(184,255,44,.6))" aria-hidden="true"><path d="M4 18 L5 9 L9 13 L12 6 L15 13 L19 9 L20 18 Z" fill="${color}"/><circle cx="5" cy="9" r="1.3" fill="#0b0d0a"/><circle cx="12" cy="6" r="1.4" fill="#0b0d0a"/><circle cx="19" cy="9" r="1.3" fill="#0b0d0a"/></svg>`; }
 function t3chips(s){ return s.slice(0,3).map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;color:#dfe3d8">${i===0?crown('#b8ff2c',13):`<b style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;font-size:.5rem;font-weight:900;color:#0b0d0a;background:${RANKC[i+1]}">${i+1}</b>`}${esc(firstName(p.name))} <span style="color:var(--mut);font-size:.62rem">${p.w}–${p.l}</span></span>`).join(''); }
@@ -482,17 +610,20 @@ function renderAvail(){
 function dtab(name){
   document.querySelectorAll('#dtabs button').forEach(b=>b.classList.toggle('on',b.dataset.d===name));
   const c=document.querySelector('.content');
-  ['overview','results','standings','rules'].forEach(n=>c.classList.toggle('dtab-'+n,n===name));
+  ['overview','results','standings','recaps','kitchen','rules'].forEach(n=>c.classList.toggle('dtab-'+n,n===name));
   window.scrollTo({top:0});
 }
 // Button click (as opposed to route()): also make the URL a shareable deep
 // link to that tab. Results reuses the existing Ladders/Completed route since
 // it's the same content; Overview/Standings/Rules reuse Home/Leaderboard/Rules.
+// Recaps/Kitchen are their own top-level routes (no mobile-tab equivalent to reuse).
 function dtabClick(name){
   dtab(name);
   if(name==='overview') RT.main='home';
   else if(name==='results'){ RT.main='ladders'; RT.ladders='completed'; }
   else if(name==='standings') RT.main='leaderboard';
+  else if(name==='recaps') RT.main='recaps';
+  else if(name==='kitchen') RT.main='kitchen';
   else if(name==='rules') RT.main='rules';
   writeHash();
 }
