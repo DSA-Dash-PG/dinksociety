@@ -10,6 +10,8 @@
 //      'next'                  → validate, genNR, currentRound++ (or finish)
 //      'wave2'                 → start wave 2 of the current round
 //      'reshuffle'             → regenerate the current round (clears its scores)
+//      'restart-round'         → rebuild ONLY the current round from the latest roster
+//      'delete-round'          → discard the current round entirely — none of it counts
 //      'restart'               → wipe all rounds
 //      'finish'                → finalize the night
 
@@ -115,6 +117,27 @@ export default async (req) => {
     if (players.length < 4) return json({ error: 'Need at least 4 players on the roster.' }, 400);
     const strength = await strengthFor(eventId, players);
     play.rounds[play.currentRound] = genR1(players, play.config.courts, strength);
+    await setPlay(eventId, play);
+    return json({ ok: true, play });
+  }
+
+  if (action === 'delete-round') {
+    // Discard the CURRENT round entirely — its courts and any scores already
+    // entered are gone, none of it counts. For when a round runs out of time
+    // mid-play and shouldn't be scored at all — different from "End ladder
+    // early" (finish, which keeps whatever's already been scored this round)
+    // and from 'restart-round' above (which keeps the round slot but reshuffles
+    // it). Steps back to the previous round; deleting round 1 un-starts the
+    // night (same end state as 'restart') since there's no earlier round to
+    // land on.
+    play.rounds.pop();
+    play.currentRound--;
+    if (play.currentRound < 0) {
+      play = { ...play, rounds: [], currentRound: -1, started: false, finished: false };
+      await setPlay(eventId, play);
+      if (event.status === 'live') { event.status = 'open'; await setEvent(event); }
+      return json({ ok: true, play, unstarted: true });
+    }
     await setPlay(eventId, play);
     return json({ ok: true, play });
   }

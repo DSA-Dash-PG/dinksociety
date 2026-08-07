@@ -357,8 +357,8 @@ function render(){
       <div class="brow"><button class="btn b-out" onclick="act('reshuffle',1)">Reshuffle</button>
       <button class="btn b-out" onclick="scRestartRound()">⟲ Restart round</button></div>
       <div class="brow"><button class="btn b-lime" onclick="act('next')">${play.currentRound>=play.config.rounds-1?'Finish ladder':'Next round →'}</button>
-      <button class="btn b-out" onclick="scAddRound()" style="flex:0 0 auto;width:auto;padding:0 16px">＋ Round</button></div>`;
-    if(play.currentRound<play.config.rounds-1) h+=`<div class="brow"><button class="btn b-red" onclick="act('finish',1)">End ladder early</button></div>`;
+      <button class="btn b-out" onclick="scAddRound()" style="flex:0 0 auto;width:auto;padding:0 16px">＋ Round</button></div>
+      <div class="brow"><button class="btn b-red" onclick="scDeleteRound()">🗑 Delete round</button>${play.currentRound<play.config.rounds-1?'<button class="btn b-red" onclick="act(\'finish\',1)">End ladder early</button>':''}</div>`;
     h+=`<div class="demoted"><a onclick="scRestart()">⟲ Restart night — re-pull roster, courts &amp; settings</a></div>`;
   } else if(!finished){
     h+=`<div class="brow"><button class="btn b-out" onclick="VR=${play.currentRound};render()">↩ Back to live round ${play.currentRound+1}</button></div>`;
@@ -651,6 +651,26 @@ async function scRestartRound(){
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   if(d.ok){ STATE.play=d.play; resetTimer(); render(); msg('ok','Round rebuilt from the latest roster.'); }
   else msg('err',d.error||'Restart round failed.');
+}
+
+// Delete the CURRENT round entirely — for when it ran out of time mid-play and
+// shouldn't count at all (no rescoring, no reshuffle — it's just gone). Distinct
+// from "Restart round" (keeps the round slot, rebuilds its pairings) and "End
+// ladder early" (keeps whatever's already been scored this round). Steps back
+// to the previous round; deleting the only/first round un-starts the night, same
+// end state as "Restart night".
+async function scDeleteRound(){
+  const cr=STATE.play.currentRound, onlyRound=cr===0;
+  const message=onlyRound
+    ? "This discards the current round entirely — none of it counts toward stats. Since it's the only round tonight, the night goes back to “not started” so you can review the roster and start over. This cannot be undone."
+    : "This discards the current round entirely — none of it counts toward stats. You'll land back on round "+cr+". This cannot be undone.";
+  if(!(await dsConfirm({ title:"Delete this round?", message, confirmLabel:"Delete round", cancelLabel:"Cancel", danger:true }))) return;
+  const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete-round'})});
+  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
+  if(d.ok){
+    STATE.play=d.play; VR=Math.max(0,d.play.currentRound); resetTimer(); render();
+    msg('ok', d.unstarted ? 'Round deleted — that was the only round, so the night reset. Review the roster, then tap “Enter event” to start over.' : 'Round deleted — none of it counts. Back on round '+(d.play.currentRound+1)+'.');
+  } else msg('err',d.error||'Delete round failed.');
 }
 
 // Extend the night by one more round (so "Next round" keeps going).
