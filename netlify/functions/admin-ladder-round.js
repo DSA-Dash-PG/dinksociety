@@ -7,10 +7,12 @@
 //   GET  ?event=<id>                          → { event, play, roster }
 //   POST ?event=<id> { action, ... }
 //      'start'    { rounds? }  → genR1 from the paid roster, currentRound 0
-//      'next'                  → validate, genNR, currentRound++ (or finish)
+//      'next'                  → validate, genNR, currentRound++ (never auto-finishes —
+//                                 the night keeps going past the configured round count
+//                                 until someone explicitly hits 'finish')
 //      'wave2'                 → start wave 2 of the current round
 //      'reshuffle'             → regenerate the current round (clears its scores)
-//      'restart-round'         → rebuild ONLY the current round from the latest roster
+//      'restart-round'         → clear the CURRENT round's scores only (same players/courts)
 //      'delete-round'          → discard the current round entirely — none of it counts
 //      'restart'               → wipe all rounds
 //      'finish'                → finalize the night
@@ -110,13 +112,11 @@ export default async (req) => {
   }
 
   if (action === 'restart-round') {
-    // Rebuild ONLY the current round from the LATEST roster — picks up anyone
-    // added or removed since the night started, and clears this round's scores.
-    // Other rounds (and their scores) are left untouched.
-    const players = participants(signups);
-    if (players.length < 4) return json({ error: 'Need at least 4 players on the roster.' }, 400);
-    const strength = await strengthFor(eventId, players);
-    play.rounds[play.currentRound] = genR1(players, play.config.courts, strength);
+    // Clear the CURRENT round's scores — same players, same courts, just a
+    // clean scoreboard. Does NOT reshuffle pairings (that's 'reshuffle', a
+    // separate action/button). Other rounds are left untouched.
+    cur.courts.forEach(c => { c.score = null; });
+    if (cur.wave2started === false) cur.wave2started = false;
     await setPlay(eventId, play);
     return json({ ok: true, play });
   }
@@ -140,16 +140,6 @@ export default async (req) => {
     }
     await setPlay(eventId, play);
     return json({ ok: true, play });
-  }
-
-  if (action === 'add-rounds') {
-    // Extend the night by N rounds (so "Next round" keeps going instead of
-    // finishing). Doesn't generate them — each is built when you advance.
-    const n = Math.max(1, Math.min(10, parseInt(body.n) || 1));
-    const base = play.config.rounds || play.rounds.length || 0;
-    play.config.rounds = Math.min(30, base + n);
-    await setPlay(eventId, play);
-    return json({ ok: true, play, rounds: play.config.rounds });
   }
 
   if (action === 'restart') {
@@ -213,11 +203,10 @@ export default async (req) => {
     if (blank.length) return json({ error: `${blank.length} court(s) still need a final score before advancing.` }, 409);
     const tied = courts.filter(c => !c.score.winner);
     if (tied.length) return json({ error: `${tied.length} tied court(s) need a winner picked.` }, 409);
-    if (play.currentRound >= play.config.rounds - 1) {
-      play.finished = true; play.finishedAt = new Date().toISOString(); await setPlay(eventId, play);
-      event.status = 'final'; await setEvent(event);
-      return json({ ok: true, finished: true, play });
-    }
+    // Reaching the configured round count no longer auto-finishes the night —
+    // organizers often keep playing past the planned count. Finishing is now
+    // exclusively the deliberate 'finish' action ("End ladder early" / "Finish
+    // ladder" button).
     const strength = await strengthFor(eventId, participants(signups));
     play.rounds.push(genNR(cur, play.config.courts, strength));
     play.currentRound++;

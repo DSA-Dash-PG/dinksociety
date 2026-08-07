@@ -51,6 +51,7 @@
   .pan{ padding:10px 11px;text-align:center; } .pan.win{ background:rgba(184,255,44,.05); } .pan.win.k{ background:rgba(240,204,0,.06); } .pan.lose{ opacity:.6; }
   .pan.r{ border-left:1px solid var(--bd); }
   .pan .role{ font-size:.55rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--mut);margin-bottom:7px; }
+  .pan-score{ font-size:2.2rem;font-weight:900;text-align:center;line-height:1;margin:0 0 9px;font-variant-numeric:tabular-nums; }
   .plr{ background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.07);border-radius:9px;padding:7px 8px;margin-bottom:6px; }
   .plr.src{ border-color:var(--gold);background:rgba(240,204,0,.08); } .plr.tgt{ border-color:var(--cyan);background:rgba(0,229,255,.08); }
   .plr .pn{ font-size:.86rem;font-weight:700;line-height:1.15; } .plr .pn .tmp{ font-size:.5rem;color:var(--gold);font-weight:800;vertical-align:middle;margin-left:3px; }
@@ -78,7 +79,7 @@
   .scm-set{ background:var(--lime)!important;color:#000!important;font-size:.85rem!important; }
   /* control-bar demoted (rare/destructive) actions */
   .demoted{ text-align:center;margin:2px 0 10px; } .demoted a{ font-size:.68rem;font-weight:800;color:var(--fnt);cursor:pointer;text-decoration:underline; }
-  /* Kitchen — fun stat categories for tonight */
+  /* Standings — tonight's ranked list (also used by the retired Kitchen fun-stats cards) */
   .kit-grid{ display:flex;flex-direction:column;gap:10px; }
   .kit-card{ background:var(--surf2);border:1px solid var(--bd);border-radius:12px;padding:11px 12px; }
   .kit-h{ display:flex;align-items:baseline;gap:6px;margin-bottom:1px; } .kit-h .e{ font-size:.92rem; } .kit-h .t{ font-size:.8rem;font-weight:900; }
@@ -138,10 +139,10 @@
   <div id="scModalPad"></div>
 </div></div>
 
-<div class="ov" id="kitchenOv"><div class="sheet"><button class="x" onclick="closeKitchen()">×</button>
-  <h3 style="margin:0 0 3px;font-size:1rem;font-weight:800">🍳 The Kitchen</h3>
-  <div class="seclbl" style="margin-top:2px">Tonight's fun stats</div>
-  <div id="kitchenBody"></div>
+<div class="ov" id="standingsOv"><div class="sheet"><button class="x" onclick="closeStandings()">×</button>
+  <h3 style="margin:0 0 3px;font-size:1rem;font-weight:800">📊 Standings</h3>
+  <div class="seclbl" style="margin-top:2px">Tonight's standings</div>
+  <div id="standingsBody"></div>
 </div></div>
 
 <script src="/js/ds-ui.js"></script>
@@ -212,7 +213,7 @@ function renderPicker(){
   if(EID){
     const all=(PICK_DATA.ladders||[]).concat(PICK_DATA.completed||[]);
     const cur=all.find(function(l){return l.id===EID;});
-    box.innerHTML='<button onclick="clearPick()" style="background:none;border:0;cursor:pointer;color:var(--lime);font-weight:800;font-size:.82rem;padding:4px 0">‹ All ladders</button>'+(cur?'<div style="font-size:1.1rem;font-weight:900;margin-top:2px">'+esc(cur.name)+' <span style="font-size:.7rem;color:#9aa094;font-weight:700">'+(cur.date||'')+'</span></div>':'')+'<div class="brow" style="gap:6px;margin-top:8px"><button onclick="shareScoring()" style="flex:1;background:var(--surf);border:1px solid var(--bd);color:#e7ebe0;border-radius:9px;font:inherit;font-size:.74rem;font-weight:800;padding:7px 12px;cursor:pointer">🔗 Share scoring access</button><button onclick="openKitchen()" style="flex:1;background:var(--surf);border:1px solid var(--bd);color:#e7ebe0;border-radius:9px;font:inherit;font-size:.74rem;font-weight:800;padding:7px 12px;cursor:pointer">🍳 Kitchen</button></div><div id="shareBox"></div>';
+    box.innerHTML='<button onclick="clearPick()" style="background:none;border:0;cursor:pointer;color:var(--lime);font-weight:800;font-size:.82rem;padding:4px 0">‹ All ladders</button>'+(cur?'<div style="font-size:1.1rem;font-weight:900;margin-top:2px">'+esc(cur.name)+' <span style="font-size:.7rem;color:#9aa094;font-weight:700">'+(cur.date||'')+'</span></div>':'')+'<div class="brow" style="gap:6px;margin-top:8px"><button onclick="shareScoring()" style="flex:1;background:var(--surf);border:1px solid var(--bd);color:#e7ebe0;border-radius:9px;font:inherit;font-size:.74rem;font-weight:800;padding:7px 12px;cursor:pointer">🔗 Share scoring access</button><button onclick="openStandings()" style="flex:1;background:var(--surf);border:1px solid var(--bd);color:#e7ebe0;border-radius:9px;font:inherit;font-size:.74rem;font-weight:800;padding:7px 12px;cursor:pointer">📊 Standings</button></div><div id="shareBox"></div>';
     return;
   }
   const A=PICK_DATA.ladders||[], C=PICK_DATA.completed||[]; let h='';
@@ -239,7 +240,7 @@ async function load(){
   if(status===401){ if(SCORER_MODE){ document.getElementById('board').innerHTML='<div class="banner">This scoring link is invalid or expired. Ask the organizer for a new scoring link.</div>'; } else { document.getElementById('authBanner').style.display='block'; document.getElementById('board').innerHTML='<div class="banner">You need to sign in as admin to score. <a href="/admin.html">Sign in →</a></div>'; } return; }
   if(status!==200||!d||d.error){ document.getElementById('board').innerHTML='<div class="banner">Couldn’t load this ladder ('+((d&&d.error)||status)+'). <a href="#" onclick="pick(EID);return false">Retry</a></div>'; return; }
   STATE=d; VR=(d.play&&d.play.currentRound!=null&&d.play.currentRound>=0)?d.play.currentRound:0;
-  if(SCORER_MODE){ const p=document.getElementById('picker'); if(p) p.innerHTML='<div style="font-size:1.1rem;font-weight:900">'+esc((d.event&&d.event.name)||'Ladder')+' <span style="font-size:.7rem;color:#9aa094;font-weight:700">'+((d.event&&d.event.date)||'')+'</span></div><button onclick="openKitchen()" style="margin-top:8px;background:var(--surf);border:1px solid var(--bd);color:#e7ebe0;border-radius:9px;font:inherit;font-size:.74rem;font-weight:800;padding:7px 12px;cursor:pointer">🍳 Kitchen</button>'; }
+  if(SCORER_MODE){ const p=document.getElementById('picker'); if(p) p.innerHTML='<div style="font-size:1.1rem;font-weight:900">'+esc((d.event&&d.event.name)||'Ladder')+' <span style="font-size:.7rem;color:#9aa094;font-weight:700">'+((d.event&&d.event.date)||'')+'</span></div><button onclick="openStandings()" style="margin-top:8px;background:var(--surf);border:1px solid var(--bd);color:#e7ebe0;border-radius:9px;font:inherit;font-size:.74rem;font-weight:800;padding:7px 12px;cursor:pointer">📊 Standings</button>'; }
   if(SC_MASTER===null){ try{ const r=await api('/admin-ladder-players'); SC_MASTER=(r.d&&r.d.players)||[]; }catch(e){ SC_MASTER=[]; } }
   resetTimer(); render();
 }
@@ -323,10 +324,15 @@ function render(){
   const play=STATE.play;
   if(!play||!play.started){
     const roster=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled'); const n=roster.length;
-    let bh=`<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">Add players, then start rounds. ${n} player${n===1?'':'s'} in${n<4?' — need at least 4.':''}</div>`;
-    bh+='<label class="seclbl" style="margin-top:6px;display:block">Add from master roster</label><input class="i" id="sc-search" placeholder="Search players…" autocomplete="off" oninput="scSearch()"><div id="sc-res" style="margin-top:6px"></div>';
+    const evRounds=(STATE.event&&STATE.event.rounds)||10, evRoundMin=(STATE.event&&STATE.event.roundMin)||12;
+    let bh=`<div class="banner" style="background:var(--surf);border-color:var(--bd);color:var(--mut)">${n} player${n===1?'':'s'} in${n<4?' — need at least 4 to start.':', ready to go.'}</div>`;
+    // Rounds/round length were already set in Ladder Info — no need to ask again
+    // here. The Start button is the primary action, right up top.
+    bh+=`<button class="btn b-lime" style="width:100%;min-height:52px;font-size:.94rem" ${n<4?'disabled':''} onclick="act('start')">🎾 Generate lineup &amp; start →</button>`;
+    bh+=`<div style="text-align:center;color:var(--fnt);font-size:.66rem;margin:8px 0 16px">${evRounds} rounds · ${evRoundMin} min each · <a href="/organizer.html" style="color:var(--fnt);text-decoration:underline">change in Ladder Info</a></div>`;
+    bh+='<div style="border-top:1px solid var(--bd);margin-bottom:14px"></div>';
+    bh+='<label class="seclbl" style="display:block">Add from master roster</label><input class="i" id="sc-search" placeholder="Search players…" autocomplete="off" oninput="scSearch()"><div id="sc-res" style="margin-top:6px"></div>';
     bh+='<label class="seclbl" style="margin-top:12px;display:block">Or add a new player</label><div class="brow" style="gap:6px"><input class="i" id="sc-name" placeholder="Name" style="flex:2"><select class="i" id="sc-gender" style="flex:1;max-width:78px"><option value="">—</option><option value="M">M</option><option value="F">F</option></select></div><div class="brow" style="gap:6px;margin-top:6px"><input class="i" id="sc-email" placeholder="Email (optional)" style="flex:1"><button class="btn b-out" style="flex:0 0 auto;width:auto;padding:0 14px" onclick="scAddNew()">Add</button></div>';
-    bh+='<div style="border-top:1px solid var(--bd);margin:14px 0 10px"></div><div class="brow"><div style="flex:1"><label class="seclbl">Rounds</label><input class="i" id="nr" type="number" value="'+((STATE.event&&STATE.event.rounds)||10)+'"></div><div style="flex:1"><label class="seclbl">Minutes / round</label><input class="i" id="nm" type="number" value="'+((STATE.event&&STATE.event.roundMin)||12)+'"></div></div><button class="btn b-lime" '+(n<4?'disabled':'')+' onclick="act(\'start\')">Enter event</button>';
     if(roster.length) bh+='<label class="seclbl" style="margin-top:18px;display:block">Players in tonight ('+n+')</label>'+roster.map(p=>`<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;background:var(--surf);border:1px solid var(--bd);border-radius:9px;margin-bottom:6px"><span style="font-size:.84rem;font-weight:700">${esc(p.name)}</span><button onclick="scRemove('${esc(p.playerId||'')}','${esc(p.email||'')}')" style="font-size:.62rem;font-weight:800;color:var(--red);background:none;border:1px solid rgba(255,92,71,.3);border-radius:9999px;padding:4px 10px;cursor:pointer">Remove</button></div>`).join('');
     b.innerHTML=bh; return;
   }
@@ -348,17 +354,20 @@ function render(){
   if(isCurrent) h+=`<div class="tbar"><i id="tf" style="width:${timer/roundSecs()*100}%;background:${timer<=60?'#ff5c47':timer<=180?'#ffcc00':'#b8ff2c'}"></i></div>`;
   if(!isCurrent&&!finished&&VR<play.currentRound) h+=`<div class="banner" style="background:rgba(240,204,0,.08);border-color:rgba(240,204,0,.3);color:var(--gold)">Fixing a score here will regenerate round ${play.currentRound+1}'s pairings from the corrected result (you'll be asked to confirm).</div>`;
 
-  // CONTROLS UP TOP — primary (timer), secondary (reshuffle/restart round,
-  // next round/+round), danger (end ladder early), demoted (restart night) —
-  // all reachable before scrolling past the court cards.
+  // CONTROLS UP TOP — primary (timer), reshuffle, [next round | clear scores],
+  // [delete round | end ladder], demoted (restart night) — all reachable
+  // before scrolling past the court cards. The same "Next round" / "End
+  // ladder" pair repeats after the last court card too (see below) so scoring
+  // the last court doesn't mean scrolling back up.
+  const finishLabel = play.currentRound<play.config.rounds-1 ? 'End ladder early' : 'Finish ladder';
   if(isCurrent){
     h+=`<div class="brow">${timerOn?'<button class="btn b-warn" onclick="pauseTimer()">⏸ Pause</button>':'<button class="btn b-lime" onclick="startTimer()">'+(timer===0?'Start timer':'Resume')+'</button>'}
       <button class="btn b-ghost" onclick="endTimer()">End</button></div>
-      <div class="brow"><button class="btn b-out" onclick="act('reshuffle',1)">Reshuffle</button>
-      <button class="btn b-out" onclick="scRestartRound()">⟲ Restart round</button></div>
-      <div class="brow"><button class="btn b-lime" onclick="act('next')">${play.currentRound>=play.config.rounds-1?'Finish ladder':'Next round →'}</button>
-      <button class="btn b-out" onclick="scAddRound()" style="flex:0 0 auto;width:auto;padding:0 16px">＋ Round</button></div>
-      <div class="brow"><button class="btn b-red" onclick="scDeleteRound()">🗑 Delete round</button>${play.currentRound<play.config.rounds-1?'<button class="btn b-red" onclick="act(\'finish\',1)">End ladder early</button>':''}</div>`;
+      <div class="brow"><button class="btn b-out" style="width:100%" onclick="act('reshuffle',1)">🔀 Reshuffle</button></div>
+      <div class="brow"><button class="btn b-lime" onclick="act('next')">Next round →</button>
+      <button class="btn b-out" onclick="scRestartRound()">⟲ Clear scores</button></div>
+      <div class="brow"><button class="btn b-red" onclick="scDeleteRound()">🗑 Delete round</button>
+      <button class="btn b-red" onclick="act('finish',1)">${finishLabel}</button></div>`;
     h+=`<div class="demoted"><a onclick="scRestart()">⟲ Restart night — re-pull roster, courts &amp; settings</a></div>`;
   } else if(!finished){
     h+=`<div class="brow"><button class="btn b-out" onclick="VR=${play.currentRound};render()">↩ Back to live round ${play.currentRound+1}</button></div>`;
@@ -394,6 +403,13 @@ function render(){
   h+=`<div class="seclbl">Round ${VR+1} courts</div>`;
   [...round.courts].map((c)=>({c,ci:round.courts.indexOf(c)})).sort((a,b)=>b.c.court-a.c.court).forEach(({c,ci})=>{ h+=courtCard(c,ci,tC); });
 
+  // Repeat the Next round / finish pair after the last court — the whole
+  // point is not having to scroll back up once the last court is scored.
+  if(isCurrent){
+    h+=`<div class="brow" style="margin-top:2px"><button class="btn b-lime" style="width:100%" onclick="act('next')">Next round →</button></div>`;
+    h+=`<div class="brow"><button class="btn b-out" style="width:100%" onclick="act('finish',1)">${finishLabel}</button></div>`;
+  }
+
   b.innerHTML=h;
   if(isCurrent && timerOn){ clearInterval(timerInt); timerInt=setInterval(()=>{ timer--; if(timer<=0){timer=0;timerOn=false;clearInterval(timerInt);} tick(); },1000); }
 }
@@ -408,6 +424,11 @@ function courtCard(c,ci,tC){
     const isWin=sc.winner===side, isLose=hb&&sc.winner&&!isWin;
     let p=`<div class="pan ${isWin?(king?'win k':'win'):''} ${isLose?'lose':''} ${ti===1?'r':''}">`;
     p+=`<div class="role">${hb?(isWin?'Winner':'Loser'):'Team '+(ti+1)}</div>`;
+    if(hb){
+      const val=side==='A'?sc.t1:sc.t2;
+      const col=isWin?(king?'var(--gold)':'var(--lime)'):'var(--red)';
+      p+=`<div class="pan-score" style="color:${col}">${val}</div>`;
+    }
     [0,1].forEach(pi=>{
       const pl=(team||[])[pi];
       if(!pl){ p+=`<div class="empty-slot" onclick="openSub(${ci},${ti},${pi})">+ Add player</div>`; return; }
@@ -447,7 +468,6 @@ async function postScore(payload){
     if(!ok) return {cancelled:true};
     res=await api('/admin-ladder-score?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,confirmRegenerate:true})});
   }
-  if(res.d&&res.d.ok&&typeof KITCHEN_CACHE==='object') delete KITCHEN_CACHE[EID]; // score changed — Kitchen stats are stale
   return {d:res.d};
 }
 // Tap a court → popup keypad: enter Team A's score, auto-advance to Team B,
@@ -563,69 +583,48 @@ async function saveEmail(){
   } else document.getElementById('emStatus').innerHTML='<div class="msg err">'+(d.error||'Failed')+'</div>';
 }
 
-/* ---------- kitchen (fun stats, live for tonight) ---------- */
-const KIT_CATS=[
-  {k:'oneNightWonder',e:'🍳',t:'One-Night Wonder',s:'most pts in a single ladder'},
-  {k:'kingOfTheCourt',e:'👑',t:'King of the Court',s:'wins on the top court'},
-  {k:'perRoundTop',e:'📈',t:'Per-Round Top',s:'highest avg pts (min 6 games)'},
-  {k:'mostPoints',e:'🏆',t:'Most Points',s:'season total incl. bonus'},
-  {k:'hotStreak',e:'🔥',t:'Hot Streak',s:'longest run of wins'},
-  {k:'bestDuo',e:'🤝',t:'Best Duo',s:'win % (min 3 games together)'},
-  {k:'theWall',e:'🛡️',t:'The Wall',s:'lowest avg pts allowed (min 6 games)'},
-  {k:'ironPlayer',e:'⚓',t:'Iron Player',s:'most ladders attended'},
-  {k:'bigMover',e:'📊',t:'Big Mover',s:'biggest court climb in a ladder'},
-  {k:'beatDown',e:'💥',t:'Beat Down',s:'biggest single-game margin'},
-  {k:'comebackKid',e:'🎢',t:'Comeback Kid',s:'wins after a loss'},
-  {k:'highestSingleGame',e:'🎯',t:'Highest Single Game',s:'most pts in one round'},
-];
-function kitRowHtml(cat,r,i){
-  const rk=`<span class="kit-rk${i<3?' top':''}">${i+1}</span>`;
-  let nm,xt='',vl;
-  switch(cat.k){
-    case 'bestDuo': nm=`${esc(r.a)} + ${esc(r.b)}`; xt=`${r.w}-${r.l}`; vl=`${r.pct}%`; break;
-    case 'oneNightWonder': nm=esc(r.name); xt=r.date; vl=r.pts; break;
-    case 'kingOfTheCourt': nm=esc(r.name); vl=`${r.wins} W`; break;
-    case 'perRoundTop': nm=esc(r.name); xt=`${r.games}g`; vl=r.avg; break;
-    case 'mostPoints': nm=esc(r.name)+(r.crownStr?' '+r.crownStr:''); vl=r.total; break;
-    case 'hotStreak': nm=esc(r.name); vl=`W${r.streak}`; break;
-    case 'theWall': nm=esc(r.name); vl=r.avg; break;
-    case 'ironPlayer': nm=esc(r.name); vl=r.nights; break;
-    case 'bigMover': nm=esc(r.name); xt=r.date; vl=`+${r.climb}`; break;
-    case 'beatDown': nm=esc(r.name); xt=`Rd ${r.round}`; vl=`+${r.margin}`; break;
-    case 'comebackKid': nm=esc(r.name); vl=r.count; break;
-    case 'highestSingleGame': nm=esc(r.name); xt=`Rd ${r.round}`; vl=r.pts; break;
-  }
-  return `<div class="kit-row">${rk}<div class="kit-nm">${nm}</div>${xt?`<div class="kit-xt">${xt}</div>`:''}<div class="kit-vl">${vl}</div></div>`;
+/* ---------- standings (this night, computed live from STATE.play — no API call) ---------- */
+function computeStandings(){
+  const play=STATE&&STATE.play; if(!play) return [];
+  const stats={};
+  (play.rounds||[]).forEach(r=>{
+    (r.courts||[]).forEach(c=>{
+      if(!c.score||!c.score.winner) return;
+      const t1=c.score.t1, t2=c.score.t2, win=c.score.winner;
+      [[c.team1,t1,t2,win==='A'],[c.team2,t2,t1,win==='B']].forEach(([team,pf,pa,won])=>{
+        (team||[]).filter(Boolean).forEach(p=>{
+          const s=stats[p.id]=stats[p.id]||{id:p.id,name:p.name,gender:p.gender||'M',w:0,l:0,pf:0,pa:0};
+          s.pf+=pf; s.pa+=pa; if(won) s.w++; else s.l++;
+        });
+      });
+    });
+  });
+  return Object.values(stats).sort((a,b)=>{
+    const ad=a.w-a.l, bd=b.w-b.l; if(bd!==ad) return bd-ad;
+    return (b.pf-b.pa)-(a.pf-a.pa);
+  });
 }
-function renderKitchenAdmin(data){
-  return '<div class="kit-grid">'+KIT_CATS.map(cat=>{
-    const rows=(data&&data[cat.k])||[];
-    return `<div class="kit-card"><div class="kit-h"><span class="e">${cat.e}</span><span class="t">${esc(cat.t)}</span></div><div class="kit-sub">${esc(cat.s)}</div>`+
-      (rows.length?rows.map((r,i)=>kitRowHtml(cat,r,i)).join(''):'<div class="kit-empty">Not enough games yet tonight.</div>')+
-      `</div>`;
-  }).join('')+'</div>';
+function renderStandings(){
+  const rows=computeStandings();
+  if(!rows.length) return '<div class="kit-empty">No games scored yet tonight.</div>';
+  return '<div class="kit-grid"><div class="kit-card">'+rows.map((r,i)=>{
+    const diff=r.pf-r.pa;
+    return `<div class="kit-row"><span class="kit-rk${i<3?' top':''}">${i+1}</span><div class="kit-nm">${esc(first(r.name))}</div><div class="kit-xt">${r.w}-${r.l}</div><div class="kit-vl">${diff>=0?'+':''}${diff}</div></div>`;
+  }).join('')+'</div></div>';
 }
-let KITCHEN_CACHE={};
-async function openKitchen(){
+function openStandings(){
   if(!EID) return;
-  document.getElementById('kitchenOv').classList.add('on');
-  const body=document.getElementById('kitchenBody');
-  if(KITCHEN_CACHE[EID]){ body.innerHTML=renderKitchenAdmin(KITCHEN_CACHE[EID]); return; }
-  body.innerHTML='<div class="kit-empty">Loading…</div>';
-  try{
-    const r=await fetch(API+'/public-ladder-stats?event='+encodeURIComponent(EID));
-    const d=await r.json();
-    KITCHEN_CACHE[EID]=d.kitchen||{};
-    if(document.getElementById('kitchenOv').classList.contains('on')) body.innerHTML=renderKitchenAdmin(KITCHEN_CACHE[EID]);
-  }catch(e){ body.innerHTML='<div class="kit-empty">Could not load — try again.</div>'; }
+  document.getElementById('standingsOv').classList.add('on');
+  document.getElementById('standingsBody').innerHTML=renderStandings();
 }
-function closeKitchen(){ document.getElementById('kitchenOv').classList.remove('on'); }
+function closeStandings(){ document.getElementById('standingsOv').classList.remove('on'); }
 
 /* ---------- round actions ---------- */
 async function act(action,confirmFirst){
   if(confirmFirst && !(await dsConfirm({ title:'Are you sure?', confirmLabel:'Yes, continue', cancelLabel:'Cancel' }))) return;
   const body={action};
-  if(action==='start'){ body.rounds=parseInt(document.getElementById('nr').value)||10; body.roundMin=parseInt(document.getElementById('nm').value)||12; }
+  // 'start' omits rounds/roundMin on purpose — the backend already falls back
+  // to the event's own settings (set once in Ladder Info) when they're absent.
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   if(d.ok){ msg(''); STATE.play=d.play; if(action==='start'||action==='next'){ VR=d.play.currentRound; resetTimer(); } render(); }
@@ -643,14 +642,14 @@ async function scRestart(){
   else msg('err',d.error||'Restart failed.');
 }
 
-// Restart ONLY the current round: clears its scores and rebuilds its pairings
-// from the latest roster (picks up adds/removes). Other rounds are untouched.
+// Clear the CURRENT round's scores only — same players, same courts, no
+// reshuffle. Other rounds are untouched.
 async function scRestartRound(){
-  if(!(await dsConfirm({ title:"Restart this round?", message:"Clears this round's scores and rebuilds its pairings from the latest roster (picks up anyone added or removed). Other rounds are untouched.", confirmLabel:"Restart round", cancelLabel:"Cancel", danger:true }))) return;
+  if(!(await dsConfirm({ title:"Clear this round's scores?", message:"Clears the scores on this round — same players and courts stay put, nothing is reshuffled. Other rounds are untouched.", confirmLabel:"Clear scores", cancelLabel:"Cancel", danger:true }))) return;
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart-round'})});
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
-  if(d.ok){ STATE.play=d.play; resetTimer(); render(); msg('ok','Round rebuilt from the latest roster.'); }
-  else msg('err',d.error||'Restart round failed.');
+  if(d.ok){ STATE.play=d.play; resetTimer(); render(); msg('ok','Scores cleared.'); }
+  else msg('err',d.error||'Could not clear scores.');
 }
 
 // Delete the CURRENT round entirely — for when it ran out of time mid-play and
@@ -673,13 +672,6 @@ async function scDeleteRound(){
   } else msg('err',d.error||'Delete round failed.');
 }
 
-// Extend the night by one more round (so "Next round" keeps going).
-async function scAddRound(){
-  const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'add-rounds',n:1})});
-  if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
-  if(d.ok){ STATE.play=d.play; render(); msg('ok','Added a round — now '+(d.rounds||(d.play.config&&d.play.config.rounds))+' total. Tap “Next round” to play it.'); }
-  else msg('err',d.error||'Could not add a round.');
-}
 loadPicker();
 </script>
 <div id="timeup" onclick="dismissTimeUp()"><div><div class="tu-big">TIME</div><div class="tu-sub">Tap anywhere to dismiss</div></div></div>
