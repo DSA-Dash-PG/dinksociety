@@ -121,13 +121,13 @@ export default async (req) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const method = ['credit', 'venmo', 'card'].includes(body.paymentMethod) ? body.paymentMethod : null;
+    const method = ['credit', 'venmo', 'card', 'free'].includes(body.paymentMethod) ? body.paymentMethod : null;
     // Respect the ladder's payment settings (credit is always allowed — it's
     // already the league's money).
     const allowedMethods = Array.isArray(event.paymentMethods) && event.paymentMethods.length
       ? event.paymentMethods : ['card', 'venmo'];
     if (method && method !== 'credit' && !allowedMethods.includes(method)) {
-      return json({ error: `${method === 'card' ? 'Card' : 'Venmo'} payments are turned off for this ladder.` }, 400);
+      return json({ error: method === 'card' ? 'Card payments are turned off for this ladder.' : method === 'venmo' ? 'Venmo payments are turned off for this ladder.' : 'This isn\'t a free ladder.' }, 400);
     }
     if (body.invitedBy) person.invitedBy = String(body.invitedBy).slice(0, 80);
 
@@ -170,6 +170,18 @@ export default async (req) => {
       const cOrgs = organizerEmails(event);
       await Promise.allSettled(cOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup — paid</h2><p style="margin:0 0 4px"><b>${person.name}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Paid by ladder credit${email ? ' · ' + email : ''}</p></div>` })));
       return json({ ok: true, status: 'in', paid: 'credit' });
+    }
+
+    if (method === 'free') {
+      // No money involved at all — instantly confirmed, same as a credit-covered
+      // signup. Organizer still gets a heads-up email (informational — nothing
+      // to confirm or claim, unlike the Venmo path).
+      entry.paymentMethod = 'free'; entry.paymentStatus = 'paid'; entry.amountCents = 0; entry.heldUntil = null;
+      await setSignups(signups);
+      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: person.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
+      const fOrgs = organizerEmails(event);
+      await Promise.allSettled(fOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup</h2><p style="margin:0 0 4px"><b>${person.name}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Free ladder — no payment to collect${email ? ' · ' + email : ''}</p></div>` })));
+      return json({ ok: true, status: 'in', paid: 'free' });
     }
 
     if (method === 'venmo') {

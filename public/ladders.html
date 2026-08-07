@@ -348,6 +348,20 @@ async function init(){
   }
   try{ pl=await (await fetch(`${API}/public-ladders`,{credentials:'include'})).json(); }catch(e){}
   try{ st=await (await fetch(`${API}/public-ladder-stats`,{credentials:'include'})).json(); }catch(e){}
+  // A private/invite-only ladder never appears in the /public-ladders LIST above,
+  // but its direct link (?event=ID, shared by hand by the organizer) still works —
+  // fetch that one ladder specifically and splice it in so whoever followed the
+  // link can see it and register, without it being discoverable any other way.
+  const _evId=_q.get('event');
+  if(_evId && !(pl.ladders||[]).some(l=>l.id===_evId)){
+    try{
+      const one=await (await fetch(`${API}/public-ladders?event=${encodeURIComponent(_evId)}`,{credentials:'include'})).json();
+      if(one&&one.ladder&&['open','full','live'].includes(one.ladder.status||'open')){
+        one.ladder._invited=true;
+        pl.ladders=[one.ladder,...(pl.ladders||[])];
+      }
+    }catch(e){}
+  }
   // Signed-in player's own signups → powers the "You're in ✓ / Cancel my spot"
   // state on each card. 401 (not signed in) just leaves MYREG empty.
   MYREG={};
@@ -548,22 +562,25 @@ function ladCountdown(l,ac){ if(l.status==='live')return''; const start=startMsO
 function ladRosterRows(roster){ const list=roster||[], half=Math.ceil(list.length/2), out=[]; for(let r=0;r<half;r++){ for(const c of [0,1]){ const k=c*half+r; if(k>=list.length){ out.push('<div></div>'); continue; } const p=list[k]; out.push(`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);min-width:0"><span style="width:15px;text-align:center;color:#5e655a;font-weight:800;font-size:.62rem;flex-shrink:0">${k+1}</span><span style="flex:1;min-width:0;font-weight:700;font-size:.78rem;color:#e7ebe0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(firstName(p.name))}</span>${p.paid?'<span style="width:15px;height:15px;border-radius:50%;background:#b8ff2c;color:#06210f;font-size:.6rem;font-weight:900;text-align:center;line-height:15px;flex-shrink:0">✓</span>':'<span style="font-size:.54rem;font-weight:800;color:#9aa094;border:1px solid rgba(255,255,255,.15);border-radius:9999px;padding:1px 7px;flex-shrink:0">PENDING</span>'}</div>`); } } return out.join(''); }
 setInterval(function(){ document.querySelectorAll('[data-cd]').forEach(function(el){ const ms=+el.dataset.cd-Date.now(); el.textContent=countdownLabel(ms); el.style.animation=(ms>0&&ms<3*3600*1000)?'dspulse 1.2s infinite':''; }); },30000);
 
+function feeLabel(l){ return (l.paymentMethods||[]).includes('free') ? 'Free' : fmt(l.feeCents); }
 function ladderCard(l,i){
   const cap=l.capacity||0, full=l.spotsLeft<=0, pct=cap?Math.round((cap-l.spotsLeft)/cap*100):0, tt=l.type||'mixed';
   const time=l.startTime?(l.endTime?`${l.startTime}–${l.endTime}`:l.startTime):'';
   const ac=PAL[(i||0)%PAL.length], barCol=full?'var(--red)':(pct>=80?'var(--gold)':ac);
+  const fee=feeLabel(l);
   return `<div style="border:1px solid ${hexA(ac,.32)};border-radius:13px;overflow:hidden;background:#000;margin-bottom:10px">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-left:3px solid ${ac};background-color:${hexA(ac,.12)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.14)} 0 9px,transparent 9px 20px)"><div style="flex:1;min-width:0"><div style="font-size:.92rem;font-weight:900;color:${ac};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div><div style="font-size:.66rem;color:var(--mut);font-weight:700">${[wd(l.date),time].filter(Boolean).join(' · ')}</div>${ladMaps(l)}${ladCourts(l,ac)}</div><span class="ttag ${tt}">${TL[tt]||'Mixed'}</span></div>
+    ${l._invited?`<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(240,192,64,.1);border-bottom:1px solid rgba(240,192,64,.25);font-size:.64rem;font-weight:800;color:var(--gold)">🔒 Invite-only — this link was shared with you directly</div>`:''}
     ${tt==='womens'?`<div style="display:flex;justify-content:center;padding:12px 12px 2px;background:#000"><div style="height:56px">${QOTC}</div></div>`:''}
     ${ladCountdown(l,ac)}
     <div style="padding:11px 12px;background:#000">
-      <div class="evc-meta" style="margin-bottom:8px">${cap} players · ${fmt(l.feeCents)}</div>
+      <div class="evc-meta" style="margin-bottom:8px">${cap} players · ${fee}</div>
       <div style="height:6px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:${barCol};border-radius:9999px"></i></div>
       <div class="spot" style="margin-top:6px"><span style="color:#9aa094">${cap-l.spotsLeft} / ${cap}</span><span class="left" style="color:${full?'var(--red)':ac}">${full?(l.waitlistCount?l.waitlistCount+' waiting':'Waitlist'):(l.spotsLeft+' spots left')}</span></div>
       ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${l.roster.map(initialDot).join('')}${(()=>{const pc=l.roster.filter(p=>p.paid).length;return pc?`<span style="margin-left:2px;font-size:.6rem;font-weight:800;color:#b8ff2c;background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.28);border-radius:9999px;padding:2px 8px">✓ ${pc} paid</span>`:'';})()}<button onclick="ladToggle('${l.id}')" style="margin-left:auto;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-top:8px">${ladRosterRows(l.roster)}</div>`:''}</div>`:''}
       ${l.status==='live'
         ? `<a class="btn btn-lime" href="/ladder-live?event=${encodeURIComponent(l.id)}" style="margin-top:11px;width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none"><span style="width:7px;height:7px;border-radius:50%;background:#06210f;margin-right:7px;animation:dspulse 1.1s infinite"></span>Watch live →</a>`
-        : myRegBlock(l)||`<button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fmt(l.feeCents)}</button>`}
+        : myRegBlock(l)||`<button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fee}</button>`}
     </div>
   </div>`;
 }
@@ -1003,6 +1020,12 @@ function openSignup(id){
   if(l.spotsLeft<=0){ document.getElementById('payBody').innerHTML='<button class="btn btn-out" onclick="joinWaitlist(\''+id+'\')">Join the waitlist</button><div class="pays" style="margin-top:8px;color:#9aa094">No charge now — we\'ll email you to pay &amp; claim when a spot opens.</div>'; document.getElementById('payOv').classList.add('on'); return; }
   const methods=l.paymentMethods||['card','venmo'];
   let h='';
+  if(methods.includes('free')){
+    h=`<button class="payopt" onclick="payFree('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎾</div><div><div class="payt">Join — it's free</div><div class="pays">No entry fee, no payment needed</div></div><div class="payamt" style="color:var(--lime)">Free</div></button>`;
+    document.getElementById('payBody').innerHTML=h;
+    document.getElementById('payOv').classList.add('on');
+    return;
+  }
   // Ladder credit only appears once a player actually has a balance (e.g. after a cancellation).
   if(MYCREDIT>0) h+=`<button class="payopt" onclick="payCredit('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎟️</div><div><div class="payt">Use ladder credit</div><div class="pays">Balance ${fmt(MYCREDIT)}</div></div><div class="payamt" style="color:var(--lime)">${fmt(l.feeCents)}</div></button>`;
   if(methods.includes('card')) h+=`<button class="payopt" onclick="payCard('${id}')"><div class="payic">💳</div><div><div class="payt">Card / Apple Pay</div><div class="pays">Instant · +10% fee</div></div><div class="payamt">${fmt(cardTotal(l.feeCents))}</div></button>`;
@@ -1013,6 +1036,7 @@ function openSignup(id){
 function payMsg(c,t){ document.getElementById('payMsg').innerHTML=`<div class="msg ${c}">${t}</div>`; }
 function needSignIn(){ payMsg('warn',`One quick step first:<br><b>New here?</b> <a href="/me.html#register" style="color:var(--lime);font-weight:700">Create your free account</a> — 10 seconds, no team needed.<br><b>Been here before?</b> <a href="/me.html" style="color:var(--lime);font-weight:700">Sign in</a>.<br>Tap the link we email you, then come back and grab your spot.`); }
 async function post(path,body){ const r=await fetch(`${API}${path}`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return {status:r.status,d:await r.json().catch(()=>({}))}; }
+async function payFree(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'free'}); if(status===401)return needSignIn(); if(d.ok)return payMsg('ok',"You're in — no payment needed. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
 async function payCredit(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit'}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
 async function payCard(id){ const {status,d}=await post(`/ladder-checkout?event=${id}`,{}); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payMsg('err',d.error||'Could not start checkout.'); }
 // Venmo on iOS only opens from a REAL anchor tap — JS location.href gets

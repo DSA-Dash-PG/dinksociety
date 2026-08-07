@@ -32,8 +32,12 @@ export default async (req) => {
   // On update, an omitted paymentMethods must KEEP the existing setting — the old
   // default here silently re-enabled card on every edit of a Venmo-only ladder.
   const methods = Array.isArray(b.paymentMethods) && b.paymentMethods.length
-    ? b.paymentMethods.filter(m => ['card', 'venmo', 'credit'].includes(m))
+    ? b.paymentMethods.filter(m => ['card', 'venmo', 'credit', 'free'].includes(m))
     : (existing?.paymentMethods?.length ? existing.paymentMethods : ['card', 'venmo']);
+  // Preserve an organizer's free/private settings on an admin-side edit (e.g.
+  // approving a ladder in the admin panel) unless explicitly overridden here.
+  const isFree = b.free != null ? !!b.free : !!existing?.free;
+  const visibility = ['public', 'private'].includes(b.visibility) ? b.visibility : (existing?.visibility || 'public');
 
   // Play format (merged from the old PickleLadder create form):
   // per-court names (top→bottom; index 0 = championship court), round count,
@@ -61,9 +65,11 @@ export default async (req) => {
     // Display string derived from courtNames, shown in reminder emails.
     courtNumbers: courtNames.length ? courtNames.join(' · ') : (existing?.courtNumbers || null),
     capacity,
-    feeCents: Number.isFinite(feeCents) ? feeCents : 0,
-    paymentMethods: methods,
-    venmoHandle: b.venmoHandle || existing?.venmoHandle || null,
+    feeCents: isFree ? 0 : (Number.isFinite(feeCents) ? feeCents : 0),
+    paymentMethods: isFree ? ['free'] : methods,
+    venmoHandle: isFree ? null : (b.venmoHandle || existing?.venmoHandle || null),
+    free: isFree,
+    visibility,
     waitlist: b.waitlist !== false,
     spotOpenPolicy: b.spotOpenPolicy === 'auto' ? 'auto' : 'hold',
     // Default is no refund/no credit — a cancelled spot just reopens. Existing

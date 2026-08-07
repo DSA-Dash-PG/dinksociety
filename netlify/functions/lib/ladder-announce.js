@@ -75,7 +75,7 @@ function renderNewLadder({ name, event, left, cap, site }) {
  */
 export async function announceNewLadder(event) {
   try {
-    if (!event || event.status !== 'open' || isTestCircuit(event.circuit)) {
+    if (!event || event.status !== 'open' || isTestCircuit(event.circuit) || event.visibility === 'private') {
       return { skipped: true, sent: 0 };
     }
     const site = siteUrl();

@@ -51,7 +51,11 @@ async function sendInviteEmail({ email, name, playerId, teamId, isResend }) {
   try {
     const token = await createPlayerToken({ email, playerId: playerId || null, teamId: teamId || null, minutes: INVITE_TOKEN_MINUTES });
     const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
-    const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}`;
+    // next=/organizer.html — without this the link lands on the regular player
+    // portal (me.html), which has no ladder-creation UI at all. This was the
+    // root cause of organizers reporting "I can't create a ladder": the invite
+    // never told the login flow where the organizer dashboard actually lives.
+    const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}&next=${encodeURIComponent('/organizer.html')}`;
     await sendEmail({
       to: email,
       subject: isResend ? 'Your Dink Society organizer link' : "You're a Dink Society ladder organizer",

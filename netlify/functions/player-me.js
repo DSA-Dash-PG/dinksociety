@@ -12,6 +12,8 @@ import { getRelevantAnnouncements } from './lib/announcements.js';
 import { getActiveWaivers, getSignature, isWaiverSatisfied } from './lib/waiver.js';
 import { isAdminEmail } from './lib/admin-auth.js';
 import { getTeamAvailability } from './lib/availability.js';
+import { getOrganizer } from './lib/organizers.js';
+import { normalizeEmail } from './lib/identity.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -25,6 +27,15 @@ export default async (req) => {
   const ctx = verified.payload;
 
   const { playerId, teamId, team, player } = ctx;
+
+  // Is this signed-in account also an active ladder ORGANIZER? Drives the
+  // "Organizer" toggle in the portal's view switcher — checked against the
+  // SESSION email (authoritative), falling back to the roster/lite email,
+  // same pattern as isAdmin below. Independent of league team/captain status:
+  // an organizer may be a lite ladder-only account or a full league player.
+  const orgEmail = normalizeEmail(ctx.session?.email || player.email || '');
+  const orgRecord = orgEmail ? await getOrganizer(orgEmail).catch(() => null) : null;
+  const isOrganizer = !!orgRecord && orgRecord.status === 'active';
 
   // ── Teamless (lite) ladder-only account ──
   // No team behind them, so there's no league schedule/roster/standing to load.
@@ -40,6 +51,7 @@ export default async (req) => {
         teamId: null, teamName: null, teamEmoji: null,
         division: null, divisionLabel: null, circuit: null,
         isCaptain: false, isCoCaptain: false, isAdmin: isAdminEmail(ctx.session?.email || liteEmail),
+        isOrganizer,
         lite: true,
         bio: {}, pendingProfile: null, hasPhoto: false, photoUpdatedAt: null,
       },
@@ -305,7 +317,7 @@ export default async (req) => {
       playerId, name: player.name, gender: player.gender || null,
       teamId, teamName: team.name, teamEmoji: team.emoji || null,
       division, divisionLabel: team.divisionLabel || division, circuit,
-      isCaptain, isCoCaptain, isAdmin,
+      isCaptain, isCoCaptain, isAdmin, isOrganizer,
       // Owner-only: the player's own bio fields (incl. DOB), any pending edit
       // awaiting admin approval, and whether an approved photo exists.
       bio: player.profile || {},

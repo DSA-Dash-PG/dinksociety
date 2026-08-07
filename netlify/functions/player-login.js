@@ -5,6 +5,15 @@ import { findPlayerByEmail, createPlayerToken } from './lib/player-auth.js';
 import { sendEmail, renderPlayerMagicLink } from './lib/email.js';
 import { allowRequest } from './lib/rate-limit.js';
 
+// Only a same-site absolute path is allowed as a post-login destination
+// (blocks open-redirects like //evil.com or https://evil.com). Mirrors the
+// same check in player-link.js, which is what actually enforces it — this
+// is just so we don't embed a garbage/unsafe value in the email itself.
+function safeNext(raw) {
+  const s = String(raw || '');
+  return (/^\/[A-Za-z0-9._~\-\/?=&%#]*$/.test(s) && !s.startsWith('//')) ? s : '';
+}
+
 const GENERIC = {
   ok: true,
   message: "If we know that email, a sign-in link is on the way — check your inbox. New to Dink Society? Create a ladder account instead (no team needed).",
@@ -13,7 +22,7 @@ const GENERIC = {
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
   try {
-    const { email } = await req.json();
+    const { email, next } = await req.json();
     const normalized = (email || '').toString().trim().toLowerCase();
     if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
       return json({ error: 'Valid email required' }, 400);
@@ -40,7 +49,10 @@ export default async (req) => {
 
     const token = await createPlayerToken({ email: normalized, playerId: found.playerId, teamId: found.teamId });
     const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
-    const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}`;
+    // Lets a page like organizer.html's own "Send sign-in link" button ask to
+    // land back on itself instead of the default /me.html.
+    const safeN = safeNext(next);
+    const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}` + (safeN ? `&next=${encodeURIComponent(safeN)}` : '');
 
     await sendEmail({
       to: normalized,

@@ -2,6 +2,13 @@
 // GET /api/public-ladders   (no auth) — what players see on the Ladders page.
 // Lists open/live ladders with public signup counts (no emails). One optional
 // ?event=<id> returns just that ladder.
+//
+// visibility:'private' ladders (organizer toggle) are excluded from the LIST —
+// they never show up in the browse page or the completed list, so random
+// visitors can't discover or join them. The single-event ?event=<id> lookup
+// below is deliberately NOT gated on visibility: a private ladder's direct
+// link (shared by hand by the organizer) still works. That's the point —
+// invite-only via an unguessable link, not invisible.
 
 import { listEvents, getEvent, getSignups, toPublicSignups, effectiveCapacity } from './lib/ladder.js';
 import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js';
@@ -37,10 +44,11 @@ export default async (req) => {
     return json({ ladder: pub(e, applyDirectoryToSignups(await getSignups(id), dir)) });
   }
   const events = await listEvents();
-  const visible = events.filter(e => ['open', 'full', 'live'].includes(e.status || 'open'));
+  const isPublic = e => e.visibility !== 'private';
+  const visible = events.filter(e => isPublic(e) && ['open', 'full', 'live'].includes(e.status || 'open'));
   const ladders = (await Promise.all(visible.map(async e => pub(e, applyDirectoryToSignups(await getSignups(e.id), dir)))))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
-  const completed = events.filter(e => (e.status || 'open') === 'final')
+  const completed = events.filter(e => isPublic(e) && (e.status || 'open') === 'final')
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
     .map(e => ({ id: e.id, name: e.name, date: e.date, place: e.place, type: e.type || 'mixed' }));
   return json({ ladders, completed });

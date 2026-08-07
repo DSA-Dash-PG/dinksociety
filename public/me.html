@@ -776,6 +776,7 @@
       <div class="ds-header__right">
         <div class="ds-role-seg" id="role-seg" role="group" aria-label="Switch view" style="display:none">
           <button class="ds-role-seg__opt" id="role-seg-admin" onclick="openAdminTools(this)" style="display:none"><span>Admin</span></button>
+          <button class="ds-role-seg__opt" id="role-seg-organizer" onclick="openOrganizerTools(this)" style="display:none"><span>Organizer</span></button>
           <button class="ds-role-seg__opt" id="role-seg-captain" onclick="openCaptainTools(this)"><span>Captain</span></button>
           <button class="ds-role-seg__opt is-on" aria-current="true">Player</button>
         </div>
@@ -805,9 +806,15 @@
           <div class="ds-drawer__section-label">View</div>
           <div class="ds-dseg" role="group" aria-label="Switch view">
             <button class="ds-dseg__opt" id="dseg-admin" onclick="openAdminTools(this)" style="display:none"><span>Admin</span></button>
+            <button class="ds-dseg__opt" id="dseg-organizer" onclick="openOrganizerTools(this)" style="display:none"><span>Organizer</span></button>
             <button class="ds-dseg__opt" id="dseg-captain" onclick="openCaptainTools(this)"><span>Captain</span></button>
             <span class="ds-dseg__opt is-on" aria-current="true">Player</span>
           </div>
+        </div>
+        <div class="ds-drawer__section" id="ds-organizer-section" style="display:none">
+          <div class="ds-drawer__section-label">Organizer</div>
+          <a class="ds-drawer__link" href="/organizer.html" style="color:var(--color-lime);font-weight:800">+ Create new ladder</a>
+          <a class="ds-drawer__link" href="/organizer.html">My ladders dashboard</a>
         </div>
         <div class="ds-drawer__section">
           <div class="ds-drawer__section-label">Player</div>
@@ -1461,13 +1468,18 @@
     // everyone — switching to the captain portal happens ONLY via the toggle.)
     const isLeader = !!(p.isCaptain || p.isCoCaptain);
     const isAdmin = !!p.isAdmin;
+    const isOrganizer = !!p.isOrganizer;
     const roleSeg = $('role-seg');
-    if (roleSeg) roleSeg.style.display = (isLeader || isAdmin) ? 'flex' : 'none';
+    if (roleSeg) roleSeg.style.display = (isLeader || isAdmin || isOrganizer) ? 'flex' : 'none';
     const viewSection = $('ds-view-section');
-    if (viewSection) viewSection.style.display = (isLeader || isAdmin) ? '' : 'none';
-    // Captain chips show for team leaders; Admin chips for ADMIN_EMAILS accounts.
+    if (viewSection) viewSection.style.display = (isLeader || isAdmin || isOrganizer) ? '' : 'none';
+    // Captain chips show for team leaders; Admin chips for ADMIN_EMAILS accounts;
+    // Organizer chips for active ladder organizers (independent of league role).
     ['role-seg-captain','dseg-captain'].forEach(id => { const el = $(id); if (el) el.style.display = isLeader ? '' : 'none'; });
     ['role-seg-admin','dseg-admin'].forEach(id => { const el = $(id); if (el) el.style.display = isAdmin ? '' : 'none'; });
+    ['role-seg-organizer','dseg-organizer'].forEach(id => { const el = $(id); if (el) el.style.display = isOrganizer ? '' : 'none'; });
+    const orgSection = $('ds-organizer-section');
+    if (orgSection) orgSection.style.display = isOrganizer ? '' : 'none';
     renderHome(); renderSchedule(); renderStandings(); renderStats(); renderTeam();
     refreshChatBadge();
     startLivePoll();
@@ -1877,6 +1889,12 @@
       if (lbl) lbl.textContent = orig;
       adminOpening = false;
     }
+  }
+
+  // The Organizer portal (organizer.html) reads the SAME player session — no
+  // separate bootstrap/mint step needed like Captain/Admin above. Just go.
+  function openOrganizerTools(btn) {
+    location.href = '/organizer.html';
   }
 
   async function openCaptainTools(btn) {

@@ -2,10 +2,16 @@
 // POST /api/organizer-ladder-save — an ORGANIZER creates/updates one of their
 // own ladder nights. Mirrors admin-ladder-save, but scoped and locked down:
 //   • ownerEmail is forced to the signed-in organizer (never trust the body)
-//   • payment is VENMO / CASH only (paymentMethods:['venmo']); no Stripe
+//   • payment is VENMO / CASH only (paymentMethods:['venmo']) unless `free:true`,
+//     in which case there's no entry fee at all (paymentMethods:['free']) — for
+//     organizers who just want the scheduling/scoring/stats tools, no money.
 //   • new ladders default leaderboard:'pending' — admin must approve before they
 //     aggregate into the running leaderboard (the ladder's own board is always public)
 //   • no league-wide "new ladder" email blast (that megaphone is admin-only)
+//   • `visibility:'private'` hides the ladder from the public /ladders browse
+//     list and from admin's league-wide blast tools — it still has a normal,
+//     working direct link (/ladders.html?event=<id>) that the organizer shares
+//     by hand with whoever they want in. Default is 'public'.
 // Everything else — recaps, reminders, signup/waitlist/Venmo emails — works exactly
 // as it does for an admin ladder, because an organizer ladder is a normal event.
 //
@@ -52,6 +58,11 @@ export default async (req) => {
   const rounds = Number.isFinite(+b.rounds) && +b.rounds > 0 ? Math.min(20, Math.floor(+b.rounds)) : (existing?.rounds ?? 10);
   const roundMin = Number.isFinite(+b.roundMin) && +b.roundMin > 0 ? Math.min(60, Math.floor(+b.roundMin)) : (existing?.roundMin ?? 12);
   const scoreMode = ['points', 'winby2', 'to11', 'to15'].includes(b.scoreMode) ? b.scoreMode : (existing?.scoreMode || 'points');
+  // Free ladder: no entry fee, no Venmo — just the scheduling/scoring/stats tools.
+  // `free` isn't in the body on an edit that doesn't touch payment (e.g. just
+  // changing the roster), so fall back to whatever the ladder already was.
+  const isFree = b.free != null ? !!b.free : !!existing?.free;
+  const visibility = ['public', 'private'].includes(b.visibility) ? b.visibility : (existing?.visibility || 'public');
 
   const event = {
     id,
@@ -68,11 +79,17 @@ export default async (req) => {
     scoreMode,
     courtNumbers: courtNames.length ? courtNames.join(' · ') : (existing?.courtNumbers || null),
     capacity,
-    feeCents: Number.isFinite(feeCents) ? feeCents : 0,
+    feeCents: isFree ? 0 : (Number.isFinite(feeCents) ? feeCents : 0),
     // Organizer ladders are Venmo/cash only — no Stripe. "Cash" is simply a Venmo-
-    // method signup the organizer marks paid by hand from their roster.
-    paymentMethods: ['venmo'],
-    venmoHandle: b.venmoHandle || existing?.venmoHandle || null,
+    // method signup the organizer marks paid by hand from their roster. A `free`
+    // ladder skips payment entirely — signups are instantly confirmed, no money.
+    paymentMethods: isFree ? ['free'] : ['venmo'],
+    venmoHandle: isFree ? null : (b.venmoHandle || existing?.venmoHandle || null),
+    free: isFree,
+    // 'private' keeps this off the public /ladders browse list and out of
+    // admin's league-wide blast tools; a direct link still works for whoever
+    // the organizer shares it with. See file header.
+    visibility,
     waitlist: b.waitlist !== false,
     spotOpenPolicy: b.spotOpenPolicy === 'auto' ? 'auto' : 'hold',
     // Organizers collect their own money, so the league credit system doesn't apply.

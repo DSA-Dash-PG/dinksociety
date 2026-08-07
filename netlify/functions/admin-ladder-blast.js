@@ -113,6 +113,9 @@ export default async (req) => {
     if (!b.eventId) return json({ error: 'eventId required for recruit' }, 400);
     const event = await getEvent(b.eventId);
     if (!event) return json({ error: 'Event not found' }, 404);
+    // A private/invite-only ladder can't be blasted to every past participant —
+    // that's the exact "everyone" exposure the organizer's toggle is for.
+    if (event.visibility === 'private') return json({ error: 'This ladder is private (invite-only) — it can\'t be blasted to the whole league. Ask the organizer to share the link directly.' }, 400);
     const signups = await getSignups(b.eventId);
     [...(signups.roster || []), ...(signups.waitlist || [])].forEach(p => { const e = normalizeEmail(p.email); if (e) exclude.add(e); });
     const open = spotsLeft(event, signups);
@@ -122,7 +125,7 @@ export default async (req) => {
   } else {
     const now = Date.now();
     const events = (await listEvents({ circuit }))
-      .filter(e => e.status === 'open')
+      .filter(e => e.status === 'open' && e.visibility !== 'private')
       .filter(e => { const s = eventStartMs(e); return s != null && s > now; })
       .sort((a, b2) => (eventStartMs(a) || 0) - (eventStartMs(b2) || 0));
     if (!events.length) return json({ error: 'No open upcoming ladders to announce.' }, 400);

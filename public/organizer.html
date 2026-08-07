@@ -125,7 +125,7 @@ function renderLogin(msg){
 async function sendLink(){
   const email=$('li-email').value.trim();
   if(!email) return toast('Enter your email.',true);
-  try{ await api('/player-login',{method:'POST',body:JSON.stringify({email})}); $('li-msg').innerHTML='Check your inbox for the sign-in link. After you tap it, <b>reload this page</b>.'; toast('Link sent — check your email.'); }
+  try{ await api('/player-login',{method:'POST',body:JSON.stringify({email,next:'/organizer.html'})}); $('li-msg').innerHTML='Check your inbox for the sign-in link — it\'ll bring you right back here.'; toast('Link sent — check your email.'); }
   catch(e){ toast(e.message,true); }
 }
 function renderNotOrganizer(){
@@ -199,12 +199,15 @@ function renderTab(){
 }
 
 /* Ladder Info form (mirrors admin edit form) */
+let FREE=false, VIS='public';
 function infoPanel(){
   const e=CUR||{}, v=(k,d)=>e[k]!=null?e[k]:(d==null?'':d);
   const courts=+v('courts',4)||4;
   const names=Array.isArray(e.courtNames)&&e.courtNames.length?e.courtNames:Array.from({length:courts},(_,i)=>String(i+1));
   const div=v('type','mixed');
   const sm=v('scoreMode','points');
+  FREE=!!e.free; VIS=e.visibility||'public';
+  const site=location.origin;
   return `<div class="card">
     <div class="frow"><label class="l">Name</label><input class="i" id="f-name" value="${esc(v('name'))}" placeholder="Thursday Night Ladder"></div>
     <div class="row3">
@@ -219,7 +222,7 @@ function infoPanel(){
     <div class="row3">
       <div class="frow"><label class="l">Courts</label><input class="i" id="f-courts" type="number" min="1" value="${courts}" oninput="recalcCourts()"></div>
       <div class="frow"><label class="l">Total players</label><input class="i" id="f-cap" type="number" min="2" value="${esc(v('capacity',courts*4))}"></div>
-      <div class="frow"><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" min="0" step="0.01" value="${e.feeCents!=null?(e.feeCents/100):9}"></div>
+      <div class="frow"><label class="l">Entry fee ($)</label><input class="i" id="f-fee" type="number" min="0" step="0.01" value="${e.feeCents!=null?(e.feeCents/100):9}" ${FREE?'disabled':''}></div>
     </div>
     <div class="row3">
       <div class="frow"><label class="l">Rounds</label><input class="i" id="f-rounds" type="number" min="1" value="${esc(v('rounds',9))}"></div>
@@ -229,8 +232,24 @@ function infoPanel(){
       </select></div>
     </div>
     <div class="frow"><label class="l">Court names (top to bottom)</label><div class="rfbar" id="f-courtnames">${names.map(n=>`<input class="rfin" value="${esc(n)}">`).join('')}</div></div>
-    <div class="frow"><label class="l">Your Venmo</label><input class="i" id="f-venmo" value="${esc(v('venmoHandle'))}" placeholder="@your-name"></div>
-    <div class="frow"><label class="l">Payments</label><div class="lock">🔒 Venmo / cash only — you collect entry fees yourself; Dink Society never touches the money.</div></div>
+    <div class="frow"><label class="l">Payments</label>
+      <div class="row2" style="gap:8px">
+        <button type="button" id="f-free-btn-paid" class="btn ${FREE?'btn-out':'btn-lime'}" style="flex:1" onclick="setFree(false)">💵 Collect entry fee</button>
+        <button type="button" id="f-free-btn-free" class="btn ${FREE?'btn-lime':'btn-out'}" style="flex:1" onclick="setFree(true)">🆓 Free — no payment</button>
+      </div>
+      <div class="help" id="f-free-help" style="margin-top:9px;display:${FREE?'block':'none'}">No entry fee, no Venmo — just the scheduling, scoring, and stats. Sign-ups are confirmed instantly.</div>
+    </div>
+    <div class="frow" id="f-venmo-row" style="display:${FREE?'none':'block'}"><label class="l">Your Venmo</label><input class="i" id="f-venmo" value="${esc(v('venmoHandle'))}" placeholder="@your-name">
+      <div class="lock" style="margin-top:8px">🔒 Venmo / cash only — you collect entry fees yourself; Dink Society never touches the money.</div>
+    </div>
+    <div class="frow"><label class="l">Visibility</label>
+      <div class="row2" style="gap:8px">
+        <button type="button" id="f-vis-btn-public" class="btn ${VIS==='public'?'btn-lime':'btn-out'}" style="flex:1" onclick="setVis('public')">🌐 Public</button>
+        <button type="button" id="f-vis-btn-private" class="btn ${VIS==='private'?'btn-lime':'btn-out'}" style="flex:1" onclick="setVis('private')">🔒 Private (invite-only)</button>
+      </div>
+      <div class="help" id="f-vis-help" style="margin-top:9px">${VIS==='private'?VIS_HELP.private:VIS_HELP.public}</div>
+    </div>
+    ${CUR&&VIS==='private'?`<div class="frow"><label class="l">Share this link with your group</label><input class="i" readonly value="${esc(site+'/ladders.html?event='+CUR.id)}" onclick="this.select()"><button class="btn btn-out btn-sm" style="margin-top:8px" onclick="copyInviteLink(this)">Copy link</button></div>`:''}
     <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:4px">
       ${CUR?`<button class="btn btn-out" onclick="loadLadders()">Done</button>`:''}
       <button class="btn btn-lime" onclick="saveLadder()">${CUR?'Save changes':'Create ladder'}</button>
@@ -240,6 +259,25 @@ function infoPanel(){
     <div class="danger"><div class="dh">Danger zone</div><div class="help" style="margin-bottom:10px">Deleting removes the ladder, its roster, and scores. This can't be undone.</div><button class="btn btn-danger" onclick="delLadder()">Delete ladder</button></div>
   </div>`:''}`;
 }
+// Direct DOM toggles (NOT a full renderTab() re-render) — a re-render would read
+// form values back off CUR, which is null/stale for an unsaved new ladder and
+// would silently wipe out anything the organizer already typed into the form.
+const VIS_HELP={ public:'Shows on the public Ladders page — anyone can find it and sign up.', private:'Hidden from the public Ladders page and from league-wide announcements. Only people you send the direct link to can find and join it.' };
+function setFree(v){
+  FREE=v;
+  $('f-free-btn-paid').className='btn '+(FREE?'btn-out':'btn-lime');
+  $('f-free-btn-free').className='btn '+(FREE?'btn-lime':'btn-out');
+  $('f-free-help').style.display=FREE?'block':'none';
+  $('f-venmo-row').style.display=FREE?'none':'block';
+  const fee=$('f-fee'); if(fee) fee.disabled=FREE;
+}
+function setVis(v){
+  VIS=v;
+  $('f-vis-btn-public').className='btn '+(VIS==='public'?'btn-lime':'btn-out');
+  $('f-vis-btn-private').className='btn '+(VIS==='private'?'btn-lime':'btn-out');
+  $('f-vis-help').textContent=VIS==='private'?VIS_HELP.private:VIS_HELP.public;
+}
+function copyInviteLink(btn){ const inp=btn.previousElementSibling; try{ navigator.clipboard.writeText(inp.value); btn.textContent='Copied ✓'; setTimeout(()=>btn.textContent='Copy link',2000); }catch(e){ inp.select(); } }
 function recalcCourts(){
   const n=Math.max(1,parseInt($('f-courts').value)||1);
   const box=$('f-courtnames'); const cur=Array.from(box.querySelectorAll('input')).map(i=>i.value);
@@ -253,8 +291,9 @@ async function saveLadder(){
   const body={
     name:$('f-name').value.trim(), date:$('f-date').value, startTime:$('f-time').value.trim(), endTime:$('f-end').value.trim(),
     place:$('f-place').value.trim(), type:$('f-type').value, courts:+$('f-courts').value||0, capacity:+$('f-cap').value||0,
-    fee:+$('f-fee').value||0, rounds:+$('f-rounds').value||0, roundMin:+$('f-roundmin').value||0, scoreMode:$('f-score').value,
-    venmoHandle:$('f-venmo').value.trim(), courtNames,
+    fee:FREE?0:(+$('f-fee').value||0), rounds:+$('f-rounds').value||0, roundMin:+$('f-roundmin').value||0, scoreMode:$('f-score').value,
+    venmoHandle:FREE?'':$('f-venmo').value.trim(), courtNames,
+    free:FREE, visibility:VIS,
   };
   if(CUR) body.id=CUR.id;
   if(!body.name||!body.date) return toast('Name and date are required.',true);
