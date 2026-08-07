@@ -40,15 +40,16 @@ const INVITE_TOKEN_MINUTES = 7 * 24 * 60;
 // which is exactly what was silently missing before this fix (the old
 // 'invite' action created the organizer record and never emailed anyone).
 //
-// Re-resolves playerId/teamId from findPlayerByEmail at send time rather than
-// trusting a caller-supplied playerId — a captain/rostered organizer needs
-// their real teamId in the token (not null) so the resulting session matches
-// their normal player session, and this stays correct even if their team
-// situation changed since the organizer record was created.
-async function sendInviteEmail({ email, name, isResend }) {
+// Takes playerId/teamId straight from the caller (the organizer record, or a
+// lookup the caller already did) rather than re-resolving via
+// findPlayerByEmail here — a fresh lite account was just written moments
+// earlier by the 'invite' case, and blob stores are eventually consistent, so
+// re-reading it back in the same request risked an intermittent miss (token
+// created with playerId:null → a session nothing can ever sign in with).
+// Trusting the caller's already-correct values removes that read entirely.
+async function sendInviteEmail({ email, name, playerId, teamId, isResend }) {
   try {
-    const found = await findPlayerByEmail(email).catch(() => null);
-    const token = await createPlayerToken({ email, playerId: found?.playerId || null, teamId: found?.teamId || null, minutes: INVITE_TOKEN_MINUTES });
+    const token = await createPlayerToken({ email, playerId: playerId || null, teamId: teamId || null, minutes: INVITE_TOKEN_MINUTES });
     const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
     const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}`;
     await sendEmail({
@@ -145,22 +146,26 @@ export default async (req) => {
       const existing = await getOrganizer(email);
       const finalName = name || existing?.name || existingPlayer?.name || '';
       const finalPlayerId = playerId || existing?.playerId || null;
+      // A league player/captain has a real teamId; a lite account never does.
+      // Stored on the organizer record so 'resend' below never has to re-derive it.
+      const finalTeamId = existingPlayer?.teamId || existing?.teamId || null;
       const rec = await setOrganizer({
         email,
         name: finalName,
         status: 'active',
         playerId: finalPlayerId,
+        teamId: finalTeamId,
         invitedAt: existing?.invitedAt || new Date().toISOString(),
         invitedBy: existing?.invitedBy || v.payload.email,
       });
-      const mail = await sendInviteEmail({ email, name: finalName, isResend: !!existing });
+      const mail = await sendInviteEmail({ email, name: finalName, playerId: finalPlayerId, teamId: finalTeamId, isResend: !!existing });
       return json({ ok: true, organizer: rec, emailSent: mail.sent, emailError: mail.error || null });
     }
     case 'resend': {
       const email = normalizeEmail(b.email);
       const rec = await getOrganizer(email);
       if (!rec) return json({ error: 'Organizer not found.' }, 404);
-      const mail = await sendInviteEmail({ email, name: rec.name, isResend: true });
+      const mail = await sendInviteEmail({ email, name: rec.name, playerId: rec.playerId, teamId: rec.teamId || null, isResend: true });
       if (!mail.sent) return json({ error: mail.error || 'Email failed to send.' }, 502);
       return json({ ok: true, emailSent: true });
     }
