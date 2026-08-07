@@ -752,6 +752,16 @@ function lbTable(rows,m){
   }).join('');
   return `<table class="lbt">${head}${rws}</table>`;
 }
+// Desktop table for under-threshold players — same columns as lbTable, but the
+// rank column reads "Unqualified" instead of a number (they aren't ranked).
+function lbTableUnq(rows,m){
+  if(!rows||!rows.length) return '';
+  const wpct=p=>{ const g=(p.w||0)+(p.l||0); return g?Math.round(100*(p.w||0)/g)+'%':'–'; };
+  const hl=(k)=> (m===k||(k==='total'&&(m==='wins'||m==='total')))?'color:var(--lime);font-weight:900':'color:var(--mut)';
+  const head=`<tr><th style="width:88px;text-align:center">Status</th><th>Player</th><th class="num">W–L</th><th class="num">Win %</th><th class="num" style="${m==='total'||m==='wins'?'color:var(--lime)':''}">Pts</th><th class="num" style="${m==='xp'?'color:var(--teal)':''}">XP</th><th class="num" style="${m==='dr'?'color:var(--purp)':''}">DR</th></tr>`;
+  const rws=rows.map(p=>`<tr onclick="profile('${p.id}')" style="cursor:pointer;opacity:.75"><td style="text-align:center;font-size:.6rem;font-weight:800;color:var(--fnt);text-transform:uppercase;letter-spacing:.03em">Unqualified</td><td>${esc(firstLast(p.name))}</td><td class="num">${p.w||0}–${p.l||0}</td><td class="num" style="color:var(--mut)">${wpct(p)}</td><td class="num" style="${hl('total')}">${lbVal(p,'total')}</td><td class="num" style="color:var(--teal);${m==='xp'?'font-weight:900':''}">${p.xp||0}</td><td class="num" style="color:var(--purp);${m==='dr'?'font-weight:900':''}">${p.dr==null?'–':p.dr}</td></tr>`).join('');
+  return `<table class="lbt">${head}${rws}</table>`;
+}
 function lbBoard(rows,m){ if(!rows||!rows.length) return '<div class="note">No results yet.</div>'; const top=rows.slice(0,3), rest=rows.slice(3); let h=''; if(top.length>=3) h+=`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">${lbPodium(top[0],1,m)}${lbPodium(top[1],2,m)}${lbPodium(top[2],3,m)}</div>`; else h+=top.map((p,i)=>lbCell(p,i+1,m)).join(''); if(rest.length){ const half=Math.ceil(rest.length/2); const col=(arr,start)=>`<div style="display:flex;flex-direction:column;gap:7px">${arr.map((p,i)=>lbCell(p,start+i,m)).join('')}</div>`; h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:7px;align-items:start">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; } return h; }
 let lbTab='wins', lbInfo=null, lbGender='all';
 const LB_GC={M:'#6aa8ff',F:'#ff8fb3'};
@@ -788,6 +798,10 @@ function renderStats(){
   let src=(j.divisions&&j.divisions[divKey])||[];
   if(lbBrd==='society' && !src.length) src=(j.divisions&&j.divisions.all)||j.leaderboard||[];
   const rowsAll=src.filter(p=>((p.w||0)+(p.l||0))>=MIN_LB_GAMES);
+  // Played at least one game but hasn't hit the season-leaderboard minimum yet
+  // (e.g. a first-night player) — shown below, unranked, so they're visible
+  // without being able to skew the ranked standings on a small sample.
+  const unqAll=src.filter(p=>{ const g=(p.w||0)+(p.l||0); return g>0 && g<MIN_LB_GAMES; });
   let h='';
   // Board switch — only boards that have a played ladder show up.
   const boards=['society','queen','king'].filter(boardOn);
@@ -828,6 +842,15 @@ function renderStats(){
     const top=view.slice(0,3);
     const podium=top.length>=3?`<div style="display:flex;gap:8px;align-items:stretch;margin:0 auto 10px;max-width:640px">${lbPodium(top[0],1,lbM)}${lbPodium(top[1],2,lbM)}${lbPodium(top[2],3,lbM)}</div>`:'';
     h+=`<div class="lb-m">${lbBoard(view, lbM)}</div><div class="lb-d">${podium}${lbTable(view, lbM)}</div>`;
+  }
+  let uview=lbGender==='all'?unqAll:unqAll.filter(p=>lbNormG(p)===lbGender);
+  if(uview.length){
+    if(lbTab==='xp') uview=[...uview].sort((a,b)=>(b.xp||0)-(a.xp||0));
+    else if(lbTab==='dr') uview=[...uview].sort((a,b)=>((b.dr??-1)-(a.dr??-1)));
+    else if(lbTab==='points') uview=[...uview].sort((a,b)=>(lbVal(b,'total')-lbVal(a,'total')));
+    else uview=[...uview].sort((a,b)=>(b.w||0)-(a.w||0));
+    h+=`<div class="seclbl">🆕 Not yet ranked <span style="font-weight:600;color:var(--fnt);text-transform:none;letter-spacing:0">— under ${MIN_LB_GAMES} games played</span></div>`;
+    h+=`<div class="lb-m" style="display:flex;flex-direction:column;gap:7px">${uview.map(p=>lbCell(Object.assign({},p,{_sec:''}),'NQ',lbM)).join('')}</div><div class="lb-d">${lbTableUnq(uview,lbM)}</div>`;
   }
   if(lbBrd==='society' && lbTab==='wins' && lbGender==='all'){
     if(j.mvpLeaders&&j.mvpLeaders.length) h+=`<div class="seclbl">🏅 Top performers</div>`+lbCard('#f0c040', j.mvpLeaders.map((x,i)=>lbRow(i,`<span onclick="profile('${x.id}')" style="cursor:pointer">${esc(firstLast(x.name))}</span>`,`<span style="font-size:1rem;font-weight:900;color:#f0c040;text-shadow:0 0 12px rgba(240,192,64,.4)">${x.count}<span style="font-size:.6rem;color:#5e655a">×</span></span>`)).join(''));
