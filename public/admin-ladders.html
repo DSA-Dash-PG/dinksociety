@@ -506,7 +506,7 @@ async function loadOrganizers(){
         const active=o.status==='active';
         const stColor=active?'#17d7b0':'#ff5c47';
         const act=active
-          ? `<button class="btn btn-danger btn-sm" onclick="setOrgStatus('${orgEsc(o.email)}','suspend')">Deny</button>`
+          ? `<button class="btn btn-out btn-sm" onclick="resendOrg('${orgEsc(o.email)}',this)">Resend invite</button> <button class="btn btn-danger btn-sm" onclick="setOrgStatus('${orgEsc(o.email)}','suspend')">Deny</button>`
           : `<button class="btn btn-out btn-sm" onclick="setOrgStatus('${orgEsc(o.email)}','activate')">Restore</button>`;
         return `<div style="padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06)">
           <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -538,10 +538,19 @@ async function inviteOrg(){
   try{
     const r=await fetch(API+'/admin-organizers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'invite',name,email})});
     const d=await r.json(); if(!r.ok) throw new Error(d.error||'Failed');
-    msg.style.color='#17d7b0'; msg.textContent='Organizer added — they sign in with the normal player magic-link.';
+    if(d.emailSent){ msg.style.color='#17d7b0'; msg.textContent='Organizer added — invite email sent.'; }
+    else { msg.style.color='#f0c040'; msg.textContent='Organizer added, but the invite email failed to send'+(d.emailError?': '+d.emailError:'')+'. Try "Resend invite" below once that\'s fixed.'; }
     document.getElementById('org-name').value=''; document.getElementById('org-email').value='';
     loadOrganizers();
   }catch(e){ msg.style.color='#ff5c47'; msg.textContent=e.message; }
+}
+async function resendOrg(email,btn){
+  const orig=btn.textContent; btn.disabled=true; btn.textContent='Sending…';
+  try{
+    const r=await fetch(API+'/admin-organizers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'resend',email})});
+    const d=await r.json(); if(!r.ok) throw new Error(d.error||'Failed to send.');
+    btn.textContent='Sent ✓'; setTimeout(()=>{ btn.textContent=orig; btn.disabled=false; },2500);
+  }catch(e){ alert('Failed to resend invite: '+e.message); btn.textContent=orig; btn.disabled=false; }
 }
 async function setOrgStatus(email,action){
   try{ await fetch(API+'/admin-organizers',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({action,email})}); loadOrganizers(); }

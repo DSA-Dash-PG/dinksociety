@@ -7,9 +7,11 @@
 //                     ladders:[{id,name,date,status,leaderboard}] }],
 //       pendingLadders:[{ id,name,date,ownerEmail,status }] }
 // POST /api/admin-organizers  { action, ... }
-//   invite         { name, email }  → grant: create/activate an organizer. Provisions a
-//                                      lite player account ONLY if the email isn't already a
-//                                      league player (captain/rostered players keep their one identity).
+//   invite         { name, email }  → grant: create/activate an organizer, then EMAIL them a
+//                                      sign-in link (7-day magic link). Provisions a lite player
+//                                      account ONLY if the email isn't already a league player
+//                                      (captain/rostered players keep their one identity).
+//   resend         { email }        → re-send the sign-in link to an existing organizer.
 //   suspend        { email }        → deny access  (status:'suspended')
 //   activate       { email }        → restore access (status:'active')
 //   remove         { email }        → delete the organizer record
@@ -22,9 +24,44 @@ import { isAdminEmail } from './lib/admin-auth.js';
 import { listOrganizers, getOrganizer, setOrganizer, deleteOrganizer } from './lib/organizers.js';
 import { listEvents, getEvent, setEvent } from './lib/ladder.js';
 import { createLitePlayer } from './lib/ladder-players.js';
-import { findPlayerByEmail } from './lib/player-auth.js';
+import { findPlayerByEmail, createPlayerToken } from './lib/player-auth.js';
 import { isTestTeam } from './lib/circuit.js';
 import { normalizeEmail } from './lib/identity.js';
+import { sendEmail, renderOrganizerInvite } from './lib/email.js';
+
+// Organizer invite links live longer than a normal "email me a link" request
+// (15 min) — an admin sends this on someone else's behalf, so the recipient
+// might not open their inbox right away. 7 days.
+const INVITE_TOKEN_MINUTES = 7 * 24 * 60;
+
+// Send (or resend) the sign-in email for an organizer. Never throws — a
+// failed send shouldn't roll back the organizer record — but the caller gets
+// the error back so the admin sees it instead of a false "sent!" message,
+// which is exactly what was silently missing before this fix (the old
+// 'invite' action created the organizer record and never emailed anyone).
+//
+// Re-resolves playerId/teamId from findPlayerByEmail at send time rather than
+// trusting a caller-supplied playerId — a captain/rostered organizer needs
+// their real teamId in the token (not null) so the resulting session matches
+// their normal player session, and this stays correct even if their team
+// situation changed since the organizer record was created.
+async function sendInviteEmail({ email, name, isResend }) {
+  try {
+    const found = await findPlayerByEmail(email).catch(() => null);
+    const token = await createPlayerToken({ email, playerId: found?.playerId || null, teamId: found?.teamId || null, minutes: INVITE_TOKEN_MINUTES });
+    const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
+    const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}`;
+    await sendEmail({
+      to: email,
+      subject: isResend ? 'Your Dink Society organizer link' : "You're a Dink Society ladder organizer",
+      html: renderOrganizerInvite(magicUrl, name, isResend),
+    });
+    return { sent: true };
+  } catch (err) {
+    console.error('organizer invite email failed:', err);
+    return { sent: false, error: err.message || 'Email failed to send.' };
+  }
+}
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -106,15 +143,26 @@ export default async (req) => {
         try { const { record } = await createLitePlayer({ name, email }); playerId = record.playerId; } catch { /* non-fatal */ }
       }
       const existing = await getOrganizer(email);
+      const finalName = name || existing?.name || existingPlayer?.name || '';
+      const finalPlayerId = playerId || existing?.playerId || null;
       const rec = await setOrganizer({
         email,
-        name: name || existing?.name || existingPlayer?.name || '',
+        name: finalName,
         status: 'active',
-        playerId: playerId || existing?.playerId || null,
+        playerId: finalPlayerId,
         invitedAt: existing?.invitedAt || new Date().toISOString(),
         invitedBy: existing?.invitedBy || v.payload.email,
       });
-      return json({ ok: true, organizer: rec });
+      const mail = await sendInviteEmail({ email, name: finalName, isResend: !!existing });
+      return json({ ok: true, organizer: rec, emailSent: mail.sent, emailError: mail.error || null });
+    }
+    case 'resend': {
+      const email = normalizeEmail(b.email);
+      const rec = await getOrganizer(email);
+      if (!rec) return json({ error: 'Organizer not found.' }, 404);
+      const mail = await sendInviteEmail({ email, name: rec.name, isResend: true });
+      if (!mail.sent) return json({ error: mail.error || 'Email failed to send.' }, 502);
+      return json({ ok: true, emailSent: true });
     }
     case 'suspend':
     case 'activate': {

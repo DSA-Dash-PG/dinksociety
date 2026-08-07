@@ -47,12 +47,16 @@ export async function deletePlayerSession(sessionId) {
 }
 
 // ===== Magic-link tokens =====
-export async function createPlayerToken({ email, playerId, teamId }) {
+// `minutes` overrides the default 15-minute window — used for organizer
+// invite links (admin-organizers.js), which someone might not open right
+// away, unlike a normal "email me a link" request where the player is
+// sitting on the login page waiting for it.
+export async function createPlayerToken({ email, playerId, teamId, minutes }) {
   const token = randomId(24);
   await getStore('player-tokens').setJSON(`token/${token}.json`, {
     token, email: email.toLowerCase(), playerId, teamId,
     createdAt: new Date().toISOString(),
-    expiresAt: new Date(Date.now() + TOKEN_MINUTES * 60 * 1000).toISOString(),
+    expiresAt: new Date(Date.now() + (minutes || TOKEN_MINUTES) * 60 * 1000).toISOString(),
   });
   return token;
 }
