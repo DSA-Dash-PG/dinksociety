@@ -686,19 +686,35 @@ async function pollLive(id){
   // and courts render king-first (descending) like the scorer and live page.
   const tC=(p.rounds[0]&&p.rounds[0].courts&&p.rounds[0].courts.length)||(rd.courts||[]).length;
   const cname=num=>{ const n=p.courtNames; const idx=tC-num; return (Array.isArray(n)&&idx>=0&&idx<n.length&&String(n[idx]||'').trim())?n[idx]:('Court '+num); };
-  const team=t=>(t||[]).map(x=>esc(firstName(x.name))).join(' + ')||'—';
-  el.innerHTML=`<div style="font-size:.62rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin-bottom:6px">Round ${rd.round} of ${p.totalRounds}${p.finished?' · Final':''}</div>`+
+  // First-name-only, EXCEPT for anyone sharing a first name with someone else
+  // on tonight's roster — they get their full name instead. Scoped to this
+  // poll (tonight's roster only), matching the admin scorer + full live board.
+  const dupCounts={};
+  ((j&&j.roster)||[]).forEach(pl=>{ const f=String((pl&&pl.name)||'').trim().split(/\s+/)[0]; if(f) dupCounts[f.toLowerCase()]=(dupCounts[f.toLowerCase()]||0)+1; });
+  const dupFirst=new Set(Object.keys(dupCounts).filter(k=>dupCounts[k]>1));
+  const nightName=n=>{ const s=String(n||'').trim(); const f=s.split(/\s+/)[0]||s; return dupFirst.has(f.toLowerCase())?s:f; };
+  // Split card per court: names left/right, score side-by-side in a center
+  // divider, winning side gets a soft tint (gold for the top/"king" court,
+  // lime otherwise) so the result reads at a glance.
+  const pl=t=>(t||[]).map(x=>esc(nightName(x.name))).join('<br>')||'<span style="color:var(--fnt)">—</span>';
+  el.innerHTML=`<div style="font-size:.62rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin-bottom:8px">Round ${rd.round} of ${p.totalRounds}${p.finished?' · Final':''}</div>`+
     [...(rd.courts||[])].sort((a,b)=>(b.court||0)-(a.court||0)).map(c=>{
       const s=c.score, has=!!(s&&(s.t1!=null||s.t2!=null));
       const w1=has&&(s.t1||0)>(s.t2||0), w2=has&&(s.t2||0)>(s.t1||0);
-      return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-        <span style="font-size:.6rem;font-weight:900;color:var(--lime);background:rgba(184,255,44,.1);border:1px solid rgba(184,255,44,.3);border-radius:6px;padding:2px 8px;flex-shrink:0;white-space:nowrap">${esc(String(cname(c.court)))}</span>
-        <div style="flex:1;min-width:0;font-size:.76rem;font-weight:700">
-          <div style="${w1?'color:var(--lime)':''};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${team(c.team1)}</div>
-          <div style="color:var(--fnt);font-size:.58rem;margin:1px 0">vs</div>
-          <div style="${w2?'color:var(--lime)':''};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${team(c.team2)}</div>
+      const king=c.court===tC;
+      const numCol=king?'var(--gold)':'var(--lime)';
+      const tint=king?'rgba(240,192,64,.08)':'rgba(184,255,44,.06)';
+      const side=(names,win)=>`<div style="padding:14px 10px;text-align:center;${win?`background:${tint}`:''}"><div style="font-size:.98rem;font-weight:800;line-height:1.35;${win?`color:${numCol}`:''}">${names}</div></div>`;
+      const label=king?`👑 ${esc(String(cname(c.court)))} · Top court`:esc(String(cname(c.court)));
+      return `<div style="border:1px solid ${king?'rgba(240,192,64,.35)':'var(--bd)'};border-radius:12px;overflow:hidden;margin-bottom:9px;background:var(--surf)">
+        <div style="padding:7px 12px;background:rgba(0,0,0,.35);border-bottom:1px solid var(--bd);font-size:.64rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;color:${king?'var(--gold)':'var(--mut)'}">${label}</div>
+        <div style="display:grid;grid-template-columns:1fr auto 1fr">
+          ${side(pl(c.team1),w1)}
+          <div style="display:flex;align-items:center;gap:6px;padding:0 12px;border-left:1px solid var(--bd);border-right:1px solid var(--bd);background:rgba(0,0,0,.25)">
+            ${has?`<span style="font-size:1.5rem;font-weight:900;font-variant-numeric:tabular-nums;color:${w1?numCol:'var(--fnt)'}">${s.t1??0}</span><span style="font-size:.7rem;color:var(--fnt)">–</span><span style="font-size:1.5rem;font-weight:900;font-variant-numeric:tabular-nums;color:${w2?numCol:'var(--fnt)'}">${s.t2??0}</span>`:'<span style="font-size:.7rem;font-weight:800;color:var(--fnt)">vs</span>'}
+          </div>
+          ${side(pl(c.team2),w2)}
         </div>
-        <div style="font-size:1.05rem;font-weight:900;flex-shrink:0;${has?'':'color:var(--fnt)'}">${has?`${s.t1??0}<span style="color:var(--fnt)">–</span>${s.t2??0}`:'· ·'}</div>
       </div>`;
     }).join('');
 }
