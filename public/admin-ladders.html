@@ -408,7 +408,7 @@
     <div style="display:flex;align-items:flex-end"><button class="btn btn-lime" style="width:100%" onclick="blastRecruit()">Email past players for this ladder</button></div>
   </div>
   <button onclick="blastOpen()" style="margin-top:8px;width:100%;background:#161616;border:1px solid #2a2a2a;color:#f5f5f5;padding:12px;border-radius:9999px;font-weight:800;font-family:inherit;cursor:pointer;font-size:.85rem">Announce all open ladders to past players</button>
-  <div class="help" style="margin:6px 0 4px">Emails everyone who's ever played a ladder (not just the waitlist). Recruit targets this ladder (skips those already in); Announce lists every open upcoming ladder.</div>
+  <div class="help" style="margin:6px 0 4px">Emails everyone who's ever played a ladder (not just the waitlist) — any admin can blast any ladder this way, organizers never can. Recruit targets this ladder (skips those already in) and works on any ladder regardless of status, including a 🔒 private one — you'll get an extra "send anyway?" confirmation first since that makes it public knowledge. Announce lists every open upcoming <i>public</i> ladder (private ones are always skipped there).</div>
   <div id="mBlastMsg"></div>
   </div><!-- /reminders -->
 
@@ -1180,9 +1180,21 @@ async function blastRecruit(){
   if(!CURRENT) return;
   const needed=parseInt(document.getElementById('m-needed').value)||0;
   if(!(await dsConfirm({ title:'Email past players?', message:'Email all past ladder players that you need '+(needed||'more')+' for '+(CURRENT.name||'this ladder')+'. (Skips anyone already registered.)', confirmLabel:'Send blast', cancelLabel:'Cancel' }))) return;
+  await doBlastRecruit(needed, false);
+}
+// Split out so the private-ladder override (see admin-ladder-blast.js) can retry
+// with confirmPrivate:true after a second, more explicit confirmation — a private
+// ladder is otherwise excluded from league-wide blasts on purpose.
+async function doBlastRecruit(needed, confirmPrivate){
   const box=document.getElementById('mBlastMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
-  const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'recruit',eventId:CURRENT.id,neededCount:needed||undefined})});
+  const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'recruit',eventId:CURRENT.id,neededCount:needed||undefined,confirmPrivate:confirmPrivate||undefined})});
   if(status===401){ msg('mBlastMsg','err','Sign in as admin first.'); return; }
+  if(status===409&&d&&d.privateConfirmRequired){
+    const ok=await dsConfirm({ title:'This ladder is private', message:'"'+(CURRENT.name||'This ladder')+'" is invite-only. Blasting it emails every past player in the league — not just people already invited — and it stops being private the moment you send this. Send anyway?', confirmLabel:'Blast it anyway', cancelLabel:'Cancel', danger:true });
+    if(ok) return doBlastRecruit(needed, true);
+    msg('mBlastMsg','err','Not sent — this ladder is private.');
+    return;
+  }
   if(d&&d.ok){ msg('mBlastMsg','ok','Emailed '+d.sent+' past player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); }
   else msg('mBlastMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }

@@ -164,6 +164,24 @@
     .lineup-game__type-num { font-weight: 800; color: var(--color-text-muted); margin-right: 6px; }
     .lineup-game select { padding: 6px 8px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 11px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); }
     .lineup-game select:focus { outline: none; border-color: var(--color-lime); }
+    /* Availability / Lineup sub-tabs — lets a captain flip between the two
+       instead of scrolling past one to reach the other. Only shown while both
+       panels are actually relevant (unlocked, roster sufficient); hidden by
+       applyMatchSubtabs() once locked/revealed, same as today. */
+    .cap-subtabs { display: flex; gap: 8px; margin: 4px 0 14px; }
+    .cap-subtab {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 2px; padding: 10px 10px 9px; border-radius: var(--radius-md);
+      background: var(--color-surface-2); border: 1px solid var(--color-border);
+      color: var(--color-text-muted); font-family: inherit; cursor: pointer;
+      transition: all var(--transition);
+    }
+    .cap-subtab strong { font-size: 12.5px; font-weight: 700; color: inherit; }
+    .cap-subtab span { font-size: 10px; color: var(--color-text-faint); font-weight: 500; }
+    .cap-subtab:hover { color: var(--color-text); }
+    .cap-subtab.is-active { background: var(--color-lime-dim); border-color: rgba(184,255,44,0.35); color: var(--color-lime); }
+    .cap-subtab.is-active span { color: var(--color-lime); opacity: 0.8; }
+
     /* availability strip above the lineup builder */
     .av-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin-bottom:10px; }
     .av-head__t { font-size:11px; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:var(--color-text-muted); }
@@ -666,6 +684,15 @@
 
         <div id="match-reveal-area"></div>
 
+        <div class="cap-subtabs" id="match-subtabs" style="display:none;">
+          <button type="button" class="cap-subtab is-active" data-subtab="avail" id="subtab-avail">
+            <strong>Availability</strong><span id="subtab-avail-meta"></span>
+          </button>
+          <button type="button" class="cap-subtab" data-subtab="lineup" id="subtab-lineup">
+            <strong>Lineup</strong><span id="subtab-lineup-meta"></span>
+          </button>
+        </div>
+
         <div id="avail-panel" style="display:none;"></div>
 
         <div id="lineup-builder"></div>
@@ -1125,6 +1152,7 @@
       scoreDraft: {},    // typed-but-unsaved score values, keyed "slot|side" — re-applied after any re-render so typing is never lost
       pendingScoreRender: false, // a post-save re-render was deferred because the captain was mid-typing
       lastScoreSaveAt: 0, // ms timestamp of the last successful score PUT — shields against stale GET re-reads (blob store is eventually consistent)
+      activeSubtab: 'avail', // 'avail' | 'lineup' — which panel the match-detail sub-tabs show
     };
 
     const $id = (id) => document.getElementById(id);
@@ -1951,6 +1979,7 @@
       state.currentMatch = state.matches.find(m => m.id === matchId);
       if (!state.currentMatch) return;
       state.scoreDirty = false; // fresh match — no unsaved edits yet
+      state.activeSubtab = 'avail'; // always land on Availability first for a freshly opened match
       updateFloatingSave('clean');
 
       // View mode — the Scoresheet tab shows ONLY scoring; the lineup flow
@@ -2200,6 +2229,7 @@
         if (shortfall) {
           $id('lineup-actions').style.display = 'none';
           const ap = $id('avail-panel'); if (ap) { ap.style.display = 'none'; ap.innerHTML = ''; }
+          const bar0 = $id('match-subtabs'); if (bar0) bar0.style.display = 'none';
           const builder = $id('lineup-builder');
           builder.style.display = '';
           builder.innerHTML = renderLineupGate(shortfall);
@@ -2348,6 +2378,11 @@
           });
         });
       }
+
+      // Keep the sub-tab bar (visibility, active state, live counts) in sync —
+      // covers both the initial render from renderMatchDetail and every
+      // re-render this function does on its own after a select change.
+      applyMatchSubtabs();
     }
 
     function buildPlayerOptions(roster, slotType) {
@@ -3334,6 +3369,63 @@
       return s;
     }
     function availableRoster() { const out = availOutSet(); return activeRoster().filter(p => !out.has(p.id)); }
+
+    // ===== Availability / Lineup sub-tabs =====
+    // Splits the match-detail card into two switchable panels instead of one
+    // long stack — avail-panel and lineup-builder render exactly as before,
+    // this just toggles which one is visible so a captain doesn't have to
+    // scroll past a 7-player availability list to reach the game slots (or
+    // back up to nudge a sub after setting a lineup).
+    function availSubtabSummary() {
+      const roster = activeRoster().filter(p => !p.isSub);
+      const avail = state.lineupAvail || {};
+      const inCount = roster.filter(p => avail[p.id]?.status === 'in').length;
+      const outCount = roster.filter(p => avail[p.id]?.status === 'out').length;
+      return { inCount, outCount };
+    }
+    function lineupSubtabSummary() {
+      const filled = SLOT_KEYS.filter(k => state.lineupDraft[k]?.p1 && state.lineupDraft[k]?.p2).length;
+      return { filled, total: SLOT_KEYS.length };
+    }
+    function renderMatchSubtabMeta() {
+      const a = availSubtabSummary();
+      const l = lineupSubtabSummary();
+      const am = $id('subtab-avail-meta');
+      const lm = $id('subtab-lineup-meta');
+      if (am) am.textContent = `${a.inCount} in · ${a.outCount} out`;
+      if (lm) lm.textContent = `${l.filled} of ${l.total} set`;
+    }
+    // renderAvailPanel clears its own innerHTML whenever it's not relevant —
+    // locked, revealed, or no active roster (see its early return). That's the
+    // signal we mirror here, NOT style.display — display alone is ambiguous
+    // once this bar exists, since selecting the Lineup tab also sets avail-panel's
+    // display to 'none' while it's still perfectly relevant underneath.
+    function applyMatchSubtabs() {
+      const bar = $id('match-subtabs');
+      const availEl = $id('avail-panel');
+      const lineupEl = $id('lineup-builder');
+      if (!bar || !availEl || !lineupEl) return;
+      if (availEl.innerHTML.trim() === '') {
+        bar.style.display = 'none';
+        availEl.style.display = 'none';
+        lineupEl.style.display = '';
+        return;
+      }
+      bar.style.display = 'flex';
+      document.querySelectorAll('#match-subtabs .cap-subtab').forEach(b =>
+        b.classList.toggle('is-active', b.dataset.subtab === state.activeSubtab)
+      );
+      availEl.style.display = state.activeSubtab === 'avail' ? '' : 'none';
+      lineupEl.style.display = state.activeSubtab === 'lineup' ? '' : 'none';
+      renderMatchSubtabMeta();
+    }
+    document.querySelectorAll('#match-subtabs .cap-subtab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.activeSubtab = btn.dataset.subtab;
+        applyMatchSubtabs();
+      });
+    });
+
     function removePlayerFromDraft(playerId) {
       for (const k of Object.keys(state.lineupDraft || {})) {
         const g = state.lineupDraft[k]; if (!g) continue;

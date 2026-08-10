@@ -1,12 +1,22 @@
 // netlify/functions/admin-ladder-blast.js
-// POST /api/admin-ladder-blast  (admin session required) — marketing blast to every
-// past ladder participant (roster OR waitlist, across all ladders).
+// POST /api/admin-ladder-blast  (admin session required — never reachable by an
+// organizer session; there is no organizer-facing UI or endpoint that calls this)
+// — marketing blast to every past ladder participant (roster OR waitlist, across
+// all ladders).
 //
 // Body:
-//   { mode: 'recruit', eventId, neededCount? }  → "we need N more for <ladder>"
-//   { mode: 'open' }                            → "new ladders are open to register"
+//   { mode: 'recruit', eventId, neededCount?, confirmPrivate? }  → "we need N more for <ladder>"
+//   { mode: 'open' }                                             → "new ladders are open to register"
 //
 // Recruit excludes anyone already registered/waitlisted for that event.
+//
+// Recruit works for ANY event regardless of status (open/full/live/final) — an
+// admin can blast a past or in-progress ladder just as easily as an upcoming one.
+// A visibility:'private' (invite-only) ladder is normally excluded from broad
+// announcements, but admin can deliberately override that and blast it to the
+// whole league anyway by passing confirmPrivate:true — a conscious one-off choice,
+// not the default. Without that flag the request 409s so the UI can re-prompt with
+// an explicit "this is private, send anyway?" confirmation before retrying.
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { listEvents, getEvent, getSignups, eventStartMs, spotsLeft, effectiveCapacity } from './lib/ladder.js';
@@ -113,9 +123,19 @@ export default async (req) => {
     if (!b.eventId) return json({ error: 'eventId required for recruit' }, 400);
     const event = await getEvent(b.eventId);
     if (!event) return json({ error: 'Event not found' }, 404);
-    // A private/invite-only ladder can't be blasted to every past participant —
-    // that's the exact "everyone" exposure the organizer's toggle is for.
-    if (event.visibility === 'private') return json({ error: 'This ladder is private (invite-only) — it can\'t be blasted to the whole league. Ask the organizer to share the link directly.' }, 400);
+    // A private/invite-only ladder is normally excluded from a league-wide blast —
+    // that's the exact "everyone" exposure the visibility toggle is for. Admin can
+    // still choose to blast it anyway (e.g. an organizer's invite-only night the
+    // admin decides to throw open) by explicitly passing confirmPrivate:true; a
+    // fresh request without that flag stops here with a 409 so the UI can surface
+    // a distinct, explicit confirmation rather than sending silently.
+    if (event.visibility === 'private' && !b.confirmPrivate) {
+      return json({
+        error: 'private_confirm_required',
+        privateConfirmRequired: true,
+        message: 'This ladder is private (invite-only). Blasting it emails every past player in the league, not just people invited to it.',
+      }, 409);
+    }
     const signups = await getSignups(b.eventId);
     [...(signups.roster || []), ...(signups.waitlist || [])].forEach(p => { const e = normalizeEmail(p.email); if (e) exclude.add(e); });
     const open = spotsLeft(event, signups);
