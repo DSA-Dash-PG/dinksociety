@@ -24,6 +24,8 @@ export default async (req) => {
       spotsLeft: spotsLeft(e, s),
       pendingVenmo,
       pendingClaim: s.pendingClaim ? s.pendingClaim.name : null,
+      visibility: e.visibility || 'public',
+      leaderboard: e.leaderboard || 'included',
     };
   }));
 

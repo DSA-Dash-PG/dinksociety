@@ -183,6 +183,10 @@
 
       <div id="ladCreate" style="display:none">
         <div class="card">
+          <div class="frow"><label class="l">Visibility</label><div class="seg" id="seg-vis"><button class="on" data-v="public">🌐 Public</button><button data-v="private">🔒 Private (invite-only)</button></div></div>
+          <div class="help" style="margin:-2px 0 13px">Public shows on the site's Ladders page and signup flow. Private is invite-only — hidden from the public list, but a direct link (dinksociety.app/ladders.html?event=…) still works for anyone you send it to.</div>
+          <div class="frow"><label class="l">Leaderboard</label><div class="seg" id="seg-lb"><button class="on" data-v="included">On Dink Society leaderboard</button><button data-v="excluded">Own board only</button></div></div>
+          <div class="help" style="margin:-2px 0 13px">Own board only keeps this ladder's results on its own night page — they won't be aggregated into the season-wide Dink Society leaderboard.</div>
           <div class="frow"><label class="l">Name</label><input class="i" id="f-name" placeholder="Saturday Morning Ladder"></div>
           <div class="frow row2">
             <div><label class="l">Date</label><input class="i" id="f-date" type="date"></div>
@@ -325,6 +329,13 @@
   <!-- ===== LADDER INFO TAB ===== -->
   <div class="mpanel" id="mpanel-info">
   <div class="sec" style="margin:8px 0 8px">Ladder info</div>
+  <div class="frow"><label class="l">Visibility</label><div class="seg" id="mseg-vis"><button class="on" data-v="public">🌐 Public</button><button data-v="private">🔒 Private (invite-only)</button></div></div>
+  <div class="help" style="margin:-2px 0 13px">Public shows on the site's Ladders page and signup flow. Private is invite-only — hidden from the public list, but a direct link (dinksociety.app/ladders.html?event=…) still works for anyone you send it to.</div>
+  <div id="m-lb-wrap">
+    <div class="frow"><label class="l">Leaderboard</label><div class="seg" id="mseg-lb"><button class="on" data-v="included">On Dink Society leaderboard</button><button data-v="excluded">Own board only</button></div></div>
+    <div class="help" style="margin:-2px 0 13px">Own board only keeps this ladder's results on its own night page — they won't be aggregated into the season-wide Dink Society leaderboard.</div>
+  </div>
+  <div id="m-lb-pending" style="display:none;margin:-2px 0 13px"><span class="chip chip-gold">Awaiting approval</span> <span class="help" style="margin:0">This organizer's ladder is pending leaderboard approval — approve or keep it on its own board from the Organizers tab.</span></div>
   <div class="frow"><label class="l">Name</label><input class="i" id="m-name"></div>
   <div class="frow row2">
     <div><label class="l">Date</label><input class="i" id="m-date" type="date"></div>
@@ -827,12 +838,14 @@ async function loadList(){
   el.innerHTML=ls.map(l=>{
     const st=l.status==='final'?'chip-gray':l.status==='full'?'chip-red':'chip-lime';
     const pend=l.pendingVenmo?` · <span class="chip chip-gold">${l.pendingVenmo} Venmo pending</span>`:'';
+    const privChip=l.visibility==='private'?' <span class="chip chip-gray">🔒 Private</span>':'';
+    const lbChip=l.leaderboard==='excluded'?' <span class="chip chip-gray">Own board only</span>':(l.leaderboard==='pending'?' <span class="chip chip-gold">Awaiting</span>':'');
     const safeName=esc((l.name||'').replace(/'/g,''));
     const upcoming=['open','full'].includes(l.status||'open');
     const remindPill=upcoming?`<button class="btn btn-out btn-sm remind-pill" onclick="event.stopPropagation();openRowRemind(event,'${l.id}','${safeName}')">Remind</button>`:'';
     const recapBtn=l.status==='final'?`<button class="btn btn-out btn-sm" style="margin-left:6px" onclick="event.stopPropagation();openRecap('${l.id}','${safeName}')">Recap</button>`:'';
     return `<div class="lad lad-row" onclick="openManage('${l.id}')"><div><div class="nm">${esc(l.name)}</div><div class="mt">${esc(l.date||'')} ${esc(l.startTime||'')} · ${esc(l.place||'')} · ${fmt(l.feeCents)}</div></div>
-      <div class="ct">${l.rosterCount}/${l.capacity} · ${l.waitlistCount} waitlist${pend}<br><span class="chip ${st}">${esc(l.status||'open')}</span></div>
+      <div class="ct">${l.rosterCount}/${l.capacity} · ${l.waitlistCount} waitlist${pend}<br><span class="chip ${st}">${esc(l.status||'open')}</span>${privChip}${lbChip}</div>
       ${remindPill}${recapBtn}<span class="lad-chev">›</span></div>`;
   }).join('');
 }
@@ -857,6 +870,8 @@ async function createLadder(){
     spotOpenPolicy:seg('seg-spot'),
     cancelPolicy:seg('seg-cancel'),
     type:seg('seg-type'),
+    visibility:seg('seg-vis'),
+    leaderboard:seg('seg-lb'),
   };
   if(!body.name||!body.date){ msg('createMsg','err','Name and date are required.'); return; }
   const {status,d}=await api('/admin-ladder-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -882,6 +897,21 @@ async function openManage(id){
     if(el){ let hit=false; el.querySelectorAll('button').forEach(b=>{ const on=b.dataset.v.split(',').sort().join(',')===pm; b.classList.toggle('on',on); if(on)hit=true; });
       if(!hit) el.querySelector('button').classList.add('on'); } }
   setv('m-rounds',d.event.rounds||10); setv('m-roundmin',d.event.roundMin||12); setv('m-score',d.event.scoreMode||'points'); renderCourtNames('m-courtnames', d.event.courts, d.event.courtNames||[]);
+  // Visibility toggle (public/private) — always editable.
+  { const vis=d.event.visibility==='private'?'private':'public';
+    const el=document.getElementById('mseg-vis');
+    if(el) el.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===vis)); }
+  // Leaderboard toggle (included/excluded) — hidden in favor of a passive notice
+  // when an organizer's ladder is still 'pending' admin approval, so saving other
+  // fields here can never silently flip it out of that state (approve/deny for
+  // pending ladders lives on the Organizers tab). Admin-created ladders are never
+  // 'pending', so this only ever applies to organizer-submitted ladders.
+  { const lbv=d.event.leaderboard||'included';
+    const wrap=document.getElementById('m-lb-wrap'), pend=document.getElementById('m-lb-pending');
+    if(lbv==='pending'){ if(wrap)wrap.style.display='none'; if(pend)pend.style.display='block'; }
+    else { if(wrap)wrap.style.display=''; if(pend)pend.style.display='none';
+      const el=document.getElementById('mseg-lb');
+      if(el) el.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===(lbv==='excluded'?'excluded':'included'))); } }
   document.getElementById('mEditMsg').innerHTML='';
   _MROSTER=(d.roster||[]).slice(); _MWAIT=(d.waitlist||[]).slice(); _MCLAIM=d.pendingClaim||null;
   let h='<div class="rfbar">'
@@ -1075,7 +1105,13 @@ async function saveEdit(){
     paymentMethods:seg('mseg-pay').split(','), organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
     spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,
     fcfsWindowHours:CURRENT.fcfsWindowHours, status:CURRENT.status,
+    visibility:seg('mseg-vis'),
   };
+  // Only send leaderboard when the interactive toggle is actually showing — a
+  // 'pending' organizer ladder hides it (see openManage) so saving other fields
+  // here never silently flips it out of 'pending'; approve/deny still lives on
+  // the Organizers tab.
+  { const wrap=document.getElementById('m-lb-wrap'); if(wrap && wrap.style.display!=='none') body.leaderboard=seg('mseg-lb'); }
   if(!body.name||!body.date){ msg('mEditMsg','err','Name and date are required.'); return; }
   const {status,d}=await api('/admin-ladder-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(status===401){ msg('mEditMsg','err','Sign in as admin first.'); return; }
