@@ -3,6 +3,7 @@
 // Credits live in the ladder-credits store keyed by normalized email (lib/credits.js);
 // there was no way to view a player's balance from admin before this.
 //
+//   GET  (no params)                                   → { active:[{email,name,balanceCents,updatedAt}], count, totalCents }
 //   GET  ?email=<email>                                → { email, balanceCents, ledger }
 //   GET  ?q=<name-or-email>                            → { query, matches:[{name,email,balanceCents}] }
 //   POST { action:'grant',  email, cents, reason }     → issue credit (earn)
@@ -13,7 +14,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail } from './lib/identity.js';
-import { getCredit, earn, adjust, voidEntry, voidAll } from './lib/credits.js';
+import { getCredit, earn, adjust, voidEntry, voidAll, listAll } from './lib/credits.js';
 import { getDirectory } from './lib/player-directory.js';
 
 function json(b, s = 200) {
@@ -73,10 +74,25 @@ async function buildPeopleIndex() {
   return byEmail;
 }
 
+// Every player with a non-zero balance right now, with a display name where one
+// can be found (falls back to the email itself in the UI). This is the default
+// view for the admin Credits tab — no search required.
+async function listActivePeople() {
+  const all = await listAll();
+  const nonZero = all.filter((r) => r.balanceCents !== 0);
+  if (!nonZero.length) return { active: [], totalCents: 0 };
+  const index = await buildPeopleIndex();
+  const active = nonZero
+    .map((r) => ({ email: r.email, name: index.get(r.email) || '', balanceCents: r.balanceCents, updatedAt: r.updatedAt }))
+    .sort((a, b) => (b.balanceCents - a.balanceCents) || String(a.name || a.email).localeCompare(String(b.name || b.email)));
+  const totalCents = active.reduce((s, a) => s + a.balanceCents, 0);
+  return { active, totalCents };
+}
+
 // Name-or-email substring search → matches with live credit balances.
 async function searchPeople(query) {
   const q = String(query || '').trim().toLowerCase();
-  if (q.length < 2) return [];
+  if (!q) return [];
   const index = await buildPeopleIndex();
   const hits = [];
   for (const [email, name] of index) {
@@ -94,11 +110,18 @@ export default async (req) => {
 
   if (req.method === 'GET') {
     const q = url.searchParams.get('q');
+    const emailParam = url.searchParams.get('email');
+
+    if (!q && !emailParam) {
+      const { active, totalCents } = await listActivePeople();
+      return json({ active, count: active.length, totalCents });
+    }
+
     if (q != null && q !== '') {
       const matches = await searchPeople(q);
       return json({ query: q, matches });
     }
-    const email = normalizeEmail(url.searchParams.get('email') || '');
+    const email = normalizeEmail(emailParam || '');
     if (!email) return json({ error: 'A valid email is required.' }, 400);
     const rec = await getCredit(email);
     return json(annotate({ email, balanceCents: rec.balanceCents, ledger: rec.ledger, updatedAt: rec.updatedAt }));

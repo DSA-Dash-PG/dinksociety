@@ -235,13 +235,19 @@
 
     <section class="ssec" id="s-credits">
       <h1 style="margin:0 0 4px">Credits</h1>
-      <div class="sec">Look up a player's ladder credit</div>
+      <div class="sec">Active ladder credit</div>
       <div class="card">
-        <div style="font-size:.82rem;color:#9aa094;line-height:1.55;margin-bottom:10px">Ladder credit follows a player's email across every ladder. Search by <b>name or email</b> to see a balance and full history, issue a credit, or void credit (no refunds, credit only).</div>
+        <div style="font-size:.82rem;color:#9aa094;line-height:1.55;margin-bottom:10px">Ladder credit follows a player's email across every ladder (no refunds, credit only). Everyone with a balance right now is listed below — click a player to view their history, issue more credit, or void it.</div>
+        <div id="clActiveSummary" style="font-size:.78rem;color:#9aa094;margin-bottom:8px"></div>
+        <div id="clActiveList"><div class="empty">Loading…</div></div>
+      </div>
+      <div class="card" style="margin-top:14px">
+        <div class="sec" style="margin:0 0 8px">Look up a specific player</div>
+        <div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">For a player who isn't listed above (no balance right now, but you want to check history or issue a first credit).</div>
         <div class="row2"><input class="i" id="cl-email" placeholder="Name or email" onkeydown="if(event.key==='Enter')creditSearch()"><button class="btn btn-lime" onclick="creditSearch()" style="max-width:130px">Search</button></div>
         <div id="clMatches" style="margin-top:10px"></div>
-        <div id="clResult" style="margin-top:12px"></div>
       </div>
+      <div id="clResult" style="margin-top:12px"></div>
     </section>
 
     <section class="ssec" id="s-import">
@@ -462,7 +468,7 @@ async function checkPayCfg(){
 const SECS=[['dash','Dashboard'],['ladders','Ladders'],['players','Players'],['scoring','Scoring'],['xp','XP & rewards'],['credits','Credits'],['organizers','Organizers'],['import','Import'],['settings','Settings']];
 let CURSEC='dash';
 function renderNav(){ const n=document.getElementById('nav'); if(n) n.innerHTML=SECS.map(([k,l])=>`<div class="navi${k===CURSEC?' on':''}" onclick="showSec('${k}')">${l}</div>`).join(''); }
-function showSec(k){ CURSEC=k; document.querySelectorAll('.ssec').forEach(s=>s.classList.toggle('on',s.id==='s-'+k)); renderNav(); if(k==='dash') renderDash(); if(k==='ladders') ladSub('all'); if(k==='organizers') loadOrganizers(); closeDrawer(); window.scrollTo({top:0}); }
+function showSec(k){ CURSEC=k; document.querySelectorAll('.ssec').forEach(s=>s.classList.toggle('on',s.id==='s-'+k)); renderNav(); if(k==='dash') renderDash(); if(k==='ladders') ladSub('all'); if(k==='organizers') loadOrganizers(); if(k==='credits') loadActiveCredits(); closeDrawer(); window.scrollTo({top:0}); }
 
 // ── Organizers tab ──────────────────────────────────────────────
 function orgEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
@@ -611,6 +617,21 @@ loadXp();
 /* ---- Credit lookup / search ---- */
 const money=c=>'$'+((Number(c)||0)/100).toFixed(2);
 const CL_EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+function clPersonRow(m){
+  const bal=Number(m.balanceCents)||0;
+  return '<div onclick="creditShow(\''+esc(m.email)+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;margin-bottom:6px;border:1px solid #2a2a2a;border-radius:9px;cursor:pointer;background:#161616"><span style="flex:1;min-width:0"><span style="font-weight:700">'+esc(m.name||'—')+'</span><br><span style="font-size:.74rem;color:#9aa094">'+esc(m.email)+'</span></span><span style="font-weight:900;color:'+(bal>0?'#b8ff2c':'#ff7a5c')+'">'+money(bal)+'</span></div>';
+}
+async function loadActiveCredits(){
+  const L=document.getElementById('clActiveList'), S=document.getElementById('clActiveSummary');
+  if(!L)return;
+  L.innerHTML='<div class="empty">Loading…</div>'; S.innerHTML='';
+  const {status,d}=await api('/admin-ladder-credits');
+  if(status===401){ L.innerHTML='<div class="msg err">Sign in as admin first.</div>'; return; }
+  const active=(d&&d.active)||[];
+  if(!active.length){ L.innerHTML='<div class="empty">No players currently have ladder credit.</div>'; return; }
+  S.innerHTML=active.length+' player'+(active.length===1?'':'s')+' · '+money(d.totalCents||0)+' outstanding';
+  L.innerHTML=active.map(clPersonRow).join('');
+}
 async function creditSearch(){
   const q=(document.getElementById('cl-email').value||'').trim();
   const M=document.getElementById('clMatches'); const R=document.getElementById('clResult');
@@ -623,10 +644,7 @@ async function creditSearch(){
   const matches=(d&&d.matches)||[];
   if(!matches.length){ M.innerHTML='<div class="msg err">No players match “'+esc(q)+'”. Try a full email.</div>'; return; }
   if(matches.length===1){ M.innerHTML=''; return creditShow(matches[0].email); }
-  M.innerHTML='<div class="sec" style="margin:2px 0 6px">'+matches.length+' matches — pick one</div>'+matches.map(m=>{
-    const bal=Number(m.balanceCents)||0;
-    return '<div onclick="creditShow(\''+esc(m.email)+'\')" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;margin-bottom:6px;border:1px solid #2a2a2a;border-radius:9px;cursor:pointer;background:#161616"><span style="flex:1;min-width:0"><span style="font-weight:700">'+esc(m.name||'—')+'</span><br><span style="font-size:.74rem;color:#9aa094">'+esc(m.email)+'</span></span><span style="font-weight:900;color:'+(bal>0?'#b8ff2c':'#5e655a')+'">'+money(bal)+'</span></div>';
-  }).join('');
+  M.innerHTML='<div class="sec" style="margin:2px 0 6px">'+matches.length+' matches — pick one</div>'+matches.map(clPersonRow).join('');
 }
 // Back-compat alias (old callers / muscle memory)
 const creditLookup=creditSearch;
@@ -672,6 +690,7 @@ async function grantCredit(email){
   if(status===401){ M.innerHTML='<div class="msg err">Sign in as admin first.</div>'; return; }
   if(!d||!d.ok){ M.innerHTML='<div class="msg err">'+esc(d&&d.error||'Failed')+'</div>'; return; }
   renderCredit(d);
+  loadActiveCredits();
 }
 async function voidCreditEntry(email,id){
   if(!confirm('Void this credit entry? It will be reversed — the balance updates but the history is kept.')) return;
@@ -679,6 +698,7 @@ async function voidCreditEntry(email,id){
   if(status===401){ alert('Sign in as admin first.'); return; }
   if(!d||!d.ok){ alert((d&&d.error)||'Failed to void.'); return; }
   renderCredit(d);
+  loadActiveCredits();
 }
 async function voidCreditAll(email){
   if(!confirm('Void this player’s ENTIRE ladder credit balance? History is kept; the balance goes to $0.')) return;
@@ -686,6 +706,7 @@ async function voidCreditAll(email){
   if(status===401){ alert('Sign in as admin first.'); return; }
   if(!d||!d.ok){ alert((d&&d.error)||'Failed to void.'); return; }
   renderCredit(d);
+  loadActiveCredits();
 }
 
 /* ---- Players & duplicate merge ---- */

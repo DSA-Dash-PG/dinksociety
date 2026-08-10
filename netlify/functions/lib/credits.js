@@ -57,6 +57,18 @@ export async function getBalanceCents(email) {
 }
 
 /**
+ * List every credit record in the store (one per person who has ever earned,
+ * spent, or been adjusted). Used by admin tooling to show all balances without
+ * requiring a search — callers filter/sort as needed. Balances are recomputed
+ * from each ledger via normalizeCredit, so a stale cached balanceCents can't leak.
+ */
+export async function listAll() {
+  const { blobs } = await store().list({ prefix: 'credit/' });
+  const recs = await Promise.all(blobs.map((bl) => store().get(bl.key, { type: 'json' }).catch(() => null)));
+  return recs.filter(Boolean).map((r) => normalizeCredit(r.email, r));
+}
+
+/**
  * Append a ledger entry and recompute the balance. If `key` is given and an
  * entry with that key already exists, this is a no-op (idempotent) — so a retry
  * can't double-credit. Returns the updated record.
