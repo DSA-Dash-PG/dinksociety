@@ -157,6 +157,18 @@ export default async (req) => {
     entry.paymentStatus = 'paid';
     entry.paymentMethod = 'venmo';
     entry.heldUntil = null;
+    // Fixed-partner ladder: this one Venmo payment covers both spots — mirror
+    // the same status/method onto the linked partner entry, which never gets
+    // its own payment.
+    if (entry.partnerId) {
+      const partnerEntry = signups.roster.find(p => p.playerId === entry.partnerId);
+      if (partnerEntry) {
+        partnerEntry.paymentStatus = entry.paymentStatus;
+        partnerEntry.paymentMethod = entry.paymentMethod;
+        partnerEntry.heldUntil = entry.heldUntil;
+        partnerEntry.amountCents = 0;
+      }
+    }
     await setSignups(signups);
     let emailed = false;
     if (entry.email) {
@@ -181,6 +193,18 @@ export default async (req) => {
       entry.paymentStatus = 'pending';
       entry.heldUntil = null;
     }
+    // Fixed-partner ladder: one payment covers both spots — mirror whatever
+    // status/method this entry ended up with onto the linked partner entry,
+    // which never gets its own payment.
+    if (entry.partnerId) {
+      const partnerEntry = signups.roster.find(p => p.playerId === entry.partnerId);
+      if (partnerEntry) {
+        partnerEntry.paymentStatus = entry.paymentStatus;
+        partnerEntry.paymentMethod = entry.paymentMethod;
+        partnerEntry.heldUntil = entry.heldUntil;
+        partnerEntry.amountCents = entry.paymentStatus === 'paid' ? 0 : null;
+      }
+    }
     await setSignups(signups);
     // Marking paid sends the player the same "you're in" confirmation as Confirm.
     if (action === 'mark-paid' && entry.email) {
@@ -196,6 +220,17 @@ export default async (req) => {
     if (!PAY_METHODS.includes(body.method)) return json({ error: 'invalid method' }, 400);
     entry.paymentMethod = body.method;
     if (entry.paymentStatus !== 'paid') { entry.paymentStatus = 'paid'; entry.amountCents = entry.amountCents != null ? entry.amountCents : feeCents; entry.heldUntil = null; }
+    // Fixed-partner ladder: mirror the corrected method onto the linked
+    // partner entry too, so the pair's payment record stays consistent.
+    if (entry.partnerId) {
+      const partnerEntry = signups.roster.find(p => p.playerId === entry.partnerId);
+      if (partnerEntry) {
+        partnerEntry.paymentMethod = entry.paymentMethod;
+        partnerEntry.paymentStatus = entry.paymentStatus;
+        partnerEntry.heldUntil = entry.heldUntil;
+        partnerEntry.amountCents = 0;
+      }
+    }
     await setSignups(signups);
     return json({ ok: true, method: body.method, name: entry.name });
   }

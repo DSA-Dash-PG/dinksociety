@@ -30,6 +30,18 @@ export default async (req) => {
     entry.paymentStatus = 'paid';
     entry.paymentMethod = 'venmo';
     entry.heldUntil = null;
+    // Fixed-partner ladder: this one Venmo payment covers both spots — flip
+    // the linked partner entry to paid too (mirrors the card-webhook behavior;
+    // it never gets its own confirmation, so nothing else would unstick it).
+    if (entry.partnerId) {
+      const partnerEntry = signups.roster.find(p => p.playerId === entry.partnerId);
+      if (partnerEntry) {
+        partnerEntry.paymentStatus = entry.paymentStatus;
+        partnerEntry.paymentMethod = entry.paymentMethod;
+        partnerEntry.heldUntil = entry.heldUntil;
+        partnerEntry.amountCents = 0;
+      }
+    }
     await setSignups(signups);
     await sendEmail({
       to: entry.email,
