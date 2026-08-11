@@ -396,14 +396,15 @@
   })().catch(function () { /* settings not available, defaults stay */ });
 
   /* ── Register CTA visibility ──
-     Hide every "Register" / "Reserve my spot" CTA when no season is
-     accepting signups. public-seasons returns EVERY non-archived season
-     (including ones with registration closed — the register page itself
-     needs those to show a "closed" card), so we filter client-side for a
-     season whose `registration` is 'open' or 'paused' (still joinable —
-     only 'closed' hides the CTA). The buttons reappear automatically once
-     a season opens or unpauses. Fails open: if the request errors, CTAs
-     stay visible. */
+     Hide every "Register" / "Reserve my spot" CTA unless a season's
+     registration is actively 'open'. public-seasons returns EVERY
+     non-archived season (including closed/paused ones — the register page
+     itself needs those to show a "closed"/"paused" card), so we filter
+     client-side rather than trusting an empty list. Paused counts the same
+     as closed here — the CTA only appears while someone can actually
+     complete a signup right now. The button reappears automatically once a
+     season's registration flips back to 'open'. Fails open: if the request
+     errors, CTAs stay visible. */
   (function () {
     var REG_CTA_SEL = '.ds-nav-cta, .ds-nav-drawer-cta, [data-register-cta]';
     function setRegisterCTAs(show) {
@@ -419,7 +420,7 @@
       .then(function (data) {
         if (!data) return; // request failed → leave CTAs visible
         var hasOpen = Array.isArray(data.seasons) && data.seasons.some(function (s) {
-          return s.registration === 'open' || s.registration === 'paused';
+          return s.registration === 'open';
         });
         if (!hasOpen) setRegisterCTAs(false);
       })
