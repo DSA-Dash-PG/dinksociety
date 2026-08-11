@@ -155,10 +155,13 @@ export default async (req) => {
     if (isPair) {
       const pName = String(body.partner?.name || '').trim();
       if (!pName) return json({ error: "Enter your partner's name — this is a Fixed Partner ladder, so you register as a pair." }, 400);
+      const pEmail = String(body.partner?.email || '').trim().toLowerCase();
+      if (!pEmail) return json({ error: "Enter your partner's email." }, 400);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pEmail)) return json({ error: "Enter a valid email for your partner." }, 400);
       partner = {
         name: pName.slice(0, 80),
         gender: body.partner?.gender === 'F' ? 'F' : (body.partner?.gender === 'M' ? 'M' : null),
-        email: String(body.partner?.email || '').trim().toLowerCase(),
+        email: pEmail,
       };
       if (genderLock) {
         const err = genderErr(partner.gender, `your partner (${partner.name})`);

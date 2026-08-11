@@ -150,6 +150,12 @@
   .sheet{ background:var(--surf);border:1px solid rgba(255,255,255,.14);border-radius:18px 18px 0 0;width:100%;max-width:520px;max-height:86vh;overflow-y:auto;padding:18px 16px 26px;position:relative; }
   @media(min-width:560px){ .sheet{ border-radius:18px; } }
   .x{ position:absolute;top:13px;right:15px;background:none;border:0;color:var(--mut);font-size:1.4rem;cursor:pointer; }
+  .frow{ margin-bottom:12px; }
+  .frow .l{ display:block; font-size:.66rem; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--mut); margin-bottom:6px; }
+  .frow .i{ display:block; width:100%; box-sizing:border-box; background:var(--surf2); border:1px solid var(--bd); border-radius:10px; padding:12px 13px; font:inherit; font-size:.86rem; color:var(--tx); }
+  .frow .i::placeholder{ color:var(--fnt); }
+  .frow .i:focus{ outline:none; border-color:var(--lime); box-shadow:0 0 0 3px rgba(184,255,44,.14); }
+  .frow select.i{ appearance:none; -webkit-appearance:none; background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%239aa094'/></svg>"); background-repeat:no-repeat; background-position:right 14px center; padding-right:34px; }
   .payopt{ display:flex;align-items:center;gap:11px;padding:12px;border:1px solid rgba(255,255,255,.14);border-radius:12px;margin-bottom:9px;cursor:pointer; } .payopt:hover{ border-color:var(--lime); }
   .payic{ width:36px;height:36px;border-radius:10px;background:var(--surf2);display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:900; }
   .payt{ font-size:.84rem;font-weight:800; } .pays{ font-size:.64rem;color:var(--fnt); } .payamt{ margin-left:auto;font-weight:900; }
@@ -1044,7 +1050,7 @@ function extrasHtml(l){
     if(l.type!=='mens'&&l.type!=='womens'){
       h+=`<div class="frow" style="margin-bottom:8px"><label class="l">Partner's gender</label><select class="i" id="su-p-gender"><option value="">Select…</option><option value="M">Male</option><option value="F">Female</option></select></div>`;
     }
-    h+=`<div class="frow" style="margin-bottom:8px"><label class="l">Partner's email (optional)</label><input class="i" id="su-p-email" placeholder="so they get their own confirmation"></div>`;
+    h+=`<div class="frow"><label class="l">Partner's email</label><input class="i" id="su-p-email" type="email" placeholder="they'll get their own confirmation"></div>`;
     if(l.duprRated) h+=`<div class="frow" style="margin-bottom:14px"><label class="l">Partner's DUPR ID</label><input class="i" id="su-p-dupr" placeholder="e.g. XYZ5678"></div>`;
   }
   return h;
@@ -1063,7 +1069,10 @@ function collectSignupExtras(l){
     const gendered=(l.type==='mens'||l.type==='womens');
     const gender=gendered?(l.type==='mens'?'M':'F'):(document.getElementById('su-p-gender')?.value||'');
     if(!gendered && !gender) return {ok:false, err:"Select your partner's gender."};
-    const partner={name, gender, email:(document.getElementById('su-p-email')?.value||'').trim()};
+    const pEmail=(document.getElementById('su-p-email')?.value||'').trim();
+    if(!pEmail) return {ok:false, err:"Enter your partner's email."};
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pEmail)) return {ok:false, err:"Enter a valid email for your partner."};
+    const partner={name, gender, email:pEmail};
     if(l.duprRated){
       const pd=(document.getElementById('su-p-dupr')?.value||'').trim();
       if(!pd) return {ok:false, err:"Enter your partner's DUPR ID."};
