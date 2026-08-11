@@ -12,7 +12,7 @@ import Stripe from 'stripe';
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import {
   getEvent, getSignups, setSignups, findEntry, addSignup, spotsLeft,
-  cardTotalCents, surchargeCents,
+  cardTotalCents, surchargeCents, addPairSignup,
 } from './lib/ladder.js';
 import { siteUrl, dateLineOf, fmtCents } from './lib/ladder-notify.js';
 
@@ -47,23 +47,78 @@ export default async (req) => {
     return json({ error: 'Card payments are turned off for this ladder — pay by Venmo instead.' }, 400);
   }
 
+  const body = await req.json().catch(() => ({}));
+  const person = { playerId, name: player?.name || 'Player', email, gender: player?.gender || null };
+
+  // Gender-locked ladder + DUPR-rated + Fixed Partner all apply here too —
+  // this is the endpoint the live "Card / Apple Pay" button actually calls
+  // (it skips ladder-signup.js's POST entirely), so it needs its own copy of
+  // the same eligibility/partner/DUPR capture that endpoint does.
+  const genderLock = event.type === 'mens' ? 'M' : event.type === 'womens' ? 'F' : null;
+  const genderErr = (g, who) => {
+    const gg = String(g || '').trim().toUpperCase().charAt(0);
+    if (gg === genderLock) return null;
+    const label = genderLock === 'F' ? "women's" : "men's";
+    return gg
+      ? `This is a ${label}-only ladder, so ${who} isn't eligible.`
+      : `This is a ${label}-only ladder and ${who} doesn't have a gender set yet, so we can't confirm eligibility.`;
+  };
+  if (genderLock) {
+    const err = genderErr(person.gender, 'your registration');
+    if (err) return json({ error: err }, 403);
+  }
+  const isPair = event.format === 'fixed-partner';
+  let partner = null;
+  if (isPair) {
+    const pName = String(body.partner?.name || '').trim();
+    if (!pName) return json({ error: "Enter your partner's name — this is a Fixed Partner ladder, so you register as a pair." }, 400);
+    partner = {
+      name: pName.slice(0, 80),
+      gender: body.partner?.gender === 'F' ? 'F' : (body.partner?.gender === 'M' ? 'M' : null),
+      email: String(body.partner?.email || '').trim().toLowerCase(),
+    };
+    if (genderLock) {
+      const err = genderErr(partner.gender, `your partner (${partner.name})`);
+      if (err) return json({ error: err }, 403);
+    }
+  }
+  if (event.duprRated) {
+    const dId = String(body.duprId || '').trim();
+    if (!dId) return json({ error: 'Enter your DUPR ID — this is a DUPR-rated ladder.' }, 400);
+    person.duprId = dId.slice(0, 40);
+    if (isPair) {
+      const pd = String(body.partner?.duprId || '').trim();
+      if (!pd) return json({ error: "Enter your partner's DUPR ID — this is a DUPR-rated ladder." }, 400);
+      partner.duprId = pd.slice(0, 40);
+    }
+  }
+
   const signups = await getSignups(eventId);
 
-  // Ensure the player holds a roster spot (this endpoint can also be the entry
-  // point, not just a follow-up to ladder-signup). If full, no checkout.
+  // Ensure the player (and, for a Fixed Partner ladder, their linked partner)
+  // holds a roster spot — this endpoint can also be the entry point, not just
+  // a follow-up to ladder-signup. If full, no checkout.
   let existing = findEntry(signups, email);
-  if (!existing || existing.list === 'waitlist') {
+  let partnerEntry = null;
+  if (isPair) {
+    if (!existing) {
+      if (spotsLeft(event, signups) < 2) return json({ error: 'This ladder doesn\'t have 2 open spots for your pair — join the waitlist instead.' }, 409);
+      const res = addPairSignup(signups, event, person, partner);
+      partnerEntry = res.partnerEntry;
+    }
+  } else if (!existing || existing.list === 'waitlist') {
     if (spotsLeft(event, signups) <= 0) {
       return json({ error: 'This ladder is full — join the waitlist instead.' }, 409);
     }
     if (!existing) {
-      addSignup(signups, event, { playerId, name: player?.name || 'Player', email, gender: player?.gender || null });
+      addSignup(signups, event, person);
     }
   }
   const entry = signups.roster.find(p => p.email === email || p.playerId === playerId);
   if (!entry) return json({ error: 'Could not reserve a spot.' }, 409);
+  if (isPair && !partnerEntry) partnerEntry = signups.roster.find(p => p.playerId === entry.partnerId) || null;
 
-  const feeCents = Number(event.feeCents) || 0;
+  const feeCents = (Number(event.feeCents) || 0) * (isPair ? 2 : 1);
   const amountCents = cardTotalCents(feeCents);
 
   const stripe = new Stripe(stripeKey);
@@ -93,6 +148,7 @@ export default async (req) => {
   entry.paymentStatus = 'pending';
   entry.amountCents = amountCents;
   entry.checkoutSessionId = checkout.id;
+  if (partnerEntry) { partnerEntry.paymentMethod = 'card'; partnerEntry.paymentStatus = 'pending'; partnerEntry.amountCents = 0; partnerEntry.checkoutSessionId = checkout.id; }
   await setSignups(signups);
 
   return json({ checkoutUrl: checkout.url, amountCents, surchargeCents: surchargeCents(feeCents) });

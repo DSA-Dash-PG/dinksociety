@@ -74,6 +74,7 @@
   .mtabbar{ display:flex;gap:4px;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:4px;margin:0 0 18px; }
   .mtabbar button{ flex:1;padding:10px 6px;border:0;border-radius:8px;background:transparent;color:#9aa094;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap; }
   .mtabbar button.on{ background:var(--lime);color:#000; }
+  .mtabbar-fade{ display:none; } /* right-edge "more tabs" hint — mobile only, see @media below */
   .mpanel{ display:none; } .mpanel.on{ display:block; }
   /* row reminder popover + toast */
   .rowpop{ position:absolute;z-index:60;background:#0f120c;border:1px solid rgba(255,255,255,.14);border-radius:13px;padding:7px;min-width:230px;box-shadow:0 18px 50px rgba(0,0,0,.6);display:none; }
@@ -109,6 +110,17 @@
     .ov{ background:rgba(0,0,0,.6);align-items:center;padding:16px; }
     .sheet{ background:#161914;border:1px solid rgba(255,255,255,.14);border-radius:16px;max-width:560px;height:auto;max-height:88vh;padding:20px; }
     .x{ position:absolute;top:14px;right:16px;width:auto;height:auto;background:none;border:0;font-size:1.4rem; }
+    /* Fix A: the 4-tab .mtabbar can't fit "Ladder Scoring" in an equal flex:1
+       share on a ~350px sheet (flex:1 + white-space:nowrap, no min-width reset
+       — see the base rule above). Below 760px, let buttons keep their natural
+       width and scroll horizontally instead of squeezing/wrapping. */
+    .mtabbar{ overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none; }
+    .mtabbar::-webkit-scrollbar{ display:none; }
+    .mtabbar button{ flex:0 0 auto;min-width:max-content;padding:10px 16px; }
+    .mtabbar-wrap{ position:relative; }
+    .mtabbar-wrap .mtabbar{ margin:0 0 18px; }
+    .mtabbar-fade{ display:flex;position:absolute;top:4px;bottom:22px;right:4px;width:28px;background:linear-gradient(to right,transparent,#161914);pointer-events:none;border-radius:0 8px 8px 0;align-items:center;justify-content:flex-end; }
+    .mtabbar-fade svg{ width:12px;height:12px;color:#9aa094;margin-right:2px; }
   }
   /* Native <select> popups follow the OS light theme by default, which made the
      payment-method options unreadable on the dark admin UI. color-scheme tells
@@ -194,7 +206,13 @@
             <div><label class="l">End time</label><input class="i" id="f-end" placeholder="11:30 AM"></div>
           </div>
           <div class="frow"><label class="l">Division</label><div class="seg" id="seg-type"><button class="on" data-v="mixed">Mixed</button><button data-v="mens">Men's</button><button data-v="womens">Women's</button></div></div>
-          <div class="frow"><label class="l">Location</label><input class="i" id="f-place" placeholder="SBTC"></div>
+          <div class="frow"><label class="l">Format</label><div class="seg" id="seg-format"><button class="on" data-v="individual">Individual</button><button data-v="fixed-partner">Fixed Partner (pairs)</button></div></div>
+          <div class="help" style="margin:-2px 0 13px">Fixed Partner: one signup registers a locked pair — they stay teamed up the whole night, moving up/down courts together on wins/losses (no re-pairing each round).</div>
+          <div class="frow"><label class="l">Rating</label><div class="seg" id="seg-dupr"><button class="on" data-v="0">Non-DUPR</button><button data-v="1">DUPR-rated</button></div></div>
+          <div class="help" style="margin:-2px 0 13px">DUPR-rated asks each player for their DUPR ID at signup and reminds them to join the Dink Society DUPR club before the night.</div>
+          <div class="frow"><label class="l">Location name</label><input class="i" id="f-place" placeholder="SBTC"></div>
+          <div class="frow"><label class="l">Address</label><input class="i" id="f-address" placeholder="123 Main St, Charlotte, NC"></div>
+          <div class="help" style="margin:-2px 0 13px">Location name is what players see (kept short). Address powers the "get directions" map link — add it for accurate directions.</div>
           <div class="frow row2">
             <div><label class="l">Courts</label><input class="i" id="f-courts" type="number" value="3" oninput="recalc()"></div>
             <div><label class="l">Total players</label><input class="i" id="f-cap" type="number" value="12"></div>
@@ -295,11 +313,14 @@
   <h2 id="mTitle" style="font-size:1.25rem;margin:0 0 2px">Manage</h2>
   <div id="mMeta" style="font-size:.78rem;color:#9aa094;margin-bottom:12px"></div>
 
-  <div class="mtabbar">
-    <button id="mtab-info" onclick="mTab('info')">Ladder Info</button>
-    <button id="mtab-roster" class="on" onclick="mTab('roster')">Roster</button>
-    <button id="mtab-rem" onclick="mTab('rem')">Reminders</button>
-    <button id="mtab-score" onclick="mTab('score')">Ladder Scoring</button>
+  <div class="mtabbar-wrap">
+    <div class="mtabbar">
+      <button id="mtab-info" onclick="mTab('info')">Ladder Info</button>
+      <button id="mtab-roster" class="on" onclick="mTab('roster')">Roster</button>
+      <button id="mtab-rem" onclick="mTab('rem')">Reminders</button>
+      <button id="mtab-score" onclick="mTab('score')">Ladder Scoring</button>
+    </div>
+    <div class="mtabbar-fade"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 18l6-6-6-6"/></svg></div>
   </div>
 
   <!-- ===== ROSTER TAB ===== -->
@@ -331,6 +352,7 @@
   <div class="sec" style="margin:8px 0 8px">Ladder info</div>
   <div class="frow"><label class="l">Visibility</label><div class="seg" id="mseg-vis"><button class="on" data-v="public">🌐 Public</button><button data-v="private">🔒 Private (invite-only)</button></div></div>
   <div class="help" style="margin:-2px 0 13px">Public shows on the site's Ladders page and signup flow. Private is invite-only — hidden from the public list, but a direct link (dinksociety.app/ladders.html?event=…) still works for anyone you send it to.</div>
+  <div id="m-share-wrap" class="frow" style="display:none"><label class="l">Share this link with your group</label><input class="i" id="m-share-link" readonly onclick="this.select()"><button class="btn btn-out btn-sm" style="margin-top:8px" onclick="copyInviteLink(this)">Copy link</button></div>
   <div id="m-lb-wrap">
     <div class="frow"><label class="l">Leaderboard</label><div class="seg" id="mseg-lb"><button class="on" data-v="included">On Dink Society leaderboard</button><button data-v="excluded">Own board only</button></div></div>
     <div class="help" style="margin:-2px 0 13px">Own board only keeps this ladder's results on its own night page — they won't be aggregated into the season-wide Dink Society leaderboard.</div>
@@ -342,8 +364,13 @@
     <div><label class="l">Start time</label><input class="i" id="m-time"></div>
     <div><label class="l">End time</label><input class="i" id="m-end"></div>
   </div>
-  <div class="frow"><label class="l">Location</label><input class="i" id="m-place"></div>
+  <div class="frow"><label class="l">Location name</label><input class="i" id="m-place"></div>
+  <div class="frow"><label class="l">Address</label><input class="i" id="m-address" placeholder="123 Main St, Charlotte, NC"></div>
+  <div class="help" style="margin:-2px 0 13px">Location name is what players see (kept short). Address powers the "get directions" map link — add it for accurate directions.</div>
   <div class="frow"><label class="l">Division</label><select class="i" id="m-type"><option value="mixed">Mixed</option><option value="mens">Men's</option><option value="womens">Women's</option></select></div>
+  <div class="frow"><label class="l">Format</label><div class="seg" id="mseg-format"><button class="on" data-v="individual">Individual</button><button data-v="fixed-partner">Fixed Partner (pairs)</button></div></div>
+  <div class="help" style="margin:-2px 0 13px">Changing this after people have registered can leave the roster inconsistent with the round engine — safest to set before signups open.</div>
+  <div class="frow"><label class="l">Rating</label><div class="seg" id="mseg-dupr"><button class="on" data-v="0">Non-DUPR</button><button data-v="1">DUPR-rated</button></div></div>
   <div class="frow row2">
     <div><label class="l">Courts</label><input class="i" id="m-courts" type="number" oninput="renderCourtNames('m-courtnames', this.value)"></div>
     <div><label class="l">Total players</label><input class="i" id="m-cap" type="number"></div>
@@ -449,7 +476,9 @@ let CURRENT=null;
 const fmt=c=>'$'+((Number(c)||0)/100%1===0?(Number(c)||0)/100:((Number(c)||0)/100).toFixed(2));
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 function seg(id){ const el=document.getElementById(id); const b=el.querySelector('button.on'); return b?b.dataset.v:el.querySelector('button').dataset.v; }
-document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(e.target.tagName==='BUTTON'){ s.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===e.target)); } }));
+document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(e.target.tagName==='BUTTON'){ s.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===e.target)); if(s.id==='mseg-vis') updateShareBox(); } }));
+function copyInviteLink(btn){ const inp=btn.previousElementSibling; try{ navigator.clipboard.writeText(inp.value); btn.textContent='Copied ✓'; setTimeout(()=>btn.textContent='Copy link',2000); }catch(e){ inp.select(); } }
+function updateShareBox(){ const wrap=document.getElementById('m-share-wrap'); if(!wrap||!CURRENT) return; const isPriv=seg('mseg-vis')==='private'; wrap.style.display=isPriv?'':'none'; if(isPriv){ const inp=document.getElementById('m-share-link'); if(inp) inp.value=location.origin+'/ladders.html?event='+CURRENT.id; } }
 function defaultCourtName(i){ return String.fromCharCode(65+i); } // A, B, C…
 function renderCourtNames(containerId, count, values){
   const c=document.getElementById(containerId); if(!c) return;
@@ -840,12 +869,14 @@ async function loadList(){
     const pend=l.pendingVenmo?` · <span class="chip chip-gold">${l.pendingVenmo} Venmo pending</span>`:'';
     const privChip=l.visibility==='private'?' <span class="chip chip-gray">🔒 Private</span>':'';
     const lbChip=l.leaderboard==='excluded'?' <span class="chip chip-gray">Own board only</span>':(l.leaderboard==='pending'?' <span class="chip chip-gold">Awaiting</span>':'');
+    const fmtChip=l.format==='fixed-partner'?' <span class="chip chip-gray">👥 Fixed Partner</span>':'';
+    const duprChip=l.duprRated?' <span class="chip chip-gold">DUPR</span>':'';
     const safeName=esc((l.name||'').replace(/'/g,''));
     const upcoming=['open','full'].includes(l.status||'open');
     const remindPill=upcoming?`<button class="btn btn-out btn-sm remind-pill" onclick="event.stopPropagation();openRowRemind(event,'${l.id}','${safeName}')">Remind</button>`:'';
     const recapBtn=l.status==='final'?`<button class="btn btn-out btn-sm" style="margin-left:6px" onclick="event.stopPropagation();openRecap('${l.id}','${safeName}')">Recap</button>`:'';
     return `<div class="lad lad-row" onclick="openManage('${l.id}')"><div><div class="nm">${esc(l.name)}</div><div class="mt">${esc(l.date||'')} ${esc(l.startTime||'')} · ${esc(l.place||'')} · ${fmt(l.feeCents)}</div></div>
-      <div class="ct">${l.rosterCount}/${l.capacity} · ${l.waitlistCount} waitlist${pend}<br><span class="chip ${st}">${esc(l.status||'open')}</span>${privChip}${lbChip}</div>
+      <div class="ct">${l.rosterCount}/${l.capacity} · ${l.waitlistCount} waitlist${pend}<br><span class="chip ${st}">${esc(l.status||'open')}</span>${privChip}${lbChip}${fmtChip}${duprChip}</div>
       ${remindPill}${recapBtn}<span class="lad-chev">›</span></div>`;
   }).join('');
 }
@@ -857,6 +888,7 @@ async function createLadder(){
     startTime:document.getElementById('f-time').value.trim(),
     endTime:document.getElementById('f-end').value.trim(),
     place:document.getElementById('f-place').value.trim(),
+    address:document.getElementById('f-address').value.trim(),
     courts:parseInt(document.getElementById('f-courts').value)||0,
     courtNames:courtNamesOf('f-courtnames'),
     rounds:parseInt(document.getElementById('f-rounds').value)||10,
@@ -872,6 +904,8 @@ async function createLadder(){
     type:seg('seg-type'),
     visibility:seg('seg-vis'),
     leaderboard:seg('seg-lb'),
+    format:seg('seg-format'),
+    duprRated:seg('seg-dupr')==='1',
   };
   if(!body.name||!body.date){ msg('createMsg','err','Name and date are required.'); return; }
   const {status,d}=await api('/admin-ladder-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -889,7 +923,7 @@ async function openManage(id){
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
   { const st=(d.event.status||'open'); const SC={open:'var(--lime)',live:'var(--gold)',final:'var(--teal)',cancelled:'var(--red)'}; const el=document.getElementById('statusLine'); if(el){ el.textContent=st.charAt(0).toUpperCase()+st.slice(1); el.style.color=SC[st]||'#9aa094'; } }
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
-  setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-type',d.event.type||'mixed');
+  setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-address',d.event.address); setv('m-type',d.event.type||'mixed');
   setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
   // Reflect the ladder's payment methods in the edit segment (credit is implicit).
   { const pm=((d.event.paymentMethods&&d.event.paymentMethods.length?d.event.paymentMethods:['card','venmo']).filter(m=>m!=='credit').sort().join(','))||'card,venmo';
@@ -901,6 +935,14 @@ async function openManage(id){
   { const vis=d.event.visibility==='private'?'private':'public';
     const el=document.getElementById('mseg-vis');
     if(el) el.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===vis)); }
+  updateShareBox();
+  // Format (individual / fixed-partner) + DUPR rating toggles — always editable.
+  { const fmt=d.event.format==='fixed-partner'?'fixed-partner':'individual';
+    const el=document.getElementById('mseg-format');
+    if(el) el.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===fmt)); }
+  { const dv=d.event.duprRated?'1':'0';
+    const el=document.getElementById('mseg-dupr');
+    if(el) el.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===dv)); }
   // Leaderboard toggle (included/excluded) — hidden in favor of a passive notice
   // when an organizer's ladder is still 'pending' admin approval, so saving other
   // fields here can never silently flip it out of that state (approve/deny for
@@ -1099,13 +1141,15 @@ async function saveEdit(){
   const g=id=>document.getElementById(id).value;
   const body={
     id:CURRENT.id, circuit:CURRENT.circuit,
-    name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(),
+    name:g('m-name').trim(), date:g('m-date'), startTime:g('m-time').trim(), endTime:g('m-end').trim(), place:g('m-place').trim(), address:g('m-address').trim(),
     courts:parseInt(g('m-courts'))||0, courtNames:courtNamesOf('m-courtnames'), rounds:parseInt(g('m-rounds'))||10, roundMin:parseInt(g('m-roundmin'))||12, scoreMode:g('m-score'), capacity:parseInt(g('m-cap'))||0,
     feeCents:Math.round((parseFloat(g('m-fee'))||0)*100), venmoHandle:g('m-venmo').trim(), type:g('m-type'),
     paymentMethods:seg('mseg-pay').split(','), organizers:CURRENT.organizers, waitlist:CURRENT.waitlist,
     spotOpenPolicy:CURRENT.spotOpenPolicy, cancelPolicy:CURRENT.cancelPolicy,
     fcfsWindowHours:CURRENT.fcfsWindowHours, status:CURRENT.status,
     visibility:seg('mseg-vis'),
+    format:seg('mseg-format'),
+    duprRated:seg('mseg-dupr')==='1',
   };
   // Only send leaderboard when the interactive toggle is actually showing — a
   // 'pending' organizer ladder hides it (see openManage) so saving other fields
@@ -1335,7 +1379,9 @@ function renderRosterList(){
   const el=document.getElementById('rosterList'); if(!el) return;
   el.innerHTML= rows.length? rows.map((p,i)=>{
     const noEmail=p.email?'':'<span class="chip chip-gray" title="No email on file">no email</span>';
-    return `<div class="prow" style="position:relative"><span class="pn">${esc(p.name)}</span>${_statusChip(p)} ${noEmail}<button class="kebab" aria-label="Actions" onclick="toggleRowMenu(event,${i})">⋯</button>${_rosterMenu(p,i)}</div>`;
+    const partner=p.partnerId?(()=>{ const o=_MROSTER.find(x=>x.playerId===p.partnerId); return o?` <span class="chip chip-gray" title="Fixed partner">👥 w/ ${esc(o.name)}</span>`:''; })():'';
+    const duprChip=p.duprId?` <span class="chip chip-gold" title="DUPR ID">DUPR ${esc(p.duprId)}</span>`:'';
+    return `<div class="prow" style="position:relative"><span class="pn">${esc(p.name)}</span>${_statusChip(p)} ${noEmail}${partner}${duprChip}<button class="kebab" aria-label="Actions" onclick="toggleRowMenu(event,${i})">⋯</button>${_rosterMenu(p,i)}</div>`;
   }).join(''):'<div class="empty">No players match these filters.</div>';
 }
 function renderWaitList(){

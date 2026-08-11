@@ -2,7 +2,7 @@
 // POST /api/admin-ladder-save  (admin session required)
 // Create or update a ladder event. Pass `id` to update; omit to create.
 //
-// Body: { id?, circuit?, name, date, startTime?, place?, courts?, capacity?,
+// Body: { id?, circuit?, name, date, startTime?, place?, address?, courts?, capacity?,
 //         fee? | feeCents?, paymentMethods?, venmoHandle?, waitlist?,
 //         spotOpenPolicy?, cancelPolicy?, fcfsWindowHours?, organizers?, status? }
 
@@ -57,6 +57,7 @@ export default async (req) => {
     startTime: b.startTime || existing?.startTime || '',
     endTime: b.endTime || existing?.endTime || '',
     place: b.place || existing?.place || '',
+    address: b.address || existing?.address || '',
     courts,
     courtNames,
     rounds,
@@ -76,6 +77,13 @@ export default async (req) => {
     // events keep whatever they had on an edit that omits this field.
     cancelPolicy: ['auto_credit', 'credit_if_refilled', 'no_credit'].includes(b.cancelPolicy) ? b.cancelPolicy : (existing?.cancelPolicy || 'no_credit'),
     type: ['mixed', 'mens', 'womens'].includes(b.type) ? b.type : (existing?.type || 'mixed'),
+    // Format 'fixed-partner': signups register a locked pair that stays
+    // teamed up all night (see lib/ladder-scoring.js genR1Pairs/genNRPairs) —
+    // default 'individual' (the original per-round re-paired model).
+    format: ['individual', 'fixed-partner'].includes(b.format) ? b.format : (existing?.format || 'individual'),
+    // DUPR-rated ladders collect a DUPR ID at signup and prompt players to
+    // join the club (see ladder-signup.js / public/ladders.html signup UI).
+    duprRated: b.duprRated != null ? !!b.duprRated : !!existing?.duprRated,
     fcfsWindowHours: Number.isFinite(+b.fcfsWindowHours) ? +b.fcfsWindowHours : (existing?.fcfsWindowHours ?? 24),
     organizers: Array.isArray(b.organizers) ? b.organizers.filter(Boolean) : (existing?.organizers || []),
     // Ladder ownership (organizer portal). Admin-created ladders have no owner

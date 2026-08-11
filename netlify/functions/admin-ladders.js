@@ -26,6 +26,8 @@ export default async (req) => {
       pendingClaim: s.pendingClaim ? s.pendingClaim.name : null,
       visibility: e.visibility || 'public',
       leaderboard: e.leaderboard || 'included',
+      format: e.format || 'individual',
+      duprRated: !!e.duprRated,
     };
   }));
 

@@ -141,6 +141,70 @@ export function genNR(prev, nC, strength) {
   return res;
 }
 
+// ── Fixed Partner mode — a pair signs up locked together and never splits ──
+// (see admin-ladder-round.js / ladder-signup.js addPairSignup). Same win/lose
+// court-movement rule as genR1/genNR, just at PAIR granularity instead of
+// individual-player granularity — no makeCoed call at all, since who's on a
+// team is fixed at signup, not re-decided every round. `pairs` is
+// [{p1,p2}, ...] (each p1/p2 the usual {id,name,gender} player shape).
+
+// Round 1 for Fixed Partner: shuffle the pairs, then 2 pairs (4 players) per court.
+export function genR1Pairs(pairs, nC) {
+  const shuffled = shuffle(pairs);
+  const tC = Math.min(Math.floor(shuffled.length / 2), 2 * nC);
+  const courts = [];
+  for (let c = 0; c < tC; c++) {
+    const a = shuffled[c * 2], b = shuffled[c * 2 + 1];
+    courts.push({ court: c + 1, team1: [a?.p1 || null, a?.p2 || null], team2: [b?.p1 || null, b?.p2 || null], score: null });
+  }
+  const res = { courts, completed: false, totalCourts: tC };
+  if (tC > nC) res.wave2started = false;
+  return res;
+}
+
+// Next round for Fixed Partner: the WHOLE pair rises on a win / drops on a
+// loss (never split), same king/bottom-court rule as genNR.
+export function genNRPairs(prev, nC) {
+  const tC = prev.courts.length;
+  const mvs = []; // { pair:{p1,p2}, to }
+  prev.courts.forEach(c => {
+    const a = { p1: c.team1[0], p2: c.team1[1] }, b = { p1: c.team2[0], p2: c.team2[1] };
+    if (!c.score || !c.score.winner) { mvs.push({ pair: a, to: c.court }, { pair: b, to: c.court }); return; }
+    const win = c.score.winner === 'A' ? a : b, lose = c.score.winner === 'A' ? b : a;
+    mvs.push({ pair: win, to: Math.min(tC, c.court + 1) });
+    mvs.push({ pair: lose, to: Math.max(1, c.court - 1) });
+  });
+
+  const bk = {}; for (let i = 1; i <= tC; i++) bk[i] = [];
+  mvs.forEach(m => { if (bk[m.to]) bk[m.to].push(m.pair); });
+  for (let i = 1; i <= tC; i++) bk[i] = shuffle(bk[i]);
+
+  // Same overflow safety net as genNR, at 2-pairs-per-court instead of 4-players.
+  for (let i = 1; i <= tC; i++) {
+    while (bk[i].length > 2) {
+      const extra = bk[i].pop();
+      let target = null, best = Infinity;
+      for (let j = 1; j <= tC; j++) {
+        if (j === i || bk[j].length >= 2) continue;
+        const d = Math.abs(j - i);
+        if (d < best) { best = d; target = j; }
+      }
+      if (target == null) { bk[i].unshift(extra); break; }
+      bk[target].push(extra);
+    }
+  }
+
+  const courts = [];
+  for (let c = 0; c < tC; c++) {
+    const g = bk[c + 1] || [];
+    const a = g[0], b = g[1];
+    courts.push({ court: c + 1, team1: a ? [a.p1, a.p2] : [null, null], team2: b ? [b.p1, b.p2] : [null, null], score: null });
+  }
+  const res = { courts, completed: false, totalCourts: tC };
+  if (tC > nC) res.wave2started = false;
+  return res;
+}
+
 // Per-night bonus points for podium finishes (15/10/5), tie-broken by diff.
 export function calcBonusPts(sessions, players) {
   const bonus = {};

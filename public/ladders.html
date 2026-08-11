@@ -555,7 +555,7 @@ function ladToggle(id){ LEXP[id]=!LEXP[id]; renderAvail(); renderHomeWeek(); }
 function parseTimeJs(s){ if(!s)return null; s=String(s).trim().toLowerCase().replace(/\s+/g,''); let m=s.match(/^(\d{1,2})[:.](\d{2})(am|pm)?$/)||s.match(/^(\d{1,2})(\d{2})(am|pm)$/); if(!m){const m2=s.match(/^(\d{1,2})(am|pm)$/); if(m2)m=[m2[0],m2[1],'00',m2[2]];} if(!m){const m3=s.match(/^(\d{2})(\d{2})$/); if(m3&&+m3[1]<=23)m=[m3[0],m3[1],m3[2],undefined];} if(!m)return null; let h=parseInt(m[1],10),min=parseInt(m[2],10); const ap=m[3]; if(ap==='pm'&&h<12)h+=12; if(ap==='am'&&h===12)h=0; if(h>23||min>59)return null; return {h,m:min}; }
 function startMsOf(l){ if(!l||!l.date)return null; const t=parseTimeJs(l.startTime); if(!t&&l.startTime)return null; const d=new Date(l.date+'T00:00:00'); if(isNaN(d))return null; const tt=t||{h:0,m:0}; d.setHours(tt.h,tt.m,0,0); return d.getTime(); }
 function countdownLabel(ms){ if(ms==null)return''; if(ms<=0)return'LIVE NOW'; const m=Math.floor(ms/60000),h=Math.floor(m/60),d=Math.floor(h/24); if(d>=1)return d+' day'+(d>1?'s':'')+' '+(h%24)+' hr'+((h%24)!==1?'s':''); if(h>=1)return h+'h '+(m%60)+'m'; return m+' min'; }
-function ladMaps(l){ if(!l.place)return''; return `<a href="https://maps.google.com/?q=${encodeURIComponent(l.place)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:.66rem;font-weight:700;color:var(--teal);text-decoration:none;margin-top:4px;max-width:100%"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg><span style="border-bottom:1px dotted var(--teal);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.place)}</span><span style="flex-shrink:0">↗</span></a>`; }
+function ladMaps(l){ if(!l.place)return''; const q=l.address||l.place; return `<a href="https://maps.google.com/?q=${encodeURIComponent(q)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="display:inline-flex;align-items:center;gap:5px;font-size:.66rem;font-weight:700;color:var(--teal);text-decoration:none;margin-top:4px;max-width:100%"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="10" r="2.6"/></svg><span style="border-bottom:1px dotted var(--teal);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.place)}</span><span style="flex-shrink:0">↗</span></a>`; }
 function ladCourts(l,ac){ const names=(Array.isArray(l.courtNames)&&l.courtNames.length)?l.courtNames:(l.courtNumbers?String(l.courtNumbers).split('·').map(s=>s.trim()).filter(Boolean):[]); const n=l.courts||names.length; if(!n)return''; return `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px"><span style="font-size:.56rem;font-weight:800;letter-spacing:.09em;color:var(--mut)">${n} COURT${n===1?'':'S'}</span>${names.map(c=>`<span style="font-size:.66rem;font-weight:800;color:${ac};background:${hexA(ac,.10)};border:1px solid ${hexA(ac,.35)};border-radius:6px;padding:2px 8px">${esc(c)}</span>`).join('')}</div>`; }
 function ladCountdown(l,ac){ if(l.status==='live')return''; const start=startMsOf(l); if(!start)return''; const ms=start-Date.now(); if(ms<=0)return''; const soon=ms<3*3600*1000; return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:${hexA(ac,.12)};border-top:1px solid ${hexA(ac,.25)};border-bottom:1px solid ${hexA(ac,.25)}"><span style="font-size:.56rem;font-weight:800;letter-spacing:.11em;color:var(--mut)">STARTS IN</span><span data-cd="${start}" style="font-size:.84rem;font-weight:800;color:${ac};${soon?'animation:dspulse 1.2s infinite':''}">${countdownLabel(ms)}</span></div>`; }
 // Never show HOW someone paid — just the check (paid) or PENDING.
@@ -1027,34 +1027,81 @@ function renderProfile(p,inLeague){
 }
 
 /* ---- SIGN UP / PAY ---- */
+const DUPR_CLUB_URL='https://dashboard.dupr.com/dashboard/browse/clubs/5171426386';
 function curLadder(id){ return ACTIVE.find(l=>l.id===id); }
+// DUPR ID + Fixed-Partner fields, shown above the payment options when the
+// ladder needs them. Same block on both the "join waitlist" view and the
+// normal payment-options view (openSignup below).
+function extrasHtml(l){
+  let h='';
+  if(l.duprRated){
+    h+=`<div class="frow" style="margin-bottom:10px"><label class="l">Your DUPR ID</label><input class="i" id="su-dupr" placeholder="e.g. ABC1234"></div>`;
+    h+=`<div style="background:rgba(232,181,66,.1);border:1px solid rgba(232,181,66,.3);border-radius:9px;padding:10px 12px;margin-bottom:14px;font-size:.74rem;line-height:1.5">This is a <b>DUPR-rated</b> ladder — before your first night, join the <b>Dink Society - South Bay</b> club on DUPR so your matches get rated: <a href="${DUPR_CLUB_URL}" target="_blank" rel="noopener" style="color:var(--lime);font-weight:700">Join the club on DUPR →</a></div>`;
+  }
+  if(l.format==='fixed-partner'){
+    h+=`<div style="font-size:.7rem;color:#9aa094;font-weight:800;text-transform:uppercase;letter-spacing:.05em;margin:2px 0 8px">Your partner · you'll play together all night</div>`;
+    h+=`<div class="frow" style="margin-bottom:8px"><label class="l">Partner's full name</label><input class="i" id="su-p-name" placeholder="Full name"></div>`;
+    if(l.type!=='mens'&&l.type!=='womens'){
+      h+=`<div class="frow" style="margin-bottom:8px"><label class="l">Partner's gender</label><select class="i" id="su-p-gender"><option value="">Select…</option><option value="M">Male</option><option value="F">Female</option></select></div>`;
+    }
+    h+=`<div class="frow" style="margin-bottom:8px"><label class="l">Partner's email (optional)</label><input class="i" id="su-p-email" placeholder="so they get their own confirmation"></div>`;
+    if(l.duprRated) h+=`<div class="frow" style="margin-bottom:14px"><label class="l">Partner's DUPR ID</label><input class="i" id="su-p-dupr" placeholder="e.g. XYZ5678"></div>`;
+  }
+  return h;
+}
+// Reads + validates the extras above → {ok:true, body} or {ok:false, err}.
+function collectSignupExtras(l){
+  const body={};
+  if(l.duprRated){
+    const v=(document.getElementById('su-dupr')?.value||'').trim();
+    if(!v) return {ok:false, err:'Enter your DUPR ID.'};
+    body.duprId=v;
+  }
+  if(l.format==='fixed-partner'){
+    const name=(document.getElementById('su-p-name')?.value||'').trim();
+    if(!name) return {ok:false, err:"Enter your partner's name."};
+    const gendered=(l.type==='mens'||l.type==='womens');
+    const gender=gendered?(l.type==='mens'?'M':'F'):(document.getElementById('su-p-gender')?.value||'');
+    if(!gendered && !gender) return {ok:false, err:"Select your partner's gender."};
+    const partner={name, gender, email:(document.getElementById('su-p-email')?.value||'').trim()};
+    if(l.duprRated){
+      const pd=(document.getElementById('su-p-dupr')?.value||'').trim();
+      if(!pd) return {ok:false, err:"Enter your partner's DUPR ID."};
+      partner.duprId=pd;
+    }
+    body.partner=partner;
+  }
+  return {ok:true, body};
+}
 function openSignup(id){
   const l=curLadder(id); if(!l) return;
   document.getElementById('payTitle').textContent=(l.spotsLeft<=0?'Join waitlist · ':'Sign up · ')+l.name;
   document.getElementById('paySub').textContent=[wd(l.date),l.startTime,l.place].filter(Boolean).join(' · ');
   document.getElementById('payMsg').innerHTML='';
-  if(l.spotsLeft<=0){ document.getElementById('payBody').innerHTML='<button class="btn btn-out" onclick="joinWaitlist(\''+id+'\')">Join the waitlist</button><div class="pays" style="margin-top:8px;color:#9aa094">No charge now — we\'ll email you to pay &amp; claim when a spot opens.</div>'; document.getElementById('payOv').classList.add('on'); return; }
+  if(l.spotsLeft<=0){ document.getElementById('payBody').innerHTML=extrasHtml(l)+'<button class="btn btn-out" onclick="joinWaitlist(\''+id+'\')">Join the waitlist</button><div class="pays" style="margin-top:8px;color:#9aa094">No charge now — we\'ll email you to pay &amp; claim when a spot opens.</div>'; document.getElementById('payOv').classList.add('on'); return; }
   const methods=l.paymentMethods||['card','venmo'];
-  let h='';
+  let h=extrasHtml(l);
   if(methods.includes('free')){
-    h=`<button class="payopt" onclick="payFree('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎾</div><div><div class="payt">Join — it's free</div><div class="pays">No entry fee, no payment needed</div></div><div class="payamt" style="color:var(--lime)">Free</div></button>`;
+    h+=`<button class="payopt" onclick="payFree('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎾</div><div><div class="payt">Join — it's free</div><div class="pays">No entry fee, no payment needed</div></div><div class="payamt" style="color:var(--lime)">Free</div></button>`;
     document.getElementById('payBody').innerHTML=h;
     document.getElementById('payOv').classList.add('on');
     return;
   }
+  const pairFee=(l.feeCents||0)*(l.format==='fixed-partner'?2:1);
+  const pairNote=l.format==='fixed-partner'?' <span style="font-weight:600">(both of you)</span>':'';
   // Ladder credit only appears once a player actually has a balance (e.g. after a cancellation).
-  if(MYCREDIT>0) h+=`<button class="payopt" onclick="payCredit('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎟️</div><div><div class="payt">Use ladder credit</div><div class="pays">Balance ${fmt(MYCREDIT)}</div></div><div class="payamt" style="color:var(--lime)">${fmt(l.feeCents)}</div></button>`;
-  if(methods.includes('card')) h+=`<button class="payopt" onclick="payCard('${id}')"><div class="payic">💳</div><div><div class="payt">Card / Apple Pay</div><div class="pays">Instant · +10% fee</div></div><div class="payamt">${fmt(cardTotal(l.feeCents))}</div></button>`;
-  if(methods.includes('venmo')) h+=`<button class="payopt" onclick="payVenmo('${id}')"><div class="payic" style="background:rgba(74,163,224,.16);color:var(--blue)">V</div><div><div class="payt">Venmo</div><div class="pays">Fee-free · organizer confirms</div></div><div class="payamt">${fmt(l.feeCents)}</div></button>`;
+  if(MYCREDIT>0) h+=`<button class="payopt" onclick="payCredit('${id}')"><div class="payic" style="background:rgba(184,255,44,.14);color:var(--lime)">🎟️</div><div><div class="payt">Use ladder credit</div><div class="pays">Balance ${fmt(MYCREDIT)}${pairNote}</div></div><div class="payamt" style="color:var(--lime)">${fmt(pairFee)}</div></button>`;
+  if(methods.includes('card')) h+=`<button class="payopt" onclick="payCard('${id}')"><div class="payic">💳</div><div><div class="payt">Card / Apple Pay</div><div class="pays">Instant · +10% fee${pairNote}</div></div><div class="payamt">${fmt(cardTotal(pairFee))}</div></button>`;
+  if(methods.includes('venmo')) h+=`<button class="payopt" onclick="payVenmo('${id}')"><div class="payic" style="background:rgba(74,163,224,.16);color:var(--blue)">V</div><div><div class="payt">Venmo</div><div class="pays">Fee-free · organizer confirms${pairNote}</div></div><div class="payamt">${fmt(pairFee)}</div></button>`;
   document.getElementById('payBody').innerHTML=h;
   document.getElementById('payOv').classList.add('on');
 }
 function payMsg(c,t){ document.getElementById('payMsg').innerHTML=`<div class="msg ${c}">${t}</div>`; }
 function needSignIn(){ payMsg('warn',`One quick step first:<br><b>New here?</b> <a href="/me.html#register" style="color:var(--lime);font-weight:700">Create your free account</a> — 10 seconds, no team needed.<br><b>Been here before?</b> <a href="/me.html" style="color:var(--lime);font-weight:700">Sign in</a>.<br>Tap the link we email you, then come back and grab your spot.`); }
 async function post(path,body){ const r=await fetch(`${API}${path}`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return {status:r.status,d:await r.json().catch(()=>({}))}; }
-async function payFree(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'free'}); if(status===401)return needSignIn(); if(d.ok)return payMsg('ok',"You're in — no payment needed. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
-async function payCredit(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit'}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
-async function payCard(id){ const {status,d}=await post(`/ladder-checkout?event=${id}`,{}); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payMsg('err',d.error||'Could not start checkout.'); }
+async function payFree(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'free',...ex.body}); if(status===401)return needSignIn(); if(d.ok)return payMsg('ok',"You're in — no payment needed. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
+async function payCredit(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit',...ex.body}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
+async function payCard(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-checkout?event=${id}`,ex.body); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payMsg('err',d.error||'Could not start checkout.'); }
 // Venmo on iOS only opens from a REAL anchor tap — JS location.href gets
 // silently dropped. So: a plain <a> whose href is the venmo://paycharge deep
 // link (recipient + amount + note all prefilled) on phones, with a venmo.com/u
@@ -1069,8 +1116,8 @@ function venmoLinks(handle,amt,note){
   const fb=mobile?`<br><a href="${web}" target="_blank" rel="noopener" style="font-size:.66rem;color:var(--mut);text-decoration:underline">App didn't open? Venmo on the web</a>`:'';
   return btn+fb;
 }
-async function payVenmo(id){ const l=curLadder(id); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo'}); if(status===401)return needSignIn(); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const amt=((l.feeCents||0)/100).toFixed(2); payMsg('ok',`Spot held. Send <b>${fmt(l.feeCents)}</b> to <b>@${esc(handle)}</b> with note “<b>${esc(l.name)}</b>”.<br>${venmoLinks(handle,amt,l.name)}<br><span style="font-size:.7rem;color:var(--mut)">An organizer confirms and you'll get a "you're in" email.</span>`); return; } payMsg('err',d.error||'Something went wrong.'); }
-async function joinWaitlist(id){ const {status,d}=await post(`/ladder-signup?event=${id}`,{}); if(status===401)return needSignIn(); if(d.status==='waitlist'){ payMsg('ok',"You're on the waitlist — we'll email you the moment a spot opens."); } else payMsg('info',d.message||'Done.'); }
+async function payVenmo(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo',...ex.body}); if(status===401)return needSignIn(); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const totalCents=(l.feeCents||0)*(l.format==='fixed-partner'?2:1); const amt=(totalCents/100).toFixed(2); payMsg('ok',`Spot held. Send <b>${fmt(totalCents)}</b> to <b>@${esc(handle)}</b> with note “<b>${esc(l.name)}</b>”.<br>${venmoLinks(handle,amt,l.name)}<br><span style="font-size:.7rem;color:var(--mut)">An organizer confirms and you'll get a "you're in" email.</span>`); return; } payMsg('err',d.error||'Something went wrong.'); }
+async function joinWaitlist(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,ex.body); if(status===401)return needSignIn(); if(d.status==='waitlist'){ payMsg('ok',"You're on the waitlist — we'll email you the moment a spot opens."); } else payMsg('info',d.message||'Done.'); }
 
 init();
 </script>

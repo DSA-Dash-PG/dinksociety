@@ -59,7 +59,7 @@ function renderNewLadder({ name, event, left, cap, site }) {
     <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 18px">
       <div style="font-size:16px;font-weight:800">${esc(event.name)}</div>
       <div style="font-size:13px;color:#17d7b0;font-weight:700;margin-top:5px">${esc(dateLineOf(event))}</div>
-      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${esc(event.place || '')} · ${esc(courtsLabel(event))} · ${esc(divisionTitle(event.type))}</div>
+      <div style="font-size:12px;color:#8a8a8a;margin-top:7px">📍 ${event.place ? `<a href="https://maps.google.com/?q=${encodeURIComponent(event.address || event.place)}" style="color:#8a8a8a;text-decoration:underline">${esc(event.place)}</a>` : ''} · ${esc(courtsLabel(event))} · ${esc(divisionTitle(event.type))}</div>
     </div>
     ${ctaButton(`${site}/ladders.html?event=${encodeURIComponent(event.id)}`, 'Lock My Spot →')}
     ${inviteButton(event, site)}

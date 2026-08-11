@@ -72,6 +72,7 @@ export default async (req) => {
     startTime: b.startTime || existing?.startTime || '',
     endTime: b.endTime || existing?.endTime || '',
     place: b.place || existing?.place || '',
+    address: b.address || existing?.address || '',
     courts,
     courtNames,
     rounds,

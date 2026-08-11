@@ -231,6 +231,7 @@ export function addSignup(rec, event, person, now = Date.now()) {
       checkoutSessionId: person.checkoutSessionId || null,
       invitedBy: person.invitedBy || null,
       heldUntil: new Date(now + PAY_HOLD_MS).toISOString(),
+      duprId: person.duprId || null,
     });
     return { list: 'roster', position: rec.roster.length };
   }
@@ -242,8 +243,53 @@ export function addSignup(rec, event, person, now = Date.now()) {
     gender: person.gender || null,
     joinedAt: new Date(now).toISOString(),
     invitedBy: person.invitedBy || null,
+    duprId: person.duprId || null,
   });
   return { list: 'waitlist', position: rec.waitlist.length };
+}
+
+/**
+ * Add a locked PAIR to a signups record for a `format:'fixed-partner'` ladder
+ * (MUTATES + returns {list, entry, partnerEntry[, position]}). Both entries
+ * land on the roster together, or both go to the waitlist together — never
+ * split, so a pair is never half-seated. `partner` has no login of its own
+ * (registered by `registrant`), so it gets a synthetic playerId cross-linked
+ * via `.partnerId` on both entries. Caller persists and (for the roster case)
+ * still owns setting paymentMethod/paymentStatus/amountCents on `entry`
+ * (mirror onto `partnerEntry` too — see ladder-signup.js).
+ */
+export function addPairSignup(rec, event, registrant, partner, now = Date.now()) {
+  const partnerId = 'partner_' + Math.random().toString(36).slice(2, 10);
+  const iso = new Date(now).toISOString();
+  const base = (p, id, linkId) => ({
+    playerId: id, name: p.name || '', email: (p.email || '').toLowerCase(),
+    gender: p.gender || null, duprId: p.duprId || null, partnerId: linkId,
+    invitedBy: p.invitedBy || null,
+  });
+  if (spotsLeft(event, rec) >= 2) {
+    const rEntry = { ...base(registrant, registrant.playerId, partnerId), signedUpAt: iso, paymentMethod: null, paymentStatus: 'pending', amountCents: null, checkoutSessionId: null, heldUntil: new Date(now + PAY_HOLD_MS).toISOString() };
+    const pEntry = { ...base(partner, partnerId, registrant.playerId), signedUpAt: iso, paymentMethod: null, paymentStatus: 'pending', amountCents: null, checkoutSessionId: null, heldUntil: new Date(now + PAY_HOLD_MS).toISOString(), manual: true };
+    rec.roster.push(rEntry, pEntry);
+    return { list: 'roster', entry: rEntry, partnerEntry: pEntry };
+  }
+  const rEntry = { ...base(registrant, registrant.playerId, partnerId), joinedAt: iso };
+  const pEntry = { ...base(partner, partnerId, registrant.playerId), joinedAt: iso, manual: true };
+  rec.waitlist.push(rEntry, pEntry);
+  return { list: 'waitlist', entry: rEntry, partnerEntry: pEntry, position: rec.waitlist.length - 1 };
+}
+
+/**
+ * Remove a roster/waitlist entry's linked partner too (fixed-partner ladders
+ * only — a no-op `removed.partnerId` on an individual ladder). MUTATES.
+ * Returns the removed partner entry, or null.
+ */
+export function removeLinkedPartner(rec, removed) {
+  if (!removed?.partnerId) return null;
+  for (const list of [rec.roster, rec.waitlist]) {
+    const i = list.findIndex(p => p.playerId === removed.partnerId);
+    if (i >= 0) return list.splice(i, 1)[0];
+  }
+  return null;
 }
 
 /**

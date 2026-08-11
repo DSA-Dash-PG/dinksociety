@@ -21,7 +21,7 @@ import { unauthResponse } from './lib/auth.js';
 import { authScoreAccess } from './lib/ladder-scorer.js';
 import { getEvent, setEvent, getSignups, setSignups } from './lib/ladder.js';
 import { getPlay, setPlay, listPlay, toSession } from './lib/ladder-play.js';
-import { genR1, genNR, buildStrengthFn } from './lib/ladder-scoring.js';
+import { genR1, genNR, genR1Pairs, genNRPairs, buildStrengthFn } from './lib/ladder-scoring.js';
 import { findPlayerByEmail } from './lib/player-auth.js';
 
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
@@ -31,6 +31,42 @@ function participants(signups) {
   return (signups.roster || [])
     .filter(p => p.paymentStatus !== 'cancelled')
     .map(p => ({ id: p.playerId, name: p.name, gender: p.gender === 'F' ? 'F' : 'M' }));
+}
+
+// Fixed Partner: group the roster into locked pairs by .partnerId (set at
+// signup — see lib/ladder.js addPairSignup). A player whose partner cancelled
+// (no live match for their partnerId) is dropped — they can't play alone in
+// this format; the organizer re-pairs or removes them from the manage panel.
+function pairsFromRoster(signups) {
+  const live = (signups.roster || []).filter(p => p.paymentStatus !== 'cancelled');
+  const byId = {}; live.forEach(p => { byId[p.playerId] = p; });
+  const seen = new Set(), pairs = [];
+  live.forEach(p => {
+    if (seen.has(p.playerId)) return;
+    const partner = p.partnerId && byId[p.partnerId];
+    if (partner && !seen.has(partner.playerId)) {
+      seen.add(p.playerId); seen.add(partner.playerId);
+      pairs.push({
+        p1: { id: p.playerId, name: p.name, gender: p.gender === 'F' ? 'F' : 'M' },
+        p2: { id: partner.playerId, name: partner.name, gender: partner.gender === 'F' ? 'F' : 'M' },
+      });
+    } else {
+      seen.add(p.playerId);
+    }
+  });
+  return pairs;
+}
+
+// Reconstruct the pairs currently seated on a round's courts (team1/team2 ARE
+// the pairs already — used by 'reshuffle' to regenerate without re-fetching
+// the roster, so a mid-night sub/manual pairing survives a reshuffle).
+function pairsFromRound(round) {
+  const pairs = [];
+  (round.courts || []).forEach(c => {
+    if (c.team1[0] && c.team1[1]) pairs.push({ p1: c.team1[0], p2: c.team1[1] });
+    if (c.team2[0] && c.team2[1]) pairs.push({ p1: c.team2[0], p2: c.team2[1] });
+  });
+  return pairs;
 }
 
 async function strengthFor(eventId, players) {
@@ -78,13 +114,21 @@ export default async (req) => {
   }
 
   if (action === 'start') {
-    const players = participants(signups);
-    if (players.length < 4) return json({ error: 'Need at least 4 players on the roster to start.' }, 400);
+    const isPair = event.format === 'fixed-partner';
+    let r1;
+    if (isPair) {
+      const pairs = pairsFromRoster(signups);
+      if (pairs.length < 2) return json({ error: 'Need at least 2 paired-up teams on the roster to start.' }, 400);
+      r1 = genR1Pairs(pairs, event.courts || 1);
+    } else {
+      const players = participants(signups);
+      if (players.length < 4) return json({ error: 'Need at least 4 players on the roster to start.' }, 400);
+      const strength = await strengthFor(eventId, players);
+      r1 = genR1(players, event.courts || 1, strength);
+    }
     // Default the format from what was set at ladder creation (the merged form);
     // an explicit value in the start request still wins.
     const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || event.rounds || 10));
-    const strength = await strengthFor(eventId, players);
-    const r1 = genR1(players, event.courts || 1, strength);
     const roundMin = Math.max(1, Math.min(60, parseInt(body.roundMin) || event.roundMin || 12));
     const scoreMode = body.scoreMode || event.scoreMode || 'points';
     const courtNames = Array.isArray(event.courtNames) && event.courtNames.length ? event.courtNames : null;
@@ -103,10 +147,14 @@ export default async (req) => {
   }
 
   if (action === 'reshuffle') {
-    const all = [];
-    cur.courts.forEach(c => [...(c.team1 || []), ...(c.team2 || [])].filter(Boolean).forEach(p => all.push(p)));
-    const strength = await strengthFor(eventId, participants(signups));
-    play.rounds[play.currentRound] = genR1(all, play.config.courts, strength);
+    if (event.format === 'fixed-partner') {
+      play.rounds[play.currentRound] = genR1Pairs(pairsFromRound(cur), play.config.courts);
+    } else {
+      const all = [];
+      cur.courts.forEach(c => [...(c.team1 || []), ...(c.team2 || [])].filter(Boolean).forEach(p => all.push(p)));
+      const strength = await strengthFor(eventId, participants(signups));
+      play.rounds[play.currentRound] = genR1(all, play.config.courts, strength);
+    }
     await setPlay(eventId, play);
     return json({ ok: true, play });
   }
@@ -207,8 +255,12 @@ export default async (req) => {
     // organizers often keep playing past the planned count. Finishing is now
     // exclusively the deliberate 'finish' action ("End ladder early" / "Finish
     // ladder" button).
-    const strength = await strengthFor(eventId, participants(signups));
-    play.rounds.push(genNR(cur, play.config.courts, strength));
+    if (event.format === 'fixed-partner') {
+      play.rounds.push(genNRPairs(cur, play.config.courts));
+    } else {
+      const strength = await strengthFor(eventId, participants(signups));
+      play.rounds.push(genNR(cur, play.config.courts, strength));
+    }
     play.currentRound++;
     await setPlay(eventId, play);
     return json({ ok: true, play });

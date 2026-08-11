@@ -16,6 +16,7 @@ import {
   getEvent, getSignups, setSignups, toPublicSignups,
   addSignup, removeFromRoster, promoteHead, moveWaitlistToRoster,
   findEntry, spotsLeft, cardTotalCents, HOLD_MS,
+  addPairSignup, removeLinkedPartner,
 } from './lib/ladder.js';
 import { earn, spend } from './lib/credits.js';
 import { createLadderToken } from './lib/ladder-token.js';
@@ -69,9 +70,18 @@ export default async (req) => {
     if (!removed) {
       // maybe they're only on the waitlist — drop them there
       const i = signups.waitlist.findIndex(p => p.playerId === playerId || normalizeEmail(p.email) === normalizeEmail(email));
-      if (i >= 0) { signups.waitlist.splice(i, 1); await setSignups(signups); return json({ ok: true, was: 'waitlist' }); }
+      if (i >= 0) {
+        const removedWait = signups.waitlist.splice(i, 1)[0];
+        removeLinkedPartner(signups, removedWait); // no-op if not a pair
+        await setSignups(signups);
+        return json({ ok: true, was: 'waitlist' });
+      }
       return json({ error: 'You are not signed up for this ladder.' }, 409);
     }
+    // Fixed-partner ladder: cancelling drops your linked partner's spot too —
+    // a pair is never left half-seated. No waitlist promotion for the freed
+    // pair-spot in this pass (see admin manage panel to backfill manually).
+    removeLinkedPartner(signups, removed);
 
     // credit policy: 'auto_credit' issues credit on any cancel; 'credit_if_refilled'
     // defers until a backfiller pays (handled at confirm time — TODO); 'no_credit' none.
@@ -87,7 +97,10 @@ export default async (req) => {
 
     // open spot → promote next in line. Inside 24h it's first-come-first-serve:
     // leave the spot open and blast the whole waitlist instead of holding it.
-    const next = promoteHead(signups, event);
+    // Fixed-partner ladders skip auto-promotion — promoteHead only ever moves
+    // ONE waitlist entry, which would seat half a pair; the organizer promotes
+    // pairs manually from the manage panel instead.
+    const next = event.format === 'fixed-partner' ? null : promoteHead(signups, event);
     await setSignups(signups);
     let opened = null;
     if (next && next.fcfs) { await notifyFcfs(event, signups); opened = 'fcfs'; }
@@ -110,14 +123,17 @@ export default async (req) => {
     // waitlist joins. A player with no gender set is blocked (strict) — the
     // organizer can still add them manually from the manage panel.
     const genderLock = event.type === 'mens' ? 'M' : event.type === 'womens' ? 'F' : null;
+    const genderErr = (g, who) => {
+      const gg = String(g || '').trim().toUpperCase().charAt(0);
+      if (gg === genderLock) return null;
+      const label = genderLock === 'F' ? "women's" : "men's";
+      return gg
+        ? `This is a ${label}-only ladder, so ${who} isn't eligible.`
+        : `This is a ${label}-only ladder and ${who} doesn't have a gender set yet, so we can't confirm eligibility. Ask the organizer to add ${who === 'your registration' ? 'you' : 'them'} manually instead.`;
+    };
     if (genderLock) {
-      const g = String(person.gender || '').trim().toUpperCase().charAt(0);
-      if (g !== genderLock) {
-        const who = genderLock === 'F' ? "women's" : "men's";
-        return json({ error: g
-          ? `This is a ${who}-only ladder, so it isn't open for your registration.`
-          : `This is a ${who}-only ladder and your player profile doesn't have a gender set yet, so we can't confirm you're eligible. Ask the organizer to add you, or have your gender set on your profile first.` }, 403);
-      }
+      const err = genderErr(person.gender, 'your registration');
+      if (err) return json({ error: err }, 403);
     }
 
     const body = await req.json().catch(() => ({}));
@@ -131,15 +147,55 @@ export default async (req) => {
     }
     if (body.invitedBy) person.invitedBy = String(body.invitedBy).slice(0, 80);
 
+    // Fixed Partner: one signup registers a locked pair — validate the
+    // partner's info up front (name always; gender if this is a gender-locked
+    // division; DUPR ID if this is a DUPR-rated ladder).
+    const isPair = event.format === 'fixed-partner';
+    let partner = null;
+    if (isPair) {
+      const pName = String(body.partner?.name || '').trim();
+      if (!pName) return json({ error: "Enter your partner's name — this is a Fixed Partner ladder, so you register as a pair." }, 400);
+      partner = {
+        name: pName.slice(0, 80),
+        gender: body.partner?.gender === 'F' ? 'F' : (body.partner?.gender === 'M' ? 'M' : null),
+        email: String(body.partner?.email || '').trim().toLowerCase(),
+      };
+      if (genderLock) {
+        const err = genderErr(partner.gender, `your partner (${partner.name})`);
+        if (err) return json({ error: err }, 403);
+      }
+    }
+    if (event.duprRated) {
+      const dId = String(body.duprId || '').trim();
+      if (!dId) return json({ error: 'Enter your DUPR ID — this is a DUPR-rated ladder.' }, 400);
+      person.duprId = dId.slice(0, 40);
+      if (isPair) {
+        const pd = String(body.partner?.duprId || '').trim();
+        if (!pd) return json({ error: "Enter your partner's DUPR ID — this is a DUPR-rated ladder." }, 400);
+        partner.duprId = pd.slice(0, 40);
+      }
+    }
+
     // Already in (roster/pending)? nothing to do. On the waitlist? Grab the open
     // spot if one's available (the first-come-first-serve case), else stay put.
+    // Fixed-partner ladders keep both entries of a pair moving together —
+    // addPairSignup below is the atomic add; re-submitting while already
+    // signed up (either list) is just reported back, no waitlist->roster
+    // auto-grab for pairs (see the promoteHead note in the cancel handler above).
     const existing = findEntry(signups, email);
-    let entry;
-    if (existing && existing.list !== 'waitlist') {
+    let entry, partnerEntry = null;
+    if (existing) {
       await setSignups(signups);
-      return json({ ok: true, status: existing.list, message: "You're already on this ladder." });
+      return json({ ok: true, status: existing.list, message: existing.list === 'waitlist' ? "You're on the waitlist." : "You're already on this ladder." });
     }
-    if (existing && existing.list === 'waitlist') {
+    if (isPair) {
+      const res = addPairSignup(signups, event, person, partner);
+      entry = res.entry; partnerEntry = res.partnerEntry;
+      if (res.list === 'waitlist') {
+        await setSignups(signups);
+        return json({ ok: true, status: 'waitlist', position: res.position });
+      }
+    } else if (existing && existing.list === 'waitlist') {
       if (spotsLeft(event, signups) <= 0) {
         await setSignups(signups);
         return json({ ok: true, status: 'waitlist', message: "You're on the waitlist." });
@@ -153,22 +209,29 @@ export default async (req) => {
       }
       entry = signups.roster[signups.roster.length - 1];
     }
-    const feeCents = Number(event.feeCents) || 0;
+    // A pair pays once for both spots — the registrant is charged double,
+    // the linked partner entry always shows amountCents:0 (see mirrorPay).
+    const feeCents = (Number(event.feeCents) || 0) * (isPair ? 2 : 1);
+    const mirrorPay = () => { if (partnerEntry) { partnerEntry.paymentMethod = entry.paymentMethod; partnerEntry.paymentStatus = entry.paymentStatus; partnerEntry.amountCents = 0; partnerEntry.heldUntil = entry.heldUntil; } };
+    // Confirmation emails read better addressed to the pair, not just the registrant.
+    const displayName = isPair ? `${person.name} & ${partner.name}` : person.name;
 
     if (method === 'credit') {
       try {
         await spend(email, feeCents, `Entry · ${event.name}`, { eventId, key: `pay:${eventId}:${normalizeEmail(email)}` });
       } catch {
-        // not enough credit — undo the roster add and tell them
+        // not enough credit — undo the roster add (and linked partner) and tell them
         removeFromRoster(signups, { playerId, email });
+        if (partnerEntry) removeLinkedPartner(signups, entry);
         await setSignups(signups);
         return json({ error: 'Not enough ladder credit.' }, 402);
       }
       entry.paymentMethod = 'credit'; entry.paymentStatus = 'paid'; entry.amountCents = 0; entry.heldUntil = null;
+      mirrorPay();
       await setSignups(signups);
-      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: person.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
+      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: displayName, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
       const cOrgs = organizerEmails(event);
-      await Promise.allSettled(cOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup — paid</h2><p style="margin:0 0 4px"><b>${person.name}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Paid by ladder credit${email ? ' · ' + email : ''}</p></div>` })));
+      await Promise.allSettled(cOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup — paid</h2><p style="margin:0 0 4px"><b>${displayName}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Paid by ladder credit${email ? ' · ' + email : ''}</p></div>` })));
       return json({ ok: true, status: 'in', paid: 'credit' });
     }
 
@@ -177,15 +240,17 @@ export default async (req) => {
       // signup. Organizer still gets a heads-up email (informational — nothing
       // to confirm or claim, unlike the Venmo path).
       entry.paymentMethod = 'free'; entry.paymentStatus = 'paid'; entry.amountCents = 0; entry.heldUntil = null;
+      mirrorPay();
       await setSignups(signups);
-      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: person.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
+      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: displayName, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
       const fOrgs = organizerEmails(event);
-      await Promise.allSettled(fOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup</h2><p style="margin:0 0 4px"><b>${person.name}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Free ladder — no payment to collect${email ? ' · ' + email : ''}</p></div>` })));
+      await Promise.allSettled(fOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup</h2><p style="margin:0 0 4px"><b>${displayName}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Free ladder — no payment to collect${email ? ' · ' + email : ''}</p></div>` })));
       return json({ ok: true, status: 'in', paid: 'free' });
     }
 
     if (method === 'venmo') {
       entry.paymentMethod = 'venmo'; entry.paymentStatus = 'venmo_pending'; entry.amountCents = feeCents;
+      mirrorPay();
       await setSignups(signups);
       // email the organizer(s) a one-tap confirm/decline
       const note = `${event.name} — ${person.name.split(' ')[0]}`;
@@ -194,7 +259,7 @@ export default async (req) => {
       const orgs = organizerEmails(event);
       if (!orgs.length) console.warn(`[ladder-signup] Venmo claim for ${event.name} (${eventId}) has NO organizer recipient — set organizers on the ladder or LADDER_ORGANIZER_EMAILS/EMAIL_ADMIN_BCC. Admin can still confirm in the manage panel.`);
       const html = renderVenmoClaimToAdmin({
-        playerName: person.name, amountLabel: fmtCents(feeCents), eventName: event.name, note,
+        playerName: displayName, amountLabel: fmtCents(feeCents), eventName: event.name, note,
         confirmUrl: venmoConfirmUrl(confirmTok), declineUrl: venmoDeclineUrl(declineTok),
       });
       await Promise.allSettled(orgs.map(to => sendEmail({ to, subject: `Venmo claim: ${person.name.split(' ')[0]} · ${fmtCents(feeCents)} · ${event.name}`, html })));
@@ -204,7 +269,12 @@ export default async (req) => {
     if (method === 'card') {
       // Stripe Checkout (entry + 10% surcharge) is handled by ladder-checkout.js
       // [[ladder-checkout]] — reuses the register-checkout/stripe-webhook pattern.
+      // NOTE: the live front-end's "Card / Apple Pay" button actually calls
+      // ladder-checkout.js DIRECTLY (skipping this POST) — ladder-checkout.js
+      // has its own copy of the partner/DUPR capture + pair-signup logic so
+      // that path works too. This branch stays correct for any other caller.
       entry.paymentMethod = 'card'; entry.paymentStatus = 'pending'; entry.amountCents = cardTotalCents(feeCents);
+      mirrorPay();
       await setSignups(signups);
       return json({ ok: true, status: 'roster', next: 'checkout', amountCents: cardTotalCents(feeCents), checkoutUrl: `/.netlify/functions/ladder-checkout?event=${encodeURIComponent(eventId)}` });
     }
@@ -242,6 +312,7 @@ function publicEvent(e) {
     courts: e.courts, capacity: e.capacity, feeCents: e.feeCents,
     paymentMethods: e.paymentMethods || ['card', 'venmo'], venmoHandle: e.venmoHandle || null,
     status: e.status || 'open',
+    format: e.format || 'individual', duprRated: !!e.duprRated,
   };
 }
 

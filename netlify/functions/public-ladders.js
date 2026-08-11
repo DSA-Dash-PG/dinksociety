@@ -16,10 +16,11 @@ import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js
 function pub(e, s) {
   const p = toPublicSignups(e, s);
   return {
-    id: e.id, name: e.name, date: e.date, startTime: e.startTime, endTime: e.endTime, place: e.place,
+    id: e.id, name: e.name, date: e.date, startTime: e.startTime, endTime: e.endTime, place: e.place, address: e.address || null,
     courts: e.courts, courtNames: e.courtNames || [], courtNumbers: e.courtNumbers || null,
     type: e.type || 'mixed', feeCents: e.feeCents, status: e.status || 'open',
     cancelPolicy: e.cancelPolicy || 'auto_credit',
+    format: e.format || 'individual', duprRated: !!e.duprRated,
     capacity: effectiveCapacity(e), spotsLeft: p.spotsLeft,
     rosterCount: p.rosterCount, waitlistCount: p.waitlistCount,
     paymentMethods: e.paymentMethods || ['card', 'venmo'],

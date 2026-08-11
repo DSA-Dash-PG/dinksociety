@@ -190,7 +190,7 @@ export function renderReminderEmail({ event, kind, recipient, profile, roster, p
     <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:15px 18px;margin:0 0 18px">
       <div style="font-size:16px;font-weight:800">${esc(event.name)}</div>
       <div style="font-size:13px;color:#cfcfcf;margin-top:5px"><b style="color:#17d7b0">${esc(dateLine)}</b></div>
-      <div style="font-size:12px;color:#8a8a8a;margin-top:7px;padding-top:8px;border-top:1px solid #2a2a2a">📍 ${esc(event.place || '')} · ${courts} · ${capacity} players · ${esc(event.type || 'mixed')}</div>
+      <div style="font-size:12px;color:#8a8a8a;margin-top:7px;padding-top:8px;border-top:1px solid #2a2a2a">📍 ${event.place ? `<a href="https://maps.google.com/?q=${encodeURIComponent(event.address || event.place)}" style="color:#8a8a8a;text-decoration:underline">${esc(event.place)}</a>` : ''} · ${courts} · ${capacity} players · ${esc(event.type || 'mixed')}</div>
     </div>
 
     ${strip}${hype}

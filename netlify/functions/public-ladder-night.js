@@ -59,7 +59,7 @@ export default async (req) => {
     const safeEvent = {
       id: event.id, name: event.name || 'Ladder',
       date: event.date || null, startTime: event.startTime || null, endTime: event.endTime || null,
-      place: event.place || null, courts: event.courts || null,
+      place: event.place || null, address: event.address || null, courts: event.courts || null,
       courtNames: event.courtNames || null, type: event.type || 'mixed',
       status, scoreMode: event.scoreMode || 'points', roundMin: event.roundMin || null,
     };

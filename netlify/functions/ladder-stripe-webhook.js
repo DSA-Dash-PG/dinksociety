@@ -72,6 +72,16 @@ export default async (req) => {
         entry.amountCents = cs.amount_total ?? entry.amountCents ?? null;
         entry.checkoutSessionId = cs.id;
         entry.heldUntil = null;
+        // Fixed-partner ladder: the registrant's checkout covers both spots —
+        // flip the linked partner entry to paid too (it never gets its own
+        // Stripe session/webhook, so nothing else would ever unstick it).
+        if (entry.partnerId) {
+          const partnerEntry = signups.roster.find(p => p.playerId === entry.partnerId);
+          if (partnerEntry && partnerEntry.paymentStatus !== 'paid') {
+            partnerEntry.paymentStatus = 'paid'; partnerEntry.paymentMethod = 'card';
+            partnerEntry.amountCents = 0; partnerEntry.checkoutSessionId = cs.id; partnerEntry.heldUntil = null;
+          }
+        }
         await setSignups(signups);
 
         if (entry.email) {
