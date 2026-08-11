@@ -829,9 +829,14 @@ function buildWeeklyTopPerformers(weekly, weekMeta = {}) {
 
 // Weekly season-to-date DSR snapshots. Returns:
 //   deltas  — rank movement vs the prior week, { pid: delta|null } (+ = moved up)
-//   history — Map(pid → [{ week, dsr, rank, gDsr, gRank, xDsr, xRank }])
+//   history — Map(pid → [{ week, dsr, rank, rankProv, gDsr, gRank, gRankProv,
+//                          xDsr, xRank, xRankProv }])
 //             end-of-week cumulative DSR + rank, overall and per discipline
-//             (g = gender line ranked within gender, x = mixed ranked overall)
+//             (g = gender line ranked within gender, x = mixed ranked overall).
+//             rank/gRank/xRank are null until a player clears the games
+//             qualification bar; rankProv/gRankProv/xRankProv are the same
+//             ranking with that bar removed, for the trend chart only — never
+//             used for the public leaderboard or rankDelta above.
 function computeRankDeltas(weekly) {
   const weeks = Object.keys(weekly).map(Number).sort((a, b) => a - b);
   const cum = new Map();
@@ -892,13 +897,26 @@ function computeRankDeltas(weekly) {
     const xPool = rows.filter(r => r.xS != null && r.games >= qAll).sort((a, b) => b.xS - a.xS);
     xPool.forEach((r, i) => { r._xRank = i + 1; });
 
+    // Provisional ranks — same pools, WITHOUT the games-qualification gate.
+    // These only ever feed the player-profile trend chart (so an unqualified
+    // player still sees an early, still-settling position instead of a gap)
+    // — the public leaderboard and rankDelta above stay gated on `qAll`.
+    const rankedProv = rows.filter(r => r.s != null).sort((a, b) => b.s - a.s);
+    rankedProv.forEach((r, i) => { r._rankProv = i + 1; });
+    for (const gflag of ['M', 'F']) {
+      const poolProv = rows.filter(r => r.gender === gflag && r.gS != null).sort((a, b) => b.gS - a.gS);
+      poolProv.forEach((r, i) => { r._gRankProv = i + 1; });
+    }
+    const xPoolProv = rows.filter(r => r.xS != null).sort((a, b) => b.xS - a.xS);
+    xPoolProv.forEach((r, i) => { r._xRankProv = i + 1; });
+
     const round1 = v => (v == null ? null : Math.round(v * 10) / 10);
     for (const r of rows) {
       pushHist(r.pid, {
         week: wk,
-        dsr: round1(r.s), rank: r._rank ?? null,
-        gDsr: round1(r.gS), gRank: r._gRank ?? null,
-        xDsr: round1(r.xS), xRank: r._xRank ?? null,
+        dsr: round1(r.s), rank: r._rank ?? null, rankProv: r._rankProv ?? null,
+        gDsr: round1(r.gS), gRank: r._gRank ?? null, gRankProv: r._gRankProv ?? null,
+        xDsr: round1(r.xS), xRank: r._xRank ?? null, xRankProv: r._xRankProv ?? null,
       });
     }
     snaps.push(snap);

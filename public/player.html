@@ -727,6 +727,7 @@
             <span id="tl-gender" style="display:none"><span class="sw" style="background:var(--color-teal)"></span>${esc(trend.genderLabel)}</span>
             <span id="tl-mixed" style="display:none"><span class="sw" style="background:#a78bfa"></span>Mixed</span>
             <span><span class="sw" style="border-top:2px dashed var(--color-text-faint);background:transparent"></span>League avg</span>
+            <span id="tl-prov" style="display:none"><span class="sw" style="border-top:2px dashed var(--color-text-muted);background:transparent"></span>Provisional (unqualified)</span>
           </div>
         </div>`;
       }
@@ -942,11 +943,14 @@
       const byWeek = {};
       for (const h of trend.hist) byWeek[h.week] = h;
 
-      // Series definitions: value + rank pickers per line
+      // Series definitions: value + rank pickers per line. `r` is the official
+      // (qualified) rank; `rp` is the same ranking with the games-qualification
+      // bar removed — used only as a fallback so early, not-yet-qualified weeks
+      // still plot a (visually distinct) provisional point instead of a gap.
       const SERIES = {
-        all:    { name: 'Overall', color: '#b8ff2c', width: 3, v: h => h.dsr,  r: h => h.rank },
-        gender: { name: trend.genderLabel, color: '#17d7b0', width: 2, v: h => h.gDsr, r: h => h.gRank },
-        mixed:  { name: 'Mixed', color: '#a78bfa', width: 2, v: h => h.xDsr, r: h => h.xRank },
+        all:    { name: 'Overall', color: '#b8ff2c', width: 3, v: h => h.dsr,  r: h => h.rank,   rp: h => h.rankProv },
+        gender: { name: trend.genderLabel, color: '#17d7b0', width: 2, v: h => h.gDsr, r: h => h.gRank, rp: h => h.gRankProv },
+        mixed:  { name: 'Mixed', color: '#a78bfa', width: 2, v: h => h.xDsr, r: h => h.xRank, rp: h => h.xRankProv },
       };
       let mode = 'dsr';
       const show = { all: true, gender: false, mixed: false };
@@ -954,13 +958,23 @@
       const W = 720, H = 300, PL = 44, PR = 16, PT = 18, PB = 34;
       const xFor = wk => PL + (wk - 1) * ((W - PL - PR) / Math.max(1, TOTAL - 1));
 
-      // Points for a series in the current mode: [{wk, val}] (nulls skipped)
+      // Points for a series in the current mode: [{wk, val, prov}] (nulls
+      // skipped). In rank mode, `val` falls back to the provisional rank when
+      // the official rank is null (not yet qualified) — `prov` flags that so
+      // the draw step can render it distinctly.
       const pts = k => {
         const out = [];
         for (let wk = 1; wk <= TOTAL; wk++) {
           const h = byWeek[wk]; if (!h) continue;
-          const val = mode === 'rank' ? SERIES[k].r(h) : SERIES[k].v(h);
-          if (val != null) out.push({ wk, val });
+          if (mode === 'rank') {
+            const off = SERIES[k].r(h);
+            const prov = off == null ? SERIES[k].rp(h) : null;
+            const val = off != null ? off : prov;
+            if (val != null) out.push({ wk, val, prov: off == null });
+          } else {
+            const val = SERIES[k].v(h);
+            if (val != null) out.push({ wk, val, prov: false });
+          }
         }
         return out;
       };
@@ -1018,26 +1032,43 @@
           if (!show[k]) continue;
           const sd = SERIES[k], points = pts(k);
           if (!points.length) continue;
-          s += `<path d="${pathFor(points, b)}" fill="none" stroke="${sd.color}" stroke-width="${sd.width}" stroke-linecap="round" stroke-linejoin="round"/>`;
+          // Drawn edge-by-edge (rather than one path) so a provisional stretch
+          // — either endpoint not yet games-qualified — renders dashed/faded
+          // instead of implying a fully-settled position.
+          let prevPt = null;
           for (const p of points) {
-            s += `<circle class="tdot" data-k="${k}" data-wk="${p.wk}" cx="${xFor(p.wk)}" cy="${yFor(p.val, b)}" r="${k === 'all' ? 5.5 : 4.5}" fill="var(--color-surface)" stroke="${sd.color}" stroke-width="2.5" style="cursor:pointer"/>`;
+            if (prevPt && p.wk === prevPt.wk + 1) {
+              const prov = prevPt.prov || p.prov;
+              s += `<path d="M${xFor(prevPt.wk).toFixed(1)},${yFor(prevPt.val, b).toFixed(1)} L${xFor(p.wk).toFixed(1)},${yFor(p.val, b).toFixed(1)}" fill="none" stroke="${sd.color}" stroke-width="${sd.width}" stroke-linecap="round" stroke-linejoin="round"${prov ? ' stroke-dasharray="5 4" opacity="0.55"' : ''}/>`;
+            }
+            prevPt = p;
+          }
+          for (const p of points) {
+            const provAttr = p.prov ? ' stroke-dasharray="2 2" opacity="0.65"' : '';
+            s += `<circle class="tdot" data-k="${k}" data-wk="${p.wk}" cx="${xFor(p.wk)}" cy="${yFor(p.val, b)}" r="${k === 'all' ? 5.5 : 4.5}" fill="var(--color-surface)" stroke="${sd.color}" stroke-width="2.5"${provAttr} style="cursor:pointer"/>`;
           }
           const last = points[points.length - 1];
-          s += `<text x="${Math.min(xFor(last.wk) + 10, W - 40)}" y="${yFor(last.val, b) - 8}" font-size="12" font-weight="800" fill="${sd.color}">${mode === 'rank' ? '#' + last.val : Number(last.val).toFixed(1)}</text>`;
+          s += `<text x="${Math.min(xFor(last.wk) + 10, W - 40)}" y="${yFor(last.val, b) - 8}" font-size="12" font-weight="800" fill="${sd.color}"${last.prov ? ' opacity="0.7"' : ''}>${mode === 'rank' ? '#' + last.val : Number(last.val).toFixed(1)}</text>`;
         }
+        const provLeg = document.getElementById('tl-prov');
+        if (provLeg) provLeg.style.display = mode === 'rank' ? '' : 'none';
         svg.innerHTML = s;
 
         svg.querySelectorAll('.tdot').forEach(dot => {
           dot.addEventListener('mouseenter', () => {
             const k = dot.dataset.k, wk = +dot.dataset.wk, sd = SERIES[k], h = byWeek[wk];
             if (!h) return;
-            const v = sd.v(h), r = sd.r(h);
+            const v = sd.v(h);
+            const officialR = sd.r(h);
+            const provR = sd.rp ? sd.rp(h) : null;
+            const r = officialR != null ? officialR : provR;
+            const isProv = officialR == null && provR != null;
             let prevV = null;
             for (let p = wk - 1; p >= 1; p--) { const ph = byWeek[p]; if (ph && sd.v(ph) != null) { prevV = sd.v(ph); break; } }
             const delta = (v != null && prevV != null) ? Math.round((v - prevV) * 10) / 10 : null;
             tip.innerHTML = `<div class="tt-wk">Week ${wk} · ${esc(sd.name)}</div>
               DSR <b>${v != null ? Number(v).toFixed(1) : '—'}</b>${delta != null ? ` <span class="${delta >= 0 ? 'val--green' : 'val--red'}" style="font-weight:800">(${delta >= 0 ? '+' : ''}${delta})</span>` : ''}<br>
-              ${r != null ? `Rank <b>#${r}</b>` : '<span style="color:var(--color-text-faint)">Unranked (unqualified)</span>'}`;
+              ${r != null ? `Rank <b>#${r}</b>${isProv ? ' <span style="color:var(--color-text-faint);font-weight:600">(provisional — not yet qualified)</span>' : ''}` : '<span style="color:var(--color-text-faint)">Unranked</span>'}`;
             const rect = svg.getBoundingClientRect();
             tip.style.left = (parseFloat(dot.getAttribute('cx')) / W * rect.width) + 'px';
             tip.style.top = (parseFloat(dot.getAttribute('cy')) / H * rect.height) + 'px';
