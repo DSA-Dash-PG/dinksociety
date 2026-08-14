@@ -4,7 +4,11 @@
 //
 // Body: { id?, circuit?, name, date, startTime?, place?, address?, courts?, capacity?,
 //         fee? | feeCents?, paymentMethods?, venmoHandle?, waitlist?,
-//         spotOpenPolicy?, cancelPolicy?, fcfsWindowHours?, organizers?, status? }
+//         spotOpenPolicy?, cancelPolicy?, fcfsWindowHours?, organizers?, status?,
+//         description?, rules?, adminNotes? }
+//
+// description / rules — markdown, shown publicly on ladders.html. Empty string clears.
+// adminNotes — private to admins/organizers; never exposed by public-ladders.js.
 
 import crypto from 'crypto';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
@@ -49,6 +53,13 @@ export default async (req) => {
   const roundMin = Number.isFinite(+b.roundMin) && +b.roundMin > 0 ? Math.min(60, Math.floor(+b.roundMin)) : (existing?.roundMin ?? 12);
   const scoreMode = ['points', 'winby2', 'to11', 'to15'].includes(b.scoreMode) ? b.scoreMode : (existing?.scoreMode || 'points');
 
+  // Free-form descriptive fields (added 2026-08-13). Length caps stop a runaway
+  // paste from bloating the blob; markdown is rendered client-side.
+  const clip = (s, max) => (s == null ? '' : String(s).slice(0, max));
+  const description = b.description !== undefined ? clip(b.description, 8000) : (existing?.description || '');
+  const rules       = b.rules       !== undefined ? clip(b.rules,       8000) : (existing?.rules       || '');
+  const adminNotes  = b.adminNotes  !== undefined ? clip(b.adminNotes,  4000) : (existing?.adminNotes  || '');
+
   const event = {
     id,
     circuit: b.circuit || existing?.circuit || 'I',
@@ -84,6 +95,10 @@ export default async (req) => {
     // DUPR-rated ladders collect a DUPR ID at signup and prompt players to
     // join the club (see ladder-signup.js / public/ladders.html signup UI).
     duprRated: b.duprRated != null ? !!b.duprRated : !!existing?.duprRated,
+    // Descriptive content (public: description, rules · private: adminNotes)
+    description,
+    rules,
+    adminNotes,
     fcfsWindowHours: Number.isFinite(+b.fcfsWindowHours) ? +b.fcfsWindowHours : (existing?.fcfsWindowHours ?? 24),
     organizers: Array.isArray(b.organizers) ? b.organizers.filter(Boolean) : (existing?.organizers || []),
     // Ladder ownership (organizer portal). Admin-created ladders have no owner

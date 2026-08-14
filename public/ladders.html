@@ -165,6 +165,21 @@
   .pf-league{ background:rgba(23,215,176,.16);color:var(--teal); } .pf-only{ background:rgba(184,255,44,.14);color:var(--lime); }
   .pf-kpis{ display:grid;grid-template-columns:repeat(4,1fr);gap:7px;margin-bottom:6px; } .pf-kpi{ background:var(--surf2);border:1px solid var(--bd);border-radius:10px;padding:10px 4px;text-align:center; }
   .pf-kpi .n{ font-size:1.05rem;font-weight:900; } .pf-kpi .l{ font-size:.5rem;text-transform:uppercase;letter-spacing:.05em;color:var(--fnt);margin-top:2px; }
+  /* Ladder description / rules expandable panel — rendered markdown, matches card colors. */
+  .lad-desc{ padding:12px 13px;background:rgba(255,255,255,.02);border-top:1px solid var(--bd);color:var(--tx);font-size:.82rem;line-height:1.55; }
+  .lad-desc h1,.lad-desc h2,.lad-desc h3{ margin:8px 0 6px;font-weight:900;color:var(--tx);line-height:1.2; }
+  .lad-desc h1{ font-size:.98rem; } .lad-desc h2{ font-size:.9rem; } .lad-desc h3{ font-size:.82rem;letter-spacing:.02em; }
+  .lad-desc p{ margin:0 0 8px; }
+  .lad-desc ul,.lad-desc ol{ margin:4px 0 8px;padding-left:20px; } .lad-desc li{ margin:2px 0; }
+  .lad-desc a{ color:var(--lime);text-decoration:underline; }
+  .lad-desc strong{ color:#fff;font-weight:800; } .lad-desc em{ color:#c9cdc3; }
+  .lad-desc code{ background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px;font-size:.75rem; }
+  .lad-desc blockquote{ margin:6px 0;padding:4px 10px;border-left:2px solid rgba(184,255,44,.4);color:var(--mut); }
+  .lad-desc-sec{ font-size:.56rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--mut);margin:2px 0 6px; }
+  .lad-desc-sec + *{ margin-top:0; }
+  .lad-desc + .lad-desc{ border-top:1px dashed var(--bd); }
+  .lad-expand-btn{ display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px;background:rgba(255,255,255,.02);border:0;border-top:1px solid var(--bd);color:var(--mut);font:inherit;font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer; }
+  .lad-expand-btn:hover{ color:var(--tx);background:rgba(255,255,255,.04); }
 </style>
 </head>
 <body>
@@ -281,6 +296,37 @@
 const API='/.netlify/functions';
 let ACTIVE=[], COMPLETED=[], STATS=null, MYCREDIT=0, FT='all', FD='all', MYREG={};
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
+
+// Minimal markdown renderer used by ladder description / rules panels. Keep in
+// sync with the version in admin-ladders.html — supports headings, **bold**,
+// *italic*, `code`, [links](url), > blockquotes, -/* bullets, 1. numbered
+// lists, blank-line paragraphs, and single-newline <br>s. HTML-escapes first.
+function mdRender(src){
+  if(!src) return '';
+  let s = esc(src);
+  s = s.replace(/^### (.+)$/gm,'<h3>$1</h3>')
+       .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+       .replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  s = s.replace(/^&gt; (.+)$/gm,'<blockquote>$1</blockquote>');
+  s = s.replace(/(?:^[-*] .+(?:\n|$))+/gm, m=>{
+    const items = m.trim().split(/\n/).map(l=>l.replace(/^[-*] /,'').trim()).map(x=>'<li>'+x+'</li>').join('');
+    return '<ul>'+items+'</ul>\n';
+  });
+  s = s.replace(/(?:^\d+\. .+(?:\n|$))+/gm, m=>{
+    const items = m.trim().split(/\n/).map(l=>l.replace(/^\d+\. /,'').trim()).map(x=>'<li>'+x+'</li>').join('');
+    return '<ol>'+items+'</ol>\n';
+  });
+  s = s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+       .replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>')
+       .replace(/`([^`]+)`/g,'<code>$1</code>')
+       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  const parts = s.split(/\n{2,}/).map(p=>{
+    const t = p.trim(); if(!t) return '';
+    if(/^<(h\d|ul|ol|blockquote)/.test(t)) return t;
+    return '<p>'+t.replace(/\n/g,'<br>')+'</p>';
+  });
+  return parts.filter(Boolean).join('\n');
+}
 // Display names in ladder views as FIRST NAME only, to keep lists/boards clean.
 const firstName=s=>{ s=String(s||'').trim(); return s.split(/\s+/)[0]||s; };
 // Ranked lists (leaderboards/standings) use first name + last initial — one name
@@ -554,6 +600,11 @@ function gotab(name){ RT.main=name; document.querySelectorAll('#tabs button').fo
 
 /* ---- LADDERS ---- */
 const LEXP={};
+// Separate expand state for the description/rules panel ("See details") — keeps
+// it independent of the roster lineup toggle so a player can peek at rules
+// without opening the whole lineup.
+const LDESC={};
+function ladDescToggle(id){ LDESC[id]=!LDESC[id]; renderAvail(); renderHomeWeek(); }
 function initialsOf(n){ return String(n||'?').split(' ').filter(Boolean).map(x=>x[0]).join('').slice(0,2).toUpperCase(); }
 function initialDot(p){ const paid=!!p.paid; return `<span title="${esc(p.name)}${paid?' · paid':' · payment pending'}" style="position:relative;width:24px;height:24px;border-radius:50%;background:var(--surf2);border:1.5px solid ${paid?'#b8ff2c':'var(--bd)'};display:inline-flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:800;color:${paid?'#b8ff2c':'#9aa094'}">${initialsOf(p.name)}${paid?'<span style="position:absolute;bottom:-3px;right:-3px;width:12px;height:12px;border-radius:50%;background:#b8ff2c;color:#06210f;display:flex;align-items:center;justify-content:center;font-size:.52rem;font-weight:900;border:1.5px solid #000">✓</span>':''}</span>`; }
 function ladToggle(id){ LEXP[id]=!LEXP[id]; renderAvail(); renderHomeWeek(); }
@@ -574,9 +625,22 @@ function ladderCard(l,i){
   const time=l.startTime?(l.endTime?`${l.startTime}–${l.endTime}`:l.startTime):'';
   const ac=PAL[(i||0)%PAL.length], barCol=full?'var(--red)':(pct>=80?'var(--gold)':ac);
   const fee=feeLabel(l);
+  // Description / rules panel — either or both can be empty. The button and
+  // panel only render if there's content, so ladders without extra detail keep
+  // the same short-card feel as before.
+  const hasDesc=!!(l.description&&l.description.trim()), hasRules=!!(l.rules&&l.rules.trim());
+  const showDesc=(hasDesc||hasRules)&&LDESC[l.id];
+  const descBtn=(hasDesc||hasRules)
+    ? `<button class="lad-expand-btn" onclick="ladDescToggle('${l.id}')">${showDesc?'Hide details ▴':'See details '+(hasDesc&&hasRules?'(description · rules)':(hasDesc?'(description)':'(rules)'))+' ▾'}</button>`
+    : '';
+  const descPanel=showDesc
+    ? (hasDesc?`<div class="lad-desc"><div class="lad-desc-sec" style="color:${ac}">About this ladder</div>${mdRender(l.description)}</div>`:'')
+     +(hasRules?`<div class="lad-desc"><div class="lad-desc-sec" style="color:${ac}">Rules</div>${mdRender(l.rules)}</div>`:'')
+    : '';
   return `<div style="border:1px solid ${hexA(ac,.32)};border-radius:13px;overflow:hidden;background:#000;margin-bottom:10px">
     <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-left:3px solid ${ac};background-color:${hexA(ac,.12)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.14)} 0 9px,transparent 9px 20px)"><div style="flex:1;min-width:0"><div style="font-size:.92rem;font-weight:900;color:${ac};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div><div style="font-size:.66rem;color:var(--mut);font-weight:700">${[wd(l.date),time].filter(Boolean).join(' · ')}</div>${ladMaps(l)}${ladCourts(l,ac)}</div><span class="ttag ${tt}">${TL[tt]||'Mixed'}</span></div>
     ${l._invited?`<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(240,192,64,.1);border-bottom:1px solid rgba(240,192,64,.25);font-size:.64rem;font-weight:800;color:var(--gold)">🔒 Invite-only — this link was shared with you directly</div>`:''}
+    ${descBtn}${descPanel}
     ${tt==='womens'?`<div style="display:flex;justify-content:center;padding:12px 12px 2px;background:#000"><div style="height:56px">${QOTC}</div></div>`:''}
     ${ladCountdown(l,ac)}
     <div style="padding:11px 12px;background:#000">
