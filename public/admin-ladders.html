@@ -42,6 +42,24 @@
   .rte-body a{ color:var(--lime); }
   .rte-body ul,.rte-body ol{ margin:6px 0;padding-left:22px; }
   .rte-body p{ margin:0 0 10px; }
+  /* Description / rules / admin notes editor — markdown textarea + live preview, mirrors .i input styling. */
+  .mdblock{ display:grid;grid-template-columns:1fr 1fr;gap:10px; }
+  @media (max-width:640px){ .mdblock{ grid-template-columns:1fr; } }
+  .mdblock textarea.i{ min-height:150px;resize:vertical;font-family:'Inter',system-ui,sans-serif; }
+  .mdprev{ border-radius:10px;border:1px dashed rgba(255,255,255,.14);background:#12140f;padding:12px 13px;font-size:.85rem;line-height:1.55;color:#e7ebe0;min-height:150px;overflow-y:auto;max-height:340px; }
+  .mdprev:empty:before{ content:'Preview appears here as you type…';color:#5e655a;font-style:italic;font-size:.78rem; }
+  .mdprev h1,.mdprev h2,.mdprev h3{ margin:6px 0 6px;font-weight:900;color:#f0f2ec;line-height:1.2; }
+  .mdprev h1{ font-size:1rem; } .mdprev h2{ font-size:.92rem; } .mdprev h3{ font-size:.84rem; }
+  .mdprev p{ margin:0 0 8px; } .mdprev ul,.mdprev ol{ margin:4px 0 8px;padding-left:22px; }
+  .mdprev li{ margin:2px 0; }
+  .mdprev a{ color:var(--lime);text-decoration:underline; }
+  .mdprev strong{ color:#fff;font-weight:800; } .mdprev em{ color:#c9cdc3; }
+  .mdprev code{ background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px;font-size:.78rem; }
+  .mdprev blockquote{ margin:6px 0;padding:4px 10px;border-left:2px solid rgba(184,255,44,.4);color:#c9cdc3; }
+  .mdcount{ font-size:.6rem;color:#5e655a;text-align:right;margin-top:4px; }
+  .mdlabel-row{ display:flex;align-items:baseline;justify-content:space-between;gap:8px;margin-bottom:5px; }
+  .mdlabel-row .l{ margin:0; }
+  .mdlabel-row .hint{ font-size:.58rem;font-weight:700;color:#5e655a;letter-spacing:.04em; }
   .btn{ display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;padding:0 18px;border-radius:9999px;border:1px solid transparent;font:inherit;font-size:.82rem;font-weight:800;cursor:pointer; }
   .btn-lime{ background:var(--lime);color:#000; } .btn-out{ border-color:rgba(255,255,255,.18);color:#f0f2ec;background:transparent; }
   .btn-sm{ min-height:32px;font-size:.72rem;padding:0 12px; } .btn-danger{ border:1px solid rgba(255,92,71,.3);color:var(--red);background:transparent;min-height:32px;font-size:.72rem;padding:0 12px;border-radius:9999px;cursor:pointer; }
@@ -233,6 +251,32 @@
           <div class="help" style="margin:-2px 0 13px">Venmo only skips Stripe entirely — no card option, no 10% card fee. Ladder credit always works regardless.</div>
           <div class="frow"><label class="l">When a spot opens</label><div class="seg" id="seg-spot"><button class="on" data-v="hold">Hold &amp; confirm (30m)</button><button data-v="auto">Auto-claim</button></div></div>
           <div class="frow"><label class="l">When a player cancels</label><div class="seg" id="seg-cancel"><button data-v="auto_credit">Auto credit</button><button data-v="credit_if_refilled">If refilled</button><button class="on" data-v="no_credit">No credit</button></div></div>
+
+          <div class="sec" style="margin:22px 0 10px">Description &amp; Rules</div>
+          <div class="help" style="margin:-4px 0 12px">Markdown supported. Left = you type, right = players see. Description &amp; rules appear on the public ladder card (expandable). Notes are admin-only — never shown to players.</div>
+
+          <div class="frow">
+            <div class="mdlabel-row"><label class="l" for="f-description">Description <span style="color:var(--lime)">· public</span></label><span class="hint">MARKDOWN</span></div>
+            <div class="mdblock">
+              <div><textarea class="i" id="f-description" placeholder="What makes this ladder special? Format, vibe, who it's for…" oninput="mdPreview('f-description','f-description-prev','f-description-count',8000)"></textarea><div class="mdcount" id="f-description-count">0 / 8000</div></div>
+              <div class="mdprev" id="f-description-prev"></div>
+            </div>
+          </div>
+
+          <div class="frow">
+            <div class="mdlabel-row"><label class="l" for="f-rules">Rules <span style="color:var(--lime)">· public</span></label><span class="hint">MARKDOWN</span></div>
+            <div class="mdblock">
+              <div><textarea class="i" id="f-rules" placeholder="How rounds run, scoring, tiebreakers, court etiquette…" oninput="mdPreview('f-rules','f-rules-prev','f-rules-count',8000)"></textarea><div class="mdcount" id="f-rules-count">0 / 8000</div></div>
+              <div class="mdprev" id="f-rules-prev"></div>
+            </div>
+          </div>
+
+          <div class="frow">
+            <div class="mdlabel-row"><label class="l" for="f-adminNotes">Admin notes <span style="color:var(--gold)">· private</span></label><span class="hint">ORGANIZERS ONLY</span></div>
+            <textarea class="i" id="f-adminNotes" placeholder="Reminders, contact numbers, comps — never shown to players." oninput="mdCount('f-adminNotes','f-adminNotes-count',4000)" style="min-height:100px"></textarea>
+            <div class="mdcount" id="f-adminNotes-count">0 / 4000</div>
+          </div>
+
           <button class="btn btn-lime" onclick="createLadder()">Create &amp; open signups</button>
           <div id="createMsg"></div>
         </div>
@@ -384,6 +428,32 @@
   <div class="frow"><label class="l">Court names (top to bottom)</label><div id="m-courtnames" style="display:flex;flex-wrap:wrap;gap:8px"></div></div>
   <div class="frow"><label class="l">League Venmo</label><input class="i" id="m-venmo"></div>
   <div class="frow"><label class="l">Payment methods</label><div class="seg" id="mseg-pay"><button class="on" data-v="card,venmo">Card + Venmo</button><button data-v="venmo">Venmo only</button><button data-v="card">Card only</button></div><div class="help" style="margin-top:4px">Changing this applies immediately — players who already paid keep their spot either way.</div></div>
+
+  <div class="sec" style="margin:22px 0 10px">Description &amp; Rules</div>
+  <div class="help" style="margin:-4px 0 12px">Markdown supported. Left = you type, right = players see. Description &amp; rules appear on the public ladder card (expandable). Notes are admin-only — never shown to players.</div>
+
+  <div class="frow">
+    <div class="mdlabel-row"><label class="l" for="m-description">Description <span style="color:var(--lime)">· public</span></label><span class="hint">MARKDOWN</span></div>
+    <div class="mdblock">
+      <div><textarea class="i" id="m-description" placeholder="What makes this ladder special? Format, vibe, who it's for…" oninput="mdPreview('m-description','m-description-prev','m-description-count',8000)"></textarea><div class="mdcount" id="m-description-count">0 / 8000</div></div>
+      <div class="mdprev" id="m-description-prev"></div>
+    </div>
+  </div>
+
+  <div class="frow">
+    <div class="mdlabel-row"><label class="l" for="m-rules">Rules <span style="color:var(--lime)">· public</span></label><span class="hint">MARKDOWN</span></div>
+    <div class="mdblock">
+      <div><textarea class="i" id="m-rules" placeholder="How rounds run, scoring, tiebreakers, court etiquette…" oninput="mdPreview('m-rules','m-rules-prev','m-rules-count',8000)"></textarea><div class="mdcount" id="m-rules-count">0 / 8000</div></div>
+      <div class="mdprev" id="m-rules-prev"></div>
+    </div>
+  </div>
+
+  <div class="frow">
+    <div class="mdlabel-row"><label class="l" for="m-adminNotes">Admin notes <span style="color:var(--gold)">· private</span></label><span class="hint">ORGANIZERS ONLY</span></div>
+    <textarea class="i" id="m-adminNotes" placeholder="Reminders, contact numbers, comps — never shown to players." oninput="mdCount('m-adminNotes','m-adminNotes-count',4000)" style="min-height:100px"></textarea>
+    <div class="mdcount" id="m-adminNotes-count">0 / 4000</div>
+  </div>
+
   <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
   <div id="mEditMsg"></div>
 
@@ -475,6 +545,55 @@ const API='/.netlify/functions';
 let CURRENT=null;
 const fmt=c=>'$'+((Number(c)||0)/100%1===0?(Number(c)||0)/100:((Number(c)||0)/100).toFixed(2));
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
+
+// Minimal markdown renderer for the ladder description/rules preview and public
+// display. Supports the marks we actually document to organizers: headings
+// (#/##/###), **bold**, *italic*, `code`, [links](url), > blockquotes, - / *
+// bullet lists, 1. numbered lists, blank-line paragraphs, and single-newline
+// <br>s. Escapes HTML first so pasted `<script>` etc. is safe.
+function mdRender(src){
+  if(!src) return '';
+  let s = esc(src);
+  // Block: headings
+  s = s.replace(/^### (.+)$/gm,'<h3>$1</h3>')
+       .replace(/^## (.+)$/gm,'<h2>$1</h2>')
+       .replace(/^# (.+)$/gm,'<h1>$1</h1>');
+  // Block: blockquote (one line at a time)
+  s = s.replace(/^&gt; (.+)$/gm,'<blockquote>$1</blockquote>');
+  // Block: unordered list (consecutive - / * lines)
+  s = s.replace(/(?:^[-*] .+(?:\n|$))+/gm, m=>{
+    const items = m.trim().split(/\n/).map(l=>l.replace(/^[-*] /,'').trim()).map(x=>'<li>'+x+'</li>').join('');
+    return '<ul>'+items+'</ul>\n';
+  });
+  // Block: ordered list (consecutive `1.` style)
+  s = s.replace(/(?:^\d+\. .+(?:\n|$))+/gm, m=>{
+    const items = m.trim().split(/\n/).map(l=>l.replace(/^\d+\. /,'').trim()).map(x=>'<li>'+x+'</li>').join('');
+    return '<ol>'+items+'</ol>\n';
+  });
+  // Inline: bold, italic, code, links
+  s = s.replace(/\*\*([^*]+)\*\*/g,'<strong>$1</strong>')
+       .replace(/(^|[^*])\*([^*\n]+)\*/g,'$1<em>$2</em>')
+       .replace(/`([^`]+)`/g,'<code>$1</code>')
+       .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,'<a href="$2" target="_blank" rel="noopener">$1</a>');
+  // Paragraphs: split on blank lines; keep block elements as-is.
+  const parts = s.split(/\n{2,}/).map(p=>{
+    const t = p.trim(); if(!t) return '';
+    if(/^<(h\d|ul|ol|blockquote)/.test(t)) return t;
+    return '<p>'+t.replace(/\n/g,'<br>')+'</p>';
+  });
+  return parts.filter(Boolean).join('\n');
+}
+function mdPreview(inId,prevId,countId,max){
+  const src=document.getElementById(inId); const prev=document.getElementById(prevId);
+  const raw=(src&&src.value)||''; if(max&&raw.length>max){ src.value=raw.slice(0,max); }
+  if(prev) prev.innerHTML = mdRender(src.value);
+  if(countId){ const c=document.getElementById(countId); if(c) c.textContent=(src.value.length)+' / '+max; }
+}
+function mdCount(inId,countId,max){
+  const src=document.getElementById(inId); const raw=(src&&src.value)||'';
+  if(max&&raw.length>max){ src.value=raw.slice(0,max); }
+  const c=document.getElementById(countId); if(c) c.textContent=(src.value.length)+' / '+max;
+}
 function seg(id){ const el=document.getElementById(id); const b=el.querySelector('button.on'); return b?b.dataset.v:el.querySelector('button').dataset.v; }
 document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(e.target.tagName==='BUTTON'){ s.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===e.target)); if(s.id==='mseg-vis') updateShareBox(); } }));
 function copyInviteLink(btn){ const inp=btn.previousElementSibling; try{ navigator.clipboard.writeText(inp.value); btn.textContent='Copied ✓'; setTimeout(()=>btn.textContent='Copy link',2000); }catch(e){ inp.select(); } }
@@ -906,11 +1025,23 @@ async function createLadder(){
     leaderboard:seg('seg-lb'),
     format:seg('seg-format'),
     duprRated:seg('seg-dupr')==='1',
+    description:document.getElementById('f-description').value,
+    rules:document.getElementById('f-rules').value,
+    adminNotes:document.getElementById('f-adminNotes').value,
   };
   if(!body.name||!body.date){ msg('createMsg','err','Name and date are required.'); return; }
   const {status,d}=await api('/admin-ladder-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(status===401){ msg('createMsg','err','Sign in as admin first (/admin.html).'); return; }
-  if(d.ok){ msg('createMsg','ok','Created! It\'s now open for signups.'); document.getElementById('f-name').value=''; loadList(); ladSub('all'); }
+  if(d.ok){
+    msg('createMsg','ok','Created! It\'s now open for signups.');
+    // Clear the description/rules/notes editors so they don't leak into the
+    // next create; textareas need explicit clears + preview refresh.
+    ['f-name','f-description','f-rules','f-adminNotes'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+    mdPreview('f-description','f-description-prev','f-description-count',8000);
+    mdPreview('f-rules','f-rules-prev','f-rules-count',8000);
+    mdCount('f-adminNotes','f-adminNotes-count',4000);
+    loadList(); ladSub('all');
+  }
   else msg('createMsg','err',d.error||'Could not create.');
 }
 
@@ -931,6 +1062,10 @@ async function openManage(id){
     if(el){ let hit=false; el.querySelectorAll('button').forEach(b=>{ const on=b.dataset.v.split(',').sort().join(',')===pm; b.classList.toggle('on',on); if(on)hit=true; });
       if(!hit) el.querySelector('button').classList.add('on'); } }
   setv('m-rounds',d.event.rounds||10); setv('m-roundmin',d.event.roundMin||12); setv('m-score',d.event.scoreMode||'points'); renderCourtNames('m-courtnames', d.event.courts, d.event.courtNames||[]);
+  // Load description / rules / admin notes into the edit modal + refresh their previews.
+  setv('m-description', d.event.description||''); mdPreview('m-description','m-description-prev','m-description-count',8000);
+  setv('m-rules',       d.event.rules||'');       mdPreview('m-rules','m-rules-prev','m-rules-count',8000);
+  setv('m-adminNotes',  d.event.adminNotes||'');  mdCount('m-adminNotes','m-adminNotes-count',4000);
   // Visibility toggle (public/private) — always editable.
   { const vis=d.event.visibility==='private'?'private':'public';
     const el=document.getElementById('mseg-vis');
@@ -1150,6 +1285,9 @@ async function saveEdit(){
     visibility:seg('mseg-vis'),
     format:seg('mseg-format'),
     duprRated:seg('mseg-dupr')==='1',
+    description:g('m-description'),
+    rules:g('m-rules'),
+    adminNotes:g('m-adminNotes'),
   };
   // Only send leaderboard when the interactive toggle is actually showing — a
   // 'pending' organizer ladder hides it (see openManage) so saving other fields

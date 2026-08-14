@@ -26,6 +26,10 @@ function pub(e, s) {
     paymentMethods: e.paymentMethods || ['card', 'venmo'],
     venmoHandle: e.venmoHandle || null,
     roster: p.roster,
+    // Public descriptive fields (rendered as markdown on ladders.html). Never
+    // include adminNotes here — that field is private to admins/organizers.
+    description: e.description || '',
+    rules: e.rules || '',
   };
 }
 
