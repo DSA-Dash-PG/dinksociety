@@ -72,6 +72,9 @@ function highlightNav() {
   else if (path.includes('schedule'))    key = 'schedule';
   else if (path.includes('standing'))    key = 'standings';
   else if (path.includes('leaderboard')) key = 'leaderboard';
+  // /queen.html and /ladders.html both light up the Ladders dropdown.
+  // Checked after 'leaderboard' so that page keeps its own key.
+  else if (path.includes('queen') || path.includes('ladder')) key = 'ladders';
   else if (path.includes('stats'))       key = 'stats';
   else if (path.includes('team'))        key = 'teams';
   else if (path.includes('gallery') || path.includes('moments')) key = 'gallery';

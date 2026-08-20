@@ -363,6 +363,7 @@
       <button id="mtab-roster" class="on" onclick="mTab('roster')">Roster</button>
       <button id="mtab-rem" onclick="mTab('rem')">Reminders</button>
       <button id="mtab-score" onclick="mTab('score')">Ladder Scoring</button>
+      <button id="mtab-photos" onclick="mTab('photos')">Photos</button>
     </div>
     <div class="mtabbar-fade"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M9 18l6-6-6-6"/></svg></div>
   </div>
@@ -517,6 +518,25 @@
       <button class="btn btn-lime" style="width:100%" onclick="if(CURRENT)location.href='/ladder-score.html?event='+encodeURIComponent(CURRENT.id)">Open ladder scoring →</button>
     </div>
   </div><!-- /scoring -->
+
+  <!-- ===== PHOTOS TAB =====
+       Photos attach to THIS ladder night, which is what makes one upload show
+       up in three places: the division gallery (queen.html), this night's
+       results overlay, and its recap article. Resizing happens in the browser
+       before upload — see uploadPhotos() — so the function stays dependency
+       free and a 12MP phone photo doesn't blow the 6MB payload ceiling. -->
+  <div class="mpanel" id="mpanel-photos">
+    <div class="sec" style="margin:0 0 6px">Add photos</div>
+    <div class="help" style="margin:0 0 12px">JPG, PNG or WebP. Pick as many as you like — each one is shrunk in your browser before it uploads, so big phone photos are fine. They appear publicly in the gallery for this night's division.</div>
+    <input type="file" id="phFiles" accept="image/jpeg,image/png,image/webp" multiple style="display:none" onchange="uploadPhotos(this.files)">
+    <button class="btn btn-lime" style="width:100%" onclick="document.getElementById('phFiles').click()">Choose photos…</button>
+    <div id="phProgress" style="margin-top:10px"></div>
+    <div id="phMsg"></div>
+
+    <div class="sec" style="margin:18px 0 6px">On this ladder <span id="phCount" style="color:#5e655a;font-weight:700;text-transform:none;letter-spacing:0"></span></div>
+    <div class="help" style="margin:0 0 10px">Click a caption to edit it. &ldquo;Make cover&rdquo; sets the big photo at the top of the night&rsquo;s gallery — only one per night.</div>
+    <div id="phList"><div class="help">Loading…</div></div>
+  </div><!-- /photos -->
   </div>
 </div></div>
 
@@ -1105,7 +1125,7 @@ async function openManage(id){
   document.getElementById('ov').classList.add('on');
 }
 function closeManage(){ document.getElementById('ov').classList.remove('on'); CURRENT=null; }
-function mTab(k){ ['info','roster','rem','score'].forEach(x=>{ const p=document.getElementById('mpanel-'+x), b=document.getElementById('mtab-'+x); if(p)p.classList.toggle('on',x===k); if(b)b.classList.toggle('on',x===k); }); const sh=document.querySelector('#ov .sheet'); if(sh)sh.scrollTop=0; }
+function mTab(k){ ['info','roster','rem','score','photos'].forEach(x=>{ const p=document.getElementById('mpanel-'+x), b=document.getElementById('mtab-'+x); if(p)p.classList.toggle('on',x===k); if(b)b.classList.toggle('on',x===k); }); const sh=document.querySelector('#ov .sheet'); if(sh)sh.scrollTop=0; if(k==='photos') loadPhotos(); }
 
 /* ---- Quick "Remind" from a list row (open ladders only) ---- */
 let ROW_REMIND_ID=null;
@@ -1567,6 +1587,124 @@ async function importOld(){
   if(d.ok){ msg('importMsg','ok',`Imported ${d.imported} night(s); skipped ${d.skipped} already-imported; ${d.playersTouched} player slots.`); loadList(); }
   else msg('importMsg','err',d.error||'Import failed.');
 }
+/* ═══════════════ Ladder photos ═══════════════
+   Uploads are resized in the BROWSER before they're sent. Two reasons:
+   a 12MP phone photo is ~8MB and would bounce off the function's 6MB payload
+   ceiling, and generating the thumbnail here keeps the function free of any
+   image library (no sharp, no native binary in the Netlify build).
+   Each photo therefore uploads twice: a full version capped at 2000px for the
+   lightbox and downloads, and a 480px thumb for the gallery grid. */
+const PH_FULL_MAX = 2000, PH_THUMB_MAX = 480, PH_QUALITY = 0.85;
+let PHOTOS = [];
+
+function resizeTo(img, maxDim, quality){
+  return new Promise(resolve => {
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(img, 0, 0, w, h);
+    c.toBlob(b => resolve({ blob: b, w, h }), 'image/jpeg', quality);
+  });
+}
+
+function loadImage(file){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not read that image.')); };
+    img.src = url;
+  });
+}
+
+async function uploadPhotos(files){
+  if(!CURRENT || !files || !files.length) return;
+  const list = [...files];
+  const prog = document.getElementById('phProgress');
+  document.getElementById('phMsg').innerHTML = '';
+  let done = 0, failed = 0;
+
+  for(const file of list){
+    prog.innerHTML = `<div class="help">Uploading ${done+1} of ${list.length} — ${esc(file.name)}…</div>`;
+    try{
+      const img  = await loadImage(file);
+      const full = await resizeTo(img, PH_FULL_MAX, PH_QUALITY);
+      const thmb = await resizeTo(img, PH_THUMB_MAX, 0.8);
+      const fd = new FormData();
+      fd.append('eventId', CURRENT.id);
+      fd.append('file',  full.blob, 'photo.jpg');
+      fd.append('thumb', thmb.blob, 'thumb.jpg');
+      fd.append('w', full.w); fd.append('h', full.h);
+      const r = await fetch(API + '/ladder-photo-upload', { method:'POST', credentials:'include', body: fd });
+      const d = await r.json().catch(() => ({}));
+      if(r.status === 200 && d.ok) done++; else { failed++; console.warn('photo upload failed', d); }
+    }catch(err){ failed++; console.warn('photo resize/upload failed', err); }
+  }
+
+  prog.innerHTML = '';
+  document.getElementById('phFiles').value = '';
+  if(done) msg('phMsg','ok', done + ' photo' + (done===1?'':'s') + ' uploaded' + (failed ? ' · ' + failed + ' failed' : '') + '.');
+  else msg('phMsg','err','Upload failed. Check the file type (JPG, PNG or WebP) and try again.');
+  loadPhotos();
+}
+
+async function loadPhotos(){
+  if(!CURRENT) return;
+  const el = document.getElementById('phList');
+  const r = await fetch('/.netlify/functions/public-ladder-photos?event=' + encodeURIComponent(CURRENT.id));
+  const d = await r.json().catch(() => ({}));
+  PHOTOS = ((d.albums || [])[0] || {}).photos || [];
+  document.getElementById('phCount').textContent = PHOTOS.length ? PHOTOS.length + ' photo' + (PHOTOS.length===1?'':'s') : '';
+  if(!PHOTOS.length){ el.innerHTML = '<div class="help">No photos on this ladder yet.</div>'; return; }
+  el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:9px">'
+    + PHOTOS.map(p => `<div style="border:1px solid rgba(255,255,255,.1);border-radius:11px;overflow:hidden;background:#000">
+        <div style="position:relative;aspect-ratio:4/3;background:#111">
+          <img src="${esc(p.thumb)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
+          ${p.cover ? '<span style="position:absolute;top:6px;left:6px;font-size:.54rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;background:rgba(0,0,0,.75);color:#E6E1D5;padding:3px 8px;border-radius:9999px">Cover</span>' : ''}
+        </div>
+        <div style="padding:8px 9px">
+          <input value="${esc(p.caption||'')}" placeholder="Add a caption…" maxlength="140"
+                 onchange="savePhotoCaption('${esc(p.id)}',this.value)"
+                 style="width:100%;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#f0f2ec;font:inherit;font-size:.74rem;padding:6px 8px">
+          <div style="display:flex;gap:6px;margin-top:7px">
+            ${p.cover ? '' : `<button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:32px" onclick="setPhotoCover('${esc(p.id)}')">Make cover</button>`}
+            <button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:32px;color:#ff5c47" onclick="removePhoto('${esc(p.id)}')">Delete</button>
+          </div>
+        </div>
+      </div>`).join('')
+    + '</div>';
+}
+
+async function savePhotoCaption(id, caption){
+  if(!CURRENT) return;
+  const {status,d} = await api('/ladder-photo-update', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ eventId: CURRENT.id, id, caption }) });
+  if(status===200 && d.ok) dsToast({ type:'success', message:'Caption saved.' });
+  else dsToast({ type:'error', message:(d && d.error) || 'Could not save the caption.' });
+}
+
+async function setPhotoCover(id){
+  if(!CURRENT) return;
+  const {status,d} = await api('/ladder-photo-update', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ eventId: CURRENT.id, id, cover:true }) });
+  if(status===200 && d.ok) loadPhotos();
+  else dsToast({ type:'error', message:(d && d.error) || 'Could not set the cover.' });
+}
+
+/* Admin-only, and unrecoverable — the binaries go with the record — so this
+   always confirms first. Organizers never see a working Delete: the endpoint
+   refuses them even though they can upload. */
+async function removePhoto(id){
+  if(!CURRENT) return;
+  if(!(await dsConfirm({ title:'Delete this photo?', message:'It disappears from the public gallery, this night\'s results and its recap. This cannot be undone.', confirmLabel:'Delete', cancelLabel:'Keep', danger:true }))) return;
+  const {status,d} = await api('/admin-ladder-photo-delete', { method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ eventId: CURRENT.id, id }) });
+  if(status===200 && d.ok){ dsToast({ type:'success', message:'Photo deleted.' }); loadPhotos(); }
+  else dsToast({ type:'error', message:(d && d.error) || 'Could not delete ('+status+').' });
+}
+
 function msg(id,cls,t){ document.getElementById(id).innerHTML=`<div class="msg ${cls}">${t}</div>`; }
 
 loadList();

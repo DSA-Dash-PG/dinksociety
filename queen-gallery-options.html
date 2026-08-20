@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Queen gallery — layout &amp; download options</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box}
+  :root{
+    --bg:#0b0d0a; --surf:#161914; --surf2:#1c1f18; --bd:rgba(255,255,255,.08);
+    --tx:#f0f2ec; --mut:#9aa094; --fnt:#5e655a; --teal:#17d7b0; --lime:#b8ff2c;
+    /* ── Palette D — Pearl & Platinum ── */
+    --acc:#E6E1D5; --deep:#9E978A; --soft:#F7F4EC; --ink:#17190f;
+    --glow:rgba(230,225,213,.10); --chipbg:rgba(230,225,213,.13);
+  }
+  body{ background:var(--bg); color:var(--tx); font-family:'Inter',system-ui,sans-serif; margin:0; }
+
+  .top{ background:#101210; border-bottom:1px solid var(--bd); padding:26px 20px; text-align:center; background-image:radial-gradient(130% 100% at 50% 0%, var(--glow), transparent 62%); }
+  .top .mark{ height:80px; display:flex; justify-content:center; }
+  .top h1{ margin:14px 0 0; font-size:1.02rem; font-weight:900; text-transform:uppercase; letter-spacing:.05em; }
+  .top p{ margin:9px auto 0; max-width:70ch; font-size:.79rem; color:var(--mut); line-height:1.65; }
+  .top code{ background:#1c1f18; padding:1px 5px; border-radius:4px; font-size:.9em; color:var(--acc); }
+
+  .wrap{ max-width:1120px; margin:0 auto; padding:26px 20px 80px; }
+  .sec{ border:1px solid var(--bd); border-radius:18px; background:#0d0f0c; margin-bottom:24px; overflow:hidden; }
+  .sec-hd{ padding:16px 18px; border-bottom:1px solid var(--bd); }
+  .sec-hd .lt{ font-size:.6rem; font-weight:900; letter-spacing:.14em; text-transform:uppercase; color:var(--acc); }
+  .sec-hd h2{ margin:3px 0 0; font-size:1rem; font-weight:900; }
+  .sec-hd .why{ font-size:.75rem; color:var(--mut); margin-top:7px; line-height:1.6; max-width:78ch; }
+  .sec-hd .verdict{ display:inline-block; margin-top:9px; font-size:.62rem; font-weight:900; letter-spacing:.08em; text-transform:uppercase; padding:4px 10px; border-radius:9999px; background:var(--chipbg); color:var(--acc); }
+  .sec-bd{ padding:18px; }
+
+  .nighthd{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:0 0 11px; flex-wrap:wrap; }
+  .nighthd h4{ margin:0; font-size:.88rem; font-weight:900; }
+  .nighthd .r{ display:flex; align-items:center; gap:9px; }
+  .nighthd .ct{ font-size:.64rem; color:var(--fnt); font-weight:800; }
+  .dlall{ font:inherit; font-size:.63rem; font-weight:800; padding:6px 12px; border-radius:9999px; border:1px solid var(--bd); background:transparent; color:var(--acc); cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+  .dlall:hover{ background:var(--chipbg); }
+
+  /* photo placeholder tones */
+  .p{ position:relative; overflow:hidden; border:1px solid var(--bd); background:linear-gradient(135deg,#232419,#141610); display:flex; align-items:center; justify-content:center; font-size:.58rem; font-weight:800; color:rgba(255,255,255,.32); }
+  .p:nth-child(4n+1){ background:linear-gradient(135deg,#26251c,#141610); }
+  .p:nth-child(4n+2){ background:linear-gradient(135deg,#1e2320,#141610); }
+  .p:nth-child(4n+3){ background:linear-gradient(135deg,#272219,#141610); }
+  .p .cap{ position:absolute; left:0; right:0; bottom:0; padding:7px 9px; background:linear-gradient(transparent,rgba(0,0,0,.86)); font-size:.6rem; font-weight:700; color:#fff; text-align:left; }
+  .p .dl{ position:absolute; top:7px; right:7px; width:28px; height:28px; border-radius:9999px; background:rgba(0,0,0,.66); backdrop-filter:blur(4px); border:1px solid rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .14s; }
+  .p:hover .dl{ opacity:1; }
+  .p .dl svg{ width:13px; height:13px; stroke:var(--acc); }
+
+  /* 1 — justified rows */
+  .just{ display:flex; flex-wrap:wrap; gap:6px; }
+  .just .p{ height:170px; flex-grow:1; border-radius:10px; }
+  .just .p.w3{ flex-basis:230px; } .just .p.w4{ flex-basis:300px; } .just .p.w2{ flex-basis:130px; }
+
+  /* 2 — uniform grid */
+  .uni{ display:grid; grid-template-columns:repeat(auto-fill,minmax(155px,1fr)); gap:7px; }
+  .uni .p{ aspect-ratio:1; border-radius:10px; }
+
+  /* 3 — editorial hero */
+  .ed{ display:grid; grid-template-columns:2fr 1fr; gap:7px; }
+  .ed .hero-p{ grid-row:span 2; aspect-ratio:4/3; border-radius:13px; }
+  .ed .p{ aspect-ratio:16/10; border-radius:11px; }
+  .ed-strip{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:6px; margin-top:7px; }
+  .ed-strip .p{ aspect-ratio:1; border-radius:9px; }
+  @media(max-width:640px){ .ed{ grid-template-columns:1fr; } .ed .hero-p{ grid-row:auto; } }
+
+  /* 4 — masonry */
+  .mas{ column-count:4; column-gap:7px; }
+  @media(max-width:900px){ .mas{ column-count:3; } }
+  @media(max-width:560px){ .mas{ column-count:2; } }
+  .mas .p{ break-inside:avoid; margin-bottom:7px; width:100%; border-radius:10px; }
+  .mas .t1{ aspect-ratio:3/4; } .mas .t2{ aspect-ratio:1; } .mas .t3{ aspect-ratio:4/3; } .mas .t4{ aspect-ratio:9/16; }
+
+  /* select mode */
+  .selbar{ display:flex; align-items:center; justify-content:space-between; gap:12px; background:var(--surf); border:1px solid var(--bd); border-radius:12px; padding:10px 13px; margin-bottom:12px; flex-wrap:wrap; }
+  .selbar .l{ font-size:.72rem; font-weight:800; color:var(--acc); }
+  .selbar .r{ display:flex; gap:7px; }
+  .sbtn{ font:inherit; font-size:.66rem; font-weight:800; padding:8px 14px; border-radius:9999px; border:1px solid var(--bd); background:transparent; color:var(--tx); cursor:pointer; }
+  .sbtn.pri{ background:var(--acc); color:var(--ink); border-color:var(--acc); }
+  .selgrid .p{ cursor:pointer; }
+  .selgrid .p .ck{ position:absolute; top:7px; left:7px; width:22px; height:22px; border-radius:9999px; border:2px solid rgba(255,255,255,.75); background:rgba(0,0,0,.45); display:flex; align-items:center; justify-content:center; }
+  .selgrid .p.sel{ outline:2.5px solid var(--acc); outline-offset:-2.5px; }
+  .selgrid .p.sel .ck{ background:var(--acc); border-color:var(--acc); }
+  .selgrid .p.sel .ck svg{ stroke:var(--ink); }
+  .selgrid .p .ck svg{ width:12px; height:12px; stroke:transparent; }
+
+  /* lightbox */
+  .lbx{ border:1px solid var(--bd); border-radius:14px; background:#000; padding:14px; max-width:620px; }
+  .lbx .bar{ display:flex; align-items:center; justify-content:space-between; }
+  .lbx .ct{ font-size:.6rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); }
+  .lbx .x{ width:30px; height:30px; border-radius:9999px; border:1px solid var(--bd); background:transparent; color:var(--tx); cursor:pointer; }
+  .lbx .img{ margin:11px 0; aspect-ratio:16/10; border-radius:11px; background:linear-gradient(135deg,#26251c,#141610); border:1px solid var(--bd); display:flex; align-items:center; justify-content:center; font-size:.68rem; font-weight:800; color:rgba(255,255,255,.3); }
+  .lbx .cap{ font-size:.84rem; font-weight:700; text-align:center; }
+  .lbx .mt{ font-size:.64rem; color:var(--fnt); font-weight:700; text-align:center; margin-top:3px; }
+  .lbx .acts{ display:flex; gap:7px; justify-content:center; margin-top:13px; flex-wrap:wrap; }
+  .lbx .acts a{ font-size:.68rem; font-weight:800; padding:9px 16px; border-radius:9999px; border:1px solid var(--bd); color:var(--tx); text-decoration:none; display:inline-flex; align-items:center; gap:6px; }
+  .lbx .acts a.pri{ background:var(--acc); color:var(--ink); border-color:var(--acc); }
+  .lbx .acts a.pri svg{ stroke:var(--ink); }
+  .lbx .acts a svg{ width:13px; height:13px; stroke:var(--acc); }
+  .lbx .hint{ font-size:.6rem; color:var(--fnt); text-align:center; margin-top:11px; letter-spacing:.05em; }
+
+  .note{ background:rgba(23,215,176,.07); border:1px solid rgba(23,215,176,.28); border-radius:12px; padding:13px 16px; font-size:.77rem; color:#bfe9df; line-height:1.65; margin-top:14px; }
+  .note b{ color:var(--teal); } .note code{ background:#10201d; padding:1px 5px; border-radius:4px; }
+  .note + .note{ margin-top:9px; }
+  .cols2{ display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  @media(max-width:760px){ .cols2{ grid-template-columns:1fr; } }
+  .subl{ font-size:.58rem; font-weight:900; letter-spacing:.13em; text-transform:uppercase; color:var(--fnt); margin:0 0 9px; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <div class="mark">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 264" style="height:100%;width:auto;display:block">
+      <g transform="translate(240,60)" fill="#E6E1D5"><path d="M-40 20 L-27 -14 L-9 8 L0 -24 L9 8 L27 -14 L40 20 Z"/><rect x="-40" y="20" width="80" height="9" rx="2.5"/><circle cx="0" cy="-24" r="4.5"/><circle cx="-27" cy="-14" r="3.5"/><circle cx="27" cy="-14" r="3.5"/></g>
+      <text x="240" y="150" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-style="italic" font-weight="600" font-size="62" fill="#F7F4EC">Queen</text>
+      <text x="240" y="184" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="16.5" letter-spacing="9" fill="#E6E1D5">OF THE COURT</text>
+      <g stroke="#E6E1D5" stroke-width="2"><line x1="150" y1="203" x2="206" y2="203"/><line x1="274" y1="203" x2="330" y2="203"/></g>
+      <circle cx="240" cy="203" r="4" fill="#E6E1D5"/>
+      <text x="240" y="230" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="10" letter-spacing="4.5" fill="#8f8d82">THE DINK SOCIETY</text>
+    </svg>
+  </div>
+  <h1>Gallery — four layouts &amp; how downloads work</h1>
+  <p>All in <b>Palette D — Pearl &amp; Platinum</b>. Hover any photo to see the per-photo download button. Pick a layout (or mix — e.g. editorial for the newest night, uniform for the archive) and I'll build it.</p>
+</div>
+
+<div class="wrap">
+
+  <!-- ═══ 1 ═══ -->
+  <div class="sec">
+    <div class="sec-hd">
+      <div class="lt">Layout 1</div>
+      <h2>Justified rows</h2>
+      <div class="why">Photos keep their real shape and rows are filled edge to edge — nothing gets cropped, tall and wide shots sit together cleanly. This is how Flickr and Google Photos lay out an album, and it's the most flattering to action shots where the framing matters.</div>
+      <span class="verdict">Best all-rounder</span>
+    </div>
+    <div class="sec-bd">
+      <div class="nighthd">
+        <h4>Amazing Ladies Ladder #3 · Aug 18</h4>
+        <div class="r"><span class="ct">12 photos</span>
+          <button class="dlall"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download all</button>
+        </div>
+      </div>
+      <div class="just">
+        <div class="p w4">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Court 5 handshake</span></div>
+        <div class="p w2">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p w3">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Sharon at the kitchen line</span></div>
+        <div class="p w3">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p w4">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Round 4 on Court 3</span></div>
+        <div class="p w2">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p w3">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Podium</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 2 ═══ -->
+  <div class="sec">
+    <div class="sec-hd">
+      <div class="lt">Layout 2</div>
+      <h2>Uniform grid</h2>
+      <div class="why">Every photo cropped to the same square. Tidiest and most predictable — an archive of 15 nights stays visually calm and scans fast. Downside is the crop: a wide court shot loses its edges in the thumbnail (the full frame is still intact in the lightbox).</div>
+      <span class="verdict">Best for the archive</span>
+    </div>
+    <div class="sec-bd">
+      <div class="nighthd">
+        <h4>Amazing Ladies Ladder #2 · Aug 11</h4>
+        <div class="r"><span class="ct">8 photos</span>
+          <button class="dlall"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download all</button>
+        </div>
+      </div>
+      <div class="uni">
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Warmups</span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Tanya takes the top court</span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 3 ═══ -->
+  <div class="sec">
+    <div class="sec-hd">
+      <div class="lt">Layout 3</div>
+      <h2>Editorial — hero + strip</h2>
+      <div class="why">One big cover shot per night, two supporting shots beside it, the rest as a thumbnail strip underneath. Makes each night feel like a story rather than a dump, and pairs naturally with the recap article. Wants a genuinely good cover photo to work — you'd pick it when uploading.</div>
+      <span class="verdict">Most premium · pairs with recaps</span>
+    </div>
+    <div class="sec-bd">
+      <div class="nighthd">
+        <h4>Amazing Ladies Ladder #1 · Jul 28</h4>
+        <div class="r"><span class="ct">15 photos</span>
+          <button class="dlall"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download all</button>
+        </div>
+      </div>
+      <div class="ed">
+        <div class="p hero-p">cover photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">The first Queen night</span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Sharon, Court 5</span></div>
+      </div>
+      <div class="ed-strip">
+        <div class="p">photo</div><div class="p">photo</div><div class="p">photo</div><div class="p">photo</div><div class="p">photo</div><div class="p">photo</div><div class="p">photo</div><div class="p">photo</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ 4 ═══ -->
+  <div class="sec">
+    <div class="sec-hd">
+      <div class="lt">Layout 4</div>
+      <h2>Masonry columns</h2>
+      <div class="why">Pinterest-style staggered columns, no cropping. Handles phone verticals well — and most on-court photos get shot on a phone. Slightly busier than justified rows, and reading order goes down the columns rather than across, which some people find odd.</div>
+      <span class="verdict">Best for phone verticals</span>
+    </div>
+    <div class="sec-bd">
+      <div class="nighthd"><h4>All nights · mixed shapes</h4><div class="r"><span class="ct">35 photos</span></div></div>
+      <div class="mas">
+        <div class="p t1">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Court 5 handshake</span></div>
+        <div class="p t3">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p t2">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p t4">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">Sharon at the line</span></div>
+        <div class="p t3">photo</div><div class="p t1">photo</div><div class="p t2">photo</div><div class="p t3">photo</div>
+        <div class="p t4">photo</div><div class="p t2">photo</div><div class="p t1">photo</div><div class="p t3">photo</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DOWNLOADS ═══ -->
+  <div class="sec">
+    <div class="sec-hd">
+      <div class="lt">Downloads</div>
+      <h2>Four ways to get the photos out</h2>
+      <div class="why">These aren't alternatives — I'd build all four. They cover the three real situations: "I want that one shot of me", "I want my photos from Monday", and "give me the whole night".</div>
+    </div>
+    <div class="sec-bd">
+
+      <div class="subl">1 · Hover / tap the photo</div>
+      <div class="uni" style="max-width:500px">
+        <div class="p">photo<span class="dl" style="opacity:1"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span><span class="cap">One tap, full resolution</span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+        <div class="p">photo<span class="dl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span></div>
+      </div>
+      <div class="note"><b>The mechanic.</b> Photos are served from your own domain, so a plain <code>&lt;a download&gt;</code> saves the file directly instead of opening it in a tab. Filename comes out readable — <code>ladies-ladder-3-2026-08-18-04.jpg</code>, not a blob id. On iPhone the tile also long-presses to "Save to Photos" like any other image.</div>
+
+      <div class="subl" style="margin-top:22px">2 · Select several</div>
+      <div class="selbar">
+        <span class="l">3 selected</span>
+        <span class="r"><button class="sbtn">Select all</button><button class="sbtn">Cancel</button><button class="sbtn pri">Download 3</button></span>
+      </div>
+      <div class="uni selgrid" style="max-width:640px">
+        <div class="p sel">photo<span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+        <div class="p sel">photo<span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+        <div class="p">photo<span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+        <div class="p sel">photo<span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+        <div class="p">photo<span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+        <div class="p">photo<span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span></div>
+      </div>
+
+      <div class="subl" style="margin-top:22px">3 · Whole night, one zip</div>
+      <div class="nighthd" style="max-width:520px;border:1px solid var(--bd);border-radius:12px;padding:12px 14px;background:var(--surf)">
+        <h4>Amazing Ladies Ladder #3 · Aug 18</h4>
+        <div class="r"><span class="ct">12 photos · 34 MB</span>
+          <button class="dlall"><svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download all</button>
+        </div>
+      </div>
+      <div class="note"><b>One decision needed here.</b> A zip has to be built somewhere. Zipping <em>in the browser</em> needs a ~90KB library added to the page and briefly holds every photo in memory — fine for 12 shots, strained at 60. Zipping <em>on the server</em> is cleaner for the visitor but Netlify functions cap the response size, so a big night could fail. My recommendation: browser-side zip with a cap (say 40 photos), and above that it falls back to downloading them in sequence. You'd never notice the difference at your night sizes.</div>
+
+      <div class="subl" style="margin-top:22px">4 · From the lightbox</div>
+      <div class="lbx">
+        <div class="bar"><span class="ct">3 / 12</span><button class="x">&times;</button></div>
+        <div class="img">full-size photo</div>
+        <div class="cap">Sharon at the kitchen line</div>
+        <div class="mt">Amazing Ladies Ladder #3 · Aug 18</div>
+        <div class="acts">
+          <a class="pri" href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download</a>
+          <a href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>Share</a>
+          <a href="#" onclick="return false">See that night's results</a>
+        </div>
+        <div class="hint">← → to move · Esc to close · swipe on mobile</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ TECH ═══ -->
+  <div class="sec">
+    <div class="sec-hd">
+      <div class="lt">Under the hood</div>
+      <h2>Two things worth deciding now</h2>
+    </div>
+    <div class="sec-bd">
+      <div class="cols2">
+        <div>
+          <div class="note" style="margin-top:0"><b>Store two sizes, not one.</b> A night with 15 photos at full resolution is 40&ndash;50 MB — loading that as thumbnails would make the gallery crawl on a phone. I'd have the upload write a small <code>thumb/</code> alongside the full <code>img/</code>, so the grid loads the small ones and the lightbox and download pull the original. Costs nothing extra and it's the difference between the gallery feeling instant or sluggish.</div>
+        </div>
+        <div>
+          <div class="note" style="margin-top:0"><b>Who can delete.</b> Organizers uploading to their own night is settled. My suggestion: an organizer can delete photos on <em>her own</em> ladders only, admin can delete anywhere — same shape as how ladder editing already works. Say if you'd rather deletion stay admin-only.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

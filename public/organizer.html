@@ -182,7 +182,7 @@ function renderManage(){
   const e=CUR, isNew=!e;
   const title=isNew?'New ladder':esc(e.name);
   const meta=isNew?'Set it up — one night, individual sign-ups.':`${esc(e.date||'')}${e.startTime?' · '+esc(e.startTime):''}${e.place?' · '+esc(e.place):''} · roster ${(e._roster||[]).length}/${e.capacity||0}`;
-  const tabs=isNew?[['info','Ladder Info']]:[['info','Ladder Info'],['signups','Sign-ups'],['scoring','Scoring'],['recap','Recap']];
+  const tabs=isNew?[['info','Ladder Info']]:[['info','Ladder Info'],['signups','Sign-ups'],['scoring','Scoring'],['recap','Recap'],['photos','Photos']];
   $('app').innerHTML=`
     <div class="back" onclick="loadLadders()">← My ladders</div>
     <h2 class="mh">${title}</h2>
@@ -198,6 +198,107 @@ function renderTab(){
   if(TAB==='signups') return b.innerHTML=signupsPanel();
   if(TAB==='scoring') return b.innerHTML=scoringPanel();
   if(TAB==='recap'){ b.innerHTML='<div class="card"><div class="empty">Loading recap…</div></div>'; return loadRecap(); }
+  if(TAB==='photos'){ b.innerHTML=photosPanel(); return loadOrgPhotos(); }
+}
+
+/* ═══════════════ Photos ═══════════════
+   An organizer can ADD photos to her own ladder night and caption them, but
+   cannot delete any — deletion is admin-only (admin-ladder-photo-delete.js
+   refuses an organizer session), so no Delete control is offered here rather
+   than showing one that always fails. Same browser-side resize as the admin
+   panel: a full version capped at 2000px plus a 480px thumb, so a phone photo
+   never hits the function's payload ceiling. */
+const OP_FULL_MAX=2000, OP_THUMB_MAX=480;
+
+function photosPanel(){
+  return `<div class="card">
+      <label class="l">Add photos</label>
+      <div class="help" style="margin:0 0 12px">JPG, PNG or WebP — pick as many as you like. Each is shrunk in your browser before it uploads, so big phone photos are fine. They show publicly in the gallery for this night.</div>
+      <input type="file" id="opFiles" accept="image/jpeg,image/png,image/webp" multiple style="display:none" onchange="uploadOrgPhotos(this.files)">
+      <button class="btn btn-lime" style="width:100%" onclick="document.getElementById('opFiles').click()">Choose photos…</button>
+      <div id="opProgress" style="margin-top:10px"></div>
+    </div>
+    <div class="card">
+      <label class="l">On this ladder <span id="opCount" style="text-transform:none;letter-spacing:0;color:#5e655a;font-weight:700"></span></label>
+      <div class="help" style="margin:0 0 10px">Click a caption to edit it. To remove a photo, ask an admin — deleting is on their side.</div>
+      <div id="opList"><div class="empty">Loading…</div></div>
+    </div>`;
+}
+
+function opLoadImage(file){
+  return new Promise((res,rej)=>{ const img=new Image(), u=URL.createObjectURL(file);
+    img.onload=()=>{URL.revokeObjectURL(u);res(img);}; img.onerror=()=>{URL.revokeObjectURL(u);rej(new Error('Could not read that image.'));}; img.src=u; });
+}
+function opResize(img,maxDim,q){
+  return new Promise(res=>{ const sc=Math.min(1,maxDim/Math.max(img.width,img.height));
+    const w=Math.max(1,Math.round(img.width*sc)), h=Math.max(1,Math.round(img.height*sc));
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    c.toBlob(b=>res({blob:b,w,h}),'image/jpeg',q); });
+}
+
+async function uploadOrgPhotos(files){
+  if(!CUR||!files||!files.length) return;
+  const list=[...files], prog=$('opProgress');
+  let done=0, failed=0;
+  for(const file of list){
+    prog.innerHTML=`<div class="help">Uploading ${done+1} of ${list.length} — ${esc(file.name)}…</div>`;
+    try{
+      const img=await opLoadImage(file);
+      const full=await opResize(img,OP_FULL_MAX,0.85);
+      const thmb=await opResize(img,OP_THUMB_MAX,0.8);
+      const fd=new FormData();
+      fd.append('eventId',CUR.id);
+      fd.append('file',full.blob,'photo.jpg');
+      fd.append('thumb',thmb.blob,'thumb.jpg');
+      fd.append('w',full.w); fd.append('h',full.h);
+      const r=await fetch(API+'/ladder-photo-upload',{method:'POST',credentials:'include',body:fd});
+      const d=await r.json().catch(()=>({}));
+      if(r.ok&&d.ok) done++; else failed++;
+    }catch(e){ failed++; }
+  }
+  prog.innerHTML='';
+  const el=$('opFiles'); if(el) el.value='';
+  toast(done ? done+' photo'+(done===1?'':'s')+' uploaded'+(failed?' · '+failed+' failed':'')+'.' : 'Upload failed.', !done);
+  loadOrgPhotos();
+}
+
+async function loadOrgPhotos(){
+  if(!CUR) return;
+  const el=$('opList'); if(!el) return;
+  let photos=[];
+  try{
+    const r=await fetch('/.netlify/functions/public-ladder-photos?event='+encodeURIComponent(CUR.id));
+    const d=await r.json();
+    photos=((d.albums||[])[0]||{}).photos||[];
+  }catch(e){ /* fall through to the empty state */ }
+  const cnt=$('opCount'); if(cnt) cnt.textContent=photos.length?'· '+photos.length:'';
+  if(!photos.length){ el.innerHTML='<div class="empty">No photos on this ladder yet.</div>'; return; }
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px">'
+    +photos.map(p=>`<div style="border:1px solid rgba(255,255,255,.1);border-radius:11px;overflow:hidden;background:#000">
+        <div style="position:relative;aspect-ratio:4/3;background:#111">
+          <img src="${esc(p.thumb)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
+          ${p.cover?'<span style="position:absolute;top:6px;left:6px;font-size:.54rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;background:rgba(0,0,0,.75);color:#E6E1D5;padding:3px 8px;border-radius:9999px">Cover</span>':''}
+        </div>
+        <div style="padding:8px 9px">
+          <input value="${esc(p.caption||'')}" placeholder="Add a caption…" maxlength="140"
+                 onchange="saveOrgCaption('${esc(p.id)}',this.value)"
+                 style="width:100%;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#f0f2ec;font:inherit;font-size:.73rem;padding:6px 8px">
+          ${p.cover?'':`<button class="btn btn-out btn-sm" style="width:100%;margin-top:7px" onclick="setOrgCover('${esc(p.id)}')">Make cover</button>`}
+        </div>
+      </div>`).join('')
+    +'</div>';
+}
+
+async function saveOrgCaption(id,caption){
+  if(!CUR) return;
+  try{ await api('/ladder-photo-update',{method:'POST',body:JSON.stringify({eventId:CUR.id,id,caption})}); toast('Caption saved.'); }
+  catch(e){ toast(e.message,true); }
+}
+async function setOrgCover(id){
+  if(!CUR) return;
+  try{ await api('/ladder-photo-update',{method:'POST',body:JSON.stringify({eventId:CUR.id,id,cover:true})}); loadOrgPhotos(); }
+  catch(e){ toast(e.message,true); }
 }
 
 /* Ladder Info form (mirrors admin edit form) */

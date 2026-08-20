@@ -56,7 +56,7 @@
       h += lab('By format');
       h += frow('Overall', 'Every ladder, all formats', '#cfd3c8', OV, '');
       if (FMT.mixed.n) h += frow('Mixed', 'Society board', LIME, FMT.mixed, '');
-      if (FMT.womens.n) h += frow("Women's", 'Queen board', '#ff7bb0', FMT.womens, '👑');
+      if (FMT.womens.n) h += frow("Women's", 'Queen board', '#E6E1D5', FMT.womens, '👑');
       if (FMT.mens.n) h += frow("Men's", 'King board', '#4aa3e0', FMT.mens, '👑');
     }
     var last = L.last10 || [];

@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Queen of the Court · The Dink Society</title>
+<meta name="description" content="The Dink Society women's ladder — its own board, its own results, and the gallery from every night.">
+<meta name="theme-color" content="#0b0d0a">
+<script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/shared.css">
+<link rel="stylesheet" href="/css/shared-nav.css">
+<style>
+  /* ══════════════════════════════════════════════════════════════════
+     Queen of the Court — the women's ladder hub.
+
+     Palette D "Pearl & Platinum": warm off-white on black, the crown
+     carrying the identity. Deliberately colourless so it never competes
+     with Society lime or the blue reserved for a future King board —
+     the division reads by its wordmark, not by a hue.
+
+     Data comes from three existing public endpoints, all filtered to the
+     women's division; nothing here has its own store:
+       public-ladders                       → open + completed nights
+       public-ladder-stats?division=womens  → board, kitchen, winners
+       public-ladder-photos?type=womens     → the gallery
+     ══════════════════════════════════════════════════════════════════ */
+  :root{
+    --bg:#0b0d0a; --surf:#161914; --surf2:#1c1f18; --bd:rgba(255,255,255,.08);
+    --tx:#f0f2ec; --mut:#9aa094; --fnt:#5e655a;
+    --lime:#b8ff2c; --teal:#17d7b0; --gold:#f0c040;
+    /* Palette D */
+    --acc:#E6E1D5; --deep:#9E978A; --soft:#F7F4EC; --ink:#17190f;
+    --glow:rgba(230,225,213,.10); --chipbg:rgba(230,225,213,.13);
+  }
+  *{box-sizing:border-box}
+  body{ background:var(--bg); color:var(--tx); font-family:'Inter',system-ui,sans-serif; margin:0; padding-top:64px; }
+  a{ color:inherit; }
+
+  .wrap{ max-width:1200px; margin:0 auto; padding:0 20px 80px; }
+
+  /* ── Hero ── */
+  .hero{ text-align:center; padding:36px 20px 24px; border-bottom:1px solid var(--bd); background:radial-gradient(120% 100% at 50% 0%, var(--glow), transparent 62%); }
+  .hero .mark{ height:118px; display:flex; justify-content:center; }
+  @media(max-width:560px){ .hero .mark{ height:88px; } .hero{ padding:26px 16px 20px; } }
+  .hero .tag{ margin-top:12px; font-size:.62rem; font-weight:800; letter-spacing:.15em; text-transform:uppercase; color:var(--acc); }
+  .hero .lede{ margin:11px auto 0; max-width:54ch; font-size:.84rem; color:var(--mut); line-height:1.65; }
+  .hstats{ display:flex; justify-content:center; gap:26px; margin-top:20px; flex-wrap:wrap; }
+  .hstats div{ text-align:center; min-width:66px; }
+  .hstats b{ display:block; font-size:1.45rem; font-weight:900; color:var(--soft); font-variant-numeric:tabular-nums; line-height:1.15; }
+  .hstats span{ font-size:.56rem; font-weight:800; letter-spacing:.13em; text-transform:uppercase; color:var(--fnt); }
+
+  /* ── Tabs ── */
+  .tabs{ display:flex; gap:7px; padding:18px 0 20px; flex-wrap:wrap; }
+  .tabs button{ font:inherit; font-size:.75rem; font-weight:800; padding:10px 17px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); cursor:pointer; }
+  .tabs button.on{ background:var(--acc); color:var(--ink); border-color:var(--acc); }
+  @media(max-width:640px){
+    .tabs{ flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; padding-bottom:14px; }
+    .tabs::-webkit-scrollbar{ display:none; }
+    .tabs button{ flex:0 0 auto; }
+  }
+
+  .cols{ display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:26px; align-items:start; }
+  @media(max-width:900px){ .cols{ grid-template-columns:1fr; } .rail{ order:-1; } }
+
+  .pane{ display:none; min-height:56vh; } .pane.on{ display:block; }
+  .h1{ font-size:1.05rem; font-weight:900; margin:0 0 3px; }
+  .sub{ font-size:.74rem; color:var(--mut); margin:0 0 15px; line-height:1.55; }
+  .card{ background:var(--surf); border:1px solid var(--bd); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .empty{ font-size:.78rem; color:var(--fnt); padding:26px 4px; text-align:center; }
+
+  /* ── Board ── */
+  .lbrow{ display:flex; align-items:center; gap:10px; padding:10px 4px; border-top:1px solid rgba(255,255,255,.06); text-decoration:none; color:inherit; }
+  .lbrow:first-of-type{ border-top:0; }
+  .rk{ width:24px; font-size:.82rem; font-weight:900; color:var(--fnt); font-variant-numeric:tabular-nums; flex-shrink:0; }
+  .rk.p1{ color:var(--acc); } .rk.p2{ color:#cfd3c8; } .rk.p3{ color:var(--deep); }
+  .nm{ flex:1; font-size:.85rem; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .nm small{ display:block; font-size:.61rem; color:var(--fnt); font-weight:600; }
+  .v2{ font-size:.7rem; font-weight:700; color:var(--mut); font-variant-numeric:tabular-nums; width:50px; text-align:right; flex-shrink:0; }
+  .vl{ font-size:.85rem; font-weight:900; color:var(--acc); font-variant-numeric:tabular-nums; width:56px; text-align:right; flex-shrink:0; }
+  .seg{ display:flex; gap:5px; background:var(--surf2); border:1px solid var(--bd); border-radius:9999px; padding:4px; margin:0 0 14px; }
+  .seg button{ flex:1; padding:8px 4px; border:0; border-radius:9999px; font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; background:transparent; color:var(--mut); }
+  .seg button.on{ background:var(--acc); color:var(--ink); }
+
+  /* ── Rail ── */
+  .rail{ position:sticky; top:80px; }
+  .evc{ background:#000; border:1px solid var(--bd); border-left:3px solid var(--acc); border-radius:14px; padding:14px; margin-bottom:12px; }
+  .evc .dt{ font-size:.6rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); }
+  .evc h4{ margin:3px 0 5px; font-size:.94rem; font-weight:900; }
+  .evc .meta{ font-size:.71rem; color:var(--mut); line-height:1.55; }
+  .evc .bar{ height:6px; border-radius:9999px; background:#222; margin:10px 0 6px; overflow:hidden; }
+  .evc .bar i{ display:block; height:100%; background:linear-gradient(90deg,var(--deep),var(--acc)); }
+  .evc .spots{ font-size:.66rem; font-weight:800; color:var(--acc); }
+  .btn{ display:block; text-align:center; margin-top:11px; padding:11px; border-radius:9999px; background:var(--acc); color:var(--ink); font-weight:900; font-size:.79rem; text-decoration:none; border:1px solid var(--acc); cursor:pointer; }
+  .btn.ghost{ background:transparent; border:1px solid var(--bd); color:var(--tx); }
+  .chip{ display:inline-block; font-size:.56rem; font-weight:900; letter-spacing:.07em; text-transform:uppercase; padding:4px 9px; border-radius:9999px; background:var(--chipbg); color:var(--acc); margin:0 4px 4px 0; }
+  .chip.dupr{ background:rgba(23,215,176,.14); color:var(--teal); }
+  .chip.live{ background:rgba(240,192,64,.16); color:var(--gold); }
+
+  /* ── Results / recaps ── */
+  .resc{ display:block; text-decoration:none; color:inherit; background:var(--surf); border:1px solid var(--bd); border-left:3px solid var(--acc); border-radius:14px; padding:14px; margin-bottom:11px; }
+  .resc.soon{ opacity:.5; border-left-color:var(--fnt); }
+  .resc .top{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .resc h4{ margin:0; font-size:.92rem; font-weight:900; }
+  .resc .d{ font-size:.65rem; color:var(--fnt); font-weight:800; }
+  .resc .cta{ margin-top:10px; font-size:.71rem; font-weight:800; color:var(--acc); }
+  .pod{ display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+  .pod span{ display:inline-flex; align-items:center; gap:5px; font-size:.69rem; font-weight:800; border-radius:9999px; padding:3px 11px 3px 4px; background:#000; border:1px solid var(--bd); }
+  .pod i{ width:17px; height:17px; border-radius:50%; font-size:.55rem; font-weight:900; text-align:center; line-height:17px; font-style:normal; color:#0b120b; }
+
+  /* ── Kitchen ── */
+  .kit-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:11px; }
+  .kit-card{ background:var(--surf); border:1px solid var(--bd); border-radius:13px; padding:12px 13px; }
+  .kit-h{ font-size:.84rem; font-weight:900; }
+  .kit-sub{ font-size:.64rem; color:var(--mut); margin-bottom:8px; }
+  .kit-row{ display:flex; gap:8px; align-items:center; padding:5px 0; border-top:1px solid rgba(255,255,255,.06); font-size:.78rem; }
+  .kit-row:first-of-type{ border-top:0; }
+  .kit-row .n{ flex:1; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .kit-row .v{ font-weight:900; color:var(--acc); font-variant-numeric:tabular-nums; }
+  .kit-row .x{ font-size:.62rem; color:var(--fnt); font-weight:700; }
+
+  /* ── Gallery ──
+     Newest night gets the editorial treatment (hero + two supports + strip);
+     every older night falls back to justified rows, which fill edge to edge
+     without cropping. Tiles carry their real aspect ratio via --ar so a phone
+     vertical stays vertical. */
+  .galnight{ margin-bottom:30px; }
+  .galhead{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:11px; flex-wrap:wrap; }
+  .galhead h4{ margin:0; font-size:.9rem; font-weight:900; }
+  .galhead .r{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .galhead .ct{ font-size:.64rem; color:var(--fnt); font-weight:800; }
+  .gbtn{ font:inherit; font-size:.63rem; font-weight:800; padding:6px 12px; border-radius:9999px; border:1px solid var(--bd); background:transparent; color:var(--acc); cursor:pointer; display:inline-flex; align-items:center; gap:5px; }
+  .gbtn:hover{ background:var(--chipbg); }
+  .gbtn.pri{ background:var(--acc); color:var(--ink); border-color:var(--acc); }
+
+  .p{ position:relative; overflow:hidden; border:1px solid var(--bd); border-radius:10px; background:#111310; cursor:pointer; display:block; }
+  .p img{ width:100%; height:100%; object-fit:cover; display:block; background:#111310; }
+  .p .cap{ position:absolute; left:0; right:0; bottom:0; padding:7px 9px; background:linear-gradient(transparent,rgba(0,0,0,.86)); font-size:.6rem; font-weight:700; color:#fff; pointer-events:none; }
+  .p .dl{ position:absolute; top:7px; right:7px; width:29px; height:29px; border-radius:9999px; background:rgba(0,0,0,.66); border:1px solid rgba(255,255,255,.16); display:flex; align-items:center; justify-content:center; opacity:0; transition:opacity .14s; }
+  .p:hover .dl, .p:focus-within .dl{ opacity:1; }
+  @media(hover:none){ .p .dl{ opacity:1; } }
+  .p .dl svg{ width:13px; height:13px; stroke:var(--acc); fill:none; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+  .p .ck{ position:absolute; top:7px; left:7px; width:22px; height:22px; border-radius:9999px; border:2px solid rgba(255,255,255,.75); background:rgba(0,0,0,.45); display:none; align-items:center; justify-content:center; }
+  .p .ck svg{ width:12px; height:12px; stroke:transparent; fill:none; stroke-width:3.4; stroke-linecap:round; stroke-linejoin:round; }
+  .selmode .p .ck{ display:flex; }
+  .selmode .p .dl{ display:none; }
+  .p.sel{ outline:2.5px solid var(--acc); outline-offset:-2.5px; }
+  .p.sel .ck{ background:var(--acc); border-color:var(--acc); }
+  .p.sel .ck svg{ stroke:var(--ink); }
+
+  .just{ display:flex; flex-wrap:wrap; gap:6px; }
+  .just .p{ height:180px; flex-grow:calc(var(--ar) * 100); flex-basis:calc(var(--ar) * 180px); }
+  @media(max-width:560px){ .just .p{ height:130px; flex-basis:calc(var(--ar) * 130px); } }
+  .ed{ display:grid; grid-template-columns:2fr 1fr; gap:7px; }
+  .ed .p.heroP{ grid-row:span 2; aspect-ratio:4/3; border-radius:13px; }
+  .ed .p{ aspect-ratio:16/10; border-radius:11px; }
+  @media(max-width:640px){ .ed{ grid-template-columns:1fr; } .ed .p.heroP{ grid-row:auto; } }
+  .strip{ display:grid; grid-template-columns:repeat(auto-fill,minmax(108px,1fr)); gap:6px; margin-top:7px; }
+  .strip .p{ aspect-ratio:1; border-radius:9px; }
+
+  .selbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; background:var(--surf); border:1px solid var(--bd); border-radius:12px; padding:9px 12px; margin-bottom:11px; flex-wrap:wrap; }
+  .selbar .l{ font-size:.71rem; font-weight:800; color:var(--acc); }
+  .selbar .r{ display:flex; gap:6px; flex-wrap:wrap; }
+
+  /* ── Lightbox ── */
+  .lb{ position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.95); display:none; flex-direction:column; }
+  .lb.on{ display:flex; }
+  .lb-top{ display:flex; align-items:center; justify-content:space-between; padding:13px 16px; gap:12px; flex-shrink:0; }
+  .lb-ct{ font-size:.65rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); }
+  .lb-x{ background:transparent; border:1px solid var(--bd); color:var(--tx); width:36px; height:36px; border-radius:9999px; font-size:1.2rem; line-height:1; cursor:pointer; }
+  .lb-body{ flex:1; display:flex; align-items:center; justify-content:center; padding:0 10px; min-height:0; position:relative; }
+  .lb-body img{ max-width:min(1100px,94vw); max-height:100%; border-radius:12px; display:block; object-fit:contain; }
+  .lb-nav{ position:absolute; top:50%; transform:translateY(-50%); width:46px; height:46px; border-radius:9999px; background:rgba(255,255,255,.08); border:1px solid var(--bd); color:#fff; font-size:1.3rem; cursor:pointer; display:flex; align-items:center; justify-content:center; }
+  .lb-nav.prev{ left:12px; } .lb-nav.next{ right:12px; }
+  .lb-foot{ padding:13px 16px 24px; text-align:center; flex-shrink:0; }
+  .lb-cap{ font-size:.85rem; font-weight:700; }
+  .lb-meta{ font-size:.66rem; color:var(--fnt); font-weight:700; margin-top:3px; }
+  .lb-acts{ display:flex; gap:7px; justify-content:center; margin-top:12px; flex-wrap:wrap; }
+  .lb-acts a, .lb-acts button{ font:inherit; font-size:.69rem; font-weight:800; padding:9px 16px; border-radius:9999px; border:1px solid var(--bd); background:transparent; color:var(--tx); text-decoration:none; cursor:pointer; display:inline-flex; align-items:center; gap:6px; }
+  .lb-acts .pri{ background:var(--acc); color:var(--ink); border-color:var(--acc); }
+  .lb-acts svg{ width:13px; height:13px; fill:none; stroke:var(--acc); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+  .lb-acts .pri svg{ stroke:var(--ink); }
+  .lb-hint{ font-size:.59rem; color:var(--fnt); margin-top:11px; letter-spacing:.05em; }
+
+  .note{ background:rgba(23,215,176,.07); border:1px solid rgba(23,215,176,.28); border-radius:12px; padding:13px 15px; font-size:.76rem; color:#bfe9df; line-height:1.65; margin-bottom:15px; }
+  .note b{ color:var(--teal); }
+  .rule{ display:flex; gap:11px; padding:11px 0; border-top:1px solid rgba(255,255,255,.06); }
+  .rule:first-child{ border-top:0; }
+  .rule .ic{ font-size:1.05rem; width:24px; text-align:center; flex-shrink:0; }
+  .rule .t{ font-size:.83rem; font-weight:800; }
+  .rule .d{ font-size:.74rem; color:var(--mut); line-height:1.55; margin-top:2px; }
+  .toast{ position:fixed; left:50%; bottom:26px; transform:translateX(-50%); background:var(--acc); color:var(--ink); font-size:.75rem; font-weight:800; padding:11px 20px; border-radius:9999px; z-index:500; opacity:0; pointer-events:none; transition:opacity .2s; }
+  .toast.on{ opacity:1; }
+</style>
+</head>
+<body>
+
+<div data-partial="nav"></div>
+
+<div class="hero">
+  <div class="mark" id="qmark"></div>
+  <div class="tag">Women's Only Ladder · Its own board</div>
+  <div class="lede">Same ladder format, same rules, women's field only. Results here build the Queen board — and every game still counts toward your overall Dink Society profile.</div>
+  <div class="hstats" id="hstats"></div>
+</div>
+
+<div class="wrap">
+  <div class="tabs" id="tabs">
+    <button class="on" data-t="overview" onclick="tab(this)">Overview</button>
+    <button data-t="board" onclick="tab(this)">👑 Queen Board</button>
+    <button data-t="results" onclick="tab(this)">Results</button>
+    <button data-t="recaps" onclick="tab(this)">Recaps</button>
+    <button data-t="kitchen" onclick="tab(this)">🍳 Kitchen</button>
+    <button data-t="gallery" onclick="tab(this)">📸 Gallery</button>
+    <button data-t="rules" onclick="tab(this)">Rules</button>
+  </div>
+
+  <div class="cols">
+    <div>
+      <div class="pane on" id="p-overview">
+        <div class="note"><b>How the stats work.</b> Every women's night feeds the <b>Queen board</b> here — a separate leaderboard from the Society (mixed) board. Your <b>profile still adds it all up</b>: Overall record, point differential, Dink Rating and XP are the sum of every format you play. Nothing is siloed on your player card.</div>
+        <div id="ovLatest"></div>
+        <div class="h1" style="margin-top:22px">Top of the Queen board</div>
+        <div class="sub">Season standings — wins → point diff → DR</div>
+        <div id="ovBoard"><div class="empty">Loading…</div></div>
+        <div id="ovPhotos"></div>
+      </div>
+
+      <div class="pane" id="p-board">
+        <div class="h1">👑 Queen board</div>
+        <div class="sub">Women's ladder standings only · ranked by <b>wins → point diff → DR</b> · tap a player for her card</div>
+        <div class="seg" id="boardSeg">
+          <button class="on" data-s="wins" onclick="setSort(this)">Wins</button>
+          <button data-s="diff" onclick="setSort(this)">Point diff</button>
+          <button data-s="pf" onclick="setSort(this)">Points</button>
+          <button data-s="dr" onclick="setSort(this)">DR</button>
+        </div>
+        <div id="boardBody"><div class="empty">Loading…</div></div>
+        <div class="note" style="margin-top:14px"><b>Also counted elsewhere.</b> These same games roll into each player's Overall line on her profile, and into her Dink Rating and XP, which stay cumulative across every format. The Queen board is a filtered view, not a separate ledger.</div>
+      </div>
+
+      <div class="pane" id="p-results">
+        <div class="h1">Completed women's nights</div>
+        <div class="sub">Every finished Queen ladder — winners and the full field</div>
+        <div id="resultsBody"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="pane" id="p-recaps">
+        <div class="h1">Recaps</div>
+        <div class="sub">Every women's night, written up</div>
+        <div id="recapsBody"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="pane" id="p-kitchen">
+        <div class="h1">🍳 The Kitchen — Queen edition</div>
+        <div class="sub">Fun stats across women's nights only. Same categories as the main Kitchen, scoped to this division.</div>
+        <div id="kitchenBody"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="pane" id="p-gallery">
+        <div class="h1">📸 Gallery</div>
+        <div class="sub">Photos from every women's night, newest first. Tap any photo to open it full size.</div>
+        <div id="galleryBody"><div class="empty">Loading…</div></div>
+      </div>
+
+      <div class="pane" id="p-rules">
+        <div class="h1">Queen ladder rules</div>
+        <div class="sub">The same ladder rules as every Dink Society night — women's field only</div>
+        <div class="card">
+          <div class="rule"><div class="ic">👑</div><div><div class="t">Women's field only</div><div class="d">Registration is gender-locked. If your profile gender isn't set, signup is blocked with a note to contact the organizer.</div></div></div>
+          <div class="rule"><div class="ic">🏓</div><div><div class="t">Games to 11, win by 1</div><div class="d">Every game is first to 11 — reach 11 before your opponents and you win, played within the round's allotted time.</div></div></div>
+          <div class="rule"><div class="ic">⏱️</div><div><div class="t">Beat the clock</div><div class="d">If time runs out before either team reaches 11, the team ahead at the buzzer wins. Tied when time runs out? The team that reached that score first wins.</div></div></div>
+          <div class="rule"><div class="ic">↗</div><div><div class="t">Winners up, losers down</div><div class="d">After each round, winning teams rise a court, losing teams drop one, and partners split — fresh teams every round.</div></div></div>
+          <div class="rule"><div class="ic">🏆</div><div><div class="t">Who wins the night</div><div class="d"><b>1.</b> Most wins. <b>2.</b> If tied, highest point differential. <b>3.</b> Still tied, higher Dink Rating (DR).</div></div></div>
+          <div class="rule"><div class="ic">⬡</div><div><div class="t">Dink Rating (DR)</div><div class="d">A 0–100 skill score from your results — the final tiebreaker, and cumulative across every format you play.</div></div></div>
+          <div class="rule"><div class="ic">📊</div><div><div class="t">Where the stats land</div><div class="d">Results build the <b>Queen board</b>, separate from the Society (mixed) board. Your profile still shows the Overall sum across every format, plus a per-format breakdown.</div></div></div>
+          <div class="rule"><div class="ic">🎟️</div><div><div class="t">Cancellations</div><div class="d">Cancel and your spot reopens for the next player — no refunds, no credit.</div></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rail">
+      <div class="h1">Play a Queen night</div>
+      <div class="sub" id="railSub">Open women's ladders</div>
+      <div id="railBody"><div class="empty">Loading…</div></div>
+      <a class="btn ghost" href="/ladders.html">All ladders (mixed too) →</a>
+    </div>
+  </div>
+</div>
+
+<div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <div class="lb-top"><span class="lb-ct" id="lbCt"></span><button class="lb-x" id="lbX" aria-label="Close">&times;</button></div>
+  <div class="lb-body">
+    <button class="lb-nav prev" id="lbPrev" aria-label="Previous">&#8249;</button>
+    <img id="lbImg" alt="">
+    <button class="lb-nav next" id="lbNext" aria-label="Next">&#8250;</button>
+  </div>
+  <div class="lb-foot">
+    <div class="lb-cap" id="lbCap"></div>
+    <div class="lb-meta" id="lbMeta"></div>
+    <div class="lb-acts">
+      <a class="pri" id="lbDl" href="#" download><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download</a>
+      <button id="lbShare"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>Share</button>
+      <a id="lbNight" href="#">See that night's results</a>
+    </div>
+    <div class="lb-hint">← → to move · Esc to close · swipe on mobile</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div data-partial="footer"></div>
+<script src="/js/partials.js"></script>
+<script>
+/* ══════════════ helpers ══════════════ */
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const wd = s => { if (!s) return ''; const d = new Date(s + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); };
+const firstName = n => String(n || '').split(/\s+/)[0] || '';
+const money = c => '$' + ((Number(c) || 0) / 100).toFixed(Number(c) % 100 ? 2 : 0);
+const MEDC = ['#E6E1D5', '#cfd3c8', '#9E978A'];
+const RECAP_URLS = { '2026-07-28': '/ladders/recaps/2026-07-28-amazing-ladies-ladder.html' };
+
+/* The wordmark, inlined so it picks up the page's Cormorant + Inter and the
+   Palette D tones rather than loading the .svg as a flat image. */
+const QOTC = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 264" style="height:100%;width:auto;display:block" role="img" aria-label="Queen of the Court">
+  <g transform="translate(240,60)" fill="#E6E1D5"><path d="M-40 20 L-27 -14 L-9 8 L0 -24 L9 8 L27 -14 L40 20 Z"/><rect x="-40" y="20" width="80" height="9" rx="2.5"/><circle cx="0" cy="-24" r="4.5"/><circle cx="-27" cy="-14" r="3.5"/><circle cx="27" cy="-14" r="3.5"/></g>
+  <text x="240" y="150" text-anchor="middle" font-family="'Cormorant Garamond',serif" font-style="italic" font-weight="600" font-size="62" fill="#F7F4EC">Queen</text>
+  <text x="240" y="184" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="16.5" letter-spacing="9" fill="#E6E1D5">OF THE COURT</text>
+  <g stroke="#E6E1D5" stroke-width="2"><line x1="150" y1="203" x2="206" y2="203"/><line x1="274" y1="203" x2="330" y2="203"/></g>
+  <circle cx="240" cy="203" r="4" fill="#E6E1D5"/>
+  <text x="240" y="230" text-anchor="middle" font-family="Inter,sans-serif" font-weight="800" font-size="10" letter-spacing="4.5" fill="#8f8d82">THE DINK SOCIETY</text>
+</svg>`;
+document.getElementById('qmark').innerHTML = QOTC;
+
+const DL_ICON = '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+const CK_ICON = '<svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>';
+
+let TOAST_T = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(TOAST_T); TOAST_T = setTimeout(() => el.classList.remove('on'), 2400);
+}
+
+/* ══════════════ state ══════════════ */
+let OPEN = [], COMPLETED = [], STATS = null, ALBUMS = [], SORT = 'wins';
+
+/* ══════════════ routing ══════════════ */
+const TABS = ['overview','board','results','recaps','kitchen','gallery','rules'];
+function tab(btn) { showTab(btn.dataset.t); if (location.hash.replace(/^#/,'') !== btn.dataset.t) history.replaceState(null, '', '#' + btn.dataset.t); }
+function showTab(name) {
+  if (!TABS.includes(name)) name = 'overview';
+  document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === name));
+  document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + name));
+}
+function route() { showTab((location.hash || '').replace(/^#/, '')); }
+window.addEventListener('hashchange', route);
+
+/* ══════════════ load ══════════════ */
+async function load() {
+  const [lad, stats, photos] = await Promise.all([
+    fetch('/.netlify/functions/public-ladders').then(r => r.json()).catch(() => ({})),
+    fetch('/.netlify/functions/public-ladder-stats?division=womens').then(r => r.json()).catch(() => ({})),
+    fetch('/.netlify/functions/public-ladder-photos?type=womens').then(r => r.json()).catch(() => ({})),
+  ]);
+  // Everything on this page is the women's division, so the filter happens once
+  // here rather than in each renderer.
+  OPEN = (lad.ladders || []).filter(l => (l.type || 'mixed') === 'womens');
+  COMPLETED = (lad.completed || []).filter(l => (l.type || 'mixed') === 'womens')
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  STATS = stats || {};
+  ALBUMS = photos.albums || [];
+
+  renderHero(); renderRail(); renderOverview(); renderBoard();
+  renderResults(); renderRecaps(); renderKitchen(); renderGallery();
+  route();
+}
+
+function renderHero() {
+  const rows = STATS.leaderboard || [];
+  const queen = rows[0];
+  const cells = [
+    { b: STATS.nights != null ? STATS.nights : COMPLETED.length, s: 'Nights played' },
+    { b: rows.length, s: 'Players' },
+    { b: OPEN.length, s: OPEN.length === 1 ? 'Ladder open' : 'Ladders open' },
+  ];
+  if (queen) cells.push({ b: esc(firstName(queen.name)), s: 'Current Queen' });
+  document.getElementById('hstats').innerHTML = cells.map(c => `<div><b>${c.b}</b><span>${c.s}</span></div>`).join('');
+}
+
+/* ══════════════ rail — open nights ══════════════ */
+function renderRail() {
+  const el = document.getElementById('railBody');
+  if (!OPEN.length) {
+    el.innerHTML = `<div class="card" style="text-align:center"><div style="font-size:.8rem;font-weight:800">No women's ladder open right now</div>
+      <div style="font-size:.72rem;color:var(--mut);margin-top:6px;line-height:1.55">New nights are announced by email — and they show up here the moment they open.</div></div>`;
+    document.getElementById('railSub').textContent = 'Nothing open at the moment';
+    return;
+  }
+  el.innerHTML = OPEN.map(l => {
+    const cap = l.capacity || 0, left = l.spotsLeft == null ? null : l.spotsLeft;
+    const filled = cap ? Math.min(100, Math.round(100 * (cap - (left || 0)) / cap)) : 0;
+    const chips = ['<span class="chip">Women\'s</span>']
+      .concat(l.format === 'fixed-partner' ? ['<span class="chip">Fixed Partner</span>'] : [])
+      .concat(l.duprRated ? ['<span class="chip dupr">DUPR</span>'] : [])
+      .concat(l.status === 'live' ? ['<span class="chip live">Live now</span>'] : []).join('');
+    const pair = l.format === 'fixed-partner';
+    return `<div class="evc">
+      <div class="dt">${esc(wd(l.date))}${l.startTime ? ' · ' + esc(l.startTime) : ''}</div>
+      <h4>${esc(l.name)}</h4>
+      <div style="margin:6px 0 8px">${chips}</div>
+      <div class="meta">${esc(l.place || '')}${l.courts ? ' · ' + l.courts + ' courts' : ''}${l.feeCents ? '<br>' + money(l.feeCents) + (pair ? ' per player (one signup covers the pair)' : ' per player') : ''}</div>
+      ${cap ? `<div class="bar"><i style="width:${filled}%"></i></div>
+        <div class="spots">${left === 0 ? 'Full — join the waitlist' : left + ' spot' + (left === 1 ? '' : 's') + ' left'} · ${cap - (left || 0)} of ${cap}</div>` : ''}
+      <a class="btn" href="/ladders.html#ladders/${encodeURIComponent(l.id)}">${pair ? 'Register a pair' : 'Register'}</a>
+    </div>`;
+  }).join('');
+  document.getElementById('railSub').textContent = OPEN.length === 1 ? 'One women\'s ladder open' : OPEN.length + ' women\'s ladders open';
+}
+
+/* ══════════════ overview ══════════════ */
+function podHtml(list) {
+  return (list || []).slice(0, 3).map((p, k) =>
+    `<span><i style="background:${MEDC[k]}">${k + 1}</i>${esc(firstName(p.name))} <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span></span>`).join('');
+}
+
+function renderOverview() {
+  const latest = (STATS.recentWinners || [])[0];
+  const el = document.getElementById('ovLatest');
+  if (latest) {
+    el.innerHTML = `<div class="h1">Latest night</div>
+      <div class="sub">${esc(latest.eventName || 'Ladder')} · ${esc(wd(latest.date))} · ${(latest.standings || []).length} players</div>
+      <a class="resc" href="/ladders.html#ladders/${encodeURIComponent(latest.eventId)}">
+        <div class="top"><h4>${esc(latest.eventName || 'Ladder')}</h4><span class="d">${esc(wd(latest.date))}</span></div>
+        <div class="pod">${podHtml(latest.winners)}</div>
+        <div class="cta">See full results →</div>
+      </a>`;
+  } else {
+    el.innerHTML = `<div class="h1">Latest night</div><div class="empty">No women's night has been played yet — the board fills in after the first one.</div>`;
+  }
+
+  const rows = (STATS.leaderboard || []).slice(0, 5);
+  document.getElementById('ovBoard').innerHTML = rows.length
+    ? `<div class="card">${rows.map((r, i) => lbRowHtml(r, i)).join('')}</div>
+       <a class="btn ghost" href="#board" onclick="showTab('board')">Full Queen board →</a>`
+    : '<div class="empty">No standings yet.</div>';
+
+  // A small taste of the newest album, so the gallery is discoverable from the
+  // first screen rather than only via its tab.
+  const a = ALBUMS[0];
+  document.getElementById('ovPhotos').innerHTML = a
+    ? `<div class="h1" style="margin-top:26px">From the last night</div>
+       <div class="sub">${esc(a.name)} · ${esc(wd(a.date))} — the full album is in the Gallery tab</div>
+       <div class="strip">${a.photos.slice(0, 6).map((p, i) => tileHtml(p, a, i, false)).join('')}</div>`
+    : '';
+}
+
+/* ══════════════ board ══════════════ */
+function lbRowHtml(r, i) {
+  const rk = i < 3 ? ` p${i + 1}` : '';
+  const diff = (r.diff > 0 ? '+' : '') + r.diff;
+  const bits = [];
+  if (r.nights) bits.push(r.nights + (r.nights === 1 ? ' night' : ' nights'));
+  if (r.dr != null) bits.push('DR ' + r.dr);
+  return `<a class="lbrow" href="/profile.html?ladderId=${encodeURIComponent(r.id)}">
+    <span class="rk${rk}">${i + 1}</span>
+    <span class="nm">${esc(r.name)}<small>${esc(bits.join(' · '))}</small></span>
+    <span class="v2">${esc(diff)}</span>
+    <span class="vl">${r.w}-${r.l}</span></a>`;
+}
+function setSort(btn) {
+  SORT = btn.dataset.s;
+  document.querySelectorAll('#boardSeg button').forEach(b => b.classList.toggle('on', b === btn));
+  renderBoard();
+}
+function renderBoard() {
+  const el = document.getElementById('boardBody');
+  const rows = (STATS.leaderboard || []).slice();
+  if (!rows.length) { el.innerHTML = '<div class="empty">No women\'s results yet. The board opens after the first night is scored.</div>'; return; }
+  // 'wins' keeps the server's canonical order (wins → diff → DR); the other
+  // three are display re-sorts only and don't change how rank is decided.
+  if (SORT === 'diff') rows.sort((a, b) => b.diff - a.diff);
+  else if (SORT === 'pf') rows.sort((a, b) => b.pf - a.pf);
+  else if (SORT === 'dr') rows.sort((a, b) => (b.dr ?? -1) - (a.dr ?? -1));
+  el.innerHTML = `<div class="card">${rows.map((r, i) => lbRowHtml(r, i)).join('')}</div>`;
+}
+
+/* ══════════════ results ══════════════ */
+function renderResults() {
+  const el = document.getElementById('resultsBody');
+  if (!COMPLETED.length) { el.innerHTML = '<div class="empty">No completed women\'s nights yet.</div>'; return; }
+  el.innerHTML = COMPLETED.map(l => {
+    const top3 = (STATS.winnersByEvent || {})[l.id] || [];
+    return `<a class="resc" href="/ladders.html#ladders/${encodeURIComponent(l.id)}">
+      <div class="top"><h4>${esc(l.name)}</h4><span class="d">${esc(wd(l.date))}${l.place ? ' · ' + esc(l.place) : ''}</span></div>
+      ${top3.length ? `<div class="pod">${podHtml(top3)}</div>` : ''}
+      <div class="cta">Full results &amp; rounds →</div></a>`;
+  }).join('');
+}
+
+function renderRecaps() {
+  const el = document.getElementById('recapsBody');
+  if (!COMPLETED.length) { el.innerHTML = '<div class="empty">No recaps yet.</div>'; return; }
+  el.innerHTML = COMPLETED.map(l => {
+    const url = l.date && RECAP_URLS[l.date];
+    const top3 = (STATS.winnersByEvent || {})[l.id] || [];
+    const inner = `<div class="top"><h4>${esc(l.name)}</h4><span class="d">${esc(wd(l.date))}</span></div>
+      ${top3.length ? `<div class="pod">${podHtml(top3)}</div>` : ''}
+      <div class="cta" style="${url ? '' : 'color:var(--fnt)'}">${url ? 'Read the full recap →' : 'Recap coming soon'}</div>`;
+    return url ? `<a class="resc" href="${url}">${inner}</a>` : `<div class="resc soon">${inner}</div>`;
+  }).join('');
+}
+
+/* ══════════════ kitchen ══════════════ */
+/* Categories mirror lib/ladder-kitchen.js. Anything the API adds later that
+   isn't listed here is simply not rendered rather than breaking the tab. */
+const KIT_CATS = [
+  { k:'oneNightWonder', e:'🌟', t:'One-Night Wonder',   s:'Best single-night record' },
+  { k:'kingOfCourt',    e:'👑', t:'Queen of the Court', s:'Most rounds on the top court' },
+  { k:'perRoundTop',    e:'📊', t:'Per-Round Top',      s:'Best average per round' },
+  { k:'mostPoints',     e:'🎯', t:'Most Points',        s:'Total points scored' },
+  { k:'hotStreak',      e:'🔥', t:'Hot Streak',         s:'Longest run of wins' },
+  { k:'bestDuo',        e:'🤝', t:'Best Duo',           s:'Best record as partners' },
+  { k:'theWall',        e:'🧱', t:'The Wall',           s:'Fewest points allowed' },
+  { k:'ironPlayer',     e:'🛡️', t:'Iron Player',        s:'Most nights played' },
+  { k:'bigMover',       e:'📈', t:'Big Mover',          s:'Biggest climb in a night' },
+  { k:'beatDown',       e:'💥', t:'Beat Down',          s:'Biggest margin of victory' },
+  { k:'comebackKid',    e:'🔄', t:'Comeback Kid',       s:'Best finish from a low start' },
+  { k:'highestGame',    e:'⚡', t:'Highest Single Game', s:'Most points in one game' },
+];
+function kitRow(r, i) {
+  const name = r.name || (r.a && r.b ? r.a + ' & ' + r.b : '—');
+  const val = r.value != null ? r.value : (r.count != null ? r.count : (r.w != null ? r.w + '-' + r.l : ''));
+  return `<div class="kit-row"><span class="n">${esc(name)}</span>${r.extra ? `<span class="x">${esc(r.extra)}</span>` : ''}<span class="v">${esc(String(val))}</span></div>`;
+}
+function renderKitchen() {
+  const el = document.getElementById('kitchenBody');
+  const k = STATS.kitchen || {};
+  const cards = KIT_CATS.map(c => {
+    const rows = Array.isArray(k[c.k]) ? k[c.k] : (k[c.k] ? [k[c.k]] : []);
+    if (!rows.length) return '';
+    return `<div class="kit-card"><div class="kit-h">${c.e} ${esc(c.t)}</div><div class="kit-sub">${esc(c.s)}</div>${rows.slice(0, 5).map(kitRow).join('')}</div>`;
+  }).filter(Boolean).join('');
+  el.innerHTML = cards
+    ? `<div class="kit-grid">${cards}</div>`
+    : '<div class="empty">Not enough women\'s nights played yet — the Kitchen needs a couple of nights before the categories mean anything.</div>';
+}
+
+/* ══════════════ gallery ══════════════ */
+/* Aspect ratio drives the justified-row layout. Photos uploaded before width
+   and height were recorded fall back to 4:3, which lays out fine. */
+const arOf = p => (p.w && p.h) ? Math.max(0.5, Math.min(2.2, p.w / p.h)) : 1.3333;
+
+function tileHtml(p, album, i, showCap = true) {
+  return `<a class="p" style="--ar:${arOf(p).toFixed(3)}" href="${esc(p.url)}"
+      data-ev="${esc(album.eventId)}" data-i="${i}" onclick="return openLb(event,this)">
+    <img src="${esc(p.thumb)}" alt="${esc(p.caption || album.name)}" loading="lazy" width="${p.w || 800}" height="${p.h || 600}">
+    <span class="dl" onclick="return grab(event,'${esc(p.download)}')" title="Download">${DL_ICON}</span>
+    <span class="ck">${CK_ICON}</span>
+    ${showCap && p.caption ? `<span class="cap">${esc(p.caption)}</span>` : ''}
+  </a>`;
+}
+
+function renderGallery() {
+  const el = document.getElementById('galleryBody');
+  if (!ALBUMS.length) {
+    el.innerHTML = `<div class="empty">No photos yet.<br><br>Photos are added from each ladder's manage panel — they'll appear here automatically, grouped by night.</div>`;
+    return;
+  }
+  el.innerHTML = ALBUMS.map((a, ai) => {
+    const head = `<div class="galhead">
+        <h4>${esc(a.name)} · ${esc(wd(a.date))}</h4>
+        <div class="r">
+          <span class="ct">${a.count} photo${a.count === 1 ? '' : 's'}</span>
+          <button class="gbtn" onclick="toggleSel('${esc(a.eventId)}')" id="selbtn-${esc(a.eventId)}">Select</button>
+        </div>
+      </div>
+      <div class="selbar" id="selbar-${esc(a.eventId)}" style="display:none">
+        <span class="l" id="selcount-${esc(a.eventId)}">0 selected</span>
+        <span class="r">
+          <button class="gbtn" onclick="selAll('${esc(a.eventId)}')">Select all</button>
+          <button class="gbtn" onclick="toggleSel('${esc(a.eventId)}')">Cancel</button>
+          <button class="gbtn pri" onclick="grabSelected('${esc(a.eventId)}')">${DL_ICON} Download</button>
+        </span>
+      </div>`;
+
+    // Newest night reads as an editorial spread; older nights are justified
+    // rows so a long archive stays quick to scan.
+    let body;
+    if (ai === 0 && a.photos.length >= 3) {
+      const [hero, b, c, ...rest] = a.photos;
+      body = `<div class="ed">
+          ${tileHtml(hero, a, 0).replace('class="p"', 'class="p heroP"')}
+          ${tileHtml(b, a, 1)}${tileHtml(c, a, 2)}
+        </div>${rest.length ? `<div class="strip">${rest.map((p, i) => tileHtml(p, a, i + 3, false)).join('')}</div>` : ''}`;
+    } else {
+      body = `<div class="just">${a.photos.map((p, i) => tileHtml(p, a, i)).join('')}</div>`;
+    }
+    return `<div class="galnight" id="album-${esc(a.eventId)}">${head}${body}</div>`;
+  }).join('');
+}
+
+const albumOf = id => ALBUMS.find(a => a.eventId === id);
+
+/* ── selection ── */
+const SEL = {};   // eventId → Set of index
+function toggleSel(evId) {
+  const wrap = document.getElementById('album-' + evId);
+  if (!wrap) return;
+  const on = !wrap.classList.contains('selmode');
+  wrap.classList.toggle('selmode', on);
+  document.getElementById('selbar-' + evId).style.display = on ? 'flex' : 'none';
+  document.getElementById('selbtn-' + evId).textContent = on ? 'Done' : 'Select';
+  if (!on) { SEL[evId] = new Set(); wrap.querySelectorAll('.p.sel').forEach(p => p.classList.remove('sel')); }
+  else SEL[evId] = SEL[evId] || new Set();
+  paintSelCount(evId);
+}
+function paintSelCount(evId) {
+  const n = (SEL[evId] || new Set()).size;
+  const el = document.getElementById('selcount-' + evId);
+  if (el) el.textContent = n + ' selected';
+}
+function selAll(evId) {
+  const a = albumOf(evId); if (!a) return;
+  SEL[evId] = new Set(a.photos.map((_, i) => i));
+  document.getElementById('album-' + evId).querySelectorAll('.p').forEach(p => p.classList.add('sel'));
+  paintSelCount(evId);
+}
+
+/* ── downloads ──
+   No zip. A single photo is a plain link to the serve endpoint with dl=1, which
+   returns Content-Disposition: attachment, so the browser saves it with a
+   readable filename instead of navigating to it. A multi-select fires those
+   same links one at a time, spaced out — browsers throttle or silently drop a
+   burst of simultaneous downloads, and the stagger is what makes all of them
+   actually land. */
+function fire(url) {
+  const a = document.createElement('a');
+  a.href = url; a.download = ''; a.style.display = 'none';
+  document.body.appendChild(a); a.click();
+  setTimeout(() => a.remove(), 1000);
+}
+function grab(ev, url) { ev.preventDefault(); ev.stopPropagation(); fire(url); return false; }
+function grabSelected(evId) {
+  const a = albumOf(evId); if (!a) return;
+  const idx = [...(SEL[evId] || new Set())].sort((x, y) => x - y);
+  if (!idx.length) { toast('Pick a photo first'); return; }
+  toast(`Downloading ${idx.length} photo${idx.length === 1 ? '' : 's'}…`);
+  idx.forEach((i, n) => setTimeout(() => fire(a.photos[i].download), n * 450));
+}
+
+/* ══════════════ lightbox ══════════════ */
+const LB = document.getElementById('lb');
+let LB_ALBUM = null, LB_I = 0;
+
+function openLb(ev, el) {
+  ev.preventDefault();
+  const evId = el.dataset.ev, wrap = document.getElementById('album-' + evId);
+  // In select mode a tap toggles selection instead of opening the viewer.
+  if (wrap && wrap.classList.contains('selmode')) {
+    const i = +el.dataset.i;
+    SEL[evId] = SEL[evId] || new Set();
+    if (SEL[evId].has(i)) { SEL[evId].delete(i); el.classList.remove('sel'); }
+    else { SEL[evId].add(i); el.classList.add('sel'); }
+    paintSelCount(evId);
+    return false;
+  }
+  LB_ALBUM = albumOf(evId); LB_I = +el.dataset.i || 0;
+  if (!LB_ALBUM) return false;
+  paintLb(); LB.classList.add('on'); document.body.style.overflow = 'hidden';
+  return false;
+}
+function paintLb() {
+  const p = LB_ALBUM.photos[LB_I]; if (!p) return;
+  document.getElementById('lbImg').src = p.url;
+  document.getElementById('lbImg').alt = p.caption || LB_ALBUM.name;
+  document.getElementById('lbCap').textContent = p.caption || '';
+  document.getElementById('lbMeta').textContent = `${LB_ALBUM.name} · ${wd(LB_ALBUM.date)}`;
+  document.getElementById('lbCt').textContent = `${LB_I + 1} / ${LB_ALBUM.photos.length}`;
+  document.getElementById('lbDl').href = p.download;
+  document.getElementById('lbNight').href = '/ladders.html#ladders/' + encodeURIComponent(LB_ALBUM.eventId);
+  document.getElementById('lbPrev').style.visibility = LB_I > 0 ? 'visible' : 'hidden';
+  document.getElementById('lbNext').style.visibility = LB_I < LB_ALBUM.photos.length - 1 ? 'visible' : 'hidden';
+  // Warm the neighbours so arrowing through feels instant.
+  [LB_I - 1, LB_I + 1].forEach(i => { const n = LB_ALBUM.photos[i]; if (n) new Image().src = n.url; });
+}
+function stepLb(n) {
+  if (!LB_ALBUM) return;
+  const i = LB_I + n;
+  if (i >= 0 && i < LB_ALBUM.photos.length) { LB_I = i; paintLb(); }
+}
+function closeLb() { LB.classList.remove('on'); document.body.style.overflow = ''; document.getElementById('lbImg').src = ''; }
+
+document.getElementById('lbX').onclick = closeLb;
+document.getElementById('lbPrev').onclick = () => stepLb(-1);
+document.getElementById('lbNext').onclick = () => stepLb(1);
+LB.addEventListener('click', e => { if (e.target === LB || e.target.className === 'lb-body') closeLb(); });
+document.getElementById('lbShare').onclick = async () => {
+  const p = LB_ALBUM && LB_ALBUM.photos[LB_I]; if (!p) return;
+  const url = location.origin + p.url;
+  // Native share sheet where there is one (phones), clipboard everywhere else.
+  if (navigator.share) { try { await navigator.share({ title: LB_ALBUM.name, url }); return; } catch { /* dismissed */ } }
+  try { await navigator.clipboard.writeText(url); toast('Link copied'); } catch { toast(url); }
+};
+document.addEventListener('keydown', e => {
+  if (!LB.classList.contains('on')) return;
+  if (e.key === 'Escape') closeLb();
+  else if (e.key === 'ArrowLeft') stepLb(-1);
+  else if (e.key === 'ArrowRight') stepLb(1);
+});
+let SX = null;
+LB.addEventListener('touchstart', e => { SX = e.touches[0].clientX; }, { passive: true });
+LB.addEventListener('touchend', e => {
+  if (SX === null) return;
+  const dx = e.changedTouches[0].clientX - SX;
+  if (Math.abs(dx) > 45) stepLb(dx < 0 ? 1 : -1);
+  SX = null;
+}, { passive: true });
+
+load();
+</script>
+</body>
+</html>

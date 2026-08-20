@@ -2,6 +2,9 @@
 // GET /api/public-ladder-stats          → season leaderboard + MVPs + streaks +
 //                                          partnerships + recent winners (+ "you")
 // GET /api/public-ladder-stats?event=ID → that night's standings + podium
+// GET /api/public-ladder-stats?division=womens → the SAME season response, but
+//                                          every field scoped to one division
+//                                          (powers queen.html / king boards).
 //
 // LADDER RANKING RULE: wins → point differential → Dink Rating. Applies to the
 // season leaderboard, each night's standings, and who counts as a winner.
@@ -69,7 +72,12 @@ function buildDivisionRows(dPlays, allDr, allBonus, allMvp) {
 }
 
 export default async (req) => {
-  const eventId = new URL(req.url).searchParams.get('event');
+  const params = new URL(req.url).searchParams;
+  const eventId = params.get('event');
+  // Optional division scope for the standalone Queen/King pages. Anything
+  // other than a real division name is ignored, so a junk value degrades to
+  // the normal season-wide response rather than an empty page.
+  const division = ['mixed', 'mens', 'womens'].includes(params.get('division')) ? params.get('division') : null;
 
   // ── one night ──
   if (eventId) {
@@ -191,6 +199,54 @@ export default async (req) => {
     winnersByEvent[p.eventId] = nr.slice(0, 3).map(r => ({ id: r.id, name: r.name, w: r.w, l: r.l }));
   }
 
+  // ── Division scope (?division=womens) ──────────────────────────────────
+  // The Queen and King pages are the same season response viewed through one
+  // division. Rather than a second endpoint, everything derived from `plays` is
+  // recomputed over that division's plays only and swapped into the response.
+  //
+  // Deliberately NOT rescoped: dr, bonus and xp. Those are cumulative career
+  // scores that follow a player across every format she plays — the same reason
+  // buildDivisionRows reuses them. A player's DR shouldn't change depending on
+  // which board you're looking at her from.
+  let scoped = null;
+  if (division) {
+    const dPlays = plays.filter(p => (typeByEvent[p.eventId] || 'mixed') === division);
+    const dPlayers = playersFromPlay(dPlays);
+    const dSessions = dPlays.map(toSession);
+    const dStats = calcStats(dSessions, dPlayers);
+    const dBonus = calcBonusPts(dSessions, dPlayers);
+    const dRows = divisions[division] || [];
+
+    const dQualified = new Set(dRows
+      .filter(r => (r.w + r.l) >= MIN_KITCHEN_GAMES && (r.nights || 0) >= MIN_KITCHEN_NIGHTS)
+      .map(r => r.id));
+    const dMvpSorted = dRows.filter(r => r.mvp > 0 && dQualified.has(r.id))
+      .sort((a, b) => b.mvp - a.mvp).map(r => ({ id: r.id, name: r.name, count: r.mvp }));
+    const dPartnerSorted = calcPartners(dSessions, dPlayers)
+      .filter(p => dQualified.has(p.p1.id) && dQualified.has(p.p2.id))
+      .map(p => ({ a: p.p1.name, b: p.p2.name, w: p.w, l: p.l, pct: (p.w + p.l) ? Math.round(100 * p.w / (p.w + p.l)) : 0 }));
+
+    const dRecent = dPlays.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 4);
+    const dWinnersByEvent = {};
+    dPlays.forEach(p => { if (winnersByEvent[p.eventId]) dWinnersByEvent[p.eventId] = winnersByEvent[p.eventId]; });
+
+    scoped = {
+      leaderboard: dRows,
+      kitchen: buildKitchen(dSessions, dPlayers, dStats, dBonus),
+      mvpLeaders: limitWithTies(dMvpSorted, r => r.count),
+      partnerships: limitWithTies(dPartnerSorted, r => r.pct),
+      recentWinners: dRecent.map(p => {
+        const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
+        const ev = eventCache.get(p.eventId) || null;
+        return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || division, winners: winnersFrom(nr), standings: nr };
+      }),
+      winnersByEvent: dWinnersByEvent,
+      hasData: dRows.length > 0,
+      nights: new Set(dPlays.map(p => p.eventId)).size,
+      players: dRows.length,
+    };
+  }
+
   let you = null, youCreditCents = 0;
   const v = await verifyPlayerSession(req);
   if (v.valid) {
@@ -200,7 +256,15 @@ export default async (req) => {
   }
 
   // Per-user fields (you / youCreditCents) → keep this response browser-private.
-  return json({ leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard, mvpLeaders, partnerships, kitchen, recentWinners, winnersByEvent, you, youCreditCents, hasData: rows.length > 0 }, 'private, max-age=10');
+  return json({
+    leaderboard: rows, divisions, activeDivisions, xp: xpLeaderboard,
+    mvpLeaders, partnerships, kitchen, recentWinners, winnersByEvent,
+    you, youCreditCents, hasData: rows.length > 0,
+    // When a division was asked for, its scoped values replace the
+    // season-wide ones — so the caller reads the same field names either
+    // way. `divisions` and `xp` stay whole for the board switcher.
+    ...(scoped || {}), division,
+  }, 'private, max-age=10');
 };
 
 export const config = { path: '/.netlify/functions/public-ladder-stats' };
