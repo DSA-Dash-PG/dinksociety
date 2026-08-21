@@ -122,16 +122,39 @@ export default async (req) => {
   const eligibleIds = new Set(
     allEvents.filter(e => e.leaderboard !== 'pending' && e.leaderboard !== 'excluded').map(e => e.id)
   );
-  const plays = applyDirectory(applyMerges(await listPlay(), await getMergeMap()), await getDirectory())
-    .filter(p => eligibleIds.has(p.eventId));
+  // ── Division pool ──
+  // 'excluded' means "Own board only" — keep this ladder out of the season-wide
+  // Dink Society aggregate. Before division boards existed that read as "count
+  // nowhere", which quietly left the Queen/King boards empty for exactly the
+  // ladders most likely to be flagged that way. A held-out ladder now still
+  // feeds ITS OWN division board, which is what the label always promised.
+  // 'pending' stays out of everything until an admin actually approves it.
+  const divisionIds = new Set(
+    allEvents.filter(e => e.leaderboard !== 'pending').map(e => e.id)
+  );
+  const loaded = applyDirectory(applyMerges(await listPlay(), await getMergeMap()), await getDirectory());
+  const plays = loaded.filter(p => eligibleIds.has(p.eventId));
+  const divPlays = loaded.filter(p => divisionIds.has(p.eventId));
   const sessions = plays.map(toSession);
   const players = playersFromPlay(plays);
   const { rows, stats: allStats, dr: allDr, bonus: allBonus, mvp: allMvp } = buildRows(sessions, players);
 
+  // Cumulative career scores for the DIVISION boards, computed over the wider
+  // pool so a player who has only ever played held-out ladders still has a real
+  // Dink Rating — otherwise she'd rank on the Queen board with no DR at all,
+  // and DR is the final tiebreaker. The Society aggregate above deliberately
+  // keeps using the strict pool, so nothing held out ever leaks into it.
+  const divSessions = divPlays.map(toSession);
+  const divPlayers = playersFromPlay(divPlays);
+  const divStats = calcStats(divSessions, divPlayers);
+  const divDr = calcDinkRating(divStats, divSessions, divPlayers);
+  const divBonus = calcBonusPts(divSessions, divPlayers);
+  const divMvp = calcMvpCount(divSessions, divPlayers);
+
   // ── Event cache: fetch each unique event ONCE and reuse for both typeByEvent
   // and recentWinners — previously fired one getEvent() call per play record
   // in each of those two loops (O(2n) DB calls → O(unique events)). ──
-  const uniqueEventIds = [...new Set(plays.map(p => p.eventId))];
+  const uniqueEventIds = [...new Set(divPlays.map(p => p.eventId))];
   const eventCache = new Map();
   await Promise.all(uniqueEventIds.map(async id => {
     const ev = await getEvent(id).catch(() => null);
@@ -143,11 +166,21 @@ export default async (req) => {
   const typeByEvent = {};
   uniqueEventIds.forEach(id => { typeByEvent[id] = eventCache.get(id)?.type || 'mixed'; });
 
+  // Which pool a division reads is not arbitrary. The Society board IS
+  // divisions.mixed — it's the aggregate — so a ladder flagged "Own board only"
+  // must stay off it, exactly as before. Queen and King are *separate* boards,
+  // so for them "own board only" means the division board is where the ladder
+  // belongs, not nowhere. That distinction is the whole fix.
+  const poolFor = d => (d === 'mixed' ? plays : divPlays);
+  const drFor = d => (d === 'mixed' ? allDr : divDr);
+  const bonusFor = d => (d === 'mixed' ? allBonus : divBonus);
+  const mvpFor = d => (d === 'mixed' ? allMvp : divMvp);
+
   const divisions = { all: rows };
   const activeDivisions = ['all'];
   for (const d of ['mixed', 'mens', 'womens']) {
-    const dPlays = plays.filter(p => (typeByEvent[p.eventId] || 'mixed') === d);
-    const dRows = buildDivisionRows(dPlays, allDr, allBonus, allMvp);
+    const dPlays = poolFor(d).filter(p => (typeByEvent[p.eventId] || 'mixed') === d);
+    const dRows = buildDivisionRows(dPlays, drFor(d), bonusFor(d), mvpFor(d));
     divisions[d] = dRows;
     if (dRows.length) activeDivisions.push(d);
   }
@@ -193,8 +226,10 @@ export default async (req) => {
 
   // Top-3 finishers for EVERY event with a play, so the Completed tab can show the
   // same 1-2-3 chips as the Home "Latest winners" cards. Keyed by eventId.
+  // Built over the wider pool so a held-out ladder still gets its 1-2-3 chips on
+  // its division page (and on the Completed tab, which lists it either way).
   const winnersByEvent = {};
-  for (const p of plays) {
+  for (const p of divPlays) {
     const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
     winnersByEvent[p.eventId] = nr.slice(0, 3).map(r => ({ id: r.id, name: r.name, w: r.w, l: r.l }));
   }
@@ -210,7 +245,7 @@ export default async (req) => {
   // which board you're looking at her from.
   let scoped = null;
   if (division) {
-    const dPlays = plays.filter(p => (typeByEvent[p.eventId] || 'mixed') === division);
+    const dPlays = poolFor(division).filter(p => (typeByEvent[p.eventId] || 'mixed') === division);
     const dPlayers = playersFromPlay(dPlays);
     const dSessions = dPlays.map(toSession);
     const dStats = calcStats(dSessions, dPlayers);

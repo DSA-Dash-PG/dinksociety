@@ -163,6 +163,46 @@
   .selbar .l{ font-size:.71rem; font-weight:800; color:var(--acc); }
   .selbar .r{ display:flex; gap:6px; flex-wrap:wrap; }
 
+  /* ── Night results overlay ──
+     A women's night opens HERE, not by bouncing to /ladders.html. Same data
+     (public-ladder-stats?event=<id>), rendered in this page's palette, with
+     that night's photos stitched onto the end so the gallery and the results
+     are one thing rather than two. */
+  .ov{ position:fixed; inset:0; z-index:350; background:rgba(0,0,0,.88); display:none; overflow-y:auto; padding:22px 13px 60px; }
+  .ov.on{ display:block; }
+  .ov .sheet{ max-width:660px; margin:0 auto; background:var(--bg); border:1px solid var(--bd); border-radius:18px; padding:20px 17px 26px; position:relative; }
+  .ov .x{ position:absolute; top:12px; right:12px; width:34px; height:34px; border-radius:9999px; border:1px solid var(--bd); background:transparent; color:var(--tx); font-size:1.25rem; line-height:1; cursor:pointer; z-index:2; }
+  .nmark{ height:44px; display:flex; justify-content:center; margin-bottom:12px; }
+  .ntitle{ font-size:1.05rem; font-weight:900; text-align:center; margin:0 0 3px; }
+  .nsub{ font-size:.72rem; color:var(--mut); text-align:center; margin-bottom:15px; }
+  .npod{ display:flex; gap:7px; margin-bottom:14px; }
+  .npod div{ flex:1; text-align:center; border:1px solid var(--bd); border-radius:12px; padding:11px 6px; background:var(--surf); }
+  .npod .pk{ font-size:.55rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
+  .npod .pn{ font-size:.83rem; font-weight:900; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .npod .pw{ font-size:.68rem; color:var(--mut); font-weight:700; margin-top:2px; }
+  .srow{ display:flex; align-items:center; gap:9px; padding:9px 4px; border-top:1px solid rgba(255,255,255,.06); }
+  .srow:first-of-type{ border-top:0; }
+  .shead{ display:flex; gap:9px; padding:0 4px 7px; font-size:.55rem; font-weight:900; letter-spacing:.09em; text-transform:uppercase; color:var(--fnt); }
+  .rpills{ display:flex; gap:5px; overflow-x:auto; scrollbar-width:none; padding-bottom:10px; }
+  .rpills::-webkit-scrollbar{ display:none; }
+  .rpills button{ flex:0 0 auto; font:inherit; font-size:.7rem; font-weight:800; padding:7px 13px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); cursor:pointer; }
+  .rpills button.on{ background:var(--acc); color:var(--ink); border-color:var(--acc); }
+  .ncourt{ border:1.5px solid var(--bd); border-radius:13px; overflow:hidden; margin-bottom:9px; }
+  .ncourt.king{ border-color:rgba(230,225,213,.42); }
+  .ncourt .ch{ display:flex; align-items:center; gap:8px; padding:7px 11px; background:rgba(0,0,0,.35); border-bottom:1px solid var(--bd); }
+  .ncourt .cn{ width:25px; height:25px; border-radius:7px; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:.76rem; background:var(--deep); color:var(--ink); }
+  .ncourt.king .cn{ background:var(--acc); }
+  .ncourt .cl{ font-size:.68rem; font-weight:900; text-transform:uppercase; color:var(--deep); }
+  .ncourt.king .cl{ color:var(--acc); }
+  .ncourt .cs{ margin-left:auto; font-size:.78rem; font-weight:900; color:var(--acc); font-variant-numeric:tabular-nums; }
+  .nteams{ display:grid; grid-template-columns:1fr 1fr; }
+  .nteams > div{ padding:9px 10px; text-align:center; }
+  .nteams > div + div{ border-left:1px solid var(--bd); }
+  .nteams .lbl2{ font-size:.5rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--fnt); margin-bottom:4px; }
+  .nteams .who{ font-size:.79rem; font-weight:700; line-height:1.3; }
+  .nteams .sc{ font-size:1.5rem; font-weight:900; margin-top:3px; font-variant-numeric:tabular-nums; }
+  .nteams .win .sc{ color:var(--acc); } .nteams .lose{ opacity:.5; }
+
   /* ── Lightbox ── */
   .lb{ position:fixed; inset:0; z-index:400; background:rgba(0,0,0,.95); display:none; flex-direction:column; }
   .lb.on{ display:flex; }
@@ -289,6 +329,20 @@
   </div>
 </div>
 
+<div class="ov" id="nightOv" role="dialog" aria-modal="true" aria-label="Night results">
+  <div class="sheet">
+    <button class="x" onclick="closeNight()" aria-label="Close">&times;</button>
+    <div class="nmark" id="nightMark"></div>
+    <h3 class="ntitle" id="nightTitle">Night results</h3>
+    <div class="nsub" id="nightSub"></div>
+    <div class="seg" id="nightSeg" style="display:none">
+      <button class="on" data-n="final" onclick="nSet(this)">Final standings</button>
+      <button data-n="rounds" onclick="nSet(this)">Round by round</button>
+    </div>
+    <div id="nightBody"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
 <div class="lb" id="lb" role="dialog" aria-modal="true" aria-label="Photo viewer">
   <div class="lb-top"><span class="lb-ct" id="lbCt"></span><button class="lb-x" id="lbX" aria-label="Close">&times;</button></div>
   <div class="lb-body">
@@ -302,7 +356,7 @@
     <div class="lb-acts">
       <a class="pri" id="lbDl" href="#" download><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download</a>
       <button id="lbShare"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.6" y1="10.5" x2="15.4" y2="6.5"/><line x1="8.6" y1="13.5" x2="15.4" y2="17.5"/></svg>Share</button>
-      <a id="lbNight" href="#">See that night's results</a>
+      <button id="lbNight">See that night's results</button>
     </div>
     <div class="lb-hint">← → to move · Esc to close · swipe on mobile</div>
   </div>
@@ -431,11 +485,11 @@ function renderOverview() {
   if (latest) {
     el.innerHTML = `<div class="h1">Latest night</div>
       <div class="sub">${esc(latest.eventName || 'Ladder')} · ${esc(wd(latest.date))} · ${(latest.standings || []).length} players</div>
-      <a class="resc" href="/ladders.html#ladders/${encodeURIComponent(latest.eventId)}">
+      <div class="resc" style="cursor:pointer" onclick="night('${esc(latest.eventId)}')">
         <div class="top"><h4>${esc(latest.eventName || 'Ladder')}</h4><span class="d">${esc(wd(latest.date))}</span></div>
         <div class="pod">${podHtml(latest.winners)}</div>
         <div class="cta">See full results →</div>
-      </a>`;
+      </div>`;
   } else {
     el.innerHTML = `<div class="h1">Latest night</div><div class="empty">No women's night has been played yet — the board fills in after the first one.</div>`;
   }
@@ -492,10 +546,10 @@ function renderResults() {
   if (!COMPLETED.length) { el.innerHTML = '<div class="empty">No completed women\'s nights yet.</div>'; return; }
   el.innerHTML = COMPLETED.map(l => {
     const top3 = (STATS.winnersByEvent || {})[l.id] || [];
-    return `<a class="resc" href="/ladders.html#ladders/${encodeURIComponent(l.id)}">
+    return `<div class="resc" style="cursor:pointer" onclick="night('${esc(l.id)}')">
       <div class="top"><h4>${esc(l.name)}</h4><span class="d">${esc(wd(l.date))}${l.place ? ' · ' + esc(l.place) : ''}</span></div>
       ${top3.length ? `<div class="pod">${podHtml(top3)}</div>` : ''}
-      <div class="cta">Full results &amp; rounds →</div></a>`;
+      <div class="cta">Full results &amp; rounds →</div></div>`;
   }).join('');
 }
 
@@ -650,6 +704,119 @@ function grabSelected(evId) {
   idx.forEach((i, n) => setTimeout(() => fire(a.photos[i].download), n * 450));
 }
 
+/* ══════════════ night results ══════════════
+   Opens in-page. Previously these linked out to /ladders.html, which dropped
+   you onto the mixed hub and out of the Queen palette entirely — the whole
+   point of the division having its own page. Same endpoint, rendered here,
+   with the night's photos appended so results and gallery are one surface. */
+let NIGHT = null, NIGHT_ID = null, nMode = 'final';
+
+async function night(id) {
+  const c = COMPLETED.find(x => x.id === id) || (STATS.recentWinners || []).find(x => x.eventId === id) || {};
+  NIGHT_ID = id; NIGHT = null; nMode = 'final';
+  document.getElementById('nightMark').innerHTML = QOTC;
+  document.getElementById('nightTitle').textContent = c.name || c.eventName || 'Night results';
+  document.getElementById('nightSub').textContent = [wd(c.date), c.place].filter(Boolean).join(' · ');
+  document.getElementById('nightSeg').style.display = 'none';
+  document.getElementById('nightBody').innerHTML = '<div class="empty">Loading…</div>';
+  document.getElementById('nightOv').classList.add('on');
+  document.body.style.overflow = 'hidden';
+  document.querySelectorAll('#nightSeg button').forEach(b => b.classList.toggle('on', b.dataset.n === 'final'));
+
+  try {
+    NIGHT = await (await fetch('/.netlify/functions/public-ladder-stats?event=' + encodeURIComponent(id))).json();
+  } catch { NIGHT = null; }
+  if (NIGHT && NIGHT.event && !c.name && !c.eventName) {
+    document.getElementById('nightTitle').textContent = NIGHT.event.name || 'Night results';
+    document.getElementById('nightSub').textContent = [wd(NIGHT.event.date), NIGHT.event.place].filter(Boolean).join(' · ');
+  }
+  // The round-by-round toggle only appears when there are rounds to show.
+  if (NIGHT && (NIGHT.history || []).length) document.getElementById('nightSeg').style.display = 'flex';
+  renderNight();
+}
+function closeNight() { document.getElementById('nightOv').classList.remove('on'); document.body.style.overflow = ''; }
+function nSet(btn) {
+  nMode = btn.dataset.n;
+  document.querySelectorAll('#nightSeg button').forEach(b => b.classList.toggle('on', b === btn));
+  renderNight();
+}
+
+let nRound = 0;
+function nSetRound(i) { nRound = i; renderNight(); }
+
+function renderNight() {
+  const el = document.getElementById('nightBody');
+  if (!NIGHT) { el.innerHTML = '<div class="empty">Could not load this night\'s results.</div>'; return; }
+  const st = NIGHT.standings || [], hist = NIGHT.history || [];
+  if (!st.length) { el.innerHTML = '<div class="empty">No scores recorded for this night yet.</div>'; return; }
+
+  let h = '';
+  if (nMode === 'final') {
+    const pk = ['🥇', '🥈', '🥉'];
+    if (st.length >= 3) {
+      h += '<div class="npod">' + st.slice(0, 3).map((p, i) =>
+        `<div><div class="pk" style="color:${MEDC[i]}">${pk[i]}</div><div class="pn">${esc(firstName(p.name))}</div><div class="pw">${p.w}–${p.l} · ${(p.diff > 0 ? '+' : '') + p.diff}</div></div>`).join('') + '</div>';
+    }
+    h += '<div class="shead"><span style="width:24px">#</span><span style="flex:1">Player</span><span style="width:50px;text-align:right">Diff</span><span style="width:56px;text-align:right">W-L</span></div>';
+    h += '<div class="card">' + st.map((p, i) => {
+      const rk = i < 3 ? ` p${i + 1}` : '';
+      const bits = [];
+      if (p.dr != null) bits.push('DR ' + p.dr);
+      if (p.pf != null) bits.push(p.pf + ' pts');
+      return `<div class="srow"><span class="rk${rk}">${i + 1}</span>
+        <span class="nm">${esc(p.name)}<small>${esc(bits.join(' · '))}</small></span>
+        <span class="v2">${(p.diff > 0 ? '+' : '') + p.diff}</span>
+        <span class="vl">${p.w}-${p.l}</span></div>`;
+    }).join('') + '</div>';
+  } else {
+    if (!hist.length) { h += '<div class="empty">No round data for this night.</div>'; }
+    else {
+      if (nRound >= hist.length) nRound = hist.length - 1;
+      h += '<div class="rpills">' + hist.map((r, i) =>
+        `<button class="${i === nRound ? 'on' : ''}" onclick="nSetRound(${i})">Round ${r.round}</button>`).join('') + '</div>';
+      const rd = hist[nRound];
+      h += (rd.courts || []).map(c => {
+        const played = c.t1 != null && c.t2 != null;
+        const aWin = c.winner === 'A', bWin = c.winner === 'B';
+        const side = (names, win, lose, score) =>
+          `<div class="${win ? 'win' : ''}${lose ? ' lose' : ''}">
+             <div class="lbl2">${played ? (win ? 'Winner' : 'Loser') : '&nbsp;'}</div>
+             <div class="who">${names && names.length ? names.map(n => esc(firstName(n))).join(' + ') : '—'}</div>
+             <div class="sc">${score == null ? '–' : score}</div></div>`;
+        return `<div class="ncourt${c.top ? ' king' : ''}">
+          <div class="ch"><span class="cn">${c.court}</span>
+            <span class="cl">${c.top ? '👑 Owns the Kitchen' : 'Court ' + c.court}</span>
+            ${played ? `<span class="cs">${c.t1} – ${c.t2}</span>` : ''}</div>
+          <div class="nteams">${side(c.teamA, aWin, played && bWin, c.t1)}${side(c.teamB, bWin, played && aWin, c.t2)}</div>
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // That night's photos, inline — tapping one opens the same lightbox.
+  const a = albumOf(NIGHT_ID);
+  if (a && a.photos.length) {
+    h += `<div class="h1" style="margin-top:22px">📸 From this night</div>
+      <div class="sub">${a.count} photo${a.count === 1 ? '' : 's'} — tap to open</div>
+      <div class="strip">${a.photos.slice(0, 8).map((p, i) => tileHtml(p, a, i, false)).join('')}</div>`;
+    if (a.photos.length > 8) h += `<a class="btn ghost" href="#gallery" onclick="closeNight();showTab('gallery');return true">See all ${a.count} in the gallery →</a>`;
+  }
+
+  const rec = RECAP_URLS[(NIGHT.event && NIGHT.event.date) || ''];
+  if (rec) h += `<a class="btn ghost" href="${rec}">Read the full recap →</a>`;
+
+  el.innerHTML = h;
+}
+
+document.getElementById('nightOv').addEventListener('click', e => {
+  if (e.target.id === 'nightOv') closeNight();
+});
+document.addEventListener('keydown', e => {
+  // Esc closes the lightbox first if it's stacked on top of the night sheet.
+  if (e.key === 'Escape' && !document.getElementById('lb').classList.contains('on')
+      && document.getElementById('nightOv').classList.contains('on')) closeNight();
+});
+
 /* ══════════════ lightbox ══════════════ */
 const LB = document.getElementById('lb');
 let LB_ALBUM = null, LB_I = 0;
@@ -679,7 +846,7 @@ function paintLb() {
   document.getElementById('lbMeta').textContent = `${LB_ALBUM.name} · ${wd(LB_ALBUM.date)}`;
   document.getElementById('lbCt').textContent = `${LB_I + 1} / ${LB_ALBUM.photos.length}`;
   document.getElementById('lbDl').href = p.download;
-  document.getElementById('lbNight').href = '/ladders.html#ladders/' + encodeURIComponent(LB_ALBUM.eventId);
+
   document.getElementById('lbPrev').style.visibility = LB_I > 0 ? 'visible' : 'hidden';
   document.getElementById('lbNext').style.visibility = LB_I < LB_ALBUM.photos.length - 1 ? 'visible' : 'hidden';
   // Warm the neighbours so arrowing through feels instant.
@@ -696,6 +863,10 @@ document.getElementById('lbX').onclick = closeLb;
 document.getElementById('lbPrev').onclick = () => stepLb(-1);
 document.getElementById('lbNext').onclick = () => stepLb(1);
 LB.addEventListener('click', e => { if (e.target === LB || e.target.className === 'lb-body') closeLb(); });
+document.getElementById('lbNight').onclick = () => {
+  const id = LB_ALBUM && LB_ALBUM.eventId; if (!id) return;
+  closeLb(); night(id);
+};
 document.getElementById('lbShare').onclick = async () => {
   const p = LB_ALBUM && LB_ALBUM.photos[LB_I]; if (!p) return;
   const url = location.origin + p.url;
