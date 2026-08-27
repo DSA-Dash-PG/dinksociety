@@ -40,7 +40,7 @@ export default async (req) => {
         finished: !!play.finished,
         currentRound: Number.isInteger(play.currentRound) ? play.currentRound : 0,
         totalRounds: play.config?.rounds || event.rounds || play.rounds.length || 0,
-        courtNames: play.config?.courtNames || event.courtNames || null,
+        courtNames: event.courtNames || play.config?.courtNames || null,
         rounds: play.rounds.map((r, ri) => ({
           round: r.round ?? (ri + 1),
           wave2started: r.wave2started !== false,

@@ -94,6 +94,7 @@
   .mtabbar button.on{ background:var(--lime);color:#000; }
   .mtabbar-fade{ display:none; } /* right-edge "more tabs" hint — mobile only, see @media below */
   .mpanel{ display:none; } .mpanel.on{ display:block; }
+  .savebar{ position:sticky;bottom:0;z-index:6;background:#0b0d0a;padding:12px 0 10px;margin-top:6px;box-shadow:0 -10px 14px -6px rgba(0,0,0,.65); }
   /* row reminder popover + toast */
   .rowpop{ position:absolute;z-index:60;background:#0f120c;border:1px solid rgba(255,255,255,.14);border-radius:13px;padding:7px;min-width:230px;box-shadow:0 18px 50px rgba(0,0,0,.6);display:none; }
   .rowpop.on{ display:block; }
@@ -127,6 +128,7 @@
     .main{ padding:16px 14px 70px; }
     .ov{ background:rgba(0,0,0,.6);align-items:center;padding:16px; }
     .sheet{ background:#161914;border:1px solid rgba(255,255,255,.14);border-radius:16px;max-width:560px;height:auto;max-height:88vh;padding:20px; }
+    .savebar{ background:#161914; }
     .x{ position:absolute;top:14px;right:16px;width:auto;height:auto;background:none;border:0;font-size:1.4rem; }
     /* Fix A: the 4-tab .mtabbar can't fit "Ladder Scoring" in an equal flex:1
        share on a ~350px sheet (flex:1 + white-space:nowrap, no min-width reset
@@ -455,8 +457,10 @@
     <div class="mdcount" id="m-adminNotes-count">0 / 4000</div>
   </div>
 
-  <button class="btn btn-lime" onclick="saveEdit()">Save changes</button>
-  <div id="mEditMsg"></div>
+  <div class="savebar">
+    <button class="btn btn-lime" style="width:100%" onclick="saveEdit()">Save changes</button>
+    <div id="mEditMsg"></div>
+  </div>
 
   <div class="frow" style="margin-top:18px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div><div class="help" style="margin-top:4px">Automatic: <b>Open</b> until the start date · <b>Live</b> while scoring · <b>Final</b> when you finish the ladder.</div></div>
 
@@ -1461,6 +1465,31 @@ async function setEmailFor(playerId,email){
     await resendConfirm(d.email,playerId);
   } else { msg('mMsg','ok','Email saved'+(d.name?' for '+d.name:'')+'.'); }
 }
+// Fixed Partner: link two roster players as a pair (cross-writes partnerId on
+// both). Players with no live partner link are NOT seated when the night
+// starts — this is the repair tool for manually-added or singly-promoted
+// entries. Reseating an already-started night takes “Restart night” in the scorer.
+async function setPartnerFor(playerId){
+  if(!CURRENT)return;
+  const me=_MROSTER.find(x=>x.playerId===playerId); if(!me)return;
+  const linked=id=>!!(id&&_MROSTER.some(y=>y.playerId===id));
+  const others=_MROSTER.filter(x=>x.playerId!==playerId);
+  if(!others.length){ msg('mMsg','err','Nobody else on the roster to pair with.'); return; }
+  const list=others.slice().sort((a,b)=>(linked(a.partnerId)?1:0)-(linked(b.partnerId)?1:0)||String(a.name||'').localeCompare(String(b.name||'')));
+  const lines=list.map((x,i)=>(i+1)+'. '+x.name+(linked(x.partnerId)?' (already paired)':'')).join('\n');
+  const pick=prompt('Partner for '+me.name+' — type a number:\n\n'+lines);
+  if(pick==null)return;
+  const idx=parseInt(pick,10)-1;
+  if(!(idx>=0&&idx<list.length)){ msg('mMsg','err','Not a valid pick — nothing changed.'); return; }
+  await _setPartner(playerId,list[idx].playerId,me.name,list[idx].name);
+}
+async function unlinkPartner(playerId){ await _setPartner(playerId,'',null,null); }
+async function _setPartner(playerId,partnerId,aName,bName){
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-partner',playerId,partnerId})});
+  if(!d.ok){ msg('mMsg','err',d.error||'Could not update partner ('+status+').'); return; }
+  await openManage(CURRENT.id);
+  msg('mMsg', d.hint?'warn':'ok', (partnerId?(aName+' & '+bName+' are now a pair ✓'):'Partner link removed.')+(d.hint?' — '+d.hint:''));
+}
 // Send (or resend) the paid confirmation email on demand.
 // Rename a player right from their roster row — writes to the shared player
 // directory (same as the Players → Master Roster editor), so it updates their
@@ -1519,6 +1548,10 @@ function _rosterMenu(p,i){
   }
   b+='<div class="ph">Actions</div>';
   b+=`<button onclick="rmCall(renameFor,'${esc(p.playerId||'')}','${esc(p.name||'').replace(/'/g,"\\'")}')">✏️ Edit name</button>`;
+  if(CURRENT&&CURRENT.format==='fixed-partner'){
+    b+=`<button onclick="rmCall(setPartnerFor,'${esc(p.playerId||'')}')">👥 ${p.partnerId?'Change partner':'Set partner'}</button>`;
+    if(p.partnerId) b+=`<button onclick="rmCall(unlinkPartner,'${esc(p.playerId||'')}')">👥 Unlink partner</button>`;
+  }
   if(p.paymentStatus!=='paid'&&p.email) b+=`<button onclick="rmCall(sendPaylink,'${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send payment link</button>`;
   if(p.paymentStatus==='paid'&&p.email) b+=`<button onclick="rmCall(resendConfirm,'${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`;
   if(!p.email) b+=`<button onclick="rmCall(setEmailFor,'${esc(p.playerId||'')}','')">✉ Add email</button>`;
@@ -1538,7 +1571,8 @@ function renderRosterList(){
   const el=document.getElementById('rosterList'); if(!el) return;
   el.innerHTML= rows.length? rows.map((p,i)=>{
     const noEmail=p.email?'':'<span class="chip chip-gray" title="No email on file">no email</span>';
-    const partner=p.partnerId?(()=>{ const o=_MROSTER.find(x=>x.playerId===p.partnerId); return o?` <span class="chip chip-gray" title="Fixed partner">👥 w/ ${esc(o.name)}</span>`:''; })():'';
+    const po=p.partnerId?_MROSTER.find(x=>x.playerId===p.partnerId):null;
+    const partner=po?` <span class="chip chip-gray" title="Fixed partner">👥 w/ ${esc(po.name)}</span>`:(CURRENT&&CURRENT.format==='fixed-partner'?` <span class="chip chip-gold" title="No partner linked — won’t be seated when the night starts. Use ⋯ → Set partner.">👥 no partner</span>`:'');
     const duprChip=p.duprId?` <span class="chip chip-gold" title="DUPR ID">DUPR ${esc(p.duprId)}</span>`:'';
     return `<div class="prow" style="position:relative"><span class="pn">${esc(p.name)}</span>${_statusChip(p)} ${noEmail}${partner}${duprChip}<button class="kebab" aria-label="Actions" onclick="toggleRowMenu(event,${i})">⋯</button>${_rosterMenu(p,i)}</div>`;
   }).join(''):'<div class="empty">No players match these filters.</div>';

@@ -279,10 +279,11 @@ function topCourt(round){ return Math.max(1,...round.courts.map(c=>c.court)); }
 // highest court number). Falls back to the number for nights set up before names.
 function courtLabel(courtNum){
   var st=STATE||{};
-  // Prefer the night's snapshot, but fall back to the LIVE event's court names
-  // so renaming courts after the night started shows up without a restart.
-  var cn=(st.play&&st.play.config&&st.play.config.courtNames);
-  if(!(Array.isArray(cn)&&cn.length)) cn=(st.event&&st.event.courtNames);
+  // Prefer the LIVE event's court names so renaming courts after the night
+  // started shows up without a restart; the night's start-time snapshot is
+  // only the fallback.
+  var cn=(st.event&&st.event.courtNames);
+  if(!(Array.isArray(cn)&&cn.length)) cn=(st.play&&st.play.config&&st.play.config.courtNames);
   if(Array.isArray(cn)&&cn.length){
     // courtNames are listed top→bottom (top = highest court number). Anchor the
     // top court to cn[0] using the courts ACTUALLY in play, so labels stay
@@ -381,6 +382,21 @@ function render(){
   for(let i=0;i<play.rounds.length;i++){ const r=play.rounds[i]; const done=r.courts.every(c=>c.score&&c.score.winner);
     h+=`<button class="pill${i===VR?' on':''}" onclick="VR=${i};render()">Rd ${i+1}${i===play.currentRound&&!finished?' ·':done?' ✓':''}</button>`; }
   h+=`</div>`;
+
+  // Why fewer courts than the ladder's configured count, and who's sitting
+  // out — courts are seated from the roster at start (4 players, or 2 pairs
+  // for Fixed Partner, per court), so a short roster fills fewer courts.
+  if(!finished){
+    const cfgC=(STATE.event&&STATE.event.courts)||0;
+    const liveR=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled');
+    const isPair=STATE.event&&STATE.event.format==='fixed-partner';
+    if(cfgC&&round.courts.length<cfgC){
+      h+=`<div class="banner">${round.courts.length} of ${cfgC} courts in play — the ${liveR.length} players on the roster fill ${round.courts.length} court${round.courts.length===1?'':'s'} at ${isPair?'2 pairs':'4 players'} per court. Courts are seated when the night starts; if the roster has grown since, <a onclick="scRestart()">⟲ Restart night</a> re-pulls it.</div>`;
+    }
+    const seated=new Set(); round.courts.forEach(c=>[...(c.team1||[]),...(c.team2||[])].filter(Boolean).forEach(p=>seated.add(p.id)));
+    const out=liveR.filter(p=>!seated.has(p.playerId));
+    if(out.length) h+=`<div class="banner">Sitting out round ${VR+1}: ${out.map(p=>esc(p.name)).join(', ')}${isPair?' — in Fixed Partner a player without a live partner on the roster cannot be auto-seated':''}. Use a court slot's SUB to swap someone in.</div>`;
+  }
 
   if(swapMode) h+=`<div class="banner" style="border-color:rgba(0,229,255,.3);background:rgba(0,229,255,.08);color:var(--cyan)">Moving ${esc(swapMode.name)} — tap another player to swap, or <a onclick="swapMode=null;render()">cancel</a>.</div>`;
 

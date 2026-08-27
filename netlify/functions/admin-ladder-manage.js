@@ -290,6 +290,41 @@ export default async (req) => {
 
   // Add or edit a roster player's email (e.g. a manually-added player who had
   // none) so they can receive the paid confirmation. Pass value:'' to clear it.
+  if (action === 'set-partner') {
+    // Fixed Partner repair tool: link (or unlink) two roster players as a
+    // pair. Cross-writes .partnerId on both entries; any old link on either
+    // side is detached first so no third entry is left pointing at them.
+    // body: { playerId, partnerId } — empty/absent partnerId unlinks.
+    // Needed because manual "Add player" / single waitlist promotion create
+    // entries with no partnerId, and pairsFromRoster silently benches them.
+    const roster = signups.roster || [];
+    const entry = roster.find(p => p.playerId === body.playerId);
+    if (!entry) return json({ error: 'Player not on the roster' }, 404);
+    const detach = (e) => {
+      if (!e || !e.partnerId) return;
+      const old = roster.find(p => p.playerId === e.partnerId);
+      if (old && old.partnerId === e.playerId) delete old.partnerId;
+      delete e.partnerId;
+    };
+    detach(entry);
+    const pid = String(body.partnerId || '').trim();
+    if (pid) {
+      if (pid === entry.playerId) return json({ error: 'A player can’t be their own partner.' }, 400);
+      const partner = roster.find(p => p.playerId === pid);
+      if (!partner) return json({ error: 'Partner not on the roster' }, 404);
+      detach(partner);
+      entry.partnerId = partner.playerId;
+      partner.partnerId = entry.playerId;
+    }
+    await setSignups(signups);
+    let hint = null;
+    try {
+      const play = await getPlay(eventId);
+      if (play && play.started && !play.finished) hint = 'The night is already started — pairs are reseated onto courts only on “Restart night” in the scorer.';
+    } catch {}
+    return json({ ok: true, partnerId: entry.partnerId || null, hint });
+  }
+
   if (action === 'set-email') {
     const entry = findRosterEntry(signups, body.playerId, body.email);
     if (!entry) return json({ error: 'Player not on the roster' }, 404);
