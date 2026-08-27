@@ -1501,11 +1501,34 @@ async function renameFor(playerId,name){
   if(v==null)return;
   const val=v.trim();
   if(!val){ msg('mMsg','err','Name cannot be empty.'); return; }
+  if(!PLDATA||!PLDATA.players){ try{ const r=await api('/admin-ladder-players'); PLDATA=r.d; }catch(e){} }
   const existing=((PLDATA&&PLDATA.players)||[]).find(x=>x.id===playerId);
   const {status,d}=await plPost({action:'update',id:playerId,name:val,email:existing?existing.email:'',gender:existing?existing.gender:'',duprId:existing?existing.duprId:''});
   if(status===401){ msg('mMsg','err','Sign in as admin first.'); return; }
   if(d&&d.ok){ msg('mMsg','ok','Renamed to '+val+' — updates on every ladder.'); loadPlayers(); await openManage(CURRENT.id); }
   else msg('mMsg','err',(d&&d.error)||'Could not rename ('+status+').');
+}
+// Set a player's DUPR ID right from their roster row. Writes to the shared
+// player directory (same as the Master Roster editor) so it follows them to
+// every ladder; the roster view falls back to the directory, so the chip
+// shows here immediately too. Passes through existing directory fields so
+// nothing gets blanked (the update endpoint treats empty as clear).
+async function setDuprFor(playerId){
+  if(!CURRENT)return;
+  if(!PLDATA||!PLDATA.players){ try{ const r=await api('/admin-ladder-players'); PLDATA=r.d; }catch(e){} }
+  const entry=_MROSTER.find(x=>x.playerId===playerId);
+  const existing=((PLDATA&&PLDATA.players)||[]).find(x=>x.id===playerId);
+  const cur=(entry&&entry.duprId)||(existing&&existing.duprId)||'';
+  const v=prompt('DUPR ID for '+((entry&&entry.name)||(existing&&existing.name)||'this player')+' (blank to clear):',cur);
+  if(v==null)return;
+  const val=v.trim();
+  const {status,d}=await plPost({action:'update',id:playerId,duprId:val,
+    name:(existing&&existing.name)||(entry&&entry.name)||'',
+    email:(existing&&existing.email)||(entry&&entry.email)||'',
+    gender:(existing&&existing.gender)||(entry&&entry.gender)||''});
+  if(status===401){ msg('mMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){ await openManage(CURRENT.id); msg('mMsg','ok', val?('DUPR ID saved ✓ — follows '+((entry&&entry.name)||'them')+' to every ladder.'):'DUPR ID cleared.'); }
+  else msg('mMsg','err',(d&&d.error)||'Could not save ('+status+').');
 }
 async function resendConfirm(email,playerId){
   if(!CURRENT)return;
@@ -1552,6 +1575,7 @@ function _rosterMenu(p,i){
     b+=`<button onclick="rmCall(setPartnerFor,'${esc(p.playerId||'')}')">👥 ${p.partnerId?'Change partner':'Set partner'}</button>`;
     if(p.partnerId) b+=`<button onclick="rmCall(unlinkPartner,'${esc(p.playerId||'')}')">👥 Unlink partner</button>`;
   }
+  b+=`<button onclick="rmCall(setDuprFor,'${esc(p.playerId||'')}')">🏷 ${p.duprId?'Edit DUPR ID':'Set DUPR ID'}</button>`;
   if(p.paymentStatus!=='paid'&&p.email) b+=`<button onclick="rmCall(sendPaylink,'${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send payment link</button>`;
   if(p.paymentStatus==='paid'&&p.email) b+=`<button onclick="rmCall(resendConfirm,'${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`;
   if(!p.email) b+=`<button onclick="rmCall(setEmailFor,'${esc(p.playerId||'')}','')">✉ Add email</button>`;

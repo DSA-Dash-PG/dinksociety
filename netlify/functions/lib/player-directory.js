@@ -43,7 +43,7 @@ export async function setPlayerInfo(id, info = {}) {
 // (keyed by playerId), so editing a player in the directory updates every ladder.
 export function applyDirectoryToSignups(rec, dir) {
   if (!rec || !dir || !Object.keys(dir).length) return rec;
-  const fix = p => { if (!p) return; const o = dir[p.playerId]; if (o) { if (o.name) p.name = o.name; if (o.gender) p.gender = o.gender; } };
+  const fix = p => { if (!p) return; const o = dir[p.playerId]; if (o) { if (o.name) p.name = o.name; if (o.gender) p.gender = o.gender; if (o.duprId && !p.duprId) p.duprId = o.duprId; } };
   (rec.roster || []).forEach(fix);
   (rec.waitlist || []).forEach(fix);
   fix(rec.pendingClaim);
