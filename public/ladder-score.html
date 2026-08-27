@@ -344,6 +344,8 @@ function render(){
 
   if(finished){
     h+=`<div class="banner">Night finalized — stats &amp; DR are live on the <a href="/ladders">Ladders</a> page. <a onclick="act('reopen')">Reopen to edit ↩</a></div>`;
+    h+=`<div class="brow"><button class="btn b-red" style="width:100%" onclick="scRestart()">⟲ Restart night — full reset</button></div>
+      <div class="demoted">Un-finalizes the night, erases every round &amp; score, and returns to the roster screen.</div>`;
   }
 
   // round header + timer (timer only for the live current round)
@@ -367,8 +369,9 @@ function render(){
       <div class="brow"><button class="btn b-lime" onclick="act('next')">Next round →</button>
       <button class="btn b-out" onclick="scRestartRound()">⟲ Clear scores</button></div>
       <div class="brow"><button class="btn b-red" onclick="scDeleteRound()">🗑 Delete round</button>
-      <button class="btn b-red" onclick="act('finish',1)">${finishLabel}</button></div>`;
-    h+=`<div class="demoted"><a onclick="scRestart()">⟲ Restart night — re-pull roster, courts &amp; settings</a></div>`;
+      <button class="btn b-red" onclick="act('finish',1)">${finishLabel}</button></div>
+      <div class="brow"><button class="btn b-red" style="width:100%" onclick="scRestart()">⟲ Restart night — full reset</button></div>`;
+    h+=`<div class="demoted">Restart erases every round &amp; score and returns to the roster screen (re-pulls roster, courts &amp; settings).</div>`;
   } else if(!finished){
     h+=`<div class="brow"><button class="btn b-out" onclick="VR=${play.currentRound};render()">↩ Back to live round ${play.currentRound+1}</button></div>`;
   }
@@ -635,7 +638,7 @@ async function act(action,confirmFirst){
 // the latest roster / courts / settings can be re-pulled. Does NOT regenerate
 // pairings — the organizer reviews the roster and taps "Enter event" to start.
 async function scRestart(){
-  if(!(await dsConfirm({ title:"Restart the night?", message:"This erases all rounds and scores and returns to the roster screen (re-pulls the latest roster, courts, and settings). It does not regenerate pairings — review the roster, then tap \"Enter event\". This cannot be undone.", confirmLabel:"Restart night", cancelLabel:"Keep playing", danger:true }))) return;
+  if(!(await dsConfirm({ title:"Restart the night?", message:"This erases all rounds and scores and returns to the roster screen (re-pulls the latest roster, courts, and settings). It does not regenerate pairings — review the roster, then tap \"Enter event\". If the night was finalized, it is un-finalized and its results come off the boards. This cannot be undone.", confirmLabel:"Restart night", cancelLabel:"Keep playing", danger:true }))) return;
   const {status,d}=await api('/admin-ladder-round?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart'})});
   if(status===401){ document.getElementById('authBanner').style.display='block'; return; }
   if(d.ok){ STATE.play=d.play; VR=0; resetTimer(); render(); msg('ok','Night reset. Review the roster below, then tap “Enter event” to regenerate Round 1.'); }

@@ -462,7 +462,8 @@
 
   <div class="sec" style="margin:22px 0 8px;color:var(--red)">Danger zone</div>
   <div style="border:1px solid rgba(255,92,71,.3);border-radius:12px;padding:13px 14px">
-    <div class="help" style="margin:0 0 10px">Deleting removes the ladder, its roster, and scores. This can't be undone.</div>
+    <div class="help" style="margin:0 0 10px">Reset wipes every round and score but keeps the roster and settings — the night goes back to not-started (a finalized night is un-finalized and its results come off the leaderboard). Deleting removes the ladder, its roster, and scores. Neither can be undone.</div>
+    <button class="btn-danger" onclick="resetNight()">Reset night</button>
     <button class="btn-danger" onclick="delLadder()">Delete ladder</button>
   </div>
   </div><!-- /info -->
@@ -1561,6 +1562,12 @@ function payCtl(p){
   return `<select title="Mark paid" style="${selStyle}" onchange="if(this.value)act('mark-paid','${em}','${pid}',this.value)"><option value="">✓ Mark paid…</option>${opt('')}</select>`;
 }
 // status segment → set-status
+async function resetNight(){
+  if(!CURRENT||!(await dsConfirm({ title:'Reset this night?', message:'This erases every round and score for "'+(CURRENT.name||'this ladder')+'" and puts it back to not-started. The roster, settings, and signups are kept — pairings are gone until the night is started again. If it was finalized, it is un-finalized and its results come off the leaderboard. This cannot be undone.', confirmLabel:'Reset night', cancelLabel:'Cancel', danger:true })))return;
+  const {d}=await api('/admin-ladder-round?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart'})});
+  if(d.ok){ msg('mEditMsg','ok','Night reset — rounds and scores wiped, roster untouched.'); loadList(); }
+  else msg('mEditMsg','err',(d&&d.error)||'Reset failed.');
+}
 async function delLadder(){
   if(!CURRENT||!(await dsConfirm({ title:'Delete this ladder?', message:'This deletes the ladder and all its signups. This cannot be undone.', confirmLabel:'Delete ladder', cancelLabel:'Cancel', danger:true })))return;
   const {d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'DELETE'});

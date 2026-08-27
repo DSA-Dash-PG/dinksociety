@@ -14,7 +14,7 @@
 //      'reshuffle'             → regenerate the current round (clears its scores)
 //      'restart-round'         → clear the CURRENT round's scores only (same players/courts)
 //      'delete-round'          → discard the current round entirely — none of it counts
-//      'restart'               → wipe all rounds
+//      'restart'               → wipe all rounds (works on a finalized night too — un-finalizes it)
 //      'finish'                → finalize the night
 
 import { unauthResponse } from './lib/auth.js';
@@ -191,9 +191,9 @@ export default async (req) => {
   }
 
   if (action === 'restart') {
-    play = { ...play, rounds: [], currentRound: -1, started: false, finished: false };
+    play = { ...play, rounds: [], currentRound: -1, started: false, finished: false, finishedAt: null };
     await setPlay(eventId, play);
-    if (event.status === 'live') { event.status = 'open'; await setEvent(event); }
+    if (event.status === 'live' || event.status === 'final') { event.status = 'open'; await setEvent(event); }
     return json({ ok: true, play });
   }
 
