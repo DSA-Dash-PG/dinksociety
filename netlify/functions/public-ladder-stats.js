@@ -47,7 +47,7 @@ function rowFor(s, dr, bonus, mvp) {
 const rankRows = rows => rows.sort((a, b) => (b.w - a.w) || (b.diff - a.diff) || ((b.dr ?? -1) - (a.dr ?? -1)));
 
 // Winner cards (top 3) — carry pts scored + diff + DR for the Home display.
-const winnersFrom = rows => rows.slice(0, 3).map((r, i) => ({ rank: i + 1, id: r.id, name: r.name, w: r.w, pf: r.pf, diff: r.diff, dr: r.dr }));
+const winnersFrom = rows => rows.slice(0, 3).map((r, i) => ({ rank: i + 1, id: r.id, name: r.name, w: r.w, l: r.l, pf: r.pf, diff: r.diff, dr: r.dr }));
 
 function buildRows(sessions, players) {
   const stats = calcStats(sessions, players);

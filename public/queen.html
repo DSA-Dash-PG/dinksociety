@@ -60,7 +60,7 @@
   }
 
   .cols{ display:grid; grid-template-columns:minmax(0,1fr) 330px; gap:26px; align-items:start; }
-  @media(max-width:900px){ .cols{ grid-template-columns:1fr; } .rail{ order:-1; } }
+  @media(max-width:900px){ .cols{ grid-template-columns:minmax(0,1fr); } .rail{ order:-1; } }
 
   .pane{ display:none; min-height:56vh; } .pane.on{ display:block; }
   .h1{ font-size:1.05rem; font-weight:900; margin:0 0 3px; }
@@ -220,6 +220,42 @@
   .lb-acts svg{ width:13px; height:13px; fill:none; stroke:var(--acc); stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   .lb-acts .pri svg{ stroke:var(--ink); }
   .lb-hint{ font-size:.59rem; color:var(--fnt); margin-top:11px; letter-spacing:.05em; }
+
+  /* ── Scrapbook overview ──
+     The Overview leads with the night's photos instead of a strip at the
+     bottom: three polaroids tossed on the table, the recap as a full-width
+     poster (headline pulled from the article itself), and a slow ticker of
+     the whole album. All of it reads from ALBUMS/RECAP_URLS — nothing new
+     is fetched beyond the recap page for its headline. */
+  .polrow{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; align-items:start; padding:10px 4px 8px; margin-bottom:20px; }
+  .pol{ background:#f4f1e8; padding:8px 8px 22px; border-radius:2px; box-shadow:0 14px 30px rgba(0,0,0,.5); display:block; text-decoration:none; transition:transform .18s ease; }
+  .pol img{ width:100%; aspect-ratio:4/3.1; object-fit:cover; display:block; background:#ddd8ca; }
+  .pol .pcap{ display:block; font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:600; color:#2b2a24; font-size:.95rem; text-align:center; margin-top:8px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pol.r1{ transform:rotate(-3deg); }
+  .pol.r2{ transform:rotate(2deg) translateY(10px); }
+  .pol.r3{ transform:rotate(-1.6deg) translateY(-5px); }
+  .pol:hover, .pol:focus-visible{ transform:rotate(0deg) translateY(-4px) scale(1.03); position:relative; z-index:2; }
+  @media(max-width:560px){ .polrow{ gap:9px; } .pol{ padding:5px 5px 16px; } .pol .pcap{ font-size:.72rem; margin-top:5px; } }
+  @media(prefers-reduced-motion:reduce){ .pol{ transition:none; } }
+
+  .poster{ position:relative; border-radius:16px; overflow:hidden; min-height:225px; display:flex; align-items:center; margin-bottom:20px; border:1px solid var(--bd); background:var(--surf); }
+  .poster .pbg{ position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr 1fr; }
+  .poster .pbg img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .poster::after{ content:""; position:absolute; inset:0; background:linear-gradient(100deg, rgba(7,8,6,.94) 38%, rgba(7,8,6,.7)); }
+  .poster .ptx{ position:relative; z-index:2; padding:24px 22px; max-width:580px; }
+  .poster .pkick{ font-size:.6rem; font-weight:900; letter-spacing:.18em; text-transform:uppercase; color:var(--gold); }
+  .poster h3{ font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:600; font-size:1.95rem; line-height:1.08; color:var(--soft); margin:8px 0 12px; text-wrap:balance; }
+  .poster .pod{ margin:0 0 14px; }
+  .poster .pacts{ display:flex; gap:8px; flex-wrap:wrap; }
+  .poster .pacts .btn{ display:inline-block; margin-top:0; padding:10px 18px; }
+  @media(max-width:560px){ .poster h3{ font-size:1.45rem; } .poster .ptx{ padding:18px 15px; } }
+
+  .ticker{ overflow:hidden; border-top:1px solid var(--bd); border-bottom:1px solid var(--bd); background:#0e100b; margin-bottom:8px; }
+  .ticker .track{ display:flex; gap:8px; padding:10px 0; width:max-content; animation:qtick 38s linear infinite; }
+  .ticker:hover .track{ animation-play-state:paused; }
+  @keyframes qtick{ from{ transform:translateX(0); } to{ transform:translateX(-50%); } }
+  @media(prefers-reduced-motion:reduce){ .ticker .track{ animation:none; } }
+  .ticker .p{ flex:0 0 auto; width:132px; height:88px; border-radius:9px; }
 
   .note{ background:rgba(23,215,176,.07); border:1px solid rgba(23,215,176,.28); border-radius:12px; padding:13px 15px; font-size:.76rem; color:#bfe9df; line-height:1.65; margin-bottom:15px; }
   .note b{ color:var(--teal); }
@@ -477,17 +513,73 @@ function podHtml(list) {
     `<span><i style="background:${MEDC[k]}">${k + 1}</i>${esc(firstName(p.name))} <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span></span>`).join('');
 }
 
+/* Scrapbook overview: polaroids → recap poster → album ticker → board.
+   The newest album supplies every photo; the poster headline is lifted from
+   the recap article itself (its .article h2) so the page never carries a
+   second copy of the copywriting. */
+function polaroidsHtml(a) {
+  if (!a || a.photos.length < 3) return '';
+  // Cover shot in the middle, flanked by the next two — captions fall back to
+  // the night's name/date when a photo wasn't captioned at upload.
+  const order = [1, 0, 2];
+  const fall = [wd(a.date), a.name, 'tap for the album'];
+  return `<div class="polrow">` + order.map((pi, k) => {
+    const p = a.photos[pi]; if (!p) return '';
+    return `<a class="pol r${k + 1}" href="${esc(p.url)}" data-ev="${esc(a.eventId)}" data-i="${pi}" onclick="return openLb(event,this)">
+      <img src="${esc(p.thumb)}" alt="${esc(p.caption || a.name)}" loading="lazy">
+      <span class="pcap">${esc(p.caption || fall[k])}</span></a>`;
+  }).join('') + `</div>`;
+}
+
+function posterHtml(latest, a) {
+  if (!latest) return '';
+  const recUrl = RECAP_URLS[latest.date] || null;
+  const bg = a ? a.photos.slice(3, 6).concat(a.photos.slice(0, 3)).slice(0, 3) : [];
+  const nPhotos = a ? a.count || a.photos.length : 0;
+  const acts = [
+    recUrl ? `<a class="btn" href="${recUrl}">Read the story →</a>` : '',
+    `<a class="btn ghost" href="#results" onclick="night('${esc(latest.eventId)}');return false">Full results</a>`,
+    nPhotos ? `<a class="btn ghost" href="#gallery" onclick="showTab('gallery')">All ${nPhotos} photos</a>` : '',
+  ].filter(Boolean).join('');
+  return `<div class="poster">
+    ${bg.length === 3 ? `<div class="pbg">${bg.map(p => `<img src="${esc(p.thumb)}" alt="" loading="lazy">`).join('')}</div>` : ''}
+    <div class="ptx">
+      <div class="pkick">The Recap · ${esc(wd(latest.date))}</div>
+      <h3 id="posterHead">${esc(latest.eventName || 'Ladder night')}</h3>
+      <div class="pod">${podHtml(latest.winners)}</div>
+      <div class="pacts">${acts}</div>
+    </div>
+  </div>`;
+}
+
+/* Swap the poster's title for the recap article's own headline once it
+   arrives — the event name renders immediately so nothing waits on this. */
+async function posterHeadline(url) {
+  try {
+    const html = await (await fetch(url)).text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const t = doc.querySelector('.article h2, h1');
+    const el = document.getElementById('posterHead');
+    if (t && el) el.textContent = t.textContent.trim();
+  } catch { /* keep the event name */ }
+}
+
+function tickerHtml(a) {
+  if (!a || a.photos.length < 4) return '';
+  const twice = a.photos.concat(a.photos);
+  return `<div class="ticker" aria-label="Photos from ${esc(a.name)}"><div class="track">
+    ${twice.map((p, i) => tileHtml(p, a, i % a.photos.length, false)).join('')}
+  </div></div>`;
+}
+
 function renderOverview() {
   const latest = (STATS.recentWinners || [])[0];
+  const a = ALBUMS[0];
   const el = document.getElementById('ovLatest');
   if (latest) {
-    el.innerHTML = `<div class="h1">Latest night</div>
-      <div class="sub">${esc(latest.eventName || 'Ladder')} · ${esc(wd(latest.date))} · ${(latest.standings || []).length} players</div>
-      <div class="resc" style="cursor:pointer" onclick="night('${esc(latest.eventId)}')">
-        <div class="top"><h4>${esc(latest.eventName || 'Ladder')}</h4><span class="d">${esc(wd(latest.date))}</span></div>
-        <div class="pod">${podHtml(latest.winners)}</div>
-        <div class="cta">See full results →</div>
-      </div>`;
+    el.innerHTML = polaroidsHtml(a) + posterHtml(latest, a) + tickerHtml(a);
+    const recUrl = RECAP_URLS[latest.date];
+    if (recUrl) posterHeadline(recUrl);
   } else {
     el.innerHTML = `<div class="h1">Latest night</div><div class="empty">No women's night has been played yet — the board fills in after the first one.</div>`;
   }
@@ -498,13 +590,9 @@ function renderOverview() {
        <a class="btn ghost" href="#board" onclick="showTab('board')">Full Queen board →</a>`
     : '<div class="empty">No standings yet.</div>';
 
-  // A small taste of the newest album, so the gallery is discoverable from the
-  // first screen rather than only via its tab.
-  const a = ALBUMS[0];
-  document.getElementById('ovPhotos').innerHTML = a
-    ? `<div class="h1" style="margin-top:26px">From the last night</div>
-       <div class="sub">${esc(a.name)} · ${esc(wd(a.date))} — the full album is in the Gallery tab</div>
-       <div class="strip">${a.photos.slice(0, 6).map((p, i) => tileHtml(p, a, i, false)).join('')}</div>`
+  // The ticker carries the newest album, so down here just point at the rest.
+  document.getElementById('ovPhotos').innerHTML = ALBUMS.length
+    ? `<a class="btn ghost" style="margin-top:14px" href="#gallery" onclick="showTab('gallery')">Browse the full gallery →</a>`
     : '';
 }
 
