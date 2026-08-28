@@ -22,13 +22,13 @@
   var FIGS = script.dataset.figs != null ? parseInt(script.dataset.figs, 10) : 2;
 
   var CSS = [
-    '.rhero{position:relative;border-radius:18px;overflow:hidden;min-height:300px;display:flex;align-items:flex-end;margin-bottom:28px;background:var(--surf1)}',
+    '.rhero{position:relative;border-radius:18px;overflow:hidden;min-height:min(480px,46vw);display:flex;align-items:flex-end;margin-bottom:28px;background:var(--surf1)}',
     '.rhero .rh-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}',
     '.rhero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(14,14,14,.3),rgba(14,14,14,.95) 90%)}',
     '.rhero .rh-tx{position:relative;z-index:2;padding:26px 26px 22px}',
     '.rhero h1{max-width:24ch;text-wrap:balance}',
     '.rhero .sub{margin-bottom:0}',
-    '@media (max-width:640px){.rhero{min-height:230px}.rhero .rh-tx{padding:18px 16px 16px}}',
+    '@media (max-width:640px){.rhero{min-height:280px}.rhero .rh-tx{padding:18px 16px 16px}}',
     '.rph{float:right;width:46%;margin:6px 0 12px 20px;border-radius:12px;overflow:hidden;border:1px solid var(--surf3);cursor:pointer;background:var(--surf1)}',
     '.rph img{width:100%;display:block}',
     '.rph figcaption{font-size:11px;color:var(--txt-faint);padding:7px 10px 9px}',
