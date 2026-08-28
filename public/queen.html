@@ -526,7 +526,7 @@ function polaroidsHtml(a) {
   return `<div class="polrow">` + order.map((pi, k) => {
     const p = a.photos[pi]; if (!p) return '';
     return `<a class="pol r${k + 1}" href="${esc(p.url)}" data-ev="${esc(a.eventId)}" data-i="${pi}" onclick="return openLb(event,this)">
-      <img src="${esc(p.thumb)}" alt="${esc(p.caption || a.name)}" loading="lazy">
+      <img src="${esc(p.thumb)}" alt="${esc(p.caption || a.name)}" loading="lazy" style="object-position:${fpos(p)}">
       <span class="pcap">${esc(p.caption || fall[k])}</span></a>`;
   }).join('') + `</div>`;
 }
@@ -542,7 +542,7 @@ function posterHtml(latest, a) {
     nPhotos ? `<a class="btn ghost" href="#gallery" onclick="showTab('gallery')">All ${nPhotos} photos</a>` : '',
   ].filter(Boolean).join('');
   return `<div class="poster">
-    ${bg.length === 3 ? `<div class="pbg">${bg.map(p => `<img src="${esc(p.thumb)}" alt="" loading="lazy">`).join('')}</div>` : ''}
+    ${bg.length === 3 ? `<div class="pbg">${bg.map(p => `<img src="${esc(p.thumb)}" alt="" loading="lazy" style="object-position:${fpos(p)}">`).join('')}</div>` : ''}
     <div class="ptx">
       <div class="pkick">The Recap · ${esc(wd(latest.date))}</div>
       <h3 id="posterHead">${esc(latest.eventName || 'Ladder night')}</h3>
@@ -691,11 +691,14 @@ function renderKitchen() {
 /* Aspect ratio drives the justified-row layout. Photos uploaded before width
    and height were recorded fall back to 4:3, which lays out fine. */
 const arOf = p => (p.w && p.h) ? Math.max(0.5, Math.min(2.2, p.w / p.h)) : 1.3333;
+/* Admin-set focal point (Photos tab → Focus) → object-position, so cover
+   crops keep the subject in frame. Center when unset. */
+const fpos = p => (Number.isFinite(p.fx) ? p.fx : 50) + '% ' + (Number.isFinite(p.fy) ? p.fy : 50) + '%';
 
 function tileHtml(p, album, i, showCap = true) {
   return `<a class="p" style="--ar:${arOf(p).toFixed(3)}" href="${esc(p.url)}"
       data-ev="${esc(album.eventId)}" data-i="${i}" onclick="return openLb(event,this)">
-    <img src="${esc(p.thumb)}" alt="${esc(p.caption || album.name)}" loading="lazy" width="${p.w || 800}" height="${p.h || 600}">
+    <img src="${esc(p.thumb)}" alt="${esc(p.caption || album.name)}" loading="lazy" width="${p.w || 800}" height="${p.h || 600}" style="object-position:${fpos(p)}">
     <span class="dl" onclick="return grab(event,'${esc(p.download)}')" title="Download">${DL_ICON}</span>
     <span class="ck">${CK_ICON}</span>
     ${showCap && p.caption ? `<span class="cap">${esc(p.caption)}</span>` : ''}

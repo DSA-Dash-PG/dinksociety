@@ -129,18 +129,7 @@
     .diffbar { width: auto; }
     .podium-aside { flex-direction:column; }
   }
-  .photo-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; }
-  .photo-grid a { display:block; border-radius:10px; overflow:hidden; background:var(--surf1); }
-  .photo-grid img { width:100%; height:100%; aspect-ratio:4/3; object-fit:cover; display:block; }
-  .photo-cap { font-size:11.5px; color:var(--txt-muted); padding:5px 2px 0; line-height:1.35; }
-  .pht-lb { position:fixed; inset:0; background:rgba(0,0,0,.92); display:none; align-items:center; justify-content:center; z-index:80; }
-  .pht-lb.on { display:flex; }
-  .pht-lb img { max-width:94vw; max-height:84vh; border-radius:8px; }
-  .pht-lb .x, .pht-lb .nav { position:absolute; background:none; border:none; color:#fff; font-size:30px; cursor:pointer; padding:12px; line-height:1; }
-  .pht-lb .x { top:10px; right:14px; }
-  .pht-lb .nav.prev { left:6px; top:50%; transform:translateY(-50%); }
-  .pht-lb .nav.next { right:6px; top:50%; transform:translateY(-50%); }
-  .pht-lb .cap { position:absolute; bottom:16px; left:0; right:0; text-align:center; color:#cfd3c9; font-size:13px; padding:0 20px; }
+  /* night-photos gallery + lightbox now come from /js/recap-photos.js */
   .wrap { padding-top: 104px; }
 </style>
 </head>
@@ -811,61 +800,8 @@
     </table>
     </div>
   </section>
-  <section id="night-photos" data-event="1499b2154d2d" hidden>
-    <h2>Photos from the night</h2>
-    <p class="chart-sub" id="night-photos-sub">Tap a photo to view it full size.</p>
-    <div class="photo-grid" id="night-photos-grid"></div>
-  </section>
 </div>
-<div class="pht-lb" id="phtLb" role="dialog" aria-label="Photo viewer">
-  <button class="x" aria-label="Close">&times;</button>
-  <button class="nav prev" aria-label="Previous">&#8249;</button>
-  <button class="nav next" aria-label="Next">&#8250;</button>
-  <img alt="">
-  <div class="cap"></div>
-</div>
-<script>
-/* Photos are loaded live from the gallery store, so pictures uploaded after
-   this article shipped appear without a redeploy. Zero photos (or a fetch
-   error) leaves the section hidden — the article stands on its own. */
-(function(){
-  var sec=document.getElementById('night-photos'); if(!sec) return;
-  var evId=sec.getAttribute('data-event');
-  fetch('/.netlify/functions/public-ladder-photos?event='+encodeURIComponent(evId))
-    .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(d){
-      var album=(d&&d.albums&&d.albums[0])||null;
-      var pics=(album&&album.photos)||[];
-      if(!pics.length) return;
-      var grid=document.getElementById('night-photos-grid');
-      pics.forEach(function(p,i){
-        var a=document.createElement('a');
-        a.href=p.url; a.setAttribute('data-i',i);
-        var im=document.createElement('img');
-        im.loading='lazy'; im.src=p.thumb||p.url; im.alt=p.caption||('Photo '+(i+1));
-        a.appendChild(im);
-        if(p.caption){ var c=document.createElement('div'); c.className='photo-cap'; c.textContent=p.caption; a.appendChild(c); }
-        a.addEventListener('click',function(e){ e.preventDefault(); open(i); });
-        grid.appendChild(a);
-      });
-      sec.hidden=false;
-      var lb=document.getElementById('phtLb'), img=lb.querySelector('img'), cap=lb.querySelector('.cap'), cur=0;
-      function open(i){ cur=(i+pics.length)%pics.length; img.src=pics[cur].url; cap.textContent=pics[cur].caption||''; lb.classList.add('on'); }
-      function close(){ lb.classList.remove('on'); img.src=''; }
-      lb.querySelector('.x').addEventListener('click',close);
-      lb.querySelector('.prev').addEventListener('click',function(){ open(cur-1); });
-      lb.querySelector('.next').addEventListener('click',function(){ open(cur+1); });
-      lb.addEventListener('click',function(e){ if(e.target===lb) close(); });
-      document.addEventListener('keydown',function(e){
-        if(!lb.classList.contains('on')) return;
-        if(e.key==='Escape') close();
-        else if(e.key==='ArrowLeft') open(cur-1);
-        else if(e.key==='ArrowRight') open(cur+1);
-      });
-    })
-    .catch(function(){ /* leave hidden */ });
-})();
-</script>
+
 <div data-partial="footer"></div>
 <script src="/js/partials.js"></script>
 <script src="/js/recap-photos.js" data-event="1499b2154d2d" defer></script>

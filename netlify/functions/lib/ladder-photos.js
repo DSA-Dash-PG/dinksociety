@@ -75,10 +75,15 @@ export async function listAllPhotos() {
   return rows.filter(Boolean);
 }
 
-/** Cover first, then oldest-uploaded first. */
+/** Cover first, then admin-set order (ord), then oldest-uploaded first.
+    `ord` is written by the Photos tab's ◀ ▶ reorder controls — photos without
+    one (older uploads) fall in after the ordered ones, by upload time. */
 export function sortPhotos(rows) {
   return rows.sort((a, b) => {
     if (!!b.cover !== !!a.cover) return b.cover ? 1 : -1;
+    const ao = Number.isFinite(a.ord) ? a.ord : Infinity;
+    const bo = Number.isFinite(b.ord) ? b.ord : Infinity;
+    if (ao !== bo) return ao - bo;
     return String(a.uploadedAt || '').localeCompare(String(b.uploadedAt || ''));
   });
 }
@@ -139,6 +144,10 @@ export function toPublic(rec, i = 0) {
     h: rec.h || null,
     bytes: rec.bytes || null,
     uploadedAt: rec.uploadedAt || null,
+    // Focal point (percentages, 0–100) for object-position crops; null = center.
+    fx: Number.isFinite(rec.fx) ? rec.fx : null,
+    fy: Number.isFinite(rec.fy) ? rec.fy : null,
+    ord: Number.isFinite(rec.ord) ? rec.ord : null,
     url: `/.netlify/functions/ladder-photo-serve?id=${encodeURIComponent(rec.id)}`,
     thumb: `/.netlify/functions/ladder-photo-serve?id=${encodeURIComponent(rec.id)}&size=thumb`,
     download: `/.netlify/functions/ladder-photo-serve?id=${encodeURIComponent(rec.id)}&dl=1`,

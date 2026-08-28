@@ -220,7 +220,7 @@ function photosPanel(){
     </div>
     <div class="card">
       <label class="l">On this ladder <span id="opCount" style="text-transform:none;letter-spacing:0;color:#5e655a;font-weight:700"></span></label>
-      <div class="help" style="margin:0 0 10px">Click a caption to edit it. To remove a photo, ask an admin — deleting is on their side.</div>
+      <div class="help" style="margin:0 0 10px">Click a caption to edit it. <b>★ Make cover</b> picks the night&rsquo;s lead photo. <b>◀ ▶</b> set the order photos appear everywhere. <b>🎯 Focus</b>: click the subject of a photo so crops keep it in frame. To remove a photo, ask an admin — deleting is on their side.</div>
       <div id="opList"><div class="empty">Loading…</div></div>
     </div>`;
 }
@@ -273,21 +273,60 @@ async function loadOrgPhotos(){
     photos=((d.albums||[])[0]||{}).photos||[];
   }catch(e){ /* fall through to the empty state */ }
   const cnt=$('opCount'); if(cnt) cnt.textContent=photos.length?'· '+photos.length:'';
-  if(!photos.length){ el.innerHTML='<div class="empty">No photos on this ladder yet.</div>'; return; }
-  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:9px">'
-    +photos.map(p=>`<div style="border:1px solid rgba(255,255,255,.1);border-radius:11px;overflow:hidden;background:#000">
-        <div style="position:relative;aspect-ratio:4/3;background:#111">
-          <img src="${esc(p.thumb)}" alt="" style="width:100%;height:100%;object-fit:cover;display:block">
+  OP_PHOTOS=photos;
+  paintOrgPhotos();
+}
+
+let OP_PHOTOS=[], OP_FOCUS=null;
+function paintOrgPhotos(){
+  const el=$('opList'); if(!el) return;
+  if(!OP_PHOTOS.length){ el.innerHTML='<div class="empty">No photos on this ladder yet.</div>'; return; }
+  el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:9px">'
+    +OP_PHOTOS.map((p,i)=>{
+      const focusing=OP_FOCUS===p.id;
+      const fx=Number.isFinite(p.fx)?p.fx:null, fy=Number.isFinite(p.fy)?p.fy:null;
+      const objPos=(fx==null?50:fx)+'% '+(fy==null?50:fy)+'%';
+      return `<div style="border:1px solid ${focusing?'rgba(184,255,44,.6)':'rgba(255,255,255,.1)'};border-radius:11px;overflow:hidden;background:#000">
+        <div style="position:relative;aspect-ratio:4/3;background:#111;${focusing?'cursor:crosshair':''}" ${focusing?`onclick="orgFocusClick(event,'${esc(p.id)}')"`:''}>
+          <img src="${esc(p.thumb)}" alt="" style="width:100%;height:100%;object-fit:cover;object-position:${objPos};display:block;pointer-events:none">
           ${p.cover?'<span style="position:absolute;top:6px;left:6px;font-size:.54rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;background:rgba(0,0,0,.75);color:#E6E1D5;padding:3px 8px;border-radius:9999px">Cover</span>':''}
+          <span style="position:absolute;top:6px;right:6px;font-size:.56rem;font-weight:900;background:rgba(0,0,0,.7);color:#9aa094;padding:3px 7px;border-radius:9999px">#${i+1}</span>
+          ${fx!=null&&!focusing?`<span style="position:absolute;left:${fx}%;top:${fy}%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #b8ff2c;background:rgba(184,255,44,.25);pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.6)"></span>`:''}
+          ${focusing?'<span style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:.6rem;font-weight:800;background:rgba(0,0,0,.75);color:#b8ff2c;padding:5px 4px">Click the subject — that point stays in frame</span>':''}
         </div>
         <div style="padding:8px 9px">
           <input value="${esc(p.caption||'')}" placeholder="Add a caption…" maxlength="140"
                  onchange="saveOrgCaption('${esc(p.id)}',this.value)"
                  style="width:100%;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#f0f2ec;font:inherit;font-size:.73rem;padding:6px 8px">
-          ${p.cover?'':`<button class="btn btn-out btn-sm" style="width:100%;margin-top:7px" onclick="setOrgCover('${esc(p.id)}')">Make cover</button>`}
+          <div style="display:flex;gap:6px;margin-top:7px">
+            <button class="btn btn-out btn-sm" style="padding:6px 9px${i===0?';opacity:.35':''}" ${i===0?'disabled':''} onclick="moveOrgPhoto('${esc(p.id)}',-1)">◀</button>
+            <button class="btn btn-out btn-sm" style="padding:6px 9px${i===OP_PHOTOS.length-1?';opacity:.35':''}" ${i===OP_PHOTOS.length-1?'disabled':''} onclick="moveOrgPhoto('${esc(p.id)}',1)">▶</button>
+            <button class="btn btn-out btn-sm" style="flex:1;${focusing?'color:#b8ff2c;border-color:rgba(184,255,44,.5)':''}" onclick="toggleOrgFocus('${esc(p.id)}')">${focusing?'Cancel':'🎯 Focus'}</button>
+          </div>
+          ${p.cover?'':`<button class="btn btn-out btn-sm" style="width:100%;margin-top:6px" onclick="setOrgCover('${esc(p.id)}')">★ Make cover</button>`}
         </div>
-      </div>`).join('')
+      </div>`;}).join('')
     +'</div>';
+}
+function toggleOrgFocus(id){ OP_FOCUS=OP_FOCUS===id?null:id; paintOrgPhotos(); }
+async function orgFocusClick(ev,id){
+  if(OP_FOCUS!==id) return;
+  const box=ev.currentTarget.getBoundingClientRect();
+  const fx=Math.round(100*(ev.clientX-box.left)/box.width);
+  const fy=Math.round(100*(ev.clientY-box.top)/box.height);
+  OP_FOCUS=null;
+  try{ await api('/ladder-photo-update',{method:'POST',body:JSON.stringify({eventId:CUR.id,id,fx,fy})}); toast('Focus set.'); }
+  catch(e){ toast(e.message,true); }
+  loadOrgPhotos();
+}
+async function moveOrgPhoto(id,dir){
+  const i=OP_PHOTOS.findIndex(p=>p.id===id), j=i+dir;
+  if(i<0||j<0||j>=OP_PHOTOS.length) return;
+  const ids=OP_PHOTOS.map(p=>p.id);
+  [ids[i],ids[j]]=[ids[j],ids[i]];
+  try{ await api('/ladder-photo-update',{method:'POST',body:JSON.stringify({eventId:CUR.id,order:ids})}); }
+  catch(e){ toast(e.message,true); }
+  loadOrgPhotos();
 }
 
 async function saveOrgCaption(id,caption){

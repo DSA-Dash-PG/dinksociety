@@ -50,6 +50,13 @@
 
   function el(tag, cls) { var e = document.createElement(tag); if (cls) e.className = cls; return e; }
 
+  // Admin-set focal point (Photos tab → Focus) → object-position, so crops
+  // keep faces in frame everywhere a photo is cover-fitted.
+  function fpos(p) {
+    var x = Number.isFinite(p.fx) ? p.fx : 50, y = Number.isFinite(p.fy) ? p.fy : 50;
+    return x + '% ' + y + '%';
+  }
+
   function buildLb() {
     lb = el('div', 'rlb');
     lb.setAttribute('role', 'dialog'); lb.setAttribute('aria-modal', 'true'); lb.setAttribute('aria-label', 'Photo viewer');
@@ -78,6 +85,7 @@
     var f = el('figure', 'rph');
     var img = el('img');
     img.src = p.thumb; img.alt = p.caption || 'Photo from the night'; img.loading = 'lazy';
+    img.style.objectPosition = fpos(p);
     f.appendChild(img);
     if (p.caption) { var c = el('figcaption'); c.textContent = p.caption; f.appendChild(c); }
     f.onclick = function () { openLb(PH.indexOf(p)); };
@@ -94,6 +102,7 @@
     if (!wrap || !eyebrow || !h1) return;
     var hero = el('div', 'rhero'), tx = el('div', 'rh-tx');
     var img = el('img', 'rh-img'); img.alt = ''; img.src = cover.url;
+    img.style.objectPosition = fpos(cover);
     hero.appendChild(img); hero.appendChild(tx);
     wrap.insertBefore(hero, eyebrow);
     tx.appendChild(eyebrow); tx.appendChild(h1); if (sub) tx.appendChild(sub);
@@ -111,6 +120,7 @@
     PH.forEach(function (p, i) {
       var link = el('a'); link.href = p.url;
       var t = el('img'); t.src = p.thumb; t.alt = p.caption || 'Photo from the night'; t.loading = 'lazy';
+      t.style.objectPosition = fpos(p);
       link.appendChild(t);
       link.onclick = function (e) { e.preventDefault(); openLb(i); };
       grid.appendChild(link);
@@ -120,7 +130,18 @@
       var cta = el('a', 'album-cta'); cta.href = '/queen.html#gallery'; cta.innerHTML = 'See the full Queen gallery &rarr;';
       sec.appendChild(cta);
     }
-    wrap.appendChild(sec);
+    // One gallery, mid-page: right after the KPI card row when the page has
+    // one, so the photos break up the stats instead of trailing the table.
+    var kpi = wrap.querySelector('.kpirow');
+    if (kpi && kpi.nextSibling) wrap.insertBefore(sec, kpi.nextSibling);
+    else wrap.appendChild(sec);
+  }
+
+  // A recap that shipped with its own photo section (the pre-shared-layer
+  // pattern) would otherwise show two galleries — this layer is canonical.
+  function removeLegacyGallery() {
+    var s1 = document.getElementById('night-photos'); if (s1) s1.remove();
+    var s2 = document.getElementById('phtLb'); if (s2) s2.remove();
   }
 
   function run() {
@@ -130,6 +151,7 @@
         var a = (d.albums || [])[0];
         if (!a || !a.photos || !a.photos.length) return;   // no album → untouched page
         PH = a.photos;
+        removeLegacyGallery();
 
         var style = document.createElement('style');
         style.textContent = CSS;
