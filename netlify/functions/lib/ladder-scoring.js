@@ -206,22 +206,74 @@ export function genNRPairs(prev, nC) {
 }
 
 // Per-night bonus points for podium finishes (15/10/5), tie-broken by diff.
+//
+// On a FIXED PARTNER night the podium is ranked at PAIR granularity and both
+// partners earn the same placement bonus (Richard, 2026-08-28, with the first
+// fixed-partner night's table: individual ranking put a pair's two identical
+// scorelines on consecutive ranks, so Ryan took +15 while Annie — his partner,
+// also 10-0 — took the +10 that belonged to the SECOND pair, and the second
+// pair split +5/0). A session counts as fixed-partner when every player kept
+// one mutual partner across 2+ scored rounds — inferred from the rounds
+// themselves, so historical sessions rank correctly without a schema change.
+// A mid-night sub breaks the inference for that night and it falls back to
+// individual ranking, which is also what a 1-round night gets (too little
+// signal to tell the formats apart).
 export function calcBonusPts(sessions, players) {
   const bonus = {};
   players.forEach(p => bonus[p.id] = { bonus: 0, wins: 0, ladderResults: [] });
   sessions.forEach(sess => {
     if (!sess || !Array.isArray(sess.rounds) || !sess.rounds.length) return;
     const pts = {}, pa = {}; players.forEach(p => { pts[p.id] = 0; pa[p.id] = 0; });
+    const partnerSets = {};
+    let scoredRounds = 0;
     sess.rounds.forEach(round => {
+      let scoredHere = false;
       round.courts.forEach(c => {
         if (!c.score || c.score.t1 === null || c.score.t2 === null || !c.score.winner) return;
+        scoredHere = true;
         const { t1, t2 } = c.score;
-        [[c.team1, t1, t2], [c.team2, t2, t1]].forEach(([team, sc, al]) => { team.filter(Boolean).forEach(p => { if (pts[p.id] !== undefined) { pts[p.id] += sc; pa[p.id] += al; } }); });
+        [[c.team1, t1, t2], [c.team2, t2, t1]].forEach(([team, sc, al]) => {
+          const t = team.filter(Boolean);
+          t.forEach(p => { if (pts[p.id] !== undefined) { pts[p.id] += sc; pa[p.id] += al; } });
+          if (t.length === 2) {
+            (partnerSets[t[0].id] = partnerSets[t[0].id] || new Set()).add(t[1].id);
+            (partnerSets[t[1].id] = partnerSets[t[1].id] || new Set()).add(t[0].id);
+          }
+        });
       });
+      if (scoredHere) scoredRounds++;
     });
+    const pIds = Object.keys(partnerSets);
+    const isFixed = scoredRounds >= 2 && pIds.length > 0 && pIds.every(id => {
+      if (partnerSets[id].size !== 1) return false;
+      const mate = [...partnerSets[id]][0];
+      return partnerSets[mate] && partnerSets[mate].size === 1 && [...partnerSets[mate]][0] === id;
+    });
+    const bonusMap = { 0: 15, 1: 10, 2: 5 };
+    if (isFixed) {
+      /* Rank the pairs, award both members alike. A pair's pts/diff are its
+         members' own (identical by construction on a fixed night). */
+      const seen = new Set(), pairs = [];
+      pIds.forEach(id => {
+        if (seen.has(id)) return;
+        const mate = [...partnerSets[id]][0];
+        seen.add(id); seen.add(mate);
+        pairs.push({ ids: [id, mate], pts: pts[id] || 0, diff: (pts[id] || 0) - (pa[id] || 0) });
+      });
+      const ranked = pairs.filter(p => p.pts > 0).sort((a, b) => b.pts - a.pts || b.diff - a.diff);
+      ranked.forEach((pair, i) => {
+        const b = bonusMap[i] || 0;
+        pair.ids.forEach(id => {
+          if (!bonus[id]) return;
+          bonus[id].bonus += b;
+          if (i === 0) bonus[id].wins++;
+          bonus[id].ladderResults.push({ date: sess.date, pts: pts[id], rank: i + 1, bonus: b, sessId: sess.id });
+        });
+      });
+      return;
+    }
     const ranked = Object.entries(pts).filter(([id, p]) => p > 0).sort((a, b) => b[1] - a[1] || ((b[1] - pa[b[0]]) - (a[1] - pa[a[0]])));
     if (!ranked.length) return;
-    const bonusMap = { 0: 15, 1: 10, 2: 5 };
     ranked.forEach(([id], i) => {
       if (!bonus[id]) return;
       const b = bonusMap[i] || 0;
