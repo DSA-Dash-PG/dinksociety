@@ -3,6 +3,7 @@
 // minis are built from hard numbers; the prose comes from the saved AI draft.
 // Inline styles only (email clients strip <style>). Dark theme to match the app.
 
+import { recapArticleUrl } from './recap-articles.js';
 const C = {
   bg: '#0e0e0e', surf: '#161616', surf2: '#1e1e1e', bd: '#262626',
   tx: '#f0f0ec', mut: '#9a9e97', fnt: '#5e625c', inv: '#0e0e0e',
@@ -90,6 +91,9 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
   const eid = encodeURIComponent(event.id || '');
   const nightUrl = eid ? `${url}/ladders#ladders/${eid}` : `${url}/ladders`;
   const boardUrl = `${url}/ladders#leaderboard`;
+  // The night's full-length recap article, when one has shipped — the story
+  // players actually forward around. Null for nights with no article yet.
+  const articleUrl = recapArticleUrl(event.date, url);
 
   return `<div style="background:${C.bg};margin:0;padding:0">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000;padding:20px 8px"><tr><td align="center">
@@ -125,13 +129,18 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
     <div style="font-size:14px;line-height:1.68;color:#dcdfd7;padding-top:10px">${safeHtml(recap.html)}</div>
     ${minis}
     ${recap.seasonNote ? `<div style="background:rgba(184,255,44,.1);border:1px solid rgba(184,255,44,.22);border-radius:10px;padding:13px 15px;margin-top:12px;font-size:13.5px;line-height:1.55;color:#eef3e4">${safeHtml(recap.seasonNote)}</div>` : ''}
-    <a href="${nightUrl}" style="display:block;text-align:center;margin:16px 0 0;background:${C.lime};color:${C.inv};font-weight:900;font-size:13px;padding:13px;border-radius:9999px;text-decoration:none">See tonight's full results & rounds →</a>
+    ${articleUrl ? `<div style="background:rgba(184,255,44,.08);border:1px solid rgba(184,255,44,.28);border-radius:14px;padding:16px 15px;margin:18px 0 0;text-align:center">
+      <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:${C.lime}">The write-up is live</div>
+      <div style="font-size:13px;color:#dcdfd7;margin-top:5px;line-height:1.5">The full story of the night — awards, the charts, every stat.</div>
+      <a href="${articleUrl}" style="display:block;text-align:center;margin:12px 0 0;background:${C.lime};color:${C.inv};font-weight:900;font-size:16px;padding:16px;border-radius:9999px;text-decoration:none">&#128240; READ THE FULL RECAP &rarr;</a>
+    </div>` : ''}
+    <a href="${nightUrl}" style="display:block;text-align:center;margin:${articleUrl ? '8px' : '16px'} 0 0;background:${articleUrl ? 'transparent' : C.lime};color:${articleUrl ? C.tx : C.inv};font-weight:${articleUrl ? '800' : '900'};font-size:${articleUrl ? '12.5px' : '13px'};padding:${articleUrl ? '11px' : '13px'};${articleUrl ? `border:1px solid ${C.bd};` : ''}border-radius:9999px;text-decoration:none">See tonight's full results & rounds →</a>
     <a href="${boardUrl}" style="display:block;text-align:center;margin:8px 0 0;background:transparent;color:${C.tx};font-weight:800;font-size:12.5px;padding:11px;border:1px solid ${C.bd};border-radius:9999px;text-decoration:none">Season leaderboard · every completed ladder →</a>
   </td></tr>
 
   <tr><td style="padding:18px 24px 24px;border-top:1px solid ${C.bd};margin-top:18px">
     <div style="font-size:11px;color:${C.fnt};line-height:1.6">You're getting this because you played the ${esc(event.name)} ladder.<br>
-    <a href="${nightUrl}" style="color:${C.lime};text-decoration:none;font-weight:700">Tonight's results</a> · <a href="${boardUrl}" style="color:${C.lime};text-decoration:none;font-weight:700">Season leaderboard</a> · <a href="${url}/me.html" style="color:${C.lime};text-decoration:none;font-weight:700">Your profile</a></div>
+    ${articleUrl ? `<a href="${articleUrl}" style="color:${C.lime};text-decoration:none;font-weight:700">Full recap</a> · ` : ''}<a href="${nightUrl}" style="color:${C.lime};text-decoration:none;font-weight:700">Tonight's results</a> · <a href="${boardUrl}" style="color:${C.lime};text-decoration:none;font-weight:700">Season leaderboard</a> · <a href="${url}/me.html" style="color:${C.lime};text-decoration:none;font-weight:700">Your profile</a></div>
   </td></tr>
 </table>
 </td></tr></table></div>`;
