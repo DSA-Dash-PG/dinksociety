@@ -95,6 +95,26 @@
   .mtabbar-fade{ display:none; } /* right-edge "more tabs" hint — mobile only, see @media below */
   .mpanel{ display:none; } .mpanel.on{ display:block; }
   .savebar{ position:sticky;bottom:0;z-index:6;background:#0b0d0a;padding:12px 0 10px;margin-top:6px;box-shadow:0 -10px 14px -6px rgba(0,0,0,.65); }
+  /* Focus editor overlay — sits above the manage modal (z 50) */
+  .focov{ position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:14px;overflow-y:auto; }
+  .focov.on{ display:flex; }
+  .focsheet{ background:#14170f;border:1px solid rgba(255,255,255,.14);border-radius:16px;width:100%;max-width:520px;max-height:94vh;overflow-y:auto;padding:16px 16px 14px; }
+  .fochd{ margin-bottom:10px; }
+  .fochd b{ display:block;font-size:1rem;font-weight:900; }
+  .fochd span{ display:block;font-size:.74rem;color:#9aa094;margin-top:3px;line-height:1.5; }
+  .focstage{ position:relative;border-radius:12px;overflow:hidden;background:#000;touch-action:none;cursor:crosshair;user-select:none;-webkit-user-select:none; }
+  .focstage img{ width:100%;display:block;pointer-events:none; }
+  .focdot{ position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #b8ff2c;background:rgba(184,255,44,.18);box-shadow:0 0 0 2px rgba(0,0,0,.65), 0 0 18px rgba(184,255,44,.55);pointer-events:none; }
+  .focdot::after{ content:"";position:absolute;left:50%;top:50%;width:4px;height:4px;margin:-2px 0 0 -2px;border-radius:50%;background:#b8ff2c; }
+  .foclbl{ font-size:.6rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#5e655a;margin:12px 0 6px; }
+  .focprevs{ display:flex;gap:10px;align-items:flex-start; }
+  .focprevs .fp{ flex:1;min-width:0;text-align:center; }
+  .focprevs .fpw{ aspect-ratio:21/8;border-radius:9px;overflow:hidden;border:1px solid rgba(255,255,255,.14); }
+  .focprevs .fps{ aspect-ratio:4/3;border-radius:9px;overflow:hidden;border:1px solid rgba(255,255,255,.14);max-width:130px;margin:0 auto; }
+  .focprevs img{ width:100%;height:100%;object-fit:cover;display:block; }
+  .focprevs span{ display:block;font-size:.6rem;color:#9aa094;font-weight:700;margin-top:5px; }
+  .focacts{ display:flex;gap:8px;margin-top:14px;position:sticky;bottom:0;background:#14170f;padding-top:4px; }
+  .focacts .btn{ min-height:46px; }
   /* row reminder popover + toast */
   .rowpop{ position:absolute;z-index:60;background:#0f120c;border:1px solid rgba(255,255,255,.14);border-radius:13px;padding:7px;min-width:230px;box-shadow:0 18px 50px rgba(0,0,0,.6);display:none; }
   .rowpop.on{ display:block; }
@@ -539,8 +559,9 @@
     <div id="phMsg"></div>
 
     <div class="sec" style="margin:18px 0 6px">On this ladder <span id="phCount" style="color:#5e655a;font-weight:700;text-transform:none;letter-spacing:0"></span></div>
-    <div class="help" style="margin:0 0 10px">Click a caption to edit it. <b>★ Make cover</b> picks the night&rsquo;s lead photo (gallery hero, recap header — one per night, always shown first). <b>◀ ▶</b> set the order photos appear everywhere. <b>🎯 Focus</b> lets you click the subject of a photo so crops keep it in frame — the thumbnails here preview exactly how it will crop.</div>
+    <div class="help" style="margin:0 0 10px">Every change here saves the moment you make it. <b>★ Make cover</b> picks the night&rsquo;s lead photo (gallery hero, recap header — one per night, always shown first). <b>◀ ▶</b> set the order photos appear everywhere. <b>🎯 Focus</b> opens the crop editor — drag the point onto the subject and every crop keeps it in frame.</div>
     <div id="phList"><div class="help">Loading…</div></div>
+    <div class="savebar"><button class="btn btn-lime" style="width:100%" onclick="closeManage()">✓ Done — changes are saved</button></div>
   </div><!-- /photos -->
   </div>
 </div></div>
@@ -554,6 +575,27 @@
   <button onclick="doRowRemind('three_hour','3 hours out')"><span>3 hours out</span><span style="color:#5e655a">›</span></button>
 </div>
 <div class="dstoast" id="dsToast"></div>
+
+<!-- FOCUS EDITOR overlay — opened from a photo card's 🎯 Focus button -->
+<div class="focov" id="focOv" role="dialog" aria-modal="true" aria-label="Set photo focus">
+  <div class="focsheet">
+    <div class="fochd"><b>🎯 Set focus</b><span>Tap or drag the ring onto the subject — every crop keeps that point in frame.</span></div>
+    <div class="focstage" id="focStage">
+      <img id="focImg" alt="" draggable="false">
+      <span class="focdot" id="focDot"></span>
+    </div>
+    <div class="foclbl">Live preview — how it crops</div>
+    <div class="focprevs">
+      <div class="fp"><div class="fpw"><img id="focPrevW" alt=""></div><span>Recap hero (wide)</span></div>
+      <div class="fp"><div class="fps"><img id="focPrevS" alt=""></div><span>Tile / thumb</span></div>
+    </div>
+    <div class="focacts">
+      <button class="btn btn-lime" style="flex:2" onclick="focSave()">✓ Save focus</button>
+      <button class="btn btn-out" style="flex:1" onclick="focCenter()">Center</button>
+      <button class="btn btn-out" style="flex:1" onclick="focClose()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <div class="ov" id="recapOv"><div class="sheet"><button class="x" onclick="closeRecap()">×</button>
   <div class="sheet-in">
@@ -1733,59 +1775,90 @@ function paintPhotos(){
   if(!PHOTOS.length){ el.innerHTML = '<div class="help">No photos on this ladder yet.</div>'; return; }
   el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:9px">'
     + PHOTOS.map((p,i) => {
-      const focusing = PH_FOCUS === p.id;
       const fx = Number.isFinite(p.fx) ? p.fx : null, fy = Number.isFinite(p.fy) ? p.fy : null;
       const objPos = (fx==null?50:fx) + '% ' + (fy==null?50:fy) + '%';
-      return `<div style="border:1px solid ${focusing?'rgba(184,255,44,.6)':'rgba(255,255,255,.1)'};border-radius:11px;overflow:hidden;background:#000">
-        <div style="position:relative;aspect-ratio:4/3;background:#111;${focusing?'cursor:crosshair':''}" ${focusing?`onclick="phFocusClick(event,'${esc(p.id)}')"`:''} title="${focusing?'Click where the subject is':''}">
+      return `<div style="border:1px solid rgba(255,255,255,.1);border-radius:11px;overflow:hidden;background:#000">
+        <div style="position:relative;aspect-ratio:4/3;background:#111">
           <img src="${esc(p.thumb)}" alt="" style="width:100%;height:100%;object-fit:cover;object-position:${objPos};display:block;pointer-events:none">
           ${p.cover ? '<span style="position:absolute;top:6px;left:6px;font-size:.54rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;background:rgba(0,0,0,.75);color:#E6E1D5;padding:3px 8px;border-radius:9999px">Cover</span>' : ''}
           <span style="position:absolute;top:6px;right:6px;font-size:.56rem;font-weight:900;background:rgba(0,0,0,.7);color:#9aa094;padding:3px 7px;border-radius:9999px">#${i+1}</span>
-          ${fx!=null && !focusing ? `<span style="position:absolute;left:${fx}%;top:${fy}%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #b8ff2c;background:rgba(184,255,44,.25);pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.6)"></span>` : ''}
-          ${focusing ? '<span style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:.6rem;font-weight:800;background:rgba(0,0,0,.75);color:#b8ff2c;padding:5px 4px">Click the subject — that point stays in frame</span>' : ''}
+          ${fx!=null ? `<span style="position:absolute;left:${fx}%;top:${fy}%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #b8ff2c;background:rgba(184,255,44,.25);pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.6)"></span>` : ''}
         </div>
         <div style="padding:8px 9px">
           <input value="${esc(p.caption||'')}" placeholder="Add a caption…" maxlength="140"
                  onchange="savePhotoCaption('${esc(p.id)}',this.value)"
                  style="width:100%;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#f0f2ec;font:inherit;font-size:.74rem;padding:6px 8px">
           <div style="display:flex;gap:6px;margin-top:7px">
-            <button class="btn btn-out" style="font-size:.72rem;padding:6px 9px;min-height:32px${i===0?';opacity:.35':''}" title="Move earlier" ${i===0?'disabled':''} onclick="movePhoto('${esc(p.id)}',-1)">◀</button>
-            <button class="btn btn-out" style="font-size:.72rem;padding:6px 9px;min-height:32px${i===PHOTOS.length-1?';opacity:.35':''}" title="Move later" ${i===PHOTOS.length-1?'disabled':''} onclick="movePhoto('${esc(p.id)}',1)">▶</button>
-            <button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:32px;${focusing?'color:#b8ff2c;border-color:rgba(184,255,44,.5)':''}" onclick="togglePhotoFocus('${esc(p.id)}')">${focusing?'Cancel':'🎯 Focus'}</button>
+            <button class="btn btn-out" style="font-size:.72rem;padding:6px 9px;min-height:38px${i===0?';opacity:.35':''}" title="Move earlier" ${i===0?'disabled':''} onclick="movePhoto('${esc(p.id)}',-1)">◀</button>
+            <button class="btn btn-out" style="font-size:.72rem;padding:6px 9px;min-height:38px${i===PHOTOS.length-1?';opacity:.35':''}" title="Move later" ${i===PHOTOS.length-1?'disabled':''} onclick="movePhoto('${esc(p.id)}',1)">▶</button>
+            <button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:38px" onclick="focOpen('${esc(p.id)}')">🎯 Focus</button>
           </div>
           <div style="display:flex;gap:6px;margin-top:6px">
-            ${p.cover ? '' : `<button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:32px" onclick="setPhotoCover('${esc(p.id)}')">★ Make cover</button>`}
-            ${fx!=null ? `<button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:32px" onclick="clearPhotoFocus('${esc(p.id)}')">Reset focus</button>` : ''}
-            <button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:32px;color:#ff5c47" onclick="removePhoto('${esc(p.id)}')">Delete</button>
+            ${p.cover ? '' : `<button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:38px" onclick="setPhotoCover('${esc(p.id)}')">★ Make cover</button>`}
+            <button class="btn btn-out" style="flex:1;font-size:.66rem;padding:6px 4px;min-height:38px;color:#ff5c47" onclick="removePhoto('${esc(p.id)}')">Delete</button>
           </div>
         </div>
       </div>`;}).join('')
     + '</div>';
 }
 
-/* ── Focus (crop anchor) ──
-   The thumbnails above preview the crop live: object-position uses the saved
-   point, and the lime dot marks it. The same point drives every cover-cropped
-   render of the photo — recap hero, polaroids, tickers, gallery tiles. */
-let PH_FOCUS = null;   // photo id currently in click-to-set mode
-function togglePhotoFocus(id){ PH_FOCUS = PH_FOCUS === id ? null : id; paintPhotos(); }
-async function phFocusClick(ev, id){
-  if(PH_FOCUS !== id) return;
-  const box = ev.currentTarget.getBoundingClientRect();
-  const fx = Math.round(100 * (ev.clientX - box.left) / box.width);
-  const fy = Math.round(100 * (ev.clientY - box.top) / box.height);
-  PH_FOCUS = null;
+/* ── Focus editor ──
+   Tap 🎯 on a card → a full-screen editor: the photo large, a draggable ring,
+   and live previews of the two crops that matter (wide recap hero + tile).
+   Save writes fx/fy; every cover-cropped render of the photo — recap hero,
+   polaroids, tickers, gallery tiles — keeps that point in frame. Much easier
+   than tapping a tiny thumbnail, especially on a phone. */
+let FOC = null;   // { id, fx, fy }
+function focOpen(id){
+  const p = PHOTOS.find(x => x.id === id); if(!p) return;
+  FOC = { id, fx: Number.isFinite(p.fx) ? p.fx : 50, fy: Number.isFinite(p.fy) ? p.fy : 50 };
+  ['focImg','focPrevW','focPrevS'].forEach(k => { document.getElementById(k).src = p.url; });
+  focPaint();
+  document.getElementById('focOv').classList.add('on');
+  document.body.style.overflow = 'hidden';
+}
+function focClose(){
+  document.getElementById('focOv').classList.remove('on');
+  document.body.style.overflow = ''; FOC = null;
+}
+function focPaint(){
+  if(!FOC) return;
+  const dot = document.getElementById('focDot');
+  dot.style.left = FOC.fx + '%'; dot.style.top = FOC.fy + '%';
+  const pos = FOC.fx + '% ' + FOC.fy + '%';
+  document.getElementById('focPrevW').style.objectPosition = pos;
+  document.getElementById('focPrevS').style.objectPosition = pos;
+}
+function focSet(ev){
+  if(!FOC) return;
+  const box = document.getElementById('focStage').getBoundingClientRect();
+  if(!(box.width > 0) || !(box.height > 0)) return;   // image not laid out yet
+  const cx = ev.clientX, cy = ev.clientY;
+  FOC.fx = Math.max(0, Math.min(100, Math.round(100 * (cx - box.left) / box.width)));
+  FOC.fy = Math.max(0, Math.min(100, Math.round(100 * (cy - box.top) / box.height)));
+  focPaint();
+}
+function focCenter(){ if(FOC){ FOC.fx = 50; FOC.fy = 50; focPaint(); } }
+async function focSave(){
+  if(!FOC || !CURRENT) return;
+  const { id, fx, fy } = FOC;
   const {status,d} = await api('/ladder-photo-update', { method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({ eventId: CURRENT.id, id, fx, fy }) });
-  if(status===200 && d.ok){ dsToast({ type:'success', message:'Focus set — crops will keep that point in frame.' }); loadPhotos(); }
-  else { dsToast({ type:'error', message:(d && d.error) || 'Could not save the focus point.' }); loadPhotos(); }
+  focClose();
+  if(status===200 && d.ok){ dsToast({ type:'success', message:'Focus saved — crops keep that point in frame.' }); loadPhotos(); }
+  else dsToast({ type:'error', message:(d && d.error) || 'Could not save the focus point.' });
 }
-async function clearPhotoFocus(id){
-  const {status,d} = await api('/ladder-photo-update', { method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ eventId: CURRENT.id, id, fx:null, fy:null }) });
-  if(status===200 && d.ok) loadPhotos();
-  else dsToast({ type:'error', message:(d && d.error) || 'Could not reset the focus point.' });
-}
+// Tap anywhere on the photo, or press and drag the point around.
+(function(){
+  document.addEventListener('DOMContentLoaded', function(){
+    const st = document.getElementById('focStage'); if(!st) return;
+    let down = false;
+    st.addEventListener('pointerdown', e => { down = true; st.setPointerCapture(e.pointerId); focSet(e); e.preventDefault(); });
+    st.addEventListener('pointermove', e => { if(down) focSet(e); });
+    st.addEventListener('pointerup',   () => { down = false; });
+    st.addEventListener('pointercancel', () => { down = false; });
+  });
+})();
 
 /* ── Order ──
    ◀ ▶ swap the photo with its neighbour and save the whole night's order in

@@ -277,45 +277,92 @@ async function loadOrgPhotos(){
   paintOrgPhotos();
 }
 
-let OP_PHOTOS=[], OP_FOCUS=null;
+let OP_PHOTOS=[];
 function paintOrgPhotos(){
   const el=$('opList'); if(!el) return;
   if(!OP_PHOTOS.length){ el.innerHTML='<div class="empty">No photos on this ladder yet.</div>'; return; }
   el.innerHTML='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:9px">'
     +OP_PHOTOS.map((p,i)=>{
-      const focusing=OP_FOCUS===p.id;
       const fx=Number.isFinite(p.fx)?p.fx:null, fy=Number.isFinite(p.fy)?p.fy:null;
       const objPos=(fx==null?50:fx)+'% '+(fy==null?50:fy)+'%';
-      return `<div style="border:1px solid ${focusing?'rgba(184,255,44,.6)':'rgba(255,255,255,.1)'};border-radius:11px;overflow:hidden;background:#000">
-        <div style="position:relative;aspect-ratio:4/3;background:#111;${focusing?'cursor:crosshair':''}" ${focusing?`onclick="orgFocusClick(event,'${esc(p.id)}')"`:''}>
+      return `<div style="border:1px solid rgba(255,255,255,.1);border-radius:11px;overflow:hidden;background:#000">
+        <div style="position:relative;aspect-ratio:4/3;background:#111">
           <img src="${esc(p.thumb)}" alt="" style="width:100%;height:100%;object-fit:cover;object-position:${objPos};display:block;pointer-events:none">
           ${p.cover?'<span style="position:absolute;top:6px;left:6px;font-size:.54rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;background:rgba(0,0,0,.75);color:#E6E1D5;padding:3px 8px;border-radius:9999px">Cover</span>':''}
           <span style="position:absolute;top:6px;right:6px;font-size:.56rem;font-weight:900;background:rgba(0,0,0,.7);color:#9aa094;padding:3px 7px;border-radius:9999px">#${i+1}</span>
-          ${fx!=null&&!focusing?`<span style="position:absolute;left:${fx}%;top:${fy}%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #b8ff2c;background:rgba(184,255,44,.25);pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.6)"></span>`:''}
-          ${focusing?'<span style="position:absolute;left:0;right:0;bottom:0;text-align:center;font-size:.6rem;font-weight:800;background:rgba(0,0,0,.75);color:#b8ff2c;padding:5px 4px">Click the subject — that point stays in frame</span>':''}
+          ${fx!=null?`<span style="position:absolute;left:${fx}%;top:${fy}%;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #b8ff2c;background:rgba(184,255,44,.25);pointer-events:none;box-shadow:0 0 0 1px rgba(0,0,0,.6)"></span>`:''}
         </div>
         <div style="padding:8px 9px">
           <input value="${esc(p.caption||'')}" placeholder="Add a caption…" maxlength="140"
                  onchange="saveOrgCaption('${esc(p.id)}',this.value)"
                  style="width:100%;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#f0f2ec;font:inherit;font-size:.73rem;padding:6px 8px">
           <div style="display:flex;gap:6px;margin-top:7px">
-            <button class="btn btn-out btn-sm" style="padding:6px 9px${i===0?';opacity:.35':''}" ${i===0?'disabled':''} onclick="moveOrgPhoto('${esc(p.id)}',-1)">◀</button>
-            <button class="btn btn-out btn-sm" style="padding:6px 9px${i===OP_PHOTOS.length-1?';opacity:.35':''}" ${i===OP_PHOTOS.length-1?'disabled':''} onclick="moveOrgPhoto('${esc(p.id)}',1)">▶</button>
-            <button class="btn btn-out btn-sm" style="flex:1;${focusing?'color:#b8ff2c;border-color:rgba(184,255,44,.5)':''}" onclick="toggleOrgFocus('${esc(p.id)}')">${focusing?'Cancel':'🎯 Focus'}</button>
+            <button class="btn btn-out btn-sm" style="padding:6px 9px;min-height:38px${i===0?';opacity:.35':''}" ${i===0?'disabled':''} onclick="moveOrgPhoto('${esc(p.id)}',-1)">◀</button>
+            <button class="btn btn-out btn-sm" style="padding:6px 9px;min-height:38px${i===OP_PHOTOS.length-1?';opacity:.35':''}" ${i===OP_PHOTOS.length-1?'disabled':''} onclick="moveOrgPhoto('${esc(p.id)}',1)">▶</button>
+            <button class="btn btn-out btn-sm" style="flex:1;min-height:38px" onclick="orgFocOpen('${esc(p.id)}')">🎯 Focus</button>
           </div>
           ${p.cover?'':`<button class="btn btn-out btn-sm" style="width:100%;margin-top:6px" onclick="setOrgCover('${esc(p.id)}')">★ Make cover</button>`}
         </div>
       </div>`;}).join('')
     +'</div>';
 }
-function toggleOrgFocus(id){ OP_FOCUS=OP_FOCUS===id?null:id; paintOrgPhotos(); }
-async function orgFocusClick(ev,id){
-  if(OP_FOCUS!==id) return;
-  const box=ev.currentTarget.getBoundingClientRect();
-  const fx=Math.round(100*(ev.clientX-box.left)/box.width);
-  const fy=Math.round(100*(ev.clientY-box.top)/box.height);
-  OP_FOCUS=null;
-  try{ await api('/ladder-photo-update',{method:'POST',body:JSON.stringify({eventId:CUR.id,id,fx,fy})}); toast('Focus set.'); }
+
+/* ── Focus editor — same as the admin panel's: photo large, draggable ring,
+   live crop previews, big Save/Cancel. Overlay + styles are injected once so
+   this page needs no markup changes elsewhere. */
+let OFOC=null;
+function orgFocEnsure(){
+  if(document.getElementById('ofocOv')) return;
+  const css=document.createElement('style');
+  css.textContent='.ofocov{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.9);display:none;align-items:center;justify-content:center;padding:14px;overflow-y:auto}.ofocov.on{display:flex}.ofocsheet{background:#14170f;border:1px solid rgba(255,255,255,.14);border-radius:16px;width:100%;max-width:520px;max-height:94vh;overflow-y:auto;padding:16px 16px 14px}.ofochd b{display:block;font-size:1rem;font-weight:900}.ofochd span{display:block;font-size:.74rem;color:#9aa094;margin:3px 0 10px;line-height:1.5}.ofocstage{position:relative;border-radius:12px;overflow:hidden;background:#000;touch-action:none;cursor:crosshair;user-select:none;-webkit-user-select:none}.ofocstage img{width:100%;display:block;pointer-events:none}.ofocdot{position:absolute;width:34px;height:34px;margin:-17px 0 0 -17px;border-radius:50%;border:3px solid #b8ff2c;background:rgba(184,255,44,.18);box-shadow:0 0 0 2px rgba(0,0,0,.65),0 0 18px rgba(184,255,44,.55);pointer-events:none}.ofoclbl{font-size:.6rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:#5e655a;margin:12px 0 6px}.ofocprevs{display:flex;gap:10px}.ofocprevs .fp{flex:1;min-width:0;text-align:center}.ofocprevs .fpw{aspect-ratio:21/8;border-radius:9px;overflow:hidden;border:1px solid rgba(255,255,255,.14)}.ofocprevs .fps{aspect-ratio:4/3;border-radius:9px;overflow:hidden;border:1px solid rgba(255,255,255,.14);max-width:130px;margin:0 auto}.ofocprevs img{width:100%;height:100%;object-fit:cover;display:block}.ofocprevs span{display:block;font-size:.6rem;color:#9aa094;font-weight:700;margin-top:5px}.ofocacts{display:flex;gap:8px;margin-top:14px}.ofocacts .btn{min-height:46px}';
+  document.head.appendChild(css);
+  const ov=document.createElement('div');
+  ov.className='ofocov'; ov.id='ofocOv';
+  ov.innerHTML='<div class="ofocsheet"><div class="ofochd"><b>🎯 Set focus</b><span>Tap or drag the ring onto the subject — every crop keeps that point in frame.</span></div>'
+    +'<div class="ofocstage" id="ofocStage"><img id="ofocImg" alt="" draggable="false"><span class="ofocdot" id="ofocDot"></span></div>'
+    +'<div class="ofoclbl">Live preview — how it crops</div>'
+    +'<div class="ofocprevs"><div class="fp"><div class="fpw"><img id="ofocPrevW" alt=""></div><span>Recap hero (wide)</span></div><div class="fp"><div class="fps"><img id="ofocPrevS" alt=""></div><span>Tile / thumb</span></div></div>'
+    +'<div class="ofocacts"><button class="btn btn-lime" style="flex:2" onclick="orgFocSave()">✓ Save focus</button><button class="btn btn-out" style="flex:1" onclick="orgFocCenter()">Center</button><button class="btn btn-out" style="flex:1" onclick="orgFocClose()">Cancel</button></div></div>';
+  document.body.appendChild(ov);
+  const st=document.getElementById('ofocStage');
+  let down=false;
+  st.addEventListener('pointerdown',e=>{down=true;st.setPointerCapture(e.pointerId);orgFocSet(e);e.preventDefault();});
+  st.addEventListener('pointermove',e=>{if(down)orgFocSet(e);});
+  st.addEventListener('pointerup',()=>{down=false;});
+  st.addEventListener('pointercancel',()=>{down=false;});
+}
+function orgFocOpen(id){
+  const p=OP_PHOTOS.find(x=>x.id===id); if(!p) return;
+  orgFocEnsure();
+  OFOC={id,fx:Number.isFinite(p.fx)?p.fx:50,fy:Number.isFinite(p.fy)?p.fy:50};
+  ['ofocImg','ofocPrevW','ofocPrevS'].forEach(k=>{document.getElementById(k).src=p.url;});
+  orgFocPaint();
+  document.getElementById('ofocOv').classList.add('on');
+  document.body.style.overflow='hidden';
+}
+function orgFocClose(){ const o=document.getElementById('ofocOv'); if(o)o.classList.remove('on'); document.body.style.overflow=''; OFOC=null; }
+function orgFocPaint(){
+  if(!OFOC) return;
+  const d=document.getElementById('ofocDot');
+  d.style.left=OFOC.fx+'%'; d.style.top=OFOC.fy+'%';
+  const pos=OFOC.fx+'% '+OFOC.fy+'%';
+  document.getElementById('ofocPrevW').style.objectPosition=pos;
+  document.getElementById('ofocPrevS').style.objectPosition=pos;
+}
+function orgFocSet(ev){
+  if(!OFOC) return;
+  const box=document.getElementById('ofocStage').getBoundingClientRect();
+  if(!(box.width>0)||!(box.height>0)) return;   // image not laid out yet
+  OFOC.fx=Math.max(0,Math.min(100,Math.round(100*(ev.clientX-box.left)/box.width)));
+  OFOC.fy=Math.max(0,Math.min(100,Math.round(100*(ev.clientY-box.top)/box.height)));
+  orgFocPaint();
+}
+function orgFocCenter(){ if(OFOC){OFOC.fx=50;OFOC.fy=50;orgFocPaint();} }
+async function orgFocSave(){
+  if(!OFOC||!CUR) return;
+  const {id,fx,fy}=OFOC;
+  orgFocClose();
+  try{ await api('/ladder-photo-update',{method:'POST',body:JSON.stringify({eventId:CUR.id,id,fx,fy})}); toast('Focus saved.'); }
   catch(e){ toast(e.message,true); }
   loadOrgPhotos();
 }

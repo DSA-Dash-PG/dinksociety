@@ -164,6 +164,19 @@
   #drop .pcard__stats .v{ font-size:15px; font-weight:900; line-height:1; color:var(--color-text); }
   #drop .pcard.m .v.hot{ color:var(--color-lime); }
   #drop .pcard.f .v.hot{ color:var(--color-teal); }
+  /* Season MVP cards — the final Drop crowns the year */
+  #drop .pcard.mvp{ border-color:rgba(240,192,64,.4); }
+  #drop .pcard.mvp::before{ background:#f0c040; }
+  #drop .pcard.mvp.f2{ border-color:rgba(230,225,213,.35); }
+  #drop .pcard.mvp.f2::before{ background:#E6E1D5; }
+  #drop .pcard.mvp .pav{ border:2px solid #f0c040; color:#f0c040; box-shadow:0 0 16px rgba(240,192,64,.35); }
+  #drop .pcard.mvp.f2 .pav{ border-color:#E6E1D5; color:#E6E1D5; box-shadow:0 0 16px rgba(230,225,213,.3); }
+  #drop .pcard.mvp .pcard__cat{ color:#f0c040; }
+  #drop .pcard.mvp.f2 .pcard__cat{ color:#E6E1D5; }
+  #drop .pcard.mvp .v.hot{ color:#f0c040; }
+  #drop .pcard.mvp.f2 .v.hot{ color:#E6E1D5; }
+  #drop .pcard.mvp .mvpcrown{ position:absolute; top:9px; left:12px; font-size:17px; filter:drop-shadow(0 0 8px rgba(240,192,64,.8)); }
+  #drop .mvpband .card{ border-color:rgba(240,192,64,.28); box-shadow:0 0 40px rgba(240,192,64,.07); }
 
   /* Team of the Week */
   #drop .totw{ display:flex; align-items:center; gap:13px; }
@@ -468,6 +481,37 @@
         + '</div></div></section>';
     }
 
+    // Band 1b — Season MVPs. Only on the final week's Drop: the season is
+    // done, so the year's two crowns ride the article right after POTW.
+    // Names/stats mirror the standings page's SEASON_MVPS — edit both together.
+    var SEASON_MVPS = {
+      male:   { name:'Ryan Hom', teamName:'Smash Society', stats:[['Record','24-6'],['DSR','72.0'],['Diff','+117'],['Clutch','7/9']] },
+      female: { name:'Shay C',   teamName:'ZERO ZERO TWO', stats:[['Record','29-3'],['DSR','82.0'],['Diff','+200'],['Win %','91%']] },
+    };
+    function mvpCardDrop(m, female){
+      var p = ddPlayerByName(m.name) || { name:m.name };
+      return '<div class="pcard mvp'+(female?' f2':'')+'">'
+        + '<span class="mvpcrown">👑</span>'
+        + '<div class="pcard__badge">MVP</div>'
+        + '<div class="pcard__cat" style="margin-left:24px">Season MVP · '+(female?'Female':'Male')+'</div>'
+        + '<div class="pcard__row">'+avatarHtml(p,'pav')
+          + '<div><div class="pcard__name">'+entPlayer(m.name, m.teamName, SN(m.name))+'</div>'
+          + '<div class="pcard__team">'+entTeam(m.teamName)+'</div></div></div>'
+        + '<div class="pcard__stats">'
+          + m.stats.map(function(s){ return '<div><div class="l">'+esc(s[0])+'</div><div class="v'+(s[0]==='Record'?' hot':'')+'">'+esc(s[1])+'</div></div>'; }).join('')
+        + '</div></div>';
+    }
+    function mvpBandHtml(week){
+      if(week !== TOTAL_WEEKS) return '';
+      return '<section class="band potwband mvpband"><div class="wrap">'
+        + bandHead('Season MVPs','Crowned at season\'s end — one male, one female')
+        + '<div class="card"><div class="cardhd"><h5>👑 Circuit I</h5><a class="cardmore" href="/standings.html">Final standings →</a></div>'
+        + '<div class="potwcards">'
+        + mvpCardDrop(SEASON_MVPS.male,false)
+        + mvpCardDrop(SEASON_MVPS.female,true)
+        + '</div></div></div></section>';
+    }
+
     // Band 2 — Top Performers, tabbed DSR / Diff / Pts.
     function topPerfBandHtml(perf){
       var tp = perf && perf.topPerformers;
@@ -682,6 +726,7 @@
       root.innerHTML = mast + heroBlock
         + '<div class="layout"><div class="wrap"><div class="col">' + lead + '</div></div></div>'
         + potwBandHtml(drop.performers)
+        + mvpBandHtml(drop.week)
         + '<div class="wrap"><div class="col">' + league + '</div></div>'
         + topPerfBandHtml(drop.performers)
         + '<div class="wrap"><div class="col">' + stories + '</div></div>'

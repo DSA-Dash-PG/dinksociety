@@ -88,6 +88,34 @@
   #recap .pcard__stats .l{font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:6px;}
   #recap .pcard__stats .v{font-size:24px;font-weight:900;line-height:1;color:var(--color-text);}
 
+  /* MVP cards — Week 8 swaps the POTW pair for the Season MVPs */
+  #recap .pcard.mvp{border-color:rgba(240,192,64,.4);}
+  #recap .pcard.mvp::before{background:#f0c040;}
+  #recap .pcard.mvp.f2{border-color:rgba(230,225,213,.35);}
+  #recap .pcard.mvp.f2::before{background:#E6E1D5;}
+  #recap .pcard.mvp .pav{border:2.5px solid #f0c040;color:#f0c040;box-shadow:0 0 0 4px rgba(240,192,64,.14),0 0 22px rgba(240,192,64,.35);}
+  #recap .pcard.mvp.f2 .pav{border-color:#E6E1D5;color:#E6E1D5;box-shadow:0 0 0 4px rgba(230,225,213,.12),0 0 22px rgba(230,225,213,.3);}
+  #recap .pcard.mvp .pcard__cat{color:#f0c040;}
+  #recap .pcard.mvp.f2 .pcard__cat{color:#E6E1D5;}
+  #recap .pcard.mvp .mvp-crown{position:absolute;top:10px;left:12px;font-size:20px;filter:drop-shadow(0 0 8px rgba(240,192,64,.8));}
+  #recap .pcard.mvp .pcard__badge{color:#f0c040;border-color:rgba(240,192,64,.4);}
+
+  /* Final-finish treatment on the home standings (mirrors the Playoffs tab) */
+  #recap .stand .fin-chip{display:inline-flex;align-items:center;gap:4px;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border-radius:9999px;padding:2px 7px;margin-left:7px;vertical-align:middle;white-space:nowrap;background:var(--color-surface-2);color:var(--color-text-faint);border:1px solid var(--color-border);}
+  #recap .stand .fin-1{background:rgba(240,192,64,.16);color:#f0c040;border-color:rgba(240,192,64,.45);box-shadow:0 0 14px rgba(240,192,64,.35);}
+  #recap .stand .fin-2{background:rgba(207,211,200,.13);color:#cfd3c8;border-color:rgba(207,211,200,.4);box-shadow:0 0 10px rgba(207,211,200,.25);}
+  #recap .stand .fin-3{background:rgba(216,138,58,.14);color:#d88a3a;border-color:rgba(216,138,58,.42);box-shadow:0 0 10px rgba(216,138,58,.28);}
+  #recap .stand tr.fm1 td{background:linear-gradient(90deg,rgba(240,192,64,.13),rgba(240,192,64,.02) 60%,transparent);}
+  #recap .stand tr.fm2 td{background:linear-gradient(90deg,rgba(207,211,200,.11),rgba(207,211,200,.02) 60%,transparent);}
+  #recap .stand tr.fm3 td{background:linear-gradient(90deg,rgba(216,138,58,.12),rgba(216,138,58,.02) 60%,transparent);}
+  #recap .stand tr.fm1 td:first-child{box-shadow:inset 3px 0 0 #f0c040;}
+  #recap .stand tr.fm2 td:first-child{box-shadow:inset 3px 0 0 #cfd3c8;}
+  #recap .stand tr.fm3 td:first-child{box-shadow:inset 3px 0 0 #d88a3a;}
+  @media(prefers-reduced-motion:no-preference){
+    #recap .stand .fin-1{animation:homeChamp 2.6s ease-in-out infinite;}
+    @keyframes homeChamp{0%,100%{box-shadow:0 0 8px rgba(240,192,64,.25);}50%{box-shadow:0 0 18px rgba(240,192,64,.6);}}
+  }
+
   /* Tabbed performers (POTW / DSR / Best Diff / Most Pts) */
   #recap .perftabs{display:flex;gap:4px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:11px;padding:3px;margin-bottom:12px;}
   #recap .perftabs button{flex:1 1 0;min-width:0;font-family:inherit;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.01em;color:var(--color-text-muted);background:none;border:0;padding:8px 2px;border-radius:8px;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -399,8 +427,9 @@
       if(!entry)return;
       var men=entry.men||[],women=entry.women||[];
       var panels=document.getElementById('rc-perfpanels');
+      setPerfTabLabel(w);
       if(panels){
-        panels.innerHTML=potwPanel(men,women,true)
+        panels.innerHTML=potwPanel(men,women,true,w)
           +perfListPanel(entry,'dsr',false)
           +perfListPanel(entry,'diff',false)
           +perfListPanel(entry,'pts',false)
@@ -470,7 +499,48 @@
         +'<div class="perf-col m"><h4>Men · Top 5</h4>'+perfMetricList(latest,'men',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div>'
         +'<div class="perf-col f"><h4>Women · Top 5</h4>'+perfMetricList(latest,'women',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div></div>';
     }
-    function potwPanel(men,women,on){
+    /* ---- Season MVPs — Week 8 replaces POTW with the season crowns ----
+       One male, one female, picked by the league at season's end (stats made
+       the shortlist). Shown only on the final week's panel; every earlier
+       week keeps its POTW pair. Edit names/stats here. */
+    var SEASON_MVPS = {
+      male:   { name:'Ryan Hom', teamName:'Smash Society', stats:[['Record','24-6'],['DSR','72.0'],['Diff','+117'],['Clutch','7/9']] },
+      female: { name:'Shay C',   teamName:'ZERO ZERO TWO', stats:[['Record','29-3'],['DSR','82.0'],['Diff','+200'],['Win rate','91%']] },
+    };
+    function playerByName(name){
+      if(!RECAP_PLAYERS) return null;
+      var ks=Object.keys(RECAP_PLAYERS);
+      for(var i=0;i<ks.length;i++){ if(RECAP_PLAYERS[ks[i]].name===name) return RECAP_PLAYERS[ks[i]]; }
+      return null;
+    }
+    function mvpCardHome(m, female){
+      var p = playerByName(m.name) || { name:m.name };
+      return '<div class="pcard mvp'+(female?' f2':'')+'">'
+        +'<span class="mvp-crown">👑</span>'
+        +'<div class="pcard__badge">MVP</div>'
+        +'<div class="pcard__cat">Season MVP · '+(female?'Female':'Male')+'</div>'
+        +'<div class="pcard__row">'
+          +avatarHtml(p,'pav')
+          +'<div class="pcard__name">'+playerLink(m.name,m.teamName,'pname',SN(m.name))+'</div>'
+          +'<div class="pcard__team">'+teamLink(m.teamName,p.teamId,'ptm')+'</div>'
+        +'</div>'
+        +'<div class="pcard__stats">'
+          +m.stats.map(function(s){return '<div><div class="l">'+s[0]+'</div><div class="v'+(s[0]==='Record'?' hot':'')+'">'+s[1]+'</div></div>';}).join('')
+        +'</div></div>';
+    }
+    function mvpPanelHome(on){
+      return '<div class="perfpanel'+(on?' on':'')+'" data-tab="potw">'
+        + mvpCardHome(SEASON_MVPS.male,false)
+        + mvpCardHome(SEASON_MVPS.female,true)
+        + '</div>';
+    }
+    function setPerfTabLabel(week){
+      var b=document.querySelector('#rc-perftabs button[data-k="potw"]');
+      if(b) b.textContent = (week===TOTAL_WEEKS && HOME_FINISH) ? 'MVP' : 'POTW';
+    }
+    function potwPanel(men,women,on,week){
+      // The final week crowns the season: MVPs take the POTW slot.
+      if(week===TOTAL_WEEKS && HOME_FINISH) return mvpPanelHome(on);
       var html='<div class="perfpanel'+(on?' on':'')+'" data-tab="potw">';
       if(men[0])html+=potwCard(men[0],'m');
       if(women[0])html+=potwCard(women[0],'f');
@@ -518,9 +588,10 @@
     function renderPerformers(latest){
       if(!latest){return;}
       var men=latest.men||[],women=latest.women||[];
+      setPerfTabLabel(latest.week);
       if(men.length||women.length){
         document.getElementById('rc-perfpanels').innerHTML =
-          potwPanel(men,women,true)
+          potwPanel(men,women,true,latest.week)
           +perfListPanel(latest,'dsr',false)
           +perfListPanel(latest,'diff',false)
           +perfListPanel(latest,'pts',false)
@@ -569,6 +640,30 @@
       return v==null?null:v;
     }
 
+    /* ---- Bracket finish (mirrors the Playoffs tab on /standings.html) ----
+       Once the medal round is finalized, the home standings rank by finish —
+       Champion → Runner-up → Bronze winner → Bronze loser → consolation —
+       with the same medal chips + glowing rows. Null until a champion exists,
+       so mid-season the table keeps its normal points order. */
+    var HOME_FINISH = null;
+    function computeBracketFinish(sched){
+      var weeks=(sched&&sched.weeks)||[], map={}, sawGold=false;
+      weeks.forEach(function(w){
+        if(w.phase!=='playoff'&&w.phase!=='championship')return;
+        (w.matches||[]).forEach(function(m){
+          if(!m.finalizedAt||m.homeRoundPts==null||m.homeRoundPts===m.awayRoundPts)return;
+          var win=m.homeRoundPts>m.awayRoundPts?m.teamA:m.teamB;
+          var lose=m.homeRoundPts>m.awayRoundPts?m.teamB:m.teamA;
+          var medal=String(m.medal||'')+' '+String(m.bracketGroup||m.gameLabel||'');
+          var place=String(m.placeLabel||'');
+          if(/🥇|gold/i.test(medal)){ map[win]={n:1,cls:'fm1',chip:'🥇 Champion'}; map[lose]={n:2,cls:'fm2',chip:'🥈 Runner-up'}; sawGold=true; }
+          else if(/🥉|bronze/i.test(medal)){ map[win]={n:3,cls:'fm3',chip:'🥉 Bronze'}; map[lose]={n:4,cls:'',chip:'4th'}; }
+          else if(/5th/i.test(place)||/consolation/i.test(medal)){ map[win]={n:5,cls:'',chip:'5th'}; map[lose]={n:6,cls:'',chip:'6th'}; }
+        });
+      });
+      return sawGold?map:null;
+    }
+
     /* ---- Standings table ---- */
     function diffCell(d){
       if(d==null)return '<td class="c-muted">—</td>';
@@ -579,15 +674,24 @@
     function renderStandings(div, weeklyTopTeamIds){
       var teams=(div&&div.teams)||[];
       if(!teams.length)return;
+      // Season over → rank by bracket finish, same as the Playoffs tab.
+      if(HOME_FINISH){
+        teams=teams.slice().sort(function(a,b){
+          var an=(HOME_FINISH[a.teamName]||{}).n||99, bn=(HOME_FINISH[b.teamName]||{}).n||99;
+          return an-bn||((b.matchPointsFor||0)-(a.matchPointsFor||0));
+        });
+      }
       var leadPts=teams[0]?teams[0].matchPointsFor:0;
       var RC=['#f0c040','#c0c8d0','#cd7f32'];
       var rows=teams.map(function(t,i){
         var pts=t.matchPointsFor||0;
         var win=weeklyTopTeamIds.indexOf(t.teamId)>=0?'<span class="wpill">Top Wk</span>':'';
+        var fin=HOME_FINISH?(HOME_FINISH[t.teamName]||null):null;
+        var finChip=fin&&fin.n<=3?'<span class="fin-chip fin-'+fin.n+'">'+fin.chip+'</span>':'';
         var rankSym=i<3?('<span style="color:'+RC[i]+';font-weight:900">'+(i+1)+'</span>'):(i+1);
-        return '<tr class="'+(i===0?'leader medal':(i<3?'medal':''))+'">'
-          +'<td class="c-rank"><div style="display:flex;align-items:center;gap:5px;justify-content:center">'+rankSym+(t.rankDelta>0?'<span class="c-delta" style="color:var(--color-lime)">▲'+t.rankDelta+'</span>':t.rankDelta<0?'<span class="c-delta" style="color:var(--color-red)">▼'+(-t.rankDelta)+'</span>':'')+'</div></td>'
-          +'<td class="l c-team">'+(t.teamEmoji?'<span class="e">'+t.teamEmoji+'</span>':'')+teamLink(t.teamName,t.teamId,'tname')+win+'</td>'
+        return '<tr class="'+(i===0?'leader medal':(i<3?'medal':''))+(fin&&fin.cls?' '+fin.cls:'')+'">'
+          +'<td class="c-rank"><div style="display:flex;align-items:center;gap:5px;justify-content:center">'+rankSym+(!HOME_FINISH&&t.rankDelta>0?'<span class="c-delta" style="color:var(--color-lime)">▲'+t.rankDelta+'</span>':!HOME_FINISH&&t.rankDelta<0?'<span class="c-delta" style="color:var(--color-red)">▼'+(-t.rankDelta)+'</span>':'')+'</div></td>'
+          +'<td class="l c-team">'+(t.teamEmoji?'<span class="e">'+t.teamEmoji+'</span>':'')+teamLink(t.teamName,t.teamId,'tname')+finChip+win+'</td>'
           +'<td>'+(teamDSR(t)!=null?'<span class="dsr-chip">'+teamDSR(t)+'</span>':'<span class="c-muted">—</span>')+'</td>'
           +'<td>'+(t.wins||0)+'</td>'
           +'<td class="c-muted">'+(t.ties||0)+'</td>'
@@ -635,9 +739,11 @@
       fetch('/.netlify/functions/public-leaderboard').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch('/.netlify/functions/public-standings').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch('/.netlify/functions/public-leaderboard?view=players').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-drop').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
+      fetch('/.netlify/functions/public-drop').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch('/.netlify/functions/public-schedule?season='+encodeURIComponent(SEASON_ID)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]).then(function(res){
-      var lb=res[0],st=res[1],pl=res[2],dropPayload=res[3];
+      var lb=res[0],st=res[1],pl=res[2],dropPayload=res[3],sched=res[4];
+      HOME_FINISH=computeBracketFinish(sched);
       DSR_BY_TEAM=buildDsrByTeam(pl);
 
       // Build the editorial entity index (player/team names → links + hover cards)
