@@ -726,6 +726,19 @@
       }
       var read=document.getElementById('rc-drop-read'); if(read)read.setAttribute('href','/drop.html?week='+drop.week);
       var cv=document.getElementById('rc-drop-cover'); if(cv)cv.textContent='Week '+drop.week+' · The Drop';
+      // Cover art: the issue's cover photo (or its first gallery shot) fills the
+      // teaser's cover box, honoring the photo's focal point from the Drop
+      // editor. No photo on the issue → the gradient stays.
+      var cvBox = cv ? cv.parentElement : null;
+      var art = drop.cover || ((drop.gallery||[])[0]) || null;
+      if(cvBox && art && art.id){
+        var f = art.focal || {};
+        var ax = (f && isFinite(f.x)) ? f.x : 50, ay = (f && isFinite(f.y)) ? f.y : 50;
+        cvBox.style.backgroundImage = 'linear-gradient(180deg, rgba(6,8,6,.08), rgba(6,8,6,.55)), url("/.netlify/functions/drop-photo-serve?id='+encodeURIComponent(art.id)+'")';
+        cvBox.style.backgroundSize = 'cover';
+        cvBox.style.backgroundPosition = ax+'% '+ay+'%';
+        cvBox.style.height = '190px';
+      }
       var aside=document.getElementById('rc-drop-aside');
       if(aside && drop.storylines && drop.storylines.length>1){
         aside.innerHTML=drop.storylines.slice(1,5).map(function(s){ return '<li>'+LZ(s.title||s.tag||'')+'</li>'; }).join('');
