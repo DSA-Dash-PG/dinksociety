@@ -14,7 +14,7 @@
 import { verifyPlayerSession } from './lib/auth.js';
 import { getEvent, listEvents } from './lib/ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './lib/ladder-play.js';
-import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier, getRoundMVPs } from './lib/ladder-scoring.js';
+import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcPartners, calcXP, xpTier, getRoundMVPs, pairRows } from './lib/ladder-scoring.js';
 import { buildKitchen, limitWithTies, MIN_KITCHEN_GAMES, MIN_KITCHEN_NIGHTS } from './lib/ladder-kitchen.js';
 import { getXpConfig, getXpGrants, grantTotals } from './lib/xp-config.js';
 import { getMergeMap, applyMerges } from './lib/player-merge.js';
@@ -47,7 +47,7 @@ function rowFor(s, dr, bonus, mvp) {
 const rankRows = rows => rows.sort((a, b) => (b.w - a.w) || (b.diff - a.diff) || ((b.dr ?? -1) - (a.dr ?? -1)));
 
 // Winner cards (top 3) — carry pts scored + diff + DR for the Home display.
-const winnersFrom = rows => rows.slice(0, 3).map((r, i) => ({ rank: i + 1, id: r.id, name: r.name, w: r.w, l: r.l, pf: r.pf, diff: r.diff, dr: r.dr }));
+const winnersFrom = rows => rows.slice(0, 3).map((r, i) => ({ rank: i + 1, id: r.id, name: r.name, w: r.w, l: r.l, pf: r.pf, diff: r.diff, dr: r.dr, ...(r.pair ? { pair: true, ids: r.ids, names: r.names } : {}) }));
 
 function buildRows(sessions, players) {
   const stats = calcStats(sessions, players);
@@ -57,6 +57,18 @@ function buildRows(sessions, players) {
   const rows = rankRows(stats.filter(s => s.w + s.l > 0).map(s => rowFor(s, dr, bonus, mvp)));
   return { rows, stats, dr, bonus, mvp };
 }
+
+// One night's ranked rows. On a Fixed Partner night the pair places together
+// (Richard, 2026-08-29: the Latest-winners podium listed Ryan 10-0, Annie 10-0,
+// Phoebe 6-4 as 1-2-3 when Ryan & Annie were ONE pair and Kai & Phoebe the
+// second) — so per-night standings collapse to pair rows. Season aggregates
+// stay per player.
+function nightRows(play, ev) {
+  const sess = toSession(play);
+  const { rows } = buildRows([sess], playersFromPlay([play]));
+  return pairRows(rows, sess, (ev && ev.format) === 'fixed-partner');
+}
+const isPairNight = rows => rows.some(r => r.pair);
 
 // Build division rows by filtering already-computed season data rather than
 // re-running all four calc functions from scratch for each division.
@@ -87,7 +99,7 @@ export default async (req) => {
     const play = applyDirectory(applyMerges([raw], await getMergeMap()), await getDirectory())[0];
     const players = playersFromPlay([play]);
     const nightSessions = [toSession(play)];
-    const { rows } = buildRows(nightSessions, players);
+    const rows = nightRows(play, event);
     // Round-by-round history: pairings, scores, movement context + round MVPs.
     const history = (play.rounds || []).map((rd, ri) => {
       const tC = Math.max(1, ...(rd.courts || []).map(c => c.court));
@@ -107,7 +119,7 @@ export default async (req) => {
     // Kitchen for just this one night — fun stats that build live as courts wrap,
     // same categories as the season-wide Kitchen but scoped to tonight only.
     const kitchen = buildKitchen(nightSessions, players);
-    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type } : null, standings: rows, winners: winnersFrom(rows), history, kitchen });
+    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type, format: event.format || 'individual' } : null, format: isPairNight(rows) ? 'fixed-partner' : 'individual', standings: rows, winners: winnersFrom(rows), history, kitchen });
   }
 
   // ── season-wide ──
@@ -219,9 +231,9 @@ export default async (req) => {
   // Event metadata now comes from the cache — no extra DB calls here.
   const recent = plays.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 4);
   const recentWinners = recent.map(p => {
-    const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
     const ev = eventCache.get(p.eventId) || null;
-    return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', winners: winnersFrom(nr), standings: nr };
+    const nr = nightRows(p, ev);
+    return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', format: isPairNight(nr) ? 'fixed-partner' : 'individual', winners: winnersFrom(nr), standings: nr };
   });
 
   // Top-3 finishers for EVERY event with a play, so the Completed tab can show the
@@ -230,8 +242,8 @@ export default async (req) => {
   // its division page (and on the Completed tab, which lists it either way).
   const winnersByEvent = {};
   for (const p of divPlays) {
-    const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
-    winnersByEvent[p.eventId] = nr.slice(0, 3).map(r => ({ id: r.id, name: r.name, w: r.w, l: r.l }));
+    const nr = nightRows(p, eventCache.get(p.eventId) || null);
+    winnersByEvent[p.eventId] = nr.slice(0, 3).map(r => ({ id: r.id, name: r.name, w: r.w, l: r.l, ...(r.pair ? { pair: true, ids: r.ids, names: r.names } : {}) }));
   }
 
   // ── Division scope (?division=womens) ──────────────────────────────────
@@ -271,9 +283,9 @@ export default async (req) => {
       mvpLeaders: limitWithTies(dMvpSorted, r => r.count),
       partnerships: limitWithTies(dPartnerSorted, r => r.pct),
       recentWinners: dRecent.map(p => {
-        const { rows: nr } = buildRows([toSession(p)], playersFromPlay([p]));
         const ev = eventCache.get(p.eventId) || null;
-        return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || division, winners: winnersFrom(nr), standings: nr };
+        const nr = nightRows(p, ev);
+        return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || division, format: isPairNight(nr) ? 'fixed-partner' : 'individual', winners: winnersFrom(nr), standings: nr };
       }),
       winnersByEvent: dWinnersByEvent,
       hasData: dRows.length > 0,

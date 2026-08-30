@@ -11,7 +11,7 @@
 
 import { getEvent, listEvents, getSignups } from './ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './ladder-play.js';
-import { calcStats, calcDinkRating } from './ladder-scoring.js';
+import { calcStats, calcDinkRating, fixedPartnerMap } from './ladder-scoring.js';
 import { getMergeMap, applyMerges } from './player-merge.js';
 import { getDirectory, applyDirectory } from './player-directory.js';
 
@@ -27,6 +27,23 @@ function rankNight(play) {
     maxStreak: s.maxStreak || 0, dr: dr[s.id] ?? null,
   }));
   rows.sort((a, b) => (b.w - a.w) || (b.diff - a.diff) || ((b.dr ?? -1) - (a.dr ?? -1)));
+  // Fixed Partner night: the pair places together — both partners share one
+  // rank (1,1,2,2,…) and `partnerName` says who they played with, so the
+  // podium/rank math treats them as a unit. Individual nights: 1,2,3,….
+  const fpm = fixedPartnerMap(sessions[0]);
+  if (fpm) {
+    const byId = {}; rows.forEach(r => { byId[r.id] = r; });
+    let place = 0;
+    rows.forEach(r => {
+      if (r.rank) return;
+      place++;
+      r.rank = place; r.pairPlace = true;
+      const mate = byId[fpm[r.id]];
+      if (mate && !mate.rank) { mate.rank = place; mate.pairPlace = true; r.partnerName = mate.name; mate.partnerName = r.name; }
+    });
+    rows.sort((a, b) => (a.rank - b.rank) || (b.w - a.w));
+    return rows;
+  }
   rows.forEach((r, i) => (r.rank = i + 1));
   return rows;
 }
@@ -138,7 +155,17 @@ export async function buildRecapBrief(eventId) {
   });
 
   // ── Recap-level facts ──
-  const podium = nightRows.slice(0, 3).map(r => ({ rank: r.rank, name: r.name, w: r.w, l: r.l, diff: r.diff }));
+  // Podium = the top 3 PLACES. On a fixed-partner night each place is a pair
+  // ("Ryan Hom & Annie Lee"); display helpers split names on " & ".
+  const podium = [];
+  for (const r of nightRows) {
+    if (podium.length >= 3) break;
+    if (podium.some(p => p.rank === r.rank)) continue;
+    const mate = r.pairPlace ? nightRows.find(o => o !== r && o.rank === r.rank) : null;
+    podium.push(mate
+      ? { rank: r.rank, name: `${r.name} & ${mate.name}`, names: [r.name, mate.name], pair: true, w: r.w, l: r.l, diff: r.diff }
+      : { rank: r.rank, name: r.name, w: r.w, l: r.l, diff: r.diff });
+  }
   const movers = players.filter(p => p.delta != null).sort((a, b) => b.delta - a.delta);
   const biggestMover = (movers[0] && movers[0].delta > 0)
     ? { name: movers[0].name, from: movers[0].priorRank, to: movers[0].rank, jump: movers[0].delta, bestEver: movers[0].isBestFinish }

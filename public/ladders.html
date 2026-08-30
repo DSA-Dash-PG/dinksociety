@@ -96,9 +96,9 @@
        with evBody's own inner 2-col grid for ranks 4+, squeezing names/scores
        into a quarter of the page width and clipping them at the edge. */
     #pastWrapLeft{ display:block; }
-    /* #recapStrip is the mobile Home container; on desktop the same recaps
-       render into #recapStripD instead, placed after Completed ladders in the
-       Results tab (so recaps follow completed ladders, not lead the page). */
+    /* #recapStrip is the mobile Home container (below the Latest-winners
+       scrapbook); on desktop the same recaps render into #recapStripD instead,
+       placed after Completed ladders in the Results tab. */
     #recapStrip{ display:none; }
     #homeWin{ display:block; }
     .story.featured .rhead{ font-size:1.5rem; }
@@ -250,7 +250,6 @@
     </div>
     <div class="pane on" id="p-home">
       <div id="homeLive"></div>
-      <div id="recapStrip"></div>
       <div class="h1" id="homeH1">Latest winners</div>
       <div class="sub" id="homeSub">Top 3 each event — tap to see the full field</div>
       <div id="homeSeg" style="display:flex;gap:5px;background:var(--surf);border:1px solid var(--bd);border-radius:9999px;padding:4px;margin:0 0 14px">
@@ -260,6 +259,11 @@
       <div id="filtersHome" style="display:none"></div>
       <div id="homeWin"><div class="empty">Loading…</div></div>
       <div id="homeUp" style="display:none"></div>
+      <!-- Mobile-only editorial recap feed ("Latest ladders"). Sits BELOW the
+           Latest-winners scrapbook so the feature leads the page (it used to
+           render above the heading and push the new layout down the screen);
+           desktop renders the same cards into #recapStripD on the Results tab. -->
+      <div id="recapStrip" style="margin-top:18px"></div>
     </div>
 
     <div class="pane" id="p-leaderboard">
@@ -369,10 +373,12 @@ function mdRender(src){
   return parts.filter(Boolean).join('\n');
 }
 // Display names in ladder views as FIRST NAME only, to keep lists/boards clean.
-const firstName=s=>{ s=String(s||'').trim(); return s.split(/\s+/)[0]||s; };
+// Pair rows from a Fixed Partner night arrive as "Ryan Hom & Annie Lee" — each
+// side shortens on its own, so the podium reads "Ryan & Annie".
+const firstName=s=>{ s=String(s||'').trim(); if(s.includes(' & ')) return s.split(' & ').map(firstName).join(' & '); return s.split(/\s+/)[0]||s; };
 // Ranked lists (leaderboards/standings) use first name + last initial — one name
 // per row, so the initial fits and disambiguates same-first-name players.
-const firstLast=s=>{ const p=String(s||'').trim().split(/\s+/); return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}`:(p[0]||String(s||'')); };
+const firstLast=s=>{ if(String(s||'').includes(' & ')) return String(s).split(' & ').map(firstLast).join(' & '); const p=String(s||'').trim().split(/\s+/); return p.length>1?`${p[0]} ${p[p.length-1][0].toUpperCase()}`:(p[0]||String(s||'')); };
 const fmt=c=>'$'+((Number(c)||0)/100%1===0?(Number(c)||0)/100:((Number(c)||0)/100).toFixed(2));
 const cardTotal=c=>(Number(c)||0)+Math.round((Number(c)||0)*0.10);
 const TL={mixed:'Mixed',mens:"Men's",womens:"Women's"};
@@ -945,7 +951,7 @@ function lbCell(p,r,m){ m=m||'pts'; const c=POD3[r]; const drTxt=p.dr==null?'–
     stats=`<span style="color:var(--mut);font-size:.64rem;min-width:30px;text-align:right">${p.w}–${p.l}</span><span style="font-weight:900;color:${lbMC(m)};font-size:.82rem;min-width:30px;text-align:right;text-shadow:0 0 9px ${lbGLOW(m)}">${lbVal(p,m)}</span>`;
   }
   const rkCell=`<span style="display:flex;flex-direction:column;align-items:center;min-width:26px;gap:1px"><span style="font-weight:800;color:${c||'var(--mut)'};font-size:.72rem">${r}</span>${p._sec?`<span style="font-size:.52rem;font-weight:800;line-height:1;white-space:nowrap">${p._sec}</span>`:''}</span>`;
-  return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer;min-width:0">${rkCell}<span style="flex:1;min-width:0;font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(firstLast(p.name))}</span>${stats}</div>`; }
+  return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer;min-width:0">${rkCell}<span style="flex:1;min-width:0;font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis${p.pair?';white-space:normal;line-height:1.2;font-size:.74rem':''}">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</span>${stats}</div>`; }
 function lbPodium(p,r,m){ m=m||'pts'; const rc=POD3[r]; const drTxt=p.dr==null?'–':p.dr; const mc=lbMC(m), glow=lbGLOW(m); let heroBlock,pills;
   if(winsFirst(m)){
     const ladders=p.nights||0;
@@ -957,7 +963,7 @@ function lbPodium(p,r,m){ m=m||'pts'; const rc=POD3[r]; const drTxt=p.dr==null?'
     pills=`<span style="font-size:.58rem;font-weight:900;color:var(--lime);background:rgba(184,255,44,.12);border-radius:6px;padding:2px 7px">${p.w}–${p.l}</span><span style="font-size:.58rem;font-weight:800;color:var(--mut);background:var(--surf2);border-radius:6px;padding:2px 7px">${second}</span>`;
   }
   if(p._sec) pills=`<span style="font-size:.55rem;font-weight:800;color:#cdd2c6;background:var(--surf2);border-radius:6px;padding:2px 7px">${p._sec}</span>`+pills;
-  return `<div onclick="profile('${p.id}')" style="flex:1;min-width:0;background:var(--surf);border:1px solid ${rc}55;border-radius:12px;overflow:hidden;cursor:pointer"><div style="display:flex;align-items:center;justify-content:center;padding:5px;border-bottom:1px solid ${rc}55;background-color:${rc}1a;background-image:repeating-linear-gradient(135deg,${rc}2e 0 6px,transparent 6px 12px)"><span style="display:inline-flex;align-items:center;gap:3px;font-size:.55rem;font-weight:900;color:${rc};letter-spacing:.07em">${r===1?crown('#b8ff2c',12):''}${String(lbOrd(r)).toUpperCase()}</span></div><div style="padding:8px 6px 9px;text-align:center"><div style="font-size:.88rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px">${esc(firstLast(p.name))}</div>${heroBlock}<div style="display:flex;gap:4px;justify-content:center;margin-top:7px">${pills}</div></div></div>`; }
+  return `<div onclick="profile('${p.id}')" style="flex:1;min-width:0;background:var(--surf);border:1px solid ${rc}55;border-radius:12px;overflow:hidden;cursor:pointer"><div style="display:flex;align-items:center;justify-content:center;padding:5px;border-bottom:1px solid ${rc}55;background-color:${rc}1a;background-image:repeating-linear-gradient(135deg,${rc}2e 0 6px,transparent 6px 12px)"><span style="display:inline-flex;align-items:center;gap:3px;font-size:.55rem;font-weight:900;color:${rc};letter-spacing:.07em">${r===1?crown('#b8ff2c',12):''}${String(lbOrd(r)).toUpperCase()}</span></div><div style="padding:8px 6px 9px;text-align:center"><div style="font-size:.88rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;line-height:1.2">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</div>${heroBlock}<div style="display:flex;gap:4px;justify-content:center;margin-top:7px">${pills}</div></div></div>`; }
 // Desktop-only full table (mobile keeps the compact cells — toggled via CSS).
 function lbTable(rows,m){
   if(!rows||!rows.length) return '';

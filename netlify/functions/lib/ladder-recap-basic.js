@@ -9,11 +9,14 @@
 // first name + last initial on first mention in the article, uplifting, and NO
 // em dashes anywhere (recast instead).
 
-const firstName = n => String(n || '').trim().split(/\s+/)[0] || 'Player';
+// Pair names ("Ryan Hom & Annie Lee", a fixed-partner podium) shorten per person.
+const firstName = n => String(n || '').includes(' & ') ? String(n).split(' & ').map(firstName).join(' & ') : (String(n || '').trim().split(/\s+/)[0] || 'Player');
 function lastInitial(n) {
+  if (String(n || '').includes(' & ')) return String(n).split(' & ').map(lastInitial).join(' & ');
   const parts = String(n || '').trim().split(/\s+/);
   return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0]}.` : (parts[0] || 'Player');
 }
+const isPair = p => !!(p && (p.pair || String(p.name || '').includes(' & ')));
 function ordinal(n) {
   const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
   return n + (s[(v - 20) % 10] || s[v] || s[0]);
@@ -86,7 +89,7 @@ export function buildBasicRecap(brief) {
   const podium = recap.podium || [];
   const winner = podium[0] || null;
 
-  const title = winner ? `${firstName(winner.name)} takes ${event.name}` : `${event.name} recap`;
+  const title = winner ? `${firstName(winner.name)} ${isPair(winner) ? 'take' : 'takes'} ${event.name}` : `${event.name} recap`;
   const dek = `${night.count} player${night.count === 1 ? '' : 's'} · ${night.courts} court${night.courts === 1 ? '' : 's'} · ${night.rounds} round${night.rounds === 1 ? '' : 's'}`;
 
   const paras = [];

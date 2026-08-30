@@ -218,6 +218,84 @@ export function genNRPairs(prev, nC) {
 // A mid-night sub breaks the inference for that night and it falls back to
 // individual ranking, which is also what a 1-round night gets (too little
 // signal to tell the formats apart).
+// ── Fixed Partner detection + pair collapsing ──
+// Who was each player's locked partner on a session, or null when the night
+// wasn't fixed-partner. Inferred from the scored rounds themselves (so history
+// ranks correctly without a schema change): strict mode (default) needs 2+
+// scored rounds and every player keeping exactly one mutual partner. `loose`
+// is for nights the EVENT says are fixed-partner — a mid-night sub breaks the
+// strict inference, so there we take each player's most frequent partner as
+// long as the link is mutual.
+export function fixedPartnerMap(sess, loose = false) {
+  if (!sess || !Array.isArray(sess.rounds) || !sess.rounds.length) return null;
+  const counts = {}; let scoredRounds = 0;
+  sess.rounds.forEach(round => {
+    let scoredHere = false;
+    (round.courts || []).forEach(c => {
+      if (!c.score || c.score.t1 === null || c.score.t1 === undefined || c.score.t2 === null || c.score.t2 === undefined || !c.score.winner) return;
+      scoredHere = true;
+      [c.team1, c.team2].forEach(team => {
+        const t = (team || []).filter(Boolean);
+        if (t.length !== 2) return;
+        (counts[t[0].id] = counts[t[0].id] || {})[t[1].id] = ((counts[t[0].id] || {})[t[1].id] || 0) + 1;
+        (counts[t[1].id] = counts[t[1].id] || {})[t[0].id] = ((counts[t[1].id] || {})[t[0].id] || 0) + 1;
+      });
+    });
+    if (scoredHere) scoredRounds++;
+  });
+  const ids = Object.keys(counts);
+  if (!ids.length) return null;
+  const map = {};
+  if (!loose) {
+    if (scoredRounds < 2) return null;
+    for (const id of ids) {
+      const mates = Object.keys(counts[id]);
+      if (mates.length !== 1) return null;
+      const mate = mates[0];
+      const back = Object.keys(counts[mate] || {});
+      if (back.length !== 1 || back[0] !== id) return null;
+      map[id] = mate;
+    }
+    return map;
+  }
+  for (const id of ids) {
+    const mate = Object.entries(counts[id]).sort((a, b) => b[1] - a[1])[0][0];
+    const back = Object.entries(counts[mate] || {}).sort((a, b) => b[1] - a[1])[0];
+    if (back && back[0] === id) map[id] = mate;
+  }
+  return Object.keys(map).length ? map : null;
+}
+
+// Collapse a ranked list of per-player night rows into PAIR rows for a
+// fixed-partner night (one row per pair, both names, the pair's shared record),
+// re-ranked by wins → diff → avg DR. Returns `rows` untouched when the night
+// wasn't fixed-partner. `forceFixed` = the event's format says fixed-partner,
+// so the loose inference is allowed. Pair rows carry `pair:true`, `ids`,
+// `names` and a "A & B" `name` — display helpers split on " & ".
+export function pairRows(rows, sess, forceFixed = false) {
+  if (!Array.isArray(rows) || rows.length < 2) return rows;
+  const map = fixedPartnerMap(sess, false) || (forceFixed ? fixedPartnerMap(sess, true) : null);
+  if (!map) return rows;
+  const byId = {}; rows.forEach(r => { byId[r.id] = r; });
+  const seen = new Set(), out = [];
+  rows.forEach(a => {
+    if (seen.has(a.id)) return;
+    const b = byId[map[a.id]];
+    if (!b || seen.has(b.id)) { seen.add(a.id); out.push(a); return; } // unpaired (sub / odd) keeps a solo row
+    seen.add(a.id); seen.add(b.id);
+    const drs = [a.dr, b.dr].filter(x => x != null);
+    out.push({
+      ...a,
+      pair: true, id: a.id, ids: [a.id, b.id],
+      name: `${a.name} & ${b.name}`, names: [a.name, b.name], gender: null,
+      dr: drs.length ? Math.round((drs.reduce((x, y) => x + y, 0) / drs.length) * 10) / 10 : null,
+      mvp: (a.mvp || 0) + (b.mvp || 0) || a.mvp,
+      xp: undefined,
+    });
+  });
+  return out.sort((x, y) => (y.w - x.w) || (y.diff - x.diff) || ((y.dr ?? -1) - (x.dr ?? -1)));
+}
+
 export function calcBonusPts(sessions, players) {
   const bonus = {};
   players.forEach(p => bonus[p.id] = { bonus: 0, wins: 0, ladderResults: [] });
@@ -376,8 +454,23 @@ export function calcXP(sessions, players, drMap = {}, amounts) {
     parts.forEach(id => { xp[id] += A.played; detail[id].played += A.played; detail[id].nights++; });
     parts.forEach(id => { const gw = (nW[id] || 0) * A.gameWin; if (gw) { xp[id] += gw; detail[id].gameWins += gw; } });
 
+    // Placement XP: on a Fixed Partner night the pair places together, so both
+    // partners get the same place points (same rule as the podium bonus).
+    const fpm = fixedPartnerMap(sess);
     const ranked = parts.slice().sort((a, b) => (nW[b] - nW[a]) || (nDiff[b] - nDiff[a]) || ((drMap[b] ?? -1) - (drMap[a] ?? -1)));
-    ranked.forEach((id, i) => { const pp = placePts(i + 1); if (pp) { xp[id] += pp; detail[id].place += pp; } if (i === 0) detail[id].firsts++; });
+    if (fpm) {
+      const seen = new Set(); let place = 0;
+      ranked.forEach(id => {
+        if (seen.has(id)) return;
+        const unit = [id].concat(fpm[id] && parts.includes(fpm[id]) && !seen.has(fpm[id]) ? [fpm[id]] : []);
+        unit.forEach(u => seen.add(u));
+        place++;
+        const pp = placePts(place);
+        unit.forEach(u => { if (pp) { xp[u] += pp; detail[u].place += pp; } if (place === 1) detail[u].firsts++; });
+      });
+    } else {
+      ranked.forEach((id, i) => { const pp = placePts(i + 1); if (pp) { xp[id] += pp; detail[id].place += pp; } if (i === 0) detail[id].firsts++; });
+    }
 
     parts.slice().sort((a, b) => (nW[b] - nW[a]) || (nDiff[b] - nDiff[a])).slice(0, A.mostWinsTop).forEach(id => { if ((nW[id] || 0) > 0) { xp[id] += A.mostWins; detail[id].mostWins += A.mostWins; } });
     parts.slice().sort((a, b) => (nDiff[b] - nDiff[a]) || (nW[b] - nW[a])).slice(0, A.bestDiffTop).forEach(id => { xp[id] += A.bestDiff; detail[id].bestDiff += A.bestDiff; });
