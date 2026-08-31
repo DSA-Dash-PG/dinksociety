@@ -77,6 +77,15 @@
     .reg-path__title { font-size: 15px; font-weight: 700; margin: 0 0 4px; }
     .reg-path__desc { font-size: 12px; line-height: 1.5; color: var(--color-text-muted); margin: 0; }
 
+    /* ── Payment method (reuses the path tiles) ───────── */
+    .reg-path[data-pay="venmo"] .reg-path__price { color: #3d95ce; }
+    .reg-path[data-pay="venmo"].is-selected { border-color: #3d95ce; background: rgba(61,149,206,0.08); }
+    .reg-venmo { background: rgba(61,149,206,0.08); border: 1px solid rgba(61,149,206,0.35); border-radius: var(--radius-sm); padding: 16px 18px; margin-bottom: 4px; }
+    .reg-venmo__title { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; color: #3d95ce; margin-bottom: 8px; }
+    .reg-venmo__steps { margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.6; color: var(--color-text-muted); }
+    .reg-venmo__steps li { margin-bottom: 4px; }
+    .reg-venmo__steps strong { color: var(--color-text); }
+
     /* ── Fields ───────────────────────────────────────── */
     .reg-field { margin-bottom: 16px; }
     .reg-field label, .reg-field__label {
@@ -445,7 +454,7 @@
       <section class="reg-section is-active" data-section="1">
         <h2 class="reg-h2">Team details</h2>
         <p class="reg-lede">Confirm your division, name the team, and enter the captain's info. You'll build your roster (6–12 players) through the Captain Portal after checkout.</p>
-        <p class="reg-note" id="deposit-note" data-deposit-note>The full <strong><span data-team-fee>$650</span> team fee</strong> is due at registration to confirm your spot.</p>
+        <p class="reg-note" id="deposit-note" data-deposit-note>A <strong>$250 deposit</strong> holds your spot — pay by card or Venmo. The balance of the team fee is due one week before the season starts.</p>
 
         <div class="reg-field" id="division-field">
           <div class="reg-field__label">Division</div>
@@ -491,8 +500,34 @@
       <!-- Step 3: Review -->
       <section class="reg-section" data-section="3">
         <h2 class="reg-h2">Review & pay</h2>
-        <p class="reg-lede">Confirm the details below, then pay the $650 team fee via Stripe to lock in your spot.</p>
+        <p class="reg-lede" id="review-lede">Confirm the details below, then choose how you'd like to pay your deposit.</p>
         <div class="reg-summary" id="summary"></div>
+
+        <div class="reg-field">
+          <div class="reg-field__label">Payment method</div>
+          <div class="reg-paths" id="pay-methods">
+            <button type="button" class="reg-path is-selected" data-pay="card">
+              <div class="reg-path__header"><span class="reg-path__label">Card</span><span class="reg-path__price" data-pay-amount>$250</span></div>
+              <div class="reg-path__title">Pay by card</div>
+              <p class="reg-path__desc">Secure checkout via Stripe. Your spot is confirmed instantly.</p>
+            </button>
+            <button type="button" class="reg-path" data-pay="venmo">
+              <div class="reg-path__header"><span class="reg-path__label">Venmo</span><span class="reg-path__price" data-pay-amount>$250</span></div>
+              <div class="reg-path__title">@<span data-venmo-handle>dink-society</span></div>
+              <p class="reg-path__desc">Send the deposit in Venmo. Your spot is held as pending until we match the payment — usually same day.</p>
+            </button>
+          </div>
+        </div>
+
+        <div class="reg-venmo" id="venmo-panel" style="display:none;">
+          <div class="reg-venmo__title">How Venmo works</div>
+          <ol class="reg-venmo__steps">
+            <li>Hit <strong>Submit</strong> below — we save your registration and show you the exact amount and note to send.</li>
+            <li>Send <strong data-pay-amount>$250</strong> to <strong>@<span data-venmo-handle>dink-society</span></strong> in Venmo. You'll get the same instructions by email.</li>
+            <li>Once we match your payment, you'll get a confirmation email with your Captain Portal link.</li>
+          </ol>
+        </div>
+
         <div class="reg-status" id="submit-status"></div>
         <div class="reg-actions"><button type="button" class="reg-btn reg-btn--secondary" data-back="2">Back</button><button type="button" class="reg-btn reg-btn--primary" id="submit-btn">Pay & secure spot</button></div>
       </section>
@@ -504,7 +539,7 @@
 
   <script>
     // ── Dynamic state (populated from public-seasons API) ──────
-    const state = { step: 1 };
+    const state = { step: 1, pay: 'card' };
     let activeSeason = null;
     let activeDiv = null;
 
@@ -569,12 +604,53 @@
       applyFeeCopy();
     }
 
-    function applyFeeCopy() {
+    // Deposit / balance terms come from public-seasons (Admin → Seasons sets
+    // them; balance defaults to one week before the season starts).
+    function feeTerms() {
       const price = activeDiv ? activeDiv.teamPrice : 650;
+      const s = activeSeason || {};
+      let deposit = (s.depositAmount != null) ? Number(s.depositAmount) : 250;
+      if (!(deposit > 0) || deposit >= price) deposit = price;
+      const balance = Math.max(0, price - deposit);
+      const dueDate = s.balanceDueDate
+        ? new Date(s.balanceDueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : '';
+      return { price, deposit, balance, dueDate, venmo: String(s.venmoHandle || 'dink-society').replace(/^@/, '') };
+    }
+
+    function applyFeeCopy() {
+      const t = feeTerms();
       const note = document.getElementById('deposit-note');
-      if (note) note.innerHTML = 'The full <strong>$' + price.toLocaleString() + ' team fee</strong> is due at registration to confirm your spot.';
+      if (note) note.innerHTML = t.balance > 0
+        ? 'A <strong>$' + t.deposit.toLocaleString() + ' deposit</strong> holds your spot — pay by card or Venmo. The remaining <strong>$' + t.balance.toLocaleString() + '</strong> of the $' + t.price.toLocaleString() + ' team fee is due ' + (t.dueDate ? 'by <strong>' + t.dueDate + '</strong>' : 'one week before the season starts') + '.'
+        : 'The full <strong>$' + t.price.toLocaleString() + ' team fee</strong> is due at registration to confirm your spot — pay by card or Venmo.';
+      updatePayUI();
+    }
+
+    // Payment method tiles (Step 3)
+    document.querySelectorAll('#pay-methods .reg-path').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#pay-methods .reg-path').forEach(b => b.classList.remove('is-selected'));
+        btn.classList.add('is-selected');
+        state.pay = btn.dataset.pay === 'venmo' ? 'venmo' : 'card';
+        updatePayUI();
+      });
+    });
+
+    function updatePayUI() {
+      const t = feeTerms();
+      document.querySelectorAll('[data-pay-amount]').forEach(el => { el.textContent = '$' + t.deposit.toLocaleString(); });
+      document.querySelectorAll('[data-venmo-handle]').forEach(el => { el.textContent = t.venmo; });
+      const panel = document.getElementById('venmo-panel');
+      if (panel) panel.style.display = state.pay === 'venmo' ? 'block' : 'none';
       const btn = document.getElementById('submit-btn');
-      if (btn) btn.textContent = 'Pay $' + price.toLocaleString() + ' & secure spot';
+      if (btn) btn.textContent = state.pay === 'venmo'
+        ? 'Submit & pay $' + t.deposit.toLocaleString() + ' via Venmo'
+        : 'Pay $' + t.deposit.toLocaleString() + ' & secure spot';
+      const lede = document.getElementById('review-lede');
+      if (lede) lede.textContent = t.balance > 0
+        ? 'Confirm the details below, then choose how you\'d like to pay your $' + t.deposit.toLocaleString() + ' deposit.'
+        : 'Confirm the details below, then choose how you\'d like to pay your $' + t.price.toLocaleString() + ' team fee.';
     }
 
     // Public schedule from the season record: start date + weeks → weekly dates.
@@ -962,9 +1038,13 @@
       rows.push(['Registration type', 'Team']);
       rows.push(['Team name', escapeHtml(document.getElementById('team-name').value.trim())]);
       rows.push(['Captain', escapeHtml(val('p1-first') + ' ' + val('p1-last'))]);
+      const t = feeTerms();
+      rows.push(['Team fee', '$' + t.price.toLocaleString()]);
+      if (t.balance > 0) rows.push(['Balance due' + (t.dueDate ? ' by ' + t.dueDate : ' (one week before the season)'), '$' + t.balance.toLocaleString()]);
       document.getElementById('summary').innerHTML =
         rows.map(([k, v]) => `<div class="reg-summary__row"><span class="reg-summary__label">${k}</span><span class="reg-summary__value">${v}</span></div>`).join('') +
-        `<div class="reg-summary__row reg-summary__row--total"><span class="reg-summary__label">Due today</span><span class="reg-summary__value">$${(activeDiv ? activeDiv.teamPrice : 650).toLocaleString()}</span></div>`;
+        `<div class="reg-summary__row reg-summary__row--total"><span class="reg-summary__label">${t.balance > 0 ? 'Deposit due today' : 'Due today'}</span><span class="reg-summary__value">$${t.deposit.toLocaleString()}</span></div>`;
+      updatePayUI();
     }
 
     // Submit → Stripe
@@ -973,7 +1053,7 @@
       const status = document.getElementById('submit-status');
       btn.disabled = true;
       status.className = 'reg-status is-info';
-      status.textContent = 'Creating your Stripe checkout session…';
+      status.textContent = state.pay === 'venmo' ? 'Saving your registration…' : 'Creating your Stripe checkout session…';
       try {
         const res = await fetch('/.netlify/functions/register-checkout', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -982,8 +1062,9 @@
         if (!res.ok) throw new Error((await res.text()) || 'Checkout session failed');
         const data = await res.json();
         if (data.confirmationUrl) {
-          // Pay-later division — skip Stripe, go straight to confirmation
-          status.textContent = 'Registration confirmed! Redirecting…';
+          // Venmo (pending until we match the payment) or a pay-later division —
+          // no Stripe, go straight to the confirmation page.
+          status.textContent = data.paymentMethod === 'venmo' ? 'Saved! Redirecting to your Venmo instructions…' : 'Registration confirmed! Redirecting…';
           window.location.href = data.confirmationUrl;
         } else if (data.checkoutUrl) {
           status.textContent = 'Redirecting to Stripe…';
@@ -1018,6 +1099,7 @@
         division: activeDiv ? activeDiv.id : '',
         divisionLabel: activeDiv ? activeDiv.name : '',
         path: 'team', price: activeDiv ? activeDiv.teamPrice : 650,
+        paymentMethod: state.pay === 'venmo' ? 'venmo' : 'card',
         agreed: { liability: true, conduct: true },
         team: { name: val('team-name'), captain: captainName, players: [
           { name: captainName, firstName: val('p1-first'), lastName: val('p1-last'), email: val('p1-email'), phone: val('p1-phone'), captain: true },

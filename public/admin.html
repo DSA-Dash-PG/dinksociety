@@ -1800,10 +1800,10 @@
   async function loadSettings() {
     try {
       const data = await apiJSON('/.netlify/functions/admin-settings');
-      SETTINGS = { circuitName: 'Season 1', startDate: '2026-06-08', teamFee: '$650', agentFee: '$75', defaultVenue: '', weeks: 8, teamsPerDiv: 6, depositAmount: 100, balanceDueDate: '2026-06-01', ...data };
+      SETTINGS = { circuitName: 'Season 1', startDate: '2026-06-08', teamFee: '$650', agentFee: '$75', defaultVenue: '', weeks: 8, teamsPerDiv: 6, depositAmount: 250, balanceDueDate: '2026-06-01', ...data };
     } catch (e) {
       console.warn('Settings load failed, using defaults:', e);
-      SETTINGS = { circuitName: 'Season 1', startDate: '2026-06-08', teamFee: '$650', agentFee: '$75', defaultVenue: '', weeks: 8, teamsPerDiv: 6, depositAmount: 100, balanceDueDate: '2026-06-01' };
+      SETTINGS = { circuitName: 'Season 1', startDate: '2026-06-08', teamFee: '$650', agentFee: '$75', defaultVenue: '', weeks: 8, teamsPerDiv: 6, depositAmount: 250, balanceDueDate: '2026-06-01' };
     }
     applySettings();
   }
@@ -1825,7 +1825,7 @@
     const depositEnabled = SETTINGS.depositAmount > 0;
     $id('set-deposit-enabled').checked = depositEnabled;
     $id('deposit-amount-row').style.display = depositEnabled ? '' : 'none';
-    f('set-deposit', SETTINGS.depositAmount || 100);
+    f('set-deposit', SETTINGS.depositAmount || 250);
     f('set-balance-due', SETTINGS.balanceDueDate);
     $id('set-deposit-enabled').addEventListener('change', () => {
       $id('deposit-amount-row').style.display = $id('set-deposit-enabled').checked ? '' : 'none';
@@ -1851,7 +1851,7 @@
       defaultVenue: $id('set-venue').value.trim(),
       weeks: parseInt($id('set-weeks').value) || 12,
       teamsPerDiv: parseInt($id('set-teams-per-div').value) || 6,
-      depositAmount: $id('set-deposit-enabled').checked ? (parseFloat($id('set-deposit').value) || 100) : 0,
+      depositAmount: $id('set-deposit-enabled').checked ? (parseFloat($id('set-deposit').value) || 250) : 0,
       balanceDueDate: $id('set-balance-due').value,
     };
     try {
@@ -2318,7 +2318,7 @@
         '<div class="af"><label>End date</label><input type="date" id="se-end" value="' + h(s.endDate || '') + '"></div>' +
       '</div>' +
       '<div class="arow">' +
-        '<div class="af"><label>Deposit amount ($, 0 = pay in full)</label><input type="number" id="se-deposit" min="0" step="1" value="' + h(s.depositAmount != null ? s.depositAmount : 100) + '"></div>' +
+        '<div class="af"><label>Deposit amount ($, 0 = pay in full)</label><input type="number" id="se-deposit" min="0" step="1" value="' + h(s.depositAmount != null ? s.depositAmount : 250) + '"></div>' +
         '<div class="af"><label>Balance due date</label><input type="date" id="se-balance-due" value="' + h(s.balanceDueDate || '') + '"></div>' +
       '</div>' +
       '<div class="arow">' +
@@ -3309,15 +3309,18 @@
           ? '<span class="p p--unpaid">$' + due + '</span>'
           : paid > 0 ? '<span class="p p--paid">$0</span>' : '<span style="color:var(--color-text-faint)">—</span>';
         const st = r.status || 'pending';
+        const isVenmo = r.paymentMethod === 'venmo';
         const actBtns = [];
-        if (st === 'pending') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="confirm" data-id="' + h(r.id) + '">Confirm</button>');
+        if (st === 'pending' && isVenmo) actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="venmo-received" data-id="' + h(r.id) + '" title="Log the Venmo deposit and confirm the spot">Venmo received</button>');
+        if (st === 'pending') actBtns.push('<button class="ab ' + (isVenmo ? 'ab--outline' : 'ab--teal') + ' ab--sm reg-act" data-act="confirm" data-id="' + h(r.id) + '"' + (isVenmo ? ' title="Confirm without logging a payment"' : '') + '>Confirm</button>');
         if (st === 'pending' || st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="reject" data-id="' + h(r.id) + '">Reject</button>');
         if (st === 'rejected') actBtns.push('<button class="ab ab--teal ab--sm reg-act" data-act="reinstate" data-id="' + h(r.id) + '">Reinstate</button>');
         if (st === 'confirmed') actBtns.push('<button class="ab ab--outline ab--sm reg-act" data-act="mark-paid" data-id="' + h(r.id) + '">Payments</button>');
         if (r.division && DIVISIONS.length > 0 && !DIVISIONS.some(d => d.id === r.division)) actBtns.push('<button class="ab ab--outline ab--sm reg-act" style="color:var(--color-gold,#c9a84c);border-color:var(--color-gold,#c9a84c)" data-act="fix-division" data-id="' + h(r.id) + '" title="Division ID \'' + h(r.division) + '\' is not configured">Fix Division</button>');
         actBtns.push('<button class="ab ab--ghost ab--sm reg-act" data-act="edit-contact" data-id="' + h(r.id) + '">Edit</button>');
         actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
-        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td><span class="p p--' + st + '">' + st + '</span></td><td style="font-size:12px;">' + feeCol + '</td><td>' + paidCol + '</td><td>' + balCol + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
+        const stCol = '<span class="p p--' + st + '">' + st + '</span>' + (isVenmo && st === 'pending' ? ' <span class="p" style="background:rgba(61,149,206,0.15);color:#3d95ce;" title="Waiting on $' + h(r.venmo?.amount || r.depositAmount || '') + ' via Venmo' + (r.venmo?.note ? ' — note: ' + h(r.venmo.note) : '') + '">Venmo · $' + h(r.venmo?.amount || r.depositAmount || '?') + '</span>' : '');
+        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td>' + stCol + '</td><td style="font-size:12px;">' + feeCol + '</td><td>' + paidCol + '</td><td>' + balCol + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
     wireRegActions();
   }
@@ -3359,6 +3362,17 @@
       if (!confirm('Permanently delete this registration? If a team was already created, it will be removed too. This cannot be undone.')) return;
     } else if (act === 'confirm') {
       if (!confirm('Confirm this registration? It will be marked approved and a team record created.')) return;
+    } else if (act === 'venmo-received') {
+      // Log the Venmo deposit + confirm in one call (admin-registration-confirm
+      // accepts recordPayment). The captain gets the "You're in" email from there.
+      const reg = allRegistrations.find(r => r.id === id) || {};
+      const expected = reg.venmo?.amount || reg.depositAmount || '';
+      const entered = prompt('Amount received via Venmo ($):', expected);
+      if (entered === null) return;
+      const amount = parseFloat(entered);
+      if (!amount || amount <= 0) { alert('Enter a valid amount.'); return; }
+      payload.action = 'confirm';
+      payload.recordPayment = { amount, method: 'venmo', note: 'Registration deposit via Venmo' + (reg.venmo?.note ? ' — ' + reg.venmo.note : '') };
     } else if (act === 'reinstate') {
       if (!confirm('Reinstate this rejected registration back to confirmed?')) return;
     } else if (act === 'fix-division') {

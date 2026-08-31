@@ -17,6 +17,10 @@
 // The stripe-webhook function handles checkout.session.completed
 // and marks the registration as 'confirmed'.
 //
+// paymentMethod: 'venmo' skips Stripe — the registration is saved as pending
+// with the Venmo handle / amount / note to send, and stays pending until an
+// admin confirms the deposit landed ("Venmo received" in the Registrations tab).
+//
 // KEY FORMAT: pending/{id}.json → confirmed/{id}.json
 // =============================================================
 
@@ -25,6 +29,7 @@ import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
 import { sendEmail } from './lib/email.js';
 import { circuitCode } from './lib/circuit.js';
+import { resolveDepositTerms, VENMO_HANDLE, venmoProfileUrl, fmtDueDate } from './lib/payment-terms.js';
 
 export default async (req) => {
   if (req.method !== 'POST') {
@@ -32,13 +37,16 @@ export default async (req) => {
   }
 
   const stripeKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeKey) {
-    return new Response('Stripe not configured', { status: 500 });
-  }
 
   try {
     const body = await req.json();
     const { seasonId, circuit, division, divisionLabel, path, team, agent } = body;
+    // 'card' (Stripe Checkout, default) or 'venmo' (deposit sent to @VENMO_HANDLE;
+    // registration stays pending until an admin confirms the payment landed).
+    const paymentMethod = body.paymentMethod === 'venmo' ? 'venmo' : 'card';
+    if (paymentMethod === 'card' && !stripeKey) {
+      return new Response('Stripe not configured', { status: 500 });
+    }
 
     // Storage uses the canonical circuit CODE ("I"); customer-facing text uses
     // the season's display name ("Season 1"). Keeping these separate is what
@@ -185,25 +193,11 @@ export default async (req) => {
     // Teams pay a deposit now; the remaining team fee is tracked as a
     // balance collected separately before the season. Agents pay in full.
     const isTeam = path === 'team';
-    let depositAmount = 100;
-    let balanceDueDate = null;
-    // Season blob is the authoritative source; fall back to circuit-settings for legacy data.
-    if (season && season.depositAmount != null) {
-      depositAmount = Number(season.depositAmount);
-      balanceDueDate = season.balanceDueDate || null;
-    } else {
-      try {
-        const configStore = getStore({ name: 'config', consistency: 'strong' });
-        const cfgRaw = await configStore.get('circuit-settings');
-        if (cfgRaw) {
-          const cfg = JSON.parse(cfgRaw);
-          if (cfg.depositAmount != null) depositAmount = Number(cfg.depositAmount);
-          if (cfg.balanceDueDate) balanceDueDate = cfg.balanceDueDate;
-        }
-      } catch (e) {
-        console.warn('Could not load circuit-settings for deposit; using defaults:', e.message);
-      }
-    }
+    // Season blob is the authoritative source; circuit-settings is the legacy
+    // fallback; the balance-due date defaults to one week before the season.
+    const terms = await resolveDepositTerms(season);
+    let depositAmount = terms.depositAmount;
+    const balanceDueDate = terms.balanceDueDate;
 
     const totalPrice = resolvedPrice;
     // Agents pay in full; clamp the deposit so it never exceeds the total.
@@ -225,6 +219,7 @@ export default async (req) => {
       divisionLabel: divisionLabel || division,
       path,
       status: 'pending',
+      paymentMethod,
       price: totalPrice,
       totalPrice: totalPrice,
       paymentType: isTeam ? 'deposit' : 'full',
@@ -241,13 +236,103 @@ export default async (req) => {
     const pendingKey = `pending/${regId}.json`;
     await regStore.set(pendingKey, JSON.stringify(registration));
 
-    // Build the Stripe Checkout Session
-    const stripe = new Stripe(stripeKey);
     const siteUrl = process.env.SITE_URL || `https://${process.env.URL || 'localhost:8888'}`;
 
     const customerEmail = path === 'team'
       ? team?.players?.[0]?.email
       : agent?.email;
+
+    // ── Venmo ──────────────────────────────────────────────────
+    // No Stripe session. The registration stays in pending/ with the exact
+    // amount + note we asked them to send; the success page and a follow-up
+    // email repeat the instructions. An admin confirms it from the
+    // Registrations tab ("Venmo received") once the payment shows up.
+    if (paymentMethod === 'venmo') {
+      const displayName = isTeam ? (team?.name || 'Team') : (agent?.name || 'Free agent');
+      const refCode = regId.slice(-6).toUpperCase();
+      registration.venmo = {
+        handle: VENMO_HANDLE,
+        url: venmoProfileUrl(VENMO_HANDLE),
+        amount: amountDueNow,
+        note: `Dink Society · ${displayName} · ${refCode}`,
+        requestedAt: new Date().toISOString(),
+      };
+      registration.paymentStatus = 'unpaid';
+      await regStore.set(pendingKey, JSON.stringify(registration));
+
+      const contactName = isTeam ? (team?.captain || team?.players?.[0]?.name || '') : (agent?.name || '');
+      const dueLabel = fmtDueDate(balanceDueDate);
+      if (customerEmail) {
+        try {
+          await sendEmail({
+            to: customerEmail,
+            subject: `Almost in — send your $${amountDueNow} Venmo deposit (${seasonName})`,
+            html: `
+              <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
+                <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:32px;">THE DINK SOCIETY</div>
+                <h1 style="font-size:24px;font-weight:800;text-transform:uppercase;color:#f5f5f5;margin:0 0 8px;">Almost in${contactName ? ', ' + contactName.split(' ')[0] : ''}.</h1>
+                <p style="font-size:15px;color:#8a8a8a;line-height:1.6;margin:0 0 24px;">
+                  We've got <strong style="color:#f5f5f5;">${displayName}</strong> down for <strong style="color:#f5f5f5;">${seasonName}</strong> (${divisionLabel || division}). Your spot is held as soon as your Venmo deposit lands.
+                </p>
+                <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #3d95ce;padding:20px;border-radius:0 12px 12px 0;margin-bottom:24px;">
+                  <div style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#3d95ce;margin-bottom:12px;font-weight:700;">Pay by Venmo</div>
+                  <table style="width:100%;font-size:14px;color:#f5f5f5;">
+                    <tr><td style="padding:6px 0;color:#8a8a8a;">Send to</td><td style="padding:6px 0;text-align:right;font-weight:700;">@${VENMO_HANDLE}</td></tr>
+                    <tr><td style="padding:6px 0;color:#8a8a8a;">Amount</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#b8ff2c;">$${amountDueNow}</td></tr>
+                    <tr><td style="padding:6px 0;color:#8a8a8a;">Note</td><td style="padding:6px 0;text-align:right;font-weight:600;">${registration.venmo.note}</td></tr>
+                  </table>
+                  <a href="${registration.venmo.url}" style="display:inline-block;margin-top:14px;padding:12px 28px;background:#3d95ce;color:#fff;font-size:13px;font-weight:700;text-decoration:none;border-radius:9999px;">Open Venmo →</a>
+                </div>
+                ${balanceDue > 0 ? `
+                <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #ffb400;padding:16px 20px;border-radius:0 12px 12px 0;margin-bottom:24px;">
+                  <p style="font-size:14px;margin:0;line-height:1.6;color:#8a8a8a;">
+                    <strong style="color:#f5f5f5;">Balance:</strong> the remaining $${balanceDue} of the $${totalPrice} team fee is due${dueLabel ? ' by ' + dueLabel : ' one week before the season starts'}.
+                  </p>
+                </div>` : ''}
+                <p style="font-size:14px;color:#8a8a8a;line-height:1.6;margin:0 0 24px;">
+                  Once we match your payment (usually the same day) you'll get a confirmation email with your Captain Portal link. Reference: <span style="font-family:monospace;color:#f5f5f5;">${regId.toUpperCase()}</span>
+                </p>
+                <div style="margin-top:40px;padding-top:20px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;">
+                  The Dink Society · Southern California Pickleball League
+                </div>
+              </div>
+            `,
+          });
+        } catch (emailErr) {
+          console.error('Venmo instructions email failed:', emailErr);
+        }
+      }
+
+      // Heads-up to the admin inbox so the deposit can be matched + confirmed.
+      const adminTo = process.env.EMAIL_ADMIN_BCC || process.env.EMAIL_REPLY_TO;
+      if (adminTo) {
+        try {
+          await sendEmail({
+            to: adminTo,
+            subject: `Venmo registration: ${displayName} — expect $${amountDueNow}`,
+            html: `
+              <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 20px;background:#0e0e0e;color:#f5f5f5;">
+                <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:24px;">THE DINK SOCIETY</div>
+                <h1 style="font-size:20px;font-weight:800;margin:0 0 12px;">New Venmo registration</h1>
+                <p style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 16px;"><b style="color:#fff;">${displayName}</b> (${divisionLabel || division}, ${seasonName}) chose Venmo. Look for <b style="color:#fff;">$${amountDueNow}</b> from ${contactName || customerEmail || 'the captain'} with note <b style="color:#fff;">${registration.venmo.note}</b>, then hit <b style="color:#fff;">Venmo received</b> on the Registrations tab.</p>
+                <a href="${siteUrl}/admin.html" style="display:inline-block;padding:12px 28px;background:#b8ff2c;color:#0e0e0e;font-size:13px;font-weight:700;text-decoration:none;border-radius:9999px;">Open Admin →</a>
+              </div>
+            `,
+          });
+        } catch (emailErr) {
+          console.error('Venmo admin notify failed:', emailErr);
+        }
+      }
+
+      return new Response(JSON.stringify({ confirmationUrl: `${siteUrl}/register-success.html?id=${regId}&pay=venmo`, paymentMethod: 'venmo' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+    // ───────────────────────────────────────────────────────────
+
+    // Build the Stripe Checkout Session
+    const stripe = new Stripe(stripeKey);
 
     const sessionParams = {
       mode: 'payment',

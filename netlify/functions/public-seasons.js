@@ -11,6 +11,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
+import { resolveDepositTerms, VENMO_HANDLE } from './lib/payment-terms.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -31,12 +32,19 @@ export default async (req) => {
         if (season.isTest === true) continue;
         if (season.status === 'archived') continue;
 
+        // Deposit / balance-due terms so the registration page can show the
+        // real amount due today (and the Venmo handle to send it to).
+        const terms = await resolveDepositTerms(season);
+
         seasons.push({
           id: season.id,
           name: season.name,
           label: season.label,
           status: season.status,
           registration: season.registration,
+          depositAmount: terms.depositAmount,
+          balanceDueDate: terms.balanceDueDate,
+          venmoHandle: VENMO_HANDLE,
           image: season.image || null,
           tagline: season.tagline || null,
           startDate: season.startDate,

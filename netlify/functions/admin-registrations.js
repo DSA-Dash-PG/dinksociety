@@ -56,6 +56,11 @@ export default async (req) => {
       balanceDueDate: r.balanceDueDate ?? null,
       paymentType: r.paymentType ?? null,
       paymentStatus: r.paymentStatus ?? null,
+      paymentMethod: r.paymentMethod ?? 'card',
+      depositAmount: r.depositAmount ?? null,
+      // Venmo instructions the captain was given (handle / amount / note) so
+      // the Registrations tab can show what to look for.
+      venmo: r.venmo ? { handle: r.venmo.handle, amount: r.venmo.amount, note: r.venmo.note } : null,
       stripeAmountPaid: r.stripeAmountPaid ?? 0,
       manualPayments: Array.isArray(r.manualPayments) ? r.manualPayments
         : r.manualPayment ? [{ id: 'mp_legacy', amount: r.amountPaid || 0, ...r.manualPayment }]

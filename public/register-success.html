@@ -40,13 +40,41 @@
     .success__note { font-size: 12px; color: var(--color-text-faint); margin: 0 0 var(--space-5); line-height: 1.6; }
     .success__ctas { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
     .success__loading { color: var(--color-text-faint); font-size: 13px; padding: 12px 0; }
+    /* Venmo — spot held, deposit still outstanding */
+    .success--venmo .success__badge { color: #3d95ce; }
+    .success--venmo .success__badge::before { background: #3d95ce; box-shadow: 0 0 0 4px rgba(61,149,206,0.2); }
+    .success__venmo { background: rgba(61,149,206,0.08); border: 1px solid rgba(61,149,206,0.35); border-radius: var(--radius-sm); padding: var(--space-5) var(--space-4); margin-bottom: var(--space-6); text-align: left; }
+    .success__venmo-title { font-size: 10px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #3d95ce; margin-bottom: 12px; }
+    .success__venmo-amount { font-size: 34px; font-weight: 800; line-height: 1; color: var(--color-text); margin-bottom: 4px; }
+    .success__venmo-to { font-size: 14px; color: var(--color-text-muted); margin-bottom: 14px; }
+    .success__venmo-to strong { color: var(--color-text); }
+    .success__venmo-note { display: flex; justify-content: space-between; gap: 10px; align-items: center; font-size: 12px; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 14px; }
+    .success__venmo-note code { font-family: inherit; font-weight: 700; color: var(--color-text); word-break: break-word; }
+    .success__venmo-copy { flex-shrink: 0; font-size: 11px; font-weight: 700; padding: 6px 10px; border-radius: 9999px; border: 1px solid var(--color-border-strong); background: transparent; color: var(--color-text); cursor: pointer; font-family: inherit; }
+    .btn-venmo { background: #3d95ce !important; color: #fff !important; border-color: #3d95ce !important; }
+    .success__venmo-steps { font-size: 12px; line-height: 1.6; color: var(--color-text-muted); margin: 14px 0 0; padding-left: 18px; }
+    .success__venmo-steps strong { color: var(--color-text); }
   </style>
 </head>
 <body>
   <div class="success">
-    <div class="success__badge">Registration confirmed</div>
-    <h1 class="success__title">You're in.</h1>
-    <p class="success__sub">Payment received. Your registration for <span id="s-circuit-text">Season 1</span> is confirmed. Welcome to the Society.</p>
+    <div class="success__badge" id="s-badge">Registration confirmed</div>
+    <h1 class="success__title" id="s-title">You're in.</h1>
+    <p class="success__sub" id="s-sub">Payment received. Your registration for <span id="s-circuit-text">Season 1</span> is confirmed. Welcome to the Society.</p>
+
+    <!-- Venmo: shown instead of the payment-received copy while the deposit is outstanding -->
+    <div class="success__venmo" id="s-venmo" style="display:none;">
+      <div class="success__venmo-title">Send your deposit on Venmo</div>
+      <div class="success__venmo-amount" id="v-amount">$250</div>
+      <div class="success__venmo-to">to <strong id="v-handle">@dink-society</strong></div>
+      <div class="success__venmo-note"><span>Note: <code id="v-note">Dink Society</code></span><button type="button" class="success__venmo-copy" id="v-copy">Copy note</button></div>
+      <a class="btn btn-venmo" id="v-open" href="https://venmo.com/u/dink-society" target="_blank" rel="noopener">Open Venmo →</a>
+      <ol class="success__venmo-steps">
+        <li>Send the amount above to <strong id="v-handle-2">@dink-society</strong> with the note filled in — it's how we match your payment.</li>
+        <li>We'll confirm your spot (usually the same day) and email your Captain Portal link.</li>
+        <li id="v-balance-step" style="display:none;">The remaining <strong id="v-balance">$400</strong> is due <span id="v-due">one week before the season starts</span>.</li>
+      </ol>
+    </div>
 
     <div class="success__detail" id="reg-detail">
       <div class="success__loading" id="s-loading">Loading registration details…</div>
@@ -59,7 +87,7 @@
       </div>
     </div>
 
-    <p class="success__note">You'll receive a magic link email to access the Captain Portal once the Circuit officially opens. Keep an eye on your inbox.</p>
+    <p class="success__note" id="s-note">You'll receive a magic link email to access the Captain Portal once the Circuit officially opens. Keep an eye on your inbox.</p>
 
     <div class="success__ctas">
       <a href="/" class="btn btn-lime">Back to home</a>
@@ -75,6 +103,15 @@
       if (!regId) {
         document.getElementById('reg-detail').style.display = 'none';
         return;
+      }
+
+      // Venmo registrations arrive with &pay=venmo — swap the headline right
+      // away so "Payment received" never flashes before the lookup finishes.
+      if (params.get('pay') === 'venmo') {
+        document.querySelector('.success').classList.add('success--venmo');
+        document.getElementById('s-badge').textContent = 'Spot held · deposit pending';
+        document.getElementById('s-title').textContent = 'Almost in.';
+        document.getElementById('s-sub').textContent = 'Loading your Venmo instructions…';
       }
 
       // Fetch registration data from API
@@ -100,6 +137,41 @@
           if (reg.path === 'team' && reg.team && reg.team.name) {
             document.getElementById('s-team').textContent = reg.team.name;
             document.getElementById('s-team-row').style.display = 'flex';
+          }
+
+          // Venmo: deposit not matched yet — swap the "payment received" copy
+          // for the exact amount / handle / note to send.
+          if (reg.paymentMethod === 'venmo' && reg.status === 'pending' && reg.venmo) {
+            var v = reg.venmo;
+            var handle = '@' + String(v.handle || 'dink-society').replace(/^@/, '');
+            document.querySelector('.success').classList.add('success--venmo');
+            document.getElementById('s-badge').textContent = 'Spot held · deposit pending';
+            document.getElementById('s-title').textContent = 'Almost in.';
+            document.getElementById('s-sub').innerHTML = 'We\'ve saved your registration for <span id="s-circuit-text"></span>. Send your Venmo deposit and we\'ll confirm your spot as soon as it lands.';
+            document.getElementById('s-circuit-text').textContent = reg.circuit ? (reg.circuit === 'I' ? 'Season 1' : 'Circuit ' + reg.circuit) : 'Season 1';
+            document.getElementById('v-amount').textContent = '$' + (v.amount != null ? v.amount : (reg.depositAmount || ''));
+            document.getElementById('v-handle').textContent = handle;
+            document.getElementById('v-handle-2').textContent = handle;
+            document.getElementById('v-note').textContent = v.note || 'Dink Society';
+            if (v.url) document.getElementById('v-open').href = v.url;
+            document.getElementById('s-amount').textContent = '$' + (v.amount != null ? v.amount : '') + ' deposit via Venmo (pending)';
+            if (reg.balanceDue > 0) {
+              document.getElementById('v-balance').textContent = '$' + reg.balanceDue;
+              if (reg.balanceDueDate) {
+                var dd = new Date(reg.balanceDueDate + 'T12:00:00');
+                if (!isNaN(dd.getTime())) document.getElementById('v-due').textContent = 'by ' + dd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+              }
+              document.getElementById('v-balance-step').style.display = 'list-item';
+            }
+            document.getElementById('s-venmo').style.display = 'block';
+            document.getElementById('s-note').textContent = 'Keep this page or the email we just sent handy — once we match your payment you\'ll get a confirmation with your Captain Portal link. Reference: ' + String(reg.id || '').toUpperCase();
+            var copyBtn = document.getElementById('v-copy');
+            copyBtn.addEventListener('click', function() {
+              var txt = document.getElementById('v-note').textContent;
+              var done = function() { copyBtn.textContent = 'Copied ✓'; setTimeout(function() { copyBtn.textContent = 'Copy note'; }, 1800); };
+              if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, done);
+              else done();
+            });
           }
         })
         .catch(function() {

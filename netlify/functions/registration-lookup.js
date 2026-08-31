@@ -62,7 +62,25 @@ export default async (req, context) => {
       amountPaid: reg.amountPaid || null,
       createdAt: reg.createdAt,
       confirmedAt: reg.confirmedAt || null,
+      // Payment terms — no account details, just what was asked for / is owed.
+      paymentMethod: reg.paymentMethod || 'card',
+      paymentStatus: reg.paymentStatus || null,
+      totalPrice: reg.totalPrice || reg.price || null,
+      depositAmount: reg.depositAmount != null ? reg.depositAmount : null,
+      balanceDue: reg.balanceDue != null ? reg.balanceDue : null,
+      balanceDueDate: reg.balanceDueDate || null,
     };
+
+    // Venmo instructions (handle / amount / note) so the success page can
+    // repeat them — only while the deposit is still outstanding.
+    if (reg.paymentMethod === 'venmo' && reg.venmo && status === 'pending') {
+      safe.venmo = {
+        handle: reg.venmo.handle,
+        url: reg.venmo.url,
+        amount: reg.venmo.amount,
+        note: reg.venmo.note,
+      };
+    }
 
     if (reg.path === 'team' && reg.team) {
       safe.team = {

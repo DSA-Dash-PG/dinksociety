@@ -15,7 +15,7 @@ const DEFAULTS = {
   teamsPerDiv:    6,
   weeks:          8,
   matchTime:      '7:00–9:00 PM',
-  depositAmount:  100,
+  depositAmount:  250,
   balanceDueDate: '2026-06-01',
   // Venues the league plays at. Each: { id, name, address, courts } where
   // courts is a free-text list of court labels (e.g. "1–8" or "3A, 5D, 5E").
