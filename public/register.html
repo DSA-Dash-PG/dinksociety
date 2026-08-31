@@ -280,7 +280,9 @@
     </div>
   </div></section>
 
-  <!-- ── Gallery (placeholder — wire to /gallery) ── -->
+  <!-- ── Gallery — filled by renderGallery(): newest ladder-night photos
+       (admin → Ladders → Photos), else the Site Images "gallery" slot,
+       else these placeholders. ── -->
   <section class="ln-sec"><div class="ln-wrap">
     <div class="ln-eyebrow">From the courts</div><h2>A night at the Society.</h2>
     <div class="ln-gal" id="ln-gallery" style="margin-top:24px">
@@ -537,6 +539,39 @@
       el.classList.remove('ln-ph');
       el.style.backgroundImage = 'url("' + String(url).replace(/"/g, '%22') + '")';
     }
+
+    // ── "A night at the Society" gallery — real court photos, no extra admin
+    // step. Source order: the ladder-night albums (what you upload in admin →
+    // Ladders → Manage → Photos), newest night first and round-robin across
+    // nights so one big album doesn't fill the whole grid — cover/#1 of each
+    // night, then #2s, and so on; honors each photo's saved focus point. Falls
+    // back to the Site Images "gallery" slot (admin → Site Images), and leaves
+    // the placeholders only when there's nothing in either. Tiles link to the
+    // ladders page recaps (albums + lightbox live there).
+    async function renderGallery() {
+      const el = document.getElementById('ln-gallery'); if (!el) return;
+      const N = 8; let tiles = [];
+      try {
+        const d = await (await fetch('/.netlify/functions/public-ladder-photos')).json();
+        const albums = (d.albums || []).filter(a => Array.isArray(a.photos) && a.photos.length);
+        for (let i = 0; tiles.length < N && albums.some(a => a.photos[i]); i++) {
+          for (const a of albums) {
+            const p = a.photos[i]; if (!p || tiles.length >= N) continue;
+            tiles.push({ url: p.thumb || p.url, fx: p.fx, fy: p.fy, alt: p.caption || a.name || 'From the courts', href: '/ladders.html#recaps' });
+          }
+        }
+      } catch (e) { /* fall through */ }
+      if (!tiles.length) {
+        try {
+          const slots = await (await fetch('/.netlify/functions/site-images-list')).json();
+          tiles = ((slots && slots.gallery) || []).filter(i => i && i.url).slice(0, N).map(i => ({ url: i.url, alt: 'From the courts', href: '/gallery.html' }));
+        } catch (e) { /* keep placeholders */ }
+      }
+      if (!tiles.length) return;
+      const pos = t => (Number.isFinite(t.fx) ? t.fx : 50) + '% ' + (Number.isFinite(t.fy) ? t.fy : 50) + '%';
+      el.innerHTML = tiles.map(t => `<a class="ln-gtile" href="${esc(t.href)}" aria-label="${esc(t.alt)}" style="background-image:url('${String(t.url).replace(/'/g, '%27')}');background-position:${pos(t)};color:transparent"></a>`).join('');
+    }
+    renderGallery();
 
     // ── Hero image, tagline, fact chips, and division preview cards ──
     function renderLanding(s) {
