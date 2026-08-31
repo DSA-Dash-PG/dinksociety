@@ -438,6 +438,8 @@
   // This fetches from the site-images API and sets the background-image.
   // Slot names: schedule, standings, stats, teams, rules, gallery
   // These are admin-managed via the Site Images admin tab.
+  // Upload more than one image to a slot and the hero cross-fades between
+  // them every 7s (js/hero-rotate.js); a single image stays static.
   var heroBg = document.querySelector('.page-hero__bg[data-hero-slot]');
   if (heroBg) {
     var slot = heroBg.getAttribute('data-hero-slot');
@@ -445,13 +447,26 @@
       .then(function (r) { return r.ok ? r.json() : {}; })
       .then(function (slots) {
         var images = slots[slot];
-        if (images && images.length > 0) {
-          // Use the first image in the slot
-          heroBg.style.backgroundImage = 'url(' + images[0].url + ')';
-          heroBg.classList.remove('page-hero__bg--fallback');
-        }
+        if (!images || !images.length) return;
+        var urls = images.map(function (im) { return im && im.url; }).filter(Boolean);
+        if (!urls.length) return;
+        dsLoadHeroRotate(function () {
+          window.dsHeroRotate(heroBg, urls, { interval: 7000 });
+        });
       })
       .catch(function () { /* fallback gradient stays */ });
+  }
+
+  // Load the rotator once, on demand — pages with no hero slot never fetch it.
+  function dsLoadHeroRotate(cb) {
+    if (window.dsHeroRotate) { cb(); return; }
+    var existing = document.getElementById('ds-hero-rotate-js');
+    if (existing) { existing.addEventListener('load', cb); return; }
+    var s = document.createElement('script');
+    s.id = 'ds-hero-rotate-js';
+    s.src = '/js/hero-rotate.js';
+    s.onload = cb;
+    (document.head || document.documentElement).appendChild(s);
   }
 
   /* ── Universal search: load the shared component (it injects its own overlay,

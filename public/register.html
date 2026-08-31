@@ -720,6 +720,18 @@
       el.style.backgroundImage = 'url("' + String(url).replace(/"/g, '%22') + '")';
     }
 
+    // Cross-fade helper, loaded on demand (shared with the sub-page heroes).
+    function loadHeroRotate(cb) {
+      if (window.dsHeroRotate) { cb(); return; }
+      const existing = document.getElementById('ds-hero-rotate-js');
+      if (existing) { existing.addEventListener('load', cb); return; }
+      const el = document.createElement('script');
+      el.id = 'ds-hero-rotate-js';
+      el.src = '/js/hero-rotate.js';
+      el.onload = cb;
+      (document.head || document.documentElement).appendChild(el);
+    }
+
     // ── "A night at the Society" scrapbook — polaroid stream. Sources, in
     // order: the Site Images "Scrapbook" slot (admin → Site Images → Scrapbook;
     // just keep uploading — newest shows first), then the newest ladder-night
@@ -788,16 +800,24 @@
     // ── Hero image, tagline, fact chips, and division preview cards ──
     function renderLanding(s) {
       const hero = document.getElementById('ln-hero-img');
-      if (s.image) {
-        // Per-season override set in the admin Seasons editor.
-        setHero(hero, s.image);
-      } else if (hero) {
-        // Fall back to the site-wide "Register" hero slot (admin → Site Images).
+      if (hero) {
+        // Frame one is the per-season image (admin → Seasons), then everything
+        // in the site-wide "Register" slot (admin → Site Images). Two or more
+        // images total and the hero cross-fades between them every 7s.
+        if (s.image) setHero(hero, s.image);
         fetch('/.netlify/functions/site-images-list')
           .then(r => r.json())
           .then(slots => {
-            const imgs = slots && slots.register;
-            if (Array.isArray(imgs) && imgs.length && imgs[0].url) setHero(hero, imgs[0].url);
+            const imgs = (slots && slots.register) || [];
+            const urls = [];
+            if (s.image) urls.push(s.image);
+            imgs.forEach(im => { if (im && im.url && urls.indexOf(im.url) === -1) urls.push(im.url); });
+            if (!urls.length) return;
+            if (urls.length === 1) { setHero(hero, urls[0]); return; }
+            loadHeroRotate(() => {
+              hero.classList.remove('ln-ph');
+              window.dsHeroRotate(hero, urls, { interval: 7000, placeholderClass: 'ln-ph' });
+            });
           })
           .catch(() => {});
       }
