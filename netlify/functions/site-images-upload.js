@@ -15,9 +15,11 @@ const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const VALID_SLOTS = new Set([
   'hero', 'divider-1', 'divider-2', 'cta',          // home page
   'schedule', 'standings', 'stats', 'teams', 'rules', 'gallery', // sub-page heroes
-  'register', 'leaderboard', 'contact', 'captain', 'admin'      // additional pages
+  'register', 'leaderboard', 'contact', 'captain', 'admin',     // additional pages
+  'scrapbook'                                        // register-page polaroid stream (keeps growing)
 ]);
 const MAX_PER_SLOT = 8; // max images per slot (hero slideshow limit)
+const SLOT_MAX = { scrapbook: 500 }; // per-slot overrides — scrapbook is meant to keep growing
 
 export default async (req, context) => {
   const headers = { 'Content-Type': 'application/json' };
@@ -77,9 +79,10 @@ export default async (req, context) => {
     if (!slots[slot]) slots[slot] = [];
 
     // Enforce max per slot
-    if (slots[slot].length >= MAX_PER_SLOT) {
+    const cap = SLOT_MAX[slot] || MAX_PER_SLOT;
+    if (slots[slot].length >= cap) {
       return new Response(JSON.stringify({
-        error: `Slot "${slot}" already has ${MAX_PER_SLOT} images. Remove one first.`
+        error: `Slot "${slot}" already has ${cap} images. Remove one first.`
       }), { status: 400, headers });
     }
 
