@@ -19,20 +19,33 @@
 //     field: 'email' | 'phone',
 //     value: '<normalized value>',          // contact value redacted-ish (kept for admin use)
 //     sameSeason: boolean,                   // true => almost certainly a real duplicate to merge
+//     linked: boolean,                       // are these ids currently ONE person?
 //     members: [{ playerId, name, teamId, teamName, seasonId, email, phone }]
 //   }],
 //   scannedTeams, scannedPlayers, clusterCount
 // }
 //
-// NOTE: a shared phone/email means "review me," not "merge me." Couples and
-// families share contact info. The admin confirms before any merge. Same-season
-// clusters are flagged (sameSeason:true) because one person on two teams in the
-// same season is the textbook duplicate; cross-season collisions are usually the
-// SAME person returning next season, which is expected and not a defect.
+// Shared EMAIL is treated as the same person automatically (lib/league-identity.js
+// merges their stats and history on read). Shared PHONE is not — plenty of
+// couples share a number — so a phone-only cluster stays separate until an admin
+// links it here.
+//
+// POST { action, ... } — the admin overrides, both directions:
+//   { action: 'link',     fromId, toId }  → same person despite different emails
+//   { action: 'unlink',   fromId }        → undo that
+//   { action: 'separate', idA, idB }      → different people despite a shared inbox
+//   { action: 'rejoin',   idA, idB }      → undo that
+//
+// These write only the small `league-identity` map. Roster ids, player-stats and
+// player-history are never rewritten, so any decision here is reversible.
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail, normalizePhone } from './lib/identity.js';
+import {
+  getIdentityMap, setLink, removeLink, setSeparate, removeSeparate,
+  groupEntries, listRosterEntries,
+} from './lib/league-identity.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -45,6 +58,7 @@ export default async (req) => {
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
 
+  if (req.method === 'POST') return handleAction(req);
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
 
   const url = new URL(req.url);
@@ -92,17 +106,45 @@ export default async (req) => {
   collect(byEmail, 'email', clusters);
   collect(byPhone, 'phone', clusters);
 
+  // Mark which clusters are currently treated as ONE person, so the UI can show
+  // "Linked" vs "Separate" rather than making the admin guess.
+  const map = await getIdentityMap();
+  const { canonicalOf } = groupEntries(await listRosterEntries(), map);
+  for (const c of clusters) {
+    const canons = new Set(c.members.map(m => canonicalOf[m.playerId] || m.playerId));
+    c.linked = canons.size === 1;
+  }
+
   // Real duplicates (same person, same season) first, then cross-season.
   clusters.sort((a, b) => (b.sameSeason - a.sameSeason));
 
   return json({
     clusters,
     clusterCount: clusters.length,
+    identity: map,
     scannedTeams,
     scannedPlayers,
     sweptAt: new Date().toISOString(),
   });
 };
+
+async function handleAction(req) {
+  let body;
+  try { body = await req.json(); }
+  catch { return json({ error: 'Invalid JSON body' }, 400); }
+
+  const { action } = body || {};
+  try {
+    if (action === 'link')     { await setLink(body.fromId, body.toId, body.note); }
+    else if (action === 'unlink')   { await removeLink(body.fromId); }
+    else if (action === 'separate') { await setSeparate(body.idA, body.idB); }
+    else if (action === 'rejoin')   { await removeSeparate(body.idA, body.idB); }
+    else return json({ error: `Unknown action: ${action}` }, 400);
+  } catch (err) {
+    return json({ error: err.message || 'Action failed' }, 400);
+  }
+  return json({ ok: true, identity: await getIdentityMap() });
+}
 
 function collect(map, field, out) {
   for (const [value, members] of map) {

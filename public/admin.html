@@ -932,6 +932,24 @@
             </table>
           </div>
           <p id="pl-foot" style="font-size:12px;color:var(--color-text-faint);margin:12px 2px 0;"></p>
+
+          <!-- ── Same person? ────────────────────────────────────────────
+               A player gets a new roster entry every time she joins a team, so
+               the same human can hold several. Matching emails are joined
+               automatically; this panel is where you correct the edge cases. -->
+          <div class="ac" style="margin-top:22px;">
+            <div class="ac__h">
+              <h2 class="ac__t">Same person?</h2>
+              <span class="ac__s">Players who share an email or phone across teams and seasons</span>
+            </div>
+            <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 12px;line-height:1.6;">
+              A matching <strong style="color:var(--color-text-muted)">email</strong> is treated as the same person automatically — her stats, season history and profile follow her to a new team.
+              A matching <strong style="color:var(--color-text-muted)">phone</strong> is not, since couples share numbers. Use the buttons to fix either case;
+              nothing is rewritten, so any choice here can be undone.
+            </p>
+            <button class="ab ab--outline ab--sm" id="dup-scan" style="font-size:11px;">Scan for duplicates</button>
+            <div id="dup-list" style="margin-top:14px;"></div>
+          </div>
         </section>
 
         <!-- PROFILE APPROVALS -->
@@ -2728,6 +2746,98 @@
     }
   }
   window.renderPlayers = renderPlayers;
+
+  // ═══════════════════════════════════════════════════════════
+  // SAME PERSON? — duplicate roster entries across teams/seasons
+  //
+  // A shared email already links two entries automatically (the profile merges
+  // their stats + history on read). This panel shows what the sweep found and
+  // lets you overrule it either way. Everything lives in one small map, so a
+  // wrong call is one click to undo — no data is rewritten.
+  // ═══════════════════════════════════════════════════════════
+  let DUPS = null;
+
+  async function renderDups(btn) {
+    const box = $id('dup-list');
+    if (!box) return;
+    if (btn && !btnBusy(btn, 'Scanning…')) return;
+    box.innerHTML = '<div style="font-size:12px;color:var(--color-text-faint);padding:8px 0;">Scanning rosters…</div>';
+    try {
+      DUPS = await apiJSON('/.netlify/functions/admin-duplicates');
+      drawDups();
+    } catch (e) {
+      box.innerHTML = '<div style="font-size:12px;color:var(--color-red);padding:8px 0;">Scan failed: ' + h(e.message || 'unknown error') + '</div>';
+    } finally { btnDone(btn); }
+  }
+
+  function drawDups() {
+    const box = $id('dup-list');
+    const clusters = (DUPS && DUPS.clusters) || [];
+    if (!clusters.length) {
+      box.innerHTML = '<div style="font-size:12px;color:var(--color-text-faint);padding:8px 0;">No shared emails or phone numbers found — every player is a distinct person. 🎉</div>';
+      return;
+    }
+    box.innerHTML = clusters.map(function (c, ci) {
+      const ids = c.members.map(function (m) { return m.playerId; });
+      const status = c.linked
+        ? '<span class="p p--paid">Treated as one person</span>'
+        : '<span class="p" style="background:var(--color-surface-2);color:var(--color-text-faint);">Separate people</span>';
+      const why = c.field === 'email' ? 'Same email' : 'Same phone';
+      const rows = c.members.map(function (m) {
+        return '<div style="display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--color-divider);font-size:12px;">' +
+          '<span><strong>' + h(m.name || '—') + '</strong> <span style="color:var(--color-text-faint)">· ' + h(m.teamName || 'no team') + '</span></span>' +
+          '<span style="color:var(--color-text-faint);font-family:monospace;font-size:10px;">' + h(m.playerId) + '</span>' +
+        '</div>';
+      }).join('');
+      // Two ids is the case the buttons can act on unambiguously; a bigger
+      // cluster is rare and is handled by acting on pairs from the smaller ones.
+      const pairable = ids.length === 2;
+      const actions = !pairable
+        ? '<div style="font-size:11px;color:var(--color-text-faint);margin-top:8px;">' + ids.length + ' entries share this — resolve them in pairs from the Players table.</div>'
+        : c.linked
+          ? '<button class="ab ab--outline ab--sm dup-act" data-act="separate" data-a="' + h(ids[0]) + '" data-b="' + h(ids[1]) + '" data-ci="' + ci + '" style="font-size:11px;margin-top:10px;">Not the same person</button>'
+          : '<button class="ab ab--teal ab--sm dup-act" data-act="link" data-a="' + h(ids[0]) + '" data-b="' + h(ids[1]) + '" data-ci="' + ci + '" style="font-size:11px;margin-top:10px;">Same person — merge their record</button>';
+      return '<div style="border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:12px 14px;margin-bottom:10px;background:var(--color-surface-2);">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">' +
+          '<span style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-text-faint);">' + why +
+            (c.sameSeason ? ' · same season' : '') + '</span>' + status +
+        '</div>' + rows + actions +
+      '</div>';
+    }).join('');
+
+    box.querySelectorAll('button.dup-act').forEach(function (b) {
+      b.addEventListener('click', function () { dupAction(b); });
+    });
+  }
+
+  async function dupAction(btn) {
+    const act = btn.dataset.act;
+    const a = btn.dataset.a, b = btn.dataset.b;
+    const cluster = DUPS.clusters[Number(btn.dataset.ci)] || {};
+    const names = (cluster.members || []).map(function (m) { return m.name || m.playerId; }).join(' and ');
+    if (act === 'separate' && !confirm('Treat ' + names + ' as two different people?\n\nTheir stats and season history will be shown separately from now on.')) return;
+    if (act === 'link' && !confirm('Treat ' + names + ' as the same person?\n\nTheir stats and season history will be combined on their profile.')) return;
+    if (!btnBusy(btn, 'Saving…')) return;
+    try {
+      // 'separate' blocks the automatic email match; 'link' forces a join for
+      // entries that share no email (a married name, a second inbox, a typo).
+      await apiJSON('/.netlify/functions/admin-duplicates', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(act === 'separate'
+          ? { action: 'separate', idA: a, idB: b }
+          : { action: 'link', fromId: a, toId: b }),
+      });
+      await renderDups();
+    } catch (e) {
+      alert('Could not save: ' + (e.message || 'unknown error'));
+      btnDone(btn);
+    }
+  }
+
+  document.addEventListener('click', function (e) {
+    const b = e.target.closest && e.target.closest('#dup-scan');
+    if (b) renderDups(b);
+  });
 
   function activateTab(t) {
     $$('.sb__link').forEach(x => x.classList.toggle('is-active', x.dataset.tab === t));

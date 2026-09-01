@@ -19,6 +19,7 @@ import { listPlay, toSession, playersFromPlay } from './ladder-play.js';
 import { calcStats, calcDinkRating, calcBonusPts, calcMvpCount, calcXP, xpTier } from './ladder-scoring.js';
 import { getXpConfig, getXpGrants, grantTotals } from './xp-config.js';
 import { getMergeMap, applyMerges, resolve as resolveMerge } from './player-merge.js';
+import { identityIdsFor, mergeStatRows } from './league-identity.js';
 import { getDirectory, applyDirectory } from './player-directory.js';
 
 const nm = p => (p ? p.name : null);
@@ -169,10 +170,17 @@ export async function leagueEmailById(leagueId) {
 }
 
 // League profile (DSR + record + team). Returns { found, player } or { found:false }.
+//
+// A person can hold several roster ids (a new one per team, per season), so the
+// stats for every id belonging to her are merged — see lib/league-identity.js.
 export async function buildLeagueProfile(leagueId, circuit = 'I') {
   if (!leagueId) return { found: false };
   const ps = await getStore('player-stats').get(`player-stats/${circuit}.json`, { type: 'json' }).catch(() => null);
-  const p = ps?.players?.[leagueId];
+  const ids = await identityIdsFor(leagueId);
+  const rows = ids
+    .map(id => (ps?.players?.[id] ? { ...ps.players[id], __id: id } : null))
+    .filter(Boolean);
+  const p = mergeStatRows(rows, leagueId);
   if (!p) return { found: false };
   const gp = (p.gamesWon || 0) + (p.gamesLost || 0);
   return {
@@ -187,6 +195,8 @@ export async function buildLeagueProfile(leagueId, circuit = 'I') {
       ps: p.ps || 0, pa: p.pa || 0, diff: p.diff || 0,
       byType: p.byType || null,
       awards: (p.awards || []).length,
+      // Present only when she played for more than one team this season.
+      teams: (p.teams && p.teams.length > 1) ? p.teams : null,
       circuit,
     },
   };
@@ -209,6 +219,8 @@ export async function buildUnifiedProfile({ email, ladderId, leagueId, circuit =
   // Resolve both product ids from whatever we have.
   let lgId = leagueId || null;
   if (!lgId && canonEmail) { const m = await findPlayerByEmail(canonEmail); lgId = m?.playerId || null; }
+  // buildLeagueProfile merges every id this person holds, so whichever entry
+  // findPlayerByEmail happened to hit first no longer decides what she sees.
   let ldId = ladderId || null;
   if (!ldId && canonEmail) ldId = await ladderIdByEmail(canonEmail);
 
