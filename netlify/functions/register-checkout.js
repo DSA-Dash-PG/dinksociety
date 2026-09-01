@@ -29,7 +29,7 @@ import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
 import { sendEmail } from './lib/email.js';
 import { circuitCode } from './lib/circuit.js';
-import { resolveDepositTerms, VENMO_HANDLE, venmoProfileUrl, fmtDueDate } from './lib/payment-terms.js';
+import { resolveDepositTerms, VENMO_HANDLE, venmoProfileUrl, fmtDueDate, CARD_PAYMENTS_ENABLED, DEFAULT_TEAM_FEE } from './lib/payment-terms.js';
 
 export default async (req) => {
   if (req.method !== 'POST') {
@@ -41,9 +41,15 @@ export default async (req) => {
   try {
     const body = await req.json();
     const { seasonId, circuit, division, divisionLabel, path, team, agent } = body;
-    // 'card' (Stripe Checkout, default) or 'venmo' (deposit sent to @VENMO_HANDLE;
-    // registration stays pending until an admin confirms the payment landed).
-    const paymentMethod = body.paymentMethod === 'venmo' ? 'venmo' : 'card';
+    // 'venmo' (sent to @VENMO_HANDLE; registration stays pending until an admin
+    // confirms the payment landed) or 'card' (Stripe Checkout — only when
+    // CARD_PAYMENTS_ENABLED is on). Venmo is the default while card is off.
+    const paymentMethod = body.paymentMethod === 'card' && CARD_PAYMENTS_ENABLED ? 'card' : 'venmo';
+    // A Venmo payer chooses the deposit or the whole team fee up front.
+    const payInFull = body.venmoOption === 'full';
+    if (body.paymentMethod === 'card' && !CARD_PAYMENTS_ENABLED) {
+      return new Response('Card payments are turned off right now — pay by Venmo instead.', { status: 400 });
+    }
     if (paymentMethod === 'card' && !stripeKey) {
       return new Response('Stripe not configured', { status: 500 });
     }
@@ -68,7 +74,7 @@ export default async (req) => {
     // Look up the season to get the Stripe price ID (if seasonId provided)
     const seasonStore = getStore('seasons');
     let stripePriceId = null;
-    let resolvedPrice = path === 'team' ? 650 : 75; // fallback
+    let resolvedPrice = path === 'team' ? DEFAULT_TEAM_FEE : 75; // fallback
     let season = null;
 
     if (seasonId) {
@@ -204,6 +210,8 @@ export default async (req) => {
     if (!isTeam || !(depositAmount > 0) || depositAmount > totalPrice) {
       depositAmount = totalPrice;
     }
+    // "Pay the whole fee now" collapses the deposit into the full amount.
+    if (paymentMethod === 'venmo' && payInFull) depositAmount = totalPrice;
     const amountDueNow = depositAmount;
     const balanceDue = Math.max(0, totalPrice - amountDueNow);
 
@@ -222,7 +230,7 @@ export default async (req) => {
       paymentMethod,
       price: totalPrice,
       totalPrice: totalPrice,
-      paymentType: isTeam ? 'deposit' : 'full',
+      paymentType: isTeam && amountDueNow < totalPrice ? 'deposit' : 'full',
       depositAmount: amountDueNow,
       balanceDue: balanceDue,
       balanceDueDate: balanceDue > 0 ? balanceDueDate : null,
@@ -266,16 +274,16 @@ export default async (req) => {
         try {
           await sendEmail({
             to: customerEmail,
-            subject: `Almost in — send your $${amountDueNow} Venmo deposit (${seasonName})`,
+            subject: `Almost in — send your $${amountDueNow} Venmo ${balanceDue > 0 ? 'deposit' : 'payment'} (${seasonName})`,
             html: `
               <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:520px;margin:0 auto;padding:40px 20px;background:#0e0e0e;color:#f5f5f5;">
                 <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:32px;">THE DINK SOCIETY</div>
                 <h1 style="font-size:24px;font-weight:800;text-transform:uppercase;color:#f5f5f5;margin:0 0 8px;">Almost in${contactName ? ', ' + contactName.split(' ')[0] : ''}.</h1>
                 <p style="font-size:15px;color:#8a8a8a;line-height:1.6;margin:0 0 24px;">
-                  We've got <strong style="color:#f5f5f5;">${displayName}</strong> down for <strong style="color:#f5f5f5;">${seasonName}</strong> (${divisionLabel || division}). Your spot is held as soon as your Venmo deposit lands.
+                  We've got <strong style="color:#f5f5f5;">${displayName}</strong> down for <strong style="color:#f5f5f5;">${seasonName}</strong> (${divisionLabel || division}). Your spot is held as soon as your Venmo payment lands.
                 </p>
                 <div style="background:#1a1a1a;border:1px solid #2a2a2a;border-left:3px solid #3d95ce;padding:20px;border-radius:0 12px 12px 0;margin-bottom:24px;">
-                  <div style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#3d95ce;margin-bottom:12px;font-weight:700;">Pay by Venmo</div>
+                  <div style="font-size:10px;letter-spacing:0.2em;text-transform:uppercase;color:#3d95ce;margin-bottom:12px;font-weight:700;">Pay by Venmo${balanceDue > 0 ? ' — deposit' : ' — paid in full'}</div>
                   <table style="width:100%;font-size:14px;color:#f5f5f5;">
                     <tr><td style="padding:6px 0;color:#8a8a8a;">Send to</td><td style="padding:6px 0;text-align:right;font-weight:700;">@${VENMO_HANDLE}</td></tr>
                     <tr><td style="padding:6px 0;color:#8a8a8a;">Amount</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#b8ff2c;">$${amountDueNow}</td></tr>
@@ -309,7 +317,7 @@ export default async (req) => {
         try {
           await sendEmail({
             to: adminTo,
-            subject: `Venmo registration: ${displayName} — expect $${amountDueNow}`,
+            subject: `Venmo registration: ${displayName} — expect $${amountDueNow}${balanceDue > 0 ? ' deposit' : ' (full fee)'}`,
             html: `
               <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 20px;background:#0e0e0e;color:#f5f5f5;">
                 <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:24px;">THE DINK SOCIETY</div>

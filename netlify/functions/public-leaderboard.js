@@ -44,7 +44,7 @@ async function serveAggregate(circuit, storeName, key) {
     return json({
       circuit,
       empty: true,
-      message: 'No data yet for this Circuit. Standings populate as matches finalize.',
+      message: 'No data yet for this season. Standings populate as matches finalize.',
     });
   }
   return json({ circuit, ...data });

@@ -11,7 +11,7 @@
 // =============================================================
 
 import { getStore } from '@netlify/blobs';
-import { resolveDepositTerms, VENMO_HANDLE } from './lib/payment-terms.js';
+import { resolveDepositTerms, VENMO_HANDLE, CARD_PAYMENTS_ENABLED } from './lib/payment-terms.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -45,6 +45,8 @@ export default async (req) => {
           depositAmount: terms.depositAmount,
           balanceDueDate: terms.balanceDueDate,
           venmoHandle: VENMO_HANDLE,
+          // Registration page hides the card tile while Stripe is switched off.
+          cardEnabled: CARD_PAYMENTS_ENABLED,
           image: season.image || null,
           tagline: season.tagline || null,
           startDate: season.startDate,

@@ -13,6 +13,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { seasonName } from './lib/circuit.js';
 
 export default async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
@@ -25,7 +26,7 @@ export default async (req) => {
 
   let meta = {};
   try { meta = await req.json(); } catch {}
-  const seasonLabel = meta.seasonLabel || `Circuit ${circuit}`;
+  const seasonLabel = meta.seasonLabel || seasonName(circuit);
   const year        = meta.year || new Date().getFullYear();
 
   try {

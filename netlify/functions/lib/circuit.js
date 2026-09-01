@@ -51,6 +51,16 @@ export function circuitCode(raw) {
   return s.toUpperCase();
 }
 
+// Customer-facing name for a circuit code. Storage stays keyed by the code
+// ("I", "II", "TEST"); everything a player reads says "Season 1".
+//   seasonName('I') -> 'Season 1'   seasonName('TEST') -> 'Test Season'
+export function seasonName(raw) {
+  const code = circuitCode(raw);
+  if (code === 'TEST') return 'Test Season';
+  const i = ROMAN.indexOf(code);
+  return i >= 0 ? `Season ${i + 1}` : `Season ${code}`;
+}
+
 // The season id ("circuit-i") for a given circuit code ("I").
 export function seasonIdForCircuit(code) {
   return 'circuit-' + circuitCode(code).toLowerCase();

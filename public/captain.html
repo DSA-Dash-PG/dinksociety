@@ -10,7 +10,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/shared.css">
-  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+  <script>
+
+    // Customer-facing season name. Storage keys stay on the circuit code
+    // ("I", "II", "TEST"); everything a player reads says "Season 1".
+    function seasonLabelOf(code) {
+      const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+      const c = String(code || 'I').trim().toUpperCase();
+      if (c === 'TEST') return 'Test Season';
+      const i = ROMAN.indexOf(c);
+      return i >= 0 ? 'Season ' + (i + 1) : 'Season ' + c;
+    }
+(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css">
   <script src="/js/short-name.js"></script>
   <style>
@@ -1237,7 +1248,7 @@
       $id('cap-shell').style.display = 'block';
       capBeacon({ tab: 'home', event: 'visit' }); // portal load = a visit
       $id('cap-team-name').textContent = state.me.team.name;
-      $id('cap-team-meta').textContent = state.me.team.circuit === 'I' ? 'Season 1' : 'Circuit ' + state.me.team.circuit;
+      $id('cap-team-meta').textContent = seasonLabelOf(state.me.team.circuit);
       $id('cap-email').textContent = state.me.email;
       // Avatar initials (header + drawer) — from name if present, else email local part
       const avSrc = (state.me.name || state.me.email || '?').replace(/@.*$/, '');
@@ -1329,7 +1340,7 @@
       const currentId = state.me.currentTeamId || state.me.team?.id;
       const opts = teams.map(t => {
         const div = t.divisionLabel || t.division || '';
-        const season = t.circuit === 'I' ? 'Season 1' : 'Circuit ' + t.circuit;
+        const season = seasonLabelOf(t.circuit);
         const label = `${t.name}${div ? ' · ' + div : ''}${t.role === 'cocaptain' ? ' (co-captain)' : ''}`;
         return `<option value="${t.id}" ${t.id === currentId ? 'selected' : ''}>${escapeHtml(label)}</option>`;
       }).join('');
@@ -1916,7 +1927,7 @@
     }
 
     /**
-     * State 1 — No schedule yet (Circuit not started or admin hasn't generated)
+     * State 1 — No schedule yet (season not started or admin hasn't generated)
      */
     function renderNoSchedule() {
       const teamName = state.me.team.name;
@@ -1928,7 +1939,7 @@
           <div class="cap-hero__eyebrow">Schedule pending</div>
           <h2 class="cap-hero__heading">No matches yet for ${escapeHtml(teamName)}.</h2>
           <p class="cap-hero__body">
-            Circuit ${escapeHtml(circuit)} ${division ? `(${escapeHtml(division)})` : ''} hasn't been scheduled yet. Once the schedule drops, your matches will show up here.
+            ${escapeHtml(seasonLabelOf(circuit))} ${division ? `(${escapeHtml(division)})` : ''} hasn't been scheduled yet. Once the schedule drops, your matches will show up here.
           </p>
           <p style="font-size: 13px; color: var(--color-text-faint); margin: 0;">In the meantime, get your roster ready &mdash; Roster tab above.</p>
         </div>
@@ -1942,10 +1953,10 @@
       const teamName = state.me.team.name;
       $id('next-landing-area').innerHTML = `
         <div class="cap-hero cap-hero--simple">
-          <div class="cap-hero__eyebrow" style="color: var(--color-gold);">Circuit complete</div>
+          <div class="cap-hero__eyebrow" style="color: var(--color-gold);">Season complete</div>
           <h2 class="cap-hero__heading">That's a wrap.</h2>
           <p class="cap-hero__body">
-            All ${escapeHtml(teamName)} matches for this Circuit are final. Hit the Schedule tab to review the season.
+            All ${escapeHtml(teamName)} matches for this season are final. Hit the Schedule tab to review the season.
           </p>
         </div>
       `;
@@ -2872,7 +2883,7 @@
       const mySubmitted = myRole === 'home' ? !!data.score.homeSubmittedAt : !!data.score.awaySubmittedAt;
 
       if (final) {
-        return `<div class="ss-banner ss-banner--final"><strong>Match finalized.</strong> Both captains submitted &mdash; scores committed to the Circuit leaderboard.</div>`;
+        return `<div class="ss-banner ss-banner--final"><strong>Match finalized.</strong> Both captains submitted &mdash; scores committed to the season leaderboard.</div>`;
       }
 
       const isHome = myRole === 'home';

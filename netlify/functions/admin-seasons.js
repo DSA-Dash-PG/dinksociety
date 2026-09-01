@@ -194,7 +194,7 @@ export default async (req) => {
           id: divId,
           name: divName.trim(),
           capacity: parseInt(capacity) || 6,
-          teamPrice: parseFloat(teamPrice) || 650,
+          teamPrice: parseFloat(teamPrice) || 700,
           agentPrice: agentPrice != null && !isNaN(parseFloat(agentPrice)) ? parseFloat(agentPrice) : 75,
           stripeTeamPriceId: cleanStripeId(stripeTeamPriceId),
           stripeAgentPriceId: cleanStripeId(stripeAgentPriceId),

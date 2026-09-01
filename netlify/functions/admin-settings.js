@@ -8,7 +8,7 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 const DEFAULTS = {
   circuitName:    'Season 1',
   startDate:      '2026-06-08',
-  teamFee:        '$650',
+  teamFee:        '$700',
   agentFee:       '$75',
   defaultVenue:   '',
   divisions:      ['3.0–3.5 Mixed'],

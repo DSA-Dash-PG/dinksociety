@@ -237,7 +237,9 @@
   <main class="lb-shell">
 
     <div class="lb-controls">
-      <select id="circuit-select"><option value="I">Season 1</option><option value="TEST">🧪 TEST Season</option></select>
+      <!-- Options are filled from public-seasons (test + archived seasons are
+           excluded server-side). Season 1 is the placeholder until it loads. -->
+      <select id="circuit-select"><option value="I">Season 1</option></select>
       <select id="division-select">
         <option value="">All divisions</option>
         <option value="3-5-mixed">3.0–3.5 Mixed</option>
@@ -1092,9 +1094,50 @@
   });
 
   readUrl();
+  loadSeasonOptions();
   Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
     renderHero(); renderAll();
   });
+
+  // ── Season dropdown ──────────────────────────────────────────────
+  // Built from the real season list so a new season (Season 2, …) shows up the
+  // moment it exists in Admin → Seasons. public-seasons already filters out
+  // test and archived seasons, so the TEST season never reaches the public page
+  // — it stays reachable only via an explicit ?circuit=TEST link from admin.
+  function seasonCodeOf(season) {
+    const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+    const tail = String(season.id || '').replace(/^circuit-/i, '').trim();
+    if (/^\d+$/.test(tail)) { const n = parseInt(tail, 10); return (n >= 1 && n <= 10) ? ROMAN[n - 1] : String(n); }
+    if (tail) return tail.toUpperCase();
+    const m = String(season.name || '').match(/season\s*(\d+)/i);
+    return m ? (ROMAN[parseInt(m[1], 10) - 1] || m[1]) : 'I';
+  }
+
+  async function loadSeasonOptions() {
+    const sel = $('circuit-select');
+    if (!sel) return;
+    try {
+      const r = await fetch('/.netlify/functions/public-seasons');
+      const data = await r.json();
+      const seasons = (data.seasons || []).filter(s => s && s.id);
+      if (!seasons.length) return; // keep the placeholder
+      const ORDER = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+      const opts = seasons
+        .map(s => ({ code: seasonCodeOf(s), label: s.name || s.label || 'Season' }))
+        // Newest season first; anything unrecognised sinks to the bottom.
+        .sort((a, b) => (ORDER.indexOf(b.code) - ORDER.indexOf(a.code)));
+      // Never lose the season the URL asked for (e.g. an admin ?circuit=TEST link).
+      if (!opts.some(o => o.code === state.circuit)) {
+        opts.push({ code: state.circuit, label: state.circuit === 'TEST' ? '🧪 TEST Season' : 'Season ' + state.circuit });
+      }
+      sel.innerHTML = opts.map(o =>
+        '<option value="' + esc(o.code) + '">' + esc(o.label) + '</option>'
+      ).join('');
+      sel.value = state.circuit;
+      // Nothing to switch between → hide the control entirely.
+      sel.style.display = opts.length > 1 ? '' : 'none';
+    } catch { /* placeholder stays */ }
+  }
   </script>
   <script src="/js/partials.js"></script>
 </body>

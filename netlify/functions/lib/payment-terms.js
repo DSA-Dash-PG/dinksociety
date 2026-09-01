@@ -10,6 +10,15 @@ import { getStore } from '@netlify/blobs';
 // season starts. Admin → Seasons can override both per season.
 export const DEFAULT_DEPOSIT = 250;
 
+// Fallback team fee, used only when a division has no price set.
+export const DEFAULT_TEAM_FEE = 700;
+
+// Card (Stripe) checkout is OFF unless CARD_PAYMENTS_ENABLED is set to "true"
+// in the Netlify environment. Venmo is the live payment path; flipping the env
+// var brings the card tile back on the registration page with no code change.
+export const CARD_PAYMENTS_ENABLED =
+  String(process.env.CARD_PAYMENTS_ENABLED || '').toLowerCase() === 'true';
+
 // Venmo handle for deposits. Override with the VENMO_HANDLE env var if it changes.
 export const VENMO_HANDLE = String(process.env.VENMO_HANDLE || 'dink-society').replace(/^@/, '');
 

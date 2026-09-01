@@ -64,7 +64,7 @@
 
     <!-- Venmo: shown instead of the payment-received copy while the deposit is outstanding -->
     <div class="success__venmo" id="s-venmo" style="display:none;">
-      <div class="success__venmo-title">Send your deposit on Venmo</div>
+      <div class="success__venmo-title" id="v-title">Send your payment on Venmo</div>
       <div class="success__venmo-amount" id="v-amount">$250</div>
       <div class="success__venmo-to">to <strong id="v-handle">@dink-society</strong></div>
       <div class="success__venmo-note"><span>Note: <code id="v-note">Dink Society</code></span><button type="button" class="success__venmo-copy" id="v-copy">Copy note</button></div>
@@ -79,7 +79,7 @@
     <div class="success__detail" id="reg-detail">
       <div class="success__loading" id="s-loading">Loading registration details…</div>
       <div id="s-rows" style="display:none;">
-        <div class="success__row"><span class="success__row-label">Circuit</span><span class="success__row-value" id="s-circuit">—</span></div>
+        <div class="success__row"><span class="success__row-label">Season</span><span class="success__row-value" id="s-circuit">—</span></div>
         <div class="success__row"><span class="success__row-label">Division</span><span class="success__row-value" id="s-division">—</span></div>
         <div class="success__row" id="s-team-row" style="display:none;"><span class="success__row-label">Team</span><span class="success__row-value" id="s-team">—</span></div>
         <div class="success__row"><span class="success__row-label">Type</span><span class="success__row-value" id="s-type">—</span></div>
@@ -87,7 +87,7 @@
       </div>
     </div>
 
-    <p class="success__note" id="s-note">You'll receive a magic link email to access the Captain Portal once the Circuit officially opens. Keep an eye on your inbox.</p>
+    <p class="success__note" id="s-note">You'll receive a magic link email to access the Captain Portal once the season officially opens. Keep an eye on your inbox.</p>
 
     <div class="success__ctas">
       <a href="/" class="btn btn-lime">Back to home</a>
@@ -96,6 +96,22 @@
   </div>
 
   <script>
+
+    // Customer-facing season name. Storage keys stay on the circuit code
+    // ("I", "II", "TEST"); everything a player reads says "Season 1".
+    function seasonLabelOf(code) {
+      const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+      const c = String(code || 'I').trim().toUpperCase();
+      if (c === 'TEST') return 'Test Season';
+      const i = ROMAN.indexOf(c);
+      return i >= 0 ? 'Season ' + (i + 1) : 'Season ' + c;
+    }
+
+    function setText(id, txt) {
+      var el = document.getElementById(id);
+      if (el) el.textContent = txt;
+    }
+
     (function() {
       var params = new URLSearchParams(window.location.search);
       var regId = params.get('id');
@@ -128,11 +144,11 @@
           document.getElementById('s-loading').style.display = 'none';
           document.getElementById('s-rows').style.display = 'block';
 
-          document.getElementById('s-circuit').textContent = reg.circuit === 'I' ? 'Season 1' : (reg.circuit || 'Season 1');
-          document.getElementById('s-circuit-text').textContent = reg.circuit ? (reg.circuit === 'I' ? 'Season 1' : 'Circuit ' + reg.circuit) : 'Season 1';
-          document.getElementById('s-division').textContent = reg.divisionLabel || reg.division || '—';
-          document.getElementById('s-type').textContent = reg.path === 'team' ? 'Team' : 'Free Agent';
-          document.getElementById('s-amount').textContent = reg.amountPaid ? '$' + reg.amountPaid : '—';
+          setText('s-circuit', seasonLabelOf(reg.circuit));
+          setText('s-circuit-text', seasonLabelOf(reg.circuit));
+          setText('s-division', reg.divisionLabel || reg.division || '—');
+          setText('s-type', reg.path === 'team' ? 'Team' : 'Free Agent');
+          setText('s-amount', reg.amountPaid ? '$' + reg.amountPaid : '—');
 
           if (reg.path === 'team' && reg.team && reg.team.name) {
             document.getElementById('s-team').textContent = reg.team.name;
@@ -144,17 +160,20 @@
           if (reg.paymentMethod === 'venmo' && reg.status === 'pending' && reg.venmo) {
             var v = reg.venmo;
             var handle = '@' + String(v.handle || 'dink-society').replace(/^@/, '');
+            // Paying the whole fee up front → never call it a "deposit".
+            var payingFull = !(reg.balanceDue > 0);
             document.querySelector('.success').classList.add('success--venmo');
-            document.getElementById('s-badge').textContent = 'Spot held · deposit pending';
+            document.getElementById('s-badge').textContent = payingFull ? 'Spot held · payment pending' : 'Spot held · deposit pending';
             document.getElementById('s-title').textContent = 'Almost in.';
-            document.getElementById('s-sub').innerHTML = 'We\'ve saved your registration for <span id="s-circuit-text"></span>. Send your Venmo deposit and we\'ll confirm your spot as soon as it lands.';
-            document.getElementById('s-circuit-text').textContent = reg.circuit ? (reg.circuit === 'I' ? 'Season 1' : 'Circuit ' + reg.circuit) : 'Season 1';
-            document.getElementById('v-amount').textContent = '$' + (v.amount != null ? v.amount : (reg.depositAmount || ''));
-            document.getElementById('v-handle').textContent = handle;
-            document.getElementById('v-handle-2').textContent = handle;
-            document.getElementById('v-note').textContent = v.note || 'Dink Society';
+            document.getElementById('s-sub').innerHTML = 'We\'ve saved your registration for <span id="s-circuit-text"></span>. Send your Venmo ' + (payingFull ? 'payment' : 'deposit') + ' and we\'ll confirm your spot as soon as it lands.';
+            setText('s-circuit-text', seasonLabelOf(reg.circuit));
+            setText('v-amount', '$' + (v.amount != null ? v.amount : (reg.depositAmount || '')));
+            setText('v-handle', handle);
+            setText('v-handle-2', handle);
+            setText('v-note', v.note || 'Dink Society');
             if (v.url) document.getElementById('v-open').href = v.url;
-            document.getElementById('s-amount').textContent = '$' + (v.amount != null ? v.amount : '') + ' deposit via Venmo (pending)';
+            setText('s-amount', '$' + (v.amount != null ? v.amount : '') + (payingFull ? ' via Venmo (pending)' : ' deposit via Venmo (pending)'));
+            setText('v-title', payingFull ? 'Send your payment on Venmo' : 'Send your deposit on Venmo');
             if (reg.balanceDue > 0) {
               document.getElementById('v-balance').textContent = '$' + reg.balanceDue;
               if (reg.balanceDueDate) {

@@ -17,6 +17,7 @@
 import Stripe from 'stripe';
 import { getStore } from '@netlify/blobs';
 import { sendEmail } from './lib/email.js';
+import { seasonName } from './lib/circuit.js';
 
 export default async (req) => {
   if (req.method !== 'POST') {
@@ -220,19 +221,19 @@ export default async (req) => {
         try {
           await sendEmail({
             to: recipientEmail,
-            subject: `You're in — ${reg.circuit || 'Dink Society'} registration confirmed`,
+            subject: `You're in — ${seasonName(reg.circuit)} registration confirmed`,
             html: `
               <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
                 <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
                 <h1 style="font-size: 24px; font-weight: 800; text-transform: uppercase; color: #f5f5f5; margin: 0 0 8px;">You're in${recipientName ? ', ' + recipientName.split(' ')[0] : ''}.</h1>
                 <p style="font-size: 15px; color: #8a8a8a; line-height: 1.6; margin: 0 0 24px;">
-                  Your registration for <strong style="color: #f5f5f5;">${reg.circuit || 'the league'}</strong> (${reg.divisionLabel || reg.division}) is confirmed.
+                  Your registration for <strong style="color: #f5f5f5;">${seasonName(reg.circuit)}</strong> (${reg.divisionLabel || reg.division}) is confirmed.
                 </p>
 
                 <div style="background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
                   <div style="font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: #b8ff2c; margin-bottom: 12px; font-weight: 700;">Your membership</div>
                   <table style="width: 100%; font-size: 14px; color: #f5f5f5;">
-                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Season</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.circuit || '—'}</td></tr>
+                    <tr><td style="padding: 6px 0; color: #8a8a8a;">Season</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${seasonName(reg.circuit)}</td></tr>
                     <tr><td style="padding: 6px 0; color: #8a8a8a;">Division</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.divisionLabel || reg.division}</td></tr>
                     ${isTeam ? `<tr><td style="padding: 6px 0; color: #8a8a8a;">Team</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${reg.team?.name || '—'}</td></tr>` : ''}
                     <tr><td style="padding: 6px 0; color: #8a8a8a;">Type</td><td style="padding: 6px 0; text-align: right; font-weight: 600;">${isTeam ? 'Team' : 'Free Agent'}</td></tr>
