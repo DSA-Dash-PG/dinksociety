@@ -25,6 +25,7 @@
        public-ladders                       → open + completed nights
        public-ladder-stats?division=womens  → board, kitchen, winners
        public-ladder-photos?type=womens     → the gallery
+       public-ladder-avatars?ids=…          → profile photos for the board
      ══════════════════════════════════════════════════════════════════ */
   :root{
     --bg:#0b0d0a; --surf:#161914; --surf2:#1c1f18; --bd:rgba(255,255,255,.08);
@@ -75,8 +76,18 @@
   .rk.p1{ color:var(--acc); } .rk.p2{ color:#cfd3c8; } .rk.p3{ color:var(--deep); }
   .nm{ flex:1; font-size:.85rem; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .nm small{ display:block; font-size:.61rem; color:var(--fnt); font-weight:600; }
-  .v2{ font-size:.7rem; font-weight:700; color:var(--mut); font-variant-numeric:tabular-nums; width:50px; text-align:right; flex-shrink:0; }
-  .vl{ font-size:.85rem; font-weight:900; color:var(--acc); font-variant-numeric:tabular-nums; width:56px; text-align:right; flex-shrink:0; }
+  .v2{ font-size:.7rem; font-weight:700; color:var(--mut); font-variant-numeric:tabular-nums; width:46px; text-align:right; flex-shrink:0; }
+  .vps{ font-size:.7rem; font-weight:700; color:var(--fnt); font-variant-numeric:tabular-nums; width:40px; text-align:right; flex-shrink:0; }
+  .vl{ font-size:.85rem; font-weight:900; color:var(--tx); font-variant-numeric:tabular-nums; width:48px; text-align:right; flex-shrink:0; }
+  /* DR gets its own highlighted column — it's the final tiebreaker, and it
+     used to hide in the small line under the name. */
+  .vdr{ width:50px; flex-shrink:0; text-align:center; font-size:.78rem; font-weight:900; color:var(--ink); background:var(--acc); border-radius:8px; padding:5px 0; font-variant-numeric:tabular-nums; line-height:1; }
+  .vdr.none{ background:transparent; color:var(--fnt); }
+  .lbrow .nm, .srow .nm{ color:inherit; }
+  .lbrow .nm b, .srow .nm b{ font-weight:700; }
+  .lbrow:hover .nm, .srow .nm a:hover{ color:var(--soft); text-decoration:underline; text-decoration-color:var(--deep); }
+  .srow .nm a{ color:inherit; text-decoration:none; }
+  @media(max-width:420px){ .v2{ width:36px; font-size:.64rem; } .vps{ width:32px; font-size:.64rem; } .vl{ width:40px; font-size:.78rem; } .vdr{ width:40px; font-size:.7rem; } .lbrow, .srow{ gap:6px; } .rk{ width:18px; } .av{ width:30px; height:30px; font-size:.58rem; } .lbrow .nm, .srow .nm{ white-space:normal; font-size:.8rem; line-height:1.2; } }
   .seg{ display:flex; gap:5px; background:var(--surf2); border:1px solid var(--bd); border-radius:9999px; padding:4px; margin:0 0 14px; }
   .seg button{ flex:1; padding:8px 4px; border:0; border-radius:9999px; font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; background:transparent; color:var(--mut); }
   .seg button.on{ background:var(--acc); color:var(--ink); }
@@ -106,6 +117,45 @@
   .pod{ display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
   .pod span{ display:inline-flex; align-items:center; gap:5px; font-size:.69rem; font-weight:800; border-radius:9999px; padding:3px 11px 3px 4px; background:#000; border:1px solid var(--bd); }
   .pod i{ width:17px; height:17px; border-radius:50%; font-size:.55rem; font-weight:900; text-align:center; line-height:17px; font-style:normal; color:#0b120b; }
+  .pod .av{ width:22px; height:22px; font-size:.5rem; margin-left:-2px; }
+
+  /* ── Avatars ──
+     A profile photo when she has one, her initials when she doesn't. The
+     initials are painted by ::before UNDER the <img>, so a photo that fails
+     to load (removed by onerror) simply reveals them — no re-render needed. */
+  .av{ position:relative; width:34px; height:34px; border-radius:50%; flex-shrink:0; overflow:hidden; background:linear-gradient(145deg,#2a2d25,#15170f); border:1px solid rgba(230,225,213,.22); display:inline-flex; align-items:center; justify-content:center; font-size:.66rem; font-weight:900; letter-spacing:.03em; color:var(--acc); font-style:normal; vertical-align:middle; }
+  .av::before{ content:attr(data-ini); position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .av img{ position:relative; z-index:1; width:100%; height:100%; object-fit:cover; display:block; }
+  .av.lg{ width:44px; height:44px; font-size:.78rem; }
+  .av.xl{ width:58px; height:58px; font-size:.95rem; border-width:2px; }
+  .lbrow .av.p1, .srow .av.p1{ border-color:var(--acc); box-shadow:0 0 0 2px rgba(230,225,213,.25); }
+  .lbrow .av.p2, .srow .av.p2{ border-color:#cfd3c8; }
+  .lbrow .av.p3, .srow .av.p3{ border-color:var(--deep); }
+  .avpair{ display:inline-flex; flex-shrink:0; }
+  .avpair .av + .av{ margin-left:-10px; }
+  .npod .av{ margin:0 auto 6px; display:flex; }
+
+  /* ── Results — one card per night, the night's own photos behind it ──
+     Results and recaps are one list now: every card opens the full results
+     sheet, and carries the "Read the recap" link when an article exists. */
+  .resc.night{ position:relative; overflow:hidden; padding:0; min-height:150px; border-left-width:1px; cursor:pointer; transition:transform .15s ease; }
+  .resc.night:hover{ transform:translateY(-2px); }
+  .resc.night .rbg{ position:absolute; inset:0; display:grid; grid-template-columns:repeat(var(--n,3),1fr); }
+  .resc.night .rbg img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .resc.night.haspix::after{ content:""; position:absolute; inset:0; background:linear-gradient(100deg, rgba(7,8,6,.95) 28%, rgba(7,8,6,.72) 58%, rgba(7,8,6,.38) 100%); }
+  .resc.night:not(.haspix){ background:repeating-linear-gradient(135deg, var(--surf) 0 14px, #1a1d17 14px 15px); }
+  .resc.night .rtx{ position:relative; z-index:2; padding:16px 16px 14px; }
+  .resc.night .kick{ font-size:.58rem; font-weight:900; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); }
+  .resc.night h4{ font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:600; font-size:1.5rem; line-height:1.1; margin:5px 0 10px; color:var(--soft); text-wrap:balance; }
+  .resc.night .top{ align-items:flex-start; }
+  .resc.night .rcount{ font-size:.6rem; font-weight:800; color:var(--acc); background:rgba(0,0,0,.55); border:1px solid var(--bd); border-radius:9999px; padding:4px 10px; white-space:nowrap; }
+  .resc.night .pod{ margin-top:0; }
+  .resc.night .racts{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; align-items:center; }
+  .rbtn{ display:inline-block; font-size:.69rem; font-weight:800; padding:8px 14px; border-radius:9999px; border:1px solid var(--bd); background:rgba(0,0,0,.45); color:var(--tx); text-decoration:none; }
+  .rbtn.pri{ background:var(--acc); color:var(--ink); border-color:var(--acc); }
+  .rbtn.pri:hover{ background:var(--soft); }
+  .rbtn.soon{ color:var(--fnt); border-style:dashed; }
+  @media(max-width:560px){ .resc.night h4{ font-size:1.25rem; } .resc.night .rtx{ padding:14px 13px 12px; } .resc.night.haspix::after{ background:linear-gradient(100deg, rgba(7,8,6,.95) 40%, rgba(7,8,6,.6)); } }
 
   /* ── Kitchen ── */
   .kit-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(250px,1fr)); gap:11px; }
@@ -175,12 +225,17 @@
   .nsub{ font-size:.72rem; color:var(--mut); text-align:center; margin-bottom:15px; }
   .npod{ display:flex; gap:7px; margin-bottom:14px; }
   .npod div{ flex:1; text-align:center; border:1px solid var(--bd); border-radius:12px; padding:11px 6px; background:var(--surf); }
-  .npod .pk{ font-size:.55rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; }
-  .npod .pn{ font-size:.83rem; font-weight:900; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .npod .pk{ font-size:1.7rem; line-height:1; margin-top:2px; }
+  .npod .pn{ font-size:.83rem; font-weight:900; margin-top:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .npod .pn a{ color:inherit; text-decoration:none; }
+  .npod .pn a:hover{ color:var(--soft); text-decoration:underline; text-decoration-color:var(--deep); }
   .npod .pw{ font-size:.68rem; color:var(--mut); font-weight:700; margin-top:2px; }
   .srow{ display:flex; align-items:center; gap:9px; padding:9px 4px; border-top:1px solid rgba(255,255,255,.06); }
   .srow:first-of-type{ border-top:0; }
-  .shead{ display:flex; gap:9px; padding:0 4px 7px; font-size:.55rem; font-weight:900; letter-spacing:.09em; text-transform:uppercase; color:var(--fnt); }
+  .shead{ display:flex; gap:9px; padding:0 4px 7px; font-size:.55rem; font-weight:900; letter-spacing:.09em; text-transform:uppercase; color:var(--fnt); align-items:center; }
+  .shead .hav{ width:34px; flex-shrink:0; }
+  .shead .hps{ width:40px; text-align:right; } .shead .hdf{ width:46px; text-align:right; } .shead .hwl{ width:48px; text-align:right; } .shead .hdr{ width:50px; text-align:center; color:var(--acc); }
+  @media(max-width:420px){ .shead{ gap:6px; } .shead > span:first-child{ width:18px !important; } .shead .hav{ width:30px; } .shead .hps{ width:32px; } .shead .hdf{ width:36px; } .shead .hwl{ width:40px; } .shead .hdr{ width:40px; } }
   .rpills{ display:flex; gap:5px; overflow-x:auto; scrollbar-width:none; padding-bottom:10px; }
   .rpills::-webkit-scrollbar{ display:none; }
   .rpills button{ flex:0 0 auto; font:inherit; font-size:.7rem; font-weight:800; padding:7px 13px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); cursor:pointer; }
@@ -281,8 +336,7 @@
   <div class="tabs" id="tabs">
     <button class="on" data-t="overview" onclick="tab(this)">Overview</button>
     <button data-t="board" onclick="tab(this)">👑 Queen Board</button>
-    <button data-t="results" onclick="tab(this)">Results</button>
-    <button data-t="recaps" onclick="tab(this)">Recaps</button>
+    <button data-t="results" onclick="tab(this)">Results &amp; Recaps</button>
     <button data-t="kitchen" onclick="tab(this)">🍳 Kitchen</button>
     <button data-t="gallery" onclick="tab(this)">📸 Gallery</button>
     <button data-t="rules" onclick="tab(this)">Rules</button>
@@ -300,7 +354,7 @@
 
       <div class="pane" id="p-board">
         <div class="h1">👑 Queen board</div>
-        <div class="sub">Women's ladder standings only · ranked by <b>wins → point diff → DR</b> · tap a player for her card</div>
+        <div class="sub">Women's ladder standings only · ranked by <b>wins → point diff → DR</b> · PS = points scored · tap a player for her profile</div>
         <div class="seg" id="boardSeg">
           <button class="on" data-s="wins" onclick="setSort(this)">Wins</button>
           <button data-s="diff" onclick="setSort(this)">Point diff</button>
@@ -312,15 +366,9 @@
       </div>
 
       <div class="pane" id="p-results">
-        <div class="h1">Completed women's nights</div>
-        <div class="sub">Every finished Queen ladder — winners and the full field</div>
+        <div class="h1">Results &amp; recaps</div>
+        <div class="sub">Every finished Queen night — the podium, the full field and rounds, the write-up, and the photos</div>
         <div id="resultsBody"><div class="empty">Loading…</div></div>
-      </div>
-
-      <div class="pane" id="p-recaps">
-        <div class="h1">Recaps</div>
-        <div class="sub">Every women's night, written up</div>
-        <div id="recapsBody"><div class="empty">Loading…</div></div>
       </div>
 
       <div class="pane" id="p-kitchen">
@@ -435,10 +483,49 @@ function toast(msg) {
 /* ══════════════ state ══════════════ */
 let OPEN = [], COMPLETED = [], STATS = null, ALBUMS = [], SORT = 'wins';
 
+/* ══════════════ avatars ══════════════
+   Ladder id → profile photo URL, from public-ladder-avatars. Rendered as the
+   photo when she has one and her initials (first + last name) when she doesn't.
+   Fetched in one call after the stats land; a second call fills in any night
+   sheet whose field isn't fully on the leaderboard. */
+let AVATARS = {};
+const AV_ASKED = new Set();
+const initials = n => {
+  const parts = String(n || '').split(' & ')[0].trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return '?';
+  return ((parts[0][0] || '') + (parts.length > 1 ? (parts[parts.length - 1][0] || '') : '')).toUpperCase();
+};
+function avHtml(id, name, cls = '') {
+  const ini = esc(initials(name));
+  const url = id && AVATARS[id];
+  return `<span class="av${cls ? ' ' + cls : ''}" data-ini="${ini}" aria-hidden="true">${url ? `<img src="${esc(url)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>`;
+}
+/* A pair row (fixed-partner night) shows both women, overlapped. */
+function avFor(r, cls = '') {
+  if (r && r.pair && Array.isArray(r.ids) && r.ids.length) {
+    return `<span class="avpair">${r.ids.map((id, i) => avHtml(id, (r.names || [])[i] || '', cls)).join('')}</span>`;
+  }
+  return avHtml(r && r.id, r && r.name, cls);
+}
+const idsOf = rows => (rows || []).flatMap(r => r && r.pair ? (r.ids || []) : [r && r.id]).filter(Boolean);
+async function ensureAvatars(ids, onDone) {
+  const want = [...new Set(ids)].filter(id => !AV_ASKED.has(id));
+  if (!want.length) return;
+  want.forEach(id => AV_ASKED.add(id));
+  try {
+    const d = await (await fetch('/.netlify/functions/public-ladder-avatars?ids=' + encodeURIComponent(want.join(',')))).json();
+    const got = d.photos || {};
+    if (!Object.keys(got).length) return;
+    Object.assign(AVATARS, got);
+    if (onDone) onDone();
+  } catch { /* initials stay */ }
+}
+
 /* ══════════════ routing ══════════════ */
-const TABS = ['overview','board','results','recaps','kitchen','gallery','rules'];
+const TABS = ['overview','board','results','kitchen','gallery','rules'];
 function tab(btn) { showTab(btn.dataset.t); if (location.hash.replace(/^#/,'') !== btn.dataset.t) history.replaceState(null, '', '#' + btn.dataset.t); }
 function showTab(name) {
+  if (name === 'recaps') name = 'results';   // the old Recaps tab lives inside Results now
   if (!TABS.includes(name)) name = 'overview';
   document.querySelectorAll('#tabs button').forEach(b => b.classList.toggle('on', b.dataset.t === name));
   document.querySelectorAll('.pane').forEach(p => p.classList.toggle('on', p.id === 'p-' + name));
@@ -462,8 +549,13 @@ async function load() {
   ALBUMS = photos.albums || [];
 
   renderHero(); renderRail(); renderOverview(); renderBoard();
-  renderResults(); renderRecaps(); renderKitchen(); renderGallery();
+  renderResults(); renderKitchen(); renderGallery();
   route();
+
+  // Profile photos, after first paint — the board is readable with initials
+  // while they load, then the rows repaint with pictures.
+  const ids = idsOf(STATS.leaderboard).concat(...Object.values(STATS.winnersByEvent || {}).map(idsOf));
+  ensureAvatars(ids, () => { renderOverview(); renderBoard(); renderResults(); if (NIGHT) renderNight(); });
 }
 
 function renderHero() {
@@ -511,7 +603,7 @@ function renderRail() {
 /* ══════════════ overview ══════════════ */
 function podHtml(list) {
   return (list || []).slice(0, 3).map((p, k) =>
-    `<span><i style="background:${MEDC[k]}">${k + 1}</i>${esc(firstName(p.name))} <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span></span>`).join('');
+    `<span><i style="background:${MEDC[k]}">${k + 1}</i>${avFor(p)}${esc(firstName(p.name))} <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span></span>`).join('');
 }
 
 /* Scrapbook overview: polaroids → recap poster → album ticker → board.
@@ -555,14 +647,29 @@ function posterHtml(latest, a) {
 
 /* Swap the poster's title for the recap article's own headline once it
    arrives — the event name renders immediately so nothing waits on this. */
+const HEADLINES = {};
 async function posterHeadline(url) {
+  const paint = () => { const el = document.getElementById('posterHead'); if (el && HEADLINES[url]) el.textContent = HEADLINES[url]; };
+  if (HEADLINES[url]) return paint();
   try {
     const html = await (await fetch(url)).text();
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const t = doc.querySelector('.article h2, h1');
-    const el = document.getElementById('posterHead');
-    if (t && el) el.textContent = t.textContent.trim();
+    if (t) { HEADLINES[url] = t.textContent.trim(); paint(); }
   } catch { /* keep the event name */ }
+}
+
+/* Which album feeds the scrapbook. The newest album by date can be a night
+   that hasn't happened yet (a promo shot uploaded to an open ladder), which
+   would silently hide the polaroids and ticker — they need 3+ photos. So:
+   the latest PLAYED night's album, else the newest played night with enough
+   photos, and never an upcoming one. */
+function scrapbookAlbum(latest) {
+  const played = latest ? albumOf(latest.eventId) : null;
+  if (played && played.photos.length >= 3) return played;
+  const done = new Set(COMPLETED.map(l => l.id));
+  if (latest) done.add(latest.eventId);
+  return ALBUMS.find(a => done.has(a.eventId) && a.photos.length >= 3) || played || null;
 }
 
 function tickerHtml(a) {
@@ -575,10 +682,10 @@ function tickerHtml(a) {
 
 function renderOverview() {
   const latest = (STATS.recentWinners || [])[0];
-  const a = ALBUMS[0];
+  const a = scrapbookAlbum(latest);
   const el = document.getElementById('ovLatest');
   if (latest) {
-    el.innerHTML = polaroidsHtml(a) + posterHtml(latest, a) + tickerHtml(a);
+    el.innerHTML = polaroidsHtml(a) + posterHtml(latest, albumOf(latest.eventId) || a) + tickerHtml(a);
     const recUrl = RECAP_URLS[latest.date];
     if (recUrl) posterHeadline(recUrl);
   } else {
@@ -587,7 +694,7 @@ function renderOverview() {
 
   const rows = (STATS.leaderboard || []).slice(0, 5);
   document.getElementById('ovBoard').innerHTML = rows.length
-    ? `<div class="card">${rows.map((r, i) => lbRowHtml(r, i)).join('')}</div>
+    ? `${HEAD_HTML}<div class="card">${rows.map((r, i) => lbRowHtml(r, i)).join('')}</div>
        <a class="btn ghost" href="#board" onclick="showTab('board')">Full Queen board →</a>`
     : '<div class="empty">No standings yet.</div>';
 
@@ -598,17 +705,23 @@ function renderOverview() {
 }
 
 /* ══════════════ board ══════════════ */
+/* Column header shared by the Queen board and the night sheet:
+   # · (avatar) · Player · PS · Diff · W-L · DR */
+const HEAD_HTML = `<div class="shead"><span style="width:24px">#</span><span class="hav"></span><span style="flex:1">Player</span><span class="hps">PS</span><span class="hdf">Diff</span><span class="hwl">W-L</span><span class="hdr">DR</span></div>`;
+const profileUrl = r => '/profile.html?ladderId=' + encodeURIComponent(r.pair ? (r.ids || [])[0] || r.id : r.id);
+const statCells = r => `<span class="vps">${r.pf != null ? r.pf : '–'}</span>
+    <span class="v2">${(r.diff > 0 ? '+' : '') + (r.diff != null ? r.diff : '–')}</span>
+    <span class="vl">${r.w}-${r.l}</span>
+    <span class="vdr${r.dr != null ? '' : ' none'}">${r.dr != null ? r.dr : '–'}</span>`;
 function lbRowHtml(r, i) {
   const rk = i < 3 ? ` p${i + 1}` : '';
-  const diff = (r.diff > 0 ? '+' : '') + r.diff;
   const bits = [];
   if (r.nights) bits.push(r.nights + (r.nights === 1 ? ' night' : ' nights'));
-  if (r.dr != null) bits.push('DR ' + r.dr);
-  return `<a class="lbrow" href="/profile.html?ladderId=${encodeURIComponent(r.id)}">
+  return `<a class="lbrow" href="${profileUrl(r)}">
     <span class="rk${rk}">${i + 1}</span>
-    <span class="nm">${esc(r.name)}<small>${esc(bits.join(' · '))}</small></span>
-    <span class="v2">${esc(diff)}</span>
-    <span class="vl">${r.w}-${r.l}</span></a>`;
+    ${avFor(r, rk.trim())}
+    <span class="nm">${esc(r.name)}${bits.length ? `<small>${esc(bits.join(' · '))}</small>` : ''}</span>
+    ${statCells(r)}</a>`;
 }
 function setSort(btn) {
   SORT = btn.dataset.s;
@@ -624,32 +737,36 @@ function renderBoard() {
   if (SORT === 'diff') rows.sort((a, b) => b.diff - a.diff);
   else if (SORT === 'pf') rows.sort((a, b) => b.pf - a.pf);
   else if (SORT === 'dr') rows.sort((a, b) => (b.dr ?? -1) - (a.dr ?? -1));
-  el.innerHTML = `<div class="card">${rows.map((r, i) => lbRowHtml(r, i)).join('')}</div>`;
+  el.innerHTML = `${HEAD_HTML}<div class="card">${rows.map((r, i) => lbRowHtml(r, i)).join('')}</div>`;
 }
 
-/* ══════════════ results ══════════════ */
+/* ══════════════ results & recaps ══════════════
+   One card per finished night, that night's photos behind it. Tap the card
+   for the full results sheet (standings, rounds, photos, recap link); the
+   recap button goes straight to the article when one exists. */
 function renderResults() {
   const el = document.getElementById('resultsBody');
   if (!COMPLETED.length) { el.innerHTML = '<div class="empty">No completed women\'s nights yet.</div>'; return; }
   el.innerHTML = COMPLETED.map(l => {
     const top3 = (STATS.winnersByEvent || {})[l.id] || [];
-    return `<div class="resc" style="cursor:pointer" onclick="night('${esc(l.id)}')">
-      <div class="top"><h4>${esc(l.name)}</h4><span class="d">${esc(wd(l.date))}${l.place ? ' · ' + esc(l.place) : ''}</span></div>
-      ${top3.length ? `<div class="pod">${podHtml(top3)}</div>` : ''}
-      <div class="cta">Full results &amp; rounds →</div></div>`;
-  }).join('');
-}
-
-function renderRecaps() {
-  const el = document.getElementById('recapsBody');
-  if (!COMPLETED.length) { el.innerHTML = '<div class="empty">No recaps yet.</div>'; return; }
-  el.innerHTML = COMPLETED.map(l => {
     const url = l.date && RECAP_URLS[l.date];
-    const top3 = (STATS.winnersByEvent || {})[l.id] || [];
-    const inner = `<div class="top"><h4>${esc(l.name)}</h4><span class="d">${esc(wd(l.date))}</span></div>
-      ${top3.length ? `<div class="pod">${podHtml(top3)}</div>` : ''}
-      <div class="cta" style="${url ? '' : 'color:var(--fnt)'}">${url ? 'Read the full recap →' : 'Recap coming soon'}</div>`;
-    return url ? `<a class="resc" href="${url}">${inner}</a>` : `<div class="resc soon">${inner}</div>`;
+    const a = albumOf(l.id);
+    const bg = a ? a.photos.slice(0, 4) : [];
+    const meta = [wd(l.date), l.place].filter(Boolean).join(' · ');
+    return `<div class="resc night${bg.length ? ' haspix' : ''}" onclick="night('${esc(l.id)}')" role="button" tabindex="0" onkeydown="if(event.key==='Enter')night('${esc(l.id)}')">
+      ${bg.length ? `<div class="rbg" style="--n:${bg.length}">${bg.map(p => `<img src="${esc(p.thumb)}" alt="" loading="lazy" style="object-position:${fpos(p)}">`).join('')}</div>` : ''}
+      <div class="rtx">
+        <div class="top">
+          <div style="min-width:0"><div class="kick">${esc(meta)}</div><h4>${esc(l.name)}</h4></div>
+          ${a ? `<span class="rcount">📸 ${a.count} photo${a.count === 1 ? '' : 's'}</span>` : ''}
+        </div>
+        ${top3.length ? `<div class="pod">${podHtml(top3)}</div>` : ''}
+        <div class="racts">
+          <span class="rbtn">Full results &amp; rounds →</span>
+          ${url ? `<a class="rbtn pri" href="${url}" onclick="event.stopPropagation()">Read the recap →</a>` : `<span class="rbtn soon">Recap coming soon</span>`}
+        </div>
+      </div>
+    </div>`;
   }).join('');
 }
 
@@ -823,6 +940,7 @@ async function night(id) {
   // The round-by-round toggle only appears when there are rounds to show.
   if (NIGHT && (NIGHT.history || []).length) document.getElementById('nightSeg').style.display = 'flex';
   renderNight();
+  if (NIGHT) ensureAvatars(idsOf(NIGHT.standings), () => { if (NIGHT_ID === id) renderNight(); });
 }
 function closeNight() { document.getElementById('nightOv').classList.remove('on'); document.body.style.overflow = ''; }
 function nSet(btn) {
@@ -845,18 +963,15 @@ function renderNight() {
     const pk = ['🥇', '🥈', '🥉'];
     if (st.length >= 3) {
       h += '<div class="npod">' + st.slice(0, 3).map((p, i) =>
-        `<div><div class="pk" style="color:${MEDC[i]}">${pk[i]}</div><div class="pn">${esc(firstName(p.name))}</div><div class="pw">${p.w}–${p.l} · ${(p.diff > 0 ? '+' : '') + p.diff}</div></div>`).join('') + '</div>';
+        `<div><a href="${profileUrl(p)}" aria-label="${esc(p.name)}">${avFor(p, 'xl')}</a><div class="pk">${pk[i]}</div><div class="pn"><a href="${profileUrl(p)}">${esc(firstName(p.name))}</a></div><div class="pw">${p.w}–${p.l} · ${(p.diff > 0 ? '+' : '') + p.diff}${p.dr != null ? ' · DR ' + p.dr : ''}</div></div>`).join('') + '</div>';
     }
-    h += '<div class="shead"><span style="width:24px">#</span><span style="flex:1">Player</span><span style="width:50px;text-align:right">Diff</span><span style="width:56px;text-align:right">W-L</span></div>';
+    h += HEAD_HTML;
     h += '<div class="card">' + st.map((p, i) => {
       const rk = i < 3 ? ` p${i + 1}` : '';
-      const bits = [];
-      if (p.dr != null) bits.push('DR ' + p.dr);
-      if (p.pf != null) bits.push(p.pf + ' pts');
       return `<div class="srow"><span class="rk${rk}">${i + 1}</span>
-        <span class="nm">${esc(p.name)}<small>${esc(bits.join(' · '))}</small></span>
-        <span class="v2">${(p.diff > 0 ? '+' : '') + p.diff}</span>
-        <span class="vl">${p.w}-${p.l}</span></div>`;
+        <a href="${profileUrl(p)}" aria-hidden="true" tabindex="-1">${avFor(p, rk.trim())}</a>
+        <span class="nm"><a href="${profileUrl(p)}">${esc(p.name)}</a></span>
+        ${statCells(p)}</div>`;
     }).join('') + '</div>';
   } else {
     if (!hist.length) { h += '<div class="empty">No round data for this night.</div>'; }

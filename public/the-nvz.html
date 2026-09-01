@@ -158,7 +158,17 @@
   <script>
   (function () {
     var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
-    var CIRCUIT = SEASON_ID.replace('circuit-', '').toUpperCase();
+    // Season ids come in several shapes ('circuit-i', 'season-2', a bare '2').
+    // Chopping off a literal 'circuit-' turned 'season-1' into 'SEASON-1', which
+    // matches no stats blob. dsSeason() overwrites this once it resolves; this is
+    // only the pre-resolution guess.
+    function codeFromId(id) {
+      var t = String(id || '').trim().replace(/^(circuit|season)-/i, '');
+      var ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+      if (/^\d+$/.test(t)) return ROMAN[parseInt(t, 10)] || t;
+      return t.toUpperCase();
+    }
+    var CIRCUIT = codeFromId(SEASON_ID);
     var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
 
     // When embedded in the Leaderboard tab (?embed=1): strip chrome and report our

@@ -31,6 +31,7 @@ import { getStore } from '@netlify/blobs';
 import { normalizeScore, decorate } from './lib/score-helpers.js';
 import { etagJson } from './lib/http-cache.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
+import { circuitCode } from './lib/circuit.js';
 
 // Slot → discipline. Mirrors public-match.js exactly.
 const SLOT_TYPE = {
@@ -57,7 +58,10 @@ export default async (req) => {
   const weekParam = Number(url.searchParams.get('week')) || null;
 
   try {
-    const circuitLetter = seasonId.replace('circuit-', '').toUpperCase();
+    // Season ids come in several shapes ('circuit-i', 'season-1', '2'), and
+    // chopping off a literal 'circuit-' turned 'season-1' into 'SEASON-1' — a
+    // blob prefix that matches nothing, so every game score read as missing.
+    const circuitLetter = circuitCode(seasonId);
     const schedStore = getStore('schedule');
 
     // ---- 1. load this circuit's schedule blobs once ----

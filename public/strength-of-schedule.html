@@ -149,7 +149,17 @@
   <script>
   // ── Config ───────────────────────────────────────────────────────
   const SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i') };
-  const CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
+  // Season ids come in several shapes ('circuit-i', 'season-2', a bare '2').
+  // Chopping off a literal 'circuit-' turned 'season-1' into 'SEASON-1', which
+  // matches no stats blob. dsSeason() overwrites this once it resolves; this is
+  // only the pre-resolution guess.
+  function codeFromId(id) {
+    var t = String(id || '').trim().replace(/^(circuit|season)-/i, '');
+    var ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    if (/^\d+$/.test(t)) return ROMAN[parseInt(t, 10)] || t;
+    return t.toUpperCase();
+  }
+  const CIRCUIT = codeFromId(SEASON.id);
   const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
   const TREND_THRESHOLD = 25; // DSR points of difference to call a run-in harder/easier
 

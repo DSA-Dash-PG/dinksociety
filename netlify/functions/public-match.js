@@ -16,6 +16,7 @@ import { getStore } from '@netlify/blobs';
 import { normalizeScore } from './lib/score-helpers.js';
 import { etagJson } from './lib/http-cache.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
+import { circuitCode } from './lib/circuit.js';
 
 // Slot → discipline label. Matches lib ordering: g1 women's, g2 men's, rest mixed.
 const SLOT_TYPE = {
@@ -35,7 +36,10 @@ export default async (req) => {
   if (!matchId) return json({ error: 'match id required' }, 400);
 
   try {
-    const circuitLetter = seasonId.replace('circuit-', '').toUpperCase();
+    // Season ids come in several shapes ('circuit-i', 'season-1', '2'), and
+    // chopping off a literal 'circuit-' turned 'season-1' into 'SEASON-1' — a
+    // blob prefix that matches nothing, so every game score read as missing.
+    const circuitLetter = circuitCode(seasonId);
     const schedStore = getStore('schedule');
 
     // Locate the match across this season's schedule blobs.
