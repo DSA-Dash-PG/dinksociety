@@ -27,6 +27,9 @@
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <!-- Resolves which season this page shows (?season= / ?circuit=, else the
+       current one, which flips a week before its start date). -->
+  <script src="/js/season.js"></script>
   <style>
     .stand-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
 
@@ -304,6 +307,8 @@
   <script src="/js/live-poll.js"></script>
   <script>
   // ── Config ───────────────────────────────────────────────────────
+  // id/CIRCUIT are refined by js/season.js before load() runs — the URL param
+  // when there is one, otherwise whichever season is current.
   const SEASON = { id:(new URLSearchParams(location.search).get('season')||'circuit-i'), totalMatches:6, maxPtsPerMatch:4, playoffSpots:4 };
   // Week 6 = Rivalry Week, the LAST week of the regular season. The playoff
   // picture (badges, cutline, points-back-of-line) only turns on then —
@@ -317,7 +322,7 @@
   let selectedWeek = 'current'; // 'current' or a week number (snapshot through that week)
   let standingsView = 'overall'; // 'overall' | 'regular' | 'playoff' — Regular/Playoffs/Overall toggle
   let dsrByTeam = {}; // teamId / lowercased teamName → summed Team DSR
-  const CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
+  let CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
 
   // Team DSR = sum of each rated player's DSR (composite, gamesPlayed>0), keyed by id + name.
   function buildDsrByTeam(pstats) {
@@ -337,7 +342,7 @@
   };
 
   // Links carry the current season so navigation stays in context (e.g. test season).
-  const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
+  let LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
   function slug(s){return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team';}
   function teamHref(t){const id=t.teamId||slug(t.teamName);return '/team?id='+encodeURIComponent(id)+LINK_SUFFIX;}
 
@@ -993,7 +998,11 @@
            + ' ' + d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
   }
 
-  load();
+  // Settle the season before loading, so a bare /standings.html follows the
+  // current season instead of being pinned to Season 1.
+  (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+    if (S) { SEASON.id = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; }
+  }).catch(() => {}).then(load);
 
   // ── Live refresh ─────────────────────────────────────────────────
   // Standings only move when matches finalize, so a relaxed 30s poll is

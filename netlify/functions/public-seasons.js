@@ -13,6 +13,7 @@
 import { getStore } from '@netlify/blobs';
 import { resolveDepositTerms, VENMO_HANDLE, CARD_PAYMENTS_ENABLED } from './lib/payment-terms.js';
 import { seasonCircuitCode } from './lib/circuit.js';
+import { currentSeasonInfo } from './lib/current-season.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -70,7 +71,12 @@ export default async (req) => {
       } catch {}
     }
 
-    return new Response(JSON.stringify({ seasons }), {
+    // Which season the site should show by default — it takes over a week
+    // before its start date. Resolved here so no page has to decide, and so the
+    // changeover needs nobody awake at midnight.
+    const current = currentSeasonInfo(seasons);
+
+    return new Response(JSON.stringify({ seasons, current }), {
       status: 200,
       headers: {
         'Content-Type': 'application/json',

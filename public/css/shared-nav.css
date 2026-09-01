@@ -34,7 +34,13 @@
   text-decoration: none; color: var(--color-text);
 }
 .ds-nav-brand svg { width: 36px; height: 36px; flex-shrink: 0; }
+/* Wordmark + season line stacked, as one column in the nav's flex row. */
+.ds-nav-brandcol {
+  display: flex; flex-direction: column; align-items: flex-start;
+  gap: 0; min-width: 0; flex-shrink: 0;
+}
 .ds-nav-brand-text { display: flex; flex-direction: column; }
+.ds-nav-brand-text strong { white-space: nowrap; }
 .ds-nav-brand-text strong {
   font-size: var(--text-sm); font-weight: 800;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -42,6 +48,100 @@
 .ds-nav-brand-text small {
   font-size: 0.65rem; color: var(--color-text-faint);
   text-transform: uppercase; letter-spacing: 0.12em;
+}
+
+/* ── Season pill ─────────────────────────────────────────────────
+   Sits where the season label always sat, under the wordmark. It only
+   becomes a control when there's more than one season to go to; with a
+   single season it stays the plain label it was. Kept out of the brand
+   <a> so tapping it never navigates home. */
+.ds-season {
+  position: relative;
+  margin-top: 1px;
+  white-space: nowrap;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+}
+.ds-season__btn {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 0; border: 0; background: none; cursor: pointer;
+  font: inherit; letter-spacing: inherit; text-transform: inherit;
+  color: var(--color-text-faint);
+  transition: color var(--transition);
+}
+.ds-season__btn:hover { color: var(--color-text); }
+.ds-season__btn[disabled] { cursor: default; }
+.ds-season__btn[disabled] .ds-season__chev { display: none; }
+.ds-season__chev { width: 9px; height: 9px; flex-shrink: 0; opacity: 0.8; transition: transform var(--transition); }
+.ds-season.is-open .ds-season__chev { transform: rotate(180deg); }
+/* Viewing a finished season — the label carries the state so it's obvious
+   from any page that this isn't what's happening now. */
+.ds-season__tag {
+  margin-left: 5px; padding: 1px 5px; border-radius: var(--radius-full);
+  font-size: 0.55rem; font-weight: 800; letter-spacing: 0.1em;
+  background: var(--color-surface-2); color: var(--color-text-faint);
+  border: 1px solid var(--color-border);
+}
+.ds-season--past .ds-season__btn { color: var(--color-gold, #f0c040); }
+.ds-season--past .ds-season__tag {
+  background: rgba(240,192,64,0.14); color: var(--color-gold, #f0c040);
+  border-color: rgba(240,192,64,0.4);
+}
+.ds-season__menu {
+  position: absolute; top: calc(100% + 7px); left: 0; z-index: 120;
+  min-width: 190px; padding: 5px;
+  background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm); box-shadow: 0 18px 40px rgba(0,0,0,0.5);
+  display: none;
+}
+.ds-season.is-open .ds-season__menu { display: block; }
+.ds-season__opt {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 8px 10px; border: 0; border-radius: var(--radius-sm);
+  background: none; cursor: pointer; text-align: left;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: none; color: var(--color-text); text-decoration: none;
+}
+.ds-season__opt:hover { background: var(--color-surface-2); }
+.ds-season__opt.is-active { color: var(--color-lime); }
+.ds-season__opt small {
+  font-size: 0.58rem; font-weight: 800; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--color-text-faint);
+}
+
+/* ── Past-season bar ─────────────────────────────────────────────
+   Shown under the nav whenever someone is looking at a finished season, so a
+   page of old standings can never be mistaken for what's happening now. Sticks
+   to the top edge under the fixed nav and travels with them across pages. */
+.ds-pastbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 99;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 7px 14px 7px;
+  background: rgba(240,192,64,0.12);
+  border-bottom: 1px solid rgba(240,192,64,0.32);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  font-size: 0.72rem; font-weight: 700;
+  color: var(--color-gold, #f0c040);
+  text-align: center;
+}
+.ds-pastbar__tag {
+  padding: 1px 7px; border-radius: var(--radius-full);
+  font-size: 0.56rem; font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
+  background: rgba(240,192,64,0.2); border: 1px solid rgba(240,192,64,0.45);
+}
+.ds-pastbar a {
+  color: inherit; text-decoration: none; font-weight: 800;
+  border-bottom: 1px dotted currentColor; white-space: nowrap;
+}
+.ds-pastbar a:hover { border-bottom-style: solid; }
+/* Push the page down so the bar never covers the nav or the hero. */
+body.ds-has-pastbar .ds-nav { top: 33px; }
+body.ds-has-pastbar { padding-top: 33px; }
+@media (max-width: 560px) {
+  .ds-pastbar { font-size: 0.66rem; gap: 7px; padding: 6px 10px; }
 }
 
 /* ── Desktop links ───────────────────────────────────────────── */

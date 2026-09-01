@@ -11,6 +11,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <!-- Resolves which season this page shows (?season= / ?circuit=, else the
+       current one, which flips a week before its start date). -->
+  <script src="/js/season.js"></script>
   <script src="/js/short-name.js"></script>
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
 
@@ -749,16 +752,23 @@
     // endpoint, so editors can see a week before it's published. Normal mode
     // uses the public endpoint (published Drops only).
     var reqPreview = qs('preview');
-    var api = reqPreview
-      ? ('/.netlify/functions/admin-drop?week=' + encodeURIComponent(reqWeek||''))
-      : ('/.netlify/functions/public-drop' + (reqWeek?('?week='+encodeURIComponent(reqWeek)):''));
     function getJSON(u, creds){ return fetch(u, creds?{credentials:'include'}:undefined).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }
-    Promise.all([
+
+    // The Drop carried no season at all, so it was pinned to Season 1 for good.
+    // Resolve first, then every call below is scoped to the season being viewed.
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+      var code = (S && S.circuit) || 'I';
+      var sid  = (S && S.id) || 'circuit-i';
+      var c    = '&circuit=' + encodeURIComponent(code);
+      var api = reqPreview
+        ? ('/.netlify/functions/admin-drop?week=' + encodeURIComponent(reqWeek||'') + c)
+        : ('/.netlify/functions/public-drop?circuit=' + encodeURIComponent(code) + (reqWeek?('&week='+encodeURIComponent(reqWeek)):''));
+      return Promise.all([
       getJSON(api, !!reqPreview),
-      getJSON('/.netlify/functions/public-drop?view=index'),
-      getJSON('/.netlify/functions/public-leaderboard?view=players'),
-      getJSON('/.netlify/functions/public-standings'),
-      getJSON('/.netlify/functions/public-teams')
+      getJSON('/.netlify/functions/public-drop?view=index' + c),
+      getJSON('/.netlify/functions/public-leaderboard?view=players&circuit=' + encodeURIComponent(code)),
+      getJSON('/.netlify/functions/public-standings?season=' + encodeURIComponent(sid)),
+      getJSON('/.netlify/functions/public-teams?season=' + encodeURIComponent(sid))
     ]).then(function(res){
       var data = res[0], idx = res[1], pl = res[2], st = res[3], tm = res[4];
       DROP_PLAYERS = (pl && pl.players) ? pl.players : null;
@@ -781,6 +791,7 @@
       render(dropObj);
       renderWeekpick(dropObj.week, pubWeeks);
     });
+    }).catch(function(){});
   })();
   </script>
 </body>

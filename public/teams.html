@@ -27,6 +27,9 @@
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <!-- Resolves which season this page shows (?season= / ?circuit=, else the
+       current one, which flips a week before its start date). -->
+  <script src="/js/season.js"></script>
   <style>
     .teams-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
 
@@ -147,9 +150,9 @@
     let statsById = {};       // teamId → { rank, wins, losses, ties, matchPointsFor, totalGamesWon, totalGamesLost, pointDiff }
     let seasonStarted = false; // rankings + diff only show once Week 1 is in the books
 
-    // Optional season override (?season=circuit-test) for staff QA. Default = live season.
-    const SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
-    const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
+    // Which season to show: ?season= when given, else the current one (js/season.js).
+    let SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
+    let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
 
     async function loadTeams() {
       const [teamsRes, standRes] = await Promise.allSettled([
@@ -288,7 +291,9 @@
 
     function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
     function slugify(s) { return String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
-    loadTeams();
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+      if (S) { SEASON_ID = S.id; LINK_SUFFIX = S.suffix; }
+    }).catch(() => {}).then(loadTeams);
   </script>
 </body>
 </html>

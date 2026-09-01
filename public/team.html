@@ -27,6 +27,9 @@
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <!-- Resolves which season this page shows (?season= / ?circuit=, else the
+       current one, which flips a week before its start date). -->
+  <script src="/js/season.js"></script>
   <script src="/js/short-name.js"></script>
   <style>
     /* ═══════════════════════════════════════
@@ -246,9 +249,10 @@
     /* ─── URL ─────────────────────────────────────────────── */
     const _q = new URLSearchParams(location.search);
     const teamParam = _q.get('id') || '';
-    const SEASON_ID = _q.get('season') || 'circuit-i';
-    const CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
-    const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
+    // Season: the URL when given, else the current one (js/season.js).
+    let SEASON_ID = _q.get('season') || 'circuit-i';
+    let CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
+    let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
 
     /* ─── Avatar markup (photo if present, else initial) ──── */
     const avatarImg = (p, cls) =>
@@ -622,7 +626,9 @@
       });
     }
 
-    load();
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+      if (S) { SEASON_ID = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; }
+    }).catch(() => {}).then(load);
   })();
   </script>
 </body>

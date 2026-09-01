@@ -107,10 +107,13 @@ async function renderFixture(record, players) {
     createElement: () => makeEl('new'), body: makeEl('body'),
   };
 
+  // Keys are matched in order — the two view= calls first, since they also
+  // contain the endpoint name. Every URL is season-scoped now (?circuit= /
+  // ?season=), so these match on the endpoint rather than an exact query.
   const routes = {
-    'public-drop?week': { drop: record },
     'view=index': { weeks: [{ week: 5 }, { week: 6 }] },
     'view=players': { players },
+    'public-drop': { drop: record },
     'public-standings': { divisions: {} },
     'public-teams': { teams: [] },
   };
@@ -128,9 +131,15 @@ async function renderFixture(record, players) {
     mount() {},
   };
 
+  // The page resolves its season before fetching (js/season.js in production).
+  const dsSeason = () => Promise.resolve({
+    id: 'circuit-i', circuit: 'I', name: 'Season 1', startDate: '2026-06-08',
+    isCurrent: true, isPast: false, suffix: '', qs: '', all: [], current: null, explicit: false,
+  });
+
   const sandbox = {
     document,
-    window: { DSEntity },
+    window: { DSEntity, dsSeason },
     location: { search: '?week=6' },
     fetch: fetchStub,
     URLSearchParams,
@@ -141,8 +150,10 @@ async function renderFixture(record, players) {
   const run = new Function(...Object.keys(sandbox), code);
   run(...Object.values(sandbox));
 
-  // Let the stubbed fetch promise chain settle.
-  for (let i = 0; i < 10; i++) await Promise.resolve();
+  // Let the stubbed fetch promise chain settle (season resolve → fetches → render).
+  for (let i = 0; i < 40; i++) await Promise.resolve();
+  await new Promise((r) => setTimeout(r, 0));
+  for (let i = 0; i < 40; i++) await Promise.resolve();
   await new Promise((r) => setTimeout(r, 0));
 
   return els['dp-root'].innerHTML;

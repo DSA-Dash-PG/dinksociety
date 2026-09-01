@@ -203,6 +203,10 @@
   .ln-teampill .nm{font-weight:800;font-size:14px}
   .ln-teampill .dv{font-size:11px;color:var(--color-text-faint);text-transform:uppercase;letter-spacing:.06em}
   .ln-teamcount{color:var(--color-lime)}
+  /* Registered but not yet paid — shown so a captain sees their own name right
+     after signing up, without claiming they're through the turnstile. */
+  .ln-teampill--hold{border-style:dashed;opacity:.72}
+  .ln-teampill .hold{display:inline-block;margin-top:2px;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-gold,#f0c040)}
   .ln-facts{display:flex;gap:26px;flex-wrap:wrap;margin:26px 0 28px}
   .ln-fact .n{font-size:24px;font-weight:900} .ln-fact .l{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);font-weight:700;margin-top:2px}
   .ln-cta{display:flex;gap:10px;flex-wrap:wrap}
@@ -356,6 +360,15 @@
     <div class="tkt-fine">Membership has its privileges. Like winning.</div>
   </div></section>
 
+  <!-- ── Who's in — sits directly under the ticket, where the metaphor lands:
+       these are the teams already through the turnstile for the season. ── -->
+  <section class="ln-sec alt" id="ln-teams-sec" style="display:none"><div class="ln-wrap">
+    <div class="ln-eyebrow">Aboard</div>
+    <h2 id="ln-teams-h">Punched their ticket.</h2>
+    <p class="ln-lede" id="ln-teams-lede">Paid up, seat claimed, name on the bracket. Yours is still open — for now.</p>
+    <div class="ln-teamgrid" id="ln-teams" style="margin-top:24px"></div>
+  </div></section>
+
   <!-- ── Divisions preview (dynamic from the season record) ── -->
   <section class="ln-sec"><div class="ln-wrap">
     <div class="ln-eyebrow" id="ln-divs-eye">Divisions</div><h2 id="ln-divs-h">Pick your bracket.</h2><p class="ln-lede" id="ln-divs-lede">Team fee covers the full season. Register as a team, or sign up solo and get drafted.</p>
@@ -366,14 +379,6 @@
   <section class="ln-sec" id="ln-sched-sec" style="display:none"><div class="ln-wrap">
     <div class="ln-eyebrow">Tentative schedule</div><h2>Mark your calendar.</h2>
     <div class="reg-schedule" id="season-schedule" style="display:none;margin-top:22px"></div>
-  </div></section>
-
-  <!-- ── Who's in — approved teams for the featured season (builds demand) ── -->
-  <section class="ln-sec alt" id="ln-teams-sec" style="display:none"><div class="ln-wrap">
-    <div class="ln-eyebrow">Locked in</div>
-    <h2 id="ln-teams-h">Who's in.</h2>
-    <p class="ln-lede">Teams already approved for the season. Claim a spot before the bracket fills.</p>
-    <div class="ln-teamgrid" id="ln-teams" style="margin-top:24px"></div>
   </div></section>
 
   <!-- ── Why join ── -->
@@ -1009,17 +1014,29 @@
       const box = document.getElementById('ln-teams');
       if (!sec || !box || !s) return;
       try {
-        const code = circuitCodeFromSeasonId(s.id);
+        const code = s.circuit || circuitCodeFromSeasonId(s.id);
         const r = await fetch('/.netlify/functions/public-registered-teams?circuit=' + encodeURIComponent(code));
         const data = await r.json();
         const teams = (data && data.teams) || [];
         if (!teams.length) { sec.style.display = 'none'; return; }
+        // The headline counts teams that are actually in; the ones still
+        // settling up are listed after, marked, so nobody is overcounted.
+        const paid = (data && data.count != null) ? data.count : teams.filter(t => t.status !== 'pending').length;
+        const holding = teams.length - paid;
         const h = document.getElementById('ln-teams-h');
-        if (h) h.innerHTML = '<span class="ln-teamcount">' + teams.length + '</span> ' +
-          (teams.length === 1 ? 'team' : 'teams') + ' locked in.';
+        if (h) h.innerHTML = paid
+          ? '<span class="ln-teamcount">' + paid + '</span> ' +
+            (paid === 1 ? 'team has punched its ticket.' : 'teams have punched their ticket.')
+          : 'First ticket is still unclaimed.';
+        const lede = document.getElementById('ln-teams-lede');
+        if (lede) lede.textContent = (paid ? 'Paid up, seat claimed, name on the bracket for ' : 'Be the first on the bracket for ') +
+          (s.name || s.label || 'the season') + '. ' +
+          (holding ? holding + (holding === 1 ? ' more is' : ' more are') + ' holding a spot while payment clears.' : 'Yours is still open — for now.');
         box.innerHTML = teams.map(t =>
-          '<div class="ln-teampill"><div class="nm">' + esc(t.name) + '</div>' +
+          '<div class="ln-teampill' + (t.status === 'pending' ? ' ln-teampill--hold' : '') + '">' +
+          '<div class="nm">' + esc(t.name) + '</div>' +
           (t.divisionLabel ? '<div class="dv">' + esc(t.divisionLabel) + '</div>' : '') +
+          (t.status === 'pending' ? '<div class="hold">Holding a spot</div>' : '') +
           '</div>'
         ).join('');
         sec.style.display = 'block';

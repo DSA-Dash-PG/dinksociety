@@ -23,6 +23,9 @@
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <!-- Resolves which season this page shows (?season= / ?circuit=, else the
+       current one, which flips a week before its start date). -->
+  <script src="/js/season.js"></script>
   <script src="/js/short-name.js"></script>
   <style>
     .lb-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
@@ -365,12 +368,12 @@
       if (!r.ok) throw 0;
       state.standings = await r.json();
       if (state.standings?.empty) {
-        r = await fetch('/.netlify/functions/public-standings?season=circuit-i');
+        r = await fetch(`/.netlify/functions/public-standings?season=${encodeURIComponent(seasonIdOf(state.circuit))}`);
         if (r.ok) { const d = await r.json(); if (!d.empty) state.standings = d; }
       }
     } catch {
       try {
-        const r = await fetch('/.netlify/functions/public-standings?season=circuit-i');
+        const r = await fetch(`/.netlify/functions/public-standings?season=${encodeURIComponent(seasonIdOf(state.circuit))}`);
         state.standings = r.ok ? await r.json() : { empty:true };
       } catch { state.standings = { empty:true }; }
     }
@@ -1093,10 +1096,24 @@
     writeUrl(); renderAll();
   });
 
+  // The season id that goes with a code — the standings API takes the id form.
+  function seasonIdOf(code) {
+    const c = String(code || 'I').toUpperCase();
+    const hit = (SEASONS_LOADED || []).find(s => String(s.circuit || '').toUpperCase() === c);
+    return (hit && hit.id) || 'circuit-' + c.toLowerCase();
+  }
+  let SEASONS_LOADED = [];
+
   readUrl();
-  loadSeasonOptions();
-  Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
-    renderHero(); renderAll();
+  // Settle the season first: with no ?circuit= in the URL the page follows the
+  // CURRENT season, which flips a week before its start date.
+  (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+    if (S) { SEASONS_LOADED = S.all || []; if (!S.explicit) { state.circuit = S.circuit; $('circuit-select').value = S.circuit; } }
+  }).catch(() => {}).then(() => {
+    loadSeasonOptions();
+    return Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
+      renderHero(); renderAll();
+    });
   });
 
   // ── Season dropdown ──────────────────────────────────────────────

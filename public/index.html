@@ -11,6 +11,9 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <!-- Resolves which season this page shows (?season= / ?circuit=, else the
+       current one, which flips a week before its start date). -->
+  <script src="/js/season.js"></script>
   <link rel="stylesheet" href="/css/ticker.css" />
   <script src="/js/short-name.js"></script>
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
@@ -390,6 +393,7 @@
     // them in scope, the first name rendered throws ReferenceError and POTW,
     // DSR, standings AND the Drop teaser all silently stay hidden.
     var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
+    var SEASON_CODE = 'I';   // both refined below, before anything is fetched
     var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
     function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
     function teamLink(name, id, cls){
@@ -749,12 +753,17 @@
       if(window.DSEntity && DROP_IDX) window.DSEntity.mount(sec, DROP_IDX);
     }
 
-    /* ---- Fetch + wire ---- */
-    Promise.all([
-      fetch('/.netlify/functions/public-leaderboard').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-standings').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-leaderboard?view=players').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-drop').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+    /* ---- Fetch + wire ----
+       Every call is season-scoped. They used to be bare, so the home page could
+       show one season's schedule beside another's standings and leaderboard. */
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+      if (S) { SEASON_ID = S.id; SEASON_CODE = S.circuit; LINK_SUFFIX = S.suffix; }
+    }).catch(function(){}).then(function(){
+    return Promise.all([
+      fetch('/.netlify/functions/public-leaderboard?circuit='+encodeURIComponent(SEASON_CODE)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch('/.netlify/functions/public-standings?season='+encodeURIComponent(SEASON_ID)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch('/.netlify/functions/public-leaderboard?circuit='+encodeURIComponent(SEASON_CODE)+'&view=players').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+      fetch('/.netlify/functions/public-drop?circuit='+encodeURIComponent(SEASON_CODE)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
       fetch('/.netlify/functions/public-schedule?season='+encodeURIComponent(SEASON_ID)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
     ]).then(function(res){
       var lb=res[0],st=res[1],pl=res[2],dropPayload=res[3],sched=res[4];
@@ -800,6 +809,7 @@
       // The Drop teaser (hidden until a week is published)
       renderDropTeaser(dropPayload);
     });
+    });
   })();
   </script>
 
@@ -811,6 +821,7 @@
   (function () {
     var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
     var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
+    // Fallback until the season resolves — then it's the real start date.
     var SEASON_START = new Date('2026-06-08T00:00:00');
     var TOTAL_WEEKS = 8;
     var MATCH_START_TIME = '7:00 PM';
@@ -970,10 +981,18 @@
       sec.style.display = '';
     }
 
-    fetch('/.netlify/functions/public-schedule?season=' + encodeURIComponent(SEASON_ID))
-      .then(function(r){ return r.ok ? r.json() : null; })
-      .then(function(data){ if (data && !data.empty && data.weeks) render(data.weeks); })
-      .catch(function(){});
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+      if (S) {
+        SEASON_ID = S.id;
+        LINK_SUFFIX = S.suffix;
+        if (S.startDate) { var d = new Date(S.startDate + 'T00:00:00'); if (!isNaN(d)) SEASON_START = d; }
+      }
+    }).catch(function(){}).then(function(){
+      return fetch('/.netlify/functions/public-schedule?season=' + encodeURIComponent(SEASON_ID))
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(data){ if (data && !data.empty && data.weeks) render(data.weeks); })
+        .catch(function(){});
+    });
   })();
   </script>
 </body>

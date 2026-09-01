@@ -27,6 +27,9 @@
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <!-- Resolves which season this page shows (?season= / ?circuit=, else the
+       current one, which flips a week before its start date). -->
+  <script src="/js/season.js"></script>
   <script src="/js/short-name.js"></script>
   <script src="/badges.js?v=2"></script>
   <style>
@@ -287,10 +290,11 @@
     const teamParam  = params.get('team')  || '';
     const playerName = params.get('name')  || '';
     const playerIdParam = params.get('id') || '';   // direct player-id lookup (future use)
-    // Optional season override (?season=circuit-test) for staff QA. Default = live season.
-    const SEASON_ID = params.get('season') || 'circuit-i';
-    const CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
-    const LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
+    // Season: the URL when given, else the current one (js/season.js).
+    let SEASON_ID = params.get('season') || 'circuit-i';
+    let CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
+    let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
+    let SEASON_NAME = null;   // filled from the season record, for the chips
 
     /* ─── Load ────────────────────────────────────────────── */
     async function load() {
@@ -739,7 +743,7 @@
           `/player?team=${teamName ? slug(teamName) : teamSlug}&name=${encodeURIComponent(name)}${LINK_SUFFIX}`;
 
         // Season chips: current season (has game data) + any archived seasons.
-        const curLabel = CIRCUIT === 'I' ? 'Season 1' : `Season ${CIRCUIT}`;
+        const curLabel = SEASON_NAME || (CIRCUIT === 'I' ? 'Season 1' : `Season ${CIRCUIT}`);
         const seasonChips = [{ id: 'current', label: curLabel }]
           .concat(history.map(s => ({ id: `hist-${s.circuit}`, label: s.seasonLabel || s.circuit })));
 
@@ -1099,7 +1103,10 @@
       draw();
     }
 
-    load().catch(e => { console.error('player load failed', e); const pr = document.getElementById('page-root'); if (pr) pr.innerHTML = '<div class="pp-loading">Couldn’t load this player. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>'; });
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+      if (S) { SEASON_ID = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; }
+    }).catch(() => {}).then(() =>
+    load()).catch(e => { console.error('player load failed', e); const pr = document.getElementById('page-root'); if (pr) pr.innerHTML = '<div class="pp-loading">Couldn’t load this player. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>'; });
   })();
   </script>
 </body>

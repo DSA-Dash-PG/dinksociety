@@ -5,12 +5,21 @@
      ═══════════════════════════════════════════════════════════ -->
 <nav class="ds-nav" id="ds-nav">
   <div class="ds-nav-inner">
-    <a href="/" class="ds-nav-brand">
-      <div class="ds-nav-brand-text">
-        <strong>The Dink Society</strong>
-        <small data-circuit-label>Season 1</small>
-      </div>
-    </a>
+    <!-- Brand column: the wordmark links home, and the season line beneath it
+         doubles as the season switcher. The switcher sits OUTSIDE the anchor so
+         tapping it never navigates home. -->
+    <div class="ds-nav-brandcol">
+      <a href="/" class="ds-nav-brand">
+        <div class="ds-nav-brand-text"><strong>The Dink Society</strong></div>
+      </a>
+      <span class="ds-season" id="ds-season" hidden>
+        <button type="button" class="ds-season__btn" id="ds-season-btn" aria-haspopup="true" aria-expanded="false">
+          <span data-circuit-label>Season 1</span>
+          <svg class="ds-season__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </button>
+        <div class="ds-season__menu" id="ds-season-menu" role="menu"></div>
+      </span>
+    </div>
 
     <div class="ds-nav-links">
       <!-- Standard links are generated from NAV_ITEMS in the script below
@@ -183,6 +192,103 @@
   buildNavLinks(desktopLinks, desktopLinks ? desktopLinks.querySelector('.ds-nav-login') : null, 'desktop');
   buildNavLinks(document.querySelector('.ds-nav-drawer-links'), null, 'drawer');
 
+  /* ── Season pill + season-aware links ──────────────────────────
+     Browsing a past season used to end at the first nav click, because every
+     link here is a bare path — one tap on Standings and you were silently back
+     in the current season. So once the season is known, every internal link in
+     the nav (including the mega panels and the drawer) carries it, and the
+     label under the wordmark becomes the switcher. */
+  (function seasonPill() {
+    function load(cb) {
+      if (window.dsSeason) return cb();
+      var existing = document.getElementById('ds-season-js');
+      if (existing) { existing.addEventListener('load', cb); return; }
+      var sc = document.createElement('script');
+      sc.id = 'ds-season-js'; sc.src = '/js/season.js'; sc.onload = cb;
+      (document.head || document.documentElement).appendChild(sc);
+    }
+
+    load(function () {
+      window.dsSeason().then(function (S) {
+        // Carry the season through every internal nav link.
+        if (!S.isCurrent) {
+          document.querySelectorAll('.ds-nav a[href], .ds-nav-drawer a[href], .ds-mega a[href]').forEach(function (a) {
+            var href = a.getAttribute('href');
+            if (!href || href.indexOf('season=') >= 0) return;
+            a.setAttribute('href', window.dsSeasonLink(href, S));
+          });
+          document.querySelectorAll('.ds-mega[data-mega-href]').forEach(function (m) {
+            m.setAttribute('data-mega-href', window.dsSeasonLink(m.getAttribute('data-mega-href'), S));
+          });
+        }
+
+        // Looking at a finished season → say so, and offer one tap back.
+        if (S.isPast) {
+          var bar = document.createElement('div');
+          bar.className = 'ds-pastbar';
+          var backName = (S.current && (S.current.name || S.current.label)) || 'the current season';
+          bar.innerHTML = '<span class="ds-pastbar__tag">Final</span>' +
+            '<span>You\'re viewing ' + (S.name || 'a past season') + '</span>' +
+            '<a href="' + location.pathname + '">Back to ' + backName + ' &rarr;</a>';
+          document.body.insertBefore(bar, document.body.firstChild);
+          document.body.classList.add('ds-has-pastbar');
+        }
+
+        var wrap = document.getElementById('ds-season'), btn = document.getElementById('ds-season-btn');
+        var menu = document.getElementById('ds-season-menu');
+        if (!wrap || !btn || !menu) return;
+        wrap.hidden = false;
+        // Every season label on the page — the pill and each hero eyebrow.
+        document.querySelectorAll('[data-circuit-label]').forEach(function (el) {
+          el.textContent = S.name || 'Season';
+        });
+        // ...and the month beside it, so a Season 2 hero doesn't read "June 2026".
+        if (S.startDate) {
+          var sd = new Date(S.startDate + 'T12:00:00');
+          if (!isNaN(sd)) {
+            var my = sd.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            document.querySelectorAll('[data-start-month-year]').forEach(function (el) { el.textContent = my; });
+          }
+        }
+        if (S.isPast) {
+          wrap.classList.add('ds-season--past');
+          var tag = document.createElement('span');
+          tag.className = 'ds-season__tag';
+          tag.textContent = 'Final';
+          btn.appendChild(tag);
+        }
+
+        // One season, nothing to switch to: stay the plain label it always was.
+        var seasons = S.all || [];
+        if (seasons.length < 2) { btn.disabled = true; return; }
+
+        var curCode = S.current ? String(S.current.circuit || '').toUpperCase() : null;
+        menu.innerHTML = seasons.map(function (s) {
+          var code = String(s.circuit || '').toUpperCase();
+          var isCur = curCode && code === curCode;
+          var here = s.id === S.id;
+          var href = isCur ? location.pathname : location.pathname + '?season=' + encodeURIComponent(s.id);
+          return '<a class="ds-season__opt' + (here ? ' is-active' : '') + '" role="menuitem" href="' + href + '">' +
+            '<span>' + (s.name || s.label || code) + '</span>' +
+            '<small>' + (isCur ? 'Current' : 'Final') + '</small></a>';
+        }).join('');
+
+        btn.addEventListener('click', function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var open = !wrap.classList.contains('is-open');
+          wrap.classList.toggle('is-open', open);
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+        document.addEventListener('click', function (e) {
+          if (!wrap.contains(e.target)) { wrap.classList.remove('is-open'); btn.setAttribute('aria-expanded', 'false'); }
+        });
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') { wrap.classList.remove('is-open'); btn.setAttribute('aria-expanded', 'false'); }
+        });
+      }).catch(function () { /* label stays as-is */ });
+    });
+  })();
+
   /* ── Dropdown wiring (Standings + Teams) ──
      Hover-capable pointers: panel opens on hover (CSS), clicking the trigger
      navigates to the parent page. Touch / no-hover: tap toggles the panel
@@ -232,7 +338,7 @@
     });
 
     // ── Populate the Teams dropdown from public-teams ──
-    var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
+    var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';  // refined by the season pill
     var SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
     function slugify(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
@@ -359,9 +465,9 @@
       // (window.DS_SETTINGS.circuitName etc.) keep working as before.
       window.DS_SETTINGS = s;
 
-      document.querySelectorAll('[data-circuit-label]').forEach(function (el) {
-        el.textContent = s.circuitName || 'Season 1';
-      });
+      // NOTE: [data-circuit-label] is filled by the season pill below, from the
+      // season actually being viewed. Setting it here too would mean a page
+      // showing Season 2 still read "Season 1" whenever this landed last.
       document.querySelectorAll('[data-circuit-venue]').forEach(function (el) {
         el.textContent = s.defaultVenue || '';
       });
