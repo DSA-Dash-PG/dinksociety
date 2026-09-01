@@ -27,11 +27,46 @@
   <script src="/js/short-name.js"></script>
   <style>
     .lb-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
+    /* The shared hero reserves room under "Presented by" for pages that need it;
+       here it just left a hole above the filters. Pull them back up. */
+    .page-hero--sponsor { margin-bottom: var(--space-2); }
+    .page-hero--sponsor .page-hero__content { padding-bottom: 22px; }
+
+    /* ── Hero: title left, Season MVPs in the empty right half ── */
+    .page-hero--sponsor .page-hero__content {
+      display:flex; align-items:flex-end; justify-content:space-between; gap:30px; flex-wrap:wrap;
+    }
+    .lb-heroL { min-width:min(100%,300px); }
+    .lb-mvp { flex:1 1 460px; max-width:660px; }
+    .lb-mvp__hd { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:9px; }
+    .lb-mvp__hd b { font-size:10.5px; font-weight:900; letter-spacing:.18em; text-transform:uppercase; color:var(--color-gold,#f0c040); }
+    .lb-mvp__hd span { font-size:10.5px; color:var(--color-text-faint); }
+    .lb-mvp__grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width:620px){ .lb-mvp__grid { grid-template-columns:1fr; } }
+    .lb-mvpc { position:relative; border:1px solid rgba(240,192,64,.3); border-radius:14px; padding:13px 14px; overflow:hidden;
+      background:radial-gradient(120% 90% at 50% 0%, rgba(240,192,64,.13), transparent 62%), rgba(14,14,14,.72);
+      backdrop-filter:blur(6px); }
+    .lb-mvpc--f { border-color:rgba(230,225,213,.3);
+      background:radial-gradient(120% 90% at 50% 0%, rgba(230,225,213,.13), transparent 62%), rgba(14,14,14,.72); }
+    .lb-mvpc__tag { display:inline-block; font-size:8px; font-weight:900; letter-spacing:.16em; text-transform:uppercase;
+      color:#0b0d0a; background:#f0c040; border-radius:9999px; padding:3px 9px; }
+    .lb-mvpc--f .lb-mvpc__tag { background:#E6E1D5; }
+    .lb-mvpc__who { display:flex; align-items:center; gap:10px; margin:10px 0 10px; }
+    .lb-mvpc__ring { width:42px; height:42px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center;
+      font-size:13px; font-weight:900; background:#0b0d0a; border:2px solid #f0c040; box-shadow:0 0 14px rgba(240,192,64,.4); }
+    .lb-mvpc--f .lb-mvpc__ring { border-color:#E6E1D5; box-shadow:0 0 14px rgba(230,225,213,.32); }
+    .lb-mvpc__nm { font-size:15px; font-weight:900; font-style:italic; line-height:1.15; }
+    .lb-mvpc__tm { font-size:10.5px; color:var(--color-text-muted); font-weight:700; margin-top:2px; }
+    .lb-mvpc__st { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+    .lb-mvpc__st div { background:rgba(0,0,0,.45); border:1px solid var(--color-border); border-radius:8px; padding:6px 2px; text-align:center; }
+    .lb-mvpc__st b { display:block; font-size:12.5px; font-weight:900; }
+    .lb-mvpc__st b.g{color:#f0c040} .lb-mvpc__st b.t{color:var(--color-teal,#17d7b0)} .lb-mvpc__st b.li{color:var(--color-lime)}
+    .lb-mvpc__st span { font-size:7.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--color-text-faint); font-weight:800; }
     a.ds-link { color: inherit; text-decoration: none; cursor: pointer; }
     a.ds-link:hover { color: var(--color-lime); text-decoration: underline; }
 
     /* Controls */
-    .lb-controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:var(--space-4); }
+    .lb-controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:var(--space-3); }
     .lb-controls select { padding:8px 14px; background:var(--color-surface-2); border:1px solid var(--color-border); color:var(--color-text); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; cursor:pointer; }
     .lb-controls select:focus { border-color:var(--color-lime); outline:none; }
 
@@ -226,12 +261,16 @@
     <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="leaderboard"></div>
     <div class="page-hero__gradient"></div>
     <div class="page-hero__content">
-      <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
-      <h1 class="page-hero__title" id="lb-title">Leaderboard</h1>
-      <div class="page-hero__presented">
-        <span class="page-hero__presented-label">Presented by</span>
-        <div class="kchn-logo"><span>K'CHN</span></div>
+      <div class="lb-heroL">
+        <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
+        <h1 class="page-hero__title" id="lb-title">Leaderboard</h1>
+        <div class="page-hero__presented">
+          <span class="page-hero__presented-label">Presented by</span>
+          <div class="kchn-logo"><span>K'CHN</span></div>
+        </div>
       </div>
+      <!-- Season MVPs — filled by renderHero() for the season they belong to. -->
+      <div class="lb-mvp" id="lb-mvp" hidden></div>
     </div>
   </div>
 
@@ -391,8 +430,38 @@
   }
 
   // ── Hero ─────────────────────────────────────────────────────────
+  // Hand-written, and specific to the season named here. The same figures live
+  // on the Standings page; when a second season's MVPs exist these should move
+  // into a blob rather than being duplicated a third time.
+  const MVP_CIRCUIT = 'I';
+  const SEASON_MVPS = {
+    male:   { initials:'RH', name:'Ryan Hom', team:'Smash Society', tag:'Season MVP · Male',
+              stats:[['72.0','DSR','g'],['24-6','Record',''],['+117','Diff','li'],['7/9','Clutch','t']] },
+    female: { initials:'SC', name:'Shay C',   team:'ZERO ZERO TWO', tag:'Season MVP · Female',
+              stats:[['82.0','DSR','g'],['29-3','Record',''],['+200','Diff','li'],['91%','Win rate','t']] },
+  };
+
   function renderHero() {
-    /* Title is static ("Leaderboard"); kept for call-site compatibility. */
+    /* Title is static ("Leaderboard"). The hero's empty right half carries the
+       season's MVPs — but only on the season they were won in. */
+    const box = $('lb-mvp');
+    if (!box) return;
+    if (state.circuit !== MVP_CIRCUIT) { box.hidden = true; box.innerHTML = ''; return; }
+    const seasonName = (SEASONS_LOADED || []).find(s => String(s.circuit || '').toUpperCase() === MVP_CIRCUIT);
+    const label = (seasonName && (seasonName.name || seasonName.label)) || 'Season 1';
+    const card = (m, cls) => '<div class="lb-mvpc ' + cls + '">' +
+      '<span class="lb-mvpc__tag">' + esc(m.tag) + '</span>' +
+      '<div class="lb-mvpc__who"><div class="lb-mvpc__ring">' + esc(m.initials) + '</div>' +
+        '<div><div class="lb-mvpc__nm">' + esc(m.name) + '</div>' +
+        '<div class="lb-mvpc__tm">' + esc(m.team) + ' · ' + esc(label) + '</div></div></div>' +
+      '<div class="lb-mvpc__st">' + m.stats.map(st =>
+        '<div><b class="' + st[2] + '">' + esc(st[0]) + '</b><span>' + esc(st[1]) + '</span></div>').join('') +
+      '</div></div>';
+    box.innerHTML =
+      '<div class="lb-mvp__hd"><b>' + esc(label) + ' MVPs</b>' +
+      '<span>Voted by the league · stats made the shortlist</span></div>' +
+      '<div class="lb-mvp__grid">' + card(SEASON_MVPS.male, '') + card(SEASON_MVPS.female, 'lb-mvpc--f') + '</div>';
+    box.hidden = false;
   }
 
   // ── Helpers ──────────────────────────────────────────────────────
