@@ -55,3 +55,25 @@ test('code and season id round-trip, and the display name follows', () => {
   assert.equal(seasonName('circuit-2'), 'Season 2');
   assert.equal(seasonName('TEST'), 'Test Season');
 });
+
+// ── The live regression: a season id that isn't "circuit-<code>" ───────────
+// public-standings / public-schedule used to derive the blob key by chopping a
+// "circuit-" prefix. For a season whose id is a slug that produced a key that
+// matches nothing, and the page rendered empty.
+
+test('any season id shape resolves to the key its blobs use', () => {
+  const chop = id => String(id).replace('circuit-', '').toUpperCase();  // the old way
+  const cases = [
+    ['circuit-i', 'I'],
+    ['circuit-1', 'I'],
+    ['season-1', 'I'],
+    ['season-2', 'II'],
+    ['circuit-test', 'TEST'],
+  ];
+  for (const [id, want] of cases) {
+    assert.equal(circuitCode(id), want, `${id} → ${want}`);
+  }
+  // And prove the old approach was wrong for exactly the shapes that broke.
+  assert.notEqual(chop('season-1'), 'I');
+  assert.equal(chop('circuit-i'), 'I', 'the shapes it did handle still work');
+});

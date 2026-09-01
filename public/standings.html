@@ -322,7 +322,16 @@
   let selectedWeek = 'current'; // 'current' or a week number (snapshot through that week)
   let standingsView = 'overall'; // 'overall' | 'regular' | 'playoff' — Regular/Playoffs/Overall toggle
   let dsrByTeam = {}; // teamId / lowercased teamName → summed Team DSR
-  let CIRCUIT = SEASON.id.replace('circuit-', '').toUpperCase();
+  // Season ids come in several shapes ('circuit-i', 'season-2', '2'). Strip the
+  // prefix and turn a number into the Roman code the stats blobs are keyed by.
+  // dsSeason() overwrites this below; this is only the pre-resolution guess.
+  function codeFromId(id) {
+    var t = String(id || '').trim().replace(/^(circuit|season)-/i, '');
+    var ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    if (/^\d+$/.test(t)) return ROMAN[parseInt(t, 10)] || t;
+    return t.toUpperCase();
+  }
+  let CIRCUIT = codeFromId(SEASON.id);
 
   // Team DSR = sum of each rated player's DSR (composite, gamesPlayed>0), keyed by id + name.
   function buildDsrByTeam(pstats) {
@@ -750,11 +759,14 @@
   // (the numbers made the shortlist; the league made the call). Stats are
   // the season-long leaderboard line at the time of the award. Rendered on
   // the Playoffs and Overall views once the bracket has a champion.
+  // Hand-written, and specific to the season named here — see MVP_CIRCUIT.
+  const MVP_CIRCUIT = 'I';
   const SEASON_MVPS = {
     male:   { initials:'RH', name:'Ryan Hom', team:'Smash Society', stats:[['72.0','DSR','g'],['24-6','Record',''],['+117','Diff','li'],['7/9','Clutch','t']] },
     female: { initials:'SC', name:'Shay C',   team:'ZERO ZERO TWO', stats:[['82.0','DSR','g'],['29-3','Record',''],['+200','Diff','li'],['91%','Win rate','t']] },
   };
   function mvpCardHtml() {
+    if (CIRCUIT !== MVP_CIRCUIT) return '';  // these MVPs belong to one season
     if (!bracketFinishMap()) return '';   // no champion yet → no MVPs yet
     const card = (m, cls, label) => '<div class="mvp-card ' + cls + '">'
       + '<span class="mvp-tag">' + label + '</span>'
@@ -1009,7 +1021,7 @@
   // plenty. ETag/304 + CDN caching make unchanged polls nearly free, and
   // the poller sleeps whenever the tab is hidden.
   DSLivePoll.create({
-    url: '/.netlify/functions/public-standings?season=' + SEASON.id,
+    url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
     interval: 30000,
     onUpdate(data) {
       standingsData = data;

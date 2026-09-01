@@ -35,13 +35,19 @@ export function circuitCode(raw) {
   // Already a bare code: roman numeral or a known keyword like TEST.
   if (/^(TEST|[IVX]+)$/i.test(s)) return s.toUpperCase();
 
-  // Season id form: "circuit-i", "circuit-test", "circuit-ii".
-  if (/^circuit-/i.test(s)) {
-    const tail = s.replace(/^circuit-/i, '').trim();
-    // numeric season id ("circuit-1") -> roman
+  // Season id form: "circuit-i", "circuit-test", "circuit-ii" — and the same
+  // shapes with a "season-" prefix, which real season records also use. Getting
+  // this wrong keyed reads to a blob that doesn't exist, and the page came back
+  // empty rather than erroring.
+  if (/^(circuit|season)-/i.test(s)) {
+    const tail = s.replace(/^(circuit|season)-/i, '').trim();
+    // numeric season id ("circuit-1" / "season-2") -> roman
     if (/^\d+$/.test(tail)) return intToRoman(parseInt(tail, 10));
     return tail.toUpperCase();
   }
+
+  // A bare number ("2") is a season number.
+  if (/^\d+$/.test(s)) return intToRoman(parseInt(s, 10));
 
   // Display-name form: "Season 1", "Season 2".
   const m = s.match(/season\s*(\d+)/i);

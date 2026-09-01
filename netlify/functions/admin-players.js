@@ -68,6 +68,11 @@ export default async (req) => {
         division: t.division || null,
         divisionLabel: t.divisionLabel || t.division || null,
         seasonId: t.seasonId || null,
+        // The season code the stats blobs are keyed by, plus DUPR — both used by
+        // the "add an existing player" picker so a returning player is linked to
+        // their profile instead of being created fresh.
+        circuit: t.circuit || null,
+        dupr: p.dupr || null,
         isCaptain,
         isCoCaptain: p.isCoCaptain === true,
         archived: p.archived === true,

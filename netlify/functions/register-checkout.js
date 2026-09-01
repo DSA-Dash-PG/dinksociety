@@ -137,6 +137,9 @@ export default async (req) => {
               division,
               divisionLabel: divisionLabel || division,
               circuit: circuitStored,
+              // Both keys: `circuit` is what the blobs are keyed by, `seasonId`
+              // is what the season-scoped pages filter on.
+              seasonId: seasonId || null,
               roster: (team.players || []).map((p, i) => ({
                 id: `p_${regId}_${i}`,
                 name: p.name || '',

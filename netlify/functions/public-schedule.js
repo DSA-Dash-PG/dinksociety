@@ -9,6 +9,7 @@
 //   → { weeks: [ { week, matches: [...] } ] }
 
 import { getStore } from '@netlify/blobs';
+import { circuitCode } from './lib/circuit.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
 import { buildBracketWeeks, resolveBracketDisplay } from './lib/bracket.js';
 
@@ -23,7 +24,7 @@ export default async (req) => {
 
   try {
     // Derive the circuit letter for this season (circuit-i → I, circuit-test → TEST)
-    const circuitLetter = seasonId.replace('circuit-', '').toUpperCase();
+    const circuitLetter = circuitCode(seasonId);   // any id shape → the blob key
 
     // Team emoji lookup so the schedule can show team logos.
     const { byId: emojiById, byName: emojiByName } = await loadTeamEmojis(seasonId);

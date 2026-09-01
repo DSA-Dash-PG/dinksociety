@@ -15,6 +15,7 @@
 //     h2h: { [opponentId]: { for, against } } }
 
 import { getStore } from '@netlify/blobs';
+import { circuitCode } from './lib/circuit.js';
 import { etagJson } from './lib/http-cache.js';
 import { isTestSeasonId } from './lib/test-data.js';
 
@@ -35,8 +36,10 @@ export default async (req) => {
   const seasonId = url.searchParams.get('season') || 'circuit-i';
   const division = url.searchParams.get('division') || '';
 
-  // Derive circuit letter from seasonId (circuit-i → I, circuit-ii → II, etc.)
-  const circuitLetter = seasonId.replace('circuit-', '').toUpperCase();
+  // The blobs are keyed by CODE. circuitCode() resolves it from any id shape
+  // ("circuit-i", "circuit-1", "season-1", a slug) — chopping the prefix by hand
+  // returned garbage for anything else, and the page rendered empty.
+  const circuitLetter = circuitCode(seasonId);
 
   try {
     const store = getStore('standings');

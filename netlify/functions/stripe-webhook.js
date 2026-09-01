@@ -171,6 +171,7 @@ export default async (req) => {
             division: reg.division || null,
             divisionLabel: reg.divisionLabel || null,
             circuit: reg.circuit || 'I',
+            seasonId: reg.seasonId || null,
             roster: (reg.team.players || []).map((p, i) => ({
               id: `p_${regId}_${i}`,
               name: p.name || '',

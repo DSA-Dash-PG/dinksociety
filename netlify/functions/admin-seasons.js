@@ -24,6 +24,8 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { seasonCircuitCode } from './lib/circuit.js';
+import { currentSeasonInfo } from './lib/current-season.js';
 
 const STORE_NAME = 'seasons';
 
@@ -75,7 +77,13 @@ export default async (req) => {
   // ─── GET: list all seasons ───
   if (req.method === 'GET') {
     const seasons = await getAllSeasons();
-    return json({ seasons });
+    // `circuit` is the code every schedule/standings/player-stats blob is keyed
+    // by, resolved from the id or the name. Admin actions target a season by
+    // this code, so it must not be guessed page-side from an id whose shape
+    // isn't guaranteed. `current` is the season the public site is showing.
+    const withCode = seasons.map(s => ({ ...s, circuit: seasonCircuitCode(s) }));
+    const current = currentSeasonInfo(withCode.filter(s => s.status !== 'archived' && s.isTest !== true));
+    return json({ seasons: withCode, current });
   }
 
   // ─── POST: create season ───

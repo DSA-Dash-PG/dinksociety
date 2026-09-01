@@ -295,6 +295,7 @@
     let CIRCUIT   = SEASON_ID.replace('circuit-', '').toUpperCase();
     let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
     let SEASON_NAME = null;   // filled from the season record, for the chips
+    let ALL_SEASONS = [];     // every public season, for the cross-season fallback
 
     /* ─── Load ────────────────────────────────────────────── */
     async function load() {
@@ -324,6 +325,35 @@
         for (const t of teams) {
           const found = (t.roster || []).find(p => p.name === playerName);
           if (found) { rosterPlayer = found; team = t; break; }
+        }
+      }
+
+      // Still nothing? The link may point at a season this player didn't play.
+      // A profile link should never dead-end just because the site has moved on
+      // to a new season — look through the other seasons before giving up, and
+      // show the player in whichever one they're actually on.
+      if (!rosterPlayer) {
+        const others = (ALL_SEASONS || [])
+          .map(sn => sn && sn.id)
+          .filter(id => id && id !== SEASON_ID);
+        for (const otherId of others) {
+          let list = null;
+          try {
+            const rr = await fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(otherId));
+            list = rr.ok ? await rr.json().catch(() => null) : null;
+          } catch { list = null; }
+          const otherTeams = (list && list.teams) || [];
+          const hitTeam = otherTeams.find(t => (t.roster || []).some(pp => pp.name === playerName));
+          if (!hitTeam) continue;
+          rosterPlayer = (hitTeam.roster || []).find(pp => pp.name === playerName);
+          team = hitTeam;
+          // Retarget the whole page at the season we found them in.
+          const sn = (ALL_SEASONS || []).find(x => x && x.id === otherId) || {};
+          SEASON_ID = otherId;
+          CIRCUIT = String(sn.circuit || '').toUpperCase() || CIRCUIT;
+          SEASON_NAME = sn.name || sn.label || SEASON_NAME;
+          LINK_SUFFIX = '&season=' + encodeURIComponent(otherId);
+          break;
         }
       }
 
@@ -1104,7 +1134,7 @@
     }
 
     (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
-      if (S) { SEASON_ID = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; }
+      if (S) { SEASON_ID = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; ALL_SEASONS = S.all || []; }
     }).catch(() => {}).then(() =>
     load()).catch(e => { console.error('player load failed', e); const pr = document.getElementById('page-root'); if (pr) pr.innerHTML = '<div class="pp-loading">Couldn’t load this player. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>'; });
   })();

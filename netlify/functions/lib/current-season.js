@@ -19,6 +19,13 @@ import { seasonCircuitCode } from './circuit.js';
 /** How far ahead of its start date a season becomes the live one. */
 export const FLIP_LEAD_DAYS = 7;
 
+/**
+ * Slack added after the last scheduled week before a season counts as over.
+ * Weeks skip holidays and playoffs run past the nominal count, so a season
+ * whose 8 weeks "ended" on paper is often still playing.
+ */
+export const TAIL_GRACE_DAYS = 21;
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Midnight local-ish parse of a YYYY-MM-DD start date. Null when unusable. */
@@ -36,13 +43,40 @@ export function flipMs(season) {
 }
 
 /**
+ * The moment a season stops being the live one. Explicit `endDate` wins;
+ * otherwise it is start + weeks + grace. Null when there is nothing to go on,
+ * which reads as "never ends" so a dateless season is never retired by accident.
+ */
+export function endMs(season) {
+  const explicit = String(season?.endDate || '').slice(0, 10);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(explicit)) {
+    const t = new Date(explicit + 'T23:59:59Z').getTime();
+    if (!Number.isNaN(t)) return t;
+  }
+  const s = startMs(season);
+  if (s == null) return null;
+  const weeks = Number(season?.weeks);
+  if (!(weeks > 0)) return null;
+  return s + (weeks * 7 + TAIL_GRACE_DAYS) * DAY_MS;
+}
+
+/** Has this season finished playing? (Unknown end date → no.) */
+export function hasEnded(season, now = Date.now()) {
+  const e = endMs(season);
+  return e != null && e <= now;
+}
+
+/**
  * Pick the season the site should show by default.
  *
- * Candidates are everything public (the caller has already dropped test and
- * archived seasons). Among those that have flipped, the LATEST start wins — so
- * a new season takes over and an old one steps down on the same date. Before
- * any has flipped, the soonest upcoming one leads; with no dates at all, the
- * list order stands.
+ * A season takes over ONE WEEK before its start date and holds the site until
+ * the next one flips. Deliberately NOT "the season currently being played":
+ * between a finished season and the next flip the site would go bare — no
+ * standings, no schedule, no leaderboard — so the season that just played stays
+ * up as the last thing that happened, and hands over a week before opening
+ * night. The upcoming season is always reachable from the season switcher.
+ *
+ * Before any season has flipped, the soonest one on the calendar leads.
  *
  * @param {object[]} seasons
  * @param {number} now epoch ms

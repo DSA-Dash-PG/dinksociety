@@ -76,6 +76,7 @@ export async function run(body, admin) {
         division: reg.division || null,
         divisionLabel: reg.divisionLabel || null,
         circuit: reg.circuit || 'I',
+        seasonId: reg.seasonId || null,
         roster: (reg.team.players || []).map((p, i) => ({
           id: `p_${id}_${i}`,
           name: p.name || '',

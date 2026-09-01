@@ -10,7 +10,7 @@
 //
 // Usage:
 //   const poller = DSLivePoll.create({
-//     url: '/.netlify/functions/public-standings?season=circuit-i',
+//     url: '/.netlify/functions/public-standings?season=circuit-i',  // or a function → url
 //     interval: 30000,                    // ms, or a function → ms (0/null = idle)
 //     fetchOpts: { credentials: 'include' },
 //     onUpdate(data) { ... },             // only called when the payload CHANGED
@@ -45,7 +45,11 @@
       try {
         const headers = Object.assign({}, fetchOpts.headers);
         if (etag) headers['If-None-Match'] = etag;
-        const res = await fetch(url, Object.assign({}, fetchOpts, { headers }));
+        // `url` may be a function so callers can point the poller at a value
+        // that settles after create() runs (e.g. the resolved season id).
+        const target = typeof url === 'function' ? url() : url;
+        if (!target) return;
+        const res = await fetch(target, Object.assign({}, fetchOpts, { headers }));
         if (res.status === 304) return;        // nothing changed — cheapest outcome
         if (!res.ok) throw new Error('poll failed: ' + res.status);
         etag = res.headers.get('ETag') || etag;

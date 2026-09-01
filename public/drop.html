@@ -487,6 +487,10 @@
     // Band 1b — Season MVPs. Only on the final week's Drop: the season is
     // done, so the year's two crowns ride the article right after POTW.
     // Names/stats mirror the standings page's SEASON_MVPS — edit both together.
+    // Hand-written, and specific to the season named here — see MVP_CIRCUIT.
+    var MVP_CIRCUIT = 'I';
+    // The season this page is showing; set once the season resolves below.
+    var DROP_CIRCUIT = 'I';
     var SEASON_MVPS = {
       male:   { name:'Ryan Hom', teamName:'Smash Society', stats:[['Record','24-6'],['DSR','72.0'],['Diff','+117'],['Clutch','7/9']] },
       female: { name:'Shay C',   teamName:'ZERO ZERO TWO', stats:[['Record','29-3'],['DSR','82.0'],['Diff','+200'],['Win %','91%']] },
@@ -504,6 +508,7 @@
         + '</div></div>';
     }
     function mvpBandHtml(week){
+      if (DROP_CIRCUIT !== MVP_CIRCUIT) return '';  // these MVPs belong to one season
       if(week !== TOTAL_WEEKS) return '';
       return '<section class="band potwband mvpband"><div class="wrap">'
         + bandHead('Season MVPs','Crowned at season\'s end — one male, one female')
@@ -759,6 +764,7 @@
     (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
       var code = (S && S.circuit) || 'I';
       var sid  = (S && S.id) || 'circuit-i';
+      DROP_CIRCUIT = code;
       var c    = '&circuit=' + encodeURIComponent(code);
       var api = reqPreview
         ? ('/.netlify/functions/admin-drop?week=' + encodeURIComponent(reqWeek||'') + c)

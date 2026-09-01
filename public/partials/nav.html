@@ -222,17 +222,9 @@
           });
         }
 
-        // Looking at a finished season → say so, and offer one tap back.
-        if (S.isPast) {
-          var bar = document.createElement('div');
-          bar.className = 'ds-pastbar';
-          var backName = (S.current && (S.current.name || S.current.label)) || 'the current season';
-          bar.innerHTML = '<span class="ds-pastbar__tag">Final</span>' +
-            '<span>You\'re viewing ' + (S.name || 'a past season') + '</span>' +
-            '<a href="' + location.pathname + '">Back to ' + backName + ' &rarr;</a>';
-          document.body.insertBefore(bar, document.body.firstChild);
-          document.body.classList.add('ds-has-pastbar');
-        }
+        // No banner. The season pill under the wordmark already says which
+        // season you are looking at, and a "back to Season 1" prompt was only
+        // ever confusing — the switcher is one tap away in the same spot.
 
         var wrap = document.getElementById('ds-season'), btn = document.getElementById('ds-season-btn');
         var menu = document.getElementById('ds-season-menu');
@@ -250,11 +242,13 @@
             document.querySelectorAll('[data-start-month-year]').forEach(function (el) { el.textContent = my; });
           }
         }
-        if (S.isPast) {
+        // A season that is being played wears no badge — that IS the badge.
+        // Anything else says where it stands: Registering / Upcoming / Final.
+        if (S.tag) {
           wrap.classList.add('ds-season--past');
           var tag = document.createElement('span');
           tag.className = 'ds-season__tag';
-          tag.textContent = 'Final';
+          tag.textContent = S.tag;
           btn.appendChild(tag);
         }
 
@@ -262,6 +256,8 @@
         var seasons = S.all || [];
         if (seasons.length < 2) { btn.disabled = true; return; }
 
+        // Listed in season order (Season 1 first). Each carries the tag season.js
+        // worked out from its own dates — "Current" only while it is being played.
         var curCode = S.current ? String(S.current.circuit || '').toUpperCase() : null;
         menu.innerHTML = seasons.map(function (s) {
           var code = String(s.circuit || '').toUpperCase();
@@ -270,7 +266,7 @@
           var href = isCur ? location.pathname : location.pathname + '?season=' + encodeURIComponent(s.id);
           return '<a class="ds-season__opt' + (here ? ' is-active' : '') + '" role="menuitem" href="' + href + '">' +
             '<span>' + (s.name || s.label || code) + '</span>' +
-            '<small>' + (isCur ? 'Current' : 'Final') + '</small></a>';
+            '<small>' + (s.tag || 'Current') + '</small></a>';
         }).join('');
 
         btn.addEventListener('click', function (e) {
@@ -338,8 +334,8 @@
     });
 
     // ── Populate the Teams dropdown from public-teams ──
-    var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';  // refined by the season pill
-    var SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
+    var SEASON_ID = new URLSearchParams(location.search).get('season') || '';
+    var SUFFIX = '';
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
     function slugify(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
     function logoHtml(t) {
@@ -350,7 +346,15 @@
       return '<span class="ds-mega-logo" style="background:radial-gradient(120% 120% at 50% 25%, ' + esc(color) + '33 0%, var(--color-surface-2) 75%)">' + esc(t.emoji || '🏓') + '</span>';
     }
 
-    fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID))
+    // The Teams menu must list the season actually being viewed, not a hardcoded
+    // fallback — resolve it first (the pill's promise), then fetch.
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null))
+      .catch(function () { return null; })
+      .then(function (S) {
+        SEASON_ID = (S && S.id) || SEASON_ID || 'circuit-i';
+        SUFFIX = S ? S.suffix : (SEASON_ID ? '&season=' + encodeURIComponent(SEASON_ID) : '');
+        return fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID));
+      })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         var teams = (data && data.teams) || [];

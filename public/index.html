@@ -394,6 +394,7 @@
     // DSR, standings AND the Drop teaser all silently stay hidden.
     var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
     var SEASON_CODE = 'I';   // both refined below, before anything is fetched
+    var SEASON_NAME = null, SEASON_START = null, SEASON_TAG = '';
     var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
     function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
     function teamLink(name, id, cls){
@@ -410,6 +411,21 @@
 
     // Shared title builder so the finale week's headline also announces the
     // champion — used by both the initial-load render and the week-pager.
+    // Before a ball is hit there is no week to recap. The static headline said
+    // "WEEK ONE IS IN THE BOOKS", which is a lie on opening week of a new season.
+    function preseasonTitleHtml(){
+      var nm = String(SEASON_NAME || 'The season').toUpperCase();
+      // A season that has already finished never says "starts" or "underway".
+      if (SEASON_TAG === 'Final') return nm + ' IS IN THE <span class="lime">BOOKS.</span>';
+      if (!SEASON_START) return nm + ' IS <span class="lime">LOADING UP.</span>';
+      var d = new Date(SEASON_START + 'T12:00:00');
+      if (isNaN(d)) return nm + ' IS <span class="lime">LOADING UP.</span>';
+      // Started, but nothing final yet — week one is being played right now.
+      if (d <= new Date()) return nm + ' IS <span class="lime">UNDERWAY.</span>';
+      var when = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toUpperCase();
+      return nm + ' STARTS <span class="lime">' + when + '.</span>';
+    }
+
     function recapTitleHtml(w){
       var WW=['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'];
       var html='WEEK '+(WW[w]||w)+' IS IN THE <span class="lime">BOOKS.</span>';
@@ -510,6 +526,8 @@
        One male, one female, picked by the league at season's end (stats made
        the shortlist). Shown only on the final week's panel; every earlier
        week keeps its POTW pair. Edit names/stats here. */
+    // Hand-written, and specific to the season named here — see MVP_CIRCUIT.
+    var MVP_CIRCUIT = 'I';
     var SEASON_MVPS = {
       male:   { name:'Ryan Hom', teamName:'Smash Society', stats:[['Record','24-6'],['DSR','72.0'],['Diff','+117'],['Clutch','7/9']] },
       female: { name:'Shay C',   teamName:'ZERO ZERO TWO', stats:[['Record','29-3'],['DSR','82.0'],['Diff','+200'],['Win rate','91%']] },
@@ -535,6 +553,7 @@
         +'</div></div>';
     }
     function mvpPanelHome(on){
+      if (SEASON_CODE !== MVP_CIRCUIT) return '';  // these MVPs belong to one season
       return '<div class="perfpanel'+(on?' on':'')+'" data-tab="potw">'
         + mvpCardHome(SEASON_MVPS.male,false)
         + mvpCardHome(SEASON_MVPS.female,true)
@@ -757,7 +776,7 @@
        Every call is season-scoped. They used to be bare, so the home page could
        show one season's schedule beside another's standings and leaderboard. */
     (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
-      if (S) { SEASON_ID = S.id; SEASON_CODE = S.circuit; LINK_SUFFIX = S.suffix; }
+      if (S) { SEASON_ID = S.id; SEASON_CODE = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; SEASON_START = S.startDate; SEASON_TAG = S.tag || ''; }
     }).catch(function(){}).then(function(){
     return Promise.all([
       fetch('/.netlify/functions/public-leaderboard?circuit='+encodeURIComponent(SEASON_CODE)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
@@ -793,6 +812,12 @@
       RECAP_PERF=perf; RECAP_MAXWEEK=latest?latest.week:0;
       RECAP_PLAYERS=(pl&&pl.players)?pl.players:null;
       renderPerformers(latest);
+      // Nothing finalized yet → say where the season actually is.
+      if(!RECAP_MAXWEEK){
+        var t0=document.getElementById('rc-title');
+        if(t0) t0.innerHTML=preseasonTitleHtml();
+        var wn=document.getElementById('rc-weeknav'); if(wn) wn.innerHTML='';
+      }
 
       // Standings — first division in the blob
       if(st&&st.divisions){

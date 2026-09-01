@@ -9,6 +9,7 @@
 // Player emails are stripped for privacy.
 
 import { getStore } from '@netlify/blobs';
+import { circuitCode } from './lib/circuit.js';
 import { publicProfile } from './lib/profile.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
 
@@ -19,6 +20,7 @@ export default async (req) => {
 
   const url = new URL(req.url);
   const seasonId = url.searchParams.get('season') || 'circuit-i';
+  const wantCode = circuitCode(seasonId);
   const division = url.searchParams.get('division') || '';
 
   try {
@@ -33,10 +35,13 @@ export default async (req) => {
         const team = JSON.parse(raw);
         // Hide test/demo teams unless this request explicitly targets that season.
         if (shouldHideTestRecord(team, seasonId)) continue;
-        // Filter by season if present
-        if (team.seasonId && team.seasonId !== seasonId) continue;
-        // Don't leak untagged (legacy) teams into non-default seasons like the test season.
-        if (!team.seasonId && seasonId !== 'circuit-i') continue;
+        // Which season is this team in? Registration writes `circuit` on the team
+        // but no `seasonId`, so matching on seasonId alone hid every registered
+        // team from any season but the first. Match on the CODE, which both
+        // carry, and fall back to seasonId when a team has one.
+        const teamCode = circuitCode(team.circuit || team.seasonId);
+        if (team.seasonId && team.seasonId !== seasonId && teamCode !== wantCode) continue;
+        if (!team.seasonId && teamCode !== wantCode) continue;
         // Filter by division if requested
         if (division && team.division !== division) continue;
 

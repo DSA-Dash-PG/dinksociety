@@ -324,7 +324,11 @@
   const $ = id => document.getElementById(id);
 
   // ── Profile links (carry the current season/circuit forward) ─────
-  function _seasonSuffix(){ return state.circuit === 'I' ? '' : '&season=circuit-' + state.circuit.toLowerCase(); }
+  // Which code is "now" — settled by dsSeason() below; 'I' only until then.
+  let CURRENT_CODE = 'I';
+  // Was a season pinned in the URL? Either spelling counts.
+  const PINNED_IN_URL = (function(){ const p = new URLSearchParams(location.search); return p.has('circuit') || p.has('season'); })();
+  function _seasonSuffix(){ return state.circuit === CURRENT_CODE ? '' : '&season=' + encodeURIComponent(seasonIdOf(state.circuit)); }
   function _slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'x'; }
   function teamLinkHtml(name, id){ if(!name) return ''; const ref=id||_slug(name); return '<a class="ds-link" href="/team?id='+encodeURIComponent(ref)+_seasonSuffix()+'">'+esc(name)+'</a>'; }
   // Display shows "First L."; the href keeps the FULL name so profile links
@@ -335,6 +339,9 @@
   function readUrl() {
     const p = new URLSearchParams(window.location.search);
     if (p.get('circuit'))  state.circuit  = p.get('circuit');
+    // Every other page links with ?season=<id>; accept it here too, otherwise
+    // the leaderboard sits on Season 1 while the rest of the site is on 2.
+    else if (p.get('season')) state.circuit = codeFromSeasonId(p.get('season'));
     if (p.get('division')) state.division = p.get('division');
     const v = p.get('view');
     // Legacy redirects: society/standings → rankings, analytics → the NVZ.
@@ -348,7 +355,7 @@
   }
   function writeUrl() {
     const p = new URLSearchParams();
-    if (state.circuit !== 'I')        p.set('circuit', state.circuit);
+    if (state.circuit !== CURRENT_CODE) p.set('circuit', state.circuit);
     if (state.division)               p.set('division', state.division);
     if (state.section !== 'rankings') p.set('view', state.section);
     const q = p.toString();
@@ -1096,6 +1103,14 @@
     writeUrl(); renderAll();
   });
 
+  // 'season-2' / 'circuit-ii' / '2' → 'II'. Season ids come in several shapes.
+  function codeFromSeasonId(id) {
+    const t = String(id || '').trim().replace(/^(circuit|season)-/i, '');
+    const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    if (/^\d+$/.test(t)) return ROMAN[parseInt(t, 10)] || t;
+    return t.toUpperCase();
+  }
+
   // The season id that goes with a code — the standings API takes the id form.
   function seasonIdOf(code) {
     const c = String(code || 'I').toUpperCase();
@@ -1108,7 +1123,13 @@
   // Settle the season first: with no ?circuit= in the URL the page follows the
   // CURRENT season, which flips a week before its start date.
   (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
-    if (S) { SEASONS_LOADED = S.all || []; if (!S.explicit) { state.circuit = S.circuit; $('circuit-select').value = S.circuit; } }
+    if (S) {
+      SEASONS_LOADED = S.all || [];
+      CURRENT_CODE = (S.current && String(S.current.circuit || '').toUpperCase()) || S.circuit || 'I';
+      // Follow the resolved season unless the URL pinned one.
+      if (!PINNED_IN_URL) { state.circuit = S.circuit; }
+      $('circuit-select').value = state.circuit;
+    }
   }).catch(() => {}).then(() => {
     loadSeasonOptions();
     return Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
@@ -1167,8 +1188,9 @@
         const prev = byCode.get(code);
         if (!prev || (prev.label === 'Season' && label !== 'Season')) byCode.set(code, { code, label });
       }
-      // Newest season first; anything unrecognised sinks to the bottom.
-      const opts = [...byCode.values()].sort((a, b) => (ROMAN.indexOf(b.code) - ROMAN.indexOf(a.code)));
+      // Season order — Season 1 at the top; anything unrecognised sinks below.
+      const rank = c => { const i = ROMAN.indexOf(c); return i < 0 ? 999 : i; };
+      const opts = [...byCode.values()].sort((a, b) => rank(a.code) - rank(b.code));
       // Never lose the season the URL asked for (e.g. an admin ?circuit=TEST link).
       if (!opts.some(o => o.code === state.circuit)) {
         opts.push({ code: state.circuit, label: state.circuit === 'TEST' ? '🧪 TEST Season' : 'Season ' + state.circuit });

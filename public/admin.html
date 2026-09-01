@@ -28,6 +28,16 @@
     .sb__brand { padding: 20px 18px; border-bottom: 1px solid var(--color-border); }
     .sb__logo { font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-text); }
     .sb__tag { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-teal); margin-top: 4px; font-weight: 600; }
+    .sb__season { display: block; margin-top: 12px; }
+    .sb__season > span { display: block; font-size: 8.5px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; margin-bottom: 5px; }
+    .sb__season select {
+      width: 100%; padding: 7px 9px; font-size: 12px; font-weight: 700; font-family: inherit;
+      color: var(--color-text); background: var(--color-surface-2);
+      border: 1px solid var(--color-border-strong); border-radius: var(--radius-sm); cursor: pointer;
+    }
+    .sb__season select:focus { outline: none; border-color: var(--color-lime); }
+    /* Working on anything but the live season — make that impossible to miss. */
+    .sb__season.is-off select { border-color: var(--color-gold); color: var(--color-gold); }
     .sb__nav { flex: 1; padding: 12px 8px; }
     .sb__sec { font-size: 9px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-text-faint); padding: 18px 12px 6px; font-weight: 700; }
     .sb__link {
@@ -200,6 +210,23 @@
     .af input, .af select, .af textarea { width: 100%; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-sm); font-size: 12px; font-family: inherit; background: var(--color-surface-2); color: var(--color-text); box-sizing: border-box; }
     .af input:focus, .af select:focus, .af textarea:focus { outline: none; border-color: var(--color-lime); }
     .arow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    /* "Add an existing player" typeahead */
+    .ppick { position: relative; }
+    .ppick__list { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 40; max-height: 232px; overflow-y: auto;
+      background: var(--color-surface-2); border: 1px solid var(--color-border-2, var(--color-border)); border-radius: var(--radius-sm);
+      box-shadow: 0 14px 34px rgba(0,0,0,.55); display: none; }
+    .ppick__list.is-open { display: block; }
+    .ppick__opt { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 9px 11px; background: none; border: 0;
+      border-bottom: 1px solid rgba(255,255,255,.05); cursor: pointer; font: inherit; color: var(--color-text); }
+    .ppick__opt:last-child { border-bottom: 0; }
+    .ppick__opt:hover, .ppick__opt.is-sel { background: var(--color-surface-3, rgba(255,255,255,.06)); }
+    .ppick__nm { font-size: 12.5px; font-weight: 700; }
+    .ppick__meta { font-size: 10.5px; color: var(--color-text-faint); margin-top: 1px; }
+    .ppick__new { font-size: 11px; color: var(--color-text-faint); padding: 9px 11px; }
+    .ppick__linked { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 7px 10px;
+      border: 1px solid rgba(23,215,176,.35); background: rgba(23,215,176,.1); border-radius: var(--radius-sm); font-size: 11.5px; }
+    .ppick__linked b { color: var(--color-teal); }
+    .ppick__unlink { font-size: 10.5px; color: var(--color-text-faint); text-decoration: underline; cursor: pointer; background: none; border: 0; }
 
     /* Seasons tab */
     .se-lbl { font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 600; margin-bottom: 4px; }
@@ -637,7 +664,18 @@
 
     <div class="admin-shell">
       <aside class="sb" id="sb">
-        <div class="sb__brand"><div class="sb__logo">The Dink Society</div><div class="sb__tag">Admin Portal</div></div>
+        <div class="sb__brand">
+          <div class="sb__logo">The Dink Society</div>
+          <div class="sb__tag">Admin Portal</div>
+          <!-- Which season every action on this screen writes to. Schedules,
+               standings rebuilds, match times and the Drop are all keyed by
+               season, so this has to be an explicit choice rather than a
+               hardcoded "I". Remembered per browser. -->
+          <label class="sb__season" id="sb-season-wrap" style="display:none;">
+            <span>Working season</span>
+            <select id="sb-season"></select>
+          </label>
+        </div>
         <!-- View switcher (phones) — jump back to the player / captain portals.
              Admin is the current view. Sessions are independent cookies, so these
              land you in that portal if you're signed in there, else its login. -->
@@ -863,6 +901,8 @@
 
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
             <input id="teams-search" type="search" placeholder="Search team or player…" style="flex:1;min-width:170px;max-width:280px;background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius-sm);padding:8px 12px;font-size:12px;font-family:inherit;">
+            <label style="font-size:12px;color:var(--color-text-faint);">Season</label>
+            <select id="teams-season-filter" style="max-width:190px;"><option value="">All seasons</option></select>
             <label style="font-size:12px;color:var(--color-text-faint);">Division</label>
             <select id="teams-div-filter" style="max-width:220px;"><option value="">All divisions</option></select>
             <label style="font-size:12px;color:var(--color-text-faint);">Sort</label>
@@ -1734,6 +1774,22 @@
     delete btn.dataset.busyHtml;
   }
 
+  // ─── Working season ────────────────────────────────────────
+  // Schedules, standings, match times, gameday and the Drop are all keyed by a
+  // season CODE. Every admin action used to send a literal 'I', so with more
+  // than one season a schedule generated from the Seasons tab still landed in
+  // Season 1's blobs. Everything now goes through adminCircuit().
+  //
+  // Defaults to the season the public site is showing (it flips a week before
+  // its start date), and the choice is remembered per browser.
+  const SEASON_LS_KEY = 'ds-admin-season';
+  let WORKING = null;          // { id, circuit, name, isCurrent }
+  let CURRENT_SEASON = null;   // what the public site is on
+
+  function adminCircuit() { return (WORKING && WORKING.circuit) || 'I'; }
+  function adminSeasonId() { return (WORKING && WORKING.id) || 'circuit-' + adminCircuit().toLowerCase(); }
+  function adminSeasonName() { return (WORKING && WORKING.name) || 'Season'; }
+
   // ─── State ─────────────────────────────────────────────────
   let SETTINGS = {};
   let DIVISIONS = []; // { id, name } from seasons
@@ -1769,6 +1825,8 @@
       if (navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
       else fetch(url, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
     } catch {}
+    // Seasons first: the working season decides what every other call fetches.
+    try { await loadSeasonsData(); } catch (e) { console.warn('Seasons unavailable:', e); }
     await Promise.all([loadSettings(), loadDivisions()]);
     populateDivisionDropdowns();
     populateWeekDropdowns();
@@ -1829,8 +1887,7 @@
   function applySettings() {
     const dt = SETTINGS.startDate ? new Date(SETTINGS.startDate + 'T00:00:00') : null;
     const monthStr = dt ? dt.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '';
-    const label = $id('ov-circuit-label');
-    if (label) label.textContent = SETTINGS.circuitName + (monthStr ? ' · ' + monthStr : '');
+    renderSeasonLabel();
 
     const f = (id, val) => { const el = $id(id); if (el) el.value = val ?? ''; };
     f('set-circuit-name', SETTINGS.circuitName);
@@ -2120,7 +2177,7 @@
   $id('waiver-refresh-btn').addEventListener('click', loadWaiverCompliance);
   $id('waiver-export-btn').addEventListener('click', () => {
     const wid = $id('waiver-pick')?.value || '';
-    window.location.href = '/.netlify/functions/admin-waivers?season=I&format=csv&waiverId=' + encodeURIComponent(wid);
+    window.location.href = '/.netlify/functions/admin-waivers?season=' + encodeURIComponent(adminCircuit()) + '&format=csv&waiverId=' + encodeURIComponent(wid);
   });
 
   async function loadWaiverCompliance() {
@@ -2128,7 +2185,7 @@
     const wid = $id('waiver-pick')?.value || '';
     box.innerHTML = '<div class="loading">Loading signatures…</div>';
     try {
-      const d = await apiJSON('/.netlify/functions/admin-waivers?season=I&waiverId=' + encodeURIComponent(wid));
+      const d = await apiJSON('/.netlify/functions/admin-waivers?season=' + encodeURIComponent(adminCircuit()) + '&waiverId=' + encodeURIComponent(wid));
       $id('waiver-count').textContent = `${d.counts.signed}/${d.counts.total} signed · ${d.waiver?.title || ''}`;
       if (!d.players.length) { box.innerHTML = '<div class="empty">No players on rosters yet.</div>'; return; }
       box.innerHTML = '<table class="at"><thead><tr><th>Player</th><th>Team</th><th>Status</th></tr></thead><tbody>' +
@@ -2204,6 +2261,90 @@
   async function loadSeasonsData() {
     const data = await apiJSON(SEASONS_API);
     SEASONS = data.seasons || [];
+    CURRENT_SEASON = data.current || CURRENT_SEASON;
+    resolveWorkingSeason();
+    renderSeasonPicker();
+  }
+
+  // Settle which season admin actions target: the remembered one if it still
+  // exists, else whatever the public site is currently showing.
+  function resolveWorkingSeason() {
+    const pickable = SEASONS.filter(s => s && s.id);
+    if (!pickable.length) return;
+    let chosen = null;
+    try {
+      const saved = localStorage.getItem(SEASON_LS_KEY);
+      if (saved) chosen = pickable.find(s => s.id === saved) || null;
+    } catch (e) { /* private mode — fall through to the default */ }
+    if (!chosen && CURRENT_SEASON) chosen = pickable.find(s => s.id === CURRENT_SEASON.id) || null;
+    if (!chosen) chosen = pickable.find(s => s.status !== 'archived' && s.isTest !== true) || pickable[0];
+    setWorkingSeason(chosen, { silent: true });
+  }
+
+  function setWorkingSeason(season, opts = {}) {
+    if (!season) return;
+    WORKING = {
+      id: season.id,
+      circuit: String(season.circuit || 'I').toUpperCase(),
+      name: season.name || season.label || season.id,
+      isCurrent: !!(CURRENT_SEASON && CURRENT_SEASON.id === season.id),
+    };
+    try { localStorage.setItem(SEASON_LS_KEY, season.id); } catch (e) {}
+    renderSeasonLabel();
+    if (!opts.silent) {
+      // Divisions belong to a season, so they move with it — then re-render
+      // whatever tab is open so nothing on screen still shows the old season.
+      loadDivisions()
+        .then(() => { try { populateDivisionDropdowns(); } catch (e) {} })
+        .catch(() => {})
+        .then(() => { const t = currentTab(); if (t) activateTab(t); });
+    }
+  }
+
+  // Names the season being worked on, with its OWN start month — not the
+  // global settings string, which belongs to whatever season is configured
+  // league-wide and goes stale the moment you switch.
+  function renderSeasonLabel() {
+    const label = $id('ov-circuit-label');
+    if (!label) return;
+    const season = SEASONS.find(x => WORKING && x.id === WORKING.id) || null;
+    const start = (season && season.startDate) || SETTINGS.startDate;
+    const dt = start ? new Date(start + 'T00:00:00') : null;
+    const monthStr = dt && !isNaN(dt) ? dt.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '';
+    const nm = (WORKING && WORKING.name) || SETTINGS.circuitName || 'Season';
+    const off = WORKING && !WORKING.isCurrent;
+    label.textContent = nm + (monthStr ? ' · ' + monthStr : '') + (off ? ' · not the live season' : '');
+    label.style.color = off ? 'var(--color-gold)' : '';
+  }
+
+  function currentTab() {
+    const on = document.querySelector('.sb__link.is-active');
+    return on ? on.dataset.tab : null;
+  }
+
+  function renderSeasonPicker() {
+    const wrap = $id('sb-season-wrap'), sel = $id('sb-season');
+    if (!wrap || !sel || !WORKING) return;
+    const list = SEASONS.filter(s => s && s.id);
+    sel.innerHTML = list.map(s => {
+      const isCur = CURRENT_SEASON && CURRENT_SEASON.id === s.id;
+      const tag = isCur ? ' · live' : s.status === 'archived' ? ' · archived' : s.isTest ? ' · test' : '';
+      return '<option value="' + h(s.id) + '"' + (s.id === WORKING.id ? ' selected' : '') + '>' +
+        h(s.name || s.label || s.id) + tag + '</option>';
+    }).join('');
+    sel.value = WORKING.id;
+    wrap.style.display = list.length ? 'block' : 'none';
+    // Amber when you're operating on something other than the live season.
+    wrap.classList.toggle('is-off', !WORKING.isCurrent);
+    if (!sel.dataset.wired) {
+      sel.dataset.wired = '1';
+      sel.addEventListener('change', () => {
+        const next = SEASONS.find(s => s.id === sel.value);
+        if (!next) return;
+        setWorkingSeason(next);
+        renderSeasonPicker();
+      });
+    }
   }
 
   async function loadAndRenderSeasons() {
@@ -2632,9 +2773,14 @@
     try {
       const data = await apiJSON('/.netlify/functions/admin-seasons');
       const seasons = data.seasons || [];
+      if (!SEASONS.length) { SEASONS = seasons; CURRENT_SEASON = data.current || CURRENT_SEASON; resolveWorkingSeason(); renderSeasonPicker(); }
       DIVISIONS = [];
-      for (const s of seasons) {
-        if (s.status === 'archived') continue;
+      // The working season's own divisions. Falling back to every non-archived
+      // season only when it has none configured yet, so a fresh season still
+      // gets usable dropdowns.
+      const mine = seasons.find(x => WORKING && x.id === WORKING.id);
+      const source = (mine && (mine.divisions || []).length) ? [mine] : seasons.filter(x => x.status !== 'archived');
+      for (const s of source) {
         for (const d of (s.divisions || [])) {
           if (!DIVISIONS.find(x => x.id === d.id)) {
             DIVISIONS.push({ id: d.id, name: d.name || d.id });
@@ -3245,7 +3391,7 @@
     try {
       const r = await apiJSON('/.netlify/functions/admin-nudge', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, circuit: 'I' }),
+        body: JSON.stringify({ type, circuit: adminCircuit() }),
       });
       const emailed = (r.sent || []).reduce((n, x) => n + (x.emailed || 0), 0);
       const skipped = (r.skipped || []).length;
@@ -3289,7 +3435,7 @@
         const status = $id('ov-qa-status');
         b.disabled = true; if (status) status.textContent = 'Rebuilding standings…';
         try {
-          await apiJSON('/.netlify/functions/admin-rebuild-standings?circuit=I', { method: 'POST' });
+          await apiJSON('/.netlify/functions/admin-rebuild-standings?circuit=' + encodeURIComponent(adminCircuit()), { method: 'POST' });
           if (status) status.textContent = 'Standings rebuilt ✓';
           renderOV();
         } catch (e) {
@@ -3319,7 +3465,7 @@
           const r = await apiJSON('/.netlify/functions/admin-backfill-times', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ circuit: 'I', times, overwrite: false }),
+            body: JSON.stringify({ circuit: adminCircuit(), times, overwrite: false }),
           });
           if (status) status.textContent = `Match times set ✓ (${r.matchesUpdated} updated, ${r.matchesSkipped} already had times)`;
         } catch (e) {
@@ -3334,7 +3480,7 @@
   async function renderOV() {
     const [ovRes, gdRes] = await Promise.allSettled([
       apiJSON('/.netlify/functions/admin-overview'),
-      apiJSON('/.netlify/functions/admin-gameday?circuit=I'),
+      apiJSON('/.netlify/functions/admin-gameday?circuit=' + encodeURIComponent(adminCircuit())),
     ]);
     if (ovRes.status === 'rejected') {
       $id('ov-stats').innerHTML = '<div class="empty">Failed to load overview: ' + h(ovRes.reason && ovRes.reason.message) + '</div>';
@@ -4153,6 +4299,23 @@
   // ═══════════════════════════════════════════════════════════
   // TEAMS — live from admin-teams endpoint + slide-out panel
   // ═══════════════════════════════════════════════════════════
+  // Which season's teams the Teams tab is showing ('' = all).
+  let TEAMS_SEASON = '';
+  // A team's season code, from whichever field it carries.
+  function teamSeasonCode(t) {
+    const raw = String((t && (t.circuit || t.seasonId)) || '').trim().replace(/^(circuit|season)-/i, '');
+    if (!raw) return '';
+    const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    if (/^\d+$/.test(raw)) return ROMAN[parseInt(raw, 10)] || raw;
+    return raw.toUpperCase();
+  }
+  function seasonNameForCode(code) {
+    const hit = (SEASONS || []).find(s => String(s.circuit || '').toUpperCase() === code);
+    if (hit) return hit.name || hit.label || ('Season ' + code);
+    const ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    const n = ROMAN.indexOf(code);
+    return n >= 0 ? 'Season ' + (n + 1) : code;
+  }
   async function renderTeams() {
     const grid = $id('teams-grid');
     grid.innerHTML = '<div class="loading" style="grid-column:1/-1;">Loading teams…</div>';
@@ -4332,6 +4495,32 @@
         divs.map(d => '<option value="' + h(d.id) + '"' + (d.id === current ? ' selected' : '') + '>' + h(d.label) + '</option>').join('');
       sel.onchange = showTeamCards;
     }
+    // Season filter. admin-teams returns every season's teams in one list, so
+    // two seasons of "Big Dink Energy" sat side by side with no way to tell them
+    // apart. Defaults to the season the sidebar is working in.
+    const ssel = $id('teams-season-filter');
+    if (ssel) {
+      const codes = new Map();
+      allTeams.forEach(t => {
+        const c = teamSeasonCode(t);
+        if (!c) return;
+        if (!codes.has(c)) codes.set(c, seasonNameForCode(c));
+      });
+      const order = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+      const list = [...codes.entries()].sort((a, b) => {
+        const ia = order.indexOf(a[0]), ib = order.indexOf(b[0]);
+        return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+      });
+      // First paint only: land on the working season so the tab matches the sidebar.
+      if (!ssel.dataset.ready) {
+        ssel.dataset.ready = '1';
+        TEAMS_SEASON = codes.has(adminCircuit()) ? adminCircuit() : '';
+      }
+      ssel.innerHTML = '<option value="">All seasons</option>' +
+        list.map(([c, label]) => '<option value="' + h(c) + '"' + (c === TEAMS_SEASON ? ' selected' : '') + '>' + h(label) + '</option>').join('');
+      ssel.onchange = () => { TEAMS_SEASON = ssel.value; showTeamCards(); };
+    }
+
     // Search + sort controls (bound once via direct assignment — safe across re-renders)
     const searchEl = $id('teams-search'), sortEl = $id('teams-sort');
     if (searchEl) searchEl.oninput = showTeamCards;
@@ -4341,7 +4530,9 @@
     const q = (searchEl ? searchEl.value : '').trim().toLowerCase();
     const sortBy = sortEl ? sortEl.value : 'name';
 
-    let shown = filterVal ? allTeams.filter(t => t.division === filterVal) : allTeams.slice();
+    let shown = allTeams.slice();
+    if (TEAMS_SEASON) shown = shown.filter(t => teamSeasonCode(t) === TEAMS_SEASON);
+    if (filterVal) shown = shown.filter(t => t.division === filterVal);
     if (q) shown = shown.filter(t =>
       (t.name || '').toLowerCase().includes(q) ||
       (t.roster || []).some(p => (p.name || '').toLowerCase().includes(q)));
@@ -4529,7 +4720,12 @@
       '<div class="pp-hd"><div class="pp-av" style="color:var(--color-teal)">+</div>' +
         '<div><div class="pp-nm">Add player</div><div class="pp-sub">' + h(t.name) + '</div></div>' +
         '<button class="pp-x" onclick="closePlayerPop()">✕</button></div>' +
-      '<div class="arow"><div class="af" style="grid-column:1/-1"><label>Name</label><input id="pp-name" placeholder="Full name"></div></div>' +
+      '<div class="arow"><div class="af ppick" style="grid-column:1/-1">' +
+          '<label>Name</label>' +
+          '<input id="pp-name" placeholder="Start typing — existing players appear below" autocomplete="off">' +
+          '<div class="ppick__list" id="pp-sugg"></div>' +
+          '<div id="pp-linked"></div>' +
+        '</div></div>' +
       '<div class="arow"><div class="af"><label>Email</label><input id="pp-email" placeholder="email@example.com"></div>' +
         '<div class="af"><label>Gender</label><select id="pp-gender"><option value="">—</option><option value="M">Male</option><option value="F">Female</option></select></div></div>' +
       '<div class="arow"><div class="af"><label>Phone</label><input id="pp-phone" placeholder="(555) 123-4567"></div>' +
@@ -4539,8 +4735,118 @@
         '<button class="ab ab--outline ab--sm" onclick="closePlayerPop()">Cancel</button>' +
         '<button class="ab ab--primary ab--sm" id="pp-add">Add to roster</button></div>';
     $id('pp-add').addEventListener('click', addPlayerFromPop);
+    wirePlayerPicker();
     $id('player-pop').classList.add('is-open');
     setTimeout(() => { const n = $id('pp-name'); if (n) n.focus(); }, 50);
+  }
+
+  // ── "Add an existing player" ──────────────────────────────────
+  // Typing a name here used to mint a brand-new player every time, so a player
+  // who changed teams between seasons ended up with two profiles and split
+  // stats. The directory below is every roster entry the league has ever had;
+  // picking someone reuses their player id and email, which is what makes their
+  // history follow them onto the new team.
+  let PLAYER_DIR = null, PLAYER_DIR_LOADING = null, PP_LINKED = null;
+
+  function loadPlayerDirectory() {
+    if (PLAYER_DIR) return Promise.resolve(PLAYER_DIR);
+    if (PLAYER_DIR_LOADING) return PLAYER_DIR_LOADING;
+    PLAYER_DIR_LOADING = apiJSON('/.netlify/functions/admin-players')
+      .then(d => {
+        // One row per person: newest season wins, but keep any contact detail
+        // an older row has and a newer one is missing.
+        const byKey = new Map();
+        const rank = t => { const i = ['I','II','III','IV','V','VI','VII','VIII','IX','X'].indexOf(teamSeasonCode({ circuit: t.circuit, seasonId: t.seasonId })); return i < 0 ? -1 : i; };
+        for (const p of (d.players || [])) {
+          if (!p.name) continue;
+          const key = (p.email || '').trim().toLowerCase() || ('name:' + p.name.trim().toLowerCase());
+          const prev = byKey.get(key);
+          if (!prev) { byKey.set(key, { ...p, seasons: [p] }); continue; }
+          const seasons = prev.seasons.concat(p);
+          const newer = rank(p) > rank(prev) ? p : prev;
+          byKey.set(key, {
+            ...newer,
+            email: newer.email || prev.email || p.email || null,
+            phone: newer.phone || prev.phone || p.phone || null,
+            gender: newer.gender || prev.gender || p.gender || null,
+            dupr: newer.dupr || prev.dupr || p.dupr || null,
+            playerId: newer.playerId || prev.playerId || p.playerId || null,
+            seasons,
+          });
+        }
+        PLAYER_DIR = [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name));
+        return PLAYER_DIR;
+      })
+      .catch(() => { PLAYER_DIR = []; return PLAYER_DIR; })
+      .finally(() => { PLAYER_DIR_LOADING = null; });
+    return PLAYER_DIR_LOADING;
+  }
+
+  function ppRenderLinked() {
+    const el = $id('pp-linked'); if (!el) return;
+    if (!PP_LINKED) { el.innerHTML = ''; return; }
+    const where = PP_LINKED.teamName ? (' · last with ' + PP_LINKED.teamName) : '';
+    el.innerHTML = '<div class="ppick__linked"><span>Linked to <b>' + h(PP_LINKED.name) + '</b>' + h(where) +
+      ' — stats and profile carry over.</span><button type="button" class="ppick__unlink" id="pp-unlink">Add as new player</button></div>';
+    $id('pp-unlink').onclick = () => { PP_LINKED = null; ppRenderLinked(); };
+  }
+
+  function wirePlayerPicker() {
+    const input = $id('pp-name'), list = $id('pp-sugg');
+    if (!input || !list) return;
+    PP_LINKED = null; ppRenderLinked();
+    loadPlayerDirectory();
+    let sel = -1, matches = [];
+
+    const close = () => { list.classList.remove('is-open'); list.innerHTML = ''; sel = -1; matches = []; };
+
+    const pick = (m) => {
+      PP_LINKED = m;
+      input.value = m.name;
+      const setIf = (id, v) => { const el = $id(id); if (el && !el.value && v) el.value = v; };
+      setIf('pp-email', m.email);
+      setIf('pp-phone', m.phone);
+      setIf('pp-dupr', m.dupr);
+      const g = $id('pp-gender'); if (g && !g.value && m.gender) g.value = m.gender;
+      close(); ppRenderLinked();
+    };
+
+    const draw = () => {
+      if (!matches.length) { close(); return; }
+      list.innerHTML = matches.map((m, i) => {
+        const seasons = [...new Set((m.seasons || [m]).map(x => teamSeasonCode({ circuit: x.circuit, seasonId: x.seasonId })).filter(Boolean))];
+        const meta = [m.teamName || null, seasons.length ? seasons.map(seasonNameForCode).join(', ') : null, m.email || null]
+          .filter(Boolean).join(' · ');
+        return '<button type="button" class="ppick__opt' + (i === sel ? ' is-sel' : '') + '" data-i="' + i + '">' +
+          '<span><span class="ppick__nm">' + h(m.name) + '</span>' +
+          (meta ? '<span class="ppick__meta">' + h(meta) + '</span>' : '') + '</span></button>';
+      }).join('') + '<div class="ppick__new">No match? Keep typing — a new player is created on save.</div>';
+      list.classList.add('is-open');
+      list.querySelectorAll('.ppick__opt').forEach(b => {
+        b.onclick = () => pick(matches[Number(b.dataset.i)]);
+      });
+    };
+
+    input.oninput = async () => {
+      if (PP_LINKED && input.value.trim() !== PP_LINKED.name) { PP_LINKED = null; ppRenderLinked(); }
+      const q = input.value.trim().toLowerCase();
+      if (q.length < 2) { close(); return; }
+      const dir = await loadPlayerDirectory();
+      const onTeam = new Set((PP_TEAM?.roster || []).map(p => (p.name || '').toLowerCase()));
+      matches = dir
+        .filter(p => p.name.toLowerCase().includes(q) && !onTeam.has(p.name.toLowerCase()))
+        .slice(0, 8);
+      sel = -1; draw();
+    };
+
+    input.onkeydown = (e) => {
+      if (!list.classList.contains('is-open')) return;
+      if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, matches.length - 1); draw(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); draw(); }
+      else if (e.key === 'Enter' && sel >= 0) { e.preventDefault(); pick(matches[sel]); }
+      else if (e.key === 'Escape') { close(); }
+    };
+    input.onblur = () => setTimeout(close, 160);   // let a click land first
   }
 
   async function addPlayerFromPop() {
@@ -4560,6 +4866,13 @@
       dupr: $id('pp-dupr').value.trim() || null,
       isCaptain: false, isCoCaptain: false,
     };
+    // Picked an existing player → reuse their id so the new roster entry IS
+    // them, not a namesake. Email is the identity layer's key; keep theirs if
+    // the form was left blank.
+    if (PP_LINKED) {
+      if (PP_LINKED.playerId) newP.id = PP_LINKED.playerId;
+      if (!newP.email && PP_LINKED.email) newP.email = PP_LINKED.email;
+    }
     try {
       const roster = [...(t.roster || []), newP];
       await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(t.id), {
@@ -4570,7 +4883,7 @@
     } catch (e) { ppStatus(e.message || 'Add failed', true); btn.disabled = false; }
   }
 
-  // Close the player popup when clicking the dimmed backdrop.
+  // Close the player popup when clicking the dimmed backdrop (link is per-open).
   $id('player-pop').addEventListener('click', e => { if (e.target.id === 'player-pop') closePlayerPop(); });
 
   // ── Seed Teams button ──
@@ -5139,7 +5452,7 @@
     if (!el) return;
     el.innerHTML = '<div class="loading" style="padding:8px 0;">Loading tonight…</div>';
     try {
-      const d = await apiJSON('/.netlify/functions/admin-gameday?circuit=I');
+      const d = await apiJSON('/.netlify/functions/admin-gameday?circuit=' + encodeURIComponent(adminCircuit()));
       if (!d || !d.week) { el.innerHTML = ''; return; }
       const k = d.kpis, ll = d.lineupLocks, al = d.alerts;
       const alertTxt = [
@@ -5222,7 +5535,7 @@
       const st = dt ? new Date(dt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null;
       btn.disabled = true; if (stat) { stat.textContent = 'Adding…'; stat.style.color = 'var(--color-text-faint)'; }
       try {
-        await apiJSON('/.netlify/functions/admin-matches?circuit=I', {
+        await apiJSON('/.netlify/functions/admin-matches?circuit=' + encodeURIComponent(adminCircuit()), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ division: div, week, teamA: { id: home.id, name: home.name }, teamB: { id: away.id, name: away.name }, courtA: ca || null, courtB: cb || null, scheduledAt: dt, startTime: st }),
         });
@@ -5276,7 +5589,7 @@
     out.innerHTML = '<div class="loading">Loading schedule…</div>';
     try {
       const [data, teamsData] = await Promise.all([
-        apiJSON('/.netlify/functions/admin-matches?circuit=I&division=' + encodeURIComponent(div)),
+        apiJSON('/.netlify/functions/admin-matches?circuit=' + encodeURIComponent(adminCircuit()) + '&division=' + encodeURIComponent(div)),
         apiJSON('/.netlify/functions/admin-teams'),
       ]);
       const weeks = data.weeks || [];
@@ -5708,7 +6021,7 @@
             method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
           });
         } else {
-          await apiJSON('/.netlify/functions/admin-matches?circuit=I', {
+          await apiJSON('/.netlify/functions/admin-matches?circuit=' + encodeURIComponent(adminCircuit()), {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ division: div, week: wk.week, ...body }),
           });
@@ -6044,7 +6357,7 @@
     out.innerHTML = '<div class="loading">Loading every game…</div>';
     try {
       const [data, teamsData] = await Promise.all([
-        apiJSON('/.netlify/functions/admin-matches?circuit=I&all=1'),
+        apiJSON('/.netlify/functions/admin-matches?circuit=' + encodeURIComponent(adminCircuit()) + '&all=1'),
         apiJSON('/.netlify/functions/admin-teams'),
       ]);
       window.__allTeams = (teamsData.teams || []).slice().sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -6118,7 +6431,7 @@
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          circuit: 'I',
+          circuit: adminCircuit(),
           division: div,
           teams: divTeams.map(t => ({ id: t.id, name: t.name })),
           // Courts are auto-assigned by rotation (Set A=1&2, B=3&6, C=5&7) and
@@ -6145,7 +6458,7 @@
       if (divTeams.length % 2 !== 0) throw new Error('Team count must be even');
       const res = await apiJSON('/.netlify/functions/admin-generate-schedule', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ circuit: 'I', division: div, teams: divTeams.map(t => ({ id: t.id, name: t.name })), bracketOnly: true }),
+        body: JSON.stringify({ circuit: adminCircuit(), division: div, teams: divTeams.map(t => ({ id: t.id, name: t.name })), bracketOnly: true }),
       });
       const added = (res.summary || []).filter(s => s.phase && !s.skipped).length;
       const conflicts = (res.summary || []).filter(s => s.conflict);
@@ -6176,7 +6489,7 @@
     const btn = $id('rebuild-standings-btn');
     btn.disabled = true; btn.textContent = 'Rebuilding…';
     try {
-      const res = await apiJSON('/.netlify/functions/admin-rebuild-standings?circuit=I', { method: 'POST' });
+      const res = await apiJSON('/.netlify/functions/admin-rebuild-standings?circuit=' + encodeURIComponent(adminCircuit()), { method: 'POST' });
       alert('Standings rebuilt: ' + (res.teamCount ?? 0) + ' teams across ' + ((res.divisions || []).length) + ' division(s).');
     } catch (e) {
       alert('Rebuild failed: ' + e.message);
@@ -6342,7 +6655,7 @@
     container.innerHTML = '<div class="loading">Loading matches…</div>';
 
     try {
-      const data = await apiJSON('/.netlify/functions/admin-matches?circuit=I&division=' + encodeURIComponent(division));
+      const data = await apiJSON('/.netlify/functions/admin-matches?circuit=' + encodeURIComponent(adminCircuit()) + '&division=' + encodeURIComponent(division));
       const weekData = (data.weeks || []).find(w => w.week === parseInt(week));
 
       if (!weekData?.matches?.length) {
@@ -6774,7 +7087,7 @@
   // ═══════════════════════════════════════════════════════════
   // THE DROP — weekly editorial composer (wired to admin-drop)
   // ═══════════════════════════════════════════════════════════
-  var DROP = { circuit: 'I', week: null, record: null, stories: [], live: null, wired: false, cover: null, gallery: [] };
+  var DROP = { circuit: adminCircuit(), week: null, record: null, stories: [], live: null, wired: false, cover: null, gallery: [] };
   function dpUrl(id){ return '/.netlify/functions/drop-photo-serve?id='+encodeURIComponent(id); }
   function dpUpload(file){
     var fd=new FormData(); fd.append('file',file); fd.append('circuit',DROP.circuit); fd.append('week', DROP.week||$d('drop-f-week').value||'');

@@ -77,3 +77,27 @@ test('the code is resolved even when the id is a slug', () => {
   const info = currentSeasonInfo([{ id: 'fall-2026', name: 'Season 2', startDate: '2026-09-24' }], at('2026-10-01T00:00:00Z'));
   assert.equal(info.circuit, 'II');
 });
+
+// ── Between seasons ────────────────────────────────────────────────
+// Season 1 finishes in August, Season 2 doesn't flip until a week before its
+// September start. The site deliberately stays on Season 1 through that gap —
+// flipping early would leave every page bare (no standings, no schedule, no
+// leaderboard) for weeks. Season 2 is reachable from the switcher the whole time.
+const P1 = { id: 'season-1', name: 'Season 1', circuit: 'I',  startDate: '2026-06-08', weeks: 8 };
+const P2 = { id: 'season-2', name: 'Season 2', circuit: 'II', startDate: '2026-09-17', weeks: 8 };
+
+test('a finished season holds the site until the next one flips', () => {
+  assert.equal(pickCurrentSeason([P1, P2], at('2026-06-20T00:00:00Z')).id, 'season-1');
+  assert.equal(pickCurrentSeason([P1, P2], at('2026-08-01T00:00:00Z')).id, 'season-1');
+  // Season 1 is over on the calendar, but nothing else has flipped yet.
+  assert.equal(pickCurrentSeason([P1, P2], at('2026-09-01T00:00:00Z')).id, 'season-1');
+  assert.equal(pickCurrentSeason([P1, P2], at('2026-09-09T00:00:00Z')).id, 'season-1');
+  // One week out — Season 2 takes over.
+  assert.equal(pickCurrentSeason([P1, P2], at('2026-09-10T00:00:00Z')).id, 'season-2');
+  assert.equal(pickCurrentSeason([P1, P2], at('2026-09-20T00:00:00Z')).id, 'season-2');
+});
+
+test('with nothing queued behind it, the last season played stays on screen', () => {
+  assert.equal(pickCurrentSeason([P1], at('2026-12-01T00:00:00Z')).id, 'season-1');
+  assert.equal(pickCurrentSeason([P1, P2], at('2027-06-01T00:00:00Z')).id, 'season-2');
+});
