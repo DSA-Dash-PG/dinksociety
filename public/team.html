@@ -254,10 +254,19 @@
     // matches no stats blob. dsSeason() overwrites this once it resolves; this is
     // only the pre-resolution guess.
     function codeFromId(id) {
-      var t = String(id || '').trim().replace(/^(circuit|season)-/i, '');
       var ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-      if (/^\d+$/.test(t)) return ROMAN[parseInt(t, 10)] || t;
-      return t.toUpperCase();
+      var roman = function (n) { return (n >= 1 && n <= 10) ? ROMAN[n] : String(n); };
+      var s = String(id || '').trim();
+      if (!s) return 'I';
+      if (/^(TEST|[IVX]+)$/i.test(s)) return s.toUpperCase();
+      if (/^(circuit|season)-/i.test(s)) {
+        var t = s.replace(/^(circuit|season)-/i, '').trim();
+        return /^\d+$/.test(t) ? roman(parseInt(t, 10)) : t.toUpperCase();
+      }
+      if (/^\d+$/.test(s)) return roman(parseInt(s, 10));
+      var m = s.match(/season\s*(\d+)/i);   // display name: "Season 2" → II
+      if (m) return roman(parseInt(m[1], 10));
+      return s.toUpperCase();
     }
     let CIRCUIT   = codeFromId(SEASON_ID);
     let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;

@@ -46,10 +46,18 @@ export default async (req) => {
 
   // ========== GET — list all or single team ==========
   if (req.method === 'GET') {
+    // Team records carry whatever was written into `circuit` at the time — the
+    // code ('I'), the season NAME ('Season 1'), or an old broken derivation
+    // ('SEASON-2'). Resolving that on the client meant every caller reinvented
+    // circuitCode() and got it subtly wrong, which is how the admin Teams tab
+    // ended up listing two "Season 1"s. Stamp the canonical code here so there
+    // is exactly one implementation and the UI never has to guess.
+    const withCode = (t) => t && { ...t, circuitCode: circuitCode(t.circuit || t.seasonId) };
+
     if (teamId) {
       const team = await store.get(`team/${teamId}.json`, { type: 'json' }).catch(() => null);
       if (!team) return json({ error: 'Team not found' }, 404);
-      return json({ team });
+      return json({ team: withCode(team) });
     }
 
     const { blobs } = await store.list({ prefix: 'team/' });
@@ -58,7 +66,7 @@ export default async (req) => {
     )).filter(Boolean);
 
     teams.sort((a, b) => (a.division || '').localeCompare(b.division || '') || (a.name || '').localeCompare(b.name || ''));
-    return json({ teams });
+    return json({ teams: teams.map(withCode) });
   }
 
   // All write operations require a team ID
@@ -81,6 +89,11 @@ export default async (req) => {
         team[field] = body[field];
       }
     }
+
+    // Self-heal the season key on any save. Old records hold a display name or a
+    // mangled id here; leaving them means every new reader has to cope with it.
+    const canonical = circuitCode(team.circuit || team.seasonId);
+    if (team.circuit !== canonical) team.circuit = canonical;
 
     // Handle roster replacement (full roster array)
     if (body.roster && Array.isArray(body.roster)) {

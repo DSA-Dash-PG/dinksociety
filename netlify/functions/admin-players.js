@@ -16,7 +16,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { isTestTeam } from './lib/circuit.js';
+import { isTestTeam, circuitCode } from './lib/circuit.js';
 import { normalizeEmail } from './lib/identity.js';
 
 function json(data, status = 200) {
@@ -72,6 +72,9 @@ export default async (req) => {
         // the "add an existing player" picker so a returning player is linked to
         // their profile instead of being created fresh.
         circuit: t.circuit || null,
+        // Resolved once here — the raw field can hold 'I', 'Season 1' or a
+        // mangled id, and every client that re-derived it got it wrong.
+        circuitCode: circuitCode(t.circuit || t.seasonId),
         dupr: p.dupr || null,
         isCaptain,
         isCoCaptain: p.isCoCaptain === true,

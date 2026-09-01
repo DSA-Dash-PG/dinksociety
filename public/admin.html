@@ -4303,12 +4303,25 @@
   // ═══════════════════════════════════════════════════════════
   // Which season's teams the Teams tab is showing ('' = all).
   let TEAMS_SEASON = '';
-  // A team's season code, from whichever field it carries.
+  // A team's season code. The server stamps `circuitCode` on every team it
+  // returns — trust that first. The fallback mirrors lib/circuit.js for records
+  // that predate it: the field can hold a code ('I'), a season id ('season-2'),
+  // a bare number, or the season's DISPLAY NAME ('Season 1'). Missing that last
+  // case is what split the Teams tab into two "Season 1" buckets.
   function teamSeasonCode(t) {
-    const raw = String((t && (t.circuit || t.seasonId)) || '').trim().replace(/^(circuit|season)-/i, '');
-    if (!raw) return '';
+    if (t && t.circuitCode) return String(t.circuitCode).toUpperCase();
     const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
-    if (/^\d+$/.test(raw)) return ROMAN[parseInt(raw, 10)] || raw;
+    const roman = (n) => (n >= 1 && n <= 10) ? ROMAN[n] : String(n);
+    const raw = String((t && (t.circuit || t.seasonId)) || '').trim();
+    if (!raw) return '';
+    if (/^(TEST|[IVX]+)$/i.test(raw)) return raw.toUpperCase();
+    if (/^(circuit|season)-/i.test(raw)) {
+      const tail = raw.replace(/^(circuit|season)-/i, '').trim();
+      return /^\d+$/.test(tail) ? roman(parseInt(tail, 10)) : tail.toUpperCase();
+    }
+    if (/^\d+$/.test(raw)) return roman(parseInt(raw, 10));
+    const m = raw.match(/season\s*(\d+)/i);          // "Season 1" → I
+    if (m) return roman(parseInt(m[1], 10));
     return raw.toUpperCase();
   }
   function seasonNameForCode(code) {
@@ -4758,7 +4771,7 @@
         // One row per person: newest season wins, but keep any contact detail
         // an older row has and a newer one is missing.
         const byKey = new Map();
-        const rank = t => { const i = ['I','II','III','IV','V','VI','VII','VIII','IX','X'].indexOf(teamSeasonCode({ circuit: t.circuit, seasonId: t.seasonId })); return i < 0 ? -1 : i; };
+        const rank = t => { const i = ['I','II','III','IV','V','VI','VII','VIII','IX','X'].indexOf(teamSeasonCode(t)); return i < 0 ? -1 : i; };
         for (const p of (d.players || [])) {
           if (!p.name) continue;
           const key = (p.email || '').trim().toLowerCase() || ('name:' + p.name.trim().toLowerCase());
@@ -4816,7 +4829,7 @@
     const draw = () => {
       if (!matches.length) { close(); return; }
       list.innerHTML = matches.map((m, i) => {
-        const seasons = [...new Set((m.seasons || [m]).map(x => teamSeasonCode({ circuit: x.circuit, seasonId: x.seasonId })).filter(Boolean))];
+        const seasons = [...new Set((m.seasons || [m]).map(x => teamSeasonCode(x)).filter(Boolean))];
         const meta = [m.teamName || null, seasons.length ? seasons.map(seasonNameForCode).join(', ') : null, m.email || null]
           .filter(Boolean).join(' · ');
         return '<button type="button" class="ppick__opt' + (i === sel ? ' is-sel' : '') + '" data-i="' + i + '">' +
