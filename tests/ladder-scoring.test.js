@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   makeCoed, calcStats, calcBonusPts, calcDinkRating, calcPartners, getRoundMVPs,
+  orderPairWomenFirst, pairRows,
 } from '../netlify/functions/lib/ladder-scoring.js';
 
 const A = { id: 'A', name: 'Al', gender: 'M' };
@@ -77,4 +78,46 @@ test('calcPartners + getRoundMVPs run over the fixture', () => {
   assert.ok(parts.length >= 1);
   const mvps = getRoundMVPs(sessions[0].rounds[0], players);
   assert.ok(mvps.male.length >= 1 || mvps.female.length >= 1);
+});
+
+// ── Fixed-partner pairs read woman-first ───────────────────────────────────
+
+test('orderPairWomenFirst puts the woman first only in a mixed pair', () => {
+  const w = { id: 'w', name: 'Wendy', gender: 'F' };
+  const m = { id: 'm', name: 'Mike', gender: 'M' };
+  assert.deepEqual(orderPairWomenFirst(m, w).map(p => p.name), ['Wendy', 'Mike']);
+  assert.deepEqual(orderPairWomenFirst(w, m).map(p => p.name), ['Wendy', 'Mike']);
+  // Same-gender pairs keep the order they arrived in (stronger record first).
+  const m2 = { id: 'm2', name: 'Moe', gender: 'M' };
+  assert.deepEqual(orderPairWomenFirst(m, m2).map(p => p.name), ['Mike', 'Moe']);
+  const w2 = { id: 'w2', name: 'Wanda', gender: 'F' };
+  assert.deepEqual(orderPairWomenFirst(w, w2).map(p => p.name), ['Wendy', 'Wanda']);
+  // Unknown gender never jumps the queue.
+  const u = { id: 'u', name: 'Uma' };
+  assert.deepEqual(orderPairWomenFirst(m, u).map(p => p.name), ['Mike', 'Uma']);
+});
+
+test('pairRows names a mixed pair woman-first but keeps the row id', () => {
+  // A+C partnered all night, B+D partnered all night — the strict inference.
+  const sess = {
+    id: 'fp', date: '2026-06-17',
+    rounds: [
+      { courts: [{ court: 1, team1: [A, C], team2: [B, D], score: { t1: 11, t2: 7, winner: 'A' } }] },
+      { courts: [{ court: 1, team1: [A, C], team2: [B, D], score: { t1: 11, t2: 9, winner: 'A' } }] },
+    ],
+  };
+  const rows = calcStats([sess], players);
+  const paired = pairRows(rows, sess, true);
+  assert.equal(paired.length, 2, 'four players collapse into two pair rows');
+  for (const r of paired) {
+    assert.ok(r.pair, 'row is a pair');
+    const [first] = r.names;
+    const women = players.filter(p => p.gender === 'F').map(p => p.name);
+    assert.ok(women.includes(first), `${r.name} should lead with the woman`);
+    assert.equal(r.name, r.names.join(' & '), 'the display name matches the ordered names');
+    // The row id still belongs to a real player, so profile links keep working.
+    assert.ok(players.some(p => p.id === r.id));
+    assert.deepEqual([...r.ids].sort(), [...r.ids].slice().sort(), 'ids present for both');
+    assert.equal(r.ids.length, 2);
+  }
 });

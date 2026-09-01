@@ -11,7 +11,7 @@
 
 import { getEvent, listEvents, getSignups } from './ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './ladder-play.js';
-import { calcStats, calcDinkRating, fixedPartnerMap } from './ladder-scoring.js';
+import { calcStats, calcDinkRating, fixedPartnerMap, orderPairWomenFirst } from './ladder-scoring.js';
 import { getMergeMap, applyMerges } from './player-merge.js';
 import { getDirectory, applyDirectory } from './player-directory.js';
 
@@ -163,7 +163,8 @@ export async function buildRecapBrief(eventId) {
     if (podium.some(p => p.rank === r.rank)) continue;
     const mate = r.pairPlace ? nightRows.find(o => o !== r && o.rank === r.rank) : null;
     podium.push(mate
-      ? { rank: r.rank, name: `${r.name} & ${mate.name}`, names: [r.name, mate.name], pair: true, w: r.w, l: r.l, diff: r.diff }
+      ? (() => { const [f, m] = orderPairWomenFirst(r, mate);
+          return { rank: r.rank, name: `${f.name} & ${m.name}`, names: [f.name, m.name], pair: true, w: r.w, l: r.l, diff: r.diff }; })()
       : { rank: r.rank, name: r.name, w: r.w, l: r.l, diff: r.diff });
   }
   const movers = players.filter(p => p.delta != null).sort((a, b) => b.delta - a.delta);

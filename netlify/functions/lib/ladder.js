@@ -428,6 +428,11 @@ export function toPublicSignups(event, rec) {
     spotsLeft: spotsLeft(event, rec),
     rosterCount: (rec.roster || []).length,
     waitlistCount: (rec.waitlist || []).length,
-    roster: (rec.roster || []).map(p => ({ name: p.name, gender: p.gender, paid: p.paymentStatus === 'paid' })),
+    // pairId groups a fixed-partner duo on the public card so the two names can
+    // be shown together (woman first) without exposing anything about either.
+    roster: (rec.roster || []).map(p => ({
+      name: p.name, gender: p.gender, paid: p.paymentStatus === 'paid',
+      pairId: p.partnerId ? [String(p.playerId || ''), String(p.partnerId)].sort().join('~') : null,
+    })),
   };
 }

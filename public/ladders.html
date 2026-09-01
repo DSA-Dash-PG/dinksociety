@@ -724,10 +724,67 @@ function ladMaps(l){ if(!l.place)return''; const q=l.address||l.place; return `<
 function ladCourts(l,ac){ const names=(Array.isArray(l.courtNames)&&l.courtNames.length)?l.courtNames:(l.courtNumbers?String(l.courtNumbers).split('·').map(s=>s.trim()).filter(Boolean):[]); const n=l.courts||names.length; if(!n)return''; return `<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-top:8px"><span style="font-size:.56rem;font-weight:800;letter-spacing:.09em;color:var(--mut)">${n} COURT${n===1?'':'S'}</span>${names.map(c=>`<span style="font-size:.66rem;font-weight:800;color:${ac};background:${hexA(ac,.10)};border:1px solid ${hexA(ac,.35)};border-radius:6px;padding:2px 8px">${esc(c)}</span>`).join('')}</div>`; }
 function ladCountdown(l,ac){ if(l.status==='live')return''; const start=startMsOf(l); if(!start)return''; const ms=start-Date.now(); if(ms<=0)return''; const soon=ms<3*3600*1000; return `<div style="display:flex;align-items:center;justify-content:space-between;padding:7px 12px;background:${hexA(ac,.12)};border-top:1px solid ${hexA(ac,.25)};border-bottom:1px solid ${hexA(ac,.25)}"><span style="font-size:.56rem;font-weight:800;letter-spacing:.11em;color:var(--mut)">STARTS IN</span><span data-cd="${start}" style="font-size:.84rem;font-weight:800;color:${ac};${soon?'animation:dspulse 1.2s infinite':''}">${countdownLabel(ms)}</span></div>`; }
 // Never show HOW someone paid — just the check (paid) or PENDING.
-function ladRosterRows(roster){ const list=roster||[], half=Math.ceil(list.length/2), out=[]; for(let r=0;r<half;r++){ for(const c of [0,1]){ const k=c*half+r; if(k>=list.length){ out.push('<div></div>'); continue; } const p=list[k]; out.push(`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);min-width:0"><span style="width:15px;text-align:center;color:#5e655a;font-weight:800;font-size:.62rem;flex-shrink:0">${k+1}</span><span style="flex:1;min-width:0;font-weight:700;font-size:.78rem;color:#e7ebe0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(firstName(p.name))}</span>${p.paid?'<span style="width:15px;height:15px;border-radius:50%;background:#b8ff2c;color:#06210f;font-size:.6rem;font-weight:900;text-align:center;line-height:15px;flex-shrink:0">✓</span>':'<span style="font-size:.54rem;font-weight:800;color:#9aa094;border:1px solid rgba(255,255,255,.15);border-radius:9999px;padding:1px 7px;flex-shrink:0">PENDING</span>'}</div>`); } } return out.join(''); }
+// Fixed-partner nights: keep a duo together and put the woman first. Entries
+// arrive with a shared pairId; anyone unpaired keeps their place in line.
+function orderRosterPairs(roster){
+  const list=(roster||[]).slice();
+  if(!list.some(p=>p&&p.pairId)) return list;
+  const out=[], done=new Set();
+  list.forEach((p,i)=>{
+    if(done.has(i)) return;
+    done.add(i);
+    if(!p||!p.pairId){ out.push(p); return; }
+    const j=list.findIndex((q,k)=>k>i&&q&&q.pairId===p.pairId&&!done.has(k));
+    if(j<0){ out.push(p); return; }
+    done.add(j);
+    const mate=list[j];
+    const flip=mate.gender==='F'&&p.gender!=='F';
+    out.push(flip?mate:p, flip?p:mate);
+  });
+  return out;
+}
+function ladRosterRows(roster){ const list=orderRosterPairs(roster), half=Math.ceil(list.length/2), out=[]; for(let r=0;r<half;r++){ for(const c of [0,1]){ const k=c*half+r; if(k>=list.length){ out.push('<div></div>'); continue; } const p=list[k]; out.push(`<div style="display:flex;align-items:center;gap:7px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.05);min-width:0"><span style="width:15px;text-align:center;color:#5e655a;font-weight:800;font-size:.62rem;flex-shrink:0">${k+1}</span><span style="flex:1;min-width:0;font-weight:700;font-size:.78rem;color:#e7ebe0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(firstName(p.name))}</span>${p.paid?'<span style="width:15px;height:15px;border-radius:50%;background:#b8ff2c;color:#06210f;font-size:.6rem;font-weight:900;text-align:center;line-height:15px;flex-shrink:0">✓</span>':'<span style="font-size:.54rem;font-weight:800;color:#9aa094;border:1px solid rgba(255,255,255,.15);border-radius:9999px;padding:1px 7px;flex-shrink:0">PENDING</span>'}</div>`); } } return out.join(''); }
 setInterval(function(){ document.querySelectorAll('[data-cd]').forEach(function(el){ const ms=+el.dataset.cd-Date.now(); el.textContent=countdownLabel(ms); el.style.animation=(ms>0&&ms<3*3600*1000)?'dspulse 1.2s infinite':''; }); },30000);
 
+// Sits under the register button on every card — including one you've already
+// joined, since that's exactly when you want to drag a friend along.
+function ladShareBtn(l){
+  return `<button onclick="ladShare('${l.id}',this)" style="display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:7px;padding:8px;background:none;border:0;cursor:pointer;font:inherit;font-size:.74rem;font-weight:800;color:var(--mut)">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><path d="M12 3v13"/><path d="M8 7l4-4 4 4"/></svg>
+    Invite a friend
+  </button>`;
+}
+
 function feeLabel(l){ if((l.paymentMethods||[]).includes('free')) return 'Free'; const base=fmt(l.feeCents); return l.format==='fixed-partner' ? base+'/player' : base; }
+// ── Share a ladder ─────────────────────────────────────────────────────────
+// One tap opens the phone's own share sheet (Messages, WhatsApp, wherever), so
+// a player can pull a friend into the night without leaving the page. Desktop
+// browsers mostly lack navigator.share, so there we fall back to a text link
+// and a copy button.
+function ladShareUrl(l){ return location.origin+'/ladders?event='+encodeURIComponent(l.id); }
+function ladShareText(l){
+  const when=[wd(l.date), l.startTime?(l.endTime?l.startTime+'–'+l.endTime:l.startTime):''].filter(Boolean).join(' at ');
+  const where=l.place?(' · '+l.place):'';
+  const full=(l.spotsLeft||0)<=0;
+  const room=full?"It's full, but you can grab a waitlist spot"
+    :(l.spotsLeft===1?'1 spot left':l.spotsLeft+' spots left');
+  return `Come play ${l.name} — ${when}${where}. ${room}. Sign up: ${ladShareUrl(l)}`;
+}
+async function ladShare(id,btn){
+  const l=curLadder(id); if(!l) return;
+  const text=ladShareText(l);
+  if(navigator.share){
+    // The sheet carries the link separately so Messages renders a rich preview.
+    try{ await navigator.share({ title:l.name, text, url:ladShareUrl(l) }); return; }
+    catch(err){ if(err&&err.name==='AbortError') return; }  // they closed the sheet
+  }
+  // No share sheet: open a pre-filled text, and copy the link so they have it
+  // either way. `sms:` is a no-op on most desktops — the toast is the real result.
+  try{ await navigator.clipboard.writeText(text); dsToast({ type:'success', title:'Invite copied', message:'Paste it into a text to your friends.' }); }
+  catch(e){ dsToast({ type:'info', title:'Share this link', message:ladShareUrl(l) }); }
+  try{ location.href='sms:?&body='+encodeURIComponent(text); }catch(e){}
+}
+
 function ladderCard(l,i){
   const cap=l.capacity||0, full=l.spotsLeft<=0, pct=cap?Math.round((cap-l.spotsLeft)/cap*100):0, tt=l.type||'mixed';
   const time=l.startTime?(l.endTime?`${l.startTime}–${l.endTime}`:l.startTime):'';
@@ -755,10 +812,11 @@ function ladderCard(l,i){
       <div class="evc-meta" style="margin-bottom:8px">${cap} players · ${fee}</div>
       <div style="height:6px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:${barCol};border-radius:9999px"></i></div>
       <div class="spot" style="margin-top:6px"><span style="color:#9aa094">${cap-l.spotsLeft} / ${cap}</span><span class="left" style="color:${full?'var(--red)':ac}">${full?(l.waitlistCount?l.waitlistCount+' waiting':'Waitlist'):(l.spotsLeft+' spots left')}</span></div>
-      ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${l.roster.map(initialDot).join('')}${(()=>{const pc=l.roster.filter(p=>p.paid).length;return pc?`<span style="margin-left:2px;font-size:.6rem;font-weight:800;color:#b8ff2c;background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.28);border-radius:9999px;padding:2px 8px">✓ ${pc} paid</span>`:'';})()}<button onclick="ladToggle('${l.id}')" style="margin-left:auto;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-top:8px">${ladRosterRows(l.roster)}</div>`:''}</div>`:''}
+      ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${orderRosterPairs(l.roster).map(initialDot).join('')}${(()=>{const pc=l.roster.filter(p=>p.paid).length;return pc?`<span style="margin-left:2px;font-size:.6rem;font-weight:800;color:#b8ff2c;background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.28);border-radius:9999px;padding:2px 8px">✓ ${pc} paid</span>`:'';})()}<button onclick="ladToggle('${l.id}')" style="margin-left:auto;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-top:8px">${ladRosterRows(l.roster)}</div>`:''}</div>`:''}
       ${l.status==='live'
         ? `<a class="btn btn-lime" href="/ladder-live?event=${encodeURIComponent(l.id)}" style="margin-top:11px;width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none"><span style="width:7px;height:7px;border-radius:50%;background:#06210f;margin-right:7px;animation:dspulse 1.1s infinite"></span>Watch live →</a>`
         : myRegBlock(l)||`<button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fee}</button>`}
+      ${ladShareBtn(l)}
     </div>
   </div>`;
 }

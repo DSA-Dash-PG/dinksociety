@@ -266,6 +266,14 @@ export function fixedPartnerMap(sess, loose = false) {
   return Object.keys(map).length ? map : null;
 }
 
+// A mixed fixed-partner pair always reads with the woman first — "Jane & Bob",
+// never "Bob & Jane". Same-gender pairs keep whatever order they came in (the
+// stronger record first), so this only ever reorders a mixed duo.
+export function orderPairWomenFirst(a, b) {
+  const fa = a?.gender === 'F', fb = b?.gender === 'F';
+  return (fb && !fa) ? [b, a] : [a, b];
+}
+
 // Collapse a ranked list of per-player night rows into PAIR rows for a
 // fixed-partner night (one row per pair, both names, the pair's shared record),
 // re-ranked by wins → diff → avg DR. Returns `rows` untouched when the night
@@ -284,10 +292,13 @@ export function pairRows(rows, sess, forceFixed = false) {
     if (!b || seen.has(b.id)) { seen.add(a.id); out.push(a); return; } // unpaired (sub / odd) keeps a solo row
     seen.add(a.id); seen.add(b.id);
     const drs = [a.dr, b.dr].filter(x => x != null);
+    // Display order only — `id` stays the higher-ranked player's so nothing
+    // keyed off the row id (profile links, XP, merges) shifts underneath.
+    const [f, m] = orderPairWomenFirst(a, b);
     out.push({
       ...a,
-      pair: true, id: a.id, ids: [a.id, b.id],
-      name: `${a.name} & ${b.name}`, names: [a.name, b.name], gender: null,
+      pair: true, id: a.id, ids: [f.id, m.id],
+      name: `${f.name} & ${m.name}`, names: [f.name, m.name], gender: null,
       dr: drs.length ? Math.round((drs.reduce((x, y) => x + y, 0) / drs.length) * 10) / 10 : null,
       mvp: (a.mvp || 0) + (b.mvp || 0) || a.mvp,
       xp: undefined,

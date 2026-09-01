@@ -236,15 +236,20 @@ function courtCard(c, live){
   const t1=c.score?.t1, t2=c.score?.t2;
   const aLead = t1!=null && t2!=null && t1>t2, bLead = t1!=null && t2!=null && t2>t1;
   const plName = pl => pl ? `<div class="pl ${pl.id===me?'me':''}">${esc(first(pl.name))}<span class="g">${pl.gender}</span></div>` : `<div class="pl" style="color:var(--fnt)">—</div>`;
+  // A mixed pair always reads with the woman on top. Display order only — the
+  // court's own team arrays are untouched.
+  const sideNames = t => { const a=(t||[])[0], b=(t||[])[1];
+    const flip = b && b.gender==='F' && (!a || a.gender!=='F');
+    return flip ? plName(b)+plName(a) : plName(a)+plName(b); };
   const scoreBlock = (t1!=null||t2!=null)
     ? `<div class="n"><span class="${aLead?'w':''}">${t1??0}</span><span class="sep">–</span><span class="${bLead?'w':''}">${t2??0}</span></div><div class="to">to 11</div>`
     : `<div class="vs">VS</div>`;
   return `<div class="court ${mine?'mine':''}">
     <div class="court-top"><div class="court-nm"><span class="court-dot" style="background:${COURT_COLORS[(c.court-1)%COURT_COLORS.length]}"></span>${esc(courtLabel(c.court))}</div>${st}</div>
     <div class="matchup">
-      <div class="side">${plName(c.team1[0])}${plName(c.team1[1])}</div>
+      <div class="side">${sideNames(c.team1)}</div>
       <div class="score">${scoreBlock}</div>
-      <div class="side r">${plName(c.team2[0])}${plName(c.team2[1])}</div>
+      <div class="side r">${sideNames(c.team2)}</div>
     </div></div>`;
 }
 

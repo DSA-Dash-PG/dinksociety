@@ -448,8 +448,12 @@ function courtCard(c,ci,tC){
       const col=isWin?(king?'var(--gold)':'var(--lime)'):'var(--red)';
       p+=`<div class="pan-score" style="color:${col}">${val}</div>`;
     }
-    [0,1].forEach(pi=>{
-      const pl=(team||[])[pi];
+    // Mixed pair reads woman-first. `pi` stays the REAL slot index so Move/Sub
+    // keep pointing at the right player — only the draw order changes.
+    const _t=team||[];
+    const _order=(_t[1]&&_t[1].gender==='F'&&(!_t[0]||_t[0].gender!=='F'))?[1,0]:[0,1];
+    _order.forEach(pi=>{
+      const pl=_t[pi];
       if(!pl){ p+=`<div class="empty-slot" onclick="openSub(${ci},${ti},${pi})">+ Add player</div>`; return; }
       const isSrc=swapMode&&swapMode.ci===ci&&swapMode.ti===ti&&swapMode.pi===pi;
       const isTgt=swapMode&&!isSrc;
