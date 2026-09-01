@@ -57,6 +57,7 @@ export default async (req) => {
           startDate: season.startDate,
           weeks: season.weeks || 8,
           matchTime: season.matchTime || '7:00–9:00 PM',
+          venue: season.venue || null,
           roundsPerMatch: season.roundsPerMatch || 2,
           gamesPerRound: season.gamesPerRound || 6,
           maxRosterSize: season.maxRosterSize || 10,

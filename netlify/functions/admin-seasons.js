@@ -143,6 +143,11 @@ export default async (req) => {
         if (payload.balanceDueDate !== undefined) season.balanceDueDate = payload.balanceDueDate;
         if (payload.weeks !== undefined) season.weeks = payload.weeks;
         if (payload.matchTime !== undefined) season.matchTime = payload.matchTime;
+        // Where the season is played. Seasons move venues, so this lives on the
+        // season record rather than being hardcoded on the registration page.
+        if (payload.venue !== undefined) {
+          season.venue = typeof payload.venue === 'string' && payload.venue.trim() ? payload.venue.trim() : null;
+        }
         if (payload.roundsPerMatch !== undefined) season.roundsPerMatch = payload.roundsPerMatch;
         if (payload.gamesPerRound !== undefined) season.gamesPerRound = payload.gamesPerRound;
         if (payload.maxRosterSize !== undefined) season.maxRosterSize = payload.maxRosterSize;
