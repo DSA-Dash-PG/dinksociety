@@ -9,6 +9,7 @@ import {
   spotsLeft, isFull, normalizeSignups, addSignup, removeFromRoster,
   promoteHead, claimSpot, claimExpired, expireClaim, nudgeDue, minutesLeft,
   parseTime, eventStartMs, isLastDay, moveWaitlistToRoster,
+  genderLockOf, genderGate,
   HOLD_MS, NUDGE_LEAD_MS,
 } from '../netlify/functions/lib/ladder.js';
 import { balanceFromLedger, normalizeCredit } from '../netlify/functions/lib/credits.js';
@@ -180,4 +181,48 @@ test('promoteHead still uses a priority hold OUTSIDE the 24h window', () => {
   assert.equal(r.name, 'C');
   assert.equal(r.autoClaimed, false);
   assert.ok(rec.pendingClaim);
+});
+
+// ── Gender-locked ladders ──────────────────────────────────────────────────
+// A men's/women's-only ladder has to turn away the wrong gender — but a player
+// whose gender we simply don't have yet is a different case: that's a question,
+// not a rejection, and answering it must not require the organizer.
+
+test('genderLockOf reads the lock off the division', () => {
+  assert.equal(genderLockOf({ type: 'womens' }), 'F');
+  assert.equal(genderLockOf({ type: 'mens' }), 'M');
+  assert.equal(genderLockOf({ type: 'mixed' }), null);
+  assert.equal(genderLockOf({}), null);
+  assert.equal(genderLockOf(null), null);
+});
+
+test('genderGate lets the right gender through and stays quiet on open ladders', () => {
+  assert.equal(genderGate('F', 'F'), null);
+  assert.equal(genderGate('M', 'M'), null);
+  assert.equal(genderGate('F', 'f'), null, 'case-insensitive');
+  assert.equal(genderGate(null, null), null, 'no lock, no check');
+  assert.equal(genderGate(null, 'M'), null);
+});
+
+test('genderGate turns away the wrong gender with a plain reason', () => {
+  const msg = genderGate('F', 'M');
+  assert.match(msg, /women's-only/);
+  assert.match(msg, /not eligible/);
+  assert.doesNotMatch(msg, /on file/, 'this is a rejection, not a question');
+});
+
+test('a missing gender reads as a question, not a rejection', () => {
+  const msg = genderGate('F', null);
+  assert.match(msg, /don't have your gender on file/);
+  assert.match(msg, /Pick it above/, 'points at the picker in the signup sheet');
+  assert.doesNotMatch(msg, /organizer/, 'never dead-ends the player');
+  assert.equal(genderGate('M', ''), genderGate('M', undefined));
+});
+
+test('a partner is described in the third person', () => {
+  const wrong = genderGate('F', 'M', 'your partner (Sam)');
+  assert.match(wrong, /your partner \(Sam\) isn't eligible/);
+  const missing = genderGate('F', null, 'your partner (Sam)');
+  assert.match(missing, /your partner \(Sam\)/);
+  assert.match(missing, /add it above/);
 });

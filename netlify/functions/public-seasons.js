@@ -12,6 +12,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { resolveDepositTerms, VENMO_HANDLE, CARD_PAYMENTS_ENABLED } from './lib/payment-terms.js';
+import { seasonCircuitCode } from './lib/circuit.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -38,6 +39,9 @@ export default async (req) => {
 
         seasons.push({
           id: season.id,
+          // The canonical code standings/stats are keyed by. Resolved here, once,
+          // so no page has to guess it from an id whose shape isn't guaranteed.
+          circuit: seasonCircuitCode(season),
           name: season.name,
           label: season.label,
           status: season.status,

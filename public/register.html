@@ -1208,9 +1208,13 @@
     function buildPayload() {
       const captainName = (val('p1-first') + ' ' + val('p1-last')).trim();
       const seasonId = activeSeason ? activeSeason.id : 'circuit-i';
+      // public-seasons resolves the canonical code (it can't be trusted to fall
+      // out of the id — a slug id would key the team to a season that has no
+      // schedule or standings). The local derivation stays as a fallback.
+      const circuit = (activeSeason && activeSeason.circuit) || circuitCodeFromSeasonId(seasonId);
       return {
         seasonId,
-        circuit: circuitCodeFromSeasonId(seasonId),
+        circuit,
         division: activeDiv ? activeDiv.id : '',
         divisionLabel: activeDiv ? activeDiv.name : '',
         path: 'team', price: activeDiv ? activeDiv.teamPrice : 700,

@@ -1104,13 +1104,33 @@
   // moment it exists in Admin → Seasons. public-seasons already filters out
   // test and archived seasons, so the TEST season never reaches the public page
   // — it stays reachable only via an explicit ?circuit=TEST link from admin.
-  function seasonCodeOf(season) {
-    const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
-    const tail = String(season.id || '').replace(/^circuit-/i, '').trim();
+  // Mirrors circuitCode() in netlify/functions/lib/circuit.js. Standings and
+  // player stats are keyed by the CODE ("I"), while a season blob's id and name
+  // vary ("circuit-i", "circuit-1", "season-1", "Season 1"), so both are tried:
+  // whichever resolves to a real code wins. Getting this wrong showed the season
+  // twice — once under a code with no data, once as the fallback that had it.
+  const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+  function codeFromToken(raw) {
+    const t = String(raw || '').trim();
+    if (!t) return null;
+    if (/^(TEST|[IVX]+)$/i.test(t)) return t.toUpperCase();
+    const tail = t.replace(/^circuit-/i, '').replace(/^season-/i, '').trim();
     if (/^\d+$/.test(tail)) { const n = parseInt(tail, 10); return (n >= 1 && n <= 10) ? ROMAN[n - 1] : String(n); }
-    if (tail) return tail.toUpperCase();
-    const m = String(season.name || '').match(/season\s*(\d+)/i);
-    return m ? (ROMAN[parseInt(m[1], 10) - 1] || m[1]) : 'I';
+    if (/^(TEST|[IVX]+)$/i.test(tail)) return tail.toUpperCase();
+    const m = t.match(/season\s*(\d+)/i);
+    if (m) { const n = parseInt(m[1], 10); return (n >= 1 && n <= 10) ? ROMAN[n - 1] : String(n); }
+    return tail ? tail.toUpperCase() : null;
+  }
+  const isCanonical = c => !!c && (c === 'TEST' || ROMAN.includes(c));
+  function seasonCodeOf(season) {
+    // The API resolves this server-side now; the local derivation is the
+    // fallback for a cached response from before that shipped.
+    if (isCanonical(season.circuit)) return String(season.circuit).toUpperCase();
+    const fromId = codeFromToken(season.id);
+    if (isCanonical(fromId)) return fromId;
+    const fromName = codeFromToken(season.name || season.label);
+    if (isCanonical(fromName)) return fromName;
+    return fromId || fromName || 'I';
   }
 
   async function loadSeasonOptions() {
@@ -1121,11 +1141,17 @@
       const data = await r.json();
       const seasons = (data.seasons || []).filter(s => s && s.id);
       if (!seasons.length) return; // keep the placeholder
-      const ORDER = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
-      const opts = seasons
-        .map(s => ({ code: seasonCodeOf(s), label: s.name || s.label || 'Season' }))
-        // Newest season first; anything unrecognised sinks to the bottom.
-        .sort((a, b) => (ORDER.indexOf(b.code) - ORDER.indexOf(a.code)));
+      // Two blobs can resolve to the same season (a legacy id alongside a newer
+      // one); show it once, keeping the entry with a real name.
+      const byCode = new Map();
+      for (const s of seasons) {
+        const code = seasonCodeOf(s);
+        const label = s.name || s.label || 'Season';
+        const prev = byCode.get(code);
+        if (!prev || (prev.label === 'Season' && label !== 'Season')) byCode.set(code, { code, label });
+      }
+      // Newest season first; anything unrecognised sinks to the bottom.
+      const opts = [...byCode.values()].sort((a, b) => (ROMAN.indexOf(b.code) - ROMAN.indexOf(a.code)));
       // Never lose the season the URL asked for (e.g. an admin ?circuit=TEST link).
       if (!opts.some(o => o.code === state.circuit)) {
         opts.push({ code: state.circuit, label: state.circuit === 'TEST' ? '🧪 TEST Season' : 'Season ' + state.circuit });

@@ -6,6 +6,10 @@
 //   Auth: admin (any) → goes LIVE immediately (admins are the approvers).
 //         the player themselves OR their captain → goes to PENDING approval.
 //
+// A ladder-only ("lite") player has no team blob to stamp, which used to make
+// this fail with "Invalid teamId" — they simply could not set a photo. They now
+// take the same route with their own record (ladder-players) holding the stamp.
+//
 // PENDING binary  → "pending/<playerId>"   (awaiting admin approval)
 // APPROVED binary → "img/<playerId>"       (served publicly)
 // The roster entry inside the `teams` blob is stamped so pages know state:
@@ -15,6 +19,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, verifyCaptainSession, verifyPlayerSession } from './lib/auth.js';
 import { notifyAdminsPendingProfile } from './lib/profile.js';
+import { getLiteById, updateLite } from './lib/ladder-players.js';
 
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB — Lambda payload ceiling (client compresses first)
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -41,14 +46,18 @@ export default async (req) => {
     const admin = await verifyAdminSession(req);
     let isAdmin = admin.valid;
     let authorized = isAdmin;
+    let isLite = false;
 
     if (!authorized) {
       const player = await verifyPlayerSession(req);
       if (player.valid && player.payload.playerId === playerId) {
         authorized = true;
         teamId = player.payload.teamId || teamId;
+        isLite = !player.payload.teamId;
       }
     }
+    // An admin acting on a teamless player lands here too.
+    if (isAdmin && !teamId && await getLiteById(playerId)) isLite = true;
     if (!authorized) {
       const cap = await verifyCaptainSession(req);
       if (cap.valid && cap.payload.team) {
@@ -59,7 +68,7 @@ export default async (req) => {
     if (!authorized) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers });
     }
-    if (!VALID_ID.test(teamId)) {
+    if (!isLite && !VALID_ID.test(teamId)) {
       return new Response(JSON.stringify({ error: 'Invalid teamId' }), { status: 400, headers });
     }
 
@@ -73,6 +82,42 @@ export default async (req) => {
       return new Response(JSON.stringify({
         error: `File is ${(file.size / 1024 / 1024).toFixed(1)}MB — exceeds the ${Math.round(MAX_BYTES / 1024 / 1024)}MB limit. Photos should auto-compress before upload; refresh and try again.`,
       }), { status: 400, headers });
+    }
+
+    // ── Ladder-only player: stamp their own record, no team involved ──
+    if (isLite) {
+      const rec = await getLiteById(playerId);
+      if (!rec) {
+        return new Response(JSON.stringify({ error: 'Player not found' }), { status: 404, headers });
+      }
+      const photoStore = getStore('player-photos');
+      const arrayBuffer = await file.arrayBuffer();
+      const updatedAt = new Date().toISOString();
+      const stamp = { updatedAt, contentType: file.type };
+
+      if (isAdmin) {
+        await photoStore.set(`img/${playerId}`, arrayBuffer, { metadata: { contentType: file.type } });
+        const pending = { ...(rec.pendingProfile || {}) };
+        delete pending.photo;
+        await updateLite(playerId, {
+          photo: stamp,
+          pendingProfile: Object.keys(pending).length ? pending : null,
+        });
+      } else {
+        await photoStore.set(`pending/${playerId}`, arrayBuffer, { metadata: { contentType: file.type } });
+        await updateLite(playerId, {
+          pendingProfile: {
+            ...(rec.pendingProfile || {}),
+            photo: stamp,
+            submittedBy: 'player',
+            submittedAt: updatedAt,
+          },
+        });
+        await notifyAdminsPendingProfile({
+          playerName: rec.name, teamName: 'Ladder player', submittedBy: 'player', what: 'new photo',
+        });
+      }
+      return new Response(JSON.stringify({ ok: true, playerId, status: isAdmin ? 'live' : 'pending', updatedAt }), { status: 200, headers });
     }
 
     // Load team + locate the roster entry to stamp.

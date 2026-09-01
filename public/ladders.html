@@ -340,6 +340,9 @@
 <script>
 const API='/.netlify/functions';
 let ACTIVE=[], COMPLETED=[], STATS=null, MYCREDIT=0, FT='all', FD='all', MYREG={};
+// The signed-in player's gender, when we have it on file. Men's/women's-only
+// ladders need it to check eligibility; null means the signup sheet asks.
+let MYGENDER=null;
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
 
 // Minimal markdown renderer used by ladder description / rules panels. Keep in
@@ -464,7 +467,8 @@ async function init(){
   // Signed-in player's own signups → powers the "You're in ✓ / Cancel my spot"
   // state on each card. 401 (not signed in) just leaves MYREG empty.
   MYREG={};
-  try{ const r=await fetch(`${API}/player-ladder-events`,{credentials:'include'}); if(r.ok){ const me=await r.json(); (me.registered||[]).forEach(ev=>{ MYREG[ev.id]={list:ev.list,paymentStatus:ev.paymentStatus}; }); } }catch(e){}
+  MYGENDER=null;
+  try{ const r=await fetch(`${API}/player-ladder-events`,{credentials:'include'}); if(r.ok){ const me=await r.json(); (me.registered||[]).forEach(ev=>{ MYREG[ev.id]={list:ev.list,paymentStatus:ev.paymentStatus}; }); MYGENDER=(me.me&&me.me.gender)||null; } }catch(e){}
   ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st; MYCREDIT=(st&&st.youCreditCents)||0;
   renderHomeLive(); renderWinners(); renderHomeWeek(); renderFilters(); renderAvail(); renderPast(); renderStats(); renderKitchen(); renderRecapsTab();
   // Photo albums for the latest-night scrapbook feature — best-effort, after
@@ -1274,6 +1278,15 @@ function curLadder(id){ return ACTIVE.find(l=>l.id===id); }
 // normal payment-options view (openSignup below).
 function extrasHtml(l){
   let h='';
+  // Men's/women's-only ladder and we have no gender on file (a brand-new
+  // account, or a league player whose roster entry never had one). Ask once,
+  // here, rather than bouncing them to the organizer — the server saves it to
+  // their profile so this is the only time they see it.
+  if(ladNeedsGender(l)){
+    const lab=l.type==='womens'?"women's":"men's";
+    h+=`<div class="frow" style="margin-bottom:6px"><label class="l">Your gender</label><select class="i" id="su-my-gender"><option value="">Select…</option><option value="F">Woman</option><option value="M">Man</option></select></div>`;
+    h+=`<div style="font-size:.72rem;color:#9aa094;line-height:1.5;margin-bottom:12px">This is a <b>${lab}-only</b> ladder, so we need this to confirm your spot. We'll save it to your profile — you'll only be asked once.</div>`;
+  }
   if(l.duprRated){
     h+=`<div class="frow" style="margin-bottom:10px"><label class="l">Your DUPR ID</label><input class="i" id="su-dupr" placeholder="e.g. ABC1234"></div>`;
     h+=`<div style="background:rgba(232,181,66,.1);border:1px solid rgba(232,181,66,.3);border-radius:9px;padding:10px 12px;margin-bottom:14px;font-size:.74rem;line-height:1.5">This is a <b>DUPR-rated</b> ladder — before your first night, join the <b>Dink Society - South Bay</b> club on DUPR so your matches get rated: <a href="${DUPR_CLUB_URL}" target="_blank" rel="noopener" style="color:var(--lime);font-weight:700">Join the club on DUPR →</a></div>`;
@@ -1289,9 +1302,20 @@ function extrasHtml(l){
   }
   return h;
 }
+// True when this ladder is gender-locked and we don't know the player's yet.
+function ladNeedsGender(l){ return (l.type==='mens'||l.type==='womens') && !MYGENDER; }
+
 // Reads + validates the extras above → {ok:true, body} or {ok:false, err}.
 function collectSignupExtras(l){
   const body={};
+  if(ladNeedsGender(l)){
+    const g=document.getElementById('su-my-gender')?.value||'';
+    if(!g) return {ok:false, err:'Select your gender to confirm you\'re eligible for this ladder.'};
+    if(g!==(l.type==='womens'?'F':'M')){
+      return {ok:false, err:`This is a ${l.type==='womens'?"women's":"men's"}-only ladder, so you're not eligible to register. Have a look at the other ladders — plenty are open to everyone.`};
+    }
+    body.gender=g;
+  }
   if(l.duprRated){
     const v=(document.getElementById('su-dupr')?.value||'').trim();
     if(!v) return {ok:false, err:'Enter your DUPR ID.'};
@@ -1340,11 +1364,18 @@ function openSignup(id){
   document.getElementById('payOv').classList.add('on');
 }
 function payMsg(c,t){ document.getElementById('payMsg').innerHTML=`<div class="msg ${c}">${t}</div>`; }
+// The server can tell us it needs a gender we thought we had (stale page, or a
+// profile that lost it). Re-open the sheet so the picker is there, rather than
+// leaving the player staring at an error they can't act on.
+function payErr(id,d){
+  if(d&&d.needsGender){ MYGENDER=null; openSignup(id); payMsg('warn',d.error||'Pick your gender above to continue.'); return; }
+  payMsg('err',(d&&d.error)||'Something went wrong.');
+}
 function needSignIn(){ payMsg('warn',`One quick step first:<br><b>New here?</b> <a href="/me.html#register" style="color:var(--lime);font-weight:700">Create your free account</a> — 10 seconds, no team needed.<br><b>Been here before?</b> <a href="/me.html" style="color:var(--lime);font-weight:700">Sign in</a>.<br>Tap the link we email you, then come back and grab your spot.`); }
 async function post(path,body){ const r=await fetch(`${API}${path}`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return {status:r.status,d:await r.json().catch(()=>({}))}; }
-async function payFree(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'free',...ex.body}); if(status===401)return needSignIn(); if(d.ok)return payMsg('ok',"You're in — no payment needed. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
-async function payCredit(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit',...ex.body}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payMsg('err',d.error||'Something went wrong.'); }
-async function payCard(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-checkout?event=${id}`,ex.body); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payMsg('err',d.error||'Could not start checkout.'); }
+async function payFree(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'free',...ex.body}); if(status===401)return needSignIn(); if(d.ok)return payMsg('ok',"You're in — no payment needed. 🎾"); payErr(id,d); }
+async function payCredit(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit',...ex.body}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payErr(id,d); }
+async function payCard(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-checkout?event=${id}`,ex.body); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payErr(id,d); }
 // Venmo on iOS only opens from a REAL anchor tap — JS location.href gets
 // silently dropped. So: a plain <a> whose href is the venmo://paycharge deep
 // link (recipient + amount + note all prefilled) on phones, with a venmo.com/u
@@ -1359,8 +1390,8 @@ function venmoLinks(handle,amt,note){
   const fb=mobile?`<br><a href="${web}" target="_blank" rel="noopener" style="font-size:.66rem;color:var(--mut);text-decoration:underline">App didn't open? Venmo on the web</a>`:'';
   return btn+fb;
 }
-async function payVenmo(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo',...ex.body}); if(status===401)return needSignIn(); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const totalCents=(l.feeCents||0)*(l.format==='fixed-partner'?2:1); const amt=(totalCents/100).toFixed(2); payMsg('ok',`Spot held. Send <b>${fmt(totalCents)}</b> to <b>@${esc(handle)}</b> with note “<b>${esc(l.name)}</b>”.<br>${venmoLinks(handle,amt,l.name)}<br><span style="font-size:.7rem;color:var(--mut)">An organizer confirms and you'll get a "you're in" email.</span>`); return; } payMsg('err',d.error||'Something went wrong.'); }
-async function joinWaitlist(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,ex.body); if(status===401)return needSignIn(); if(d.status==='waitlist'){ payMsg('ok',"You're on the waitlist — we'll email you the moment a spot opens."); } else payMsg('info',d.message||'Done.'); }
+async function payVenmo(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo',...ex.body}); if(status===401)return needSignIn(); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const totalCents=(l.feeCents||0)*(l.format==='fixed-partner'?2:1); const amt=(totalCents/100).toFixed(2); payMsg('ok',`Spot held. Send <b>${fmt(totalCents)}</b> to <b>@${esc(handle)}</b> with note “<b>${esc(l.name)}</b>”.<br>${venmoLinks(handle,amt,l.name)}<br><span style="font-size:.7rem;color:var(--mut)">An organizer confirms and you'll get a "you're in" email.</span>`); return; } payErr(id,d); }
+async function joinWaitlist(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,ex.body); if(status===401)return needSignIn(); if(d.status==='waitlist'){ payMsg('ok',"You're on the waitlist — we'll email you the moment a spot opens."); } else if(status>=400){ payErr(id,d); } else payMsg('info',d.message||'Done.'); }
 
 init();
 </script>

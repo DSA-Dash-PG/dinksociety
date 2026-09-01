@@ -16,9 +16,11 @@ import {
   getEvent, getSignups, setSignups, toPublicSignups,
   addSignup, removeFromRoster, promoteHead, moveWaitlistToRoster,
   findEntry, spotsLeft, cardTotalCents, HOLD_MS,
-  addPairSignup, removeLinkedPartner,
+  addPairSignup, removeLinkedPartner, genderLockOf, genderGate,
 } from './lib/ladder.js';
 import { earn, spend } from './lib/credits.js';
+import { setPlayerInfo } from './lib/player-directory.js';
+import { getLiteById, isLiteId } from './lib/ladder-players.js';
 import { createLadderToken } from './lib/ladder-token.js';
 import {
   claimUrl, venmoConfirmUrl, venmoDeclineUrl, dateLineOf, organizerEmails, fmtCents, siteUrl,
@@ -118,25 +120,30 @@ export default async (req) => {
 
   // ── sign up ──
   if (req.method === 'POST') {
+    const body = await req.json().catch(() => ({}));
+
     // Gender-locked ladder: a Men's or Women's division only accepts that gender.
     // Enforced here so it covers every payment path (credit / venmo / card) and
-    // waitlist joins. A player with no gender set is blocked (strict) — the
-    // organizer can still add them manually from the manage panel.
-    const genderLock = event.type === 'mens' ? 'M' : event.type === 'womens' ? 'F' : null;
-    const genderErr = (g, who) => {
-      const gg = String(g || '').trim().toUpperCase().charAt(0);
-      if (gg === genderLock) return null;
-      const label = genderLock === 'F' ? "women's" : "men's";
-      return gg
-        ? `This is a ${label}-only ladder, so ${who} isn't eligible.`
-        : `This is a ${label}-only ladder and ${who} doesn't have a gender set yet, so we can't confirm eligibility. Ask the organizer to add ${who === 'your registration' ? 'you' : 'them'} manually instead.`;
-    };
-    if (genderLock) {
-      const err = genderErr(person.gender, 'your registration');
-      if (err) return json({ error: err }, 403);
+    // waitlist joins.
+    //
+    // A brand-new player often has no gender on file yet (a lite account created
+    // without one, or a league roster entry built by team registration, which
+    // leaves gender blank). Blocking them outright dead-ended real signups, so
+    // the page asks for it in the signup sheet and sends it here; we accept it,
+    // use it for this signup, and save it to their profile so they're asked once.
+    // What we never do is GUESS: with nothing supplied, the strict block stands.
+    const genderLock = genderLockOf(event);
+    const supplied = ['M', 'F'].includes(body.gender) ? body.gender : null;
+    let genderAdopted = null;
+    if (genderLock && !person.gender && supplied) {
+      person.gender = supplied;
+      genderAdopted = supplied;
     }
-
-    const body = await req.json().catch(() => ({}));
+    if (genderLock) {
+      const err = genderGate(genderLock, person.gender, 'self');
+      // needsGender lets the page reveal the picker instead of showing a dead end.
+      if (err) return json({ error: err, needsGender: !person.gender }, 403);
+    }
     const method = ['credit', 'venmo', 'card', 'free'].includes(body.paymentMethod) ? body.paymentMethod : null;
     // Respect the ladder's payment settings (credit is always allowed — it's
     // already the league's money).
@@ -146,6 +153,22 @@ export default async (req) => {
       return json({ error: method === 'card' ? 'Card payments are turned off for this ladder.' : method === 'venmo' ? 'Venmo payments are turned off for this ladder.' : 'This isn\'t a free ladder.' }, 400);
     }
     if (body.invitedBy) person.invitedBy = String(body.invitedBy).slice(0, 80);
+
+    // Remember the gender they just told us, so no one has to answer twice.
+    // Both writes are best-effort: this signup already holds the value it needs.
+    if (genderAdopted) {
+      try { await setPlayerInfo(playerId, { gender: genderAdopted }); }
+      catch (e) { console.warn('[ladder-signup] directory gender save failed:', e?.message || e); }
+      if (isLiteId(playerId)) {
+        try {
+          const { getStore } = await import('@netlify/blobs');
+          const rec = await getLiteById(playerId);
+          if (rec && !rec.gender) {
+            await getStore('ladder-players').setJSON(`player/${playerId}.json`, { ...rec, gender: genderAdopted });
+          }
+        } catch (e) { console.warn('[ladder-signup] lite gender save failed:', e?.message || e); }
+      }
+    }
 
     // Fixed Partner: one signup registers a locked pair — validate the
     // partner's info up front (name always; gender if this is a gender-locked
@@ -164,7 +187,7 @@ export default async (req) => {
         email: pEmail,
       };
       if (genderLock) {
-        const err = genderErr(partner.gender, `your partner (${partner.name})`);
+        const err = genderGate(genderLock, partner.gender, `your partner (${partner.name})`);
         if (err) return json({ error: err }, 403);
       }
     }

@@ -80,3 +80,27 @@ export async function createLitePlayer({ name, email, gender = null }) {
 export function isLiteId(playerId) {
   return typeof playerId === 'string' && playerId.startsWith('lp_');
 }
+
+/**
+ * Merge fields into a lite record and save. A ladder-only player has no team
+ * blob to hold their photo, bio or pending edits, so their own record carries
+ * the same shapes a roster entry does — `profile`, `pendingProfile`, `photo`,
+ * `gender` — and every profile endpoint can treat them the same way.
+ * Returns the saved record, or null if there's no such player.
+ */
+export async function updateLite(playerId, patch = {}) {
+  const rec = await getLiteById(playerId);
+  if (!rec) return null;
+  const next = { ...rec, ...patch, playerId: rec.playerId, updatedAt: new Date().toISOString() };
+  await store().setJSON(`player/${playerId}.json`, next);
+  return next;
+}
+
+/** Every lite player record. Used by the admin approvals queue. */
+export async function listLitePlayers() {
+  const { blobs } = await store().list({ prefix: 'player/' }).catch(() => ({ blobs: [] }));
+  const recs = await Promise.all(
+    blobs.map(b => store().get(b.key, { type: 'json', consistency: 'strong' }).catch(() => null))
+  );
+  return recs.filter(Boolean);
+}

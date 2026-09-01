@@ -249,6 +249,45 @@ export function addSignup(rec, event, person, now = Date.now()) {
 }
 
 /**
+ * Which gender, if any, a ladder is locked to. Men's and Women's divisions only
+ * accept that gender; everything else is open.
+ * @returns {'M'|'F'|null}
+ */
+export function genderLockOf(event) {
+  return event?.type === 'mens' ? 'M' : event?.type === 'womens' ? 'F' : null;
+}
+
+/**
+ * Check one person against a ladder's gender lock.
+ *
+ * Returns null when they're fine, otherwise the message to show them. The
+ * no-gender-on-file case is deliberately a DIFFERENT message from the wrong-
+ * gender one: a blank means "we need to ask", not "you can't play", and the
+ * signup sheet turns it into a picker rather than a dead end.
+ *
+ * @param {'M'|'F'|null} lock
+ * @param {string|null} gender what we have on file (or were just told)
+ * @param {'self'|string} who 'self' for the signed-in player, else a label like "your partner (Sam)"
+ * @returns {string|null}
+ */
+export function genderGate(lock, gender, who = 'self') {
+  if (!lock) return null;
+  const g = String(gender || '').trim().toUpperCase().charAt(0);
+  if (g === lock) return null;
+  const label = lock === 'F' ? "women's" : "men's";
+  const self = who === 'self';
+  const subject = self ? 'you' : who;
+  if (g) {
+    return self
+      ? `This is a ${label}-only ladder, so you're not eligible to register.`
+      : `This is a ${label}-only ladder, so ${subject} isn't eligible.`;
+  }
+  return self
+    ? `This is a ${label}-only ladder and we don't have your gender on file yet. Pick it above and we'll save it to your profile.`
+    : `This is a ${label}-only ladder and we don't have a gender for ${subject} yet — add it above.`;
+}
+
+/**
  * Add a locked PAIR to a signups record for a `format:'fixed-partner'` ladder
  * (MUTATES + returns {list, entry, partnerEntry[, position]}). Both entries
  * land on the roster together, or both go to the waitlist together — never

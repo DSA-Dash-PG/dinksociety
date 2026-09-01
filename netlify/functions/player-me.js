@@ -53,7 +53,12 @@ export default async (req) => {
         isCaptain: false, isCoCaptain: false, isAdmin: isAdminEmail(ctx.session?.email || liteEmail),
         isOrganizer,
         lite: true,
-        bio: {}, pendingProfile: null, hasPhoto: false, photoUpdatedAt: null,
+        // A ladder-only player's photo + bio live on their own record (they
+        // have no roster entry to hold them) — surface them the same way.
+        bio: player.profile || {},
+        pendingProfile: player.pendingProfile || null,
+        hasPhoto: !!(player.photo && player.photo.updatedAt),
+        photoUpdatedAt: player.photo?.updatedAt || null,
       },
       myTeams: [], currentTeamId: null,
       stats: null, partnerNames: {},

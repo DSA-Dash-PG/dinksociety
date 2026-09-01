@@ -1100,8 +1100,15 @@
           </div>
         </div>
 
-        <label class="pf-row"><span>Gender</span><input value="${genderTxt}" disabled></label>
-        <div class="pf-hint">Gender is set by your captain (used for lineups).</div>
+        ${me.lite
+          ? `<label class="pf-row"><span>Gender</span><select id="pf-gender">
+               <option value=""${!me.gender ? ' selected' : ''}>Select…</option>
+               <option value="F"${me.gender === 'F' ? ' selected' : ''}>Woman</option>
+               <option value="M"${me.gender === 'M' ? ' selected' : ''}>Man</option>
+             </select></label>
+             <div class="pf-hint">Used to check eligibility for men's and women's ladders. Saves right away.</div>`
+          : `<label class="pf-row"><span>Gender</span><input value="${genderTxt}" disabled></label>
+             <div class="pf-hint">Gender is set by your captain (used for lineups).</div>`}
 
         <label class="pf-row"><span>Height</span><input id="pf-height" maxlength="16" placeholder="e.g. 5'8&quot;" value="${esc(bio.height || '')}"></label>
         <label class="pf-row"><span>Date of birth</span><input id="pf-dob" type="date" value="${esc(bio.dob || '')}"></label>
@@ -1110,9 +1117,11 @@
         <label class="pf-row"><span>City</span><input id="pf-city" maxlength="60" value="${esc(bio.city || '')}"></label>
         <label class="pf-row"><span>Home court</span><input id="pf-court" maxlength="80" value="${esc(bio.homeCourt || '')}"></label>
 
-        <button class="pf-btn pf-btn--full" id="pf-save">Submit for approval</button>
+        <button class="pf-btn pf-btn--full" id="pf-save">${me.lite ? 'Save' : 'Submit for approval'}</button>
         <div class="pf-status pf-status--main" id="pf-save-status"></div>
-        <div class="pf-hint" style="text-align:center">Changes go live once a league admin approves them.</div>
+        <div class="pf-hint" style="text-align:center">${me.lite
+          ? 'Your gender saves right away; bio changes go live once an admin approves them.'
+          : 'Changes go live once a league admin approves them.'}</div>
       </div>`;
 
     // Photo wiring
@@ -1134,7 +1143,9 @@
         const f = await _pfCompress(pickedPhoto);
         st.textContent = 'Uploading…';
         const fd = new FormData();
-        fd.append('file', f); fd.append('playerId', me.playerId); fd.append('teamId', me.teamId);
+        fd.append('file', f); fd.append('playerId', me.playerId);
+        // Ladder-only players have no team — the server stamps their own record.
+        if (me.teamId) fd.append('teamId', me.teamId);
         const r = await fetch(API + '/player-photo-upload', { method: 'POST', body: fd, credentials: 'include' });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || 'Upload failed');
@@ -1155,9 +1166,13 @@
         homeCourt: $('pf-court').value.trim(),
       };
       try {
+        // A ladder-only player can also set their own gender here.
+        const payload = { playerId: me.playerId, teamId: me.teamId || '', profile };
+        const gSel = document.getElementById('pf-gender');
+        if (gSel && gSel.value) payload.gender = gSel.value;
         const r = await fetch(API + '/player-profile', {
           method: 'PUT', credentials: 'include', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ playerId: me.playerId, teamId: me.teamId, profile }),
+          body: JSON.stringify(payload),
         });
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || 'Save failed');

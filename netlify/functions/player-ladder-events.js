@@ -2,10 +2,12 @@
 // GET /.netlify/functions/player-ladder-events  (authed player session)
 // Returns the logged-in player's UPCOMING ladder events, mirroring how the
 // portal shows upcoming league matches:
-//   { registered: [...], open: [...] }
+//   { registered: [...], open: [...], me: { gender } }
 // - registered: events where the player is on the roster/waitlist (matched by
 //   email, the ladder's identity link), so they "see their upcoming ladder games".
 // - open: upcoming events with spots left that they could still join.
+// - me.gender: what we have on file, so the Ladders page knows whether to ask
+//   for it before a men's/women's-only signup instead of dead-ending the player.
 // Reuses the shared ladder helpers so this stays in sync with the Ladders page.
 
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
@@ -62,7 +64,8 @@ export default async (req) => {
   const byDate = (a, b) => String(a.date || '').localeCompare(String(b.date || ''));
   registered.sort(byDate);
   open.sort(byDate);
-  return json({ registered, open });
+  const gender = String(ctx.player?.gender || '').trim().toUpperCase().charAt(0);
+  return json({ registered, open, me: { gender: gender === 'F' || gender === 'M' ? gender : null } });
 };
 
 export const config = { path: '/.netlify/functions/player-ladder-events' };

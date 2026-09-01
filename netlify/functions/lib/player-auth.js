@@ -148,7 +148,13 @@ export async function requirePlayer(req) {
     return {
       session: { id: sessionId, email: session.email },
       playerId: lite.playerId, teamId: null, team: null,
-      player: { id: lite.playerId, name: lite.name, email: lite.email, gender: lite.gender || null },
+      // Same shape a roster entry has, so the profile endpoints (photo, bio,
+      // approvals) can treat a teamless player like any other.
+      player: {
+        id: lite.playerId, name: lite.name, email: lite.email, gender: lite.gender || null,
+        profile: lite.profile || {}, pendingProfile: lite.pendingProfile || null,
+        photo: lite.photo || null,
+      },
       lite: true,
     };
   }

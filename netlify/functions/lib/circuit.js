@@ -61,6 +61,30 @@ export function seasonName(raw) {
   return i >= 0 ? `Season ${i + 1}` : `Season ${code}`;
 }
 
+// Is this a real code we know how to key blobs with?
+const CANONICAL = new Set([...ROMAN, 'TEST']);
+export function isCanonicalCode(code) { return CANONICAL.has(String(code || '').toUpperCase()); }
+
+/**
+ * The canonical code for a SEASON RECORD, trying its id and then its name.
+ *
+ * A season's id is not guaranteed to look like "circuit-1" — it can be a slug
+ * or a generated key, and circuitCode() would then hand back that token
+ * verbatim ("SEASON-1", "S_9F2C"), which matches no standings or player-stats
+ * blob. Falling back to the display name ("Season 1" -> "I") is what keeps the
+ * public pages pointed at the data that actually exists.
+ */
+export function seasonCircuitCode(season) {
+  const fromId = circuitCode(season?.id);
+  if (isCanonicalCode(fromId)) return fromId;
+  for (const raw of [season?.circuit, season?.name, season?.label]) {
+    if (!raw) continue;
+    const c = circuitCode(raw);
+    if (isCanonicalCode(c)) return c;
+  }
+  return fromId;
+}
+
 // The season id ("circuit-i") for a given circuit code ("I").
 export function seasonIdForCircuit(code) {
   return 'circuit-' + circuitCode(code).toLowerCase();
