@@ -29,7 +29,7 @@
        current one, which flips a week before its start date). -->
   <script src="/js/season.js"></script>
   <script src="/js/short-name.js"></script>
-  <script src="/badges.js?v=2"></script>
+  <script src="/badges.js?v=3"></script>
   <style>
     /* ═══════════════════════════════════════
        PLAYER PROFILE — full-page layout
@@ -162,7 +162,9 @@
     .history-list { display: flex; flex-direction: column; gap: 0; }
     .history-row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--color-border); }
     .history-row:last-child { border-bottom: none; }
-    .history-season { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-lime); background: var(--color-lime-ghost); padding: 3px 8px; border-radius: 4px; flex-shrink: 0; min-width: 72px; text-align: center; }
+    .history-season { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--color-lime); background: var(--color-lime-ghost); padding: 3px 8px; border-radius: 4px; flex-shrink: 0; min-width: 72px; text-align: center; text-decoration: none; }
+    a.history-season:hover { background: var(--color-lime); color: var(--color-text-inverse); }
+    .history-row.is-viewing .history-season { background: var(--color-lime); color: var(--color-text-inverse); }
     .history-team { flex: 1; }
     .history-team__name { font-size: 13px; font-weight: 700; color: var(--color-text); text-decoration: none; }
     .history-team__name:hover { color: var(--color-teal); }
@@ -313,6 +315,24 @@
     let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
     let SEASON_NAME = null;   // filled from the season record, for the chips
     let ALL_SEASONS = [];     // every public season, for the cross-season fallback
+    // The season record being viewed (start date, tag) — for copy that names it.
+    function seasonRec() { return (ALL_SEASONS || []).find(x => x && x.id === SEASON_ID) || null; }
+    function seasonNameNow() { return SEASON_NAME || (seasonRec() && seasonRec().name) || 'This season'; }
+    function seasonStartText() {
+      const sr = seasonRec(); const d = sr && sr.startDate ? new Date(sr.startDate + 'T12:00:00') : null;
+      return d && !isNaN(d) ? d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }) : '';
+    }
+    // Season id for a history row's circuit code ('I' → 'season-1'), so the row
+    // can link to this same profile as it looked that season.
+    function seasonIdForCode(code) {
+      const c = String(code || '').toUpperCase();
+      const hit = (ALL_SEASONS || []).find(x => x && String(x.circuit || '').toUpperCase() === c);
+      return hit ? hit.id : null;
+    }
+    function profileHrefFor(seasonId, teamName) {
+      const t = teamName ? slug(teamName) : teamParam;
+      return `/player?team=${encodeURIComponent(t)}&name=${encodeURIComponent(playerName)}${seasonId ? '&season=' + encodeURIComponent(seasonId) : ''}`;
+    }
 
     /* ─── Load ────────────────────────────────────────────── */
     async function load() {
@@ -394,7 +414,7 @@
                    || allP.find(p => p.name === playerName);
 
       // If we have a player ID, fetch cross-season history + per-game log
-      let history = [], gameLog = [];
+      let history = [], gameLog = [], careerAwards = null;
       const resolvedId = pStat?.playerId || rosterPlayer?.id || '';
       if (resolvedId) {
         try {
@@ -403,6 +423,10 @@
             const hd = await hr.json();
             history = hd.history || [];
             gameLog = hd.games || [];
+            careerAwards = Array.isArray(hd.careerAwards) ? hd.careerAwards : null;
+            // A new season's roster entry has no photo stamp of its own; the
+            // endpoint finds the photo under whichever of her ids it was uploaded to.
+            if (!rosterPlayer.photoUrl && hd.photoUrl) rosterPlayer.photoUrl = hd.photoUrl;
             // merge partnerNames for display
             if (pStat && hd.partnerNames) pStat._partnerNames = hd.partnerNames;
           }
@@ -517,7 +541,7 @@
 
       // Load badge data first (config + grants) so the tabs can show the right
       // crest + pills per view, and house everything in a Trophy Case tab.
-      const badgeOpts = await loadBadgeOpts(pStat, resolvedId);
+      const badgeOpts = await loadBadgeOpts(pStat, resolvedId, careerAwards);
 
       // Some players also play the Ladder — pull that profile if present.
       let ladderData = null;
@@ -532,16 +556,21 @@
 
     /* ─── Badges + League / Ladder / Trophy Case tabs ──────── */
     // Load badge config + grants and build the opts the renderers read.
-    async function loadBadgeOpts(stat, pid) {
+    async function loadBadgeOpts(stat, pid, careerAwards) {
       if (!window.dsBadges) return null;
       let cfg = null, grants = [];
       try {
-        const qs = `circuit=${encodeURIComponent(CIRCUIT)}${pid ? '&playerId=' + encodeURIComponent(pid) : ''}`;
+        // all=1 → grants from every season and every roster id this person has
+        // held, so the Trophy Case is a career view rather than one season's.
+        const qs = `circuit=${encodeURIComponent(CIRCUIT)}${pid ? '&playerId=' + encodeURIComponent(pid) + '&all=1' : ''}`;
         const r = await fetch(`/.netlify/functions/public-badges?${qs}`);
         if (r.ok) { const d = await r.json(); cfg = d.config; grants = d.grants || []; }
       } catch {}
       if (cfg) dsBadges.setConfig(cfg);
-      return { awards: (stat && stat.awards) || [], ladder: null, grants, currentSeason: CIRCUIT,
+      // Career awards (every season, stamped with its season) when the profile
+      // endpoint supplied them; the viewed season's own list otherwise.
+      const awards = Array.isArray(careerAwards) && careerAwards.length ? careerAwards : ((stat && stat.awards) || []);
+      return { awards, ladder: null, grants, currentSeason: CIRCUIT,
                league: stat ? { w: stat.gamesWon, l: stat.gamesLost, gp: stat.gamesPlayed, matchesPlayed: stat.matchesPlayed } : null,
                // Per-week records → per-MATCH Undefeated badge (a night won ≥1, lost 0).
                // Falls back to the season-long league record above when absent.
@@ -899,7 +928,13 @@
         html += `<div class="pp-card" style="text-align:center;padding:var(--space-8);">
           <div style="font-size:32px;margin-bottom:var(--space-3)">📊</div>
           <div style="font-size:14px;font-weight:700;margin-bottom:var(--space-2)">Stats pending</div>
-          <div style="font-size:12px;color:var(--color-text-faint)">Game stats will appear here once Season 1 begins on June 8.</div>
+          <div style="font-size:12px;color:var(--color-text-faint)">${(() => {
+            const sr = seasonRec() || {}; const nm = esc(seasonNameNow()); const st = seasonStartText();
+            const started = sr.startDate && sr.startDate <= new Date().toISOString().slice(0, 10);
+            return started ? `No games recorded for ${nm} yet — stats land here after the first match night.`
+                           : `Game stats will appear here once ${nm} begins${st ? ' on ' + esc(st) : ''}.`;
+          })()}</div>
+          ${history.length ? `<div style="font-size:11px;color:var(--color-text-faint);margin-top:var(--space-3)">Looking for a past season? Tap a row under Season History.</div>` : ''}
         </div>`;
       }
 
@@ -912,11 +947,15 @@
           ${history.map(s => {
             const sp = pct(s.stats?.gamesWon || 0, s.stats?.gamesPlayed || 0);
             const tSlug = s.teamName ? slug(s.teamName) : '';
-            return `<div class="history-row">
-              <span class="history-season">${esc(s.seasonLabel || s.circuit)}</span>
+            const sid = seasonIdForCode(s.circuit);
+            const viewing = sid && sid === SEASON_ID;
+            const sHref = sid && !viewing ? profileHrefFor(sid, s.teamName) : '';
+            const sfx = sid ? '&season=' + encodeURIComponent(sid) : '';
+            return `<div class="history-row${viewing ? ' is-viewing' : ''}">
+              ${sHref ? `<a href="${sHref}" class="history-season" title="See this profile as it looked in ${esc(s.seasonLabel || s.circuit)}">${esc(s.seasonLabel || s.circuit)}</a>` : `<span class="history-season">${esc(s.seasonLabel || s.circuit)}${viewing ? ' · viewing' : ''}</span>`}
               <div class="history-team">
-                ${tSlug ? `<a href="/team?id=${tSlug}" class="history-team__name">${esc(s.teamName)}</a>` : `<span class="history-team__name">${esc(s.teamName || '—')}</span>`}
-                <div class="history-team__div">${s.year || ''}</div>
+                ${tSlug ? `<a href="/team?id=${tSlug}${sfx}" class="history-team__name">${esc(s.teamName)}</a>` : `<span class="history-team__name">${esc(s.teamName || '—')}</span>`}
+                <div class="history-team__div">${s.year || ''}${sHref ? ` · <a href="${sHref}" style="color:var(--color-teal);text-decoration:none;font-weight:700">View ${esc(s.seasonLabel || s.circuit)} stats →</a>` : ''}</div>
               </div>
               <div class="history-stat">
                 <div class="history-stat__record">${s.stats?.gamesWon ?? '—'}–${s.stats?.gamesLost ?? '—'}</div>
@@ -930,10 +969,10 @@
         const liveStat = stat && stat.gamesPlayed > 0;
         html += `<div class="history-list">
           <div class="history-row">
-            <span class="history-season">Season 1</span>
+            <span class="history-season">${esc(seasonNameNow())}</span>
             <div class="history-team">
-              <a href="/team?id=${teamSlug}" class="history-team__name">${esc(team.name)}</a>
-              <div class="history-team__div">2026 — In progress</div>
+              <a href="/team?id=${teamSlug}${LINK_SUFFIX}" class="history-team__name">${esc(team.name)}</a>
+              <div class="history-team__div">${(() => { const sr = seasonRec() || {}; const yr = (sr.startDate || '').slice(0, 4) || new Date().getFullYear(); return `${yr} — ${sr.tag || 'In progress'}`; })()}</div>
             </div>
             <div class="history-stat">
               ${liveStat

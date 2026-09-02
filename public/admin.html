@@ -602,7 +602,7 @@
       .tdp-jump button:active { background: var(--color-lime); color: var(--color-text-inverse); }
     }
   </style>
-  <script src="/badges.js?v=2"></script>
+  <script src="/badges.js?v=3"></script>
 </head>
 <body data-page="admin">
 <script>/*ds-embed-mode*/(function(){try{if(new URLSearchParams(location.search).get("embed")!=="1")return;document.documentElement.classList.add("embed");var st=document.createElement("style");st.textContent="html.embed .sb,html.embed .am-bottomnav,html.embed #mob-overlay,html.embed #mob-av{display:none!important}html.embed .admin-shell{grid-template-columns:1fr!important}";document.head.appendChild(st);}catch(e){}})();</script>
@@ -938,7 +938,11 @@
           .appr-diff__l { font-weight: 700; color: var(--color-text-muted); }
           .appr-diff__o { color: var(--color-text-faint); text-decoration: line-through; }
           .appr-diff__a { font-weight: 700; color: var(--color-lime); }
-          .appr-card__act { display: flex; gap: 8px; justify-content: flex-end; }
+          .radd-note { width: 100%; margin: 10px 0 4px; padding: 8px 11px; font-family: inherit; font-size: 12px;
+      background: var(--color-bg); color: var(--color-text); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+    .radd-note:focus { outline: none; border-color: var(--color-lime); }
+    .radd-note::placeholder { color: var(--color-text-faint); }
+    .appr-card__act { display: flex; gap: 8px; justify-content: flex-end; }
           @media (max-width: 560px) { .appr-diff { grid-template-columns: 88px 1fr; } .appr-diff__a { grid-column: 2; } }
         </style>
         <!-- PLAYERS — master roster with contact info -->
@@ -3157,6 +3161,8 @@
       </div>
       <div class="appr-diffs"><div class="appr-diff"><span class="appr-diff__l">Details</span><span class="appr-diff__a">${bits.length ? bits.join(' · ') : '<i>name only</i>'}</span></div></div>
       ${match}
+      <input class="radd-note" id="raddnote-${aEsc(p.teamId)}-${aEsc(p.playerId)}" type="text" maxlength="400"
+             placeholder="Optional note to the captain — included in the email" autocomplete="off">
       <div class="appr-card__act">
         <button class="ab ab--ghost ab--sm" onclick="actRosterAdd('${aEsc(p.teamId)}','${aEsc(p.playerId)}','reject',this)">Decline</button>
         <button class="ab ab--lime ab--sm" onclick="actRosterAdd('${aEsc(p.teamId)}','${aEsc(p.playerId)}','approve',this)">Add to roster</button>
@@ -3168,12 +3174,15 @@
     if (action === 'reject' && !confirm('Decline this add? The player is removed from the captain\u2019s request.')) return;
     if (btn) btn.disabled = true;
     try {
+      const noteEl = $id('raddnote-' + teamId + '-' + playerId);
+      const note = noteEl ? noteEl.value.trim() : '';
       const r = await api('/.netlify/functions/admin-roster-approvals', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ teamId, playerId, action }),
+        body: JSON.stringify({ teamId, playerId, action, note }),
       });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(d.error || 'Failed');
+      if (!d.notified) console.warn('No captain email on file for team', teamId, '— nobody was notified.');
       const card = $id('radd-' + teamId + '-' + playerId); if (card) card.remove();
       const box = $id('radd-list');
       RADD_COUNT = box.querySelectorAll('.appr-card').length;

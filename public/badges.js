@@ -205,10 +205,19 @@
     });
 
     // POTW / Chef of the Week — league-side, one per award.
+    // Awards may come from any season (career view) — each carries `season`
+    // (a circuit code like 'I'); the meta names it when it isn't the one being viewed.
+    var ROMAN = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    function seasonLabel(code) {
+      var c = String(code || '').toUpperCase(), n = ROMAN.indexOf(c) + 1;
+      return n ? 'Season ' + n : (c === 'TEST' ? 'Test Season' : c);
+    }
     (Array.isArray(opts.awards) ? opts.awards : []).forEach(function (a) {
+      var sn = a.season != null ? String(a.season) : null;
+      var tag = sn && CS && sn !== CS ? seasonLabel(sn) : '';
       push('potw', 'Week ' + a.week + ' ' + (a.type === 'womens' ? "Women's" : "Men's") + ' Chef',
-        [fmtDate(a.date), (a.w != null ? a.w + 'W–' + a.l + 'L' : ''), (a.diff != null ? (a.diff >= 0 ? '+' : '') + a.diff + ' pt diff' : '')].filter(Boolean).join(' · '), a.date,
-        { domain: 'league' });
+        [tag, fmtDate(a.date), (a.w != null ? a.w + 'W–' + a.l + 'L' : ''), (a.diff != null ? (a.diff >= 0 ? '+' : '') + a.diff + ' pt diff' : '')].filter(Boolean).join(' · '), a.date,
+        { domain: 'league', season: sn });
     });
 
     // League undefeated — per-week perfect records when supplied, else a season-to-date

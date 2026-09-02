@@ -92,7 +92,29 @@ export default async (req) => {
     // that was played but never finalized would otherwise vanish from her
     // record, so fill the gaps straight from that season's stats blob. There is
     // one blob per season, so this is a handful of small reads.
-    for (const past of await pastSeasonRows(ids, circuit, seen)) history.push(past);
+    const pastAwards = [];
+    const pastRows = await pastSeasonRows(ids, circuit, seen, pastAwards);
+    for (const past of pastRows) history.push(past);
+
+    // ── Career awards: POTW / Chef of the Week from every season ──
+    // Each season's stats blob carries that season's awards; the client used to
+    // read only the viewed season's, so a Season 1 POTW vanished on the Season 2
+    // view. Stamp the season so the Trophy Case can label them.
+    const careerAwards = [];
+    for (const a of (player?.awards || [])) careerAwards.push({ ...a, season: a.season || circuit });
+    for (const a of pastAwards) careerAwards.push(a);
+
+    // ── Profile photo, across her ids ──
+    // Photos are keyed by the roster id they were uploaded under. A new season
+    // means a new roster entry with no photo stamp, so look through every id.
+    let photoUrl = null;
+    try {
+      const ph = getStore('player-photos');
+      for (const id of ids) {
+        const meta = await ph.getMetadata(`img/${id}`).catch(() => null);
+        if (meta) { photoUrl = '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(id) + (meta.etag ? '&v=' + encodeURIComponent(meta.etag) : ''); break; }
+      }
+    } catch { photoUrl = null; }
 
     history.sort((a, b) => String(a.circuit || '').localeCompare(String(b.circuit || '')));
 
@@ -109,6 +131,8 @@ export default async (req) => {
       player,
       partnerNames,
       history,
+      careerAwards,
+      photoUrl,
       // Transparency for the UI: how many roster entries this profile covers.
       identity: { ids, merged: ids.length > 1 },
       ...(games ? { games } : {}),
@@ -210,7 +234,7 @@ async function buildGameLog(circuit, playerId, teamId, psData, ids = [playerId])
  * same row shape admin-finalize-season.js writes, marked `provisional` so the
  * UI can tell the difference if it ever wants to.
  */
-async function pastSeasonRows(ids, currentCircuit, seen) {
+async function pastSeasonRows(ids, currentCircuit, seen, awardsOut = []) {
   try {
     const store = getStore('player-stats');
     const { blobs } = await store.list().catch(() => ({ blobs: [] }));
@@ -224,6 +248,9 @@ async function pastSeasonRows(ids, currentCircuit, seen) {
       for (const id of ids) {
         const p = data.players[id];
         if (!p) continue;
+        // Awards are collected from every past season, finalized or not —
+        // finalized history rows don't carry them.
+        for (const a of (Array.isArray(p.awards) ? p.awards : [])) awardsOut.push({ ...a, season: a.season || code });
         const k = `${code}|${p.teamId || ''}`;
         if (seen.has(k)) continue;
         seen.add(k);

@@ -10,7 +10,8 @@
 // Public + cached; no auth.
 
 import { circuitCode } from './lib/circuit.js';
-import { getBadgeConfig, listGrantsForPlayer } from './lib/badges-config.js';
+import { identityIdsFor } from './lib/league-identity.js';
+import { getBadgeConfig, listGrantsForPlayer, listGrantsForIds } from './lib/badges-config.js';
 
 const LOGO_BASE = '/.netlify/functions/site-images-serve?id=';
 
@@ -38,7 +39,14 @@ export default async (req) => {
 
     const out = { season, config: { badges } };
     const pid = url.searchParams.get('playerId');
-    if (pid) out.grants = await listGrantsForPlayer(season, pid);
+    // ?all=1 → the career view: grants from every season, for every roster id
+    // this person has held. The default stays season-scoped for the standings
+    // pills and other per-season callers.
+    if (pid && url.searchParams.get('all') === '1') {
+      const ids = await identityIdsFor(pid).catch(() => [pid]);
+      out.grants = await listGrantsForIds(ids);
+      out.identity = { ids };
+    } else if (pid) out.grants = await listGrantsForPlayer(season, pid);
     return json(out);
   } catch (e) {
     console.error('public-badges error:', e);

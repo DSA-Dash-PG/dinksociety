@@ -227,6 +227,51 @@ export function renderCaptainMessageNotify({ teamName, captainName, body, adminU
 }
 
 /**
+ * Render the roster-add decision email — sent to a team's captain (and
+ * co-captains) when the league approves or declines a player they asked to add.
+ *
+ * A captain submits an add and then hears nothing; this closes that loop. On an
+ * approval it says the player is on the roster and can be picked; on a decline
+ * it points them at the league rather than leaving them guessing why.
+ *
+ * @param {{ approved:boolean, playerName:string, teamName:string, teamEmoji?:string,
+ *           seasonName?:string, decidedBy?:string, note?:string, portalUrl:string,
+ *           adminEmail?:string }} opts
+ */
+export function renderRosterAddDecision({ approved, playerName, teamName, teamEmoji, seasonName, note, portalUrl, adminEmail }) {
+  const accent = approved ? '#b8ff2c' : '#f0c040';
+  const kicker = approved ? 'Roster approved' : 'Roster request declined';
+  const headline = approved
+    ? `${escapeBody(playerName)} is on your roster`
+    : `${escapeBody(playerName)} wasn\u2019t added`;
+  const lede = approved
+    ? `The league approved your add for ${escapeBody(teamName)}${seasonName ? ' \u00b7 ' + escapeBody(seasonName) : ''}. They can be picked for a lineup right away.`
+    : `The league didn\u2019t approve this add for ${escapeBody(teamName)}${seasonName ? ' \u00b7 ' + escapeBody(seasonName) : ''}, so they\u2019ve been removed from your pending list.`;
+  const noteBlock = note
+    ? `<div style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 22px;padding:14px 16px;background:#161616;border-left:3px solid ${accent};border-radius:6px;">${escapeBody(note)}</div>`
+    : '';
+  const help = approved
+    ? ''
+    : `<p style="font-size:13px;color:#8a8a8a;margin:22px 0 0;line-height:1.6;">Think this was a mistake? Reply to this email${adminEmail ? ' or write to ' + escapeBody(adminEmail) : ''} and we\u2019ll take another look.</p>`;
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 24px;">THE DINK SOCIETY</div>
+      <div style="display:inline-block;font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#0e0e0e;background:${accent};border-radius:9999px;padding:4px 12px;margin-bottom:16px;">${kicker}</div>
+      <h1 style="font-size: 21px; font-weight: 800; color: #f5f5f5; margin: 0 0 8px;">${teamEmoji ? escapeBody(teamEmoji) + ' ' : ''}${headline}</h1>
+      <p style="font-size: 14px; color: #a5a5a5; margin: 0 0 22px; line-height: 1.6;">${lede}</p>
+      ${noteBlock}
+      <a href="${portalUrl}" style="display: inline-block; padding: 12px 28px; background: ${accent}; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
+        ${approved ? 'View your roster' : 'Open captain portal'}
+      </a>
+      ${help}
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        ${escapeBody(teamName)} \u00b7 The Dink Society \u00b7 Southern California Pickleball League
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Render a team-chat notification email. Sent to a teammate when another
  * player posts in their team's group chat.
  * @param {{ teamName:string, authorName:string, body:string, portalUrl:string }} opts

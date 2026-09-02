@@ -110,6 +110,31 @@ export async function listGrantsForPlayer(season, playerId) {
   } catch { return []; }
 }
 
+/**
+ * Every grant across EVERY season for a set of ids (one human can hold several
+ * roster ids — see lib/league-identity.js). Powers the career Trophy Case: a
+ * Season 1 award must still show on the Season 2 view of the same person.
+ * One prefixed list() over grants/, then only the matching keys are read.
+ */
+export async function listGrantsForIds(playerIds) {
+  const ids = new Set((Array.isArray(playerIds) ? playerIds : [playerIds]).filter(Boolean));
+  if (!ids.size) return [];
+  try {
+    const { blobs } = await store().list({ prefix: 'grants/' });
+    const keys = (blobs || []).map(b => b.key).filter(k => {
+      const m = /^grants\/([^/]+)\/(.+)\.json$/.exec(k);
+      return m && ids.has(m[2]);
+    });
+    const docs = await Promise.all(keys.map(k => store().get(k, { type: 'json' }).catch(() => null)));
+    const out = [];
+    keys.forEach((k, i) => {
+      const season = /^grants\/([^/]+)\//.exec(k)[1];
+      for (const g of (Array.isArray(docs[i]) ? docs[i] : [])) out.push({ ...g, season: g.season || season });
+    });
+    return out;
+  } catch { return []; }
+}
+
 // Grant `award` to many players at once (e.g. a whole championship roster).
 // award: { kind, scope?, type?, week?, label?, date?, season }
 export async function addGrant(season, playerIds, award, adminEmail) {

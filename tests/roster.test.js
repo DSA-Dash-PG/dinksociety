@@ -39,3 +39,50 @@ test('an empty or missing roster is handled, not thrown on', () => {
   assert.deepEqual(activeRoster({}), []);
   assert.deepEqual(activeRoster({ roster: [] }), []);
 });
+
+// ── The decision email ─────────────────────────────────────────────
+// A request that vanishes silently is worse than no approval step: the captain
+// re-adds the player and wonders why nothing sticks. These pin the two shapes.
+import { renderRosterAddDecision } from '../netlify/functions/lib/email.js';
+
+const strip = (h) => String(h).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+
+test('approval email says they are on the roster and can be played', () => {
+  const html = renderRosterAddDecision({
+    approved: true, playerName: 'Arica Green', teamName: 'Big Dink Energy',
+    seasonName: 'Season 2', portalUrl: 'https://dinksociety.app/captain.html',
+  });
+  const txt = strip(html);
+  assert.match(txt, /Roster approved/);
+  assert.match(txt, /Arica Green is on your roster/);
+  assert.match(txt, /picked for a lineup/);
+  assert.match(html, /https:\/\/dinksociety\.app\/captain\.html/);
+});
+
+test('decline email explains, carries the note, and offers a way back', () => {
+  const html = renderRosterAddDecision({
+    approved: false, playerName: 'Jane Doe', teamName: 'Bonkerz',
+    note: 'Roster is full for this division.',
+    portalUrl: 'https://dinksociety.app/captain.html', adminEmail: 'dink@dinksociety.app',
+  });
+  const txt = strip(html);
+  assert.match(txt, /declined/i);
+  assert.match(txt, /Roster is full for this division\./, 'the admin note reaches the captain');
+  assert.match(txt, /Think this was a mistake\?/);
+  assert.match(txt, /dink@dinksociety\.app/);
+});
+
+test('an empty note leaves no empty note block behind', () => {
+  const html = renderRosterAddDecision({
+    approved: false, playerName: 'Jane Doe', teamName: 'Bonkerz', portalUrl: '#',
+  });
+  assert.equal(html.includes('border-left:3px solid'), false);
+});
+
+test('names from the roster are escaped, not injected', () => {
+  const html = renderRosterAddDecision({
+    approved: true, playerName: '<script>alert(1)</script>', teamName: 'T', portalUrl: '#',
+  });
+  assert.match(html, /&lt;script&gt;/);
+  assert.equal(html.includes('<script>alert(1)</script>'), false);
+});
