@@ -530,8 +530,9 @@
     <div><label class="l">Players still needed (optional)</label><input class="i" id="m-needed" type="number" placeholder="auto = open spots"></div>
     <div style="display:flex;align-items:flex-end"><button class="btn btn-lime" style="width:100%" onclick="blastRecruit()">Email past players for this ladder</button></div>
   </div>
-  <button onclick="blastOpen()" style="margin-top:8px;width:100%;background:#161616;border:1px solid #2a2a2a;color:#f5f5f5;padding:12px;border-radius:9999px;font-weight:800;font-family:inherit;cursor:pointer;font-size:.85rem">Announce all open ladders to past players</button>
-  <div class="help" style="margin:6px 0 4px">Emails everyone who's ever played a ladder (not just the waitlist) — any admin can blast any ladder this way, organizers never can. Recruit targets this ladder (skips those already in) and works on any ladder regardless of status, including a 🔒 private one — you'll get an extra "send anyway?" confirmation first since that makes it public knowledge. Announce lists every open upcoming <i>public</i> ladder (private ones are always skipped there).</div>
+  <button onclick="blastOpen('ladder')" style="margin-top:8px;width:100%;background:#161616;border:1px solid #2a2a2a;color:#f5f5f5;padding:12px;border-radius:9999px;font-weight:800;font-family:inherit;cursor:pointer;font-size:.85rem">Announce to ladder players</button>
+  <button onclick="blastOpen('all')" style="margin-top:8px;width:100%;background:#b8ff2c;border:1px solid #b8ff2c;color:#0e0e0e;padding:12px;border-radius:9999px;font-weight:800;font-family:inherit;cursor:pointer;font-size:.85rem">Announce to ladder + league players</button>
+  <div class="help" style="margin:6px 0 4px"><b>Ladder players</b> = anyone who's played or signed up for a ladder, Challengers and Queen's Court alike. <b>Ladder + league</b> adds every player on a team roster; anyone who's never played a ladder gets an opening that explains what ladder nights are, and while a season is taking sign-ups both versions carry a "register your team" block with the start date. Nobody is emailed twice. Emails everyone who's ever played a ladder (not just the waitlist) — any admin can blast any ladder this way, organizers never can. Recruit targets this ladder (skips those already in) and works on any ladder regardless of status, including a 🔒 private one — you'll get an extra "send anyway?" confirmation first since that makes it public knowledge. Announce lists every open upcoming <i>public</i> ladder (private ones are always skipped there).</div>
   <div id="mBlastMsg"></div>
   </div><!-- /reminders -->
 
@@ -1447,12 +1448,23 @@ async function doBlastRecruit(needed, confirmPrivate){
   if(d&&d.ok){ msg('mBlastMsg','ok','Emailed '+d.sent+' past player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'); }
   else msg('mBlastMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }
-async function blastOpen(){
-  if(!(await dsConfirm({ title:'Announce open ladders?', message:'Announce all open upcoming ladders to every past player.', confirmLabel:'Announce all', cancelLabel:'Cancel' }))) return;
+async function blastOpen(audience){
+  audience = audience === 'all' ? 'all' : 'ladder';
+  const wide = audience === 'all';
+  if(!(await dsConfirm({
+    title: wide ? 'Announce to the whole league?' : 'Announce open ladders?',
+    message: wide
+      ? 'Emails every ladder player AND every player on a team roster. League players who have never played a ladder get an explainer, plus the season registration block if a season is open. Nobody gets it twice.'
+      : 'Announce all open upcoming ladders to everyone who has played or signed up for a ladder.',
+    confirmLabel: wide ? 'Send to everyone' : 'Announce', cancelLabel:'Cancel' }))) return;
   const box=document.getElementById('mBlastMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
-  const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'open'})});
+  const {status,d}=await api('/admin-ladder-blast',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({mode:'open',audience})});
   if(status===401){ msg('mBlastMsg','err','Sign in as admin first.'); return; }
-  if(d&&d.ok){ msg('mBlastMsg','ok','Announced to '+d.sent+' past player'+(d.sent===1?'':'s')+'.'); }
+  if(d&&d.ok){
+    const extra = d.newToLadders ? ' · '+d.newToLadders+' new to ladders' : '';
+    const season = d.seasonPitch ? ' · '+d.seasonPitch+' registration included' : '';
+    msg('mBlastMsg','ok','Announced to '+d.sent+' player'+(d.sent===1?'':'s')+extra+season+'.');
+  }
   else msg('mBlastMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }
 

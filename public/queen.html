@@ -102,6 +102,21 @@
 
   /* ── Rail ── */
   .rail{ position:sticky; top:80px; }
+  /* On phones the rail sits ABOVE the content (order:-1), so a sticky rail
+     rode over everything as you scrolled. There it scrolls away normally, and
+     a one-line bar at the bottom of the screen takes over once the register
+     card is out of view — date · night · spots · Register. */
+  @media(max-width:900px){ .rail{ position:static; top:auto; } body{ padding-bottom:0; } }
+  .mbar{ display:none; position:fixed; left:0; right:0; bottom:0; z-index:300; padding:8px 12px calc(8px + env(safe-area-inset-bottom)); background:rgba(11,13,10,.92); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); border-top:1px solid var(--bd); transform:translateY(110%); transition:transform .22s ease; }
+  .mbar.on{ transform:translateY(0); }
+  .mbar .in{ display:flex; align-items:center; gap:10px; }
+  .mbar .t{ flex:1; min-width:0; }
+  .mbar .d{ font-size:.56rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); }
+  .mbar b{ display:block; font-size:.8rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .mbar small{ font-size:.64rem; color:var(--mut); font-weight:700; }
+  .mbar .btn{ margin-top:0; padding:9px 16px; font-size:.74rem; white-space:nowrap; }
+  @media(max-width:900px){ .mbar{ display:block; } body.has-mbar .wrap{ padding-bottom:110px; } }
+  @media(prefers-reduced-motion:reduce){ .mbar{ transition:none; } }
   .evc{ background:#000; border:1px solid var(--bd); border-left:3px solid var(--acc); border-radius:14px; padding:14px; margin-bottom:12px; }
   .evc .dt{ font-size:.6rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); }
   .evc h4{ margin:3px 0 5px; font-size:.94rem; font-weight:900; }
@@ -452,6 +467,7 @@
 </div>
 
 <div class="toast" id="toast"></div>
+<div class="mbar" id="mbar" aria-hidden="true"></div>
 
 <div data-partial="footer"></div>
 <script src="/js/partials.js"></script>
@@ -607,6 +623,30 @@ function renderRail() {
     </div>`;
   }).join('');
   document.getElementById('railSub').textContent = OPEN.length === 1 ? 'One women\'s ladder open' : OPEN.length + ' women\'s ladders open';
+  renderMbar();
+}
+
+/* Compact register bar for phones — the first open night, shown only while the
+   full register card up top is scrolled out of view. */
+let MBAR_IO = null;
+function renderMbar() {
+  const bar = document.getElementById('mbar');
+  const l = OPEN[0];
+  if (!l) { bar.innerHTML = ''; bar.classList.remove('on'); document.body.classList.remove('has-mbar'); if (MBAR_IO) { MBAR_IO.disconnect(); MBAR_IO = null; } return; }
+  const left = l.spotsLeft, pair = l.format === 'fixed-partner';
+  const spots = left == null ? '' : left === 0 ? 'Full — waitlist' : left + ' spot' + (left === 1 ? '' : 's') + ' left';
+  bar.innerHTML = `<div class="in"><div class="t"><div class="d">${esc(wd(l.date))}${l.startTime ? ' · ' + esc(l.startTime) : ''}</div><b>${esc(l.name)}</b>${spots ? `<small>${esc(spots)}</small>` : ''}</div>
+    <a class="btn" href="/ladders.html#ladders/${encodeURIComponent(l.id)}">${left === 0 ? 'Waitlist' : pair ? 'Register a pair' : 'Register'}</a></div>`;
+  document.body.classList.add('has-mbar');
+  const card = document.querySelector('#railBody .evc');
+  if (MBAR_IO) MBAR_IO.disconnect();
+  if (!card || !('IntersectionObserver' in window)) { bar.classList.add('on'); return; }
+  MBAR_IO = new IntersectionObserver(([e]) => {
+    // Show the bar once the big card has left the screen (in either direction).
+    bar.classList.toggle('on', !e.isIntersecting);
+    bar.setAttribute('aria-hidden', e.isIntersecting ? 'true' : 'false');
+  }, { threshold: 0 });
+  MBAR_IO.observe(card);
 }
 
 /* ══════════════ overview ══════════════ */
