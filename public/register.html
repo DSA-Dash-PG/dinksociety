@@ -317,7 +317,7 @@
   .ln-closed{background:var(--color-gold-dim);border:1px solid rgba(240,192,64,.3);color:var(--color-gold);border-radius:12px;padding:13px 15px;font-size:13.5px;font-weight:600;text-align:center;margin:0 0 16px}
 </style>
 </head>
-<body data-page="register">
+<body data-page="register" data-season-pill="off">
   <div data-partial="nav"></div>
 
   <!-- ── Hero (season image) ── -->
@@ -325,7 +325,7 @@
     <div class="ln-hero__img ln-ph" id="ln-hero-img" data-hero-slot="register"></div>
     <div class="ln-hero__scrim"></div>
     <div class="ln-wrap ln-hero__in">
-      <div class="ln-eyebrow"><span data-circuit-label>Season</span> · <span id="ln-reg-state">Registration</span></div>
+      <div class="ln-eyebrow"><span data-reg-season-label>Season</span> · <span id="ln-reg-state">Registration</span></div>
       <h1 id="ln-hero-title">Play the <span class="lime">Society.</span></h1>
       <p class="ln-hero__sub" id="ln-hero-sub">Southern California's night-match pickleball league. Team up, climb the standings, and chase gold.</p>
       <div class="ln-facts" id="ln-facts"></div>
@@ -345,13 +345,13 @@
   <!-- ── Season ticket — league details. Static copy; the date strip refreshes
        from the season record (startDate + weeks) in renderLanding. ── -->
   <section class="ln-sec" id="ln-ticket-sec"><div class="ln-wrap">
-    <div class="ln-eyebrow" style="justify-content:center">Season 2 · The details</div>
+    <div class="ln-eyebrow" style="justify-content:center"><span data-reg-season-label>Season</span> · The details</div>
     <h2 style="text-align:center">Your ticket in.</h2>
     <div class="tkt-wrap">
       <div class="tkt">
         <div class="tkt__top">
           <div class="adm"><span>The Dink Society · Admit One Team</span><span class="live" id="tkt-reg-state">● Registration open</span></div>
-          <h3>Season <span class="lime">Two</span></h3>
+          <h3 id="tkt-season"><span class="lime" data-reg-season-label>Season</span></h3>
           <div class="sub">Thursday Night League</div>
           <div class="sub" id="tkt-venue" style="display:none"></div>
         </div>
@@ -467,7 +467,7 @@
       <div class="ln-eyebrow">The scrapbook</div><h2>A night at the Society.</h2>
       <p class="ln-lede">Straight off the courts — and the pile keeps growing all season.</p>
       <div class="ln-polrow" id="ln-polrow" style="margin-top:30px">
-        <div class="ln-pol r1"><div class="ph"></div><span class="cap">Season 2 loading…</span></div>
+        <div class="ln-pol r1"><div class="ph"></div><span class="cap">Loading…</span></div>
         <div class="ln-pol r2"><div class="ph"></div><span class="cap">Under the lights</span></div>
         <div class="ln-pol r3"><div class="ph"></div><span class="cap">See you Thursday</span></div>
       </div>
@@ -490,7 +490,7 @@
   <!-- ── Registration ── -->
   <div id="register"></div>
   <section class="ln-sec alt" style="padding-bottom:20px"><div class="ln-wrap ln-reghead">
-    <div class="ln-eyebrow" style="justify-content:center"><span data-circuit-label>Season</span> · Registration</div>
+    <div class="ln-eyebrow" style="justify-content:center"><span data-reg-season-label>Season</span> · Registration</div>
     <h2>Lock in your spot.</h2>
   </div></section>
 
@@ -672,8 +672,14 @@
         // upcoming, else the most recent. Lets the page render even when registration
         // is closed (private preview) — the CTA + form reflect the open/closed state.
         activeSeason = pickFeatured(seasons);
+        // The season you REGISTER for is not always the season the site is
+        // showing: Season 1 stays live until Season 2 flips a week before its
+        // start, so during that window this page sells Season 2 while the rest
+        // of the site is still on Season 1. The nav owns [data-circuit-label]
+        // (the viewed season) and would overwrite these, so the registration
+        // labels carry their own attribute.
         const lbl = activeSeason.name || activeSeason.label || 'Season';
-        document.querySelectorAll('[data-circuit-label]').forEach(el => { el.textContent = lbl; });
+        document.querySelectorAll('[data-reg-season-label]').forEach(el => { el.textContent = lbl; });
         document.title = lbl + ' · The Dink Society';
         renderDivisions(activeSeason.divisions || []);
         renderSchedule(activeSeason);
