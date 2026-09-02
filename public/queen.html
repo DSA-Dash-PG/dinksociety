@@ -187,6 +187,9 @@
   .kit-sub{ font-size:.64rem; color:var(--mut); margin-bottom:8px; }
   .kit-row{ display:flex; gap:8px; align-items:center; padding:5px 0; border-top:1px solid rgba(255,255,255,.06); font-size:.78rem; }
   .kit-row:first-of-type{ border-top:0; }
+  .kit-row .rk{ width:16px; font-size:.68rem; font-weight:900; color:var(--fnt); flex-shrink:0; }
+  .kit-row .rk.top{ color:var(--gold); }
+  .kit-row.tie{ justify-content:center; color:var(--fnt); font-size:.68rem; font-weight:700; font-style:italic; }
   .kit-row .n{ flex:1; font-weight:700; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .kit-row .v{ font-weight:900; color:var(--acc); font-variant-numeric:tabular-nums; }
   .kit-row .x{ font-size:.62rem; color:var(--fnt); font-weight:700; }
@@ -823,23 +826,43 @@ function renderResults() {
 /* Categories mirror lib/ladder-kitchen.js. Anything the API adds later that
    isn't listed here is simply not rendered rather than breaking the tab. */
 const KIT_CATS = [
-  { k:'oneNightWonder', e:'🌟', t:'One-Night Wonder',   s:'Best single-night record' },
-  { k:'kingOfCourt',    e:'👑', t:'Queen of the Court', s:'Most rounds on the top court' },
-  { k:'perRoundTop',    e:'📊', t:'Per-Round Top',      s:'Best average per round' },
-  { k:'mostPoints',     e:'🎯', t:'Most Points',        s:'Total points scored' },
+  { k:'oneNightWonder', e:'🌟', t:'One-Night Wonder',   s:'Most pts in a single night' },
+  { k:'kingOfTheCourt', e:'👑', t:'Queen of the Court', s:'Wins on the top court' },
+  { k:'perRoundTop',    e:'📊', t:'Per-Round Top',      s:'Highest avg pts (min 6 games)' },
+  { k:'mostPoints',     e:'🎯', t:'Most Points',        s:'Season total incl. bonus' },
   { k:'hotStreak',      e:'🔥', t:'Hot Streak',         s:'Longest run of wins' },
-  { k:'bestDuo',        e:'🤝', t:'Best Duo',           s:'Best record as partners' },
-  { k:'theWall',        e:'🧱', t:'The Wall',           s:'Fewest points allowed' },
+  { k:'bestDuo',        e:'🤝', t:'Best Duo',           s:'Win % (min 3 games together)' },
+  { k:'theWall',        e:'🧱', t:'The Wall',           s:'Lowest avg pts allowed (min 6 games)' },
   { k:'ironPlayer',     e:'🛡️', t:'Iron Player',        s:'Most nights played' },
   { k:'bigMover',       e:'📈', t:'Big Mover',          s:'Biggest climb in a night' },
   { k:'beatDown',       e:'💥', t:'Beat Down',          s:'Biggest margin of victory' },
-  { k:'comebackKid',    e:'🔄', t:'Comeback Kid',       s:'Best finish from a low start' },
-  { k:'highestGame',    e:'⚡', t:'Highest Single Game', s:'Most points in one game' },
+  { k:'comebackKid',    e:'🔄', t:'Comeback Kid',       s:'Wins after a loss' },
+  { k:'highestSingleGame', e:'⚡', t:'Highest Single Game', s:'Most pts in one round' },
 ];
-function kitRow(r, i) {
-  const name = r.name || (r.a && r.b ? r.a + ' & ' + r.b : '—');
-  const val = r.value != null ? r.value : (r.count != null ? r.count : (r.w != null ? r.w + '-' + r.l : ''));
-  return `<div class="kit-row"><span class="n">${esc(name)}</span>${r.extra ? `<span class="x">${esc(r.extra)}</span>` : ''}<span class="v">${esc(String(val))}</span></div>`;
+/* Row shapes come straight from lib/ladder-kitchen.js (same as ladders.html's
+   kitRowHtml) — each category carries different fields, so the value/meta
+   shown is picked per category. A `{tie:true,count}` sentinel closes a tied
+   last spot. */
+function kitRow(cat, r, i) {
+  if (r.tie) return `<div class="kit-row tie">${r.count} players tied for the last spot</div>`;
+  const rk = `<span class="rk${i < 3 ? ' top' : ''}">${i + 1}</span>`;
+  let nm, xt = '', vl = '';
+  switch (cat.k) {
+    case 'bestDuo':           nm = `${esc(r.a)} + ${esc(r.b)}`; xt = `${r.w}-${r.l}`; vl = `${r.pct}%`; break;
+    case 'oneNightWonder':    nm = esc(r.name); xt = r.date || ''; vl = r.pts; break;
+    case 'kingOfTheCourt':    nm = esc(r.name); vl = `${r.wins} W`; break;
+    case 'perRoundTop':       nm = esc(r.name); xt = `${r.games}g`; vl = r.avg; break;
+    case 'mostPoints':        nm = esc(r.name) + (r.crownStr ? ' ' + r.crownStr : ''); vl = r.total; break;
+    case 'hotStreak':         nm = esc(r.name); vl = `W${r.streak}`; break;
+    case 'theWall':           nm = esc(r.name); vl = r.avg; break;
+    case 'ironPlayer':        nm = esc(r.name); vl = r.nights; break;
+    case 'bigMover':          nm = esc(r.name); xt = r.date || ''; vl = `+${r.climb}`; break;
+    case 'beatDown':          nm = esc(r.name); xt = `Rd ${r.round}`; vl = `+${r.margin}`; break;
+    case 'comebackKid':       nm = esc(r.name); vl = r.count; break;
+    case 'highestSingleGame': nm = esc(r.name); xt = `Rd ${r.round}`; vl = r.pts; break;
+    default:                  nm = esc(r.name || (r.a && r.b ? r.a + ' & ' + r.b : '—')); vl = r.value != null ? r.value : (r.count != null ? r.count : '');
+  }
+  return `<div class="kit-row">${rk}<span class="n">${nm}</span>${xt ? `<span class="x">${esc(String(xt))}</span>` : ''}<span class="v">${esc(String(vl ?? ''))}</span></div>`;
 }
 function renderKitchen() {
   const el = document.getElementById('kitchenBody');
@@ -847,7 +870,7 @@ function renderKitchen() {
   const cards = KIT_CATS.map(c => {
     const rows = Array.isArray(k[c.k]) ? k[c.k] : (k[c.k] ? [k[c.k]] : []);
     if (!rows.length) return '';
-    return `<div class="kit-card"><div class="kit-h">${c.e} ${esc(c.t)}</div><div class="kit-sub">${esc(c.s)}</div>${rows.slice(0, 5).map(kitRow).join('')}</div>`;
+    return `<div class="kit-card"><div class="kit-h">${c.e} ${esc(c.t)}</div><div class="kit-sub">${esc(c.s)}</div>${rows.map((r, i) => kitRow(c, r, i)).join('')}</div>`;
   }).filter(Boolean).join('');
   el.innerHTML = cards
     ? `<div class="kit-grid">${cards}</div>`
