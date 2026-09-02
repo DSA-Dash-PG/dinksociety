@@ -342,8 +342,10 @@
     <div><b>🧾</b> <span>The Society keeps receipts</span></div>
   </div></div>
 
-  <!-- ── Season ticket — league details. Static copy; the date strip refreshes
-       from the season record (startDate + weeks) in renderLanding. ── -->
+  <!-- ── Season ticket — league details. Level, Length and the date strip all
+       refresh from the season record in renderLanding; the markup below is the
+       pre-load fallback. Bracket and Playoffs are still static copy — there is
+       no field behind them on the season record yet. ── -->
   <section class="ln-sec" id="ln-ticket-sec"><div class="ln-wrap">
     <div class="ln-eyebrow" style="justify-content:center"><span data-reg-season-label>Season</span> · The details</div>
     <h2 style="text-align:center">Your ticket in.</h2>
@@ -356,9 +358,9 @@
           <div class="sub" id="tkt-venue" style="display:none"></div>
         </div>
         <div class="tkt__meta">
-          <div class="tf"><div class="k">Level</div><div class="v lime">3.5+ Mix</div></div>
+          <div class="tf"><div class="k">Level</div><div class="v lime" id="tkt-level">3.5+ Mix</div></div>
           <div class="tf"><div class="k">Bracket</div><div class="v">Adv-Intermediate</div></div>
-          <div class="tf"><div class="k">Length</div><div class="v">8 Weeks</div></div>
+          <div class="tf"><div class="k">Length</div><div class="v" id="tkt-length">8 Weeks</div></div>
           <div class="tf"><div class="k">Playoffs</div><div class="v lime">Included</div></div>
         </div>
         <div class="tkt__dates">
@@ -1050,6 +1052,17 @@
       setTxt('fmt-games', String(totalGames));
       setTxt('fmt-count', totalGames + ' games · ' + rounds + ' rounds of ' + perRound);
       if (s.weeks) setTxt('fmt-weeks', String(s.weeks));
+
+      // Ticket meta — Level mirrors the division name(s) so it can't drift from
+      // the hero chip, Length mirrors the season week count. Both keep the
+      // markup's copy if the season record has nothing to say.
+      const tLevel = document.getElementById('tkt-level');
+      if (tLevel && divs.length) {
+        tLevel.textContent = divs.map(d => d.name).filter(Boolean).join(' · ') || tLevel.textContent;
+      }
+      const tLength = document.getElementById('tkt-length');
+      const nWeeks = parseInt(s.weeks, 10);
+      if (tLength && nWeeks > 0) tLength.textContent = nWeeks + (nWeeks === 1 ? ' Week' : ' Weeks');
 
       // Where the season is played. Season 2 moved to South End; the venue is a
       // field on the season record so a future move is an admin edit, not a deploy.
