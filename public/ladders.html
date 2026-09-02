@@ -111,6 +111,15 @@
     table.lbt td{ font-size:.8rem; font-weight:700; padding:10px; border-bottom:1px solid rgba(255,255,255,.05); }
     table.lbt td.num,table.lbt th.num{ text-align:right; font-variant-numeric:tabular-nums; }
     table.lbt tr[onclick]:hover td{ background:rgba(255,255,255,.03); }
+    /* Player avatars on the leaderboard — photo when she has one, initials
+       painted by ::before underneath so a missing photo just shows through. */
+    .lav{ position:relative; width:30px; height:30px; border-radius:50%; flex-shrink:0; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; background:linear-gradient(145deg,#262a22,#121410); border:1px solid rgba(255,255,255,.14); font-size:.58rem; font-weight:900; letter-spacing:.03em; color:#dfe3d8; font-style:normal; }
+    .lav::before{ content:attr(data-ini); position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+    .lav img{ position:relative; z-index:1; width:100%; height:100%; object-fit:cover; display:block; }
+    .lav.pod{ width:46px; height:46px; font-size:.8rem; margin:0 auto 6px; display:flex; border-width:2px; }
+    .lav.tbl{ width:28px; height:28px; margin-right:9px; }
+    .lavpair{ display:inline-flex; flex-shrink:0; } .lavpair .lav+.lav{ margin-left:-9px; }
+    .lavpair.pod{ justify-content:center; margin-bottom:6px; }
     .kit-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   }
   .tabs button{ flex:0 0 auto; white-space:nowrap; padding:8px 14px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; }
@@ -344,6 +353,15 @@ let ACTIVE=[], COMPLETED=[], STATS=null, MYCREDIT=0, FT='all', FD='all', MYREG={
 // ladders need it to check eligibility; null means the signup sheet asks.
 let MYGENDER=null;
 const esc=s=>String(s||'').replace(/[<>&]/g,m=>({'<':'&lt;','>':'&gt;','&':'&amp;'}[m]));
+// Profile photos for ladder ids (public-ladder-avatars) — fetched once after the
+// leaderboard first paints, then the board repaints with pictures. Initials
+// (first + last name) until then, and for anyone without a photo.
+let AVATARS={}; const AV_ASKED=new Set();
+const lavIni=n=>{ const p=String(n||'').split(' & ')[0].trim().split(/\s+/).filter(Boolean); return p.length?((p[0][0]||'')+(p.length>1?(p[p.length-1][0]||''):'')).toUpperCase():'?'; };
+function lav(id,name,cls){ const u=id&&AVATARS[id]; return `<span class="lav${cls?' '+cls:''}" data-ini="${esc(lavIni(name))}" aria-hidden="true">${u?`<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">`:''}</span>`; }
+function lavFor(p,cls){ if(p&&p.pair&&Array.isArray(p.ids)&&p.ids.length) return `<span class="lavpair${cls?' '+cls:''}">${p.ids.map((id,i)=>lav(id,(p.names||[])[i]||'',cls==='pod'?'':cls)).join('')}</span>`; return lav(p&&p.id,p&&p.name,cls); }
+const lavIds=rows=>(rows||[]).flatMap(r=>r&&r.pair?(r.ids||[]):[r&&r.id]).filter(Boolean);
+async function ensureAvatars(ids,onDone){ const want=[...new Set(ids)].filter(id=>!AV_ASKED.has(id)); if(!want.length) return; want.forEach(id=>AV_ASKED.add(id)); try{ const d=await (await fetch(`${API}/public-ladder-avatars?ids=${encodeURIComponent(want.join(','))}`)).json(); const got=d.photos||{}; if(!Object.keys(got).length) return; Object.assign(AVATARS,got); if(onDone) onDone(); }catch(e){} }
 
 // Minimal markdown renderer used by ladder description / rules panels. Keep in
 // sync with the version in admin-ladders.html — supports headings, **bold**,
@@ -474,6 +492,8 @@ async function init(){
   // Photo albums for the latest-night scrapbook feature — best-effort, after
   // first paint; the polaroids/ticker pop in when the albums land.
   fetch(`${API}/public-ladder-photos`).then(r=>r.json()).then(p=>{ PHALBUMS=p.albums||[]; renderWinners(); }).catch(()=>{});
+  // Leaderboard avatars — every board's rows in one request, repaint when they land.
+  { const d=(st&&st.divisions)||{}; const ids=lavIds((st&&st.leaderboard)||[]).concat(...Object.values(d).map(lavIds)); ensureAvatars(ids,()=>renderStats()); }
   route(); // also sets the initial desktop dtab, from the hash (defaults to Overview)
   // Recap teasers for the register tab (best-effort, renders whenever it lands)
   try{ const rr=await fetch(`${API}/public-ladder-recaps`); if(rr.ok){ RECAPS=(await rr.json()).recaps||[]; renderRecaps(); } }catch(e){}
@@ -1013,7 +1033,7 @@ function lbCell(p,r,m){ m=m||'pts'; const c=POD3[r]; const drTxt=p.dr==null?'–
     stats=`<span style="color:var(--mut);font-size:.64rem;min-width:30px;text-align:right">${p.w}–${p.l}</span><span style="font-weight:900;color:${lbMC(m)};font-size:.82rem;min-width:30px;text-align:right;text-shadow:0 0 9px ${lbGLOW(m)}">${lbVal(p,m)}</span>`;
   }
   const rkCell=`<span style="display:flex;flex-direction:column;align-items:center;min-width:26px;gap:1px"><span style="font-weight:800;color:${c||'var(--mut)'};font-size:.72rem">${r}</span>${p._sec?`<span style="font-size:.52rem;font-weight:800;line-height:1;white-space:nowrap">${p._sec}</span>`:''}</span>`;
-  return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer;min-width:0">${rkCell}<span style="flex:1;min-width:0;font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis${p.pair?';white-space:normal;line-height:1.2;font-size:.74rem':''}">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</span>${stats}</div>`; }
+  return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer;min-width:0">${rkCell}${lavFor(p)}<span style="flex:1;min-width:0;font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis${p.pair?';white-space:normal;line-height:1.2;font-size:.74rem':''}">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</span>${stats}</div>`; }
 function lbPodium(p,r,m){ m=m||'pts'; const rc=POD3[r]; const drTxt=p.dr==null?'–':p.dr; const mc=lbMC(m), glow=lbGLOW(m); let heroBlock,pills;
   if(winsFirst(m)){
     const ladders=p.nights||0;
@@ -1025,7 +1045,7 @@ function lbPodium(p,r,m){ m=m||'pts'; const rc=POD3[r]; const drTxt=p.dr==null?'
     pills=`<span style="font-size:.58rem;font-weight:900;color:var(--lime);background:rgba(184,255,44,.12);border-radius:6px;padding:2px 7px">${p.w}–${p.l}</span><span style="font-size:.58rem;font-weight:800;color:var(--mut);background:var(--surf2);border-radius:6px;padding:2px 7px">${second}</span>`;
   }
   if(p._sec) pills=`<span style="font-size:.55rem;font-weight:800;color:#cdd2c6;background:var(--surf2);border-radius:6px;padding:2px 7px">${p._sec}</span>`+pills;
-  return `<div onclick="profile('${p.id}')" style="flex:1;min-width:0;background:var(--surf);border:1px solid ${rc}55;border-radius:12px;overflow:hidden;cursor:pointer"><div style="display:flex;align-items:center;justify-content:center;padding:5px;border-bottom:1px solid ${rc}55;background-color:${rc}1a;background-image:repeating-linear-gradient(135deg,${rc}2e 0 6px,transparent 6px 12px)"><span style="display:inline-flex;align-items:center;gap:3px;font-size:.55rem;font-weight:900;color:${rc};letter-spacing:.07em">${r===1?crown('#b8ff2c',12):''}${String(lbOrd(r)).toUpperCase()}</span></div><div style="padding:8px 6px 9px;text-align:center"><div style="font-size:.88rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;line-height:1.2">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</div>${heroBlock}<div style="display:flex;gap:4px;justify-content:center;margin-top:7px">${pills}</div></div></div>`; }
+  return `<div onclick="profile('${p.id}')" style="flex:1;min-width:0;background:var(--surf);border:1px solid ${rc}55;border-radius:12px;overflow:hidden;cursor:pointer"><div style="display:flex;align-items:center;justify-content:center;padding:5px;border-bottom:1px solid ${rc}55;background-color:${rc}1a;background-image:repeating-linear-gradient(135deg,${rc}2e 0 6px,transparent 6px 12px)"><span style="display:inline-flex;align-items:center;gap:3px;font-size:.55rem;font-weight:900;color:${rc};letter-spacing:.07em">${r===1?crown('#b8ff2c',12):''}${String(lbOrd(r)).toUpperCase()}</span></div><div style="padding:8px 6px 9px;text-align:center">${lavFor(p,'pod')}<div style="font-size:.88rem;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;line-height:1.2">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</div>${heroBlock}<div style="display:flex;gap:4px;justify-content:center;margin-top:7px">${pills}</div></div></div>`; }
 // Desktop-only full table (mobile keeps the compact cells — toggled via CSS).
 function lbTable(rows,m){
   if(!rows||!rows.length) return '';
@@ -1034,7 +1054,7 @@ function lbTable(rows,m){
   const head=`<tr><th style="width:44px;text-align:center">#</th><th>Player</th><th class="num">W–L</th><th class="num">Win %</th><th class="num" style="${m==='total'||m==='wins'?'color:var(--lime)':''}">Pts</th><th class="num" style="${m==='xp'?'color:var(--teal)':''}">XP</th><th class="num" style="${m==='dr'?'color:var(--purp)':''}">DR</th></tr>`;
   const rws=rows.map((p,i)=>{
     const c=POD3[i+1]||'';
-    return `<tr onclick="profile('${p.id}')" style="cursor:pointer"><td style="text-align:center;font-weight:900;color:${c||'var(--fnt)'}">${i+1}</td><td style="text-align:left">${esc(firstLast(p.name))}${p._sec?` <span style="font-size:.6rem;font-weight:800;margin-left:6px">${p._sec}</span>`:''}</td><td class="num">${p.w||0}–${p.l||0}</td><td class="num" style="color:var(--mut)">${wpct(p)}</td><td class="num" style="${hl('total')}">${lbVal(p,'total')}</td><td class="num" style="color:var(--teal);${m==='xp'?'font-weight:900':''}">${p.xp||0}</td><td class="num" style="color:var(--purp);${m==='dr'?'font-weight:900':''}">${p.dr==null?'–':p.dr}</td></tr>`;
+    return `<tr onclick="profile('${p.id}')" style="cursor:pointer"><td style="text-align:center;font-weight:900;color:${c||'var(--fnt)'}">${i+1}</td><td style="text-align:left"><span style="display:inline-flex;align-items:center">${lavFor(p,'tbl')}${esc(firstLast(p.name))}</span>${p._sec?` <span style="font-size:.6rem;font-weight:800;margin-left:6px">${p._sec}</span>`:''}</td><td class="num">${p.w||0}–${p.l||0}</td><td class="num" style="color:var(--mut)">${wpct(p)}</td><td class="num" style="${hl('total')}">${lbVal(p,'total')}</td><td class="num" style="color:var(--teal);${m==='xp'?'font-weight:900':''}">${p.xp||0}</td><td class="num" style="color:var(--purp);${m==='dr'?'font-weight:900':''}">${p.dr==null?'–':p.dr}</td></tr>`;
   }).join('');
   return `<table class="lbt">${head}${rws}</table>`;
 }
@@ -1045,7 +1065,7 @@ function lbTableUnq(rows,m){
   const wpct=p=>{ const g=(p.w||0)+(p.l||0); return g?Math.round(100*(p.w||0)/g)+'%':'–'; };
   const hl=(k)=> (m===k||(k==='total'&&(m==='wins'||m==='total')))?'color:var(--lime);font-weight:900':'color:var(--mut)';
   const head=`<tr><th style="width:88px;text-align:center">Status</th><th>Player</th><th class="num">W–L</th><th class="num">Win %</th><th class="num" style="${m==='total'||m==='wins'?'color:var(--lime)':''}">Pts</th><th class="num" style="${m==='xp'?'color:var(--teal)':''}">XP</th><th class="num" style="${m==='dr'?'color:var(--purp)':''}">DR</th></tr>`;
-  const rws=rows.map(p=>`<tr onclick="profile('${p.id}')" style="cursor:pointer;opacity:.75"><td style="text-align:center;font-size:.6rem;font-weight:800;color:var(--fnt);text-transform:uppercase;letter-spacing:.03em">Unqualified</td><td style="text-align:left">${esc(firstLast(p.name))}</td><td class="num">${p.w||0}–${p.l||0}</td><td class="num" style="color:var(--mut)">${wpct(p)}</td><td class="num" style="${hl('total')}">${lbVal(p,'total')}</td><td class="num" style="color:var(--teal);${m==='xp'?'font-weight:900':''}">${p.xp||0}</td><td class="num" style="color:var(--purp);${m==='dr'?'font-weight:900':''}">${p.dr==null?'–':p.dr}</td></tr>`).join('');
+  const rws=rows.map(p=>`<tr onclick="profile('${p.id}')" style="cursor:pointer;opacity:.75"><td style="text-align:center;font-size:.6rem;font-weight:800;color:var(--fnt);text-transform:uppercase;letter-spacing:.03em">Unqualified</td><td style="text-align:left"><span style="display:inline-flex;align-items:center">${lavFor(p,'tbl')}${esc(firstLast(p.name))}</span></td><td class="num">${p.w||0}–${p.l||0}</td><td class="num" style="color:var(--mut)">${wpct(p)}</td><td class="num" style="${hl('total')}">${lbVal(p,'total')}</td><td class="num" style="color:var(--teal);${m==='xp'?'font-weight:900':''}">${p.xp||0}</td><td class="num" style="color:var(--purp);${m==='dr'?'font-weight:900':''}">${p.dr==null?'–':p.dr}</td></tr>`).join('');
   return `<table class="lbt">${head}${rws}</table>`;
 }
 function lbBoard(rows,m){ if(!rows||!rows.length) return '<div class="note">No results yet.</div>'; const top=rows.slice(0,3), rest=rows.slice(3); let h=''; if(top.length>=3) h+=`<div style="display:flex;gap:8px;align-items:stretch;margin-bottom:10px">${lbPodium(top[0],1,m)}${lbPodium(top[1],2,m)}${lbPodium(top[2],3,m)}</div>`; else h+=top.map((p,i)=>lbCell(p,i+1,m)).join(''); if(rest.length){ const half=Math.ceil(rest.length/2); const col=(arr,start)=>`<div style="display:flex;flex-direction:column;gap:7px;min-width:0">${arr.map((p,i)=>lbCell(p,start+i,m)).join('')}</div>`; h+=`<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:7px;align-items:start">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; } return h; }
