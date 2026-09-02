@@ -24,6 +24,7 @@ import { SLOT_KEYS, gameNoOf, slotTypeLabel, formatOffset } from './lineup-helpe
 import {
   sendEmail, renderLineupPlaying, renderLineupNotIn, renderLineupChanged, renderLineupReceipt,
 } from './email.js';
+import { isActivePlayer } from './roster.js';
 
 const TZ = 'America/Los_Angeles';
 
@@ -118,7 +119,7 @@ async function matchContext(team, match) {
  * @returns {Promise<{sent:number, notifiedGames:object, summary:object}>}
  */
 export async function notifyTeamOfLock({ team, match, games, notifiedGames, lockedByEmail, lockOffsetMin }) {
-  const roster = (team.roster || []).filter(p => !p.archived);
+  const roster = (team.roster || []).filter(isActivePlayer);
   const nameById = new Map(roster.map(p => [p.id, p.name]));
   const nameOf = (id) => (id ? nameById.get(id) || null : null);
 

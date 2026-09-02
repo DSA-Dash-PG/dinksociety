@@ -14,6 +14,7 @@ import { isAdminEmail } from './lib/admin-auth.js';
 import { getTeamAvailability } from './lib/availability.js';
 import { getOrganizer } from './lib/organizers.js';
 import { normalizeEmail } from './lib/identity.js';
+import { isActivePlayer } from './lib/roster.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -155,7 +156,7 @@ export default async (req) => {
   }
   const teamCapEmail = (team.captainEmail || '').toLowerCase();
   // Archived teammates drop off the Team tab (but the viewer always sees themselves).
-  const roster = (team.roster || []).filter(p => !p.archived || p.id === playerId).map(p => ({
+  const roster = (team.roster || []).filter(p => isActivePlayer(p) || p.id === playerId).map(p => ({
     id: p.id, name: p.name, gender: p.gender || null,
     dsr: players[p.id]?.composite != null ? Math.round(players[p.id].composite * 10) / 10 : null,
     ps: players[p.id]?.ps ?? null, pa: players[p.id]?.pa ?? null,

@@ -19,6 +19,7 @@ import { getTeamAvailability } from './availability.js';
 import { hardLockTime, DEFAULT_LOCK_OFFSET_MIN } from './lineup-helpers.js';
 import { signAvailabilityToken } from './availability-token.js';
 import { sendEmail, renderAvailabilityReminder } from './email.js';
+import { isActivePlayer } from './roster.js';
 
 const TZ = 'America/Los_Angeles';
 const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
@@ -133,7 +134,7 @@ async function loadTeam(id, cache) {
 function autoTargets(team, availRec) {
   const responded = availRec.players || {};
   return (team.roster || []).filter(p =>
-    !p.archived && !p.isSub && (p.email || '').trim() && !responded[p.id]);
+    !isActivePlayer(p) ? false : (!p.isSub && (p.email || '').trim() && !responded[p.id]));
 }
 
 /**
@@ -208,7 +209,7 @@ export async function nudgeTeam({ team, match, playerIds }) {
   let targets;
   if (Array.isArray(playerIds) && playerIds.length) {
     const wanted = new Set(playerIds);
-    targets = (team.roster || []).filter(p => !p.archived && wanted.has(p.id) && !responded[p.id]);
+    targets = (team.roster || []).filter(p => isActivePlayer(p) && wanted.has(p.id) && !responded[p.id]);
   } else {
     targets = autoTargets(team, availRec); // regular non-sub, unconfirmed, has email
   }

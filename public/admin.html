@@ -994,9 +994,15 @@
 
         <!-- PROFILE APPROVALS -->
         <section class="admin-section" data-section="approvals">
-          <div class="am-head"><h1 class="am-title">Profile Approvals</h1>
-            <button class="ab ab--ghost ab--sm" onclick="renderApprovals()" style="font-size:10px;">Refresh</button>
+          <div class="am-head"><h1 class="am-title">Approvals</h1>
+            <button class="ab ab--ghost ab--sm" onclick="renderApprovals();renderRosterAdds()" style="font-size:10px;">Refresh</button>
           </div>
+          <div class="ac" style="margin-bottom:16px;">
+            <div class="ac__h"><h2 class="ac__t">Roster additions</h2></div>
+            <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;line-height:1.5;">Players captains have asked to add. They are not on the roster — no lineups, no availability, not on the public team page — until you approve them here.</p>
+            <div id="radd-list"><div class="loading" style="font-size:12px;">Loading…</div></div>
+          </div>
+
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Pending player edits</h2></div>
             <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;line-height:1.5;">Photo &amp; bio changes submitted by players or captains. Nothing shows publicly until you approve it.</p>
@@ -2995,7 +3001,7 @@
     if (t === 'registrations') renderReg();
     if (t === 'teams') renderTeams();
     if (t === 'players') renderPlayers();
-    if (t === 'approvals') renderApprovals();
+    if (t === 'approvals') { renderApprovals(); renderRosterAdds(); }
     if (t === 'schedule') { renderGameday(); renderAllGames(); renderSched(); }
     if (t === 'scores') {}
     if (t === 'messages') renderMessages();
@@ -3115,6 +3121,70 @@
     </div>`;
   }
 
+  // ── Roster additions ─────────────────────────────────────────────
+  // Captains can edit and remove their own players, but a NEW person is a
+  // request. Approving is what puts them on the team.
+  let RADD_COUNT = 0;
+  async function renderRosterAdds() {
+    const box = $id('radd-list'); if (!box) return;
+    box.innerHTML = '<div class="loading" style="font-size:12px;">Loading…</div>';
+    try {
+      const r = await api('/.netlify/functions/admin-roster-approvals');
+      const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Failed');
+      const list = d.pending || [];
+      RADD_COUNT = list.length;
+      updateApprBadge(null);
+      box.innerHTML = list.length ? list.map(renderRaddCard).join('') : '<div class="empty">No pending roster adds.</div>';
+    } catch (e) { box.innerHTML = '<div class="empty">Could not load (' + aEsc(e.message) + ').</div>'; }
+  }
+
+  function renderRaddCard(p) {
+    const bits = [];
+    if (p.gender) bits.push(p.gender === 'F' ? 'Women\u2019s' : 'Men\u2019s');
+    if (p.email) bits.push(aEsc(p.email));
+    if (p.phone) bits.push(aEsc(p.phone));
+    if (p.dupr) bits.push('DUPR ' + aEsc(p.dupr));
+    const when = p.requestedAt ? new Date(p.requestedAt).toLocaleString() : '';
+    // A known email is the useful signal: this is probably someone who has
+    // played before, so their history follows them without any id surgery.
+    const match = p.match
+      ? `<div class="appr-diffs"><div class="appr-diff"><span class="appr-diff__l">Played before</span><span class="appr-diff__a">${aEsc(p.match.name)} · ${aEsc(p.match.teamName)} · ${aEsc(p.match.seasonName)}</span></div></div>`
+      : (p.email ? '' : '<div class="appr-diffs"><i style="color:var(--color-text-faint)">No email on file — stats can\u2019t be matched to a past player automatically.</i></div>');
+    return `<div class="appr-card" id="radd-${aEsc(p.teamId)}-${aEsc(p.playerId)}">
+      <div class="appr-card__head">
+        <div><b>${aEsc(p.name)}</b> <span class="appr-card__team">${aEsc(p.teamName)} · ${aEsc(p.seasonName)}</span></div>
+        <div class="appr-card__by">requested by ${aEsc(p.requestedBy || 'captain')}${when ? ' · ' + aEsc(when) : ''}</div>
+      </div>
+      <div class="appr-diffs"><div class="appr-diff"><span class="appr-diff__l">Details</span><span class="appr-diff__a">${bits.length ? bits.join(' · ') : '<i>name only</i>'}</span></div></div>
+      ${match}
+      <div class="appr-card__act">
+        <button class="ab ab--ghost ab--sm" onclick="actRosterAdd('${aEsc(p.teamId)}','${aEsc(p.playerId)}','reject',this)">Decline</button>
+        <button class="ab ab--lime ab--sm" onclick="actRosterAdd('${aEsc(p.teamId)}','${aEsc(p.playerId)}','approve',this)">Add to roster</button>
+      </div>
+    </div>`;
+  }
+
+  async function actRosterAdd(teamId, playerId, action, btn) {
+    if (action === 'reject' && !confirm('Decline this add? The player is removed from the captain\u2019s request.')) return;
+    if (btn) btn.disabled = true;
+    try {
+      const r = await api('/.netlify/functions/admin-roster-approvals', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ teamId, playerId, action }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      const card = $id('radd-' + teamId + '-' + playerId); if (card) card.remove();
+      const box = $id('radd-list');
+      RADD_COUNT = box.querySelectorAll('.appr-card').length;
+      if (!RADD_COUNT) box.innerHTML = '<div class="empty">No pending roster adds.</div>';
+      updateApprBadge(null);
+      if (typeof allTeams !== 'undefined' && allTeams.length) renderTeams();
+    } catch (e) { alert('Failed: ' + (e.message || 'unknown error')); if (btn) btn.disabled = false; }
+  }
+  window.actRosterAdd = actRosterAdd;
+  window.renderRosterAdds = renderRosterAdds;
+
   async function actApproval(teamId, playerId, action, btn) {
     if (action === 'reject' && !confirm('Discard this player’s pending changes?')) return;
     if (btn) btn.disabled = true;
@@ -3135,9 +3205,14 @@
   window.actApproval = actApproval;
   window.renderApprovals = renderApprovals;
 
+  // The sidebar badge counts BOTH queues; pass null to keep the profile-edit
+  // half as-is and just re-add the roster half.
+  let APPR_PROFILE_COUNT = 0;
   function updateApprBadge(n) {
+    if (n !== null && n !== undefined) APPR_PROFILE_COUNT = n;
+    const total = APPR_PROFILE_COUNT + (typeof RADD_COUNT === 'number' ? RADD_COUNT : 0);
     const b = $id('sb-appr-ct');
-    if (b) { if (n > 0) { b.textContent = n; b.style.display = ''; } else { b.style.display = 'none'; } }
+    if (b) { if (total > 0) { b.textContent = total; b.style.display = ''; } else { b.style.display = 'none'; } }
     // Overview banner
     const ov = $id('ov-appr');
     if (ov) {
@@ -3158,6 +3233,11 @@
     api('/.netlify/functions/admin-profile-approvals')
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d) updateApprBadge((d.pending || []).length); })
+      .catch(() => {});
+    // Roster adds are the other half of the same badge.
+    api('/.netlify/functions/admin-roster-approvals')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { RADD_COUNT = (d.pending || []).length; updateApprBadge(null); } })
       .catch(() => {});
   })();
 

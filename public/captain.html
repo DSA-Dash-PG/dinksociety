@@ -248,6 +248,15 @@
     .ros-row { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 4px; border: none; border-bottom: 1px solid var(--color-border); background: none; color: var(--color-text); font-family: inherit; cursor: pointer; text-align: left; }
     .ros-row:last-child { border-bottom: none; }
     /* Archived players — collapsed section under the active roster */
+    /* Players a captain has asked to add — visible only to them, until the league rules. */
+    .ros-pend { border: 1px dashed rgba(240,192,64,.45); background: rgba(240,192,64,.06); border-radius: 12px; padding: 10px 12px; margin-bottom: 14px; }
+    .ros-pend__hd { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--color-gold, #f0c040); margin-bottom: 8px; }
+    .ros-pend__n { background: rgba(240,192,64,.2); border-radius: 9999px; padding: 1px 8px; font-size: 10.5px; }
+    .ros-pend__row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.05); }
+    .ros-pend__row:last-of-type { border-bottom: 0; }
+    .ros-pend__meta { display: block; font-size: 11px; color: var(--color-text-faint); margin-top: 1px; }
+    .ros-pend__tag { margin-left: auto; font-size: 9.5px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: var(--color-gold, #f0c040); border: 1px solid rgba(240,192,64,.45); border-radius: 9999px; padding: 3px 9px; white-space: nowrap; }
+    .ros-pend__note { font-size: 11px; color: var(--color-text-muted); line-height: 1.5; margin-top: 8px; }
     .ros-arch { margin-top: 16px; border-top: 1px solid var(--color-border); padding-top: 8px; }
     .ros-arch__head { display: flex; align-items: center; justify-content: space-between; width: 100%; padding: 8px 4px; background: none; border: none; color: var(--color-text-faint); font-family: inherit; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; cursor: pointer; }
     .ros-arch__n { display: inline-block; min-width: 16px; padding: 1px 6px; border-radius: var(--radius-full); background: var(--color-surface-3); color: var(--color-text-muted); font-size: 10px; margin-left: 6px; }
@@ -3370,7 +3379,11 @@
     }
     // Active = everyone not archived. Archived players keep their record + past
     // games but leave the active roster, lineups, and capacity counts.
-    function activeRoster() { return (state.roster || []).filter(p => !p.archived); }
+    // On the team right now. A player the league hasn't approved yet is NOT on
+    // the team — no lineups, no availability, no roster health — they just show
+    // as a pending row so the captain can see their own request.
+    function activeRoster() { return (state.roster || []).filter(p => !p.archived && !p.pendingAdd); }
+    function pendingRoster() { return (state.roster || []).filter(p => p.pendingAdd); }
     // Players marked unavailable for the current match — excluded from the lineup
     // builder (hard block). Default is available, so only explicit 'out' counts.
     function availOutSet() {
@@ -3571,7 +3584,7 @@
         if (btn) { btn.disabled = false; btn.textContent = next === 'out' ? 'Out' : 'In'; }
       }
     }
-    function archivedRoster() { return (state.roster || []).filter(p => p.archived); }
+    function archivedRoster() { return (state.roster || []).filter(p => p.archived && !p.pendingAdd); }
     function rosterSorted() {
       const rank = (p) => isCap(p) ? 0 : p.isCoCaptain ? 1 : 2;
       return activeRoster().slice().sort((a, b) =>
@@ -3641,6 +3654,19 @@
     function renderRoster() {
       const container = $id('roster-rows');
       const addBtn = $id('add-player-btn');
+      const pending = pendingRoster();
+      const pendingBlock = pending.length ? `
+        <div class="ros-pend">
+          <div class="ros-pend__hd">Waiting on league approval <span class="ros-pend__n">${pending.length}</span></div>
+          ${pending.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||'')).map(p => `
+            <div class="ros-pend__row">
+              <span class="ros-av">${escapeHtml(initialsOf(p.name || '?'))}</span>
+              <span class="ros-body"><span class="ros-name">${escapeHtml(p.name)}</span>
+                <span class="ros-pend__meta">Submitted${p.pendingAddAt ? ' · ' + escapeHtml(fmtArchivedDate(p.pendingAddAt)) : ''} — not on your roster yet</span></span>
+              <span class="ros-pend__tag">Pending</span>
+            </div>`).join('')}
+          <div class="ros-pend__note">New players are reviewed by the league before they join your roster. They can't be picked for a lineup until then.</div>
+        </div>` : '';
 
       // Locked for the season (Week 2 played) — roster is read-only, BUT subs can
       // still be changed (it only affects reminders, not who's on the team).
@@ -3648,14 +3674,15 @@
         if (addBtn) addBtn.style.display = 'none';
         container.innerHTML = `
           <div class="cap-status is-info" style="margin-bottom:12px;">🔒 Roster is locked for the season (Week 2 has been played). You can still mark players as subs; contact a league admin for any other change.</div>
-          ${state.roster.length ? rosterSorted().map(p => rosterRowHtml(p, true)).join('') : '<div class="empty-state">No players on the roster.</div>'}
+          ${pendingBlock}
+          ${activeRoster().length ? rosterSorted().map(p => rosterRowHtml(p, true)).join('') : '<div class="empty-state">No players on the roster.</div>'}
         `;
         return;
       }
 
       if (addBtn) addBtn.style.display = '';
       const archived = archivedRoster();
-      if (!activeRoster().length && !archived.length) {
+      if (!activeRoster().length && !archived.length && !pending.length) {
         container.innerHTML = '<div class="empty-state">Add your first player below.</div>';
         return;
       }
@@ -3674,7 +3701,9 @@
               </div>`).join('')}
           </div>
         </div>` : '';
-      container.innerHTML = (activeRoster().length ? rosterSorted().map(p => rosterRowHtml(p, false)).join('') : '<div class="empty-state">No active players — restore one below or add a new player.</div>') + archivedBlock;
+      container.innerHTML = pendingBlock
+        + (activeRoster().length ? rosterSorted().map(p => rosterRowHtml(p, false)).join('') : '<div class="empty-state">No active players — restore one below or add a new player.</div>')
+        + archivedBlock;
       container.querySelectorAll('.ros-row[data-rid]').forEach(row => {
         row.addEventListener('click', () => openRosterEditor(Number(row.dataset.rid)));
       });
@@ -3798,6 +3827,18 @@
         updateGenderWarning();
         maybeShowGenderWarning();
         const status = $id('roster-status');
+        // A brand-new player doesn't join the team on save — the league approves
+        // them first. Say so plainly instead of a bare "Saved", or the captain
+        // goes looking for someone who isn't there.
+        const queued = (data.pendingApproval || []).length;
+        if (queued) {
+          status.className = 'cap-status is-info';
+          status.textContent = queued === 1
+            ? `Sent to the league for approval. ${data.pendingApproval[0].name} joins your roster once it's approved.`
+            : `${queued} players sent to the league for approval.`;
+          setTimeout(() => { status.textContent = ''; }, 6000);
+          return;
+        }
         status.className = 'cap-status is-success';
         status.textContent = successMsg;
         setTimeout(() => { if (status.textContent === successMsg) status.textContent = ''; }, 4000);

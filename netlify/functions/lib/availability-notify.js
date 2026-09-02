@@ -17,6 +17,7 @@ import { getStore } from '@netlify/blobs';
 import { getTeamAvailability } from './availability.js';
 import { signAvailabilityToken } from './availability-token.js';
 import { sendEmail, renderAvailabilityNotify, renderAvailabilitySetByCaptain } from './email.js';
+import { isActivePlayer } from './roster.js';
 
 const TZ = 'America/Los_Angeles';
 
@@ -52,7 +53,7 @@ export async function notifyCaptainsOfChange({ team, player, actingEmail, match,
   const recPlayers = rec.players || {};
   const shortNm = (n) => { const p = String(n || '').trim().split(/\s+/); return p[0] + (p[1] ? ' ' + p[1][0] + '.' : ''); };
   const unconfirmed = (team.roster || [])
-    .filter(p => !p.archived && !p.isSub && !recPlayers[p.id])
+    .filter(p => isActivePlayer(p) && !p.isSub && !recPlayers[p.id])
     .map(p => shortNm(p.name));
 
   const html = renderAvailabilityNotify({

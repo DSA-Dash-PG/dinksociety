@@ -76,6 +76,23 @@ export default async (req) => {
         // can't grant or strip captain/co-captain through this endpoint.
         // (Previously a roster save silently wiped these flags.)
         const prev = existingById.get(p.id) || null;
+        // A captain can edit and remove their own players freely, but they
+        // cannot put someone new on the roster on their own say-so — a player
+        // the league has never seen arrives as a REQUEST. Approval is what makes
+        // them a roster member; until then they're visible only to their own
+        // captain. (An existing player keeps whatever state they already had, so
+        // an ordinary save can neither approve a pending add nor un-approve
+        // someone already on the team.)
+        const isNew = !prev;
+        const pendingState = isNew
+          ? { pendingAdd: true,
+              pendingAddAt: new Date().toISOString(),
+              pendingAddBy: ctx.user?.email || ctx.session?.email || ctx.captainEmail || 'captain' }
+          : (prev.pendingAdd
+              ? { pendingAdd: true,
+                  pendingAddAt: prev.pendingAddAt || null,
+                  pendingAddBy: prev.pendingAddBy || null }
+              : {});
         cleaned.push({
           id,
           name: name.slice(0, 60),
@@ -102,6 +119,7 @@ export default async (req) => {
           // Archive state is owned by the archive/restore endpoint — preserve it
           // from the stored roster so an ordinary roster save can't flip or wipe it.
           ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),
+          ...pendingState,
         });
       }
 
@@ -119,7 +137,11 @@ export default async (req) => {
       };
       await store.setJSON(teamKey, updated);
 
-      return json({ team: updated, duplicateWarnings });
+      return json({
+        team: updated,
+        duplicateWarnings,
+        pendingApproval: cleaned.filter(p => p.pendingAdd).map(p => ({ id: p.id, name: p.name })),
+      });
     } catch (err) {
       console.error('captain-roster PUT error:', err);
       return json({ error: 'Save failed', detail: err.message }, 500);

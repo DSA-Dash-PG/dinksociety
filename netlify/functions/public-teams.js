@@ -12,6 +12,7 @@ import { getStore } from '@netlify/blobs';
 import { circuitCode } from './lib/circuit.js';
 import { publicProfile } from './lib/profile.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
+import { isActivePlayer } from './lib/roster.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -68,7 +69,7 @@ export default async (req) => {
           photoUrl: team.photo?.updatedAt
             ? `/.netlify/functions/team-photo-serve?id=${encodeURIComponent(team.id)}&v=${encodeURIComponent(team.photo.updatedAt)}`
             : null,
-          roster: (team.roster || []).filter(p => !p.archived).map(p => {
+          roster: (team.roster || []).filter(isActivePlayer).map(p => {
             // Approved bio fields only — DOB is converted to a computed age and
             // never emitted. Pending (unapproved) edits are NOT exposed here.
             const prof = publicProfile(p);
