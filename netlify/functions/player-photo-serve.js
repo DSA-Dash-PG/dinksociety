@@ -9,6 +9,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession } from './lib/auth.js';
+import { identityIdsFor } from './lib/league-identity.js';
 
 const VALID_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -31,7 +32,21 @@ export default async (req) => {
     }
 
     const store = getStore('player-photos');
-    const result = await store.getWithMetadata(key, { type: 'arrayBuffer' });
+    let result = await store.getWithMetadata(key, { type: 'arrayBuffer' });
+
+    // No photo under THIS id? One person holds a roster id per season (and a
+    // ladder id), and the photo lives under whichever one it was uploaded to.
+    // Pages build this URL from the id they have, so resolve it here once
+    // rather than teaching every page about the identity layer. Only for the
+    // public (approved) variant; the CDN caches the answer either way.
+    if ((!result || !result.data) && !wantPending) {
+      const ids = await identityIdsFor(id).catch(() => []);
+      for (const other of ids) {
+        if (other === id) continue;
+        const r = await store.getWithMetadata(`img/${other}`, { type: 'arrayBuffer' }).catch(() => null);
+        if (r && r.data) { result = r; break; }
+      }
+    }
 
     if (!result || !result.data) {
       return new Response('Not found', { status: 404 });

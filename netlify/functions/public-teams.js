@@ -13,6 +13,52 @@ import { circuitCode } from './lib/circuit.js';
 import { publicProfile } from './lib/profile.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
 import { isActivePlayer } from './lib/roster.js';
+import { groupEntries, getIdentityMap } from './lib/league-identity.js';
+import { normalizeEmail } from './lib/identity.js';
+
+/**
+ * Profile photos, resolved from the store rather than the roster stamp.
+ * `p.photo.updatedAt` is written at upload time, but a roster entry can be
+ * re-saved without it (admin edits, season rollover, identity relinks) while
+ * the approved binary still sits at img/<id> — Richard's Season 1 card showed
+ * initials with a perfectly good photo on file. And a new season's entry never
+ * has a photo of its own; the identity layer says which of her other ids does.
+ * One list() over img/ gives every id with a photo; identity grouping is
+ * built from the team blobs already in hand.
+ */
+async function photoResolver(allTeams) {
+  const withPhoto = new Map();
+  try {
+    const { blobs } = await getStore('player-photos').list({ prefix: 'img/' });
+    for (const b of blobs || []) { const id = b.key.slice(4); if (id) withPhoto.set(id, b.etag || ''); }
+  } catch { /* no store yet → nobody has a photo */ }
+  if (!withPhoto.size) return () => null;
+
+  let membersOf = {}, canonicalOf = {};
+  try {
+    const entries = [];
+    for (const team of allTeams) {
+      for (const p of team?.roster || []) {
+        if (!p?.id) continue;
+        entries.push({ id: p.id, name: p.name || null, email: p.email || null,
+          normalizedEmail: p.normalizedEmail || normalizeEmail(p.email), phone: p.phone || null,
+          teamId: team.id, teamName: team.name || null, seasonId: team.seasonId || null, circuit: team.circuit || null });
+      }
+    }
+    ({ canonicalOf, membersOf } = groupEntries(entries, await getIdentityMap()));
+  } catch { /* fall back to direct ids only */ }
+
+  const url = (id, v) => `/.netlify/functions/player-photo-serve?id=${encodeURIComponent(id)}&v=${encodeURIComponent(v || '')}`;
+  return (p) => {
+    if (!p?.id) return null;
+    if (withPhoto.has(p.id)) return url(p.id, p.photo?.updatedAt || withPhoto.get(p.id));
+    const canon = canonicalOf[p.id];
+    for (const id of (canon ? membersOf[canon] || [] : [])) {
+      if (withPhoto.has(id)) return url(id, withPhoto.get(id));
+    }
+    return null;
+  };
+}
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -28,12 +74,14 @@ export default async (req) => {
     const store = getStore('teams');
     const { blobs } = await store.list();
     const teams = [];
+    const allTeams = [];   // every season's teams, for identity grouping
 
     for (const blob of blobs) {
       const raw = await store.get(blob.key);
       if (!raw) continue;
       try {
         const team = JSON.parse(raw);
+        allTeams.push(team);
         // Hide test/demo teams unless this request explicitly targets that season.
         if (shouldHideTestRecord(team, seasonId)) continue;
         // Which season is this team in? Registration writes `circuit` on the team
@@ -87,13 +135,19 @@ export default async (req) => {
               plays: prof.plays,
               city: prof.city,
               homeCourt: prof.homeCourt,
-              photoUrl: p.photo?.updatedAt
-                ? `/.netlify/functions/player-photo-serve?id=${encodeURIComponent(p.id)}&v=${encodeURIComponent(p.photo.updatedAt)}`
-                : null,
+              // Filled by the resolver below (store-backed, identity-aware).
+              photoUrl: null,
+              _raw: p,
             };
           }),
         });
       } catch {}
+    }
+
+    // Photos: from the store, across each person's ids.
+    const photoFor = await photoResolver(allTeams);
+    for (const t of teams) {
+      for (const p of t.roster) { p.photoUrl = photoFor(p._raw); delete p._raw; }
     }
 
     // Sort by division then name

@@ -230,12 +230,28 @@ export async function buildUnifiedProfile({ email, ladderId, leagueId, circuit =
   const name = (league.found && league.player.name) || (ladder.found && ladder.player.name) || null;
   if (!name) return { found: false };
 
+  // Profile photo: look under every id this person has held — league roster
+  // ids across seasons (identity layer), the ladder id, and a lite `lp_` id —
+  // so the unified card shows her picture wherever it was uploaded.
+  let photoUrl = null;
+  try {
+    const ids = [];
+    if (lgId) ids.push(...await identityIdsFor(lgId));
+    if (ldId) ids.push(ldId);
+    if (lgId) ids.push(lgId);
+    const ph = getStore('player-photos');
+    for (const id of [...new Set(ids.filter(Boolean))]) {
+      const meta = await ph.getMetadata(`img/${id}`).catch(() => null);
+      if (meta) { photoUrl = '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(id) + (meta.etag ? '&v=' + encodeURIComponent(meta.etag) : ''); break; }
+    }
+  } catch { photoUrl = null; }
+
   return {
     found: true,
     // NOTE: email is intentionally NOT exposed in this public payload (privacy).
     // It's used server-side to link the two products, but the client only needs
     // presence flags.
-    identity: { name, hasLeague: league.found, hasLadder: ladder.found },
+    identity: { name, hasLeague: league.found, hasLadder: ladder.found, leagueId: lgId, ladderId: ldId, photoUrl },
     league: league.found ? league.player : null,
     ladder: ladder.found ? ladder.player : null,
   };
