@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ladders · The Dink Society</title>
+<meta name="description" content="Two ladder leagues, one night a week each — Ladder Challengers (mixed) and Queen of the Court (women's). Pick your court.">
+<meta name="theme-color" content="#0b0d0a">
+<script>(function(){var t=localStorage.getItem("ds-theme");document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark")})()</script>
+<!-- Deep links that belong to the Challengers hub keep working: the recap
+     emails link /ladders#ladders/<eventId> and /ladders#leaderboard, and those
+     hashes mean nothing on this landing page. Forward them before paint. -->
+<script>(function(){var h=location.hash||'';if(/^#(ladders|leaderboard|home|recaps|kitchen|rules)\b/.test(h)||location.search.indexOf('event=')>-1){location.replace('/ladders.html'+location.search+h);}})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/shared.css">
+<link rel="stylesheet" href="/css/shared-nav.css">
+<style>
+  /* ══════════════════════════════════════════════════════════════════
+     Ladders — the front door to both ladder leagues.
+
+     One tile per league (Ladder Challengers · Queen of the Court), the next
+     nights across both, the latest recaps across both, and the newest
+     album's ticker. Every number here is read from the same public
+     endpoints the two league pages already use; nothing new is stored.
+     Lime = Challengers, pearl = Queen — the same tokens those pages use.
+     ══════════════════════════════════════════════════════════════════ */
+  :root{ --bg:#0b0d0a; --surf:#161914; --surf2:#1c1f18; --bd:rgba(255,255,255,.08); --tx:#f0f2ec; --mut:#9aa094; --fnt:#5e655a;
+         --lime:#b8ff2c; --teal:#17d7b0; --gold:#f0c040; --purp:#a78bfa; --ink:#0b0d0a;
+         --queen:#E6E1D5; --queen-deep:#9E978A; --queen-soft:#F7F4EC; }
+  *{ box-sizing:border-box }
+  body{ background:var(--bg); color:var(--tx); font-family:'Inter',system-ui,sans-serif; margin:0; padding-top:64px; }
+  a{ color:inherit }
+  .wrap{ max-width:1200px; margin:0 auto; padding:26px 20px 80px; }
+  .kick{ font-size:.6rem; font-weight:900; letter-spacing:.18em; text-transform:uppercase; }
+  .head{ display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:16px; }
+  .head h1{ margin:4px 0 0; font-size:2rem; font-weight:900; letter-spacing:-.02em; line-height:1; }
+  .head p{ margin:0; font-size:.8rem; color:var(--mut); max-width:520px; line-height:1.55; }
+  .serif{ font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:600; }
+
+  /* ── League tiles ── */
+  .tiles{ display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+  .tile{ position:relative; border-radius:20px; overflow:hidden; min-height:360px; border:1px solid var(--bd); display:flex; flex-direction:column; justify-content:flex-end; padding:22px; text-decoration:none; color:inherit; background:#101309; transition:transform .18s ease, border-color .18s ease; }
+  .tile:hover{ transform:translateY(-3px); }
+  .tile .bg{ position:absolute; inset:0; display:grid; grid-template-columns:repeat(var(--n,1),1fr); }
+  .tile .bg img{ width:100%; height:100%; object-fit:cover; display:block; opacity:.9; }
+  .tile .bg.fallback{ background:radial-gradient(80% 60% at 60% 20%, var(--glow), transparent 62%); }
+  .tile::after{ content:""; position:absolute; inset:0; background:linear-gradient(180deg, rgba(7,8,6,.08) 15%, rgba(7,8,6,.82) 55%, rgba(7,8,6,.97) 100%); }
+  .tile > *:not(.bg){ position:relative; z-index:2; }
+  .tile.c{ --acc:var(--lime); --glow:rgba(184,255,44,.32); } .tile.c:hover{ border-color:rgba(184,255,44,.4); }
+  .tile.q{ --acc:var(--queen); --glow:rgba(230,225,213,.3); } .tile.q:hover{ border-color:rgba(230,225,213,.4); }
+  .chip{ display:inline-block; font-size:.56rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; padding:4px 9px; border-radius:9999px; background:rgba(0,0,0,.5); border:1px solid var(--bd); color:var(--acc); }
+  .tile h2{ margin:8px 0 10px; font-size:2.2rem; line-height:1; font-weight:900; letter-spacing:-.02em; color:var(--tx); }
+  .tile.q h2{ font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:600; font-size:2.6rem; color:var(--queen-soft); letter-spacing:0; }
+  .tile .lead{ display:flex; align-items:center; gap:11px; margin-bottom:10px; }
+  .tile .lead .lbl{ font-size:.56rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--fnt); }
+  .tile .lead b{ font-size:.95rem; } .tile .lead span.s{ font-size:.72rem; color:var(--mut); font-weight:700; }
+  .pods{ display:flex; gap:6px; flex-wrap:wrap; margin:0 0 12px; }
+  .pods span{ display:inline-flex; align-items:center; gap:5px; font-size:.68rem; font-weight:800; background:#000; border:1px solid var(--bd); border-radius:9999px; padding:3px 10px 3px 4px; }
+  .pods i{ width:16px; height:16px; border-radius:50%; font-size:.52rem; font-weight:900; font-style:normal; color:var(--ink); display:inline-flex; align-items:center; justify-content:center; }
+  .pods .av{ width:20px; height:20px; font-size:.46rem; margin-left:-2px; }
+  .acts{ display:flex; gap:8px; flex-wrap:wrap; }
+  .btn{ display:inline-block; font-size:.74rem; font-weight:900; padding:10px 16px; border-radius:9999px; text-decoration:none; border:1px solid var(--bd); color:var(--tx); background:rgba(0,0,0,.45); cursor:pointer; }
+  .btn.pri{ background:var(--acc, var(--lime)); color:var(--ink); border-color:var(--acc, var(--lime)); }
+  .tile .empty{ font-size:.76rem; color:var(--mut); margin-bottom:12px; line-height:1.5; }
+  @media(max-width:820px){ .tiles{ grid-template-columns:1fr; } .tile{ min-height:280px; padding:18px; } .tile h2{ font-size:1.8rem; } .tile.q h2{ font-size:2.1rem; } }
+
+  /* ── Avatars (photo or initials; initials painted under the img) ── */
+  .av{ position:relative; width:34px; height:34px; border-radius:50%; flex-shrink:0; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; background:linear-gradient(145deg,#2a2d25,#15170f); border:1px solid rgba(255,255,255,.2); font-size:.62rem; font-weight:900; letter-spacing:.03em; color:var(--tx); font-style:normal; }
+  .av::before{ content:attr(data-ini); position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .av img{ position:relative; z-index:1; width:100%; height:100%; object-fit:cover; display:block; }
+  .av.xl{ width:56px; height:56px; font-size:.95rem; border:2px solid var(--acc, var(--lime)); box-shadow:0 0 0 3px rgba(0,0,0,.4); }
+  .avpair{ display:inline-flex; flex-shrink:0; } .avpair .av + .av{ margin-left:-8px; }
+
+  /* ── Sections ── */
+  .sec{ margin-top:26px; }
+  .sec .kick{ color:var(--mut); margin-bottom:10px; display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .sec .kick a{ font-size:.66rem; letter-spacing:0; text-transform:none; font-weight:800; color:var(--lime); text-decoration:none; }
+  .strip{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:12px; }
+  .nite{ display:flex; gap:12px; align-items:center; background:#000; border:1px solid var(--bd); border-left:3px solid var(--acc, var(--lime)); border-radius:14px; padding:12px 14px; text-decoration:none; color:inherit; }
+  .nite.c{ --acc:var(--lime); } .nite.q{ --acc:var(--queen); }
+  .nite .d{ font-size:.58rem; font-weight:900; letter-spacing:.1em; text-transform:uppercase; color:var(--acc); }
+  .nite b{ display:block; font-size:.88rem; margin-top:2px; } .nite small{ font-size:.68rem; color:var(--mut); display:block; margin-top:2px; }
+  .nite .btn{ margin-left:auto; padding:8px 14px; font-size:.68rem; white-space:nowrap; }
+  .nite .bar{ height:5px; border-radius:9999px; background:#222; margin-top:7px; overflow:hidden; max-width:180px; }
+  .nite .bar i{ display:block; height:100%; background:var(--acc); }
+  .empty{ font-size:.78rem; color:var(--fnt); padding:18px 4px; }
+
+  /* ── Recaps across both leagues ── */
+  .recs{ display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px; }
+  .rec{ position:relative; overflow:hidden; border:1px solid var(--bd); border-radius:14px; background:var(--surf); padding:0; min-height:150px; display:flex; text-decoration:none; color:inherit; }
+  .rec.c{ --acc:var(--lime); } .rec.q{ --acc:var(--queen); }
+  .rec .rbg{ position:absolute; inset:0; display:grid; grid-template-columns:repeat(var(--n,3),1fr); }
+  .rec .rbg img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .rec.haspix::after{ content:""; position:absolute; inset:0; background:linear-gradient(100deg, rgba(7,8,6,.95) 30%, rgba(7,8,6,.7) 60%, rgba(7,8,6,.4)); }
+  .rec:not(.haspix){ background:repeating-linear-gradient(135deg, var(--surf) 0 14px, #1a1d17 14px 15px); }
+  .rec .rtx{ position:relative; z-index:2; padding:14px 15px 13px; width:100%; display:flex; flex-direction:column; }
+  .rec .top{ display:flex; justify-content:space-between; gap:8px; align-items:flex-start; }
+  .rec .kick{ color:var(--acc); }
+  .rec h4{ margin:4px 0 8px; font-family:'Cormorant Garamond',serif; font-style:italic; font-weight:600; font-size:1.3rem; line-height:1.1; color:var(--queen-soft); }
+  .rec .pods{ margin-bottom:auto; }
+  .rec .racts{ display:flex; gap:6px; flex-wrap:wrap; margin-top:12px; }
+  .rec .racts .btn{ padding:7px 12px; font-size:.66rem; }
+  .rec .cnt{ font-size:.58rem; font-weight:800; color:var(--acc); background:rgba(0,0,0,.55); border:1px solid var(--bd); border-radius:9999px; padding:3px 8px; white-space:nowrap; }
+
+  /* ── Ticker ── */
+  .ticker{ overflow:hidden; border-top:1px solid var(--bd); border-bottom:1px solid var(--bd); background:#0e100b; margin-top:22px; }
+  .ticker .track{ display:flex; gap:8px; padding:10px 0; width:max-content; animation:ltick 40s linear infinite; }
+  .ticker:hover .track{ animation-play-state:paused; }
+  @keyframes ltick{ from{ transform:translateX(0) } to{ transform:translateX(-50%) } }
+  @media(prefers-reduced-motion:reduce){ .ticker .track{ animation:none } }
+  .ticker a{ flex:0 0 auto; width:132px; height:88px; border-radius:9px; overflow:hidden; border:1px solid var(--bd); background:#111310; display:block; }
+  .ticker img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .ticker .cap{ font-size:.62rem; color:var(--fnt); padding:0 0 10px; text-align:center; }
+</style>
+</head>
+<body>
+<div data-partial="nav"></div>
+
+<div class="wrap">
+  <div class="head">
+    <div><div class="kick" style="color:var(--lime)">The Dink Society</div><h1>Ladders</h1></div>
+    <p>Two leagues, one night a week each. Show up, get seated, climb. Mixed nights build the <b>Society board</b>; women's nights crown the <b>Queen</b>.</p>
+  </div>
+
+  <div class="tiles" id="tiles">
+    <a class="tile c" href="/ladders.html"><div class="bg fallback"></div><span class="chip">Mixed · Society board</span><h2>Ladder Challengers</h2><div class="empty">Loading…</div></a>
+    <a class="tile q" href="/queen.html"><div class="bg fallback"></div><span class="chip">Women's · Queen board</span><h2>Queen of the Court</h2><div class="empty">Loading…</div></a>
+  </div>
+
+  <div class="sec">
+    <div class="kick"><span>Next up · both leagues</span><a href="/ladders.html#home/up">Every open night →</a></div>
+    <div class="strip" id="nextUp"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div class="sec">
+    <div class="kick"><span>Latest nights · results &amp; recaps</span><a href="/ladders.html#recaps">All recaps →</a></div>
+    <div class="recs" id="recaps"><div class="empty">Loading…</div></div>
+  </div>
+
+  <div id="ticker"></div>
+</div>
+
+<div data-partial="footer"></div>
+<script src="/js/partials.js"></script>
+<script src="/js/recap-urls.js"></script>
+<script>
+const API = '/.netlify/functions';
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+const wd = s => { if (!s) return ''; const d = new Date(s + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); };
+const firstName = n => String(n || '').includes(' & ') ? String(n).split(' & ').map(firstName).join(' & ') : (String(n || '').split(/\s+/)[0] || '');
+const money = c => '$' + ((Number(c) || 0) / 100).toFixed(Number(c) % 100 ? 2 : 0);
+const RECAP_URLS = window.DS_RECAP_URLS || {};
+const MEDC = ['#f0c040', '#cfd3c8', '#d88a3a'];
+const fpos = p => (Number.isFinite(p.fx) ? p.fx : 50) + '% ' + (Number.isFinite(p.fy) ? p.fy : 50) + '%';
+const isQ = t => t === 'womens';
+const LEAGUE = { mixed: { cls:'c', name:'Ladder Challengers', hub:'/ladders.html', results: id => '/ladders.html#ladders/' + encodeURIComponent(id) },
+                 womens:{ cls:'q', name:'Queen of the Court', hub:'/queen.html',   results: id => '/queen.html#results' } };
+const lg = t => LEAGUE[isQ(t) ? 'womens' : 'mixed'];
+
+/* ── avatars ── */
+let AVATARS = {};
+const initials = n => { const p = String(n || '').split(' & ')[0].trim().split(/\s+/).filter(Boolean); return p.length ? ((p[0][0] || '') + (p.length > 1 ? (p[p.length - 1][0] || '') : '')).toUpperCase() : '?'; };
+function av(id, name, cls = '') { const u = id && AVATARS[id]; return `<span class="av${cls ? ' ' + cls : ''}" data-ini="${esc(initials(name))}" aria-hidden="true">${u ? `<img src="${esc(u)}" alt="" loading="lazy" onerror="this.remove()">` : ''}</span>`; }
+function avFor(r, cls = '') { if (r && r.pair && Array.isArray(r.ids) && r.ids.length) return `<span class="avpair">${r.ids.map((id, i) => av(id, (r.names || [])[i] || '', cls)).join('')}</span>`; return av(r && r.id, r && r.name, cls); }
+const idsOf = rows => (rows || []).flatMap(r => r && r.pair ? (r.ids || []) : [r && r.id]).filter(Boolean);
+
+/* ── state ── */
+let OPEN = [], COMPLETED = [], STATS = {}, ALBUMS = [];
+const albumOf = id => ALBUMS.find(a => a.eventId === id);
+
+async function load() {
+  const [lad, stats, photos] = await Promise.all([
+    fetch(`${API}/public-ladders`).then(r => r.json()).catch(() => ({})),
+    fetch(`${API}/public-ladder-stats`).then(r => r.json()).catch(() => ({})),
+    fetch(`${API}/public-ladder-photos`).then(r => r.json()).catch(() => ({})),
+  ]);
+  OPEN = (lad.ladders || []).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  COMPLETED = (lad.completed || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+  STATS = stats || {}; ALBUMS = photos.albums || [];
+  render();
+  // Photos for the #1s and podiums — one call, then repaint.
+  const boards = STATS.divisions || {};
+  const ids = idsOf((boards.mixed || []).slice(0, 1)).concat(idsOf((boards.womens || []).slice(0, 1)), ...Object.values(STATS.winnersByEvent || {}).map(idsOf));
+  if (ids.length) {
+    try { const d = await (await fetch(`${API}/public-ladder-avatars?ids=${encodeURIComponent([...new Set(ids)].join(','))}`)).json(); AVATARS = d.photos || {}; if (Object.keys(AVATARS).length) render(); } catch {}
+  }
+}
+
+function render() { renderTiles(); renderNext(); renderRecaps(); renderTicker(); }
+
+function podHtml(list) {
+  return (list || []).slice(0, 3).map((p, k) => `<span><i style="background:${MEDC[k]}">${k + 1}</i>${avFor(p)}${esc(firstName(p.name))} <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span></span>`).join('');
+}
+
+function tileHtml(type) {
+  const L = lg(type), boards = STATS.divisions || {};
+  const rows = boards[isQ(type) ? 'womens' : 'mixed'] || [];
+  const top = rows[0];
+  const latest = (STATS.recentWinners || []).find(r => (r.type || 'mixed') === (isQ(type) ? 'womens' : 'mixed'));
+  const next = OPEN.find(l => ((l.type || 'mixed') === 'womens') === isQ(type));
+  // Newest album for this league (played nights only) → photo background.
+  const done = new Set(COMPLETED.map(l => l.id));
+  const alb = ALBUMS.find(a => (a.type || 'mixed') === (isQ(type) ? 'womens' : 'mixed') && done.has(a.eventId) && a.photos.length);
+  const bg = alb ? alb.photos.slice(0, Math.min(3, alb.photos.length)) : [];
+  const nights = isQ(type) ? 'Mondays' : 'Thursdays';
+  const chip = isQ(type) ? `Women's · Queen board` : `Mixed · Society board`;
+  const title = isQ(type) ? `Queen of the Court` : `Ladder Challengers`;
+  let inner = '';
+  if (top) inner += `<div class="lead">${avFor(top, 'xl')}<div><div class="lbl">${isQ(type) ? 'Current Queen' : 'Holds #1'}</div><b>${esc(top.name)}</b> <span class="s">${top.w}–${top.l}${top.dr != null ? ' · DR ' + top.dr : ''}</span></div></div>`;
+  else inner += `<div class="empty">No nights played yet — the board opens after the first one is scored.</div>`;
+  if (latest && latest.winners && latest.winners.length) inner += `<div class="kick" style="color:var(--fnt);margin-bottom:6px">Latest night · ${esc(wd(latest.date))}</div><div class="pods">${podHtml(latest.winners)}</div>`;
+  inner += `<div class="acts"><span class="btn pri">Enter the ${isQ(type) ? 'Queen' : 'Challengers'} hub →</span>${next ? `<span class="btn">${esc(wd(next.date))} · ${next.spotsLeft === 0 ? 'Waitlist' : (next.spotsLeft != null ? next.spotsLeft + ' left' : 'Open')}</span>` : ''}</div>`;
+  return `<a class="tile ${L.cls}" href="${L.hub}">
+    ${bg.length ? `<div class="bg" style="--n:${bg.length}">${bg.map(p => `<img src="${esc(p.thumb)}" alt="" loading="lazy" style="object-position:${fpos(p)}">`).join('')}</div>` : `<div class="bg fallback"></div>`}
+    <span class="chip">${chip}</span><h2>${title}</h2>${inner}</a>`;
+}
+function renderTiles() { document.getElementById('tiles').innerHTML = tileHtml('mixed') + tileHtml('womens'); }
+
+function renderNext() {
+  const el = document.getElementById('nextUp');
+  if (!OPEN.length) { el.innerHTML = `<div class="empty">Nothing open right now — new nights are announced by email and land here the moment they open.</div>`; return; }
+  el.innerHTML = OPEN.slice(0, 6).map(l => {
+    const L = lg(l.type); const cap = l.capacity || 0, left = l.spotsLeft;
+    const filled = cap ? Math.min(100, Math.round(100 * (cap - (left || 0)) / cap)) : 0;
+    const pair = l.format === 'fixed-partner';
+    return `<a class="nite ${L.cls}" href="/ladders.html#ladders/${encodeURIComponent(l.id)}">
+      <div style="min-width:0;flex:1"><div class="d">${esc(wd(l.date))}${l.startTime ? ' · ' + esc(l.startTime) : ''} · ${isQ(l.type) ? 'Queen' : 'Challengers'}</div>
+        <b>${esc(l.name)}</b><small>${esc(l.place || '')}${l.courts ? ' · ' + l.courts + ' courts' : ''}${l.feeCents ? ' · ' + money(l.feeCents) + (pair ? ' · pairs' : '') : ''}${l.duprRated ? ' · DUPR' : ''}</small>
+        ${cap ? `<div class="bar"><i style="width:${filled}%"></i></div><small>${left === 0 ? 'Full — waitlist open' : (left != null ? left + ' spot' + (left === 1 ? '' : 's') + ' left' : '')} · ${cap - (left || 0)} of ${cap}</small>` : ''}</div>
+      <span class="btn pri">${left === 0 ? 'Waitlist' : (pair ? 'Register a pair' : 'Register')}</span></a>`;
+  }).join('');
+}
+
+function renderRecaps() {
+  const el = document.getElementById('recaps');
+  const nights = COMPLETED.slice(0, 4);
+  if (!nights.length) { el.innerHTML = `<div class="empty">No completed nights yet.</div>`; return; }
+  el.innerHTML = nights.map(l => {
+    const L = lg(l.type); const top3 = (STATS.winnersByEvent || {})[l.id] || [];
+    const url = l.date && RECAP_URLS[l.date]; const a = albumOf(l.id); const bg = a ? a.photos.slice(0, 3) : [];
+    return `<div class="rec ${L.cls}${bg.length ? ' haspix' : ''}">
+      ${bg.length ? `<div class="rbg" style="--n:${bg.length}">${bg.map(p => `<img src="${esc(p.thumb)}" alt="" loading="lazy" style="object-position:${fpos(p)}">`).join('')}</div>` : ''}
+      <div class="rtx"><div class="top"><div class="kick">${esc(wd(l.date))} · ${isQ(l.type) ? 'Queen' : 'Challengers'}</div>${a ? `<span class="cnt">📸 ${a.count}</span>` : ''}</div>
+        <h4>${esc(l.name)}</h4>
+        ${top3.length ? `<div class="pods">${podHtml(top3)}</div>` : '<div style="margin-bottom:auto"></div>'}
+        <div class="racts"><a class="btn" href="${L.results(l.id)}">Full results →</a>${url ? `<a class="btn pri" href="${url}">Read the recap →</a>` : ''}</div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderTicker() {
+  const el = document.getElementById('ticker');
+  const done = new Set(COMPLETED.map(l => l.id));
+  const a = ALBUMS.find(x => done.has(x.eventId) && x.photos.length >= 4);
+  if (!a) { el.innerHTML = ''; return; }
+  const L = lg(a.type); const href = isQ(a.type) ? '/queen.html#gallery' : (RECAP_URLS[a.date] || L.results(a.eventId));
+  const twice = a.photos.concat(a.photos);
+  el.innerHTML = `<div class="ticker" aria-label="Photos from ${esc(a.name)}"><div class="track">${twice.map(p => `<a href="${href}"><img src="${esc(p.thumb)}" alt="" loading="lazy" style="object-position:${fpos(p)}"></a>`).join('')}</div><div class="cap">📸 ${esc(a.name)} · ${esc(wd(a.date))} · ${a.count} photos</div></div>`;
+}
+
+load();
+</script>
+</body>
+</html>
