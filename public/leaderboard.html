@@ -62,7 +62,7 @@
       color:#0b0d0a; background:#f0c040; border-radius:9999px; padding:3px 9px; }
     .lb-mvpc--f .lb-mvpc__tag { background:#E6E1D5; }
     .lb-mvpc__who { display:flex; align-items:center; gap:10px; margin:10px 0 10px; }
-    .lb-mvpc__ring { width:42px; height:42px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center;
+    .lb-mvpc__ring { width:42px; height:42px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; overflow:hidden;
       font-size:13px; font-weight:900; background:#0b0d0a; border:2px solid #f0c040; box-shadow:0 0 14px rgba(240,192,64,.4); }
     .lb-mvpc--f .lb-mvpc__ring { border-color:#E6E1D5; box-shadow:0 0 14px rgba(230,225,213,.32); }
     .lb-mvpc__nm { font-size:15px; font-weight:900; font-style:italic; line-height:1.15; }
@@ -453,11 +453,22 @@
   // into a blob rather than being duplicated a third time.
   const MVP_CIRCUIT = 'I';
   const SEASON_MVPS = {
-    male:   { initials:'RH', name:'Ryan Hom', team:'Smash Society', tag:'Season MVP · Male',
+    // playerId = the Season 1 roster id, so the ring shows the real photo
+    // (player-photo-serve resolves across a person's ids; 404 → initials).
+    male:   { initials:'RH', name:'Ryan Hom', team:'Smash Society', tag:'Season MVP · Male', playerId:'p_fd8a1d5cc957f4ee_0',
               stats:[['72.0','DSR','g'],['24-6','Record',''],['+117','Diff','li'],['7/9','Clutch','t']] },
-    female: { initials:'SC', name:'Shay C',   team:'ZERO ZERO TWO', tag:'Season MVP · Female',
+    female: { initials:'SC', name:'Shay C',   team:'ZERO ZERO TWO', tag:'Season MVP · Female', playerId:'p_e46927c1b38c',
               stats:[['82.0','DSR','g'],['29-3','Record',''],['+200','Diff','li'],['91%','Win rate','t']] },
   };
+  // Photo when the MVP has one: the standings row's stamped URL first, else the
+  // serve endpoint by id; the initials sit underneath for the 404 case.
+  function mvpRing(m) {
+    const row = (state.playerStats?.players ? Object.values(state.playerStats.players) : []).find(p => p.name === m.name || p.playerId === m.playerId);
+    const src = (row && row.photoUrl) || (m.playerId ? '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(m.playerId) : null);
+    return '<div class="lb-mvpc__ring">' + (src
+      ? '<img data-ini="' + esc(m.initials) + '" src="' + esc(src) + '" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:50%;" onerror="avFallback(this)">'
+      : esc(m.initials)) + '</div>';
+  }
 
   function renderHero() {
     /* Title is static ("Leaderboard"). The hero's empty right half carries the
@@ -469,7 +480,7 @@
     const label = (seasonName && (seasonName.name || seasonName.label)) || 'Season 1';
     const card = (m, cls) => '<div class="lb-mvpc ' + cls + '">' +
       '<span class="lb-mvpc__tag">' + esc(m.tag) + '</span>' +
-      '<div class="lb-mvpc__who"><div class="lb-mvpc__ring">' + esc(m.initials) + '</div>' +
+      '<div class="lb-mvpc__who">' + mvpRing(m) +
         '<div><div class="lb-mvpc__nm">' + esc(m.name) + '</div>' +
         '<div class="lb-mvpc__tm">' + esc(m.team) + ' · ' + esc(label) + '</div></div></div>' +
       '<div class="lb-mvpc__st">' + m.stats.map(st =>
