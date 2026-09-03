@@ -1814,6 +1814,13 @@
   }
   function adminSeasonId() { return (WORKING && WORKING.id) || 'circuit-' + adminCircuit().toLowerCase(); }
   function adminSeasonName() { return (WORKING && WORKING.name) || 'Season'; }
+  // The full season record behind WORKING. Anything that needs the season's own
+  // dates or length must come from here — SETTINGS.startDate / SETTINGS.weeks
+  // are league-wide fields pinned to whichever season was configured last, so
+  // reading them while working on another season silently uses the wrong dates.
+  function workingSeason() { return SEASONS.find(x => WORKING && x.id === WORKING.id) || null; }
+  function workingStartDate() { const s = workingSeason(); return (s && s.startDate) || SETTINGS.startDate || '2026-06-08'; }
+  function workingWeeks() { const s = workingSeason(); return Number(s && s.weeks) || Number(SETTINGS.weeks) || 8; }
 
   // ─── State ─────────────────────────────────────────────────
   let SETTINGS = {};
@@ -2332,8 +2339,7 @@
   function renderSeasonLabel() {
     const label = $id('ov-circuit-label');
     if (!label) return;
-    const season = SEASONS.find(x => WORKING && x.id === WORKING.id) || null;
-    const start = (season && season.startDate) || SETTINGS.startDate;
+    const start = workingStartDate();
     const dt = start ? new Date(start + 'T00:00:00') : null;
     const monthStr = dt && !isNaN(dt) ? dt.toLocaleString('en-US', { month: 'long', year: 'numeric' }) : '';
     const nm = (WORKING && WORKING.name) || SETTINGS.circuitName || 'Season';
@@ -3551,22 +3557,29 @@
         setTimeout(() => { const st = $id('ov-qa-status'); if (st) st.textContent = ''; }, 5000);
       }
       if (qa === 'settimes') {
-        // Backfill scheduledAt on every match: week date + 7:00 PM, computed in
+        // Backfill scheduledAt on every match in the WORKING season, computed in
         // THIS browser's timezone (server is UTC). The blind-lineup reveal gate
         // reads scheduledAt and now fails closed when it's missing.
         const status = $id('ov-qa-status');
         try {
-          const cfg = await apiJSON('/.netlify/functions/admin-settings');
-          const startDate = cfg.startDate || '2026-06-08';
-          const weeks = Number(cfg.weeks) || 8;
+          // Dates come from the season BEING WORKED ON, not from the league-wide
+          // settings fields — those name whichever season was configured last,
+          // so this used to stamp Season 1's June dates onto Season 2's matches.
+          // A week with a published game night uses that exact datetime; the
+          // rest fall back to the season's start + 7n at 7:00 PM local.
+          const startDate = workingStartDate();
+          const weeks = workingWeeks();
+          const planned = seasonWeekDates();
           const times = {};
           for (let w = 1; w <= weeks; w++) {
+            const pd = planned[w] ? new Date(planned[w]) : null;
+            if (pd && !isNaN(pd)) { times[w] = pd.toISOString(); continue; }
             const d = new Date(startDate + 'T19:00:00'); // 7:00 PM local
             d.setDate(d.getDate() + (w - 1) * 7);
             times[w] = d.toISOString();
           }
           const sample = new Date(times[1]).toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-          if (!confirm(`Set every match's start time to 7:00 PM on its week night (Week 1 = ${sample})?\n\nLineups reveal 15 min before this time. Existing per-match times are kept.`)) return;
+          if (!confirm(`Set every ${adminSeasonName()} match's start time to its week night (Week 1 = ${sample})?\n\nLineups reveal 15 min before this time. Existing per-match times are kept.`)) return;
           b.disabled = true; if (status) status.textContent = 'Setting match times…';
           const r = await apiJSON('/.netlify/functions/admin-backfill-times', {
             method: 'POST',
