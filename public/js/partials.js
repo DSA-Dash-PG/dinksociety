@@ -4,11 +4,15 @@
 // Example: <div data-partial="nav"></div> fetches /partials/nav.html
 // ═══════════════════════════════════════════════════════════════
 
-// Central admin-settings fetch — ONE request shared site-wide.
+// Central settings fetch — ONE request shared site-wide.
 // Starts as a promise; nav.html awaits it and then replaces it with the
 // resolved object so existing synchronous readers (captain.html,
 // register.html) keep working once it has loaded.
-window.DS_SETTINGS = fetch('/.netlify/functions/admin-settings').then(r => r.json()).catch(() => ({}));
+//
+// public-settings, NOT admin-settings: this response is readable by anyone who
+// opens the site, so it carries only the fields the public pages render (venue,
+// fees, season length, planned week dates). admin-settings is admin-only.
+window.DS_SETTINGS = fetch('/.netlify/functions/public-settings').then(r => r.json()).catch(() => ({}));
 
 (async function loadPartials() {
   // Partials may themselves contain [data-partial] slots (footer.html nests

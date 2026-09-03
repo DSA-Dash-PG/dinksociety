@@ -1,9 +1,16 @@
 // netlify/functions/admin-settings.js
-// GET  → return current circuit settings (public, no auth)
+// GET  → return the FULL settings record (admin-only)
 // POST → save circuit settings (admin-only)
+//
+// This used to answer GET with no auth, which put waiver text, email templates,
+// balance-due dates and updatedBy on the public wire — every public page pulled
+// it just to read the venue and the fees. Public pages now use public-settings,
+// which serves a whitelist of the same record. Keep the two in step: a field
+// added here is invisible to the site until it is added there too.
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { normalizeWeekDates } from './lib/week-dates.js';
 
 const DEFAULTS = {
   circuitName:    'Season 1',
@@ -21,9 +28,11 @@ const DEFAULTS = {
   // courts is a free-text list of court labels (e.g. "1–8" or "3A, 5D, 5E").
   // Feeds the venue dropdowns on the Schedule tab.
   venues:         [],
-  // Planned game-night date per week (league-wide), keyed by week number →
-  // ISO datetime. Lets admins publish a week's date before matchups exist;
-  // matches inherit it and the public schedule shows it. e.g. { "6": "2026-07-27T19:00:00.000Z" }
+  // Planned game-night dates, keyed by circuit CODE then week number → ISO
+  // datetime. Lets admins publish a week's date before matchups exist; matches
+  // inherit it and the public schedule shows it.
+  // e.g. { "II": { "6": "2026-10-22T02:00:00.000Z" } }
+  // See lib/week-dates.js — a legacy flat { "6": ... } map is migrated on read.
   weekDates:      {},
   // Email appearance for league broadcasts/messages. Blank fields fall back to
   // built-in defaults (see lib/email.js EMAIL_TEMPLATE_DEFAULTS).
@@ -47,8 +56,10 @@ function json(body, status = 200) {
 export default async (req) => {
   const store = getStore({ name: 'config', consistency: 'strong' });
 
-  // GET — public, no auth needed
+  // GET — admin only. Public pages read public-settings instead.
   if (req.method === 'GET') {
+    const verified = await verifyAdminSession(req);
+    if (!verified.valid) return unauthResponse(verified.error);
     try {
       const raw = await store.get('circuit-settings');
       const s = raw ? JSON.parse(raw) : { ...DEFAULTS };
@@ -62,6 +73,7 @@ export default async (req) => {
       }
       if (!s.emailTemplate) s.emailTemplate = { ...DEFAULTS.emailTemplate };
       if (!Array.isArray(s.venues)) s.venues = [];
+      s.weekDates = normalizeWeekDates(s.weekDates, s.circuitName);
       return json(s);
     } catch (e) {
       console.error('settings GET error:', e);
@@ -133,7 +145,9 @@ export default async (req) => {
         matchTime:      body.matchTime      ?? prev.matchTime      ?? DEFAULTS.matchTime,
         depositAmount:  body.depositAmount  ?? prev.depositAmount  ?? DEFAULTS.depositAmount,
         balanceDueDate: body.balanceDueDate ?? prev.balanceDueDate ?? DEFAULTS.balanceDueDate,
-        weekDates:      body.weekDates      ?? prev.weekDates      ?? {},
+        // Always stored season-keyed; a flat map from an older client is
+        // migrated onto whichever season these settings name.
+        weekDates:      normalizeWeekDates(body.weekDates ?? prev.weekDates ?? {}, body.circuitName ?? prev.circuitName),
         venues,
         emailTemplate:  body.emailTemplate
           ? { ...(prev.emailTemplate || DEFAULTS.emailTemplate), ...body.emailTemplate }

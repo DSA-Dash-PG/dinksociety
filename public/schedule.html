@@ -351,7 +351,13 @@
     // pinned to Season 1's calendar.
     let SEASON_START = new Date('2026-06-08T00:00:00');
     const TOTAL_WEEKS  = 8;
-    let   PLANNED_DATES = {};   // week # → ISO date published by admin (for weeks without matches yet)
+    // The viewed season's code ('I', 'II', …). Planned week dates are stored
+    // per season, so this is what picks the right bucket.
+    let   SEASON_CODE = 'I';
+    // week # → ISO date published by admin, FOR THIS SEASON ONLY (used for weeks
+    // without matchups yet). This was league-wide, which is how Season 1's July
+    // game nights showed up under Season 2's weeks 5-8.
+    let   PLANNED_DATES = {};
     const MATCH_START_TIME = '7:00 PM';   // fallback only — scheduledAt is the source of truth
     const matchStartLabel = m => {
       if (m && m.scheduledAt) { const d = new Date(m.scheduledAt); if (!isNaN(d)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
@@ -861,8 +867,11 @@
         // Planned week dates published by the admin — used for weeks that don't
         // have matches scheduled yet, so teams still see when they'll play.
         try {
-          const sr = await fetch('/.netlify/functions/admin-settings');
-          if (sr.ok) { const s = await sr.json(); if (s && s.weekDates) PLANNED_DATES = s.weekDates; }
+          const sr = await fetch('/.netlify/functions/public-settings');
+          if (sr.ok) {
+            const s = await sr.json();
+            PLANNED_DATES = (s && s.weekDates && s.weekDates[SEASON_CODE]) || {};
+          }
         } catch {}
         const p = new URLSearchParams({ season: SEASON_ID });
         const r = await fetch(`/.netlify/functions/public-schedule?${p}`);
@@ -911,6 +920,7 @@
     (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
       if (S) {
         SEASON_ID = S.id;
+        SEASON_CODE = String(S.circuit || 'I').toUpperCase();
         LINK_SUFFIX = S.suffix;
         if (S.startDate) { const d = new Date(S.startDate + 'T00:00:00'); if (!isNaN(d)) SEASON_START = d; }
       }

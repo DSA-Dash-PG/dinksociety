@@ -242,12 +242,21 @@
         document.querySelectorAll('[data-circuit-label]').forEach(function (el) {
           el.textContent = S.name || 'Season';
         });
-        // ...and the month beside it, so a Season 2 hero doesn't read "June 2026".
+        // ...and every date beside it, so a Season 2 page doesn't read
+        // "June 2026" or "Mondays". These come from the season BEING VIEWED,
+        // never from admin-settings.startDate — that field names whichever
+        // season the settings record was last saved for (Season 1), which is
+        // what put "June 2026" on the Season 2 schedule hero.
         if (S.startDate) {
           var sd = new Date(S.startDate + 'T12:00:00');
           if (!isNaN(sd)) {
-            var my = sd.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            document.querySelectorAll('[data-start-month-year]').forEach(function (el) { el.textContent = my; });
+            var seasonMY  = sd.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            var seasonDay = sd.toLocaleDateString('en-US', { weekday: 'long' });
+            var seasonDate = sd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            document.querySelectorAll('[data-start-month-year]').forEach(function (el) { el.textContent = seasonMY; });
+            document.querySelectorAll('[data-start-date]').forEach(function (el) { el.textContent = seasonDate; });
+            document.querySelectorAll('[data-start-day]').forEach(function (el) { el.textContent = seasonDay; });
+            document.querySelectorAll('[data-start-day-plural]').forEach(function (el) { el.textContent = seasonDay + 's'; });
           }
         }
         // A season that is being played wears no badge — that IS the badge.
@@ -451,23 +460,8 @@
   window.addEventListener('scroll', checkScroll, { passive: true });
   checkScroll(); // run on load in case page is already scrolled
 
-  /* ── Load circuit settings (public GET) ── */
-
-  function _dsDate(iso) {
-    if (!iso) return '';
-    var d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-  }
-  function _dsDay(iso) {
-    if (!iso) return '';
-    var d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString('en-US', { weekday: 'long' });
-  }
-  function _dsMonthYear(iso) {
-    if (!iso) return '';
-    var d = new Date(iso + 'T12:00:00');
-    return d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  }
+  /* ── Apply public settings (venue, fees, season length) ──
+     Date labels are NOT set here — see the note in the block below. */
 
   (async function () {
       // Shared settings promise created in js/partials.js — no second fetch.
@@ -495,23 +489,12 @@
       document.querySelectorAll('[data-match-time]').forEach(function (el) {
         el.textContent = s.matchTime || '7:00 PM';
       });
-      if (s.startDate) {
-        var startDate = _dsDate(s.startDate);
-        var startDay  = _dsDay(s.startDate);
-        var startMY   = _dsMonthYear(s.startDate);
-        document.querySelectorAll('[data-start-date]').forEach(function (el) {
-          el.textContent = startDate;
-        });
-        document.querySelectorAll('[data-start-day]').forEach(function (el) {
-          el.textContent = startDay;
-        });
-        document.querySelectorAll('[data-start-day-plural]').forEach(function (el) {
-          el.textContent = startDay + 's';
-        });
-        document.querySelectorAll('[data-start-month-year]').forEach(function (el) {
-          el.textContent = startMY;
-        });
-      }
+      // NOTE: [data-start-date], [data-start-day], [data-start-day-plural] and
+      // [data-start-month-year] are filled by the season pill above, from the
+      // season actually being viewed — same reason [data-circuit-label] is.
+      // settings.startDate is a single league-wide field pinned to whichever
+      // season was last saved, so setting them here raced the season block and
+      // left Season 2 pages reading "June 2026" / "Mondays".
       var feeLabel = s.teamFee ? '$' + s.teamFee : '$650';
       var feeHtml = 'The full <strong>' + feeLabel + ' team fee</strong> is due at registration to confirm your spot.';
       document.querySelectorAll('[data-deposit-note]').forEach(function (el) {

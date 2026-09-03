@@ -1797,6 +1797,21 @@
   let CURRENT_SEASON = null;   // what the public site is on
 
   function adminCircuit() { return (WORKING && WORKING.circuit) || 'I'; }
+  // Planned game-night dates are stored per season: SETTINGS.weekDates is
+  // { "<circuit code>": { "<week>": "<iso>" } }. Reading or writing the flat
+  // map is what leaked Season 1's dates onto Season 2's public schedule, so
+  // always go through these two.
+  function seasonWeekDates() {
+    const all = SETTINGS.weekDates || {};
+    return all[adminCircuit()] || {};
+  }
+  function setSeasonWeekDate(week, iso) {
+    SETTINGS.weekDates = SETTINGS.weekDates || {};
+    const bucket = { ...(SETTINGS.weekDates[adminCircuit()] || {}) };
+    if (iso) bucket[week] = iso; else delete bucket[week];
+    SETTINGS.weekDates[adminCircuit()] = bucket;
+    return SETTINGS.weekDates;
+  }
   function adminSeasonId() { return (WORKING && WORKING.id) || 'circuit-' + adminCircuit().toLowerCase(); }
   function adminSeasonName() { return (WORKING && WORKING.name) || 'Season'; }
 
@@ -5666,7 +5681,7 @@
   // Week rollup status: done (all final) · live (some final / in play) · up (dated, none final) · tbd (no dates).
   function weekStatus(w) {
     const ms = w.matches || [];
-    if (!ms.length) return (SETTINGS.weekDates && SETTINGS.weekDates[w.week]) ? 'up' : 'tbd';
+    if (!ms.length) return seasonWeekDates()[w.week] ? 'up' : 'tbd';
     const fin = ms.filter(m => m.finalizedAt).length;
     if (fin === ms.length) return 'done';
     if (fin > 0) return 'live';
@@ -5681,7 +5696,7 @@
   function plannedWeekDate(w) {
     const d = weekDateObj(w);
     if (d) return d;
-    const wd = (SETTINGS.weekDates || {})[w.week];
+    const wd = seasonWeekDates()[w.week];
     if (wd) { const x = new Date(wd); if (!isNaN(x)) return x; }
     return null;
   }
@@ -6100,15 +6115,12 @@
     card.querySelectorAll('button, select, input').forEach(el => { el.disabled = true; });
     prog();
     try {
-      // Persist the week's planned date league-wide (in settings), so the date
-      // sticks even when the week has no matches yet — and shows on the public
-      // schedule. Matches created later inherit it.
-      SETTINGS.weekDates = SETTINGS.weekDates || {};
-      if (scheduledAt) SETTINGS.weekDates[wk.week] = scheduledAt;
-      else delete SETTINGS.weekDates[wk.week];
+      // Persist the week's planned date for THIS SEASON (in settings), so the
+      // date sticks even when the week has no matches yet — and shows on the
+      // public schedule. Matches created later inherit it.
       await apiJSON('/.netlify/functions/admin-settings', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ weekDates: SETTINGS.weekDates }),
+        body: JSON.stringify({ weekDates: setSeasonWeekDate(wk.week, scheduledAt) }),
       });
       for (const m of deletes) {
         await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(m.id), { method: 'DELETE' });
