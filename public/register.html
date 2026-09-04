@@ -528,9 +528,29 @@
 
       <!-- Step 1: Team details -->
       <section class="reg-section is-active" data-section="1">
-        <h2 class="reg-h2">Team details</h2>
-        <p class="reg-lede">Confirm your division, name the team, and enter the captain's info. You'll build your roster (6–12 players) through the Captain Portal after checkout.</p>
-        <p class="reg-note" id="deposit-note" data-deposit-note>A <strong>$250 deposit</strong> holds your spot — pay by card or Venmo. The balance of the team fee is due one week before the season starts.</p>
+        <h2 class="reg-h2" id="step1-h">Team details</h2>
+        <p class="reg-lede" id="step1-lede">Confirm your division, name the team, and enter the captain's info. You'll build your roster (6–12 players) through the Captain Portal after checkout.</p>
+        <!-- Fee copy is written by applyFeeCopy() from the season record
+             (division team/free-agent price, season deposit + balance date).
+             Nothing else on the site may write to this node. -->
+        <p class="reg-note" id="deposit-note">Loading season fees…</p>
+
+        <!-- Team vs free agent. Prices come off the selected division. -->
+        <div class="reg-field" id="path-field">
+          <div class="reg-field__label">I'm registering</div>
+          <div class="reg-paths" id="reg-paths">
+            <button type="button" class="reg-path is-selected" data-path="team">
+              <div class="reg-path__header"><span class="reg-path__label">A team</span><span class="reg-path__price" data-team-price>$—</span></div>
+              <div class="reg-path__title">Captain a squad</div>
+              <p class="reg-path__desc">Name the team, register as captain, and build your 6–12 player roster in the Captain Portal.</p>
+            </button>
+            <button type="button" class="reg-path" data-path="agent">
+              <div class="reg-path__header"><span class="reg-path__label">Free agent</span><span class="reg-path__price" data-agent-price>$—</span></div>
+              <div class="reg-path__title">Solo — get drafted</div>
+              <p class="reg-path__desc">No team yet? Sign up on your own and we'll place you with a squad that needs players.</p>
+            </button>
+          </div>
+        </div>
 
         <div class="reg-field" id="division-field">
           <div class="reg-field__label">Division</div>
@@ -543,6 +563,11 @@
           <div class="reg-field"><label for="team-name">Team name</label><input type="text" id="team-name" placeholder="e.g. Dink Floyd" maxlength="40"><div class="reg-field__error" data-error="team-name">Team name is required.</div></div>
           <div class="reg-player"><div class="reg-player__heading">Captain</div><div class="reg-field__row"><div class="reg-field"><label for="p1-first">First name</label><input type="text" id="p1-first" data-required="1"></div><div class="reg-field"><label for="p1-last">Last name</label><input type="text" id="p1-last" data-required="1"></div></div><div class="reg-field__row"><div class="reg-field"><label for="p1-email">Email</label><input type="email" id="p1-email" data-required="1"></div><div class="reg-field"><label for="p1-phone">Phone</label><input type="tel" id="p1-phone" data-required="1"></div></div></div>
           <p style="font-size: 12px; line-height: 1.6; color: var(--color-text-faint); margin: 4px 0 0;">You'll build your full roster (6–12 players) through the Captain Portal after checkout.</p>
+        </div>
+
+        <div id="agent-fields" style="display:none;">
+          <div class="reg-player"><div class="reg-player__heading">About you</div><div class="reg-field__row"><div class="reg-field"><label for="a-first">First name</label><input type="text" id="a-first" data-required="1"></div><div class="reg-field"><label for="a-last">Last name</label><input type="text" id="a-last" data-required="1"></div></div><div class="reg-field__row"><div class="reg-field"><label for="a-email">Email</label><input type="email" id="a-email" data-required="1"></div><div class="reg-field"><label for="a-phone">Phone</label><input type="tel" id="a-phone" data-required="1"></div></div><div class="reg-field__row"><div class="reg-field"><label for="a-dupr">DUPR rating <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);">(optional)</span></label><input type="text" id="a-dupr" inputmode="decimal" placeholder="e.g. 3.6"></div><div class="reg-field"><label for="a-notes">Anything we should know? <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);">(optional)</span></label><input type="text" id="a-notes" maxlength="140" placeholder="Friends you'd like to play with, availability…"></div></div></div>
+          <p style="font-size: 12px; line-height: 1.6; color: var(--color-text-faint); margin: 4px 0 0;">We match free agents with teams that need players before the season starts. Your captain will reach out once you're placed.</p>
         </div>
 
         <div class="reg-actions"><button type="button" class="reg-btn reg-btn--primary" id="to-step-2">Continue</button></div>
@@ -636,7 +661,7 @@
           <ol class="reg-venmo__steps">
             <li>Hit <strong>Submit</strong> below — we save your registration and show you the exact amount and note to send.</li>
             <li>Send <strong data-pay-amount>$250</strong> to <strong>@<span data-venmo-handle>dink-society</span></strong> in Venmo. You'll get the same instructions by email.</li>
-            <li>Once we match your payment, you'll get a confirmation email with your Captain Portal link.</li>
+            <li id="venmo-step-3">Once we match your payment, you'll get a confirmation email with your Captain Portal link.</li>
           </ol>
         </div>
 
@@ -651,7 +676,14 @@
 
   <script>
     // ── Dynamic state (populated from public-seasons API) ──────
-    const state = { step: 1, pay: 'venmo', venmoOption: 'deposit' };
+    // path: 'team' | 'agent' — ?path=agent (or #agent) lands on the free-agent side.
+    const state = { step: 1, pay: 'venmo', venmoOption: 'deposit', path: 'team' };
+    (function () {
+      const q = new URLSearchParams(location.search).get('path');
+      if (q === 'agent' || /^#(agent|free-agent|solo)$/i.test(location.hash)) state.path = 'agent';
+    })();
+    // Fallbacks only — the live numbers are the division's prices in Admin → Seasons.
+    const FALLBACK_TEAM_FEE = 700, FALLBACK_AGENT_FEE = 125, FALLBACK_DEPOSIT = 250;
     let activeSeason = null;
     let activeDiv = null;
 
@@ -702,10 +734,13 @@
       container.innerHTML = divs.map((d, i) =>
         `<button type="button" class="reg-div${i === 0 ? ' is-selected' : ''}" data-div="${esc(d.id)}">` +
           `<div class="reg-div__name">${esc(d.name)}</div>` +
-          `<div class="reg-div__meta">$${d.teamPrice ? d.teamPrice.toLocaleString() : '—'} · Open</div>` +
+          `<div class="reg-div__meta">$${d.teamPrice ? d.teamPrice.toLocaleString() : '—'} / team` +
+            (d.agentPrice > 0 ? ` · $${d.agentPrice.toLocaleString()} free agent` : '') + ` · Open</div>` +
         `</button>`
       ).join('');
       selectDivision(divs[0]);
+      // Team / free-agent prices on the chooser follow the selected division.
+      applyPath();
       container.querySelectorAll('.reg-div').forEach(btn => {
         btn.addEventListener('click', () => {
           const div = activeSeason.divisions.find(d => d.id === btn.dataset.div);
@@ -724,11 +759,16 @@
 
     // Deposit / balance terms come from public-seasons (Admin → Seasons sets
     // them; balance defaults to one week before the season starts).
+    function divTeamPrice() { const p = activeDiv && Number(activeDiv.teamPrice); return p > 0 ? p : FALLBACK_TEAM_FEE; }
+    function divAgentPrice() { const p = activeDiv && Number(activeDiv.agentPrice); return p > 0 ? p : FALLBACK_AGENT_FEE; }
+    function isAgent() { return state.path === 'agent'; }
+
     function feeTerms() {
-      const price = activeDiv ? activeDiv.teamPrice : 700;
       const s = activeSeason || {};
-      let deposit = (s.depositAmount != null) ? Number(s.depositAmount) : 250;
-      if (!(deposit > 0) || deposit >= price) deposit = price;
+      const price = isAgent() ? divAgentPrice() : divTeamPrice();
+      let deposit = (s.depositAmount != null) ? Number(s.depositAmount) : FALLBACK_DEPOSIT;
+      // Free agents pay the whole fee up front — deposits are a team thing.
+      if (isAgent() || !(deposit > 0) || deposit >= price) deposit = price;
       const balance = Math.max(0, price - deposit);
       const dueDate = s.balanceDueDate
         ? new Date(s.balanceDueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
@@ -748,11 +788,39 @@
       const t = feeTerms();
       const how = t.cardEnabled ? 'pay by card or Venmo' : 'pay by Venmo';
       const note = document.getElementById('deposit-note');
-      if (note) note.innerHTML = t.balance > 0
-        ? 'A <strong>$' + t.deposit.toLocaleString() + ' deposit</strong> holds your spot — ' + how + ', or settle the full <strong>$' + t.price.toLocaleString() + '</strong> up front. The balance is due ' + (t.dueDate ? 'by <strong>' + t.dueDate + '</strong>' : 'one week before the season starts') + '.'
-        : 'The full <strong>$' + t.price.toLocaleString() + ' team fee</strong> is due at registration to confirm your spot — ' + how + '.';
+      if (note) note.innerHTML = isAgent()
+        ? 'The <strong>$' + t.price.toLocaleString() + ' free agent fee</strong> is due at registration — ' + how + '. We place you on a team before the season starts.'
+        : t.balance > 0
+          ? 'A <strong>$' + t.deposit.toLocaleString() + ' deposit</strong> holds your spot — ' + how + ', or settle the full <strong>$' + t.price.toLocaleString() + '</strong> up front. The balance is due ' + (t.dueDate ? 'by <strong>' + t.dueDate + '</strong>' : 'one week before the season starts') + '.'
+          : 'The full <strong>$' + t.price.toLocaleString() + ' team fee</strong> is due at registration to confirm your spot — ' + how + '.';
+      // Chooser prices track the selected division.
+      document.querySelectorAll('[data-team-price]').forEach(el => { el.textContent = '$' + divTeamPrice().toLocaleString(); });
+      document.querySelectorAll('[data-agent-price]').forEach(el => { el.textContent = '$' + divAgentPrice().toLocaleString(); });
       updatePayUI();
     }
+
+    // ── Team vs free agent ──
+    function applyPath() {
+      const agent = isAgent();
+      document.querySelectorAll('#reg-paths .reg-path').forEach(b => b.classList.toggle('is-selected', b.dataset.path === state.path));
+      const tf = document.getElementById('team-fields'), af = document.getElementById('agent-fields');
+      if (tf) tf.style.display = agent ? 'none' : '';
+      if (af) af.style.display = agent ? '' : 'none';
+      const h = document.getElementById('step1-h'), lede = document.getElementById('step1-lede');
+      if (h) h.textContent = agent ? 'Free agent details' : 'Team details';
+      if (lede) lede.textContent = agent
+        ? 'Pick the division you play at and tell us how to reach you. We draft free agents onto teams that need players.'
+        : 'Confirm your division, name the team, and enter the captain\'s info. You\'ll build your roster (6–12 players) through the Captain Portal after checkout.';
+      const v3 = document.getElementById('venmo-step-3');
+      if (v3) v3.textContent = agent
+        ? 'Once we match your payment, you\'re in — you\'ll get a confirmation email, and your captain reaches out once you\'re placed on a team.'
+        : 'Once we match your payment, you\'ll get a confirmation email with your Captain Portal link.';
+      applyFeeCopy();
+    }
+    document.querySelectorAll('#reg-paths .reg-path').forEach(btn => {
+      btn.addEventListener('click', () => { state.path = btn.dataset.path === 'agent' ? 'agent' : 'team'; applyPath(); });
+    });
+    applyPath();
 
     // Payment method tiles (Step 3) — only rendered when card is switched on.
     document.querySelectorAll('#pay-methods .reg-path').forEach(btn => {
@@ -993,6 +1061,8 @@
         : { n: String(divs.length), l: 'Divisions' });
       const prices = divs.map(d => d.teamPrice).filter(p => p > 0);
       if (prices.length) facts.push({ n: '$' + Math.min.apply(null, prices).toLocaleString(), l: 'Team fee' });
+      const aPrices = divs.map(d => d.agentPrice).filter(p => p > 0);
+      if (aPrices.length) facts.push({ n: '$' + Math.min.apply(null, aPrices).toLocaleString(), l: 'Free agent' });
       const fbox = document.getElementById('ln-facts');
       if (fbox) fbox.innerHTML = facts.map(f =>
         '<div class="ln-fact"><div class="n">' + esc(f.n) + '</div><div class="l">' + esc(f.l) + '</div></div>'
@@ -1006,6 +1076,7 @@
                 '<div class="sp">' + (d.capacity ? esc(d.capacity) + ' teams' : 'Open') + '</div>' +
                 '<div class="nm">' + esc(d.name) + '</div>' +
                 '<div class="pr">$' + (d.teamPrice ? d.teamPrice.toLocaleString() : '—') + ' <small>/ team</small></div>' +
+                (d.agentPrice > 0 ? '<div class="sp" style="margin-top:6px">$' + d.agentPrice.toLocaleString() + ' free agent</div>' : '') +
               '</div>'
             ).join('')
           : '<div style="color:var(--color-text-faint);font-size:13px">Divisions announced soon.</div>';
@@ -1024,8 +1095,8 @@
           ? (divTeams ? 'One bracket, ' + divTeams + ' teams.' : 'One bracket.')
           : 'Pick your bracket.';
         if (dLede) dLede.textContent = oneDiv
-          ? ('Team fee covers the full season — grab one of the ' + (divTeams || 'open') + ' team spots in ' + divs[0].name + '.')
-          : 'Team fee covers the full season. Register as a team, or sign up solo and get drafted.';
+          ? ('Team fee covers the full season — grab one of the ' + (divTeams || 'open') + ' team spots in ' + divs[0].name + ', or sign up solo as a free agent and get drafted.')
+          : 'Team fee covers the full season. Register as a team, or sign up solo as a free agent and get drafted.';
       }
 
       // Neon stat bar — honest, season-driven. No invented totals.
@@ -1237,13 +1308,14 @@
     // Step 1: Team details → Waiver
     document.getElementById('to-step-2').addEventListener('click', () => {
       let valid = true;
-      const scope = document.getElementById('team-fields');
+      const scope = document.getElementById(isAgent() ? 'agent-fields' : 'team-fields');
       scope.querySelectorAll('input[data-required]').forEach(inp => {
         if (!inp.value.trim()) { inp.classList.add('is-invalid'); valid = false; }
         else inp.classList.remove('is-invalid');
       });
       const tn = document.getElementById('team-name');
-      if (!tn.value.trim()) { tn.classList.add('is-invalid'); showError('team-name'); valid = false; }
+      if (isAgent()) { tn.classList.remove('is-invalid'); clearError('team-name'); }
+      else if (!tn.value.trim()) { tn.classList.add('is-invalid'); showError('team-name'); valid = false; }
       else { tn.classList.remove('is-invalid'); clearError('team-name'); }
       scope.querySelectorAll('input[type="email"]').forEach(inp => {
         if (inp.value && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inp.value)) { inp.classList.add('is-invalid'); valid = false; }
@@ -1278,11 +1350,18 @@
       rows.push(['Season', seasonName + (seasonWhen ? ' · ' + seasonWhen : '')]);
       if (season.venue) rows.push(['Location', escapeHtml(season.venue)]);
       rows.push(['Division', activeDiv ? activeDiv.name : '—']);
-      rows.push(['Registration type', 'Team']);
-      rows.push(['Team name', escapeHtml(document.getElementById('team-name').value.trim())]);
-      rows.push(['Captain', escapeHtml(val('p1-first') + ' ' + val('p1-last'))]);
       const t = feeTerms();
-      rows.push(['Team fee', '$' + t.price.toLocaleString()]);
+      if (isAgent()) {
+        rows.push(['Registration type', 'Free agent']);
+        rows.push(['Player', escapeHtml(val('a-first') + ' ' + val('a-last'))]);
+        if (val('a-dupr')) rows.push(['DUPR', escapeHtml(val('a-dupr'))]);
+        rows.push(['Free agent fee', '$' + t.price.toLocaleString()]);
+      } else {
+        rows.push(['Registration type', 'Team']);
+        rows.push(['Team name', escapeHtml(document.getElementById('team-name').value.trim())]);
+        rows.push(['Captain', escapeHtml(val('p1-first') + ' ' + val('p1-last'))]);
+        rows.push(['Team fee', '$' + t.price.toLocaleString()]);
+      }
       if (t.owedAfter > 0) rows.push(['Balance due' + (t.dueDate ? ' by ' + t.dueDate : ' (one week before the season)'), '$' + t.owedAfter.toLocaleString()]);
       document.getElementById('summary').innerHTML =
         rows.map(([k, v]) => `<div class="reg-summary__row"><span class="reg-summary__label">${k}</span><span class="reg-summary__value">${v}</span></div>`).join('') +
@@ -1340,19 +1419,30 @@
       // out of the id — a slug id would key the team to a season that has no
       // schedule or standings). The local derivation stays as a fallback.
       const circuit = (activeSeason && activeSeason.circuit) || circuitCodeFromSeasonId(seasonId);
-      return {
+      const base = {
         seasonId,
         circuit,
         division: activeDiv ? activeDiv.id : '',
         divisionLabel: activeDiv ? activeDiv.name : '',
-        path: 'team', price: activeDiv ? activeDiv.teamPrice : 700,
         paymentMethod: state.pay === 'card' ? 'card' : 'venmo',
-        venmoOption: state.venmoOption === 'full' ? 'full' : 'deposit',
         agreed: { liability: true, conduct: true },
+      };
+      if (isAgent()) {
+        const agentName = (val('a-first') + ' ' + val('a-last')).trim();
+        return Object.assign(base, {
+          path: 'agent', price: divAgentPrice(),
+          // Free agents always pay in full — the server enforces it too.
+          venmoOption: 'full',
+          agent: { name: agentName, firstName: val('a-first'), lastName: val('a-last'), email: val('a-email'), phone: val('a-phone'), dupr: val('a-dupr'), notes: val('a-notes') },
+        });
+      }
+      return Object.assign(base, {
+        path: 'team', price: divTeamPrice(),
+        venmoOption: state.venmoOption === 'full' ? 'full' : 'deposit',
         team: { name: val('team-name'), captain: captainName, players: [
           { name: captainName, firstName: val('p1-first'), lastName: val('p1-last'), email: val('p1-email'), phone: val('p1-phone'), captain: true },
         ]},
-      };
+      });
     }
 
     function val(id) { const el = document.getElementById(id); return el ? el.value.trim() : ''; }

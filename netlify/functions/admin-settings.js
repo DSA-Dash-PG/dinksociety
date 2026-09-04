@@ -15,13 +15,13 @@ import { normalizeWeekDates } from './lib/week-dates.js';
 const DEFAULTS = {
   circuitName:    'Season 1',
   startDate:      '2026-06-08',
-  teamFee:        '$700',
-  agentFee:       '$75',
   defaultVenue:   '',
   divisions:      ['3.0–3.5 Mixed'],
   teamsPerDiv:    6,
   weeks:          8,
   matchTime:      '7:00–9:00 PM',
+  // Legacy fallback only — resolveDepositTerms() reads the season first.
+  // Not editable in the UI anymore; Admin → Seasons owns deposit + balance date.
   depositAmount:  250,
   balanceDueDate: '2026-06-01',
   // Venues the league plays at. Each: { id, name, address, courts } where
@@ -136,8 +136,6 @@ export default async (req) => {
         ...prev,
         circuitName:  body.circuitName  ?? prev.circuitName,
         startDate:    body.startDate    ?? prev.startDate,
-        teamFee:      body.teamFee      ?? prev.teamFee,
-        agentFee:     body.agentFee     ?? prev.agentFee,
         defaultVenue: body.defaultVenue ?? prev.defaultVenue,
         divisions:    body.divisions    ?? prev.divisions,
         teamsPerDiv:  body.teamsPerDiv  ?? prev.teamsPerDiv,

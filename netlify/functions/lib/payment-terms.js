@@ -10,8 +10,10 @@ import { getStore } from '@netlify/blobs';
 // season starts. Admin → Seasons can override both per season.
 export const DEFAULT_DEPOSIT = 250;
 
-// Fallback team fee, used only when a division has no price set.
+// Fallback fees, used only when a division has no price set. The live
+// numbers are the division's teamPrice / agentPrice in Admin → Seasons.
 export const DEFAULT_TEAM_FEE = 700;
+export const DEFAULT_AGENT_FEE = 125;
 
 // Card (Stripe) checkout is OFF unless CARD_PAYMENTS_ENABLED is set to "true"
 // in the Netlify environment. Venmo is the live payment path; flipping the env

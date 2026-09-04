@@ -29,7 +29,7 @@ import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
 import { sendEmail } from './lib/email.js';
 import { circuitCode } from './lib/circuit.js';
-import { resolveDepositTerms, VENMO_HANDLE, venmoProfileUrl, fmtDueDate, CARD_PAYMENTS_ENABLED, DEFAULT_TEAM_FEE } from './lib/payment-terms.js';
+import { resolveDepositTerms, VENMO_HANDLE, venmoProfileUrl, fmtDueDate, CARD_PAYMENTS_ENABLED, DEFAULT_TEAM_FEE, DEFAULT_AGENT_FEE } from './lib/payment-terms.js';
 
 export default async (req) => {
   if (req.method !== 'POST') {
@@ -74,7 +74,7 @@ export default async (req) => {
     // Look up the season to get the Stripe price ID (if seasonId provided)
     const seasonStore = getStore('seasons');
     let stripePriceId = null;
-    let resolvedPrice = path === 'team' ? DEFAULT_TEAM_FEE : 75; // fallback
+    let resolvedPrice = path === 'team' ? DEFAULT_TEAM_FEE : DEFAULT_AGENT_FEE; // fallback only
     let season = null;
 
     if (seasonId) {
@@ -92,7 +92,9 @@ export default async (req) => {
         const div = season.divisions.find(d => d.id === division);
         if (div) {
           stripePriceId = path === 'team' ? div.stripeTeamPriceId : div.stripeAgentPriceId;
-          resolvedPrice = path === 'team' ? div.teamPrice : div.agentPrice;
+          // Division prices are the source of truth; fall back only if unset.
+          const divPrice = Number(path === 'team' ? div.teamPrice : div.agentPrice);
+          if (divPrice > 0) resolvedPrice = divPrice;
 
           // ── Pay-later bypass ──────────────────────────────────
           // If the division has payLater enabled, skip Stripe entirely.
@@ -301,7 +303,7 @@ export default async (req) => {
                   </p>
                 </div>` : ''}
                 <p style="font-size:14px;color:#8a8a8a;line-height:1.6;margin:0 0 24px;">
-                  Once we match your payment (usually the same day) you'll get a confirmation email with your Captain Portal link. Reference: <span style="font-family:monospace;color:#f5f5f5;">${regId.toUpperCase()}</span>
+                  Once we match your payment (usually the same day) you'll get a confirmation email${isTeam ? ' with your Captain Portal link' : ' — and your captain will reach out once you\'re placed on a team'}. Reference: <span style="font-family:monospace;color:#f5f5f5;">${regId.toUpperCase()}</span>
                 </p>
                 <div style="margin-top:40px;padding-top:20px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;">
                   The Dink Society · Southern California Pickleball League
@@ -325,7 +327,7 @@ export default async (req) => {
               <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:32px 20px;background:#0e0e0e;color:#f5f5f5;">
                 <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:24px;">THE DINK SOCIETY</div>
                 <h1 style="font-size:20px;font-weight:800;margin:0 0 12px;">New Venmo registration</h1>
-                <p style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 16px;"><b style="color:#fff;">${displayName}</b> (${divisionLabel || division}, ${seasonName}) chose Venmo. Look for <b style="color:#fff;">$${amountDueNow}</b> from ${contactName || customerEmail || 'the captain'} with note <b style="color:#fff;">${registration.venmo.note}</b>, then hit <b style="color:#fff;">Venmo received</b> on the Registrations tab.</p>
+                <p style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 16px;"><b style="color:#fff;">${displayName}</b> (${divisionLabel || division}, ${seasonName}) chose Venmo${isTeam ? '' : ' (free agent)'}. Look for <b style="color:#fff;">$${amountDueNow}</b> from ${contactName || customerEmail || (isTeam ? 'the captain' : 'the player')} with note <b style="color:#fff;">${registration.venmo.note}</b>, then hit <b style="color:#fff;">Venmo received</b> on the Registrations tab.</p>
                 <a href="${siteUrl}/admin.html" style="display:inline-block;padding:12px 28px;background:#b8ff2c;color:#0e0e0e;font-size:13px;font-weight:700;text-decoration:none;border-radius:9999px;">Open Admin →</a>
               </div>
             `,

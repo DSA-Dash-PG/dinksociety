@@ -69,7 +69,7 @@
       <a class="btn btn-venmo" id="v-open" href="https://venmo.com/u/dink-society" target="_blank" rel="noopener">Open Venmo →</a>
       <ol class="success__venmo-steps">
         <li>Send the amount above to <strong id="v-handle-2">@dink-society</strong> with the note filled in — it's how we match your payment.</li>
-        <li>We'll confirm your spot (usually the same day) and email your Captain Portal link.</li>
+        <li id="v-step-2">We'll confirm your spot (usually the same day) and email your Captain Portal link.</li>
         <li id="v-balance-step" style="display:none;">The remaining <strong id="v-balance">$400</strong> is due <span id="v-due">one week before the season starts</span>.</li>
       </ol>
     </div>
@@ -152,6 +152,13 @@
             document.getElementById('s-team').textContent = reg.team.name;
             document.getElementById('s-team-row').style.display = 'flex';
           }
+          var isAgent = reg.path === 'agent';
+          if (isAgent) {
+            // Free agents have no portal — they get drafted onto a team.
+            if (reg.agent && reg.agent.name) { setText('s-team', reg.agent.name); document.querySelector('#s-team-row .success__row-label').textContent = 'Player'; document.getElementById('s-team-row').style.display = 'flex'; }
+            setText('v-step-2', 'We\'ll confirm your spot (usually the same day). Your captain reaches out once you\'re placed on a team.');
+            setText('s-note', 'You\'re on the free-agent list. We place free agents with teams that need players before the season starts — your captain will reach out once you\'re drafted.');
+          }
 
           // Venmo: deposit not matched yet — swap the "payment received" copy
           // for the exact amount / handle / note to send.
@@ -181,7 +188,7 @@
               document.getElementById('v-balance-step').style.display = 'list-item';
             }
             document.getElementById('s-venmo').style.display = 'block';
-            document.getElementById('s-note').textContent = 'Keep this page or the email we just sent handy — once we match your payment you\'ll get a confirmation with your Captain Portal link. Reference: ' + String(reg.id || '').toUpperCase();
+            document.getElementById('s-note').textContent = 'Keep this page or the email we just sent handy — once we match your payment you\'ll get a confirmation' + (isAgent ? ' and we\'ll place you on a team before the season starts' : ' with your Captain Portal link') + '. Reference: ' + String(reg.id || '').toUpperCase();
             var copyBtn = document.getElementById('v-copy');
             copyBtn.addEventListener('click', function() {
               var txt = document.getElementById('v-note').textContent;

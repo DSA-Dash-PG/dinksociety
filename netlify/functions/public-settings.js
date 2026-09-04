@@ -19,9 +19,6 @@ const PUBLIC_DEFAULTS = {
   startDate:     '2026-06-08',
   weeks:         8,
   matchTime:     '7:00–9:00 PM',
-  teamFee:       '$700',
-  agentFee:      '$75',
-  depositAmount: 250,
   defaultVenue:  '',
   divisions:     ['3.0–3.5 Mixed'],
   teamsPerDiv:   6,
@@ -58,9 +55,8 @@ export default async (req) => {
     startDate:     s.startDate,
     weeks:         s.weeks,
     matchTime:     s.matchTime,
-    teamFee:       s.teamFee,
-    agentFee:      s.agentFee,
-    depositAmount: s.depositAmount,
+    // Fees are deliberately NOT here — the season record (public-seasons)
+    // owns team price, free-agent price, deposit and balance-due date.
     defaultVenue:  s.defaultVenue,
     divisions:     Array.isArray(s.divisions) ? s.divisions : PUBLIC_DEFAULTS.divisions,
     teamsPerDiv:   s.teamsPerDiv,

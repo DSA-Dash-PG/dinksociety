@@ -477,12 +477,10 @@
       document.querySelectorAll('[data-circuit-venue]').forEach(function (el) {
         el.textContent = s.defaultVenue || '';
       });
-      document.querySelectorAll('[data-team-fee]').forEach(function (el) {
-        el.textContent = s.teamFee ? '$' + s.teamFee : '$650';
-      });
-      document.querySelectorAll('[data-agent-fee]').forEach(function (el) {
-        el.textContent = s.agentFee || '$75';
-      });
+      // NOTE: fees are NOT read from settings. The season record owns them
+      // (division teamPrice / agentPrice, season depositAmount) — see the
+      // seasonFees block below. This partial used to stamp settings.teamFee
+      // (or a stale $650) over the register page's fee note; never again.
       document.querySelectorAll('[data-season-weeks]').forEach(function (el) {
         el.textContent = s.weeks || '8';
       });
@@ -495,12 +493,36 @@
       // settings.startDate is a single league-wide field pinned to whichever
       // season was last saved, so setting them here raced the season block and
       // left Season 2 pages reading "June 2026" / "Mondays".
-      var feeLabel = s.teamFee ? '$' + s.teamFee : '$650';
-      var feeHtml = 'The full <strong>' + feeLabel + ' team fee</strong> is due at registration to confirm your spot.';
-      document.querySelectorAll('[data-deposit-note]').forEach(function (el) {
-        el.innerHTML = feeHtml;
-      });
   })().catch(function () { /* settings not available, defaults stay */ });
+
+  /* ── Season fees ──
+     [data-team-fee], [data-agent-fee], [data-deposit-fee] on any page are
+     filled from the season taking registrations (else the current one):
+     lowest division team price / free-agent price, and the season deposit.
+     Single source of truth = Admin → Seasons. Pages that render their own fee
+     copy (register.html) don't use these attributes at all. */
+  (function seasonFees() {
+    if (!document.querySelector('[data-team-fee],[data-agent-fee],[data-deposit-fee]')) return;
+    var p = window.DS_SEASONS || fetch('/.netlify/functions/public-seasons').then(function (r) { return r.json(); });
+    Promise.resolve(p).then(function (data) {
+      var all = (data && data.seasons) || [];
+      if (!all.length) return;
+      var open = all.filter(function (x) { return x.registration === 'open'; })
+        .sort(function (a, b) { return String(a.startDate || '9999').localeCompare(String(b.startDate || '9999')); });
+      var cur = data.current && all.filter(function (x) { return x.id === data.current.id; })[0];
+      var s = open[0] || cur || all[0];
+      var divs = s.divisions || [];
+      var min = function (key) {
+        var v = divs.map(function (d) { return Number(d[key]); }).filter(function (n) { return n > 0; });
+        return v.length ? Math.min.apply(null, v) : null;
+      };
+      var money = function (n) { return '$' + Number(n).toLocaleString('en-US'); };
+      var team = min('teamPrice'), agent = min('agentPrice'), dep = Number(s.depositAmount);
+      document.querySelectorAll('[data-team-fee]').forEach(function (el) { if (team) el.textContent = money(team); });
+      document.querySelectorAll('[data-agent-fee]').forEach(function (el) { if (agent) el.textContent = money(agent); });
+      document.querySelectorAll('[data-deposit-fee]').forEach(function (el) { if (dep > 0) el.textContent = money(dep); });
+    }).catch(function () { /* markup copy stays */ });
+  })();
 
   /* ── Register CTA visibility ──
      Hide every "Register" / "Reserve my spot" CTA unless a season's
