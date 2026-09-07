@@ -200,6 +200,12 @@ export default async (req) => {
         if (!pd) return json({ error: "Enter your partner's DUPR ID — this is a DUPR-rated ladder." }, 400);
         partner.duprId = pd.slice(0, 40);
       }
+      // Store the DUPR ID on their master player profile (the directory the
+      // admin Players page reads), not just on this event's roster entry —
+      // otherwise it was re-asked every ladder and never showed on the profile.
+      // Best-effort: this signup already carries the value it needs.
+      try { await setPlayerInfo(playerId, { duprId: person.duprId }); }
+      catch (e) { console.warn('[ladder-signup] directory DUPR save failed:', e?.message || e); }
     }
 
     // Already in (roster/pending)? nothing to do. On the waitlist? Grab the open

@@ -11,6 +11,7 @@
 // Reuses the shared ladder helpers so this stays in sync with the Ladders page.
 
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
+import { getDirectory } from './lib/player-directory.js';
 import { listEvents, getSignups, findEntry, effectiveCapacity, spotsLeft, eventStartMs } from './lib/ladder.js';
 
 function json(data, status = 200) {
@@ -65,7 +66,11 @@ export default async (req) => {
   registered.sort(byDate);
   open.sort(byDate);
   const gender = String(ctx.player?.gender || '').trim().toUpperCase().charAt(0);
-  return json({ registered, open, me: { gender: gender === 'F' || gender === 'M' ? gender : null } });
+  // DUPR ID from the master directory, so a DUPR-rated signup can prefill it
+  // instead of asking every time.
+  const dir = await getDirectory().catch(() => ({}));
+  const duprId = dir[ctx.playerId]?.duprId || null;
+  return json({ registered, open, me: { gender: gender === 'F' || gender === 'M' ? gender : null, duprId } });
 };
 
 export const config = { path: '/.netlify/functions/player-ladder-events' };

@@ -15,6 +15,7 @@ import {
   cardTotalCents, surchargeCents, addPairSignup,
 } from './lib/ladder.js';
 import { siteUrl, dateLineOf, fmtCents } from './lib/ladder-notify.js';
+import { setPlayerInfo } from './lib/player-directory.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -94,6 +95,9 @@ export default async (req) => {
       if (!pd) return json({ error: "Enter your partner's DUPR ID — this is a DUPR-rated ladder." }, 400);
       partner.duprId = pd.slice(0, 40);
     }
+    // Persist to the master player profile too (see ladder-signup.js).
+    try { await setPlayerInfo(playerId, { duprId: person.duprId }); }
+    catch (e) { console.warn('[ladder-checkout] directory DUPR save failed:', e?.message || e); }
   }
 
   const signups = await getSignups(eventId);

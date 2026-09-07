@@ -58,8 +58,12 @@ export default async (req) => {
       [...(sg.roster || []), ...(sg.waitlist || [])].forEach((pl) => {
         if (!pl || !pl.playerId) return;
         addEvt(pl.playerId, ev.id);
-        if (!rosterPlayers[pl.playerId]) rosterPlayers[pl.playerId] = { id: pl.playerId, name: pl.name, gender: pl.gender || 'M', email: pl.email || '' };
-        else if (!rosterPlayers[pl.playerId].email && pl.email) rosterPlayers[pl.playerId].email = pl.email;
+        if (!rosterPlayers[pl.playerId]) rosterPlayers[pl.playerId] = { id: pl.playerId, name: pl.name, gender: pl.gender || 'M', email: pl.email || '', duprId: pl.duprId || '' };
+        else {
+          if (!rosterPlayers[pl.playerId].email && pl.email) rosterPlayers[pl.playerId].email = pl.email;
+          // DUPR typed in at a DUPR-rated ladder signup — same fallback as email.
+          if (!rosterPlayers[pl.playerId].duprId && pl.duprId) rosterPlayers[pl.playerId].duprId = pl.duprId;
+        }
       });
     }));
 
@@ -102,7 +106,7 @@ export default async (req) => {
       .map(p => ({
         id: p.id, name: (dir[p.id]?.name) || p.name, gender: (dir[p.id]?.gender) || p.gender,
         email: dir[p.id]?.email || rosterPlayers[p.id]?.email || leagueRosterPlayers[p.id]?.email || '',
-        duprId: dir[p.id]?.duprId || '',
+        duprId: dir[p.id]?.duprId || rosterPlayers[p.id]?.duprId || '',
         teamName: leagueRosterPlayers[p.id]?.teamName || null,
         nights: ladderIds[p.id] ? ladderIds[p.id].size : 0, mergedInto: map[p.id] ? map[p.id].to : null,
       }))
