@@ -468,6 +468,11 @@ function focusLadder(id){
   },140);
 }
 
+// Private/invite-only ladders the player has opened a direct link for.
+const INV_KEY='ds_invited_ladders';
+function invitedIds(){ try{ const a=JSON.parse(localStorage.getItem(INV_KEY)||'[]'); return Array.isArray(a)?a.filter(x=>typeof x==='string'):[]; }catch(e){ return []; } }
+function rememberInvite(id){ try{ const a=invitedIds().filter(x=>x!==id); a.unshift(id); localStorage.setItem(INV_KEY,JSON.stringify(a.slice(0,10))); }catch(e){} }
+function forgetInvite(id){ try{ localStorage.setItem(INV_KEY,JSON.stringify(invitedIds().filter(x=>x!==id))); }catch(e){} }
 async function init(){
   let pl={}, st={};
   // Returning from Stripe card / Apple Pay checkout → reconcile the payment so the
@@ -483,16 +488,25 @@ async function init(){
   // but its direct link (?event=ID, shared by hand by the organizer) still works —
   // fetch that one ladder specifically and splice it in so whoever followed the
   // link can see it and register, without it being discoverable any other way.
+  // The invite id is also remembered in localStorage so the ladder keeps
+  // showing after the player is bounced through sign-in (which loses the
+  // query string) or comes back to /ladders later on the same phone.
   const _evId=_q.get('event');
-  if(_evId && !(pl.ladders||[]).some(l=>l.id===_evId)){
+  if(_evId) rememberInvite(_evId);
+  const _inv=[...new Set([_evId,...invitedIds()].filter(Boolean))];
+  for(const iid of _inv){
+    if((pl.ladders||[]).some(l=>l.id===iid)) continue;
     try{
-      const one=await (await fetch(`${API}/public-ladders?event=${encodeURIComponent(_evId)}`,{credentials:'include'})).json();
+      const one=await (await fetch(`${API}/public-ladders?event=${encodeURIComponent(iid)}`,{credentials:'include'})).json();
       if(one&&one.ladder&&['open','full','live'].includes(one.ladder.status||'open')){
         one.ladder._invited=true;
         pl.ladders=[one.ladder,...(pl.ladders||[])];
-      }
+      } else if(iid!==_evId){ forgetInvite(iid); } // played / cancelled — stop remembering it
     }catch(e){}
   }
+  // Landed on a private-ladder link: open the Ladders tab on that card unless
+  // the URL already says where to go.
+  if(_evId && !location.hash) history.replaceState(null,'',location.pathname+location.search+'#ladders/'+encodeURIComponent(_evId));
   // Signed-in player's own signups → powers the "You're in ✓ / Cancel my spot"
   // state on each card. 401 (not signed in) just leaves MYREG empty.
   MYREG={};
@@ -1404,11 +1418,18 @@ function payErr(id,d){
   if(d&&d.needsGender){ MYGENDER=null; openSignup(id); payMsg('warn',d.error||'Pick your gender above to continue.'); return; }
   payMsg('err',(d&&d.error)||'Something went wrong.');
 }
-function needSignIn(){ payMsg('warn',`One quick step first:<br><b>New here?</b> <a href="/me.html#register" style="color:var(--lime);font-weight:700">Create your free account</a> — 10 seconds, no team needed.<br><b>Been here before?</b> <a href="/me.html" style="color:var(--lime);font-weight:700">Sign in</a>.<br>Tap the link we email you, then come back and grab your spot.`); }
+// Not signed in. Send them to /me.html with a ?next= that brings them straight
+// back to THIS ladder after the magic link — the link's ?event= is how a
+// private ladder is reachable at all, so it must survive the round trip.
+function needSignIn(id){
+  const back=id?`/ladders.html?event=${encodeURIComponent(id)}#ladders/${encodeURIComponent(id)}`:'/ladders.html';
+  const n='?next='+encodeURIComponent(back);
+  payMsg('warn',`One quick step first:<br><b>New here?</b> <a href="/me.html${n}#register" style="color:var(--lime);font-weight:700">Create your free account</a> — 10 seconds, no team needed.<br><b>Been here before?</b> <a href="/me.html${n}" style="color:var(--lime);font-weight:700">Sign in</a>.<br>Tap the link we email you and you'll land right back here to grab your spot.`);
+}
 async function post(path,body){ const r=await fetch(`${API}${path}`,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body||{})}); return {status:r.status,d:await r.json().catch(()=>({}))}; }
-async function payFree(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'free',...ex.body}); if(status===401)return needSignIn(); if(d.ok)return payMsg('ok',"You're in — no payment needed. 🎾"); payErr(id,d); }
-async function payCredit(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit',...ex.body}); if(status===401)return needSignIn(); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payErr(id,d); }
-async function payCard(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-checkout?event=${id}`,ex.body); if(status===401)return needSignIn(); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payErr(id,d); }
+async function payFree(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'free',...ex.body}); if(status===401)return needSignIn(id); if(d.ok)return payMsg('ok',"You're in — no payment needed. 🎾"); payErr(id,d); }
+async function payCredit(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'credit',...ex.body}); if(status===401)return needSignIn(id); if(status===402)return payMsg('err','Not enough ladder credit — pick card or Venmo.'); if(d.ok)return payMsg('ok',"You're in — covered by ladder credit. 🎾"); payErr(id,d); }
+async function payCard(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-checkout?event=${id}`,ex.body); if(status===401)return needSignIn(id); if(status===409)return payMsg('err',d.error||'This ladder is full.'); if(d.checkoutUrl){ location.href=d.checkoutUrl; return; } payErr(id,d); }
 // Venmo on iOS only opens from a REAL anchor tap — JS location.href gets
 // silently dropped. So: a plain <a> whose href is the venmo://paycharge deep
 // link (recipient + amount + note all prefilled) on phones, with a venmo.com/u
@@ -1423,8 +1444,8 @@ function venmoLinks(handle,amt,note){
   const fb=mobile?`<br><a href="${web}" target="_blank" rel="noopener" style="font-size:.66rem;color:var(--mut);text-decoration:underline">App didn't open? Venmo on the web</a>`:'';
   return btn+fb;
 }
-async function payVenmo(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo',...ex.body}); if(status===401)return needSignIn(); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const totalCents=(l.feeCents||0)*(l.format==='fixed-partner'?2:1); const amt=(totalCents/100).toFixed(2); payMsg('ok',`Spot held. Send <b>${fmt(totalCents)}</b> to <b>@${esc(handle)}</b> with note “<b>${esc(l.name)}</b>”.<br>${venmoLinks(handle,amt,l.name)}<br><span style="font-size:.7rem;color:var(--mut)">An organizer confirms and you'll get a "you're in" email.</span>`); return; } payErr(id,d); }
-async function joinWaitlist(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,ex.body); if(status===401)return needSignIn(); if(d.status==='waitlist'){ payMsg('ok',"You're on the waitlist — we'll email you the moment a spot opens."); } else if(status>=400){ payErr(id,d); } else payMsg('info',d.message||'Done.'); }
+async function payVenmo(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,{paymentMethod:'venmo',...ex.body}); if(status===401)return needSignIn(id); if(d.ok){ const handle=(l.venmoHandle||'@DinkSociety').replace(/^@/,''); const totalCents=(l.feeCents||0)*(l.format==='fixed-partner'?2:1); const amt=(totalCents/100).toFixed(2); payMsg('ok',`Spot held. Send <b>${fmt(totalCents)}</b> to <b>@${esc(handle)}</b> with note “<b>${esc(l.name)}</b>”.<br>${venmoLinks(handle,amt,l.name)}<br><span style="font-size:.7rem;color:var(--mut)">An organizer confirms and you'll get a "you're in" email.</span>`); return; } payErr(id,d); }
+async function joinWaitlist(id){ const l=curLadder(id); const ex=collectSignupExtras(l); if(!ex.ok) return payMsg('err',ex.err); const {status,d}=await post(`/ladder-signup?event=${id}`,ex.body); if(status===401)return needSignIn(id); if(d.status==='waitlist'){ payMsg('ok',"You're on the waitlist — we'll email you the moment a spot opens."); } else if(status>=400){ payErr(id,d); } else payMsg('info',d.message||'Done.'); }
 
 init();
 </script>

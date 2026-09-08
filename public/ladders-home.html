@@ -175,7 +175,16 @@ async function load() {
     fetch(`${API}/public-ladder-stats`).then(r => r.json()).catch(() => ({})),
     fetch(`${API}/public-ladder-photos`).then(r => r.json()).catch(() => ({})),
   ]);
-  OPEN = (lad.ladders || []).slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+  OPEN = (lad.ladders || []).slice();
+  // Invite-only ladders this phone has opened a link for (remembered by
+  // ladders.html) — not in the public list, so fetch each and show it too.
+  let inv = []; try { inv = JSON.parse(localStorage.getItem('ds_invited_ladders') || '[]'); } catch (e) {}
+  if (Array.isArray(inv) && inv.length) {
+    const extra = await Promise.all(inv.filter(id => typeof id === 'string' && !OPEN.some(l => l.id === id)).map(id =>
+      fetch(`${API}/public-ladders?event=${encodeURIComponent(id)}`, { credentials: 'include' }).then(r => r.json()).then(j => j && j.ladder).catch(() => null)));
+    extra.forEach(l => { if (l && ['open', 'full', 'live'].includes(l.status || 'open')) OPEN.push(l); });
+  }
+  OPEN.sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
   COMPLETED = (lad.completed || []).slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   STATS = stats || {}; ALBUMS = photos.albums || [];
   render();

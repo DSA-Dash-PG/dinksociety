@@ -15,6 +15,12 @@ import { sendEmail, renderPlayerMagicLink } from './lib/email.js';
 import { allowRequest } from './lib/rate-limit.js';
 import { normalizeEmail } from './lib/identity.js';
 
+// Same-site absolute path only (mirrors player-login.js / player-link.js).
+function safeNext(raw) {
+  const s = String(raw || '');
+  return (/^\/[A-Za-z0-9._~\-\/?=&%#]*$/.test(s) && !s.startsWith('//')) ? s : '';
+}
+
 const GENERIC = {
   ok: true,
   message: "You're all set — we just sent a one-tap sign-in link. Check your inbox.",
@@ -54,7 +60,10 @@ export default async (req) => {
 
     const token = await createPlayerToken({ email: normalized, playerId: found.playerId, teamId: found.teamId || null });
     const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
-    const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}`;
+    // Optional same-site ?next= (e.g. back to a private ladder's invite link);
+    // player-link.js re-validates before redirecting.
+    const safeN = safeNext(body.next);
+    const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}` + (safeN ? `&next=${encodeURIComponent(safeN)}` : '');
 
     await sendEmail({
       to: normalized,

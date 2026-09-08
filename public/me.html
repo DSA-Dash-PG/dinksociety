@@ -1422,12 +1422,21 @@
   let DATA = null, lbFilter = 'all', bootEtag = null;
 
   // ---- boot ----
+  // ?next=/ladders.html?event=… — where to land after the magic link (set by
+  // the ladders page when an invite-only ladder needs a sign-in first). Same-
+  // site paths only; player-link.js re-validates it server-side.
+  const NEXT_AFTER_LOGIN = (function () {
+    const n = new URLSearchParams(location.search).get('next') || '';
+    return (/^\/[A-Za-z0-9._~\-\/?=&%#]*$/.test(n) && !n.startsWith('//')) ? n : '';
+  })();
   (async function init() {
     const err = new URLSearchParams(location.search).get('error');
     try {
       const res = await fetch(API + '/player-me', { credentials: 'include' });
       if (res.status === 401) return showLogin(err);
       if (!res.ok) throw new Error('load failed');
+      // Already signed in and came here only to get back somewhere — go there.
+      if (NEXT_AFTER_LOGIN) { location.replace(NEXT_AFTER_LOGIN); return; }
       bootEtag = res.headers.get('ETag') || null;  // seeds the live poller
       DATA = await res.json();
       sortDataSchedule();
@@ -1582,7 +1591,7 @@
     if (!email) return;
     const btn = $('login-btn'); btn.disabled = true; btn.textContent = 'Sending…';
     try {
-      await fetch(API + '/player-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      await fetch(API + '/player-login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, next: NEXT_AFTER_LOGIN }) });
       $('login-step1').classList.add('hidden');
       $('login-err').classList.add('hidden');
       $('login-step2').classList.remove('hidden');
@@ -1616,7 +1625,7 @@
       if (!name || !email) { $('login-err').textContent = 'Name and email are required.'; $('login-err').classList.remove('hidden'); return; }
       regBtn.disabled = true; regBtn.textContent = 'Creating…';
       try {
-        await fetch(API + '/player-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, gender: regGender }) });
+        await fetch(API + '/player-register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, email, gender: regGender, next: NEXT_AFTER_LOGIN }) });
         $('login-err').classList.add('hidden');
         if (foot) foot.classList.add('hidden');
         show('login-step2');
