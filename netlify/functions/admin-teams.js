@@ -34,6 +34,50 @@ function generatePlayerId() {
   return 'p_' + Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
+// ── Division sync ─────────────────────────────────────────────
+// The team blob is what the public pages read, but admin-seed-teams ("Sync
+// Teams") treats the confirmed REGISTRATION as the source of truth for
+// division and rewrites the team from it. So a division change made in the
+// Team editor has to land on the registration too, or the next Sync flips
+// the team straight back.
+async function syncRegistrationDivision(team, oldDivision) {
+  const regStore = getStore('registrations');
+  const wantEmail = (team.captainEmail || '').toLowerCase().trim();
+  const wantSeason = circuitCode(team.circuit || team.seasonId);
+
+  // 1) Direct link (confirm flow stores registrationId, seed flow stores seededFromRegistrationId)
+  const linkedId = team.registrationId || team.seededFromRegistrationId || null;
+  let hit = null;
+  if (linkedId) {
+    for (const key of [`confirmed/${linkedId}.json`, `pending/${linkedId}.json`, linkedId]) {
+      const reg = await regStore.get(key, { type: 'json' }).catch(() => null);
+      if (reg) { hit = { key, reg }; break; }
+    }
+  }
+
+  // 2) Fallback: same captain email + same season among confirmed registrations
+  if (!hit && wantEmail) {
+    const { blobs } = await regStore.list({ prefix: 'confirmed/' });
+    for (const b of blobs) {
+      const reg = await regStore.get(b.key, { type: 'json' }).catch(() => null);
+      if (!reg || reg.path !== 'team') continue;
+      const email = (reg.team?.players?.[0]?.email || '').toLowerCase().trim();
+      if (email !== wantEmail) continue;
+      if (wantSeason && circuitCode(reg.circuit || reg.seasonId) !== wantSeason) continue;
+      hit = { key: b.key, reg }; break;
+    }
+  }
+
+  if (!hit) return { synced: false, reason: 'no linked registration' };
+  const { key, reg } = hit;
+  reg.division = team.division;
+  reg.divisionLabel = team.divisionLabel || reg.divisionLabel || null;
+  reg.updatedAt = new Date().toISOString();
+  reg.divisionMoved = { from: oldDivision || null, to: team.division, at: reg.updatedAt };
+  await regStore.set(key, JSON.stringify(reg));
+  return { synced: true, registrationId: reg.id };
+}
+
 export default async (req) => {
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
@@ -82,6 +126,7 @@ export default async (req) => {
   if (req.method === 'PUT') {
     const body = await req.json();
     const oldName = team.name;
+    const oldDivision = team.division;
     const allowed = ['name', 'emoji', 'color', 'secondaryColor', 'notes', 'division', 'divisionLabel', 'bio'];
 
     for (const field of allowed) {
@@ -157,6 +202,25 @@ export default async (req) => {
     team.updatedBy = admin.email;
     await store.setJSON(teamKey, team);
 
+    // Division moved → push it onto the registration too (see syncRegistrationDivision)
+    // and refresh standings so the team shows under its new division immediately.
+    let divisionSync = null;
+    const divisionChanged = 'division' in body && team.division !== oldDivision;
+    if (divisionChanged) {
+      divisionSync = await syncRegistrationDivision(team, oldDivision).catch(err => {
+        console.error('Registration division sync failed:', err);
+        return { synced: false, reason: err.message };
+      });
+      await logActivity({
+        type: 'team.division_moved',
+        actor: { email: admin.email, role: 'admin' },
+        team,
+        details: `Division ${oldDivision || '—'} → ${team.division}` + (divisionSync?.synced ? '' : ' (registration not updated: ' + (divisionSync?.reason || 'unknown') + ')'),
+      });
+      rebuildStandings(circuitCode(team.circuit)).catch(err =>
+        console.error('rebuildStandings after division move failed:', err));
+    }
+
     await logActivity({
       type: body.roster ? 'roster.replaced' : 'team.updated',
       actor: { email: admin.email, role: 'admin' },
@@ -185,6 +249,9 @@ export default async (req) => {
       // "Team Leaders", leaderboard, etc.). Rename path above already rebuilds.
       rebuildStandings(circuitCode(team.circuit)).catch(err =>
         console.error('rebuildStandings after roster update failed:', err));
+    }
+    if (divisionChanged && divisionSync && !divisionSync.synced) {
+      return json({ ok: true, team, warning: 'Division saved on the team, but no linked registration was found to update (' + divisionSync.reason + '). "Sync Teams" may revert it — fix the registration division too.' });
     }
     return json({ ok: true, team });
   }

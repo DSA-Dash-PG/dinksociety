@@ -25,18 +25,34 @@ export async function run(body) {
   reg.updatedAt = new Date().toISOString();
   await regStore.set(foundKey, JSON.stringify(reg));
 
-  // If there's a corresponding team record, update it too
-  if (reg.path === 'team' && reg.teamId) {
-    const teamRaw = await teamStore.get(reg.teamId);
-    if (teamRaw) {
-      const team = JSON.parse(teamRaw);
+  // Update the corresponding team record too. Registrations never carry a
+  // teamId — the confirm flow writes `team_<regId>` with registrationId, the
+  // seed flow writes a slug id with seededFromRegistrationId — so scan for it.
+  let teamUpdated = null;
+  if (reg.path === 'team') {
+    const captainEmail = (reg.team?.players?.[0]?.email || '').toLowerCase().trim();
+    const { blobs } = await teamStore.list({ prefix: 'team/' });
+    for (const b of blobs) {
+      const team = await teamStore.get(b.key, { type: 'json' }).catch(() => null);
+      if (!team) continue;
+      const linked = team.registrationId === id || team.seededFromRegistrationId === id;
+      const sameCaptain = captainEmail && (team.captainEmail || '').toLowerCase().trim() === captainEmail
+        && (!reg.seasonId || !team.seasonId || team.seasonId === reg.seasonId);
+      if (!linked && !sameCaptain) continue;
       team.division = newDivision;
-      team.updatedAt = new Date().toISOString();
-      await teamStore.set(reg.teamId, JSON.stringify(team));
+      if (body.newDivisionLabel) team.divisionLabel = body.newDivisionLabel;
+      team.updatedAt = reg.updatedAt;
+      await teamStore.setJSON(b.key, team);
+      teamUpdated = team.id;
+      break;
     }
   }
+  if (body.newDivisionLabel) {
+    reg.divisionLabel = body.newDivisionLabel;
+    await regStore.set(foundKey, JSON.stringify(reg));
+  }
 
-  return json({ ok: true, registration: reg, moved: { from: oldDivision, to: newDivision } });
+  return json({ ok: true, registration: reg, teamUpdated, moved: { from: oldDivision, to: newDivision } });
 }
 
 export default async (req) => {
