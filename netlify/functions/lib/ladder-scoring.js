@@ -205,6 +205,133 @@ export function genNRPairs(prev, nC) {
   return res;
 }
 
+// ── Round Robin ladder — block movement (Richard, 2026-09-08) ──
+// Built for the 2-court night, where per-game movement (genNR) is meaningless:
+// the max climb is ±1 court, so every game just swaps the same people back and
+// forth. Instead the night runs in BLOCKS of `BLOCK_ROUNDS` games:
+//   • Inside a block everyone stays on their court and rotates partners every
+//     game — with 4 players and 3 games that's a full round robin (AB·CD,
+//     AC·BD, AD·BC), so you partner with each of the other three exactly once.
+//   • At a block boundary (rounds 4 and 7 of a 9-round night) each court is
+//     ranked on the block just played — wins → point diff → DR — and the TOP 2
+//     move up a court, the BOTTOM 2 move down. Top court's top 2 and bottom
+//     court's bottom 2 hold their spot.
+// Works on any court count; the individual-player data shape is unchanged, so
+// stats / DR / XP / Kitchen / recaps read a Round Robin night like any other.
+export const BLOCK_ROUNDS = 3;
+
+const courtPlayers = c => [...(c.team1 || []), ...(c.team2 || [])].filter(Boolean);
+const pairKey = (a, b) => [a.id, b.id].sort().join('-');
+
+// Partner combos already used in these rounds (Set of "idA-idB").
+export function partnerKeys(rounds) {
+  const used = new Set();
+  (rounds || []).forEach(r => (r.courts || []).forEach(c => [c.team1, c.team2].forEach(t => {
+    const p = (t || []).filter(Boolean);
+    if (p.length === 2) used.add(pairKey(p[0], p[1]));
+  })));
+  return used;
+}
+
+// Per-player record over a set of rounds → { id: { w, l, diff } }.
+export function blockStandings(rounds) {
+  const st = {};
+  const row = id => (st[id] = st[id] || { w: 0, l: 0, diff: 0 });
+  (rounds || []).forEach(r => (r.courts || []).forEach(c => {
+    if (!c.score || c.score.t1 == null || c.score.t2 == null || !c.score.winner) return;
+    const { t1, t2, winner } = c.score;
+    [[c.team1, t1, t2, winner === 'A'], [c.team2, t2, t1, winner === 'B']].forEach(([team, sc, al, won]) => {
+      (team || []).filter(Boolean).forEach(p => { const s = row(p.id); s.diff += sc - al; if (won) s.w++; else s.l++; });
+    });
+  }));
+  return st;
+}
+
+// Split 4 players into two teams, preferring a combo where neither team has
+// already partnered this block; among the valid options, pick at random. With
+// an empty `used` set (block start) it's a straight coin toss; by the third
+// game of a block exactly one combo remains. Short courts (<4) just fill in.
+export function pickRotation(g, used = new Set()) {
+  const p = (g || []).filter(Boolean);
+  if (p.length < 4) return { t1: [p[0] || null, p[1] || null], t2: [p[2] || null, p[3] || null] };
+  const [a, b, c, d] = p;
+  const opts = [[[a, b], [c, d]], [[a, c], [b, d]], [[a, d], [b, c]]];
+  const fresh = opts.filter(([x, y]) => !used.has(pairKey(x[0], x[1])) && !used.has(pairKey(y[0], y[1])));
+  const pool = fresh.length ? fresh : opts;
+  const [t1, t2] = pool[Math.floor(Math.random() * pool.length)];
+  return { t1: [t1[0], t1[1]], t2: [t2[0], t2[1]] };
+}
+
+// Round 1: courts are assigned at random (no seeding, no gender snake), 4 per court.
+export function genR1Block(players, nC) {
+  const sh = shuffle(players);
+  const tC = Math.min(Math.floor(sh.length / 4), 2 * nC);
+  const courts = [];
+  for (let c = 0; c < tC; c++) {
+    const { t1, t2 } = pickRotation(sh.slice(c * 4, c * 4 + 4));
+    courts.push({ court: c + 1, team1: [t1[0] || null, t1[1] || null], team2: [t2[0] || null, t2[1] || null], score: null });
+  }
+  const res = { courts, completed: false, totalCourts: tC };
+  if (tC > nC) res.wave2started = false;
+  return res;
+}
+
+// Next round from every round played so far (`rounds` — the new round's index
+// is rounds.length). Inside a block: same courts, next partner rotation. At a
+// boundary: rank each court on the block just finished (wins → diff → DR via
+// `drMap` → coin flip), top 2 up / bottom 2 down, fresh random rotation.
+export function genNRBlock(rounds, nC, drMap = {}, block = BLOCK_ROUNDS) {
+  const ri = rounds.length;
+  const prev = rounds[ri - 1];
+  const tC = prev.courts.length;
+  const blockStart = Math.floor((ri - 1) / block) * block;
+  const blockRounds = rounds.slice(blockStart, ri);
+  const boundary = ri % block === 0;
+
+  const bk = {}; for (let i = 1; i <= tC; i++) bk[i] = [];
+  if (!boundary) {
+    prev.courts.forEach(c => { bk[c.court] = courtPlayers(c); });
+  } else {
+    const st = blockStandings(blockRounds);
+    const dr = id => (drMap && drMap[id] != null) ? drMap[id] : -1;
+    prev.courts.forEach(c => {
+      const g = courtPlayers(c);
+      if (g.length < 4) { g.forEach(p => bk[c.court].push(p)); return; } // short court: nobody moves
+      const ranked = shuffle(g).sort((a, b) => {
+        const A = st[a.id] || { w: 0, diff: 0 }, B = st[b.id] || { w: 0, diff: 0 };
+        return (B.w - A.w) || (B.diff - A.diff) || (dr(b.id) - dr(a.id));
+      });
+      ranked.slice(0, 2).forEach(p => bk[Math.min(tC, c.court + 1)].push(p));
+      ranked.slice(2).forEach(p => bk[Math.max(1, c.court - 1)].push(p));
+    });
+    // Same overflow safety net as genNR — a court can only ever hold 4.
+    for (let i = 1; i <= tC; i++) {
+      while (bk[i].length > 4) {
+        const extra = bk[i].pop();
+        let target = null, best = Infinity;
+        for (let j = 1; j <= tC; j++) {
+          if (j === i || bk[j].length >= 4) continue;
+          const d = Math.abs(j - i);
+          if (d < best) { best = d; target = j; }
+        }
+        if (target == null) { bk[i].unshift(extra); break; }
+        bk[target].push(extra);
+      }
+    }
+  }
+
+  const used = boundary ? new Set() : partnerKeys(blockRounds);
+  const courts = [];
+  for (let c = 0; c < tC; c++) {
+    const g = (bk[c + 1] || []).slice(0, 4);
+    const { t1, t2 } = pickRotation(boundary ? shuffle(g) : g, used);
+    courts.push({ court: c + 1, team1: [t1[0] || null, t1[1] || null], team2: [t2[0] || null, t2[1] || null], score: null });
+  }
+  const res = { courts, completed: false, totalCourts: tC };
+  if (tC > nC) res.wave2started = false;
+  return res;
+}
+
 // Per-night bonus points for podium finishes (15/10/5), tie-broken by diff.
 //
 // On a FIXED PARTNER night the podium is ranked at PAIR granularity and both

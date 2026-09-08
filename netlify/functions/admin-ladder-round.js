@@ -7,7 +7,8 @@
 //   GET  ?event=<id>                          → { event, play, roster }
 //   POST ?event=<id> { action, ... }
 //      'start'    { rounds? }  → genR1 from the paid roster, currentRound 0
-//      'next'                  → validate, genNR, currentRound++ (never auto-finishes —
+//      'next'                  → validate, lib/ladder-next.js nextRound() (genNR / genNRPairs /
+//                                 genNRBlock by event.format), currentRound++ (never auto-finishes —
 //                                 the night keeps going past the configured round count
 //                                 until someone explicitly hits 'finish')
 //      'wave2'                 → start wave 2 of the current round
@@ -20,8 +21,9 @@
 import { unauthResponse } from './lib/auth.js';
 import { authScoreAccess } from './lib/ladder-scorer.js';
 import { getEvent, setEvent, getSignups, setSignups } from './lib/ladder.js';
-import { getPlay, setPlay, listPlay, toSession } from './lib/ladder-play.js';
-import { genR1, genNR, genR1Pairs, genNRPairs, buildStrengthFn } from './lib/ladder-scoring.js';
+import { getPlay, setPlay } from './lib/ladder-play.js';
+import { genR1, genR1Pairs, genR1Block, BLOCK_ROUNDS } from './lib/ladder-scoring.js';
+import { nextRound, strengthFor, isRoundRobin } from './lib/ladder-next.js';
 import { findPlayerByEmail } from './lib/player-auth.js';
 
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
@@ -67,11 +69,6 @@ function pairsFromRound(round) {
     if (c.team2[0] && c.team2[1]) pairs.push({ p1: c.team2[0], p2: c.team2[1] });
   });
   return pairs;
-}
-
-async function strengthFor(eventId, players) {
-  const prior = (await listPlay()).filter(p => p.finished && p.eventId !== eventId).map(toSession);
-  return buildStrengthFn(prior, players);
 }
 
 export default async (req) => {
@@ -120,6 +117,11 @@ export default async (req) => {
       const pairs = pairsFromRoster(signups);
       if (pairs.length < 2) return json({ error: 'Need at least 2 paired-up teams on the roster to start.' }, 400);
       r1 = genR1Pairs(pairs, event.courts || 1);
+    } else if (isRoundRobin(event)) {
+      // Round Robin: random courts, 4 per court, courts locked for a block.
+      const players = participants(signups);
+      if (players.length < 4) return json({ error: 'Need at least 4 players on the roster to start.' }, 400);
+      r1 = genR1Block(players, event.courts || 1);
     } else {
       const players = participants(signups);
       if (players.length < 4) return json({ error: 'Need at least 4 players on the roster to start.' }, 400);
@@ -128,11 +130,13 @@ export default async (req) => {
     }
     // Default the format from what was set at ladder creation (the merged form);
     // an explicit value in the start request still wins.
-    const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || event.rounds || 10));
+    const rounds = Math.max(1, Math.min(20, parseInt(body.rounds) || event.rounds || (isRoundRobin(event) ? 3 * BLOCK_ROUNDS : 10)));
     const roundMin = Math.max(1, Math.min(60, parseInt(body.roundMin) || event.roundMin || 12));
     const scoreMode = body.scoreMode || event.scoreMode || 'points';
     const courtNames = Array.isArray(event.courtNames) && event.courtNames.length ? event.courtNames : null;
-    play = { eventId, date: event.date || null, config: { courts: event.courts || 1, rounds, roundMin, scoreMode, courtNames }, rounds: [r1], currentRound: 0, started: true, finished: false };
+    const config = { courts: event.courts || 1, rounds, roundMin, scoreMode, courtNames, format: event.format || 'individual' };
+    if (isRoundRobin(event)) config.block = BLOCK_ROUNDS;
+    play = { eventId, date: event.date || null, config, rounds: [r1], currentRound: 0, started: true, finished: false };
     await setPlay(eventId, play);
     if (event.status === 'open') { event.status = 'live'; await setEvent(event); }
     return json({ ok: true, play });
@@ -149,6 +153,17 @@ export default async (req) => {
   if (action === 'reshuffle') {
     if (event.format === 'fixed-partner') {
       play.rounds[play.currentRound] = genR1Pairs(pairsFromRound(cur), play.config.courts);
+    } else if (isRoundRobin(event)) {
+      // Round 1: re-draw the courts. Mid-night: re-derive this round from the
+      // rounds before it (same courts inside a block; a boundary round is
+      // re-ranked from the block's standings, re-rolling any coin-flip ties).
+      if (play.currentRound === 0) {
+        const all = [];
+        cur.courts.forEach(c => [...(c.team1 || []), ...(c.team2 || [])].filter(Boolean).forEach(p => all.push(p)));
+        play.rounds[0] = genR1Block(all, play.config.courts);
+      } else {
+        play.rounds[play.currentRound] = await nextRound({ event, play, rounds: play.rounds.slice(0, play.currentRound), eventId });
+      }
     } else {
       const all = [];
       cur.courts.forEach(c => [...(c.team1 || []), ...(c.team2 || [])].filter(Boolean).forEach(p => all.push(p)));
@@ -255,12 +270,7 @@ export default async (req) => {
     // organizers often keep playing past the planned count. Finishing is now
     // exclusively the deliberate 'finish' action ("End ladder early" / "Finish
     // ladder" button).
-    if (event.format === 'fixed-partner') {
-      play.rounds.push(genNRPairs(cur, play.config.courts));
-    } else {
-      const strength = await strengthFor(eventId, participants(signups));
-      play.rounds.push(genNR(cur, play.config.courts, strength));
-    }
+    play.rounds.push(await nextRound({ event, play, rounds: play.rounds, eventId, participants: participants(signups) }));
     play.currentRound++;
     await setPlay(eventId, play);
     return json({ ok: true, play });

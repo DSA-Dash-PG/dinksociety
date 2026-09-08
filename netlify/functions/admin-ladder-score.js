@@ -20,7 +20,7 @@ import { unauthResponse } from './lib/auth.js';
 import { authScoreAccess } from './lib/ladder-scorer.js';
 import { getPlay, setPlay } from './lib/ladder-play.js';
 import { getEvent, setEvent } from './lib/ladder.js';
-import { genNR } from './lib/ladder-scoring.js';
+import { nextRound } from './lib/ladder-next.js';
 
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
 const num = v => (v === '' || v === null || v === undefined || isNaN(+v)) ? null : Math.trunc(+v);
@@ -91,7 +91,12 @@ export default async (req) => {
 
     roundsCleared = play.rounds.length - (ri + 1);
     play.rounds = play.rounds.slice(0, ri + 1);
-    play.rounds.push(genNR(round, play.config.courts));
+    // Format-aware (was a bare genNR — wrong for Fixed Partner and Round Robin
+    // nights, which would have been re-paired as individuals).
+    const event = await getEvent(eventId);
+    const participants = [];
+    round.courts.forEach(c => [...(c.team1 || []), ...(c.team2 || [])].filter(Boolean).forEach(p => participants.push(p)));
+    play.rounds.push(await nextRound({ event: event || {}, play, rounds: play.rounds, eventId, participants }));
     play.currentRound = ri + 1;
     cascaded = true;
 
@@ -100,7 +105,6 @@ export default async (req) => {
     if (play.finished) {
       play.finished = false;
       play.finishedAt = null;
-      const event = await getEvent(eventId);
       if (event && event.status === 'final') { event.status = 'live'; await setEvent(event); }
     }
   }

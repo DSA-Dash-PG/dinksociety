@@ -60,7 +60,7 @@ export default async (req) => {
       id: event.id, name: event.name || 'Ladder',
       date: event.date || null, startTime: event.startTime || null, endTime: event.endTime || null,
       place: event.place || null, address: event.address || null, courts: event.courts || null,
-      courtNames: event.courtNames || null, type: event.type || 'mixed',
+      courtNames: event.courtNames || null, type: event.type || 'mixed', format: event.format || 'individual',
       status, scoreMode: event.scoreMode || 'points', roundMin: event.roundMin || null,
     };
 

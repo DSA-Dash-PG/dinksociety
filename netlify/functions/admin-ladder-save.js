@@ -91,7 +91,9 @@ export default async (req) => {
     // Format 'fixed-partner': signups register a locked pair that stays
     // teamed up all night (see lib/ladder-scoring.js genR1Pairs/genNRPairs) —
     // default 'individual' (the original per-round re-paired model).
-    format: ['individual', 'fixed-partner'].includes(b.format) ? b.format : (existing?.format || 'individual'),
+    // 'round-robin': courts locked for blocks of 3 games with partner rotation,
+    // top 2 up / bottom 2 down at each block boundary (genR1Block/genNRBlock).
+    format: ['individual', 'fixed-partner', 'round-robin'].includes(b.format) ? b.format : (existing?.format || 'individual'),
     // DUPR-rated ladders collect a DUPR ID at signup and prompt players to
     // join the club (see ladder-signup.js / public/ladders.html signup UI).
     duprRated: b.duprRated != null ? !!b.duprRated : !!existing?.duprRated,

@@ -246,8 +246,8 @@
             <div><label class="l">End time</label><input class="i" id="f-end" placeholder="11:30 AM"></div>
           </div>
           <div class="frow"><label class="l">Division</label><div class="seg" id="seg-type"><button class="on" data-v="mixed">Mixed</button><button data-v="mens">Men's</button><button data-v="womens">Women's</button></div></div>
-          <div class="frow"><label class="l">Format</label><div class="seg" id="seg-format"><button class="on" data-v="individual">Individual</button><button data-v="fixed-partner">Fixed Partner (pairs)</button></div></div>
-          <div class="help" style="margin:-2px 0 13px">Fixed Partner: one signup registers a locked pair — they stay teamed up the whole night, moving up/down courts together on wins/losses (no re-pairing each round).</div>
+          <div class="frow"><label class="l">Format</label><div class="seg" id="seg-format"><button class="on" data-v="individual">Individual</button><button data-v="fixed-partner">Fixed Partner (pairs)</button><button data-v="round-robin">Round Robin (blocks)</button></div></div>
+          <div class="help" style="margin:-2px 0 13px">Fixed Partner: one signup registers a locked pair — they stay teamed up the whole night, moving up/down courts together on wins/losses (no re-pairing each round). <b>Round Robin</b>: built for 2-court nights — random courts, then 3 games on the same court rotating partners; after every 3rd game the top 2 on each court (wins → point diff → DR) move up and the bottom 2 move down. Sets Rounds to 9.</div>
           <div class="frow"><label class="l">Rating</label><div class="seg" id="seg-dupr"><button class="on" data-v="0">Non-DUPR</button><button data-v="1">DUPR-rated</button></div></div>
           <div class="help" style="margin:-2px 0 13px">DUPR-rated asks each player for their DUPR ID at signup and reminds them to join the Dink Society DUPR club before the night.</div>
           <div class="frow"><label class="l">Location name</label><input class="i" id="f-place" placeholder="SBTC"></div>
@@ -435,7 +435,7 @@
   <div class="frow"><label class="l">Address</label><input class="i" id="m-address" placeholder="123 Main St, Charlotte, NC"></div>
   <div class="help" style="margin:-2px 0 13px">Location name is what players see (kept short). Address powers the "get directions" map link — add it for accurate directions.</div>
   <div class="frow"><label class="l">Division</label><select class="i" id="m-type"><option value="mixed">Mixed</option><option value="mens">Men's</option><option value="womens">Women's</option></select></div>
-  <div class="frow"><label class="l">Format</label><div class="seg" id="mseg-format"><button class="on" data-v="individual">Individual</button><button data-v="fixed-partner">Fixed Partner (pairs)</button></div></div>
+  <div class="frow"><label class="l">Format</label><div class="seg" id="mseg-format"><button class="on" data-v="individual">Individual</button><button data-v="fixed-partner">Fixed Partner (pairs)</button><button data-v="round-robin">Round Robin (blocks)</button></div></div>
   <div class="help" style="margin:-2px 0 13px">Changing this after people have registered can leave the roster inconsistent with the round engine — safest to set before signups open.</div>
   <div class="frow"><label class="l">Rating</label><div class="seg" id="mseg-dupr"><button class="on" data-v="0">Non-DUPR</button><button data-v="1">DUPR-rated</button></div></div>
   <div class="frow row2">
@@ -663,7 +663,7 @@ function mdCount(inId,countId,max){
   const c=document.getElementById(countId); if(c) c.textContent=(src.value.length)+' / '+max;
 }
 function seg(id){ const el=document.getElementById(id); const b=el.querySelector('button.on'); return b?b.dataset.v:el.querySelector('button').dataset.v; }
-document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(e.target.tagName==='BUTTON'){ s.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===e.target)); if(s.id==='mseg-vis') updateShareBox(); } }));
+document.querySelectorAll('.seg').forEach(s=>s.addEventListener('click',e=>{ if(e.target.tagName==='BUTTON'){ s.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===e.target)); if(s.id==='mseg-vis') updateShareBox(); if((s.id==='seg-format'||s.id==='mseg-format')&&e.target.dataset.v==='round-robin'){ const r=document.getElementById(s.id==='seg-format'?'f-rounds':'m-rounds'); if(r&&(!r.value||r.value==='10')) r.value='9'; } } }));
 function copyInviteLink(btn){ const inp=btn.previousElementSibling; try{ navigator.clipboard.writeText(inp.value); btn.textContent='Copied ✓'; setTimeout(()=>btn.textContent='Copy link',2000); }catch(e){ inp.select(); } }
 function updateShareBox(){ const wrap=document.getElementById('m-share-wrap'); if(!wrap||!CURRENT) return; const isPriv=seg('mseg-vis')==='private'; wrap.style.display=isPriv?'':'none'; if(isPriv){ const inp=document.getElementById('m-share-link'); if(inp) inp.value=location.origin+'/ladders.html?event='+CURRENT.id; } }
 function defaultCourtName(i){ return String.fromCharCode(65+i); } // A, B, C…
@@ -1056,7 +1056,7 @@ async function loadList(){
     const pend=l.pendingVenmo?` · <span class="chip chip-gold">${l.pendingVenmo} Venmo pending</span>`:'';
     const privChip=l.visibility==='private'?' <span class="chip chip-gray">🔒 Private</span>':'';
     const lbChip=l.leaderboard==='excluded'?' <span class="chip chip-gray">Own board only</span>':(l.leaderboard==='pending'?' <span class="chip chip-gold">Awaiting</span>':'');
-    const fmtChip=l.format==='fixed-partner'?' <span class="chip chip-gray">👥 Fixed Partner</span>':'';
+    const fmtChip=l.format==='fixed-partner'?' <span class="chip chip-gray">👥 Fixed Partner</span>':(l.format==='round-robin'?' <span class="chip chip-gray">🔁 Round Robin</span>':'');
     const duprChip=l.duprRated?' <span class="chip chip-gold">DUPR</span>':'';
     const safeName=esc((l.name||'').replace(/'/g,''));
     const upcoming=['open','full'].includes(l.status||'open');
@@ -1140,7 +1140,7 @@ async function openManage(id){
     if(el) el.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===vis)); }
   updateShareBox();
   // Format (individual / fixed-partner) + DUPR rating toggles — always editable.
-  { const fmt=d.event.format==='fixed-partner'?'fixed-partner':'individual';
+  { const fmt=['fixed-partner','round-robin'].includes(d.event.format)?d.event.format:'individual';
     const el=document.getElementById('mseg-format');
     if(el) el.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.v===fmt)); }
   { const dv=d.event.duprRated?'1':'0';

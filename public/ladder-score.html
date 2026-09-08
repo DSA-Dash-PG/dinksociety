@@ -390,6 +390,13 @@ function render(){
     const cfgC=(STATE.event&&STATE.event.courts)||0;
     const liveR=(STATE.roster||[]).filter(p=>p.paymentStatus!=='cancelled');
     const isPair=STATE.event&&STATE.event.format==='fixed-partner';
+    // Round Robin (block) format: courts are locked for 3 games at a time —
+    // say where we are in the block and what happens next so nobody expects
+    // the usual per-game movement.
+    if(STATE.event&&STATE.event.format==='round-robin'){
+      const B=(play.config&&play.config.block)||3, blk=Math.floor(VR/B)+1, inB=(VR%B)+1, last=inB===B, nB=Math.ceil(((play.config&&play.config.rounds)||play.rounds.length)/B);
+      h+=`<div class="banner" style="border-color:rgba(184,255,44,.3);background:rgba(184,255,44,.07)"><b>🔁 Round Robin · Block ${blk} of ${nB} · game ${inB} of ${B}</b> — ${VR===0?'courts drawn at random; ':''}same courts, partners rotate each game. ${last?`After this game each court re-ranks on the block (wins → point diff → DR): <b>top 2 move up, bottom 2 move down</b>.`:`Courts move after game ${B} of this block.`}</div>`;
+    }
     if(cfgC&&round.courts.length<cfgC){
       h+=`<div class="banner">${round.courts.length} of ${cfgC} courts in play — the ${liveR.length} players on the roster fill ${round.courts.length} court${round.courts.length===1?'':'s'} at ${isPair?'2 pairs':'4 players'} per court. Courts are seated when the night starts; if the roster has grown since, <a onclick="scRestart()">⟲ Restart night</a> re-pulls it.</div>`;
     }
