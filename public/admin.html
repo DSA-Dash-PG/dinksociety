@@ -5075,6 +5075,24 @@
   }
 
   // ── Team Detail Panel ──
+  // Divisions for the TEAM's season. DIVISIONS follows the admin working-season
+  // picker, which may be a different season than the team belongs to (Circuit I
+  // has one division; Season 2 has two) — so a Season 2 team opened while the
+  // picker sat on Circuit I could only "choose" Circuit I's division.
+  function divisionsForTeam(t) {
+    const code = String(t.circuitCode || t.circuit || t.seasonId || '').toUpperCase();
+    const season = SEASONS.find(s => String(s.circuit || s.id || '').toUpperCase() === code)
+      || SEASONS.find(s => String(s.id || '').toUpperCase() === code);
+    let list = (season && (season.divisions || []).length)
+      ? season.divisions.map(d => ({ id: d.id, name: d.name || d.id }))
+      : DIVISIONS.slice();
+    // Always keep the team's current value selectable, even if it's stale.
+    if (t.division && !list.find(d => d.id === t.division)) {
+      list = [{ id: t.division, name: (t.divisionLabel || t.division) + ' (not in season)' }].concat(list);
+    }
+    return list;
+  }
+
   function openTeamPanel(teamId) {
     const team = allTeams.find(t => t.id === teamId);
     if (!team) return;
@@ -5178,7 +5196,7 @@
       /* ── DETAILS ── */
       '<div class="ac__h tdp-anchor" id="sec-details" style="margin:22px 0 12px;"><span class="ac__t">Details</span></div>' +
       '<div class="arow">' +
-        '<div class="af"><label>Division</label><select id="tdp-division">' + DIVISIONS.map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
+        '<div class="af"><label>Division</label><select id="tdp-division">' + divisionsForTeam(t).map(d => '<option value="' + h(d.id) + '"' + (d.id === t.division ? ' selected' : '') + '>' + h(d.name) + '</option>').join('') + '</select></div>' +
         '<div class="af"><label>Notes</label><input type="text" id="tdp-notes" value="' + h(t.notes || '') + '"><span style="font-size:10px;color:var(--color-text-faint);display:block;margin-top:3px;">Admin-only — never shown publicly.</span></div>' +
       '</div>' +
 
@@ -5524,7 +5542,7 @@
       emoji: ($id('tdp-emoji') ? $id('tdp-emoji').value.trim() : (currentPanelTeam.emoji || '')),
       bio: ($id('tdp-bio') ? $id('tdp-bio').value.trim() : (currentPanelTeam.bio || '')),
       division: $id('tdp-division').value,
-      divisionLabel: DIVISIONS.find(d => d.id === $id('tdp-division').value)?.name || $id('tdp-division').value,
+      divisionLabel: divisionsForTeam(currentPanelTeam).find(d => d.id === $id('tdp-division').value)?.name?.replace(/ \(not in season\)$/, '') || $id('tdp-division').value,
       notes: $id('tdp-notes').value.trim(),
       color: $id('tdp-color-hex').value.trim() || null,
       secondaryColor: $id('tdp-color2-hex').value.trim() || null,
