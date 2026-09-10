@@ -83,8 +83,10 @@
   <script src="/js/partials.js"></script>
   <script src="/js/live-poll.js"></script>
   <script>
-  const SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i') };
-  const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
+  // Pre-resolution guess only — dsSeason() overwrites both below. They must be
+  // `let`: as `const` this page could never leave Season 1.
+  let SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i') };
+  let LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
   function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
@@ -145,14 +147,24 @@
       + '</div>';
   }
 
-  load();
-  if (window.DSLivePoll) {
-    DSLivePoll.create({
-      url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
-      interval: 30000,
-      onUpdate(data) { render(data); },
-    }).start();
-  }
+  // Settle the season BEFORE the first fetch. This page loaded season.js but
+  // never asked it anything, so it stayed pinned to the 'circuit-i' guess and
+  // rendered Season 1's matrix under a Season 2 heading — the nav resolves the
+  // season properly, so the chrome said Season 2 while the data did not.
+  (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+    if (S) { SEASON.id = S.id; LINK_SUFFIX = S.suffix; }
+  }).catch(() => {}).then(function () {
+    load();
+    // Started only once the season is known: a poller that fires on the guess
+    // races load() and can stamp the old season's data over the new one's.
+    if (window.DSLivePoll) {
+      DSLivePoll.create({
+        url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
+        interval: 30000,
+        onUpdate(data) { render(data); },
+      }).start();
+    }
+  });
   </script>
 </body>
 </html>

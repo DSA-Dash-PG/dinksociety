@@ -32,6 +32,11 @@
   function create(opts) {
     const { url, fetchOpts = {}, onUpdate, onError } = opts;
     let etag = opts.etag || null;   // seed from an initial fetch if you have one
+    // The URL that etag came from. An ETag only means anything for the resource
+    // that issued it, and `url` may be a function whose value changes (the
+    // resolved season id). Sending a stale season's ETag against the new
+    // season's URL invites a 304 that suppresses the render the page needs.
+    let etagUrl = null;
     let timer = null;
     let running = false;
     let inFlight = false;
@@ -43,16 +48,18 @@
       if (inFlight || document.hidden) return;
       inFlight = true;
       try {
-        const headers = Object.assign({}, fetchOpts.headers);
-        if (etag) headers['If-None-Match'] = etag;
         // `url` may be a function so callers can point the poller at a value
         // that settles after create() runs (e.g. the resolved season id).
         const target = typeof url === 'function' ? url() : url;
         if (!target) return;
+        const headers = Object.assign({}, fetchOpts.headers);
+        // Only revalidate against the URL the ETag actually came from.
+        if (etag && (etagUrl === null || etagUrl === target)) headers['If-None-Match'] = etag;
         const res = await fetch(target, Object.assign({}, fetchOpts, { headers }));
         if (res.status === 304) return;        // nothing changed — cheapest outcome
         if (!res.ok) throw new Error('poll failed: ' + res.status);
-        etag = res.headers.get('ETag') || etag;
+        etag = res.headers.get('ETag') || null;
+        etagUrl = target;
         const data = await res.json();
         if (onUpdate) onUpdate(data);
       } catch (err) {
@@ -92,7 +99,7 @@
         document.removeEventListener('visibilitychange', onVisibility);
       },
       pollNow() { if (running) { clearTimeout(timer); poll(); } },
-      setEtag(t) { etag = t; },
+      setEtag(t, u) { etag = t; etagUrl = u || null; },
     };
   }
 

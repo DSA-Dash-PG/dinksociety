@@ -1029,12 +1029,18 @@
   // current season instead of being pinned to Season 1.
   (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
     if (S) { SEASON.id = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; }
-  }).catch(() => {}).then(load);
+  }).catch(() => {}).then(load).then(startLivePoll);
 
   // ── Live refresh ─────────────────────────────────────────────────
   // Standings only move when matches finalize, so a relaxed 30s poll is
   // plenty. ETag/304 + CDN caching make unchanged polls nearly free, and
   // the poller sleeps whenever the tab is hidden.
+  //
+  // Started ONLY after the season resolves. start() polls immediately, so
+  // starting it at parse time fired a fetch on the 'circuit-i' guess; that
+  // response racing load() is what put Season 1's table under a Season 2
+  // heading.
+  function startLivePoll() {
   DSLivePoll.create({
     url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
     interval: 30000,
@@ -1051,6 +1057,7 @@
       render();
     },
   }).start();
+  }
   </script>
 </body>
 </html>

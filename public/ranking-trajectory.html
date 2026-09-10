@@ -78,7 +78,8 @@
   <script src="/js/partials.js"></script>
   <script src="/js/live-poll.js"></script>
   <script>
-  const SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i'), totalMatches: 6 };
+  // Pre-resolution guess only — dsSeason() overwrites it below. Must be `let`.
+  let SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i'), totalMatches: 6 };
   const PALETTE = ['#b8ff2c','#17d7b0','#f0c040','#ff7b54','#a78bfa','#f472b6','#60a5fa','#34d399'];
 
   let standingsData = null, scheduleData = null;
@@ -234,18 +235,25 @@
     return svg;
   }
 
-  load();
-  if (window.DSLivePoll) {
-    DSLivePoll.create({
-      url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
-      interval: 30000,
-      onUpdate(data) {
-        standingsData = data;
-        fetch('/.netlify/functions/public-schedule?season=' + SEASON.id)
-          .then(r => r.ok ? r.json() : null).then(sc => { if (sc) scheduleData = sc; render(); }).catch(() => render());
-      },
-    }).start();
-  }
+  // Settle the season BEFORE the first fetch — this page loaded season.js but
+  // never asked it anything, so it stayed pinned to Season 1.
+  (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+    if (S) { SEASON.id = S.id; }
+  }).catch(() => {}).then(function () {
+    load();
+    // Started only once the season is known — see head-to-head.html.
+    if (window.DSLivePoll) {
+      DSLivePoll.create({
+        url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
+        interval: 30000,
+        onUpdate(data) {
+          standingsData = data;
+          fetch('/.netlify/functions/public-schedule?season=' + SEASON.id)
+            .then(r => r.ok ? r.json() : null).then(sc => { if (sc) scheduleData = sc; render(); }).catch(() => render());
+        },
+      }).start();
+    }
+  });
   </script>
 </body>
 </html>

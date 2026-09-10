@@ -148,7 +148,9 @@
   <script src="/js/live-poll.js"></script>
   <script>
   // ── Config ───────────────────────────────────────────────────────
-  const SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i') };
+  // Pre-resolution guess only — dsSeason() overwrites SEASON/CIRCUIT/LINK_SUFFIX
+  // below. They must be `let`: as `const` this page could never leave Season 1.
+  let SEASON = { id: (new URLSearchParams(location.search).get('season') || 'circuit-i') };
   // Season ids come in several shapes ('circuit-i', 'season-2', a bare '2').
   // Chopping off a literal 'circuit-' turned 'season-1' into 'SEASON-1', which
   // matches no stats blob. dsSeason() overwrites this once it resolves; this is
@@ -168,8 +170,8 @@
     if (m) return roman(parseInt(m[1], 10));
     return s.toUpperCase();
   }
-  const CIRCUIT = codeFromId(SEASON.id);
-  const LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
+  let CIRCUIT = codeFromId(SEASON.id);
+  let LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
   const TREND_THRESHOLD = 25; // DSR points of difference to call a run-in harder/easier
 
   let dsrByTeam = {};
@@ -451,16 +453,23 @@
     });
   }
 
-  load();
+  // Settle the season BEFORE the first fetch — this page loaded season.js but
+  // never asked it anything, so it stayed pinned to Season 1.
+  (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+    if (S) { SEASON.id = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; }
+  }).catch(() => {}).then(function () {
+    load();
 
-  // ── Live refresh: re-pull when matches finalize (30s, cheap with ETag) ──
-  if (window.DSLivePoll) {
-    DSLivePoll.create({
-      url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
-      interval: 30000,
-      onUpdate() { load(); },
-    }).start();
-  }
+    // ── Live refresh: re-pull when matches finalize (30s, cheap with ETag) ──
+    // Started only once the season is known — see head-to-head.html.
+    if (window.DSLivePoll) {
+      DSLivePoll.create({
+        url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
+        interval: 30000,
+        onUpdate() { load(); },
+      }).start();
+    }
+  });
   </script>
 </body>
 </html>
