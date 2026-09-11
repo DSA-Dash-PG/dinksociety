@@ -48,8 +48,9 @@ function miniRow(label, value, sub, color) {
  * @param {object} recap the draft.recap (title, dek, html, seasonNote, podium, minis)
  * @param {object} event {name, date, type}
  * @param {string} siteUrl
+ * @param {string[]} [photos] photo ids from the night, for the photo strip
  */
-export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
+export function renderLadderRecapEmail(pr, recap, event, siteUrl, photos) {
   const first = String(pr.name || 'there').split(' ')[0];
   const place = pr.rank ? ord(pr.rank) : '—';
   // The header already renders the finish ("1st of 10"). Never echo a sub that
@@ -93,7 +94,24 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
   const boardUrl = `${url}/ladders#leaderboard`;
   // The night's full-length recap article, when one has shipped — the story
   // players actually forward around. Null for nights with no article yet.
-  const articleUrl = recapArticleUrl(event.date, url);
+  const articleUrl = recapArticleUrl(event.date, url, event.id);
+
+
+  // ── Night photos ───────────────────────────────────────────────────────
+  // ladder-photo-serve is public and immutable, so the thumbs hotlink straight
+  // from the site: no attachments, no extra storage, and they stay cached. One
+  // row of three fits the 552px content width (there is no object-fit in
+  // Outlook, so each image keeps its own aspect ratio).
+  const photoList = Array.isArray(photos) ? photos.filter(Boolean) : [];
+  const photoStrip = photoList.length ? `<div style="margin:20px 0 0">
+    <div style="font-size:10.5px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;color:${C.fnt};margin-bottom:10px">&#9314; From the night</div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      ${photoList.slice(0, 3).map(id => `<td width="33.3%" style="padding:0 3px">
+        <a href="${nightUrl}" style="text-decoration:none"><img src="${url}/api/ladder-photo-serve?id=${encodeURIComponent(id)}&size=thumb" width="176" alt="${esc(event.name || 'Ladder')} photo" style="width:100%;max-width:176px;height:auto;display:block;border-radius:10px;border:1px solid ${C.bd}"></a>
+      </td>`).join('')}
+    </tr></table>
+    ${photoList.length > 3 ? `<a href="${nightUrl}" style="display:block;text-align:center;margin:10px 0 0;font-size:12px;font-weight:800;color:${C.lime};text-decoration:none">See all ${photoList.length} photos from the night &rarr;</a>` : ''}
+  </div>` : '';
 
   return `<div style="background:${C.bg};margin:0;padding:0">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#000;padding:20px 8px"><tr><td align="center">
@@ -129,6 +147,7 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl) {
     <div style="font-size:14px;line-height:1.68;color:#dcdfd7;padding-top:10px">${safeHtml(recap.html)}</div>
     ${minis}
     ${recap.seasonNote ? `<div style="background:rgba(184,255,44,.1);border:1px solid rgba(184,255,44,.22);border-radius:10px;padding:13px 15px;margin-top:12px;font-size:13.5px;line-height:1.55;color:#eef3e4">${safeHtml(recap.seasonNote)}</div>` : ''}
+    ${photoStrip}
     ${articleUrl ? `<div style="background:rgba(184,255,44,.08);border:1px solid rgba(184,255,44,.28);border-radius:14px;padding:16px 15px;margin:18px 0 0;text-align:center">
       <div style="font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:${C.lime}">The write-up is live</div>
       <div style="font-size:13px;color:#dcdfd7;margin-top:5px;line-height:1.5">The full story of the night — awards, the charts, every stat.</div>

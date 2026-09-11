@@ -17,11 +17,18 @@ export const RECAP_ARTICLES = {
   '2026-07-14': '/ladders/recaps/2026-07-14-aloha-night-ladder.html',
 };
 
-// Absolute URL of the night's article, or null when none exists. `date` is the
-// event's YYYY-MM-DD; tolerant of a full ISO string.
-export function recapArticleUrl(date, siteUrl) {
-  const d = String(date || '').slice(0, 10);
-  const path = RECAP_ARTICLES[d];
-  if (!path) return null;
-  return (siteUrl || 'https://dinksociety.app').replace(/\/$/, '') + path;
+// Absolute URL of the night's article. `date` is the event's YYYY-MM-DD
+// (tolerant of a full ISO string).
+//
+// Hand-built articles win when the date is in the map above. Otherwise, if an
+// eventId is given, point at the GENERATED article at /ladders/recaps/<id> —
+// recap-article-cron publishes that within ten minutes of a night finishing,
+// and ladder-recap-page answers "recap on the way" in the meantime, so the
+// link is always safe to send. Null only when we have neither.
+export function recapArticleUrl(date, siteUrl, eventId) {
+  const base = (siteUrl || 'https://dinksociety.app').replace(/\/$/, '');
+  const path = RECAP_ARTICLES[String(date || '').slice(0, 10)];
+  if (path) return base + path;
+  if (eventId) return `${base}/ladders/recaps/${encodeURIComponent(eventId)}`;
+  return null;
 }

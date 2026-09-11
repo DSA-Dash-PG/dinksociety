@@ -10,31 +10,23 @@
 //                         same engine the public stats use (wins → point diff →
 //                         Dink Rating). Court paths, King Court tenure, climbs,
 //                         streaks, margins and the round-by-round board.
-//   writeNarrative()      only the PROSE — headline, dek and 4–6 paragraphs.
-//                         Claude gets the computed stats and may not introduce
-//                         a number of its own. Falls back to a templated write
-//                         up when there's no API key or the call fails, so an
-//                         article is never blocked on the API.
+//   buildNarrative()      the PROSE — headline, dek and the paragraphs. Fully
+//                         templated off the computed stats. No API, no key, no
+//                         external call, so an article can never fail to
+//                         publish and never invents a number.
 //   renderArticleHtml()   the page itself. Awards, tables and charts are built
-//                         from the computed stats, never from model output.
+//                         from the computed stats too.
 //
-// That split is the anti-fabrication guarantee: the model can pick what to
-// talk about, but every figure on the page came out of the scoring engine.
-//
-// Env: ANTHROPIC_API_KEY (optional), LADDER_RECAP_MODEL / DROP_MODEL (optional).
+// The writer leads on whatever actually decided the night, which is why
+// buildArticleStats computes `beforeFinal` (the table as it stood going into
+// the last round). A tie or a lead change there is the story, and it is
+// invisible in the final table.
 
 import { getEvent } from './ladder.js';
 import { getPlay, toSession, playersFromPlay } from './ladder-play.js';
 import { calcStats, calcDinkRating, fixedPartnerMap, orderPairWomenFirst } from './ladder-scoring.js';
 import { getMergeMap, applyMerges } from './player-merge.js';
 import { getDirectory, applyDirectory } from './player-directory.js';
-
-const DEFAULT_MODEL = 'claude-sonnet-4-6';
-function env(name) {
-  return (typeof Netlify !== 'undefined' && Netlify.env.get(name)) || process.env[name] || '';
-}
-function apiKey() { return env('ANTHROPIC_API_KEY'); }
-function modelId() { return env('LADDER_RECAP_MODEL') || env('DROP_MODEL') || DEFAULT_MODEL; }
 
 // ───────────────────────────── helpers ─────────────────────────────
 
@@ -182,8 +174,8 @@ export async function buildArticleStats(eventId) {
       climb: (e.courts[e.courts.length - 1] ?? 0) - (e.courts[0] ?? 0),
       kingRounds: e.courts.filter(c => c === maxCourt).length,
       streak: maxStreak(e.seq),
-      avgFor: e.games ? Math.round((e.pf / (e.w + e.l)) * 10) / 10 : 0,
-      avgAgainst: e.games ? Math.round((e.pa / (e.w + e.l)) * 10) / 10 : 0,
+      avgFor: (e.w + e.l) ? Math.round((e.pf / (e.w + e.l)) * 10) / 10 : 0,
+      avgAgainst: (e.w + e.l) ? Math.round((e.pa / (e.w + e.l)) * 10) / 10 : 0,
     };
   });
 
@@ -324,136 +316,209 @@ export async function buildArticleStats(eventId) {
 
 // ───────────────────────────── narrative ─────────────────────────────
 
-const SYSTEM = `You are the editorial voice of The Dink Society, a social pickleball league in Southern California, writing the long-form recap article for one ladder night. The voice: a great sports columnist secretly having the time of their life. Confident, specific, funny, warm. The league's motto is "The Society keeps receipts."
+const plural = (n, w, sfx) => `${n} ${n === 1 ? w : (sfx || w + 's')}`;
+const SMALL = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve'];
+const spellOut = n => (n >= 0 && n < SMALL.length ? SMALL[n] : String(n));
+const Spell = n => { const w = spellOut(n); return w.charAt(0).toUpperCase() + w.slice(1); };
+const ordinal = n => {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+};
 
-You are given a STATS PACK containing every computed number for the night, and sometimes NIGHT NOTES from the organizer with context the numbers cannot show (someone's partner no-showed, a player was on vacation, a running joke). The notes are true and are the best material in the pack. Use them.
-
-HARD RULES, no exceptions:
-- Every number you write MUST appear in the STATS PACK. Never invent or estimate a score, record, differential, rating, court, round number or streak. If you want to make a point and the number is not in the pack, make a different point.
-- Never invent quotes, names, or events. NIGHT NOTES may be paraphrased but not embellished with invented detail.
-- Roast records and math, never people. Everyone keeps their dignity, especially whoever finished last.
-- The tiebreaker is wins, then point differential, then Dink Rating (DR). It is NEVER head-to-head. Do not describe a tie as broken by head-to-head.
-- On a night with only 2 courts there is no real court movement, so do not use climbing or ladder-progression framing. With 3+ courts, climbing framing is accurate and encouraged.
-- Court direction: the STATS PACK names the top court (King Court) and the bottom court explicitly. Use those names exactly as given. Never assume a court name is high or low from its letter or number.
-- On a fixed-partner night the pair places together; write about pairs, not individuals, in the standings narrative.
-- Name a player as first name plus last initial on first mention, first name after.
-- No em dashes anywhere. Recast the sentence instead.
-
-Return ONLY valid JSON, no markdown fence, in exactly this shape:
-{
-  "headline": "the article headline, earned and specific, 6 to 14 words",
-  "dek": "one sentence under the headline giving the night's shape",
-  "paragraphs": ["<p-worth of text>", "…4 to 6 of them…"]
-}
-Paragraphs are plain text, no HTML tags. Lead with whatever actually decided the night. Check standingsBeforeTheFinalRound against the final standings first: if the night turned on the last round, if anyone was tied going in, or if a pair led with one round left and finished off the podium, that IS the lead. Otherwise lead with the winner. Then the podium fight, then the rest of the field, then anything from NIGHT NOTES that deserves its own beat.`;
-
-function statsPack(stats) {
-  const cn = stats.courtLabel;
-  return {
-    event: stats.event,
-    format: stats.fixedPartner ? 'fixed-partner (pairs place together)' : 'individual',
-    shape: stats.kpis,
-    topCourtIsCalled: cn(stats.maxCourt) + ' — the TOP court, called King Court',
-    bottomCourtIsCalled: cn(1) + ' — the BOTTOM court',
-    standings: stats.rows.map(r => ({
-      rank: r.rank, name: r.name, record: `${r.w}-${r.l}`,
-      pointsFor: r.pf, pointsAgainst: r.pa, differential: r.diff,
-      dinkRating: r.dr, pointsPerGame: r.avgFor, allowedPerGame: r.avgAgainst,
-      longestWinStreak: r.streak,
-      startedOn: cn(r.start), finishedOn: cn(r.end), courtsMoved: r.climb,
-      roundsOnKingCourt: r.kingRounds, roundsPlayed: r.games,
-      courtByRound: r.courts.map(cn),
-      resultByRound: r.seq,
-    })),
-    standingsBeforeTheFinalRound: stats.beforeFinal ? stats.beforeFinal.map(r => ({
-      rank: r.rank, name: r.name, record: `${r.w}-${r.l}`, differential: r.diff,
-    })) : null,
-    finalRoundNumber: stats.lastRound,
-    everyGame: stats.games.map(g => ({
-      round: g.round, court: cn(g.court),
-      winner: g.sa > g.sb ? g.aNames.join(' & ') : g.bNames.join(' & '),
-      loser: g.sa > g.sb ? g.bNames.join(' & ') : g.aNames.join(' & '),
-      score: `${Math.max(g.sa, g.sb)}-${Math.min(g.sa, g.sb)}`,
-      margin: g.margin,
-    })),
-    computedAwards: stats.awards.map(a => ({
-      award: a.tag, who: stats.entities.get(a.entity)?.name, detail: a.detail.replace(/<[^>]+>/g, ''),
-    })),
-  };
+/** Deterministic choice so phrasing varies between nights but never re-rolls. */
+function pickOne(seed, arr) {
+  const str = String(seed);
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return arr[(h >>> 0) % arr.length];
 }
 
-/** Templated write-up used when there is no API key or the call fails. */
-function basicNarrative(stats) {
+/**
+ * The article's prose, templated from the computed stats.
+ *
+ * Order of business: work out what decided the night (a last-round tie, a lead
+ * change, or a wire-to-wire win), lead with that, then the podium and its
+ * tiebreaks, then the shape of the field, then the organizer's notes.
+ */
+export function buildNarrative(stats, { notes = '' } = {}) {
   const cn = stats.courtLabel;
-  const r = stats.rows;
-  const w = r[0];
+  const rows = stats.rows;
+  const seed = `${stats.event.id}|${stats.event.date}`;
   const unit = stats.fixedPartner ? 'pair' : 'player';
+  const w = rows[0];
   const paragraphs = [];
-  if (w) paragraphs.push(
-    `${w.name} took the night at ${w.w}-${w.l} with a ${signed(w.diff)} point differential, ` +
-    `scoring ${w.avgFor} a game and allowing ${w.avgAgainst}. ` +
-    (w.climb > 0
-      ? `They started on ${cn(w.start)} and finished on ${cn(w.end)}.`
-      : `They started and finished on ${cn(w.end)}.`)
-  );
-  if (r[1] && r[2]) paragraphs.push(
-    `${r[1].name} finished second at ${r[1].w}-${r[1].l} (${signed(r[1].diff)}), ` +
-    `and ${r[2].name} took third at ${r[2].w}-${r[2].l} (${signed(r[2].diff)}). ` +
-    `Places are settled on wins first, then point differential, then Dink Rating.`
-  );
-  const best = [...r].sort((a, b) => b.kingRounds - a.kingRounds)[0];
-  if (best && best.kingRounds > 0) paragraphs.push(
-    `${best.name} spent the most time on King Court, ${best.kingRounds} of ${best.games} rounds on ${cn(stats.maxCourt)}.`
-  );
-  paragraphs.push(
-    `${stats.kpis.games} games across ${stats.kpis.rounds} rounds on ${stats.kpis.courts} courts, ` +
-    `with ${stats.kpis.players} players${stats.kpis.pairs ? ` in ${stats.kpis.pairs} fixed pairs` : ''}. ` +
-    `Full standings and the round by round board are below.`
-  );
-  return {
-    headline: w ? `${w.name} Take the ${stats.event.name}` : `${stats.event.name} Recap`,
-    dek: `${stats.kpis.players} players · ${stats.kpis.rounds} rounds · ${stats.kpis.courts} courts`,
-    paragraphs,
-    engine: 'basic',
+  let headline = null;
+
+  // House style: full names on first mention, first names after that.
+  const seen = new Set();
+  const shortOf = key => (stats.entities.get(key)?.names || []).map(firstName).join(' & ');
+  const nm = key => {
+    if (!key) return '';
+    const full = stats.entities.get(key)?.name || '';
+    if (seen.has(key)) return shortOf(key) || full;
+    seen.add(key);
+    return full;
   };
-}
 
-function extractJson(text) {
-  if (!text) throw new Error('Empty model response');
-  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
-  const raw = fenced ? fenced[1] : text;
-  const start = raw.indexOf('{'), end = raw.lastIndexOf('}');
-  if (start < 0 || end < 0) throw new Error('No JSON object in model response');
-  return JSON.parse(raw.slice(start, end + 1));
-}
+  const before = stats.beforeFinal;
+  const bLead = before ? before[0] : null;
+  const bSecond = before ? before[1] : null;
+  const deadHeat = !!(bLead && bSecond && bLead.w === bSecond.w && bLead.diff === bSecond.diff);
+  const leadChanged = !!(bLead && w && bLead.key !== w.key);
 
-export async function writeNarrative(stats, { notes = '' } = {}) {
-  const key = apiKey();
-  if (!key) return basicNarrative(stats);
-  try {
-    const user = `STATS PACK\n${JSON.stringify(statsPack(stats), null, 2)}\n\n` +
-      (notes ? `NIGHT NOTES from the organizer (true, use them):\n${notes}\n\n` : '') +
-      `Write the article for ${stats.event.name} on ${stats.event.date}.`;
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({
-        model: modelId(), max_tokens: 3000, system: SYSTEM,
-        messages: [{ role: 'user', content: user }],
-      }),
-    });
-    if (!res.ok) throw new Error(`Claude API ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
-    const data = await res.json();
-    const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const out = extractJson(text);
-    if (!out.headline || !Array.isArray(out.paragraphs) || !out.paragraphs.length) {
-      throw new Error('Model response missing headline/paragraphs');
-    }
-    return { ...out, engine: 'claude', model: modelId() };
-  } catch (e) {
-    const fb = basicNarrative(stats);
-    return { ...fb, engine: 'basic-fallback', error: String(e.message || e) };
+  // Did the two pairs who were level actually meet in the final round?
+  const finalGames = stats.games.filter(g => g.round === stats.lastRound);
+  const decider = (deadHeat && finalGames.find(g =>
+    (g.entA === bLead.key && g.entB === bSecond.key) || (g.entA === bSecond.key && g.entB === bLead.key))) || null;
+
+  // ── the lead ──
+  if (deadHeat && decider) {
+    const winnerKey = decider.sa > decider.sb ? decider.entA : decider.entB;
+    const loserKey = winnerKey === decider.entA ? decider.entB : decider.entA;
+    const wn = stats.entities.get(winnerKey)?.name;
+    const ln = stats.entities.get(loserKey)?.name;
+    const score = `${Math.max(decider.sa, decider.sb)}-${Math.min(decider.sa, decider.sb)}`;
+    headline = `Dead Level Going Into the Last Round: ${(wn || '').split(' & ')[0]} Settles It on ${cn(decider.court).replace('Court ', '')}`;
+    paragraphs.push(
+      `Two ${unit}s walked onto ${cn(decider.court)} for the final round with nothing between them. ` +
+      `${nm(winnerKey)} and ${nm(loserKey)} were both ${bLead.w}-${bLead.l}. Both were ${signed(bLead.diff)} on point differential. ` +
+      `Not close, identical. ${Spell(stats.lastRound - 1)} rounds had failed to separate them, so the night did the ` +
+      `sensible thing and settled it head to head. ${nm(winnerKey)} won it ${score}.`
+    );
+  } else if (deadHeat) {
+    headline = `${(w.name || '').split(' & ')[0]} Takes It on the Last Round`;
+    paragraphs.push(
+      `${nm(bLead.key)} and ${nm(bSecond.key)} went into the final round tied at ${bLead.w}-${bLead.l}, level on ` +
+      `point differential at ${signed(bLead.diff)}, playing different opponents and watching each other's scoreboard. ` +
+      `${nm(w.key)} came out of it on top at ${w.w}-${w.l}.`
+    );
+  } else if (leadChanged) {
+    headline = `${(w.name || '').split(' & ')[0]} Steals It in the Final Round`;
+    paragraphs.push(
+      `${nm(bLead.key)} led going into the last round at ${bLead.w}-${bLead.l}. They did not lead coming out of it. ` +
+      `${nm(w.key)} closed at ${w.w}-${w.l} with a ${signed(w.diff)} differential and took the night off them ` +
+      `in the time it takes to play one game.`
+    );
+  } else if (w) {
+    headline = pickOne(seed, [
+      `${(w.name || '').split(' & ')[0]} Runs the Ladder at the ${stats.event.name}`,
+      `${w.w}-${w.l} and No Argument: ${(w.name || '').split(' & ')[0]} Takes the Night`,
+    ]);
+    paragraphs.push(
+      `${nm(w.key)} won the ${stats.event.name} at ${w.w}-${w.l} with a ${signed(w.diff)} point differential, ` +
+      `and led or shared the lead going into the final round. No late drama, no tiebreak, just the best ` +
+      `${unit} on the courts finishing like it.`
+    );
   }
+
+  // ── the winner's night in detail ──
+  if (w) {
+    const bits = [];
+    if (w.climb > 0) {
+      bits.push(`They opened on ${cn(w.start)} and finished on ${cn(w.end)}, ${
+        w.start === 1 && w.end === stats.maxCourt
+          ? 'the full bottom-to-top climb and the only one of the night'
+          : `a climb of ${plural(w.climb, 'court')}`}`);
+    } else if (w.kingRounds === w.games) {
+      bits.push(`They never left ${cn(stats.maxCourt)}, all ${plural(w.games, 'round')} of it`);
+    } else {
+      bits.push(`They started and finished on ${cn(w.end)}`);
+    }
+    if (w.avgAgainst != null) bits.push(`and gave up ${w.avgAgainst} points a game, the stingiest defense in the field`);
+    if (w.streak >= 3) bits.push(`with ${plural(w.streak, 'straight win')} in the middle of it`);
+    paragraphs.push(`${bits.join(', ')}. Night DR of ${w.dr ?? '—'}.`);
+  }
+
+  // ── the podium, and any tiebreak that decided it ──
+  const p2 = rows[1], p3 = rows[2], p4 = rows[3];
+  if (p2 && p3) {
+    const tied23 = p2.w === p3.w;
+    const tied34 = p4 && p3.w === p4.w;
+    if (tied34 && p3.diff - p4.diff <= 2) {
+      paragraphs.push(
+        `Third came down to arithmetic. ${nm(p3.key)} and ${nm(p4.key)} both finished ${p3.w}-${p3.l}, so it went to ` +
+        `point differential: ${signed(p3.diff)} against ${signed(p4.diff)}. ` +
+        `${p3.diff - p4.diff === 1 ? 'One point, across a full night of games, decided the last podium step.' :
+          `${plural(p3.diff - p4.diff, 'point')} decided the last podium step.`}`
+      );
+    } else if (tied23) {
+      paragraphs.push(
+        `${nm(p2.key)} and ${nm(p3.key)} both finished ${p2.w}-${p2.l}, split by point differential at ` +
+        `${signed(p2.diff)} and ${signed(p3.diff)}.`
+      );
+    } else {
+      paragraphs.push(
+        `${nm(p2.key)} took second at ${p2.w}-${p2.l} (${signed(p2.diff)}) and ${nm(p3.key)} third at ` +
+        `${p3.w}-${p3.l} (${signed(p3.diff)}).`
+      );
+    }
+  }
+
+  // ── anyone who led and then fell off the podium ──
+  if (before) {
+    const topBefore = before.slice(0, 3).map(r => r.key);
+    const topAfter = rows.slice(0, 3).map(r => r.key);
+    const dropped = before.slice(0, 2).find(r => topBefore.includes(r.key) && !topAfter.includes(r.key));
+    if (dropped) {
+      const now = rows.find(r => r.key === dropped.key);
+      if (now) paragraphs.push(
+        `${nm(now.key)} will want the last round back. They were ${ordinal(dropped.rank)} going into it at ` +
+        `${dropped.w}-${dropped.l} and finished ${ordinal(now.rank)}, off the podium entirely. ` +
+        `${now.kingRounds >= Math.ceil(now.games / 2)
+          ? `They had spent ${now.kingRounds} of ${plural(now.games, 'round')} on ${cn(stats.maxCourt)}, which makes it sting more.`
+          : ''}`.trim()
+      );
+    }
+  }
+
+  // ── the shape of the field ──
+  const field = [];
+  const kings = [...rows].sort((a, b) => b.kingRounds - a.kingRounds)[0];
+  if (kings && kings.kingRounds > 0 && kings.key !== w?.key) {
+    const sharers = rows.filter(r => r.kingRounds === kings.kingRounds);
+    field.push(sharers.length > 1
+      ? `${sharers.map(r => nm(r.key)).join(' and ')} spent the most time on ${cn(stats.maxCourt)}, ${kings.kingRounds} rounds each`
+      : `${nm(kings.key)} spent the most time on ${cn(stats.maxCourt)}, ${kings.kingRounds} of ${plural(kings.games, 'round')}`);
+  }
+  const slider = [...rows.filter(r => r.climb < 0)].sort((a, b) => (a.climb - b.climb) || (a.end - b.end))[0];
+  if (slider) {
+    field.push(`${nm(slider.key)} went the other way, from ${cn(slider.start)} down to ${cn(slider.end)}`);
+  }
+  const closest = [...stats.games].sort((a, b) => (a.margin - b.margin) || (a.round - b.round))[0];
+  if (closest && closest.margin <= 2) {
+    const cw = nm(closest.sa > closest.sb ? closest.entA : closest.entB);
+    const cl = nm(closest.sa > closest.sb ? closest.entB : closest.entA);
+    const only = stats.games.filter(g => g.margin === closest.margin).length === 1;
+    field.push(
+      `the tightest game of the night was ${cw} over ${cl}, ` +
+      `${Math.max(closest.sa, closest.sb)}-${Math.min(closest.sa, closest.sb)} in round ${closest.round}` +
+      (only ? `, the only ${closest.margin}-point game out of ${stats.games.length}` : '')
+    );
+  }
+  if (field.length) paragraphs.push(`Down the ladder: ${field.join('; ')}.`);
+
+  // ── last place, with its dignity intact ──
+  const last = rows[rows.length - 1];
+  if (last && rows.length > 3 && last.key !== w?.key) {
+    paragraphs.push(
+      `${nm(last.key)} had the hardest night of it at ${last.w}-${last.l} (${signed(last.diff)})` +
+      (last.streak >= 2
+        ? `, though they did win ${plural(last.streak, 'game')} back to back in there, which the differential does its best to hide.`
+        : `, and answered the bell for all ${plural(last.games, 'round')} anyway.`)
+    );
+  }
+
+  // ── the organizer's own notes, as their own beat ──
+  for (const line of String(notes || '').split(/\n{2,}|\r\n\r\n/).map(t => t.trim()).filter(Boolean)) {
+    paragraphs.push(line);
+  }
+
+  return {
+    headline: headline || `${stats.event.name} Recap`,
+    dek: `${plural(stats.kpis.players, 'player')} · ${plural(stats.kpis.rounds, 'round')} · ${plural(stats.kpis.courts, 'court')}`,
+    paragraphs,
+    engine: 'templated',
+  };
 }
 
 // ────────────────────────────── render ──────────────────────────────
@@ -894,7 +959,7 @@ export async function generateRecapArticle(eventId, { force = false, notes = '' 
 
   // Carry forward any notes the admin already attached unless new ones are given.
   const useNotes = notes || existing?.notes || '';
-  const narrative = await writeNarrative(stats, { notes: useNotes });
+  const narrative = buildNarrative(stats, { notes: useNotes });
   const html = renderArticleHtml(stats, narrative);
 
   const record = await saveArticle(eventId, {
@@ -905,8 +970,6 @@ export async function generateRecapArticle(eventId, { force = false, notes = '' 
     html,
     notes: useNotes,
     generatedBy: narrative.engine,
-    model: narrative.model || null,
-    generatorError: narrative.error || null,
     // Keep the numbers that went into the page, for debugging a bad article.
     stats: {
       event: stats.event,

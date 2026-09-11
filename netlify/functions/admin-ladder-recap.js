@@ -11,35 +11,13 @@
 import { requireLadderOwner, orgErr } from './lib/organizer-auth.js';
 import { getRecap, markRecapSent, updateRecapDraft } from './lib/ladder-recap.js';
 import { generateLadderRecapDraft } from './lib/ladder-recap-generate.js';
-import { renderLadderRecapEmail } from './lib/ladder-recap-email.js';
-import { sendNotify } from './lib/notify-prefs.js';
+import { sendRecapToAll, sendRecapTo, recapPhotoIds } from './lib/ladder-recap-send.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } });
 }
 function siteUrl() {
   return (typeof Netlify !== 'undefined' && Netlify.env.get('SITE_URL')) || process.env.SITE_URL || 'https://dinksociety.app';
-}
-
-// Render + send one recipient's recap. Returns the sendNotify result
-// ({ skipped:true } for a recap opt-out). Shared by the bulk send + resend-one.
-function sendRecapTo(rcpt, rec, url) {
-  const pr = (rec.players && rec.players[rcpt.playerId]) || { name: rcpt.name, rank: null, count: rec.recap.podium?.length || 0, w: 0, l: 0, diff: 0, delta: null, story: [] };
-  const html = renderLadderRecapEmail(pr, rec.recap, rec.event || { name: 'Ladder', date: null }, url);
-  return sendNotify({ to: rcpt.email, category: 'recap', subject: `Your ladder recap — ${rec.event?.name || 'Dink Society'}`, html });
-}
-
-// Send in small batches so we stay under Resend's 10-requests/second limit
-// (firing all recipients at once is what was bouncing sends as "Too many
-// requests"). Results come back in the same order as `items`.
-async function sendInBatches(items, worker, { size = 5, gapMs = 1100 } = {}) {
-  const out = [];
-  for (let i = 0; i < items.length; i += size) {
-    const batch = items.slice(i, i + size);
-    out.push(...await Promise.allSettled(batch.map(worker)));
-    if (i + size < items.length) await new Promise(r => setTimeout(r, gapMs));
-  }
-  return out;
 }
 
 export default async (req) => {
@@ -79,32 +57,13 @@ export default async (req) => {
     }
 
     if (body.action === 'send') {
-      const rec = await getRecap(eventId);
-      if (!rec || !rec.recap) return json({ error: 'No draft to send — generate one first.' }, 409);
-      const url = siteUrl();
-      const recipients = rec.recipients || [];
-      if (!recipients.length) return json({ error: 'No recipients with an email on this ladder.' }, 409);
-
-      const results = await sendInBatches(recipients, rcpt => sendRecapTo(rcpt, rec, url));
-
-      // Classify each recipient so the panel can show WHO didn't get the email,
-      // and split genuine send failures from opt-outs (recap unsubscribes come
-      // back as { skipped:true } and must not be mistaken for delivery errors).
-      const optedOut = [];
-      const errored = [];
-      results.forEach((r, i) => {
-        const rcpt = recipients[i];
-        const who = { playerId: rcpt.playerId || null, name: rcpt.name || rcpt.email, email: rcpt.email };
-        if (r.status === 'fulfilled' && r.value && r.value.skipped) {
-          optedOut.push(who);
-        } else if (r.status === 'rejected') {
-          errored.push({ ...who, reason: String((r.reason && r.reason.message) || r.reason || 'send failed') });
-        }
-      });
-      const sent = results.length - optedOut.length - errored.length;
-      await markRecapSent(eventId, sent);
+      const r = await sendRecapToAll(eventId, { url: siteUrl() });
+      if (!r.ok) return json({ error: r.error }, 409);
       // `failed` kept for backward compat = anyone who didn't receive it.
-      return json({ ok: true, sent, failed: optedOut.length + errored.length, optedOut, errored });
+      return json({
+        ok: true, sent: r.sent, failed: r.optedOut.length + r.errored.length,
+        optedOut: r.optedOut, errored: r.errored,
+      });
     }
 
     // Resend the recap to ONE recipient — used by the per-player "Resend" button
@@ -118,7 +77,7 @@ export default async (req) => {
       if (!rcpt) return json({ error: 'That player is not on this ladder’s send list.' }, 404);
       if (!rcpt.email) return json({ error: 'No email on file for this player.' }, 400);
       try {
-        const r = await sendRecapTo(rcpt, rec, siteUrl());
+        const r = await sendRecapTo(rcpt, rec, siteUrl(), await recapPhotoIds(eventId));
         if (r && r.skipped) return json({ ok: true, skipped: true, name: rcpt.name, email: rcpt.email });
         return json({ ok: true, sent: 1, name: rcpt.name, email: rcpt.email });
       } catch (e) {
