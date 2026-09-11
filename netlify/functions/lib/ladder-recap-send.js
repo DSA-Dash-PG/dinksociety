@@ -13,6 +13,7 @@ import { getRecap, markRecapSent } from './ladder-recap.js';
 import { renderLadderRecapEmail } from './ladder-recap-email.js';
 import { sendNotify } from './notify-prefs.js';
 import { listPhotos } from './ladder-photos.js';
+import { recordSend } from './recap-tracking.js';
 
 export function siteUrl() {
   return (typeof Netlify !== 'undefined' && Netlify.env.get('SITE_URL'))
@@ -46,20 +47,40 @@ export function findPlayerNote(rec, rcpt) {
  * like a real email and tells the player their night did not happen. Three
  * people got one on 2026-09-11. Now an unmatched player is skipped and reported.
  */
-export function sendRecapTo(rcpt, rec, url, photoIds) {
+export async function sendRecapTo(rcpt, rec, url, photoIds) {
   const pr = findPlayerNote(rec, rcpt);
   if (!pr) {
-    return Promise.resolve({ skipped: true, unmatched: true, name: rcpt.name, email: rcpt.email });
+    return { skipped: true, unmatched: true, name: rcpt.name, email: rcpt.email };
   }
   const html = renderLadderRecapEmail(
     pr, rec.recap, rec.event || { name: 'Ladder', date: null }, url, photoIds
   );
-  return sendNotify({
+  const res = await sendNotify({
     to: rcpt.email,
     category: 'recap',
     subject: `Your ladder recap — ${rec.event?.name || 'Dink Society'}`,
     html,
   });
+
+  // File the Resend message id against this player so resend-webhook.js can
+  // attribute opens and clicks later. Best effort only: a tracking write must
+  // never turn a delivered email into a reported failure.
+  try {
+    const messageId = res?.data?.id || res?.id || null;
+    if (messageId && !res?.skipped) {
+      await recordSend({
+        messageId,
+        eventId: rec.event?.id || rec.eventId || null,
+        playerId: rcpt.playerId || null,
+        name: rcpt.name || pr.name || null,
+        email: rcpt.email,
+      });
+    }
+  } catch (err) {
+    console.warn('[ladder-recap-send] could not record send for tracking:', err?.message || err);
+  }
+
+  return res;
 }
 
 async function sendInBatches(items, worker, { size = 5, gapMs = 1100 } = {}) {

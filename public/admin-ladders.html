@@ -1215,9 +1215,8 @@ function renderRecap(r){
   const body=document.getElementById('rcBody'), meta=document.getElementById('rcMeta');
   if(!r){
     meta.textContent='No recap drafted yet.';
-    body.innerHTML='<div class="empty" style="margin-bottom:12px">Auto-drafts after a night finishes — or build it now from the night’s results. No AI needed; you can edit the write-up before sending.</div>'
-      +'<button class="btn btn-lime" onclick="genRecap(false,\'basic\')">🧮 Build recap from the night</button>'
-      +'<button class="btn btn-out" style="margin-top:8px" onclick="genRecap(false,\'ai\')">✨ Try AI draft</button>';
+    body.innerHTML='<div class="empty" style="margin-bottom:12px">Auto-drafts about ten minutes after a night finishes — or build it now from the night’s results. You can edit the write-up before sending.</div>'
+      +'<button class="btn btn-lime" onclick="genRecap(false,\'basic\')">🧮 Build recap from the night</button>';
     return;
   }
   const players=r.players?Object.values(r.players):[];
@@ -1232,6 +1231,11 @@ function renderRecap(r){
   // Part 1 list
   h+='<div class="sec" style="margin:16px 0 8px">Part 1 · Per-player notes ('+players.length+')</div>';
   h+='<div style="max-height:280px;overflow:auto">'+players.sort((a,b)=>(a.rank||99)-(b.rank||99)).map(p=>`<div style="border-bottom:1px solid rgba(255,255,255,.06);padding:8px 0"><div style="font-size:.82rem;font-weight:700">${esc(p.name)} <span style="color:#5e655a;font-weight:500">· ${p.rank?('#'+p.rank):''} · ${p.w}-${p.l} · ${(p.diff>=0?'+':'')+p.diff}</span></div><div style="font-size:.76rem;color:#9aa094;margin-top:2px">${esc(p.hi||'')} ${esc((p.story&&p.story[0])||'')}</div></div>`).join('')+'</div>';
+  // Recipients + engagement. Every recipient gets a Resend button here, not just
+  // the ones that errored on a bulk send — a delivered-but-wrong email needs
+  // resending too, and there was no way to do that from this panel before.
+  h+='<div class="sec" style="margin:16px 0 8px">Who got it</div>';
+  h+='<div id="rcEngage"><div style="color:#9aa094;font-size:.78rem">Loading…</div></div>';
   // Actions
   h+='<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">';
   h+='<button class="btn btn-out" onclick="editRecap()">✏️ Edit write-up</button>';
@@ -1240,6 +1244,67 @@ function renderRecap(r){
   else h+='<button class="btn btn-lime" onclick="sendRecap()">Re-send to players</button>';
   h+='</div>';
   body.innerHTML=h;
+  loadEngagement();
+}
+
+/* ---- Who got it: send list + open/click engagement ---- */
+// Opens are approximate by nature (Apple Mail pre-fetches images, image
+// blocking hides real opens, Gmail caches so a re-read often doesn't register).
+// Clicks are real. The UI says so rather than presenting both as equal.
+async function loadEngagement(){
+  const el=document.getElementById('rcEngage'); if(!el||!RECAP_ID) return;
+  const {status,d}=await api('/admin-ladder-recap-engagement?event='+encodeURIComponent(RECAP_ID));
+  if(status!==200||!d){ el.innerHTML='<div style="color:#9aa094;font-size:.78rem">Engagement unavailable.</div>'; return; }
+  renderEngagement(el,d);
+}
+function renderEngagement(el,d){
+  const eng=d.engagement||{}, rows=eng.players||[], recips=d.recipients||[];
+  const byId={}, byEmail={};
+  rows.forEach(r=>{ if(r.playerId) byId[r.playerId]=r; if(r.email) byEmail[r.email]=r; });
+  const list = recips.length ? recips : rows;
+  if(!list.length){ el.innerHTML='<div style="color:#9aa094;font-size:.78rem">No send list yet.</div>'; return; }
+
+  const t=eng.totals||{};
+  let h='';
+  if(d.status==='sent'){
+    h+='<div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.76rem;color:#9aa094;margin-bottom:10px">'
+      +`<span><b style="color:#f0f0ec">${t.sent||0}</b> sent</span>`
+      +`<span><b style="color:#f0f0ec">${t.delivered||0}</b> delivered</span>`
+      +`<span><b style="color:#f0c040">${t.opened||0}</b> opened</span>`
+      +`<span><b style="color:#f0c040">${t.reopened||0}</b> re-opened</span>`
+      +`<span><b style="color:#b8ff2c">${t.clicked||0}</b> clicked</span>`
+      +`<span><b style="color:#b8ff2c">${t.readArticle||0}</b> opened the write-up</span>`
+      +(t.bounced?`<span style="color:#ff5c47"><b>${t.bounced}</b> bounced</span>`:'')
+      +'</div>';
+  }
+
+  h+='<div style="max-height:300px;overflow:auto">';
+  list.forEach(p=>{
+    const e = (p.playerId&&byId[p.playerId]) || (p.email&&byEmail[p.email]) || null;
+    const chips=[];
+    if(e){
+      if(e.bounced) chips.push('<span class="chip" style="background:rgba(255,92,71,.15);color:#ff5c47">bounced</span>');
+      else if(e.delivered) chips.push('<span class="chip chip-gray">delivered</span>');
+      if(e.opens>0) chips.push(`<span class="chip" style="background:rgba(240,192,64,.15);color:#f0c040">opened${e.opens>1?' ×'+e.opens:''}</span>`);
+      if(e.clickCount>0) chips.push(`<span class="chip" style="background:rgba(184,255,44,.15);color:#b8ff2c">clicked${e.clickCount>1?' ×'+e.clickCount:''}</span>`);
+      if(e.openedArticle) chips.push('<span class="chip" style="background:rgba(184,255,44,.15);color:#b8ff2c">read the write-up</span>');
+    }
+    if(!chips.length) chips.push('<span style="color:#5e655a;font-size:.72rem">no activity yet</span>');
+    const pid=p.playerId?`'${esc(p.playerId)}'`:'null';
+    const em=esc((p.email||'').replace(/'/g,'&#39;'));
+    h+=`<div style="display:flex;align-items:center;gap:8px;border-bottom:1px solid rgba(255,255,255,.06);padding:8px 0">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:700">${esc(p.name||p.email||'Player')}</div>
+        <div style="margin-top:3px;display:flex;gap:5px;flex-wrap:wrap;align-items:center">${chips.join('')}</div>
+      </div>
+      <button class="btn btn-out btn-sm" style="font-size:.68rem;padding:3px 10px;flex-shrink:0" onclick="resendRecapOne(this,${pid},'${em}')">Resend</button>
+    </div>`;
+  });
+  h+='</div>';
+  if(d.status==='sent'&&eng.caveat){
+    h+=`<div style="font-size:.7rem;color:#5e655a;line-height:1.5;margin-top:8px">${esc(eng.caveat)}</div>`;
+  }
+  el.innerHTML=h;
 }
 // Edit the shared Part 2 write-up (title / sub / article / season note). Lets
 // you paste a custom or Cowork-written recap before sending. Per-player notes
@@ -1280,12 +1345,17 @@ async function sendRecap(){
 // Render the send result with a per-recipient breakdown: who got it, who opted
 // out of recap emails (not a problem), and who genuinely errored (needs a look).
 function recapSendResult(d){
-  const optedOut=d.optedOut||[], errored=d.errored||[];
-  const cls=errored.length?'err':'ok';
+  const optedOut=d.optedOut||[], errored=d.errored||[], unmatched=d.unmatched||[];
+  const cls=(errored.length||unmatched.length)?'err':'ok';
   let h=`<div class="msg ${cls}">Sent to ${d.sent} player${d.sent===1?'':'s'}`;
   if(optedOut.length) h+=` · ${optedOut.length} opted out`;
   if(errored.length) h+=` · ${errored.length} failed`;
+  if(unmatched.length) h+=` · ${unmatched.length} had no stats`;
   h+='.</div>';
+  if(unmatched.length){
+    h+=`<div style="margin-top:8px;font-size:.78rem;color:#ffb4a8"><b>Not sent — no stats matched these players</b> (rebuild the draft, then resend):<ul style="margin:4px 0 0;padding-left:18px">`+
+       unmatched.map(p=>`<li>${esc(p.name||p.email)}</li>`).join('')+`</ul></div>`;
+  }
   const nm=p=>esc(p.name||p.email);
   if(errored.length){
     h+=`<div style="margin-top:8px;font-size:.78rem;color:#ffb4a8"><b>Didn’t send (needs attention):</b><ul style="margin:4px 0 0;padding-left:18px;list-style:none">`+
@@ -1303,7 +1373,7 @@ async function resendRecapOne(btn,playerId,email){
   const old=btn.textContent; btn.disabled=true; btn.textContent='Sending…';
   const {status,d}=await api('/admin-ladder-recap?event='+encodeURIComponent(RECAP_ID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-one',playerId:playerId||null,email:email||null})});
   if(d&&d.ok&&d.skipped){ btn.textContent='Opted out'; btn.style.color='#9aa094'; }
-  else if(d&&d.ok){ btn.textContent='Sent ✓'; btn.style.color='#b8ff2c'; btn.style.borderColor='#b8ff2c'; }
+  else if(d&&d.ok){ btn.textContent='Sent ✓'; btn.style.color='#b8ff2c'; btn.style.borderColor='#b8ff2c'; setTimeout(loadEngagement,1200); }
   else { btn.disabled=false; btn.textContent=old; dsToast({ type:'error', message:(d&&d.error)||('Resend failed ('+status+').') }); }
 }
 let MROSTER=[];
