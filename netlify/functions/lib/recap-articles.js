@@ -7,6 +7,7 @@
 // Used by ladder-recap-email.js to put a "Read the full recap" button in the
 // player recap email (Richard, 2026-08-28: "email the recap to the players too").
 export const RECAP_ARTICLES = {
+  '2026-09-10': '/ladders/recaps/2026-09-10-fix-partner-ladder.html',
   '2026-08-27': '/ladders/recaps/2026-08-27-fix-partner-mix-ladder.html',
   '2026-08-17': '/ladders/recaps/2026-08-17-august-birthdays-womens-ladder.html',
   '2026-08-06': '/ladders/recaps/2026-08-06-thursday-night-ladder-dupr-rated.html',
