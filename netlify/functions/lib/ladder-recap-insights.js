@@ -12,7 +12,7 @@
 import { getEvent, listEvents, getSignups } from './ladder.js';
 import { getPlay, listPlay, toSession, playersFromPlay } from './ladder-play.js';
 import { calcStats, calcDinkRating, fixedPartnerMap, orderPairWomenFirst } from './ladder-scoring.js';
-import { getMergeMap, applyMerges } from './player-merge.js';
+import { getMergeMap, applyMerges, resolve as resolveMergedId } from './player-merge.js';
 import { getDirectory, applyDirectory } from './player-directory.js';
 
 // Rank one night's field: most wins, then point diff, then Dink Rating.
@@ -180,10 +180,25 @@ export async function buildRecapBrief(eventId) {
   const prevAvg = prevCounts.length ? Math.round(prevCounts.reduce((a, b) => a + b, 0) / prevCounts.length) : null;
 
   // Recipients: everyone on the paid roster with an email (league + lite alike).
+  //
+  // The signup roster carries the id the player signed up under, but every number
+  // in this brief is keyed by the CANONICAL id (play records go through
+  // applyMerges above, which rewrites duplicate ids onto the canonical one). For
+  // a merged player those two differ, so the recipient id has to be resolved the
+  // same way or the email renderer can't find that player's stats.
+  //
+  // 2026-09-11: this is exactly what went wrong on the Sep 10 send. Kayo
+  // (new_1780420521660 → mqhl6x2yyijxv), Richard and T Petitt all signed up
+  // under pre-merge ids, found no match, and were mailed a blank 0-0 card.
   const signups = await getSignups(eventId).catch(() => null);
   const recipients = ((signups && signups.roster) || [])
     .filter(p => p.email)
-    .map(p => ({ playerId: p.playerId || null, name: p.name, email: (p.email || '').toLowerCase() }));
+    .map(p => ({
+      playerId: p.playerId ? resolveMergedId(mergeMap, p.playerId) : null,
+      signupId: p.playerId || null,
+      name: p.name,
+      email: (p.email || '').toLowerCase(),
+    }));
 
   return {
     event: { id: event.id, name: event.name, date: event.date || play.date || null, type: event.type || 'mixed', place: event.place || null },

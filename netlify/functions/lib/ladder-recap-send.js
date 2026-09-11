@@ -19,12 +19,38 @@ export function siteUrl() {
     || process.env.SITE_URL || 'https://dinksociety.app';
 }
 
-/** Render + send one recipient's copy. `{skipped:true}` means a recap opt-out. */
+const normName = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+/**
+ * That player's note from the draft, or null when we genuinely can't identify
+ * them. Tries the canonical id, then the id they signed up under, then an exact
+ * name match (which covers a player whose merge hasn't been recorded yet).
+ */
+export function findPlayerNote(rec, rcpt) {
+  const players = rec.players || {};
+  if (rcpt.playerId && players[rcpt.playerId]) return players[rcpt.playerId];
+  if (rcpt.signupId && players[rcpt.signupId]) return players[rcpt.signupId];
+  const want = normName(rcpt.name);
+  if (want) {
+    for (const p of Object.values(players)) if (normName(p.name) === want) return p;
+  }
+  return null;
+}
+
+/**
+ * Render + send one recipient's copy. `{skipped:true}` means a recap opt-out;
+ * `{skipped:true, unmatched:true}` means we could not find their stats.
+ *
+ * There used to be a fallback here that mailed a zeroed record (0-0, no finish,
+ * "of 3") when the lookup missed. That is worse than sending nothing: it looks
+ * like a real email and tells the player their night did not happen. Three
+ * people got one on 2026-09-11. Now an unmatched player is skipped and reported.
+ */
 export function sendRecapTo(rcpt, rec, url, photoIds) {
-  const pr = (rec.players && rec.players[rcpt.playerId]) || {
-    name: rcpt.name, rank: null, count: (rec.recap.podium || []).length,
-    w: 0, l: 0, diff: 0, delta: null, story: [],
-  };
+  const pr = findPlayerNote(rec, rcpt);
+  if (!pr) {
+    return Promise.resolve({ skipped: true, unmatched: true, name: rcpt.name, email: rcpt.email });
+  }
   const html = renderLadderRecapEmail(
     pr, rec.recap, rec.event || { name: 'Ladder', date: null }, url, photoIds
   );
@@ -58,7 +84,7 @@ export async function recapPhotoIds(eventId, limit = 3) {
 
 /**
  * Send the saved draft to every recipient on it.
- * @returns {Promise<{ok, sent?, optedOut?, errored?, error?}>}
+ * @returns {Promise<{ok, sent?, optedOut?, errored?, unmatched?, error?}>}
  */
 export async function sendRecapToAll(eventId, { url = siteUrl() } = {}) {
   const rec = await getRecap(eventId);
@@ -73,17 +99,22 @@ export async function sendRecapToAll(eventId, { url = siteUrl() } = {}) {
 
   // Separate opt-outs from genuine failures so the panel can show who missed it
   // and why — an unsubscribe is not a delivery error.
-  const optedOut = [], errored = [];
+  const optedOut = [], errored = [], unmatched = [];
   results.forEach((r, i) => {
     const rcpt = recipients[i];
     const who = { playerId: rcpt.playerId || null, name: rcpt.name || rcpt.email, email: rcpt.email };
-    if (r.status === 'fulfilled' && r.value && r.value.skipped) optedOut.push(who);
+    if (r.status === 'fulfilled' && r.value && r.value.unmatched) unmatched.push(who);
+    else if (r.status === 'fulfilled' && r.value && r.value.skipped) optedOut.push(who);
     else if (r.status === 'rejected') {
       errored.push({ ...who, reason: String((r.reason && r.reason.message) || r.reason || 'send failed') });
     }
   });
 
-  const sent = results.length - optedOut.length - errored.length;
+  const sent = results.length - optedOut.length - errored.length - unmatched.length;
   await markRecapSent(eventId, sent);
-  return { ok: true, sent, optedOut, errored, photos: photoIds.length };
+  if (unmatched.length) {
+    console.warn('[ladder-recap-send] no stats matched, not mailed:',
+      JSON.stringify(unmatched.map(u => u.name)));
+  }
+  return { ok: true, sent, optedOut, errored, unmatched, photos: photoIds.length };
 }

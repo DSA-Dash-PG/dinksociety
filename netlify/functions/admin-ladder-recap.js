@@ -60,9 +60,13 @@ export default async (req) => {
       const r = await sendRecapToAll(eventId, { url: siteUrl() });
       if (!r.ok) return json({ error: r.error }, 409);
       // `failed` kept for backward compat = anyone who didn't receive it.
+      // `unmatched` = on the roster but no stats found, so deliberately NOT
+      // mailed rather than mailed a blank card. Surface it: it means their
+      // signup id never resolved to a player in the draft.
       return json({
-        ok: true, sent: r.sent, failed: r.optedOut.length + r.errored.length,
-        optedOut: r.optedOut, errored: r.errored,
+        ok: true, sent: r.sent,
+        failed: r.optedOut.length + r.errored.length + r.unmatched.length,
+        optedOut: r.optedOut, errored: r.errored, unmatched: r.unmatched,
       });
     }
 
@@ -78,6 +82,7 @@ export default async (req) => {
       if (!rcpt.email) return json({ error: 'No email on file for this player.' }, 400);
       try {
         const r = await sendRecapTo(rcpt, rec, siteUrl(), await recapPhotoIds(eventId));
+        if (r && r.unmatched) return json({ error: `No stats found for ${rcpt.name} in this draft — rebuild the draft first.`, unmatched: true, name: rcpt.name }, 409);
         if (r && r.skipped) return json({ ok: true, skipped: true, name: rcpt.name, email: rcpt.email });
         return json({ ok: true, sent: 1, name: rcpt.name, email: rcpt.email });
       } catch (e) {
