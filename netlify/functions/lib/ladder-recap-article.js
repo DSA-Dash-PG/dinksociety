@@ -875,17 +875,17 @@ export function renderArticleHtml(stats, narrative) {
   for (const g of stats.games) (byRound[g.round] = byRound[g.round] || []).push(g);
   A('  <section>');
   A('    <h2>Round by round</h2>');
-  A(`    <p class="chart-sub">Every game of the night, court by court. ${esc(cn(stats.maxCourt))} is King Court, ${esc(cn(1))} the bottom.</p>`);
+  A(`    <p class="chart-sub">Every game of the night. Courts are listed top to bottom: <strong>${esc(cn(stats.maxCourt))} is King Court</strong>, ${esc(cn(1))} the bottom. Win and you move up a court for the next round, lose and you move down.</p>`);
   A('    <div class="rounds">');
   for (const rn of Object.keys(byRound).sort((a, b) => a - b)) {
     A('      <div class="rnd">');
     A(`        <h3>Round ${rn}</h3>`);
-    for (const g of byRound[rn].sort((x, y) => x.court - y.court)) {
+    // Top court first, so the board reads the way the ladder is stacked.
+    for (const g of byRound[rn].sort((x, y) => y.court - x.court)) {
       const aw = g.sa > g.sb ? 'won' : '';
       const bw = g.sb > g.sa ? 'won' : '';
-      const kt = g.court === stats.maxCourt ? ' <span class="kt">KING</span>' : '';
       const cname = cn(g.court).replace(/^Court /, '');
-      A(`        <div class="gm"><span class="ct">${esc(cname)}</span><span class="tm ${aw}">${entShort(g.entA)}</span><span class="sc">${g.sa}&ndash;${g.sb}</span><span class="tm ${bw}" style="text-align:right;">${entShort(g.entB)}</span>${kt}</div>`);
+      A(`        <div class="gm"><span class="ct">${esc(cname)}</span><span class="tm ${aw}">${entShort(g.entA)}</span><span class="sc">${g.sa}&ndash;${g.sb}</span><span class="tm ${bw}" style="text-align:right;">${entShort(g.entB)}</span></div>`);
     }
     A('      </div>');
   }
@@ -896,13 +896,13 @@ export function renderArticleHtml(stats, narrative) {
   if (stats.fixedPartner) {
     A('  <section>');
     A('    <h2>Individual stats (sortable)</h2>');
-    A('    <p class="chart-sub">In Fixed Partner play a player&rsquo;s record and differential match their pair&rsquo;s. Every game still counts toward their overall Dink Society profile.</p>');
+    A(`    <p class="chart-sub">In Fixed Partner play a player&rsquo;s record, differential and court path are their pair&rsquo;s &mdash; partners share every game. <strong>Best streak</strong> is the longest run of consecutive wins. <strong>King Court rds</strong> counts rounds played on ${esc(cn(stats.maxCourt))}, the top court. Every game still counts toward their overall Dink Society profile.</p>`);
     A('    <div class="table-wrap">');
     A('    <table id="statsheet">');
     A('      <thead><tr>');
     A('        <th>#</th><th class="sortable" data-key="name">Player</th><th>Pair</th><th class="num">W-L</th>');
     A('        <th class="num sortable" data-key="diff">Diff</th><th class="num sortable" data-key="dr">DR</th>');
-    A('        <th class="num sortable" data-key="streak">Best streak</th><th class="num">Court (start&rarr;end)</th>');
+    A('        <th class="num sortable" data-key="streak">Best streak</th><th class="num sortable" data-key="king">King Court rds</th><th class="num">Court (start&rarr;end)</th>');
     A('      </tr></thead>');
     A('      <tbody>');
     let n = 0;
@@ -911,7 +911,7 @@ export function renderArticleHtml(stats, narrative) {
       r.names.forEach((nm, j) => {
         n++;
         const other = firstName(r.names[1 - j] || '');
-        A(`    <tr data-name="${esc(nm)}" data-diff="${r.diff}" data-dr="${r.dr ?? 0}" data-streak="${r.streak}">`);
+        A(`    <tr data-name="${esc(nm)}" data-diff="${r.diff}" data-dr="${r.dr ?? 0}" data-streak="${r.streak}" data-king="${r.kingRounds}">`);
         A(`      <td class="rank">${n}</td>`);
         A(`      <td class="pname">${nameLink(nm)}</td>`);
         A(`      <td>${other ? 'w/ ' + esc(other) : '&mdash;'}</td>`);
@@ -919,6 +919,7 @@ export function renderArticleHtml(stats, narrative) {
         A(`      <td class="num" style="color:${dc};font-weight:700;">${signed(r.diff)}</td>`);
         A(`      <td class="num">${r.dr ?? '&mdash;'}</td>`);
         A(`      <td class="num">${r.streak}</td>`);
+        A(`      <td class="num">${r.kingRounds}/${r.games}</td>`);
         A(`      <td class="num">${esc(cn(r.start))} &rarr; ${esc(cn(r.end))}</td>`);
         A('    </tr>');
       });
