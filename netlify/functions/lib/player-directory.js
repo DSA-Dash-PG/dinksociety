@@ -41,9 +41,16 @@ export async function setPlayerInfo(id, info = {}) {
 
 // Overlay live directory name/gender onto a signups record's roster/waitlist/claim
 // (keyed by playerId), so editing a player in the directory updates every ladder.
+//
+// duprId: the directory WINS over whatever was typed at signup. It used to be
+// the other way round (signup value first, directory only as a backstop), which
+// meant a placeholder DUPR typed in to get past the signup gate — e.g. the temp
+// IDs handed out while DUPR itself was down — permanently shadowed the real ID
+// an admin later set on the player's profile. The directory is the curated
+// master record, same as name and gender, so it takes precedence here too.
 export function applyDirectoryToSignups(rec, dir) {
   if (!rec || !dir || !Object.keys(dir).length) return rec;
-  const fix = p => { if (!p) return; const o = dir[p.playerId]; if (o) { if (o.name) p.name = o.name; if (o.gender) p.gender = o.gender; if (o.duprId && !p.duprId) p.duprId = o.duprId; } };
+  const fix = p => { if (!p) return; const o = dir[p.playerId]; if (o) { if (o.name) p.name = o.name; if (o.gender) p.gender = o.gender; if (o.duprId) p.duprId = o.duprId; } };
   (rec.roster || []).forEach(fix);
   (rec.waitlist || []).forEach(fix);
   fix(rec.pendingClaim);

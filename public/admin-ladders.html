@@ -482,7 +482,11 @@
     <div id="mEditMsg"></div>
   </div>
 
-  <div class="frow" style="margin-top:18px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div><div class="help" style="margin-top:4px">Automatic: <b>Open</b> until the start date · <b>Live</b> while scoring · <b>Final</b> when you finish the ladder.</div></div>
+  <div class="frow" style="margin-top:18px"><label class="l">Status</label><div id="statusLine" style="font-size:.82rem;color:#9aa094;font-weight:700"></div>
+    <div id="statusBtns" style="display:flex;gap:7px;flex-wrap:wrap;margin-top:8px"></div>
+    <div id="mStatusMsg"></div>
+    <div class="help" style="margin-top:6px"><b>Live</b> and <b>Final</b> are automatic — they follow the scorer. <b>Close registration</b> shuts new signups while the ladder otherwise carries on as normal: it still shows on the Ladders page with its roster, and you can still add players here. <b>Cancel</b> pulls it off the Ladders page entirely.</div>
+  </div>
 
   <div class="sec" style="margin:22px 0 8px;color:var(--red)">Danger zone</div>
   <div style="border:1px solid rgba(255,92,71,.3);border-radius:12px;padding:13px 14px">
@@ -1052,14 +1056,14 @@ async function loadList(){
   const ls=(d.ladders||[]).slice().sort((a,b)=>String(b.date||'').localeCompare(String(a.date||'')));
   if(!ls.length){ el.innerHTML='<div class="empty">No ladders yet — create one above and it\'ll show here.</div>'; return; }
   el.innerHTML=ls.map(l=>{
-    const st=l.status==='final'?'chip-gray':l.status==='full'?'chip-red':'chip-lime';
+    const st=l.status==='final'?'chip-gray':l.status==='cancelled'?'chip-red':l.status==='closed'?'chip-gray':l.status==='full'?'chip-red':'chip-lime';
     const pend=l.pendingVenmo?` · <span class="chip chip-gold">${l.pendingVenmo} Venmo pending</span>`:'';
     const privChip=l.visibility==='private'?' <span class="chip chip-gray">🔒 Private</span>':'';
     const lbChip=l.leaderboard==='excluded'?' <span class="chip chip-gray">Own board only</span>':(l.leaderboard==='pending'?' <span class="chip chip-gold">Awaiting</span>':'');
     const fmtChip=l.format==='fixed-partner'?' <span class="chip chip-gray">👥 Fixed Partner</span>':(l.format==='round-robin'?' <span class="chip chip-gray">🔁 Round Robin</span>':'');
     const duprChip=l.duprRated?' <span class="chip chip-gold">DUPR</span>':'';
     const safeName=esc((l.name||'').replace(/'/g,''));
-    const upcoming=['open','full'].includes(l.status||'open');
+    const upcoming=['open','closed','full'].includes(l.status||'open');
     const remindPill=upcoming?`<button class="btn btn-out btn-sm remind-pill" onclick="event.stopPropagation();openRowRemind(event,'${l.id}','${safeName}')">Remind</button>`:'';
     const recapBtn=l.status==='final'?`<button class="btn btn-out btn-sm" style="margin-left:6px" onclick="event.stopPropagation();openRecap('${l.id}','${safeName}')">Recap</button>`:'';
     return `<div class="lad lad-row" onclick="openManage('${l.id}')"><div><div class="nm">${esc(l.name)}</div><div class="mt">${esc(l.date||'')} ${esc(l.startTime||'')} · ${esc(l.place||'')} · ${fmt(l.feeCents)}</div></div>
@@ -1120,7 +1124,7 @@ async function openManage(id){
   const rs=document.getElementById('ros-search'); if(rs)rs.value=''; const rr=document.getElementById('rosResults'); if(rr)rr.innerHTML='';
   document.getElementById('mTitle').textContent=d.event.name;
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
-  { const st=(d.event.status||'open'); const SC={open:'var(--lime)',live:'var(--gold)',final:'var(--teal)',cancelled:'var(--red)'}; const el=document.getElementById('statusLine'); if(el){ el.textContent=st.charAt(0).toUpperCase()+st.slice(1); el.style.color=SC[st]||'#9aa094'; } }
+  { const st=(d.event.status||'open'); const el=document.getElementById('statusLine'); if(el){ el.textContent=STATUS_LABEL[st]||(st.charAt(0).toUpperCase()+st.slice(1)); el.style.color=STATUS_COLOR[st]||'#9aa094'; } renderStatusBtns(st); }
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
   setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-address',d.event.address); setv('m-type',d.event.type||'mixed');
   setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
@@ -1674,6 +1678,34 @@ function payCtl(p){
   return `<select title="Mark paid" style="${selStyle}" onchange="if(this.value)act('mark-paid','${em}','${pid}',this.value)"><option value="">✓ Mark paid…</option>${opt('')}</select>`;
 }
 // status segment → set-status
+const STATUS_COLOR={open:'var(--lime)',closed:'#9aa094',full:'var(--gold)',live:'var(--gold)',final:'var(--teal)',cancelled:'var(--red)'};
+const STATUS_LABEL={open:'Open — accepting signups',closed:'Closed — signups shut',full:'Full',live:'Live',final:'Final',cancelled:'Cancelled'};
+// Which status changes an admin can make by hand. Live/Final are driven by the
+// scorer, so they're deliberately not offered here — once a night is live or
+// final the only manual move left is cancelling it.
+function renderStatusBtns(st){
+  const el=document.getElementById('statusBtns'); if(!el) return;
+  const btn=(to,label,danger)=>`<button class="${danger?'btn-danger':'btn btn-out btn-sm'}" onclick="setLadderStatus('${to}')">${label}</button>`;
+  let h='';
+  if(st==='open'||st==='full') h+=btn('closed','🔒 Close registration');
+  if(st==='closed') h+=btn('open','🔓 Reopen registration');
+  if(st!=='cancelled'&&st!=='final') h+=btn('cancelled','Cancel ladder',true);
+  if(st==='cancelled') h+=btn('open','Restore to open');
+  el.innerHTML=h;
+}
+async function setLadderStatus(to){
+  if(!CURRENT) return;
+  const CONFIRM={
+    closed:{ title:'Close registration?', message:'New signups and waitlist joins will be refused. The ladder stays on the Ladders page with its roster, still runs, and you can still add players from here. You can reopen it any time.', confirmLabel:'Close registration' },
+    cancelled:{ title:'Cancel this ladder?', message:'It comes off the Ladders page for everyone. The roster and any scores are kept, so you can restore it — but nobody is emailed about the cancellation automatically.', confirmLabel:'Cancel ladder', danger:true },
+    open:{ title:'Reopen this ladder?', message:'It goes back to accepting signups on the Ladders page.', confirmLabel:'Reopen' },
+  }[to];
+  if(CONFIRM && !(await dsConfirm(Object.assign({cancelLabel:'Never mind'},CONFIRM)))) return;
+  const {status,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-status',status:to})});
+  if(status===401){ msg('mStatusMsg','err','Sign in as admin first.'); return; }
+  if(d&&d.ok){ await openManage(CURRENT.id); loadList(); msg('mStatusMsg','ok',STATUS_LABEL[to]||('Status set to '+to)); }
+  else msg('mStatusMsg','err',(d&&d.error)||'Could not change status ('+status+').');
+}
 async function resetNight(){
   if(!CURRENT||!(await dsConfirm({ title:'Reset this night?', message:'This erases every round and score for "'+(CURRENT.name||'this ladder')+'" and puts it back to not-started. The roster, settings, and signups are kept — pairings are gone until the night is started again. If it was finalized, it is un-finalized and its results come off the leaderboard. This cannot be undone.', confirmLabel:'Reset night', cancelLabel:'Cancel', danger:true })))return;
   const {d}=await api('/admin-ladder-round?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'restart'})});

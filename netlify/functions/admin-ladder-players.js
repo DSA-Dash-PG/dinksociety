@@ -18,10 +18,39 @@ import { authScoreAccess } from './lib/ladder-scorer.js';
 import { listPlay, playersFromPlay } from './lib/ladder-play.js';
 import { getMergeMap, setMerge, removeMerge } from './lib/player-merge.js';
 import { getDirectory, setPlayerInfo } from './lib/player-directory.js';
-import { listEvents, getSignups } from './lib/ladder.js';
+import { listEvents, getSignups, setSignups } from './lib/ladder.js';
 import { isTestTeam } from './lib/circuit.js';
 
 function json(b, s = 200) { return new Response(JSON.stringify(b), { status: s, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } }); }
+
+// Push a corrected DUPR ID down onto every ladder's stored roster/waitlist entry
+// for this player. The read paths already overlay the directory (see
+// applyDirectoryToSignups), so this isn't what makes the new ID show up — it's
+// what stops the OLD one lingering in the blob, where anything reading signups
+// raw (exports, future match submission to DUPR) would still pick it up.
+// Placeholder IDs typed in to clear the signup gate are exactly that case.
+// Best-effort and per-event: one event failing never fails the admin's save.
+async function syncDuprToSignups(playerId, duprId) {
+  if (!playerId) return 0;
+  const value = String(duprId || '').trim().slice(0, 30);
+  const events = await listEvents().catch(() => []);
+  let touched = 0;
+  await Promise.all(events.map(async (ev) => {
+    try {
+      const sg = await getSignups(ev.id);
+      if (!sg) return;
+      let changed = false;
+      [...(sg.roster || []), ...(sg.waitlist || [])].forEach((p) => {
+        if (!p || p.playerId !== playerId) return;
+        if ((p.duprId || '') === value) return;
+        if (value) p.duprId = value; else delete p.duprId;
+        changed = true;
+      });
+      if (changed) { await setSignups(sg); touched++; }
+    } catch (e) { console.warn('[admin-ladder-players] dupr sync failed for', ev.id, e?.message || e); }
+  }));
+  return touched;
+}
 
 export default async (req) => {
   const auth = await authScoreAccess(req, null); // event-agnostic read for roster search
@@ -120,7 +149,13 @@ export default async (req) => {
   try {
     if (body.action === 'merge') { await setMerge(body.from, body.to, body.name); return json({ ok: true }); }
     if (body.action === 'unmerge') { await removeMerge(body.from); return json({ ok: true }); }
-    if (body.action === 'update') { const info = await setPlayerInfo(body.id, { email: body.email, name: body.name, gender: body.gender, duprId: body.duprId }); return json({ ok: true, info }); }
+    if (body.action === 'update') {
+      const info = await setPlayerInfo(body.id, { email: body.email, name: body.name, gender: body.gender, duprId: body.duprId });
+      // Only sweep the ladders when the DUPR ID was actually part of this save —
+      // a plain rename shouldn't rewrite every event blob.
+      const synced = ('duprId' in body) ? await syncDuprToSignups(body.id, info.duprId) : 0;
+      return json({ ok: true, info, laddersSynced: synced });
+    }
     return json({ error: 'unknown action' }, 400);
   } catch (e) {
     return json({ error: e.message || 'failed' }, 400);

@@ -79,6 +79,23 @@
      sat in row 1 and each pane in row 2, with #p-ladders spanning both rows —
      when the rail was taller than #dtabs + a short pane combined, Grid had to
      inflate row 1 to fit the rail, leaving dead space below the tab buttons.) */
+  /* Player avatars (leaderboard rows, podium, desktop table).
+     These MUST live in the base stylesheet, not inside the 900px media query —
+     they used to be desktop-only, so on a phone the <img> rendered completely
+     unstyled: full-column square photos that squeezed the player's name out of
+     the row, and nothing at all (dead space) for anyone without a photo, since
+     the ::before initials fallback was unstyled too.
+     Small circle, photo clipped to it, initials painted underneath so a missing
+     photo degrades to a neat monogram rather than a hole. */
+  .lav{ position:relative; width:22px; height:22px; border-radius:50%; flex-shrink:0; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; background:linear-gradient(145deg,#262a22,#121410); border:1px solid rgba(255,255,255,.14); font-size:.5rem; font-weight:900; letter-spacing:.03em; color:#dfe3d8; font-style:normal; }
+  .lav::before{ content:attr(data-ini); position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+  .lav img{ position:relative; z-index:1; width:100%; height:100%; object-fit:cover; display:block; border-radius:50%; }
+  .lav.pod{ width:40px; height:40px; font-size:.72rem; margin:0 auto 6px; display:flex; border-width:2px; }
+  .lav.sm{ width:20px; height:20px; font-size:.46rem; }
+  .lav.tbl{ width:24px; height:24px; margin-right:9px; }
+  .lavpair{ display:inline-flex; flex-shrink:0; } .lavpair .lav+.lav{ margin-left:-8px; }
+  .lavpair.pod{ justify-content:center; margin-bottom:6px; }
+
   @media(min-width:900px){
     .wrap{ max-width:var(--max-w,1200px); width:min(calc(100% - 2rem),var(--max-w,1200px)); }
     .tabs{ display:none; }
@@ -118,15 +135,11 @@
     table.lbt td{ font-size:.8rem; font-weight:700; padding:10px; border-bottom:1px solid rgba(255,255,255,.05); }
     table.lbt td.num,table.lbt th.num{ text-align:right; font-variant-numeric:tabular-nums; }
     table.lbt tr[onclick]:hover td{ background:rgba(255,255,255,.03); }
-    /* Player avatars on the leaderboard — photo when she has one, initials
-       painted by ::before underneath so a missing photo just shows through. */
-    .lav{ position:relative; width:30px; height:30px; border-radius:50%; flex-shrink:0; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; vertical-align:middle; background:linear-gradient(145deg,#262a22,#121410); border:1px solid rgba(255,255,255,.14); font-size:.58rem; font-weight:900; letter-spacing:.03em; color:#dfe3d8; font-style:normal; }
-    .lav::before{ content:attr(data-ini); position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-    .lav img{ position:relative; z-index:1; width:100%; height:100%; object-fit:cover; display:block; }
-    .lav.pod{ width:46px; height:46px; font-size:.8rem; margin:0 auto 6px; display:flex; border-width:2px; }
-    .lav.tbl{ width:28px; height:28px; margin-right:9px; }
-    .lavpair{ display:inline-flex; flex-shrink:0; } .lavpair .lav+.lav{ margin-left:-9px; }
-    .lavpair.pod{ justify-content:center; margin-bottom:6px; }
+    /* Desktop nudges the avatars up a little — the base sizes below 900px are
+       deliberately small so a leaderboard row stays one tight line on a phone. */
+    .lav{ width:26px; height:26px; }
+    .lav.pod{ width:44px; height:44px; font-size:.78rem; }
+    .lav.tbl{ width:26px; height:26px; }
     .kit-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
   }
   .tabs button{ flex:0 0 auto; white-space:nowrap; padding:8px 14px; border-radius:9999px; border:1px solid var(--bd); background:var(--surf); color:var(--mut); font:inherit; font-size:.72rem; font-weight:800; cursor:pointer; }
@@ -196,6 +209,24 @@
   .lad-desc code{ background:rgba(255,255,255,.08);padding:1px 5px;border-radius:4px;font-size:.75rem; }
   .lad-desc blockquote{ margin:6px 0;padding:4px 10px;border-left:2px solid rgba(184,255,44,.4);color:var(--mut); }
   .lad-desc-sec{ font-size:.56rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--mut);margin:2px 0 6px; }
+
+  /* Compact ladder cards on phones. A ladder used to render its whole detail
+     stack (location, courts, countdown, capacity bar, roster dots, Register)
+     inline, so two or three ladders filled the screen and pushed the rest of
+     the page out of reach. Below 900px the card collapses to its header — name,
+     when, division, and a one-line summary — and taps open to the full detail
+     including Register. Desktop is unchanged: .lad-body is block by default and
+     only this max-width block hides it. */
+  .lad-body{ display:block; }
+  .lad-sum, .lad-chev{ display:none; }
+  @media(max-width:899px){
+    .lad-body{ display:none; }
+    .lad-body.on{ display:block; }
+    .lad-head{ cursor:pointer; -webkit-tap-highlight-color:transparent; }
+    .lad-sum{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:5px; font-size:.66rem; font-weight:800; }
+    .lad-chev{ display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; flex-shrink:0; color:var(--mut); transition:transform .18s ease; }
+    .lad-chev.on{ transform:rotate(180deg); }
+  }
   .lad-desc-sec + *{ margin-top:0; }
   .lad-desc + .lad-desc{ border-top:1px dashed var(--bd); }
   .lad-expand-btn{ display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:9px;background:rgba(255,255,255,.02);border:0;border-top:1px solid var(--bd);color:var(--mut);font:inherit;font-size:.68rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;cursor:pointer; }
@@ -460,6 +491,7 @@ function focusLadder(id){
   // A completed ladder has its own direct link (#ladders/<eventId>): open that
   // night's full results + rounds overlay instead of just scrolling.
   if((COMPLETED||[]).some(function(x){return x.id===id;})){ ladTab('completed'); night(id); return; }
+  ladCardOpen(id);
   setTimeout(function(){
     var el=document.getElementById('lad-'+id); if(!el) return;
     el.scrollIntoView({behavior:'smooth',block:'center'});
@@ -498,7 +530,7 @@ async function init(){
     if((pl.ladders||[]).some(l=>l.id===iid)) continue;
     try{
       const one=await (await fetch(`${API}/public-ladders?event=${encodeURIComponent(iid)}`,{credentials:'include'})).json();
-      if(one&&one.ladder&&['open','full','live'].includes(one.ladder.status||'open')){
+      if(one&&one.ladder&&['open','closed','full','live'].includes(one.ladder.status||'open')){
         one.ladder._invited=true;
         pl.ladders=[one.ladder,...(pl.ladders||[])];
       } else if(iid!==_evId){ forgetInvite(iid); } // played / cancelled — stop remembering it
@@ -736,7 +768,7 @@ function hSub(t){
   RT.home=t; writeHash();
 }
 // Is there an upcoming/registerable ladder? Drives the default home view.
-function hasUpcoming(){ return (ACTIVE||[]).some(l=>['open','full','live'].includes(l.status||'open')); }
+function hasUpcoming(){ return (ACTIVE||[]).some(l=>['open','closed','full','live'].includes(l.status||'open')); }
 function renderHomeWeek(){
   const el=document.getElementById('homeUp');
   // Soonest first, so "the next ladder" sits at the top of the upcoming list.
@@ -758,6 +790,11 @@ function gotab(name){ RT.main=name; document.querySelectorAll('#tabs button').fo
 
 /* ---- LADDERS ---- */
 const LEXP={};
+// Which ladder cards are opened out on mobile (see .lad-body / ladCardToggle).
+// Collapsed by default; desktop ignores this entirely via CSS.
+const LCARD={};
+function ladCardToggle(id){ LCARD[id]=!LCARD[id]; renderAvail(); renderHomeWeek(); }
+function ladCardOpen(id){ if(LCARD[id]) return; LCARD[id]=true; if((ACTIVE||[]).length){ renderAvail(); renderHomeWeek(); } }
 // Separate expand state for the description/rules panel ("See details") — keeps
 // it independent of the roster lineup toggle so a player can peek at rules
 // without opening the whole lineup.
@@ -840,6 +877,10 @@ function ladderCard(l,i){
   const time=l.startTime?(l.endTime?`${l.startTime}–${l.endTime}`:l.startTime):'';
   const ac=PAL[(i||0)%PAL.length], barCol=full?'var(--red)':(pct>=80?'var(--gold)':ac);
   const fee=feeLabel(l);
+  // Registration shut by the organizer (admin → Manage → Status → Closed). The
+  // ladder still runs and still shows here; only signing up is off.
+  const closed=(l.status==='closed');
+  const open=!!LCARD[l.id];
   // Description / rules panel — either or both can be empty. The button and
   // panel only render if there's content, so ladders without extra detail keep
   // the same short-card feel as before.
@@ -852,8 +893,31 @@ function ladderCard(l,i){
     ? (hasDesc?`<div class="lad-desc"><div class="lad-desc-sec" style="color:${ac}">About this ladder</div>${mdRender(l.description)}</div>`:'')
      +(hasRules?`<div class="lad-desc"><div class="lad-desc-sec" style="color:${ac}">Rules</div>${mdRender(l.rules)}</div>`:'')
     : '';
+  // Collapsed-state one-liner (mobile only — .lad-sum is display:none above
+  // 900px). Everything you need to decide whether to open the card: how full it
+  // is, what it costs, and whether you're already in.
+  const my=MYREG[l.id];
+  const sumPill=(txt,col,bg)=>`<span style="color:${col};background:${bg};border-radius:9999px;padding:2px 8px;white-space:nowrap">${txt}</span>`;
+  let sumState;
+  if(my) sumState=my.list==='waitlist'?sumPill("⏳ You're on the waitlist",'var(--gold)','rgba(240,192,64,.14)'):sumPill("✓ You're in",'var(--lime)','rgba(184,255,44,.14)');
+  else if(l.status==='live') sumState=sumPill('● LIVE NOW','#06210f','var(--lime)');
+  else if(closed) sumState=sumPill('Registration closed','var(--mut)','rgba(255,255,255,.07)');
+  else if(full) sumState=sumPill(l.waitlistCount?l.waitlistCount+' waiting':'Waitlist','var(--red)','rgba(255,92,71,.14)');
+  else sumState=sumPill(l.spotsLeft+' spot'+(l.spotsLeft===1?'':'s')+' left',ac,hexA(ac,.14));
+  const summary=`<div class="lad-sum">${sumState}<span style="color:var(--mut);font-weight:700">${cap-l.spotsLeft}/${cap} · ${fee}</span></div>`;
+  const chev=`<span class="lad-chev${open?' on':''}" aria-hidden="true"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>`;
+  // Action row. Live → watch. Closed → say so plainly (someone already
+  // registered still sees their own status + cancel via myRegBlock).
+  const closedBlock=`<div style="margin-top:11px;padding:11px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--bd);color:var(--mut);font-weight:800;font-size:.8rem;text-align:center">Registration is closed for this ladder</div>`;
+  const action = l.status==='live'
+    ? `<a class="btn btn-lime" href="/ladder-live?event=${encodeURIComponent(l.id)}" style="margin-top:11px;width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none"><span style="width:7px;height:7px;border-radius:50%;background:#06210f;margin-right:7px;animation:dspulse 1.1s infinite"></span>Watch live →</a>`
+    : closed
+      ? (myRegBlock(l)||closedBlock)
+      : (myRegBlock(l)||`<button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fee}</button>`);
   return `<div style="border:1px solid ${hexA(ac,.32)};border-radius:13px;overflow:hidden;background:#000;margin-bottom:10px">
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-left:3px solid ${ac};background-color:${hexA(ac,.12)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.14)} 0 9px,transparent 9px 20px)"><div style="flex:1;min-width:0"><div style="font-size:.92rem;font-weight:900;color:${ac};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div><div style="font-size:.66rem;color:var(--mut);font-weight:700">${[wd(l.date),time].filter(Boolean).join(' · ')}</div>${ladMaps(l)}${ladCourts(l,ac)}</div><span class="ttag ${tt}">${TL[tt]||'Mixed'}</span></div>
+    <div class="lad-head" onclick="ladCardToggle('${l.id}')" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-left:3px solid ${ac};background-color:${hexA(ac,.12)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.14)} 0 9px,transparent 9px 20px)"><div style="flex:1;min-width:0"><div style="font-size:.92rem;font-weight:900;color:${ac};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(l.name)}</div><div style="font-size:.66rem;color:var(--mut);font-weight:700">${[wd(l.date),time].filter(Boolean).join(' · ')}</div>${summary}</div>${closed?`<span style="font-size:.54rem;font-weight:900;letter-spacing:.09em;color:var(--mut);border:1px solid var(--bd);border-radius:9999px;padding:3px 8px;white-space:nowrap;flex-shrink:0">CLOSED</span>`:''}<span class="ttag ${tt}">${TL[tt]||'Mixed'}</span>${chev}</div>
+    <div class="lad-body${open?' on':''}">
+    <div style="padding:0 12px 2px;border-left:3px solid ${ac};background-color:${hexA(ac,.12)};background-image:repeating-linear-gradient(135deg,${hexA(ac,.14)} 0 9px,transparent 9px 20px)">${ladMaps(l)}${ladCourts(l,ac)}</div>
     ${l._invited?`<div style="display:flex;align-items:center;gap:6px;padding:6px 12px;background:rgba(240,192,64,.1);border-bottom:1px solid rgba(240,192,64,.25);font-size:.64rem;font-weight:800;color:var(--gold)">🔒 Invite-only — this link was shared with you directly</div>`:''}
     ${descBtn}${descPanel}
     ${tt==='womens'?`<div style="display:flex;justify-content:center;padding:12px 12px 2px;background:#000"><div style="height:56px">${QOTC}</div></div>`:''}
@@ -862,14 +926,14 @@ function ladderCard(l,i){
       <div class="evc-meta" style="margin-bottom:8px">${cap} players · ${fee}</div>
       <div style="height:6px;border-radius:9999px;background:rgba(255,255,255,.08);overflow:hidden"><i style="display:block;height:100%;width:${pct}%;background:${barCol};border-radius:9999px"></i></div>
       <div class="spot" style="margin-top:6px"><span style="color:#9aa094">${cap-l.spotsLeft} / ${cap}</span><span class="left" style="color:${full?'var(--red)':ac}">${full?(l.waitlistCount?l.waitlistCount+' waiting':'Waitlist'):(l.spotsLeft+' spots left')}</span></div>
-      ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${orderRosterPairs(l.roster).map(initialDot).join('')}${(()=>{const pc=l.roster.filter(p=>p.paid).length;return pc?`<span style="margin-left:2px;font-size:.6rem;font-weight:800;color:#b8ff2c;background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.28);border-radius:9999px;padding:2px 8px">✓ ${pc} paid</span>`:'';})()}<button onclick="ladToggle('${l.id}')" style="margin-left:auto;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-top:8px">${ladRosterRows(l.roster)}</div>`:''}</div>`:''}
-      ${l.status==='live'
-        ? `<a class="btn btn-lime" href="/ladder-live?event=${encodeURIComponent(l.id)}" style="margin-top:11px;width:100%;display:flex;align-items:center;justify-content:center;text-decoration:none"><span style="width:7px;height:7px;border-radius:50%;background:#06210f;margin-right:7px;animation:dspulse 1.1s infinite"></span>Watch live →</a>`
-        : myRegBlock(l)||`<button class="btn ${full?'btn-out':'btn-lime'}" style="margin-top:11px;width:100%" onclick="openSignup('${l.id}')">${full?'Join waitlist':'Register · '+fee}</button>`}
+      ${(l.roster&&l.roster.length)?`<div style="margin-top:10px"><div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center">${orderRosterPairs(l.roster).map(initialDot).join('')}${(()=>{const pc=l.roster.filter(p=>p.paid).length;return pc?`<span style="margin-left:2px;font-size:.6rem;font-weight:800;color:#b8ff2c;background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.28);border-radius:9999px;padding:2px 8px">✓ ${pc} paid</span>`:'';})()}<button onclick="event.stopPropagation();ladToggle('${l.id}')" style="margin-left:auto;font-size:.64rem;font-weight:800;color:var(--mut);background:none;border:0;cursor:pointer">${LEXP[l.id]?'Hide lineup ▴':'See lineup ▾'}</button></div>${LEXP[l.id]?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 14px;margin-top:8px">${ladRosterRows(l.roster)}</div>`:''}</div>`:''}
+      ${action}
       ${ladShareBtn(l)}
+    </div>
     </div>
   </div>`;
 }
+
 // Signed-in + registered → replace the Register button with your status and a
 // self-serve cancel. Returns '' (falsy) when not registered so the caller falls
 // back to the normal Register/waitlist button.
@@ -1054,12 +1118,15 @@ const lbGLOW=m=>m==='xp'?'rgba(23,215,176,.55)':m==='dr'?'rgba(167,139,250,.55)'
 const winsFirst=m=>m==='wins';
 function lbCell(p,r,m){ m=m||'pts'; const c=POD3[r]; const drTxt=p.dr==null?'–':p.dr; let stats;
   if(winsFirst(m)){
-    stats=`<span style="font-weight:900;color:var(--lime);font-size:.82rem;min-width:28px;text-align:right;text-shadow:0 0 9px rgba(184,255,44,.35)">${p.w}<span style="color:var(--mut);font-weight:600;font-size:.6rem">–${p.l}</span></span><span style="font-weight:900;color:var(--teal);font-size:.72rem;min-width:20px;text-align:right">${p.nights||0}</span>`;
+    stats=`<span style="font-weight:900;color:var(--lime);font-size:.8rem;min-width:24px;text-align:right;text-shadow:0 0 9px rgba(184,255,44,.35)">${p.w}<span style="color:var(--mut);font-weight:600;font-size:.58rem">–${p.l}</span></span><span style="font-weight:900;color:var(--teal);font-size:.7rem;text-align:right">${p.nights||0}</span>`;
   } else {
-    stats=`<span style="color:var(--mut);font-size:.64rem;min-width:30px;text-align:right">${p.w}–${p.l}</span><span style="font-weight:900;color:${lbMC(m)};font-size:.82rem;min-width:30px;text-align:right;text-shadow:0 0 9px ${lbGLOW(m)}">${lbVal(p,m)}</span>`;
+    stats=`<span style="color:var(--mut);font-size:.62rem;min-width:26px;text-align:right">${p.w}–${p.l}</span><span style="font-weight:900;color:${lbMC(m)};font-size:.8rem;min-width:26px;text-align:right;text-shadow:0 0 9px ${lbGLOW(m)}">${lbVal(p,m)}</span>`;
   }
-  const rkCell=`<span style="display:flex;flex-direction:column;align-items:center;min-width:26px;gap:1px"><span style="font-weight:800;color:${c||'var(--mut)'};font-size:.72rem">${r}</span>${p._sec?`<span style="font-size:.52rem;font-weight:800;line-height:1;white-space:nowrap">${p._sec}</span>`:''}</span>`;
-  return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:8px;padding:7px 9px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer;min-width:0">${rkCell}${lavFor(p)}<span style="flex:1;min-width:0;font-weight:700;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis${p.pair?';white-space:normal;line-height:1.2;font-size:.74rem':''}">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</span>${stats}</div>`; }
+  const rkCell=`<span style="display:flex;flex-direction:column;align-items:center;min-width:20px;gap:1px"><span style="font-weight:800;color:${c||'var(--mut)'};font-size:.72rem">${r}</span>${p._sec?`<span style="font-size:.5rem;font-weight:800;line-height:1;white-space:nowrap">${p._sec}</span>`:''}</span>`;
+  // The name wraps rather than truncating: these cells sit two-up on a phone, so
+  // between the rank, the avatar and two stat columns there isn't room for a
+  // full name on one line — "Chandler H" beat out to "C…" is useless.
+  return `<div onclick="profile('${p.id}')" style="display:flex;align-items:center;gap:5px;padding:6px 6px;background:var(--surf);border:1px solid var(--bd);${c?'border-left:3px solid '+c+';':''}border-radius:8px;cursor:pointer;min-width:0">${rkCell}${lavFor(p,'sm')}<span class="lb-nm" style="flex:1;min-width:0;font-weight:700;font-size:.72rem;line-height:1.15;overflow-wrap:break-word${p.pair?';font-size:.72rem':''}">${p.pair&&p.names?p.names.map(n=>esc(firstLast(n))).join('<br>'):esc(firstLast(p.name))}</span>${stats}</div>`; }
 function lbPodium(p,r,m){ m=m||'pts'; const rc=POD3[r]; const drTxt=p.dr==null?'–':p.dr; const mc=lbMC(m), glow=lbGLOW(m); let heroBlock,pills;
   if(winsFirst(m)){
     const ladders=p.nights||0;

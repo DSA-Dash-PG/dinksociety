@@ -7,7 +7,10 @@
 //       action 'confirm-venmo' { playerId|email }  mark a Venmo signup paid
 //       action 'decline-venmo' { playerId|email }  release it → promote next
 //       action 'promote'                           promote head of waitlist now
-//       action 'set-status'    { status }          open|full|live|final|cancelled
+//       action 'set-status'    { status }          open|closed|full|live|final|cancelled
+//         'closed' = registration is shut, the ladder is otherwise untouched:
+//         it still shows on the Ladders page, keeps its roster, still runs and
+//         scores. Only new public signups are refused (see ladder-signup.js).
 //   DELETE ?event=<id>                          → delete the ladder + its signups
 
 import { getStore } from '@netlify/blobs';
@@ -75,7 +78,7 @@ export default async (req) => {
   const feeCents = Number(event.feeCents) || 0;
 
   if (action === 'set-status') {
-    const status = ['open', 'full', 'live', 'final', 'cancelled'].includes(body.status) ? body.status : null;
+    const status = ['open', 'closed', 'full', 'live', 'final', 'cancelled'].includes(body.status) ? body.status : null;
     if (!status) return json({ error: 'invalid status' }, 400);
     event.status = status;
     await setEvent(event);

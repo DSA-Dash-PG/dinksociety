@@ -122,6 +122,22 @@ export default async (req) => {
   if (req.method === 'POST') {
     const body = await req.json().catch(() => ({}));
 
+    // Registration gate. 'closed' is the organizer shutting signups by hand
+    // (admin → Manage → Status) while the ladder otherwise carries on as normal;
+    // 'cancelled' and 'final' are terminal. Waitlist joins are refused too — a
+    // closed ladder shouldn't keep collecting people. Admins can still add
+    // players directly from the manage panel, which never comes through here.
+    const evStatus = event.status || 'open';
+    if (evStatus === 'closed') {
+      return json({ error: 'Registration for this ladder is closed. Message the organizer if you still want to get in.' }, 409);
+    }
+    if (evStatus === 'cancelled') {
+      return json({ error: 'This ladder has been cancelled.' }, 409);
+    }
+    if (evStatus === 'final') {
+      return json({ error: 'This ladder is already finished.' }, 409);
+    }
+
     // Gender-locked ladder: a Men's or Women's division only accepts that gender.
     // Enforced here so it covers every payment path (credit / venmo / card) and
     // waitlist joins.

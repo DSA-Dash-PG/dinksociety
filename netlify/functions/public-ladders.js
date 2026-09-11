@@ -50,7 +50,10 @@ export default async (req) => {
   }
   const events = await listEvents();
   const isPublic = e => e.visibility !== 'private';
-  const visible = events.filter(e => isPublic(e) && ['open', 'full', 'live'].includes(e.status || 'open'));
+  // 'closed' stays in the LIST — a closed ladder is still an upcoming ladder,
+  // people just can't sign up for it any more (the page shows it as closed
+  // instead of a Register button). Only 'final' and 'cancelled' drop out.
+  const visible = events.filter(e => isPublic(e) && ['open', 'closed', 'full', 'live'].includes(e.status || 'open'));
   const ladders = (await Promise.all(visible.map(async e => pub(e, applyDirectoryToSignups(await getSignups(e.id), dir)))))
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
   const completed = events.filter(e => isPublic(e) && (e.status || 'open') === 'final')
