@@ -190,6 +190,8 @@
     .p--div { background: var(--color-surface-3); color: var(--color-text-muted); }
     .p--season { background: var(--color-surface-3); color: var(--color-text-faint); cursor: pointer; margin-right: 6px; }
     .p--season:hover { color: var(--color-lime); box-shadow: inset 0 0 0 1px var(--color-lime); }
+    .p--del { background: var(--color-surface-3); color: var(--color-text-faint); cursor: pointer; margin-right: 6px; font-weight: 800; }
+    .p--del:hover { color: var(--color-red, #ef4444); box-shadow: inset 0 0 0 1px var(--color-red, #ef4444); }
 
     /* ── Buttons ──────────────────────────────────────────────── */
     .ab { padding: 7px 16px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid transparent; transition: all var(--transition); }
@@ -4419,6 +4421,42 @@
   // it belonged to. A team filed under the wrong one showed up in that season's
   // Teams tab and standings with no way to correct it — which is exactly how
   // one squad ended up looking like two teams in the same season.
+  // ── Delete a team record ────────────────────────────────────────────
+  // Needed because "Sync from Registrations" could mint a duplicate team from a
+  // registration that already had one. Deleting was only half the fix; the
+  // other half is registration-id matching in admin-seed-teams, which stops it
+  // coming back.
+  async function deleteTeam(teamId) {
+    const t = (allTeams || []).find(x => x.id === teamId);
+    if (!t) return;
+    const n = (t.roster || []).length;
+    if (!confirm('Delete "' + t.name + '" (' + seasonLabel(teamSeasonCode(t)) + ')?\n\n'
+      + n + ' roster entr' + (n === 1 ? 'y' : 'ies') + ' go with it. This cannot be undone.')) return;
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(teamId) + '&action=delete-team', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      });
+      await renderTeams();
+      alert('"' + (d.teamName || t.name) + '" deleted. Standings rebuilt.');
+    } catch (err) {
+      const msg = err.message || 'unknown error';
+      // The server refuses while matches still reference the team. Say what it
+      // said, then let the admin decide rather than silently forcing.
+      if (/match record/i.test(msg)) {
+        if (!confirm(msg + '\n\nDelete it anyway?')) return;
+        try {
+          await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(teamId) + '&action=delete-team', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ force: true }),
+          });
+          await renderTeams();
+        } catch (e2) { alert('Delete failed: ' + (e2.message || 'unknown error')); }
+        return;
+      }
+      alert('Delete failed: ' + msg);
+    }
+  }
+
   function openSeasonMove(chip, teamId) {
     if (chip.dataset.open === '1') return;
     const t = (allTeams || []).find(x => x.id === teamId);
@@ -4757,6 +4795,7 @@
           '</div>' +
           '<div class="tc2-splitwrap"><div class="tc2-mw"><span class="mw"><b class="m">' + men.length + ' M</b> · <b class="w">' + women.length + ' W</b></span>' +
             '<span class="p p--season" data-moveseason="' + h(t.id) + '" title="Which season this team belongs to — click to move it">' + h(seasonLabel(teamSeasonCode(t))) + ' ⇄</span>' +
+            '<span class="p p--del" data-delteam="' + h(t.id) + '" title="Delete this team record">✕</span>' +
             '<span class="p p--div">' + h(t.divisionLabel || t.division || '') + '</span></div>' +
             '<div class="split"><i class="m" style="width:' + (men.length / splitTot * 100) + '%"></i><i class="w" style="width:' + (women.length / splitTot * 100) + '%"></i></div></div>' +
           gcol('Men', 'm', men, false) +
@@ -4769,6 +4808,10 @@
     grid.querySelectorAll('[data-moveseason]').forEach(el => el.addEventListener('click', e => {
       e.stopPropagation();
       openSeasonMove(el, el.dataset.moveseason);
+    }));
+    grid.querySelectorAll('[data-delteam]').forEach(el => el.addEventListener('click', e => {
+      e.stopPropagation();
+      deleteTeam(el.dataset.delteam);
     }));
     grid.querySelectorAll('.pchip[data-player]').forEach(el => el.addEventListener('click', e => {
       e.stopPropagation();

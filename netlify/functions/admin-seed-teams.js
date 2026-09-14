@@ -106,7 +106,17 @@ async function buildPlan() {
   for (const t of existingTeams) {
     existingIds.add(t.id);
     const regId = t.registrationId || t.seededFromRegistrationId;
-    if (regId) teamsByRegId.set(String(regId), t);
+    if (regId) {
+      // Two teams can claim the same registration — that is exactly the mess a
+      // by-email match left behind (one real team from the confirm flow, one
+      // duplicate Sync minted alongside it). `registrationId` is the strong
+      // link the confirm flow writes; `seededFromRegistrationId` is Sync's own
+      // record of what it created, and must never displace the real one.
+      const prev = teamsByRegId.get(String(regId));
+      if (!prev || (!prev.registrationId && t.registrationId)) {
+        teamsByRegId.set(String(regId), t);
+      }
+    }
     if (t.captainEmail) {
       teamsByEmailSeason.set(emailSeasonKey(t.captainEmail, t.circuit || t.seasonId), t);
     }
