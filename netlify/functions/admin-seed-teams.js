@@ -9,13 +9,36 @@
 // POST              → applies the plan, returns { created, updated, skipped, errors }
 //
 // Team ID derivation: slugified team name, de-duplicated with -2, -3, etc.
-// If a team with the same captainEmail already exists, it's matched by email
-// rather than by generated ID. This lets captains change their team name
-// post-registration without orphaning the record.
+//
+// MATCHING an existing team (this is the part that used to corrupt data).
+// Matching was by captainEmail ALONE, in a Map with one entry per email. A
+// team record is PER SEASON, so a captain who plays two seasons has two team
+// records — and the map kept only the last one. Their Season 2 registration
+// would then match their SEASON 1 team and overwrite its circuit and division
+// with Season 2 values, silently moving a finished team into the new season.
+// (That is how one Season 1 squad ended up filed under Season 2, showing as a
+// second team in that season's Teams tab and standings.)
+//
+// Now it matches, in order:
+//   1. the registration id already recorded on the team — the strongest link
+//   2. captainEmail + SEASON together
+//   3. no match → create
+//
+// WHAT SYNC WILL NOT TOUCH on a team that already exists:
+//   name    — an admin renamed it deliberately (often to tell apart two teams
+//             registered under the same name). The registration keeps the old
+//             name forever, so copying it back wiped the rename every run.
+//   circuit — the season is owned by the team record and the move-season
+//             action; re-asserting it from the registration would undo a
+//             deliberate move.
+// Both are reported in the result as `preserved` so the difference between the
+// team and its registration is visible rather than silently resolved.
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail, normalizePhone } from './lib/identity.js';
+import { circuitCode, seasonName } from './lib/circuit.js';
+import { logActivity } from './lib/activity-log.js';
 
 const DIVISION_LABELS = {
   '3.0M': '3.0 Mixed',
@@ -75,11 +98,18 @@ async function buildPlan() {
     teamBlobs.map(b => teamsStore.get(b.key, { type: 'json' }))
   )).filter(Boolean);
 
-  const teamsByEmail = new Map();
+  // Two indexes, both season-aware. The email+season key is what stops a
+  // captain's new-season registration from reaching their old-season team.
+  const teamsByRegId = new Map();
+  const teamsByEmailSeason = new Map();
   const existingIds = new Set();
   for (const t of existingTeams) {
     existingIds.add(t.id);
-    if (t.captainEmail) teamsByEmail.set(t.captainEmail.toLowerCase(), t);
+    const regId = t.registrationId || t.seededFromRegistrationId;
+    if (regId) teamsByRegId.set(String(regId), t);
+    if (t.captainEmail) {
+      teamsByEmailSeason.set(emailSeasonKey(t.captainEmail, t.circuit || t.seasonId), t);
+    }
   }
 
   const teamRegs = regs.filter(r => r.path === 'team');
@@ -107,25 +137,34 @@ async function buildPlan() {
 
     const roster = buildRosterFromRegistration(reg);
 
-    const existing = teamsByEmail.get(captainEmail);
+    // Match by the registration this team was built from first; only then by
+    // captain AND season. Never by email alone — see the header note.
+    const existing = teamsByRegId.get(String(reg.id))
+      || teamsByEmailSeason.get(emailSeasonKey(captainEmail, reg.circuit));
+
     if (existing) {
-      // Update path: team record exists for this captain email already
-      const changes = diffExistingTeam(existing, { reg, teamName, captainEmail, roster });
+      // Update path: team record exists for this captain in this season
+      const { changes, preserved } = diffExistingTeam(existing, { reg, teamName, captainEmail, roster });
       if (changes.length === 0) {
         toSkip.push({
           reason: 'team already exists and matches registration',
           teamId: existing.id,
           teamName: existing.name,
           captainEmail,
+          ...(preserved.length ? { preserved } : {}),
         });
       } else {
         toUpdate.push({
           action: 'update',
           teamId: existing.id,
-          teamName,
+          // The team's OWN name is what gets written back — not the
+          // registration's. `teamName` here is only used for reporting.
+          teamName: existing.name,
+          registrationName: teamName,
           captainEmail,
           division: reg.division,
           changes,
+          preserved,
           _reg: reg,
           _existing: existing,
         });
@@ -154,16 +193,31 @@ async function buildPlan() {
 
 function diffExistingTeam(existing, { reg, teamName, roster }) {
   const changes = [];
-  if (existing.name !== teamName) changes.push(`name: "${existing.name}" → "${teamName}"`);
+  const preserved = [];
+
+  // Name and season are the team's own. Where they differ from the
+  // registration, SAY so and move on — don't overwrite.
+  if (existing.name !== teamName) {
+    preserved.push(`name kept as "${existing.name}" (registration says "${teamName}")`);
+  }
+  if (circuitCode(existing.circuit || existing.seasonId) !== circuitCode(reg.circuit)) {
+    preserved.push(`season kept as ${seasonName(existing.circuit || existing.seasonId)}`
+      + ` (registration says ${seasonName(reg.circuit)})`);
+  }
+
   if (existing.division !== reg.division) changes.push(`division: ${existing.division} → ${reg.division}`);
-  if (existing.circuit !== reg.circuit) changes.push(`circuit: ${existing.circuit} → ${reg.circuit}`);
 
   // Only propose roster update if existing roster is empty (don't clobber captain edits)
   const existingRoster = existing.roster || [];
   if (existingRoster.length === 0 && roster.length > 0) {
     changes.push(`seed roster (${roster.length} players)`);
   }
-  return changes;
+  return { changes, preserved };
+}
+
+/** One key per captain PER SEASON — never per captain alone. */
+function emailSeasonKey(email, circuitish) {
+  return String(email || '').trim().toLowerCase() + '::' + circuitCode(circuitish);
 }
 
 // ===== Apply =====
@@ -191,6 +245,14 @@ async function applyPlan(plan, adminEmail) {
       };
       await teamsStore.setJSON(`team/${team.id}.json`, team);
       created.push({ teamId: team.id, name: team.name, captainEmail: team.captainEmail });
+      // Sync used to write nothing to the activity log, so a team appearing or
+      // a name changing looked like it happened by itself.
+      await logActivity({
+        type: 'team.updated',
+        actor: { email: adminEmail, role: 'admin' },
+        team,
+        details: `Created by Sync from Registrations (${seasonName(team.circuit)})`,
+      }).catch(() => {});
     } catch (err) {
       errors.push({ teamName: item.teamName, error: err.message });
     }
@@ -206,28 +268,50 @@ async function applyPlan(plan, adminEmail) {
 
       const team = {
         ...existing,
-        name: item.teamName,
+        // name and circuit are deliberately NOT taken from the registration —
+        // both are owned by the team record once it exists. See header.
         captainEmail: item.captainEmail,
         division: reg.division,
         divisionLabel: reg.divisionLabel || DIVISION_LABELS[reg.division],
-        circuit: reg.circuit,
         roster,
+        // Record the link so future runs match on it rather than on identity.
+        ...(existing.registrationId || existing.seededFromRegistrationId
+          ? {}
+          : { seededFromRegistrationId: reg.id }),
         updatedAt: now,
         updatedBy: adminEmail,
       };
       await teamsStore.setJSON(`team/${team.id}.json`, team);
-      updated.push({ teamId: team.id, name: team.name, changes: item.changes });
+      updated.push({
+        teamId: team.id, name: team.name,
+        changes: item.changes,
+        ...(item.preserved?.length ? { preserved: item.preserved } : {}),
+      });
+      await logActivity({
+        type: 'team.updated',
+        actor: { email: adminEmail, role: 'admin' },
+        team,
+        details: `Sync from Registrations: ${item.changes.join('; ')}`
+          + (item.preserved?.length ? ` · left alone: ${item.preserved.join('; ')}` : ''),
+      }).catch(() => {});
     } catch (err) {
       errors.push({ teamName: item.teamName, error: err.message });
     }
   }
+
+  // Everything Sync chose NOT to overwrite, surfaced together — the admin can
+  // see at a glance where a team and its registration disagree.
+  const preserved = [...plan.toUpdate, ...plan.toSkip]
+    .filter(i => i.preserved?.length)
+    .map(i => ({ teamId: i.teamId, teamName: i.teamName, preserved: i.preserved }));
 
   return {
     created: created.length,
     updated: updated.length,
     skipped: plan.toSkip.length,
     errors: errors.length,
-    details: { created, updated, skipped: plan.toSkip, errors },
+    preservedCount: preserved.length,
+    details: { created, updated, skipped: plan.toSkip, errors, preserved },
   };
 }
 
