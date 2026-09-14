@@ -40,23 +40,27 @@ function generatePlayerId() {
 // division and rewrites the team from it. So a division change made in the
 // Team editor has to land on the registration too, or the next Sync flips
 // the team straight back.
-async function syncRegistrationDivision(team, oldDivision) {
+/**
+ * The registration a team record came from.
+ *
+ * Tries the recorded link first (the confirm flow stores registrationId, the
+ * seed flow stores seededFromRegistrationId), then falls back to captain email
+ * + season — never email alone, which would reach across seasons.
+ */
+async function findLinkedRegistration(team) {
   const regStore = getStore('registrations');
   const wantEmail = (team.captainEmail || '').toLowerCase().trim();
   const wantSeason = circuitCode(team.circuit || team.seasonId);
 
-  // 1) Direct link (confirm flow stores registrationId, seed flow stores seededFromRegistrationId)
   const linkedId = team.registrationId || team.seededFromRegistrationId || null;
-  let hit = null;
   if (linkedId) {
     for (const key of [`confirmed/${linkedId}.json`, `pending/${linkedId}.json`, linkedId]) {
       const reg = await regStore.get(key, { type: 'json' }).catch(() => null);
-      if (reg) { hit = { key, reg }; break; }
+      if (reg) return { store: regStore, key, reg };
     }
   }
 
-  // 2) Fallback: same captain email + same season among confirmed registrations
-  if (!hit && wantEmail) {
+  if (wantEmail) {
     const { blobs } = await regStore.list({ prefix: 'confirmed/' });
     for (const b of blobs) {
       const reg = await regStore.get(b.key, { type: 'json' }).catch(() => null);
@@ -64,17 +68,42 @@ async function syncRegistrationDivision(team, oldDivision) {
       const email = (reg.team?.players?.[0]?.email || '').toLowerCase().trim();
       if (email !== wantEmail) continue;
       if (wantSeason && circuitCode(reg.circuit || reg.seasonId) !== wantSeason) continue;
-      hit = { key: b.key, reg }; break;
+      return { store: regStore, key: b.key, reg };
     }
   }
+  return null;
+}
 
+async function syncRegistrationDivision(team, oldDivision) {
+  const hit = await findLinkedRegistration(team);
   if (!hit) return { synced: false, reason: 'no linked registration' };
-  const { key, reg } = hit;
+  const { store, key, reg } = hit;
   reg.division = team.division;
   reg.divisionLabel = team.divisionLabel || reg.divisionLabel || null;
   reg.updatedAt = new Date().toISOString();
   reg.divisionMoved = { from: oldDivision || null, to: team.division, at: reg.updatedAt };
-  await regStore.set(key, JSON.stringify(reg));
+  await store.set(key, JSON.stringify(reg));
+  return { synced: true, registrationId: reg.id };
+}
+
+/**
+ * Push a team rename onto its registration.
+ *
+ * The registration holds the name typed at sign-up and nothing ever updated it,
+ * so a renamed team disagreed with its registration forever — and "Sync from
+ * Registrations" used to stamp the old name straight back over the rename.
+ * Renaming the team is the admin saying what the team is called, so the
+ * registration follows it, exactly as it already does for a division move.
+ */
+async function syncRegistrationName(team, oldName) {
+  const hit = await findLinkedRegistration(team);
+  if (!hit) return { synced: false, reason: 'no linked registration' };
+  const { store, key, reg } = hit;
+  if (!reg.team || typeof reg.team !== 'object') return { synced: false, reason: 'registration has no team block' };
+  reg.team.name = team.name;
+  reg.updatedAt = new Date().toISOString();
+  reg.renamed = { from: oldName || null, to: team.name, at: reg.updatedAt };
+  await store.set(key, JSON.stringify(reg));
   return { synced: true, registrationId: reg.id };
 }
 
@@ -237,6 +266,14 @@ export default async (req) => {
     // those are created. On rename, push the new name into every copy so the
     // whole site updates — otherwise public schedule/standings keep the old name.
     if ('name' in body && team.name !== oldName) {
+      // The registration keeps the name typed at sign-up. Push the new one onto
+      // it so the two never drift, and so a later Sync has nothing to disagree
+      // about. Best-effort: a rename must not fail because of this.
+      const nameSync = await syncRegistrationName(team, oldName)
+        .catch(err => ({ synced: false, reason: err.message }));
+      if (!nameSync.synced) {
+        console.warn(`Team renamed but registration not updated (${nameSync.reason})`);
+      }
       try {
         await propagateTeamRename(team);
       } catch (err) {
@@ -262,6 +299,56 @@ export default async (req) => {
     const body = await req.json();
 
     switch (action) {
+      // ── Delete a team record ───────────────────────────────────────────
+      // There was no way to remove a team at all, which matters because
+      // "Sync from Registrations" could mint a duplicate from a registration
+      // that already had a team (it matched on captain email alone). Deleting
+      // the duplicate was only half a fix — the next Sync re-created it. Both
+      // halves now exist: this, and registration-id matching in seed-teams.
+      //
+      // Refuses while the team still has match records, unless `force` is set:
+      // deleting a team that played leaves orphaned names in the schedule and
+      // scores, which is almost never what someone means.
+      case 'delete-team': {
+        const code = circuitCode(team.circuit || team.seasonId);
+        let matchCount = 0;
+        try {
+          const schedStore = getStore('schedule');
+          const { blobs } = await schedStore.list({ prefix: `schedule/${code}/` });
+          for (const b of blobs) {
+            const wk = await schedStore.get(b.key, { type: 'json' }).catch(() => null);
+            for (const m of (wk?.matches || [])) {
+              if (m.teamA?.id === team.id || m.teamB?.id === team.id) matchCount++;
+            }
+          }
+        } catch { /* advisory only */ }
+
+        if (matchCount > 0 && body.force !== true) {
+          return json({
+            error: `${team.name} still has ${matchCount} match record(s) in ${seasonName(code)}. `
+                 + 'Deleting it would leave those matches pointing at a team that no longer exists.',
+            matchCount, needsForce: true,
+          }, 409);
+        }
+
+        await store.delete(teamKey);
+
+        await logActivity({
+          type: 'team.deleted',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          details: `Team deleted from ${seasonName(code)}`
+            + (matchCount ? ` (forced \u2014 ${matchCount} match record(s) left behind)` : '')
+            + ` \u00b7 ${(team.roster || []).length} roster entr${(team.roster || []).length === 1 ? 'y' : 'ies'}`,
+        }).catch(() => {});
+
+        // Drop it out of the public standings straight away.
+        await rebuildStandings(code).catch(err =>
+          console.error('rebuildStandings after team delete failed:', err?.message || err));
+
+        return json({ ok: true, deleted: teamId, teamName: team.name, matchCount });
+      }
+
       // ── Move a team to a different season ──────────────────────────────
       // A team record is per-season and its season lives in two fields that
       // drifted apart on older records (`circuit` holding 'Season 1', 'II' or
