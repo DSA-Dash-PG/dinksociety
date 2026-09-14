@@ -188,6 +188,8 @@
     .pm-method input[type=radio] { accent-color: var(--color-teal); }
     .pm-method.is-selected { border-color: var(--color-teal); background: var(--color-teal-dim); color: var(--color-teal); }
     .p--div { background: var(--color-surface-3); color: var(--color-text-muted); }
+    .p--season { background: var(--color-surface-3); color: var(--color-text-faint); cursor: pointer; margin-right: 6px; }
+    .p--season:hover { color: var(--color-lime); box-shadow: inset 0 0 0 1px var(--color-lime); }
 
     /* ── Buttons ──────────────────────────────────────────────── */
     .ab { padding: 7px 16px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; border: 1px solid transparent; transition: all var(--transition); }
@@ -708,7 +710,7 @@
           </button>
           <button class="sb__link" data-tab="approvals">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-            Profile Approvals <span class="sb__badge" id="sb-appr-ct" style="display:none;">0</span>
+            Approvals <span class="sb__badge" id="sb-appr-ct" style="display:none;">0</span>
           </button>
           <button class="sb__link" data-tab="schedule">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -3213,18 +3215,28 @@
     const total = APPR_PROFILE_COUNT + (typeof RADD_COUNT === 'number' ? RADD_COUNT : 0);
     const b = $id('sb-appr-ct');
     if (b) { if (total > 0) { b.textContent = total; b.style.display = ''; } else { b.style.display = 'none'; } }
-    // Overview banner
+    // Overview banner — covers BOTH queues. It used to read only the
+    // profile-edit count, so a stack of roster additions waiting on the league
+    // showed nothing at all on the page the admin actually lands on.
     const ov = $id('ov-appr');
     if (ov) {
-      ov.innerHTML = n > 0
-        ? `<div class="ova" style="margin-top:10px;"><div class="ova__item ova__item--warn">
+      const rows = [];
+      if (RADD_COUNT > 0) {
+        rows.push(`<div class="ova__item ova__item--warn">
+             <span class="ova__ico">🧑‍🤝‍🧑</span>
+             <div class="ova__body"><div class="ova__t">${RADD_COUNT} roster addition${RADD_COUNT === 1 ? '' : 's'} awaiting approval</div>
+             <div class="ova__s">Players new to the league — they can't be picked for a lineup until you approve</div></div>
+             <button class="ab ab--outline ab--sm" data-appr-go="1">Review</button></div>`);
+      }
+      if (APPR_PROFILE_COUNT > 0) {
+        rows.push(`<div class="ova__item ova__item--warn">
              <span class="ova__ico">🖼️</span>
-             <div class="ova__body"><div class="ova__t">${n} profile change${n === 1 ? '' : 's'} awaiting approval</div>
+             <div class="ova__body"><div class="ova__t">${APPR_PROFILE_COUNT} profile change${APPR_PROFILE_COUNT === 1 ? '' : 's'} awaiting approval</div>
              <div class="ova__s">Player/captain photo &amp; bio edits waiting for review</div></div>
-             <button class="ab ab--outline ab--sm" id="ov-appr-go">Review</button></div></div>`
-        : '';
-      const go = $id('ov-appr-go');
-      if (go) go.addEventListener('click', () => gotoTab('approvals'));
+             <button class="ab ab--outline ab--sm" data-appr-go="1">Review</button></div>`);
+      }
+      ov.innerHTML = rows.length ? `<div class="ova" style="margin-top:10px;">${rows.join('')}</div>` : '';
+      ov.querySelectorAll('[data-appr-go]').forEach(b => b.addEventListener('click', () => gotoTab('approvals')));
     }
   }
   // Surface the pending count on load (best-effort; ignores auth errors).
@@ -4396,6 +4408,62 @@
   // that predate it: the field can hold a code ('I'), a season id ('season-2'),
   // a bare number, or the season's DISPLAY NAME ('Season 1'). Missing that last
   // case is what split the Teams tab into two "Season 1" buckets.
+  const SEASON_CODES = ['I', 'II', 'III', 'IV', 'V'];
+  function seasonLabel(code) {
+    const i = SEASON_CODES.indexOf(String(code || '').toUpperCase());
+    return i >= 0 ? 'Season ' + (i + 1) : (code ? String(code) : 'No season');
+  }
+
+  // ── Move a team to another season ────────────────────────────────────
+  // A team record is per-season, and until now nothing could edit which season
+  // it belonged to. A team filed under the wrong one showed up in that season's
+  // Teams tab and standings with no way to correct it — which is exactly how
+  // one squad ended up looking like two teams in the same season.
+  function openSeasonMove(chip, teamId) {
+    if (chip.dataset.open === '1') return;
+    const t = (allTeams || []).find(x => x.id === teamId);
+    if (!t) return;
+    const current = teamSeasonCode(t);
+    chip.dataset.open = '1';
+    const original = chip.innerHTML;
+
+    const sel = document.createElement('select');
+    sel.style.cssText = 'font:inherit;font-size:10px;padding:2px 4px;border-radius:6px;border:1px solid var(--color-lime);background:var(--color-surface-2);color:var(--color-text);';
+    sel.innerHTML = '<option value="">Move to…</option>' +
+      SEASON_CODES.map(c => '<option value="' + c + '"' + (c === current ? ' disabled' : '') + '>' +
+        seasonLabel(c) + (c === current ? ' (current)' : '') + '</option>').join('');
+    chip.innerHTML = '';
+    chip.appendChild(sel);
+    sel.focus();
+
+    const restore = () => { chip.innerHTML = original; delete chip.dataset.open; };
+    sel.addEventListener('click', e => e.stopPropagation());
+    sel.addEventListener('blur', () => setTimeout(() => { if (chip.dataset.open === '1') restore(); }, 160));
+    sel.addEventListener('change', async () => {
+      const target = sel.value;
+      if (!target) { restore(); return; }
+      if (!confirm('Move "' + t.name + '" from ' + seasonLabel(current) + ' to ' + seasonLabel(target) + '?\n\n'
+        + 'Matches already played stay recorded under ' + seasonLabel(current) + '. Standings for both seasons are rebuilt.')) {
+        restore(); return;
+      }
+      sel.disabled = true;
+      try {
+        const d = await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(teamId) + '&action=move-season', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ circuit: target }),
+        });
+        if (d.strandedMatches) {
+          alert(t.name + ' moved to ' + d.movedTo + '.\n\n' + d.strandedMatches
+            + ' match record(s) stay under ' + d.movedFrom + ' — that is normal for a finished season.');
+        }
+        await renderTeams();
+      } catch (err) {
+        alert('Move failed: ' + (err.message || 'unknown error'));
+        restore();
+      }
+    });
+  }
+
   function teamSeasonCode(t) {
     if (t && t.circuitCode) return String(t.circuitCode).toUpperCase();
     const ROMAN = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
@@ -4687,7 +4755,9 @@
               '<div class="tc2-cap"><b>' + h(captain?.name || '—') + '</b>' + (coCaptain ? ' · co: ' + h(coCaptain.name) : '') + '</div></div>' +
             '<div class="tc2-count"><div class="n">' + tot + (max != null ? '<span style="font-size:11px;color:var(--color-text-faint);font-weight:700">/' + max + '</span>' : '') + '</div><div class="l">Players</div></div>' +
           '</div>' +
-          '<div class="tc2-splitwrap"><div class="tc2-mw"><span class="mw"><b class="m">' + men.length + ' M</b> · <b class="w">' + women.length + ' W</b></span><span class="p p--div">' + h(t.divisionLabel || t.division || '') + '</span></div>' +
+          '<div class="tc2-splitwrap"><div class="tc2-mw"><span class="mw"><b class="m">' + men.length + ' M</b> · <b class="w">' + women.length + ' W</b></span>' +
+            '<span class="p p--season" data-moveseason="' + h(t.id) + '" title="Which season this team belongs to — click to move it">' + h(seasonLabel(teamSeasonCode(t))) + ' ⇄</span>' +
+            '<span class="p p--div">' + h(t.divisionLabel || t.division || '') + '</span></div>' +
             '<div class="split"><i class="m" style="width:' + (men.length / splitTot * 100) + '%"></i><i class="w" style="width:' + (women.length / splitTot * 100) + '%"></i></div></div>' +
           gcol('Men', 'm', men, false) +
           gcol('Women', 'w', women, true) +
@@ -4696,6 +4766,10 @@
       '</div>';
     }).join('');
 
+    grid.querySelectorAll('[data-moveseason]').forEach(el => el.addEventListener('click', e => {
+      e.stopPropagation();
+      openSeasonMove(el, el.dataset.moveseason);
+    }));
     grid.querySelectorAll('.pchip[data-player]').forEach(el => el.addEventListener('click', e => {
       e.stopPropagation();
       openPlayerPop(el.dataset.team, el.dataset.player);

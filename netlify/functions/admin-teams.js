@@ -17,7 +17,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
-import { circuitCode } from './lib/circuit.js';
+import { circuitCode, seasonName, seasonIdForCircuit, isCanonicalCode } from './lib/circuit.js';
 import { rebuildStandings } from './lib/standings.js';
 import { logActivity } from './lib/activity-log.js';
 
@@ -262,6 +262,78 @@ export default async (req) => {
     const body = await req.json();
 
     switch (action) {
+      // ── Move a team to a different season ──────────────────────────────
+      // A team record is per-season and its season lives in two fields that
+      // drifted apart on older records (`circuit` holding 'Season 1', 'II' or
+      // nothing; `seasonId` often null). Nothing could edit them, so a team
+      // filed under the wrong season was stuck there — showing up in the wrong
+      // season's Teams tab and standings with no way to correct it.
+      //
+      // Both fields are written together here, and the aggregates for BOTH the
+      // old and the new season are rebuilt: leaving the old one stale is what
+      // makes a moved team appear in two seasons at once.
+      //
+      // Existing schedule/score records are NOT moved — they stay keyed to the
+      // circuit they were played in, which is what you want for a finished
+      // season. The response says how many matches were left behind so the
+      // admin isn't guessing.
+      case 'move-season': {
+        const target = circuitCode(body.circuit || body.seasonId);
+        if (!isCanonicalCode(target)) {
+          return json({ error: `"${body.circuit || body.seasonId}" is not a season I recognize.` }, 400);
+        }
+        const fromCode = circuitCode(team.circuit || team.seasonId);
+        if (fromCode === target && !('division' in body)) {
+          return json({ error: `${team.name} is already in ${seasonName(target)}.` }, 409);
+        }
+
+        // Matches already played under the old season — reported, not moved.
+        let strandedMatches = 0;
+        try {
+          const schedStore = getStore('schedule');
+          const { blobs } = await schedStore.list({ prefix: `schedule/${fromCode}/` });
+          for (const b of blobs) {
+            const wk = await schedStore.get(b.key, { type: 'json' }).catch(() => null);
+            for (const m of (wk?.matches || [])) {
+              if (m.teamA?.id === team.id || m.teamB?.id === team.id) strandedMatches++;
+            }
+          }
+        } catch { /* non-fatal — the count is advisory */ }
+
+        team.circuit = target;
+        team.seasonId = seasonIdForCircuit(target);
+        if (typeof body.division === 'string' && body.division.trim()) {
+          team.division = body.division.trim();
+          if (typeof body.divisionLabel === 'string') team.divisionLabel = body.divisionLabel.trim();
+        }
+        team.updatedAt = now;
+        team.updatedBy = admin.email;
+        await store.setJSON(teamKey, team);
+
+        await logActivity({
+          type: 'team.season_moved',
+          actor: { email: admin.email, role: 'admin' },
+          team,
+          details: `Season ${seasonName(fromCode)} → ${seasonName(target)}`
+            + (body.division ? ` · division → ${team.division}` : '')
+            + (strandedMatches ? ` · ${strandedMatches} existing match record(s) left in ${seasonName(fromCode)}` : ''),
+        }).catch(() => {});
+
+        // Awaited: a lambda that returns first kills the rebuild in flight, and
+        // a half-rebuilt standings blob is worse than a stale one.
+        for (const code of new Set([fromCode, target])) {
+          await rebuildStandings(code).catch(err =>
+            console.error(`rebuildStandings(${code}) after season move failed:`, err?.message || err));
+        }
+
+        return json({
+          ok: true, team,
+          movedFrom: seasonName(fromCode),
+          movedTo: seasonName(target),
+          strandedMatches,
+        });
+      }
+
       case 'add-player': {
         const roster = team.roster || [];
         const seasonData = team.seasonId

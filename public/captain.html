@@ -302,6 +302,23 @@
     .ros-f label { display: block; font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 5px; }
     .ros-f input, .ros-f select { width: 100%; padding: 11px 12px; border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text); font-family: inherit; font-size: 14px; box-sizing: border-box; }
     .ros-f input:focus, .ros-f select:focus { outline: none; border-color: var(--color-lime); }
+    /* Type-to-find player picker in the Add-player sheet */
+    .rp-find { position: relative; }
+    .rp-find__results { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30; max-height: 260px; overflow-y: auto; -webkit-overflow-scrolling: touch; background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); box-shadow: 0 14px 34px rgba(0,0,0,.5); }
+    .rp-hit { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 12px; background: none; border: none; border-bottom: 1px solid rgba(255,255,255,.05); color: var(--color-text); font-family: inherit; cursor: pointer; }
+    .rp-hit:last-child { border-bottom: none; }
+    .rp-hit:hover, .rp-hit.is-active { background: var(--color-surface-3); }
+    .rp-hit__av { width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; display: grid; place-items: center; background: var(--color-surface-3); color: var(--color-lime); font-size: 11px; font-weight: 800; }
+    .rp-hit__body { flex: 1; min-width: 0; }
+    .rp-hit__name { display: block; font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .rp-hit__meta { display: block; font-size: 11px; color: var(--color-text-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    .rp-hit__tag { flex-shrink: 0; font-size: 9px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--color-lime); border: 1px solid rgba(184,255,44,.4); border-radius: 9999px; padding: 2px 7px; }
+    .rp-hit__tag--appr { color: var(--color-gold, #f0c040); border-color: rgba(240,192,64,.45); }
+    .rp-find__empty { padding: 12px; font-size: 12px; color: var(--color-text-faint); line-height: 1.5; }
+    .rp-find__or { display: flex; align-items: center; gap: 10px; margin: 12px 0 2px; color: var(--color-text-faint); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+    .rp-find__or::before, .rp-find__or::after { content: ''; flex: 1; height: 1px; background: var(--color-border); }
+    /* A player the league already knew — added with no approval step */
+    .ros-rtag { font-size: 9px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; color: var(--color-teal, #17d7b0); border: 1px solid rgba(23,215,176,.4); border-radius: 9999px; padding: 2px 7px; margin-left: 4px; white-space: nowrap; }
     .ros-f.is-bad input, .ros-f.is-bad select { border-color: var(--color-red); }
     .ros-req { color: var(--color-red); margin-left: 2px; }
     .ros-err { display: none; font-size: 12px; font-weight: 600; color: var(--color-red); background: var(--color-red-dim); border: 1px solid rgba(255,92,71,0.3); border-radius: var(--radius-sm); padding: 9px 12px; margin: 4px 0 10px; }
@@ -1042,6 +1059,19 @@
     <div class="cap-sheet__grip"></div>
     <h3 class="cap-sheet__title" id="rp-title">Edit player</h3>
     <div class="cap-sheet__sub" id="rp-sub"></div>
+
+    <!-- Type-to-find over everyone who has played in the league. Picking a hit
+         reuses the league's existing email, which is what keeps one human as
+         one player across seasons — and skips the approval queue. -->
+    <div class="ros-f" id="rp-find-w" style="display:none;">
+      <label>Find an existing player <span style="text-transform:none;letter-spacing:0;font-weight:500;">(played before? start typing)</span></label>
+      <div class="rp-find">
+        <input id="rp-find" type="text" placeholder="Type a name…" autocomplete="off" spellcheck="false">
+        <div class="rp-find__results" id="rp-find-results" hidden></div>
+      </div>
+      <div class="rp-find__or"><span>or enter them manually</span></div>
+    </div>
+
     <div class="ros-f" id="rp-name-w"><label>Name<span class="ros-req">*</span></label><input id="rp-name" type="text" placeholder="Player name"></div>
     <div class="ros-f" id="rp-gender-w"><label>Gender<span class="ros-req">*</span> <span style="text-transform:none;letter-spacing:0;font-weight:500;">(needed for lineup slots)</span></label>
       <select id="rp-gender"><option value="">— select —</option><option value="F">Female</option><option value="M">Male</option></select>
@@ -3665,7 +3695,7 @@
                 <span class="ros-pend__meta">Submitted${p.pendingAddAt ? ' · ' + escapeHtml(fmtArchivedDate(p.pendingAddAt)) : ''} — not on your roster yet</span></span>
               <span class="ros-pend__tag">Pending</span>
             </div>`).join('')}
-          <div class="ros-pend__note">New players are reviewed by the league before they join your roster. They can't be picked for a lineup until then.</div>
+          <div class="ros-pend__note">Anyone who hasn't played for your team before is reviewed by the league first. They can't be picked for a lineup until then. Your own past players join straight away.</div>
         </div>` : '';
 
       // Locked for the season (Week 2 played) — roster is read-only, BUT subs can
@@ -3753,6 +3783,9 @@
       rpIdx = p ? idx : null;
       $id('rp-title').textContent = p ? `Edit · ${p.name}` : 'Add player';
       $id('rp-sub').textContent = p && isCap(p) ? 'Team captain' : p?.isCoCaptain ? 'Co-captain' : 'Name, gender & email required';
+      // The league-wide search is only for ADDING — editing an existing player
+      // has nobody to look up.
+      resetPlayerFind(!p);
       $id('rp-name').value = p?.name || '';
       $id('rp-gender').value = p?.gender || '';
       $id('rp-email').value = p?.email || '';
@@ -3805,7 +3838,84 @@
     function closeRosterEditor() {
       $id('rp-sheet').classList.remove('is-open');
       $id('rp-scrim').classList.remove('is-open');
+      hidePlayerFind();
       rpIdx = null;
+    }
+
+    // ── Find an existing league player ───────────────────────────────────
+    // Retyping a name and email from memory is how the league ended up with
+    // two copies of the same person: a typo'd address breaks their sign-in and
+    // orphans their stats. Picking from this list reuses the exact address the
+    // league already holds — which also means no approval step.
+    let _rpFindTimer = null, _rpFindSeq = 0, _rpHits = [], _rpActive = -1;
+
+    function resetPlayerFind(show) {
+      const w = $id('rp-find-w'); if (!w) return;
+      w.style.display = show ? '' : 'none';
+      const input = $id('rp-find');
+      if (input) input.value = '';
+      hidePlayerFind();
+    }
+    function hidePlayerFind() {
+      const box = $id('rp-find-results');
+      if (box) { box.hidden = true; box.innerHTML = ''; }
+      _rpHits = []; _rpActive = -1;
+    }
+    function rpInitials(n) {
+      return String(n || '?').replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean)
+        .map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
+    }
+    function renderPlayerFind(hits, query, more) {
+      const box = $id('rp-find-results'); if (!box) return;
+      _rpHits = hits; _rpActive = -1;
+      if (!hits.length) {
+        box.innerHTML = `<div class="rp-find__empty">No past player matches “${escapeHtml(query)}”.<br>They're new to the league — add them below and the league will review them.</div>`;
+        box.hidden = false;
+        return;
+      }
+      box.innerHTML = hits.map((h, i) => {
+        const bits = [];
+        if (h.lastTeamName) bits.push(`${escapeHtml(h.lastTeamName)} · ${escapeHtml(h.lastSeasonName)}`);
+        if (h.emailMasked) bits.push(escapeHtml(h.emailMasked));
+        return `<button type="button" class="rp-hit" data-hit="${i}">
+          <span class="rp-hit__av">${escapeHtml(rpInitials(h.name))}</span>
+          <span class="rp-hit__body">
+            <span class="rp-hit__name">${escapeHtml(h.name)}</span>
+            <span class="rp-hit__meta">${bits.join(' · ') || 'Played in the league'}</span>
+          </span>
+          ${h.playedForYou
+            ? '<span class="rp-hit__tag">Your player</span>'
+            : '<span class="rp-hit__tag rp-hit__tag--appr">Needs approval</span>'}
+        </button>`;
+      }).join('') + (more ? `<div class="rp-find__empty">+${more} more — keep typing to narrow it down.</div>` : '');
+      box.hidden = false;
+      box.querySelectorAll('[data-hit]').forEach(btn => {
+        btn.addEventListener('click', () => choosePlayerHit(Number(btn.dataset.hit)));
+      });
+    }
+    function choosePlayerHit(i) {
+      const h = _rpHits[i]; if (!h) return;
+      $id('rp-name').value = h.name || '';
+      $id('rp-email').value = h.email || '';
+      if (h.gender) $id('rp-gender').value = h.gender;
+      if (h.phone && !$id('rp-phone').value) $id('rp-phone').value = h.phone;
+      $id('rp-find').value = '';
+      hidePlayerFind();
+      $id('rp-sub').textContent = h.playedForYou
+        ? `Played for you in ${h.lastSeasonName || 'a past season'} — joins your roster right away.`
+        : `Played for ${h.lastTeamName || 'another team'} in ${h.lastSeasonName || 'a past season'} — the league reviews this one before they join.`;
+      ['rp-name-w', 'rp-gender-w', 'rp-email-w'].forEach(id => $id(id).classList.remove('is-bad'));
+    }
+    async function runPlayerFind(q) {
+      const seq = ++_rpFindSeq;
+      try {
+        const res = await fetch('/.netlify/functions/captain-player-search?q=' + encodeURIComponent(q),
+          { credentials: 'include' });
+        if (!res.ok) { hidePlayerFind(); return; }
+        const d = await res.json();
+        if (seq !== _rpFindSeq) return; // a newer keystroke already won
+        renderPlayerFind(d.results || [], q, d.more || 0);
+      } catch { hidePlayerFind(); }
     }
 
     async function saveRosterArray(updated, successMsg) {
@@ -3831,12 +3941,23 @@
         // them first. Say so plainly instead of a bare "Saved", or the captain
         // goes looking for someone who isn't there.
         const queued = (data.pendingApproval || []).length;
-        if (queued) {
-          status.className = 'cap-status is-info';
-          status.textContent = queued === 1
-            ? `Sent to the league for approval. ${data.pendingApproval[0].name} joins your roster once it's approved.`
-            : `${queued} players sent to the league for approval.`;
-          setTimeout(() => { status.textContent = ''; }, 6000);
+        const straightIn = (data.autoAdded || []).length;
+        if (queued || straightIn) {
+          const parts = [];
+          if (straightIn) {
+            const first = data.autoAdded[0];
+            parts.push(straightIn === 1
+              ? `${first.name} has played for you before — added straight to your roster.`
+              : `${straightIn} of your past players were added straight to your roster.`);
+          }
+          if (queued) {
+            parts.push(queued === 1
+              ? `${data.pendingApproval[0].name} hasn't played for you before, so they're with the league for approval.`
+              : `${queued} players haven't played for you before and are with the league for approval.`);
+          }
+          status.className = queued ? 'cap-status is-info' : 'cap-status is-success';
+          status.textContent = parts.join(' ');
+          setTimeout(() => { status.textContent = ''; }, 7000);
           return;
         }
         status.className = 'cap-status is-success';
@@ -4095,6 +4216,39 @@
     }
 
     $id('add-player-btn').addEventListener('click', () => openRosterEditor(null));
+
+    // Player search: debounced so a fast typist fires one request, not six.
+    (function wirePlayerFind() {
+      const input = $id('rp-find'); if (!input) return;
+      input.addEventListener('input', () => {
+        const q = input.value.trim();
+        clearTimeout(_rpFindTimer);
+        if (q.length < 2) { hidePlayerFind(); return; }
+        _rpFindTimer = setTimeout(() => runPlayerFind(q), 220);
+      });
+      input.addEventListener('keydown', (e) => {
+        const box = $id('rp-find-results');
+        if (!_rpHits.length || box.hidden) {
+          if (e.key === 'Escape') hidePlayerFind();
+          return;
+        }
+        if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault();
+          _rpActive = (_rpActive + (e.key === 'ArrowDown' ? 1 : -1) + _rpHits.length) % _rpHits.length;
+          box.querySelectorAll('.rp-hit').forEach((el, i) => el.classList.toggle('is-active', i === _rpActive));
+          box.querySelectorAll('.rp-hit')[_rpActive]?.scrollIntoView({ block: 'nearest' });
+        } else if (e.key === 'Enter') {
+          e.preventDefault();
+          choosePlayerHit(_rpActive >= 0 ? _rpActive : 0);
+        } else if (e.key === 'Escape') {
+          hidePlayerFind();
+        }
+      });
+      // Clicking anywhere else in the sheet closes the dropdown.
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('.rp-find')) hidePlayerFind();
+      });
+    })();
 
     // ===== Utils =====
     function escapeHtml(s) {

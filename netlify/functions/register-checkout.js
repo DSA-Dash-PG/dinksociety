@@ -29,6 +29,9 @@ import { getStore } from '@netlify/blobs';
 import crypto from 'crypto';
 import { sendEmail } from './lib/email.js';
 import { circuitCode } from './lib/circuit.js';
+import { carryOverRoster } from './lib/league-players.js';
+import { normalizeEmail, normalizePhone } from './lib/identity.js';
+import { rebuildStandings } from './lib/standings.js';
 import { resolveDepositTerms, VENMO_HANDLE, venmoProfileUrl, fmtDueDate, CARD_PAYMENTS_ENABLED, DEFAULT_TEAM_FEE, DEFAULT_AGENT_FEE } from './lib/payment-terms.js';
 
 export default async (req) => {
@@ -69,6 +72,46 @@ export default async (req) => {
     }
     if (path === 'agent' && (!agent?.name || !agent?.email)) {
       return new Response('Free agent registration requires name and email', { status: 400 });
+    }
+
+    // ── Returning team: carry last season's roster forward ───────────────
+    // The page sends only roster IDs (it was never shown real email addresses),
+    // so the roster is rebuilt here from the prior team record — and only after
+    // re-checking that this captain actually led it. The carried players ride
+    // along on the registration as ordinary team.players, which means all three
+    // places a team record gets created (below, stripe-webhook, and
+    // admin-registration-confirm) pick them up without special-casing.
+    if (path === 'team' && team?.returningFrom?.teamId) {
+      try {
+        const { players: carried, team: prior } = await carryOverRoster({
+          teamId: team.returningFrom.teamId,
+          playerIds: team.returningFrom.playerIds,
+          captainEmail: team.players?.[0]?.email,
+        });
+        if (carried.length) {
+          const seen = new Set(
+            (team.players || []).map(p => normalizeEmail(p.email)).filter(Boolean)
+          );
+          const fresh = carried.filter(p => {
+            const k = normalizeEmail(p.email);
+            if (k && seen.has(k)) return false;
+            if (k) seen.add(k);
+            return true;
+          });
+          team.players = [...(team.players || []), ...fresh];
+          team.carriedOver = {
+            fromTeamId: prior?.id || null,
+            fromTeamName: prior?.name || '',
+            count: fresh.length,
+            at: new Date().toISOString(),
+          };
+        }
+      } catch (carryErr) {
+        // A failed carry-over must never block the registration — worst case
+        // the captain builds the roster in the portal as before.
+        console.error('Returning-team carry-over failed:', carryErr?.message || carryErr);
+      }
+      delete team.returningFrom;
     }
 
     // Look up the season to get the Stripe price ID (if seasonId provided)
@@ -142,18 +185,34 @@ export default async (req) => {
               // Both keys: `circuit` is what the blobs are keyed by, `seasonId`
               // is what the season-scoped pages filter on.
               seasonId: seasonId || null,
+              // gender/dupr are carried through rather than blanked: a returning
+              // roster arrives with them already filled in, and dropping them
+              // would send the captain back to retype what the league knows.
               roster: (team.players || []).map((p, i) => ({
                 id: `p_${regId}_${i}`,
                 name: p.name || '',
-                gender: '',
+                gender: p.gender || '',
                 email: p.email || '',
                 phone: p.phone || '',
-                dupr: '',
+                dupr: p.dupr || '',
+                normalizedEmail: normalizeEmail(p.email),
+                normalizedPhone: normalizePhone(p.phone),
+                ...(i === 0 ? { isCaptain: true } : {}),
+                ...(p.returning ? { returningPlayer: true } : {}),
               })),
               registrationId: regId,
+              // The team this squad came from, so next season's roster adds can
+              // tell "our player" from a transfer even if the captain changes.
+              priorTeamId: team.carriedOver?.fromTeamId || null,
               createdAt: new Date().toISOString(),
               status: 'active',
             });
+
+            // Public standings read a persisted blob, not the live team list —
+            // without this the team appears on /teams but never on /standings.
+            // Awaited on purpose: a returning lambda kills work in flight.
+            await rebuildStandings(circuitStored)
+              .catch(e => console.error('rebuildStandings after team create failed:', e?.message || e));
 
             // Send a confirmation email (no payment summary since pay-later)
             if (captainEmail) {

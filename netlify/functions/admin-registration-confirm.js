@@ -14,6 +14,9 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { json, findRegistration, migratePayments, recalcPayments } from './lib/registrations.js';
 import { sendEmail } from './lib/email.js';
 import { fmtDueDate } from './lib/payment-terms.js';
+import { normalizeEmail, normalizePhone } from './lib/identity.js';
+import { circuitCode } from './lib/circuit.js';
+import { rebuildStandings } from './lib/standings.js';
 
 // Core logic — also invoked by the admin-registration-update router.
 export async function run(body, admin) {
@@ -77,22 +80,34 @@ export async function run(body, admin) {
         divisionLabel: reg.divisionLabel || null,
         circuit: reg.circuit || 'I',
         seasonId: reg.seasonId || null,
+        // gender/dupr carried through — a returning-team registration arrives
+        // with last season's details already on the players.
         roster: (reg.team.players || []).map((p, i) => ({
           id: `p_${id}_${i}`,
           name: p.name || '',
-          gender: '',
+          gender: p.gender || '',
           email: p.email || '',
           phone: p.phone || '',
-          dupr: '',
+          dupr: p.dupr || '',
+          normalizedEmail: normalizeEmail(p.email),
+          normalizedPhone: normalizePhone(p.phone),
           isCaptain: i === 0,
+          ...(p.returning ? { returningPlayer: true } : {}),
         })),
         registrationId: id,
+        priorTeamId: reg.team.carriedOver?.fromTeamId || null,
         createdAt: new Date().toISOString(),
         createdBy: admin.email,
         status: 'active',
       };
       await teamStore.setJSON(`team/${teamId}.json`, teamRecord);
       console.log(`Team created via admin confirm: ${teamId} (${reg.team.name})`);
+      // The public standings/leaderboard read a PERSISTED blob, not the live
+      // team list — so a newly approved team is invisible on the public side
+      // until the aggregate is rebuilt. Must be AWAITED: a lambda that returns
+      // first kills the work in flight.
+      await rebuildStandings(circuitCode(reg.circuit || reg.seasonId))
+        .catch(e => console.error('rebuildStandings after team create failed:', e?.message || e));
     } catch (teamErr) {
       console.error('Failed to create team on confirm:', teamErr);
     }

@@ -18,6 +18,9 @@ import Stripe from 'stripe';
 import { getStore } from '@netlify/blobs';
 import { sendEmail } from './lib/email.js';
 import { seasonName } from './lib/circuit.js';
+import { normalizeEmail, normalizePhone } from './lib/identity.js';
+import { circuitCode } from './lib/circuit.js';
+import { rebuildStandings } from './lib/standings.js';
 
 export default async (req) => {
   if (req.method !== 'POST') {
@@ -172,21 +175,32 @@ export default async (req) => {
             divisionLabel: reg.divisionLabel || null,
             circuit: reg.circuit || 'I',
             seasonId: reg.seasonId || null,
+            // gender/dupr carried through — a returning-team registration
+            // arrives with last season's details already on the players.
             roster: (reg.team.players || []).map((p, i) => ({
               id: `p_${regId}_${i}`,
               name: p.name || '',
-              gender: '',
+              gender: p.gender || '',
               email: p.email || '',
               phone: p.phone || '',
-              dupr: '',
+              dupr: p.dupr || '',
+              normalizedEmail: normalizeEmail(p.email),
+              normalizedPhone: normalizePhone(p.phone),
+              ...(i === 0 ? { isCaptain: true } : {}),
+              ...(p.returning ? { returningPlayer: true } : {}),
             })),
             registrationId: regId,
+            priorTeamId: reg.team.carriedOver?.fromTeamId || null,
             createdAt: new Date().toISOString(),
             status: 'active',
           };
 
           await teamsStore.setJSON(`team/${teamId}.json`, teamRecord);
           console.log(`Team created: ${teamId} (${reg.team.name}) captain=${captainEmail}`);
+          // Public standings read a persisted blob — rebuild it or the new team
+          // shows on /teams but is missing from /standings. Must be awaited.
+          await rebuildStandings(circuitCode(reg.circuit || reg.seasonId))
+            .catch(e => console.error('rebuildStandings after team create failed:', e?.message || e));
         } catch (teamErr) {
           console.error('Failed to create team record:', teamErr);
         }

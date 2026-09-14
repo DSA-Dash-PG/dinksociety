@@ -119,6 +119,28 @@
     .reg-player__heading { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 700; margin-bottom: 12px; color: var(--color-text-faint); }
     .reg-player__heading .captain { color: var(--color-lime); margin-left: 6px; }
 
+    /* ── Returning team: bring last season's roster forward ──────── */
+    .reg-back { margin: 14px 0 4px; padding: 16px 18px; border-radius: var(--radius-sm);
+      background: var(--color-lime-ghost); border: 1px solid var(--color-lime); }
+    .reg-back__hd { font-size: 14px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; margin: 0 0 4px; }
+    .reg-back__sub { font-size: 12.5px; line-height: 1.6; color: var(--color-text-muted); margin: 0 0 14px; }
+    .reg-back__tools { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+    .reg-back__tool { background: none; border: none; padding: 0; font-family: inherit; font-size: 11px;
+      font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--color-lime); cursor: pointer; }
+    .reg-back__count { margin-left: auto; font-size: 11px; color: var(--color-text-faint); font-weight: 600; }
+    .reg-back__list { display: grid; gap: 2px; max-height: 300px; overflow-y: auto; }
+    .reg-back__row { display: flex; align-items: center; gap: 11px; padding: 9px 2px; cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,.06); }
+    .reg-back__row:last-child { border-bottom: none; }
+    .reg-back__row input { width: 17px; height: 17px; flex-shrink: 0; accent-color: var(--color-lime); cursor: pointer; }
+    .reg-back__who { flex: 1; min-width: 0; }
+    .reg-back__name { display: block; font-size: 13.5px; font-weight: 700; }
+    .reg-back__meta { display: block; font-size: 11px; color: var(--color-text-faint); margin-top: 1px; }
+    .reg-back__note { font-size: 11.5px; line-height: 1.55; color: var(--color-text-faint); margin: 12px 0 0; }
+    .reg-back__dismiss { background: none; border: none; padding: 0; margin-top: 10px; font-family: inherit;
+      font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      color: var(--color-text-faint); cursor: pointer; }
+
     /* ── Waiver ────────────────────────────────────────── */
     .reg-waiver {
       max-height: 240px; overflow-y: auto;
@@ -562,6 +584,22 @@
         <div id="team-fields">
           <div class="reg-field"><label for="team-name">Team name</label><input type="text" id="team-name" placeholder="e.g. Dink Floyd" maxlength="40"><div class="reg-field__error" data-error="team-name">Team name is required.</div></div>
           <div class="reg-player"><div class="reg-player__heading">Captain</div><div class="reg-field__row"><div class="reg-field"><label for="p1-first">First name</label><input type="text" id="p1-first" data-required="1"></div><div class="reg-field"><label for="p1-last">Last name</label><input type="text" id="p1-last" data-required="1"></div></div><div class="reg-field__row"><div class="reg-field"><label for="p1-email">Email</label><input type="email" id="p1-email" data-required="1"></div><div class="reg-field"><label for="p1-phone">Phone</label><input type="tel" id="p1-phone" data-required="1"></div></div></div>
+          <!-- Returning team — populated once the captain's email is recognized.
+               Ticked players are written straight onto the new roster at
+               checkout, so a repeat team doesn't rebuild what we already have. -->
+          <div class="reg-back" id="returning-card" style="display:none;">
+            <h3 class="reg-back__hd" id="returning-hd">Welcome back</h3>
+            <p class="reg-back__sub" id="returning-sub"></p>
+            <div class="reg-back__tools">
+              <button type="button" class="reg-back__tool" id="returning-all">Select all</button>
+              <button type="button" class="reg-back__tool" id="returning-none">Clear</button>
+              <span class="reg-back__count" id="returning-count"></span>
+            </div>
+            <div class="reg-back__list" id="returning-list"></div>
+            <p class="reg-back__note">These players join your roster as soon as you're registered — no approval needed, and their stats carry over. You can add, drop and edit anyone in the Captain Portal afterwards.</p>
+            <button type="button" class="reg-back__dismiss" id="returning-dismiss">Not this team — start fresh</button>
+          </div>
+
           <p style="font-size: 12px; line-height: 1.6; color: var(--color-text-faint); margin: 4px 0 0;">You'll build your full roster (6–12 players) through the Captain Portal after checkout.</p>
         </div>
 
@@ -1412,6 +1450,106 @@
       return tail ? tail.toUpperCase() : 'I';
     }
 
+    // ── Returning team ──────────────────────────────────────────────────
+    // A team re-registering used to arrive with a one-person roster and rebuild
+    // last season's squad by hand, one approval at a time. Recognizing the
+    // captain's email and offering their previous roster as a checklist is the
+    // whole fix; the ticked players are resolved server-side at checkout (the
+    // page is only ever given masked emails and roster ids).
+    const returning = { data: null, chosen: new Set(), dismissed: false, lastQueried: '' };
+
+    async function lookupReturningTeam() {
+      const email = val('p1-email');
+      if (returning.dismissed) return;
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+      if (email.toLowerCase() === returning.lastQueried) return;
+      returning.lastQueried = email.toLowerCase();
+      try {
+        const res = await fetch('/.netlify/functions/registration-returning-team', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            circuit: (activeSeason && activeSeason.circuit) || null,
+          }),
+        });
+        if (!res.ok) return;
+        const d = await res.json();
+        if (!d.found || !(d.players || []).length) { hideReturning(); return; }
+        returning.data = d;
+        returning.chosen = new Set(d.players.map(p => p.id)); // everyone ticked by default
+        renderReturning();
+      } catch { /* a failed lookup just means the normal flow */ }
+    }
+
+    function hideReturning() {
+      returning.data = null;
+      returning.chosen = new Set();
+      const card = document.getElementById('returning-card');
+      if (card) card.style.display = 'none';
+    }
+
+    function renderReturning() {
+      const d = returning.data;
+      const card = document.getElementById('returning-card');
+      if (!d || !card) return;
+      document.getElementById('returning-hd').textContent =
+        `Welcome back, ${d.teamName || 'captain'}`;
+      document.getElementById('returning-sub').textContent =
+        `You captained ${d.teamName} in ${d.seasonName}. Bring the roster over — untick anyone who isn't playing this season.`;
+      document.getElementById('returning-list').innerHTML = d.players.map(p => {
+        const bits = [];
+        if (p.gender) bits.push(p.gender === 'F' ? 'Women’s' : 'Men’s');
+        if (p.emailMasked) bits.push(esc(p.emailMasked));
+        if (p.dupr) bits.push('DUPR ' + esc(p.dupr));
+        return `<label class="reg-back__row">
+          <input type="checkbox" data-ret="${esc(p.id)}" ${returning.chosen.has(p.id) ? 'checked' : ''}>
+          <span class="reg-back__who">
+            <span class="reg-back__name">${esc(p.name)}</span>
+            <span class="reg-back__meta">${bits.join(' · ') || 'Played last season'}</span>
+          </span>
+        </label>`;
+      }).join('');
+      card.style.display = '';
+      card.querySelectorAll('[data-ret]').forEach(cb => {
+        cb.addEventListener('change', () => {
+          if (cb.checked) returning.chosen.add(cb.dataset.ret);
+          else returning.chosen.delete(cb.dataset.ret);
+          updateReturningCount();
+        });
+      });
+      // Offer the old team name, but never overwrite one they've already typed.
+      const nameEl = document.getElementById('team-name');
+      if (nameEl && !nameEl.value.trim() && d.teamName) nameEl.value = d.teamName;
+      updateReturningCount();
+    }
+
+    function updateReturningCount() {
+      const el = document.getElementById('returning-count');
+      const total = (returning.data?.players || []).length;
+      if (el) el.textContent = `${returning.chosen.size} of ${total} coming back`;
+    }
+
+    (function wireReturning() {
+      const email = document.getElementById('p1-email');
+      if (email) {
+        email.addEventListener('blur', lookupReturningTeam);
+        email.addEventListener('change', lookupReturningTeam);
+      }
+      document.getElementById('returning-all')?.addEventListener('click', () => {
+        returning.chosen = new Set((returning.data?.players || []).map(p => p.id));
+        renderReturning();
+      });
+      document.getElementById('returning-none')?.addEventListener('click', () => {
+        returning.chosen = new Set();
+        renderReturning();
+      });
+      document.getElementById('returning-dismiss')?.addEventListener('click', () => {
+        returning.dismissed = true;
+        hideReturning();
+      });
+    })();
+
     function buildPayload() {
       const captainName = (val('p1-first') + ' ' + val('p1-last')).trim();
       const seasonId = activeSeason ? activeSeason.id : 'circuit-i';
@@ -1439,9 +1577,17 @@
       return Object.assign(base, {
         path: 'team', price: divTeamPrice(),
         venmoOption: state.venmoOption === 'full' ? 'full' : 'deposit',
-        team: { name: val('team-name'), captain: captainName, players: [
-          { name: captainName, firstName: val('p1-first'), lastName: val('p1-last'), email: val('p1-email'), phone: val('p1-phone'), captain: true },
-        ]},
+        team: {
+          name: val('team-name'), captain: captainName,
+          players: [
+            { name: captainName, firstName: val('p1-first'), lastName: val('p1-last'), email: val('p1-email'), phone: val('p1-phone'), captain: true },
+          ],
+          // Roster ids only — register-checkout re-resolves the real players
+          // from the prior team record after re-checking this captain led it.
+          ...(returning.data && returning.chosen.size
+            ? { returningFrom: { teamId: returning.data.teamId, playerIds: [...returning.chosen] } }
+            : {}),
+        },
       });
     }
 
