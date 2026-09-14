@@ -20,6 +20,7 @@ import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/ide
 import { circuitCode, seasonName, seasonIdForCircuit, isCanonicalCode } from './lib/circuit.js';
 import { rebuildStandings } from './lib/standings.js';
 import { logActivity } from './lib/activity-log.js';
+import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -174,6 +175,9 @@ export default async (req) => {
       // Archive state is owned by the archive/restore actions — preserve it from
       // the stored roster by id so a plain roster save can't flip or wipe it.
       const prevById = new Map((team.roster || []).map(x => [x.id, x]));
+      // Ids present before this save — anything else in the result is someone
+      // the admin has just introduced, and they get welcomed like any other add.
+      const priorIds = new Set((team.roster || []).map(x => x && x.id).filter(Boolean));
       team.roster = body.roster.map(p => {
         const prev = prevById.get(p.id) || null;
         // Bio profile: merge any admin-supplied fields onto the stored profile
@@ -286,6 +290,12 @@ export default async (req) => {
       // "Team Leaders", leaderboard, etc.). Rename path above already rebuilds.
       rebuildStandings(circuitCode(team.circuit)).catch(err =>
         console.error('rebuildStandings after roster update failed:', err));
+      const introduced = (team.roster || [])
+        .filter(p => p && p.id && p.email && !priorIds.has(p.id))
+        .map(p => p.id);
+      if (introduced.length) {
+        await sendRosterWelcomesSafe({ teamId, playerIds: introduced });
+      }
     }
     if (divisionChanged && divisionSync && !divisionSync.synced) {
       return json({ ok: true, team, warning: 'Division saved on the team, but no linked registration was found to update (' + divisionSync.reason + '). "Sync Teams" may revert it — fix the registration division too.' });
@@ -458,6 +468,12 @@ export default async (req) => {
         // Refresh aggregates so the new player appears on public pages.
         rebuildStandings(circuitCode(team.circuit)).catch(err =>
           console.error('rebuildStandings after add-player failed:', err));
+        // An admin add puts them on the roster just as surely as a captain's
+        // does, so it earns the same welcome. No `addedByName`: the admin isn't
+        // their captain, and the copy reads fine without a name.
+        if (newPlayer.email) {
+          await sendRosterWelcomesSafe({ teamId, playerIds: [newPlayer.id] });
+        }
         // Surface (don't block) any contact collision the new player created.
         const duplicateWarnings = findContactCollisions(roster);
         return json({ ok: true, player: newPlayer, rosterCount: roster.length, duplicateWarnings });
