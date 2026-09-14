@@ -25,6 +25,7 @@ import { normalizeEmail } from './lib/identity.js';
 import { isTestTeam } from './lib/circuit.js';
 import { logActivity } from './lib/activity-log.js';
 import { sendEmail, renderRosterAddDecision } from './lib/email.js';
+import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 
 const VALID_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -179,6 +180,17 @@ export default async (req) => {
       } catch (err) {
         console.error('roster-approval email failed:', err?.message || err);
       }
+    }
+
+    // Approved means they are actually ON the roster now — that is the moment
+    // the player hears from us. A rejection sends nothing to the player, who
+    // never knew they were requested.
+    if (action === 'approve') {
+      await sendRosterWelcomesSafe({
+        teamId,
+        playerIds: [playerId],
+        addedByName: player.pendingAddBy || team.captainName || '',
+      });
     }
 
     await logActivity({

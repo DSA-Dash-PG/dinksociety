@@ -937,3 +937,136 @@ export function renderLineupReceipt({ teamName, teamEmoji, opponentName, oppEmoj
     bodyHtml: body, teamName: `${teamName} captains`,
   });
 }
+
+/**
+ * Render the roster-welcome email — sent once, the moment a player actually
+ * lands on a roster (a captain adding one of their own past players, or the
+ * league approving a request).
+ *
+ * TWO VERSIONS, chosen by `returning`:
+ *   returning → "Welcome back". Leads with the record and DSR that follow them
+ *               across seasons, which is the thing a repeat player cares about.
+ *   new       → "Welcome to the league". Same skeleton, but the strip explains
+ *               how a league night actually works, and step 3 explains what a
+ *               DSR is rather than quoting one they don't have yet.
+ *
+ * NOTE on "returning": this is looser than the roster-approval rule. Approval
+ * asks "have they played for THIS team" (anyone else is a transfer the league
+ * should see). This asks "have they played in this LEAGUE at all" — their stats
+ * carry over either way, so greeting a team-switcher as a newcomer would be
+ * plainly wrong.
+ *
+ * `carry` is optional and omitted wholesale when thin — a returning player with
+ * no completed matches gets the welcome without a box full of dashes.
+ *
+ * @param {{ playerName:string, teamName:string, teamEmoji?:string, seasonName:string,
+ *           divisionLabel?:string, addedByName?:string, returning:boolean,
+ *           carry?:{ teamName:string, seasonName:string, record?:string, dsr?:string }|null,
+ *           night?:{ when?:string, format?:string, venue?:string }|null,
+ *           magicUrl:string, siteUrl:string }} opts
+ */
+export function renderRosterWelcome({
+  playerName, teamName, teamEmoji, seasonName, divisionLabel,
+  addedByName, returning, carry, night, magicUrl, siteUrl,
+}) {
+  const accent = '#b8ff2c';
+  const kickerBg = returning ? '#17d7b0' : '#b8ff2c';
+  const first = String(playerName || '').trim().split(/\s+/)[0] || 'there';
+  const site = siteUrl || 'https://dinksociety.app';
+  const addedBy = (addedByName || '').trim();
+  const divLine = divisionLabel ? ` · ${escapeBody(divisionLabel)}` : '';
+
+  const lede = returning
+    ? `${addedBy ? escapeBody(addedBy) + ' added you to' : 'You’re back on'} <strong style="color:#f5f5f5;">${escapeBody(teamName)}</strong> for <strong style="color:#f5f5f5;">${escapeBody(seasonName)}</strong>${divLine}. Same paddle, new season.`
+    : `${addedBy ? escapeBody(addedBy) + ' added you to' : 'You’ve been added to'} <strong style="color:#f5f5f5;">${escapeBody(teamName)}</strong> for <strong style="color:#f5f5f5;">${escapeBody(seasonName)}</strong>${divLine}. Here’s everything you need before your first Monday.`;
+
+  // ── the strip under the lede ──
+  const row = (label, value, color) =>
+    `<tr><td style="padding:2px 0;">${escapeBody(label)}</td>`
+    + `<td style="padding:2px 0;text-align:right;font-weight:700;color:${color || '#f5f5f5'};">${escapeBody(value)}</td></tr>`;
+
+  let strip = '';
+  if (returning && carry) {
+    const rows = [
+      carry.record ? row(`${carry.seasonName} · ${carry.teamName}`, carry.record) : '',
+      carry.dsr ? row('Your DSR going in', carry.dsr, '#17d7b0') : '',
+    ].filter(Boolean).join('');
+    if (rows) {
+      strip = `
+      <div style="margin:0 0 24px;padding:14px 16px;background:#161616;border-left:3px solid #17d7b0;border-radius:0 8px 8px 0;">
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#17d7b0;margin-bottom:8px;">Your record follows you</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;color:#cfcfcf;">${rows}</table>
+      </div>`;
+    }
+  } else if (!returning && night) {
+    const rows = [
+      night.when ? row('When', night.when) : '',
+      night.format ? row('Format', night.format) : '',
+      night.venue ? row('Where', night.venue) : '',
+    ].filter(Boolean).join('');
+    if (rows) {
+      strip = `
+      <div style="margin:0 0 24px;padding:14px 16px;background:#161616;border-left:3px solid ${accent};border-radius:0 8px 8px 0;">
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:${accent};margin-bottom:8px;">How a league night works</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;color:#cfcfcf;">${rows}</table>
+      </div>`;
+    }
+  }
+
+  // ── the three things ──
+  const step = (n, title, body, last) => `
+    <tr>
+      <td style="width:26px;vertical-align:top;padding:0 0 ${last ? '0' : '14px'};font-size:13px;font-weight:800;color:${accent};">${n}</td>
+      <td style="vertical-align:top;padding:0 0 ${last ? '0' : '14px'};">
+        <div style="font-size:14px;font-weight:700;color:#f5f5f5;margin-bottom:2px;">${title}</div>
+        <div style="font-size:13px;color:#8a8a8a;line-height:1.55;">${body}</div>
+      </td>
+    </tr>`;
+
+  const availBody = returning
+    ? 'Mark yourself for each Monday. Your captain can’t put you in a lineup if you’re out — and can’t leave you out by accident if you’re in.'
+    : `Mark yourself for each Monday. It’s how ${addedBy ? escapeBody(addedBy.split(/\s+/)[0]) : 'your captain'} knows who can go in the lineup — do this one first.`;
+  const lineupBody = returning
+    ? 'Who you’re partnered with, which games, which court. Both teams’ lineups unlock 15 minutes before first serve.'
+    : 'Who you’re partnered with, which games, which court. Both teams’ lineups unlock 15 minutes before first serve — nobody sees yours early.';
+  const statsTitle = returning ? 'Track your stats' : 'Watch your rating build';
+  const statsBody = returning
+    ? 'Your DSR week by week, your record, who you play best with, and where you land on the leaderboard.'
+    : 'Everyone gets a DSR — our league rating. Yours starts after your first night and moves every week.';
+
+  const readLinks = returning
+    ? `Also worth a look: <a href="${site}/schedule.html" style="color:${accent};text-decoration:none;font-weight:600;">the schedule</a>, <a href="${site}/standings.html" style="color:${accent};text-decoration:none;font-weight:600;">standings</a>, and <a href="${site}/drop.html" style="color:${accent};text-decoration:none;font-weight:600;">The Drop</a> — our weekly write-up of who did what.`
+    : `Worth a read before Monday: <a href="${site}/rules.html" style="color:${accent};text-decoration:none;font-weight:600;">the rules</a>, <a href="${site}/schedule.html" style="color:${accent};text-decoration:none;font-weight:600;">the schedule</a>, and <a href="${site}/drop.html" style="color:${accent};text-decoration:none;font-weight:600;">The Drop</a> — our weekly write-up of who did what.`;
+
+  return `
+    <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:36px 24px;background:#0e0e0e;color:#f5f5f5;">
+      <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:24px;">THE DINK SOCIETY</div>
+      <div style="display:inline-block;font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#0e0e0e;background:${kickerBg};border-radius:9999px;padding:4px 12px;margin-bottom:16px;">${returning ? 'You’re on the roster' : 'Welcome to the league'}</div>
+      <h1 style="font-size:21px;font-weight:800;color:#f5f5f5;margin:0 0 8px;line-height:1.25;">${teamEmoji ? escapeBody(teamEmoji) + ' ' : ''}${returning ? `Welcome back, ${escapeBody(first)}.` : `You’re in, ${escapeBody(first)}.`}</h1>
+      <p style="font-size:14px;color:#a5a5a5;margin:0 0 22px;line-height:1.6;">${lede}</p>
+      ${strip}
+      <a href="${magicUrl}" style="display:inline-block;padding:13px 30px;background:${accent};color:#0e0e0e;font-size:14px;font-weight:700;text-decoration:none;border-radius:9999px;">Open my portal</a>
+      <p style="font-size:12px;color:#6a6a6a;margin:10px 0 26px;line-height:1.5;">One tap — no password${returning ? '' : ' to set up'}. The link is yours and expires in 7 days.</p>
+      <div style="font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#8a8a8a;margin:0 0 12px;">Three things you’ll use it for</div>
+      <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;margin:0 0 24px;">
+        ${step(1, 'Say if you’re in or out', availBody, false)}
+        ${step(2, 'See the lineup', lineupBody, false)}
+        ${step(3, statsTitle, statsBody, true)}
+      </table>
+      <div style="padding-top:18px;border-top:1px solid #2a2a2a;">
+        <div style="font-size:13px;color:#8a8a8a;line-height:1.7;">${readLinks}</div>
+      </div>
+      <div style="margin-top:32px;padding-top:18px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6;">
+        ${escapeBody(teamName)} · The Dink Society · Southern California Pickleball League<br>
+        ${returning ? 'Questions? Just reply to this email.' : 'New and not sure about something? Just reply to this email.'}
+      </div>
+    </div>
+  `;
+}
+
+/** Subject line that goes with renderRosterWelcome. */
+export function rosterWelcomeSubject({ returning, teamName, seasonName }) {
+  return returning
+    ? `You’re back — ${teamName}, ${seasonName}`
+    : `Welcome to The Dink Society — you’re on ${teamName}`;
+}

@@ -17,6 +17,7 @@ import { fmtDueDate } from './lib/payment-terms.js';
 import { normalizeEmail, normalizePhone } from './lib/identity.js';
 import { circuitCode } from './lib/circuit.js';
 import { rebuildStandings } from './lib/standings.js';
+import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 
 // Core logic — also invoked by the admin-registration-update router.
 export async function run(body, admin) {
@@ -108,6 +109,21 @@ export async function run(body, admin) {
       // first kills the work in flight.
       await rebuildStandings(circuitCode(reg.circuit || reg.seasonId))
         .catch(e => console.error('rebuildStandings after team create failed:', e?.message || e));
+
+      // A returning team arrives with last season's squad already carried onto
+      // the roster, so this is the moment those players join. The captain is
+      // skipped: they just got the registration-confirmed email and don't need
+      // welcoming to their own team.
+      const welcomeIds = (teamRecord.roster || [])
+        .filter(p => p && !p.isCaptain && p.email)
+        .map(p => p.id);
+      if (welcomeIds.length) {
+        await sendRosterWelcomesSafe({
+          teamId,
+          playerIds: welcomeIds,
+          addedByName: teamRecord.captainName || '',
+        });
+      }
     } catch (teamErr) {
       console.error('Failed to create team on confirm:', teamErr);
     }

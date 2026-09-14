@@ -12,6 +12,7 @@ import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/identity.js';
 import { circuitCode } from './lib/circuit.js';
 import { buildLeagueIndex, playedBefore, playedForTeam } from './lib/league-players.js';
+import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 
 const MAX_ROSTER_SIZE = 20;
 
@@ -204,6 +205,18 @@ export default async (req) => {
         rosterUpdatedAt: new Date().toISOString(),
       };
       await store.setJSON(teamKey, updated);
+
+      // Welcome the players who actually JOINED on this save. Anyone queued for
+      // approval is deliberately left out — admin-roster-approvals welcomes
+      // them if and when the league says yes. Awaited so the send completes
+      // before the lambda returns, but it can never fail the save.
+      if (autoAddedNow.length) {
+        await sendRosterWelcomesSafe({
+          teamId: ctx.team.id,
+          playerIds: autoAddedNow.map(p => p.id),
+          addedByName: ctx.user?.name || ctx.team?.captainName || '',
+        });
+      }
 
       return json({
         team: updated,

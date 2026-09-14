@@ -84,7 +84,11 @@ export function indexLeaguePlayers(teams) {
         rec = { email: key, name: '', gender: '', phone: '', dupr: '', stints: [], _latest: -1 };
         byEmail.set(key, rec);
       }
-      rec.stints.push(stint);
+      // playerId is per-stint, not per-person: a returning player gets a fresh
+      // id on each season's team record. player-stats blobs are keyed by that
+      // id, so carrying it here is the only way to find what someone did last
+      // season from the email they came back with.
+      rec.stints.push({ ...stint, playerId: p.id || null });
 
       if (order >= rec._latest) {
         rec._latest = order;
