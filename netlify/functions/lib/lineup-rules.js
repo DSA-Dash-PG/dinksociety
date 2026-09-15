@@ -1,7 +1,17 @@
 // netlify/functions/lib/lineup-rules.js
 // Pure, dependency-free lineup rules shared by captain-lineup.js (and unit-tested).
 
-export const MAX_GAMES_PER_NIGHT = 4;
+// Nightly per-player game cap — the single source of truth. lineup-helpers.js
+// derives the minimum roster depth from this, and the captain portal / rules page
+// quote it, so changing this number moves every downstream rule with it.
+//
+// RULE CHANGE 2026-09-15: raised from 4 to 6 games per player per night.
+// At 6, the minimum legal roster is 2 women + 2 men (12 women-slots / 6 = 2, and
+// the same for men), so a 2F/2M team can field a full legal 12-game lineup.
+export const MAX_GAMES_PER_NIGHT = 6;
+
+/** When the current cap took effect — surfaced in UI copy so the change is traceable. */
+export const MAX_GAMES_RULE_EFFECTIVE = '2026-09-15';
 
 /**
  * Woman-first ordering for mixed doubles: returns { p1, p2 } with the woman as p1.

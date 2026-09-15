@@ -21,7 +21,9 @@
 //     keeps the override from becoming a loophole).
 //   - Hard errors (never bypassed): player not on roster, same player twice,
 //     wrong gender for the slot.
-//   - Soft rule violations (4-game cap, simultaneous-court pairs,
+//   - Soft rule violations (the per-player nightly game cap —
+//     MAX_GAMES_PER_NIGHT in lib/lineup-rules.js, 6 as of 2026-09-15 —
+//     simultaneous-court pairs,
 //     back-to-back/duplicate combos) return 409 { warning } unless
 //     force:true — admin can override everything, with friction + logging.
 //
