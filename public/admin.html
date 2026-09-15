@@ -227,6 +227,16 @@
     .ppick__nm { font-size: 12.5px; font-weight: 700; }
     .ppick__meta { font-size: 10.5px; color: var(--color-text-faint); margin-top: 1px; }
     .ppick__new { font-size: 11px; color: var(--color-text-faint); padding: 9px 11px; }
+    /* Already on the team we're adding to: shown, not hidden, so "missing" and
+       "already here / archived here" can't look the same. */
+    .ppick__opt--onteam { display: flex; align-items: center; justify-content: space-between; gap: 9px; width: 100%; text-align: left;
+      padding: 9px 11px; border-bottom: 1px solid var(--color-border); cursor: default; opacity: 0.85; }
+    .ppick__opt--onteam:last-of-type { border-bottom: 0; }
+    .ppick__tag { flex-shrink: 0; font-size: 9.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--color-text-faint); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 3px 9px; }
+    .ppick__restore { flex-shrink: 0; background: var(--color-lime-dim); color: var(--color-lime); border: none; border-radius: var(--radius-full);
+      font-family: inherit; font-size: 10px; font-weight: 700; padding: 5px 12px; cursor: pointer; }
+    .ppick__restore:disabled { opacity: 0.5; cursor: default; }
     .ppick__linked { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; padding: 7px 10px;
       border: 1px solid rgba(23,215,176,.35); background: rgba(23,215,176,.1); border-radius: var(--radius-sm); font-size: 11.5px; }
     .ppick__linked b { color: var(--color-teal); }
@@ -5031,19 +5041,63 @@
       close(); ppRenderLinked();
     };
 
+    // Restore someone who is on THIS roster but archived. Without this the only
+    // route back was the team panel's archived list, which is exactly where an
+    // admin doesn't look when they're trying to "add" a player they remember.
+    const restoreOnTeam = async (m, btn) => {
+      const entry = m.onTeam;
+      if (!entry || !entry.id) { ppStatus('Can’t restore — no player id on that roster entry.', true); return; }
+      if (btn) btn.disabled = true;
+      ppStatus('Restoring ' + (m.name || 'player') + '…');
+      try {
+        await ppAction('restore-player', { playerId: entry.id });
+        close();
+        closePlayerPop();
+        await renderTeams();
+      } catch (e) {
+        if (btn) btn.disabled = false;
+        ppStatus(e.message || 'Restore failed', true);
+      }
+    };
+
     const draw = () => {
-      if (!matches.length) { close(); return; }
+      // An empty list used to just close, so "no results" and "not typed enough"
+      // looked identical and a hidden player looked like a missing one. Always
+      // say something.
+      if (!matches.length) {
+        list.innerHTML = '<div class="ppick__new">No one in the league matches that. Keep typing — a new player is created on save.</div>';
+        list.classList.add('is-open');
+        return;
+      }
       list.innerHTML = matches.map((m, i) => {
         const seasons = [...new Set((m.seasons || [m]).map(x => teamSeasonCode(x)).filter(Boolean))];
         const meta = [m.teamName || null, seasons.length ? seasons.map(seasonNameForCode).join(', ') : null, m.email || null]
           .filter(Boolean).join(' · ');
+        // Already on the team we're adding to: say so instead of hiding them.
+        if (m.onTeam) {
+          const archived = m.onTeam.archived === true;
+          return '<div class="ppick__opt ppick__opt--onteam">' +
+            '<span><span class="ppick__nm">' + h(m.name) + '</span>' +
+            '<span class="ppick__meta">' + (archived
+              ? 'Archived on this roster — restore to bring back their stats'
+              : 'Already on this roster') +
+            (meta ? ' · ' + h(meta) : '') + '</span></span>' +
+            (archived
+              ? '<button type="button" class="ppick__restore" data-restore="' + i + '">Restore</button>'
+              : '<span class="ppick__tag">On roster</span>') +
+            '</div>';
+        }
         return '<button type="button" class="ppick__opt' + (i === sel ? ' is-sel' : '') + '" data-i="' + i + '">' +
           '<span><span class="ppick__nm">' + h(m.name) + '</span>' +
           (meta ? '<span class="ppick__meta">' + h(meta) + '</span>' : '') + '</span></button>';
       }).join('') + '<div class="ppick__new">No match? Keep typing — a new player is created on save.</div>';
       list.classList.add('is-open');
-      list.querySelectorAll('.ppick__opt').forEach(b => {
+      list.querySelectorAll('.ppick__opt[data-i]').forEach(b => {
         b.onclick = () => pick(matches[Number(b.dataset.i)]);
+      });
+      list.querySelectorAll('.ppick__restore').forEach(b => {
+        // mousedown, not click: the input's blur handler closes the list first.
+        b.onmousedown = (e) => { e.preventDefault(); restoreOnTeam(matches[Number(b.dataset.restore)], b); };
       });
     };
 
@@ -5052,18 +5106,45 @@
       const q = input.value.trim().toLowerCase();
       if (q.length < 2) { close(); return; }
       const dir = await loadPlayerDirectory();
-      const onTeam = new Set((PP_TEAM?.roster || []).map(p => (p.name || '').toLowerCase()));
+      // Players already on this team are annotated, NOT dropped. Dropping them
+      // made an archived team-mate (or a player already rostered here) look like
+      // someone the league had never heard of — the admin then created a
+      // duplicate, or gave up. Keyed by both name and email so a rename or a
+      // renamed-email row still lines up.
+      const onTeamByName = new Map(), onTeamByEmail = new Map();
+      for (const p of (PP_TEAM?.roster || [])) {
+        if (p.name) onTeamByName.set(p.name.trim().toLowerCase(), p);
+        if (p.email) onTeamByEmail.set(String(p.email).trim().toLowerCase(), p);
+      }
+      const hit = p => (p.name || '').toLowerCase().includes(q) || (p.email || '').toLowerCase().includes(q);
       matches = dir
-        .filter(p => p.name.toLowerCase().includes(q) && !onTeam.has(p.name.toLowerCase()))
+        .filter(hit)
+        .map(p => ({
+          ...p,
+          onTeam: onTeamByName.get((p.name || '').trim().toLowerCase())
+            || (p.email ? onTeamByEmail.get(String(p.email).trim().toLowerCase()) : null)
+            || null,
+        }))
+        // Addable people first, then archived (restorable), then already-rostered.
+        .sort((a, b) => {
+          const w = x => x.onTeam ? (x.onTeam.archived ? 1 : 2) : 0;
+          return w(a) - w(b) || a.name.localeCompare(b.name);
+        })
         .slice(0, 8);
       sel = -1; draw();
     };
 
+    // Arrow/Enter only ever land on a pickable row — skip the on-team ones.
+    const pickable = (i) => matches[i] && !matches[i].onTeam;
+    const nextPickable = (from, step) => {
+      for (let i = from; i >= 0 && i < matches.length; i += step) if (pickable(i)) return i;
+      return sel;
+    };
     input.onkeydown = (e) => {
       if (!list.classList.contains('is-open')) return;
-      if (e.key === 'ArrowDown') { e.preventDefault(); sel = Math.min(sel + 1, matches.length - 1); draw(); }
-      else if (e.key === 'ArrowUp') { e.preventDefault(); sel = Math.max(sel - 1, 0); draw(); }
-      else if (e.key === 'Enter' && sel >= 0) { e.preventDefault(); pick(matches[sel]); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); sel = nextPickable(sel + 1, 1); draw(); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); sel = nextPickable(Math.max(sel - 1, 0), -1); draw(); }
+      else if (e.key === 'Enter' && sel >= 0 && pickable(sel)) { e.preventDefault(); pick(matches[sel]); }
       else if (e.key === 'Escape') { close(); }
     };
     input.onblur = () => setTimeout(close, 160);   // let a click land first
