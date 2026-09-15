@@ -591,7 +591,7 @@ function renderRecapsTab(){
   if(!list.length){ el.innerHTML='<div class="empty">No completed ladders yet.</div>'; return; }
   el.innerHTML=list.map((l,i)=>{
     const ac=PAL[i%PAL.length];
-    const url=l.date&&RECAP_URLS[l.date];
+    const url=RECAP_URLS[l.id];
     const top3=(STATS&&STATS.winnersByEvent&&STATS.winnersByEvent[l.id])||[];
     const pods=top3.slice(0,3).map((p,k)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.7rem;font-weight:800;border-radius:9999px;padding:3px 11px 3px 4px;background:#000;border:1px solid var(--bd)"><span style="width:17px;height:17px;border-radius:50%;background:${MEDC[k]};color:#0b120b;font-size:.56rem;font-weight:900;text-align:center;line-height:17px">${k+1}</span>${esc(firstName(p.name))} <span style="color:var(--mut);font-weight:600">${p.w}–${p.l}</span></span>`).join(' ');
     const inner=`<div class="rec-kick" style="color:${ac}">${wd(l.date)}</div>
@@ -672,19 +672,21 @@ function renderKitchen(){
 const HEXP={};
 const PAL=['#b8ff2c','#17d7b0','#a78bfa','#f0c040','#5b9fff','#ff7bb0','#ff8c5a'];
 const hexA=(c,a)=>{const n=parseInt(c.slice(1),16);return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`;};
-// One-off recap articles, keyed by the ladder night's date (YYYY-MM-DD, same
-// string evBody()/pastCard() already have as ev.date / l.date). Not tied into
-// the old recap-story system (removed 8/6) — just a manual link per night.
+// One-off recap articles, keyed by EVENT ID (the same id evBody()/pastCard()
+// already have as l.id / ev.eventId). Never keyed by date: one night can hold
+// two ladders — 2026-09-14 ran the men's Kings Court and the women's September
+// Reigns — so a date key would collide.
+// Not tied into the old recap-story system (removed 8/6) — just a manual link per night.
 // Also the source list for the dedicated Recaps tab (renderRecapsTab()).
-// KEEP IN SYNC with netlify/functions/lib/recap-articles.js (the recap email's "Read the full recap" button) and the other page's copy of this map.
-// Recap article map lives in /js/recap-urls.js (shared with queen.html and the Ladders landing).
+// Map lives in /js/recap-urls.js — ONE copy, shared with queen.html and the Ladders landing.
+// KEEP IN SYNC with netlify/functions/lib/recap-articles.js (the recap email's "Read the full recap" button).
 const RECAP_URLS=window.DS_RECAP_URLS||{};
 const RANKC={1:'#f0c040',2:'#cfd3c8',3:'#d88a3a'};
 function crown(color,size){ size=size||13; color=color||'#b8ff2c'; return `<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:-2px;flex-shrink:0;filter:drop-shadow(0 0 4px rgba(184,255,44,.85)) drop-shadow(0 0 1.5px rgba(184,255,44,.6))" aria-hidden="true"><path d="M4 18 L5 9 L9 13 L12 6 L15 13 L19 9 L20 18 Z" fill="${color}"/><circle cx="5" cy="9" r="1.3" fill="#0b0d0a"/><circle cx="12" cy="6" r="1.4" fill="#0b0d0a"/><circle cx="19" cy="9" r="1.3" fill="#0b0d0a"/></svg>`; }
 function t3chips(s){ return s.slice(0,3).map((p,i)=>`<span style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem;font-weight:700;color:#dfe3d8">${i===0?crown('#b8ff2c',13):`<b style="display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;font-size:.5rem;font-weight:900;color:#0b0d0a;background:${RANKC[i+1]}">${i+1}</b>`}${esc(firstName(p.name))} <span style="color:var(--mut);font-size:.62rem">${p.w}–${p.l}</span></span>`).join(''); }
 function evField(s){ const rest=s.slice(3); if(!rest.length) return ''; const half=Math.ceil(rest.length/2); const col=(a,st)=>`<div style="display:flex;flex-direction:column;gap:6px">${a.map((p,k)=>lbCell(p,st+k,'pts')).join('')}</div>`; return `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;align-items:start;margin-bottom:9px">${col(rest.slice(0,half),4)}${col(rest.slice(half),4+half)}</div>`; }
 function evBody(s,id,ac,date){ let h='<div style="display:flex;gap:7px;align-items:stretch;margin-bottom:8px">'; if(s.length>=3) h+=lbPodium(s[0],1,'pts')+lbPodium(s[1],2,'pts')+lbPodium(s[2],3,'pts'); else h+=s.map((p,i)=>lbCell(p,i+1,'pts')).join(''); h+='</div>'+evField(s)+`<button onclick="event.stopPropagation();night('${id}')" style="display:block;width:100%;padding:8px;border:1px solid ${hexA(ac,.32)};background:transparent;color:${ac};font:inherit;font-size:.72rem;font-weight:800;border-radius:8px;cursor:pointer">Full results &amp; rounds →</button>`;
-  const recapUrl=date&&RECAP_URLS[date];
+  const recapUrl=RECAP_URLS[id];
   if(recapUrl) h+=`<a href="${recapUrl}" onclick="event.stopPropagation()" style="display:block;box-sizing:border-box;width:100%;margin-top:7px;padding:8px;border:1px solid ${hexA(ac,.32)};background:${hexA(ac,.12)};color:${ac};font:inherit;font-size:.72rem;font-weight:800;border-radius:8px;cursor:pointer;text-align:center;text-decoration:none">📊 Read the full recap →</a>`;
   return h; }
 function evCard(o){ const ac=o.ac,open=o.open;
@@ -705,7 +707,7 @@ const fpos=p=>(Number.isFinite(p.fx)?p.fx:50)+'% '+(Number.isFinite(p.fy)?p.fy:5
 
 function featureNight(ev,ac){
   const a=albumFor(ev.eventId);
-  const recapUrl=ev.date&&RECAP_URLS[ev.date];
+  const recapUrl=RECAP_URLS[ev.eventId];
   const openHref=recapUrl?esc(recapUrl):null;   // photos click through to the recap's album
   let h='';
   if(a&&a.photos.length>=3){

@@ -484,6 +484,8 @@ const firstName = n => String(n || '').includes(' & ') ? String(n).split(' & ').
 const money = c => '$' + ((Number(c) || 0) / 100).toFixed(Number(c) % 100 ? 2 : 0);
 const MEDC = ['#E6E1D5', '#cfd3c8', '#9E978A'];
 // Recap article map lives in /js/recap-urls.js (shared with ladders.html and the Ladders landing).
+// Keyed by event id, never date — one night can hold two ladders (2026-09-14
+// ran a men's and a women's), so a date key would collide.
 const RECAP_URLS = window.DS_RECAP_URLS || {};
 
 /* The wordmark, inlined so it picks up the page's Cormorant + Inter and the
@@ -678,7 +680,7 @@ function polaroidsHtml(a) {
 
 function posterHtml(latest, a) {
   if (!latest) return '';
-  const recUrl = RECAP_URLS[latest.date] || null;
+  const recUrl = RECAP_URLS[latest.eventId] || null;
   const bg = a ? a.photos.slice(3, 6).concat(a.photos.slice(0, 3)).slice(0, 3) : [];
   const nPhotos = a ? a.count || a.photos.length : 0;
   const acts = [
@@ -738,7 +740,7 @@ function renderOverview() {
   const el = document.getElementById('ovLatest');
   if (latest) {
     el.innerHTML = polaroidsHtml(a) + posterHtml(latest, albumOf(latest.eventId) || a) + tickerHtml(a);
-    const recUrl = RECAP_URLS[latest.date];
+    const recUrl = RECAP_URLS[latest.eventId];
     if (recUrl) posterHeadline(recUrl);
   } else {
     el.innerHTML = `<div class="h1">Latest night</div><div class="empty">No women's night has been played yet — the board fills in after the first one.</div>`;
@@ -801,7 +803,7 @@ function renderResults() {
   if (!COMPLETED.length) { el.innerHTML = '<div class="empty">No completed women\'s nights yet.</div>'; return; }
   el.innerHTML = COMPLETED.map(l => {
     const top3 = (STATS.winnersByEvent || {})[l.id] || [];
-    const url = l.date && RECAP_URLS[l.date];
+    const url = RECAP_URLS[l.id];
     const a = albumOf(l.id);
     const bg = a ? a.photos.slice(0, 4) : [];
     const meta = [wd(l.date), l.place].filter(Boolean).join(' · ');
@@ -1079,7 +1081,7 @@ function renderNight() {
     if (a.photos.length > 8) h += `<a class="btn ghost" href="#gallery" onclick="closeNight();showTab('gallery');return true">See all ${a.count} in the gallery →</a>`;
   }
 
-  const rec = RECAP_URLS[(NIGHT.event && NIGHT.event.date) || ''];
+  const rec = RECAP_URLS[(NIGHT.event && NIGHT.event.id) || ''];
   if (rec) h += `<a class="btn ghost" href="${rec}">Read the full recap →</a>`;
 
   el.innerHTML = h;

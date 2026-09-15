@@ -94,7 +94,7 @@ export function renderLadderRecapEmail(pr, recap, event, siteUrl, photos) {
   const boardUrl = `${url}/ladders#leaderboard`;
   // The night's full-length recap article, when one has shipped — the story
   // players actually forward around. Null for nights with no article yet.
-  const articleUrl = recapArticleUrl(event.date, url, event.id);
+  const articleUrl = recapArticleUrl(event.id, url);
 
 
   // ── Night photos ───────────────────────────────────────────────────────

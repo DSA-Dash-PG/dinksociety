@@ -150,6 +150,8 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&am
 const wd = s => { if (!s) return ''; const d = new Date(s + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' }); };
 const firstName = n => String(n || '').includes(' & ') ? String(n).split(' & ').map(firstName).join(' & ') : (String(n || '').split(/\s+/)[0] || '');
 const money = c => '$' + ((Number(c) || 0) / 100).toFixed(Number(c) % 100 ? 2 : 0);
+// Keyed by event id, never date — one night can hold two ladders (2026-09-14
+// ran a men's and a women's), so a date key would collide.
 const RECAP_URLS = window.DS_RECAP_URLS || {};
 const MEDC = ['#f0c040', '#cfd3c8', '#d88a3a'];
 const fpos = p => (Number.isFinite(p.fx) ? p.fx : 50) + '% ' + (Number.isFinite(p.fy) ? p.fy : 50) + '%';
@@ -247,7 +249,7 @@ function renderRecaps() {
   if (!nights.length) { el.innerHTML = `<div class="empty">No completed nights yet.</div>`; return; }
   el.innerHTML = nights.map(l => {
     const L = lg(l.type); const top3 = (STATS.winnersByEvent || {})[l.id] || [];
-    const url = l.date && RECAP_URLS[l.date]; const a = albumOf(l.id); const bg = a ? a.photos.slice(0, 3) : [];
+    const url = RECAP_URLS[l.id]; const a = albumOf(l.id); const bg = a ? a.photos.slice(0, 3) : [];
     return `<div class="rec ${L.cls}${bg.length ? ' haspix' : ''}">
       ${bg.length ? `<div class="rbg" style="--n:${bg.length}">${bg.map(p => `<img src="${esc(p.thumb)}" alt="" loading="lazy" style="object-position:${fpos(p)}">`).join('')}</div>` : ''}
       <div class="rtx"><div class="top"><div class="kick">${esc(wd(l.date))} · ${isQ(l.type) ? 'Queen' : 'Challengers'}</div>${a ? `<span class="cnt">📸 ${a.count}</span>` : ''}</div>
@@ -263,7 +265,7 @@ function renderTicker() {
   const done = new Set(COMPLETED.map(l => l.id));
   const a = ALBUMS.find(x => done.has(x.eventId) && x.photos.length >= 4);
   if (!a) { el.innerHTML = ''; return; }
-  const L = lg(a.type); const href = isQ(a.type) ? '/queen.html#gallery' : (RECAP_URLS[a.date] || L.results(a.eventId));
+  const L = lg(a.type); const href = isQ(a.type) ? '/queen.html#gallery' : (RECAP_URLS[a.eventId] || L.results(a.eventId));
   const twice = a.photos.concat(a.photos);
   el.innerHTML = `<div class="ticker" aria-label="Photos from ${esc(a.name)}"><div class="track">${twice.map(p => `<a href="${href}"><img src="${esc(p.thumb)}" alt="" loading="lazy" style="object-position:${fpos(p)}"></a>`).join('')}</div><div class="cap">📸 ${esc(a.name)} · ${esc(wd(a.date))} · ${a.count} photos</div></div>`;
 }
