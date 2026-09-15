@@ -55,6 +55,30 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   real `courtA`/`courtB` — **per-match court values always win** over the `COURT_SET_META`
   labels in `schedule.html` / `index.html`, which are only a color source and a legacy
   fallback. (That's why live courts read `5A & 5B` rather than the default `1 & 2`.)
+- **LADDER COURT LABELS ARE INVERTED vs the raw data. Get this right every time.**
+  In ladder play data the `court` integer is a **bottom-up rank**: `court: 1` is the BOTTOM
+  court and the HIGHEST number (`court === tC`) is the TOP / King Court. That is why
+  `public-ladder-stats` sets `top: c.court === tC` and `bottom: c.court === 1`.
+  But `event.courtNames` is entered by the admin **top first** (`admin-ladders.html`:
+  "Court names (top to bottom)", defaulting to A, B, C…). The two run in opposite
+  directions, so:
+
+      label for raw court N  =  courtNames[tC - N]        // NOT courtNames[N - 1]
+
+  Anchor `tC` on the round's actual court count (`rounds[0].courts.length`), not on
+  `courtNames.length` — an admin may have named more courts than were played.
+  **A / 1 is ALWAYS the top court.** Worked examples:
+  - 3 courts named `["A","B","C"]` → raw 3 = **A** (King Court), raw 2 = B, raw 1 = **C**.
+  - 4 courts named `["1","2","3","4"]` → raw 4 = **Court 1** (top), raw 1 = **Court 4**.
+
+  Never print the raw `court` integer to a user. Doing so silently inverts every court
+  reference and puts the winner on the bottom court — it happened in the Jul/Aug 2026
+  hand-built recaps and again in the 2026-09-14 pair. `lib/ladder-recap-article.js`
+  (`courtNamer()`) has the correct implementation; copy it.
+  Known offenders still printing raw numbers: the night modal in `public/ladders.html`
+  (`nightCourt()`, `nMove()`) and `public/queen.html`.
+  Also: `history[].courts` is already sorted King-first (descending `court`) — render in
+  payload order, do not re-sort ascending.
 - **Scores go public per game, not per match.** `captain-score.js`: home captain enters,
   away captain confirms; a game is CONFIRMED only when away's confirmation matches home's
   entry, and a home edit clears the confirmation. `public-match.js` exposes only confirmed
