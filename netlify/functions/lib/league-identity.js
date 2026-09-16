@@ -208,15 +208,31 @@ export async function listRosterEntries() {
  */
 export async function identityIdsFor(playerId) {
   if (!playerId) return [];
+  const index = await identityIndex();
+  return index.idsFor(playerId);
+}
+
+/**
+ * Load the identity grouping ONCE and hand back a lookup. For callers that
+ * need every id for many people at a time (a whole roster's waiver status),
+ * so they don't re-list every team per player.
+ * @returns {Promise<{ idsFor: (id:string) => string[] }>}
+ */
+export async function identityIndex() {
   try {
     const [entries, map] = await Promise.all([listRosterEntries(), getIdentityMap()]);
     const { canonicalOf, membersOf } = groupEntries(entries, map);
-    const canon = canonicalOf[playerId];
-    const ids = canon ? (membersOf[canon] || []) : [];
-    return ids.includes(playerId) ? ids : [playerId, ...ids];
+    return {
+      idsFor(playerId) {
+        if (!playerId) return [];
+        const canon = canonicalOf[playerId];
+        const ids = canon ? (membersOf[canon] || []) : [];
+        return ids.includes(playerId) ? ids : [playerId, ...ids];
+      },
+    };
   } catch (err) {
-    console.error('identityIdsFor failed; falling back to the single id:', err.message);
-    return [playerId];
+    console.error('identityIndex failed; falling back to single ids:', err.message);
+    return { idsFor: (id) => (id ? [id] : []) };
   }
 }
 

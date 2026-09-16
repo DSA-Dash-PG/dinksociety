@@ -1070,3 +1070,38 @@ export function rosterWelcomeSubject({ returning, teamName, seasonName }) {
     ? `You’re back — ${teamName}, ${seasonName}`
     : `Welcome to The Dink Society — you’re on ${teamName}`;
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// WAIVER reminder — captain nudges a roster player who hasn't signed
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * "Sign the waiver" nudge sent by a captain. `signUrl` is a multi-day magic
+ * link so one tap lands the player in the portal with the gate open;
+ * `readUrl` is the public /waiver page for anyone who wants to read first.
+ */
+export function renderWaiverReminder({ playerName, captainName, teamName, teamEmoji, seasonName, waiverTitles, signUrl, readUrl }) {
+  const titles = (waiverTitles || []).filter(Boolean);
+  const what = titles.length === 1 ? titles[0] : (titles.length ? `${titles.length} waivers` : 'the player waiver');
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 10px; line-height: 1.15;">One thing before you play${playerName ? ', ' + escapeBody(String(playerName).split(' ')[0]) : ''}</h1>
+      <p style="font-size: 14px; color: #cfcfcf; line-height: 1.6; margin: 0 0 18px;">${captainName ? escapeBody(captainName) + ' needs' : 'Your captain needs'} you to sign ${escapeBody(what)}${seasonName ? ' for ' + escapeBody(seasonName) : ''}. Every player on <b style="color:#f5f5f5;">${teamEmoji ? escapeBody(teamEmoji) + ' ' : ''}${escapeBody(teamName || 'the team')}</b> has to sign it once, and you can't be put in a lineup until it's done.</p>
+      <div style="background: #161616; border-radius: 8px; padding: 14px 16px; margin: 0 0 22px;">
+        <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; margin-bottom: 6px;">✍️ Takes about two minutes</div>
+        <div style="font-size: 13px; color: #cfcfcf; line-height: 1.55;">Tap the button, confirm sign-in, read to the bottom, type your full legal name.</div>
+      </div>
+      ${_btn(signUrl, 'Sign in & sign the waiver')}
+      <p style="font-size: 12px; color: #8a8a8a; line-height: 1.6; margin: 18px 0 0;">Want to read it first? <a href="${readUrl}" style="color:#b8ff2c;">Here's the full text.</a> The sign-in button is personal to you and works for 3 days — after that, request a fresh link from the Player Portal.</p>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        The Dink Society · Sent because your captain asked us to remind you.
+      </div>
+    </div>`;
+}
+
+export function waiverReminderSubject({ teamName, waiverTitles }) {
+  const t = (waiverTitles || []).filter(Boolean);
+  return t.length === 1 ? `Please sign: ${t[0]} — ${teamName}` : `Please sign your Dink Society waiver — ${teamName}`;
+}

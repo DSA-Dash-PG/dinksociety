@@ -21,6 +21,9 @@
 // current version. New season or edited text (→ version bump) forces re-sign.
 
 import { getStore } from '@netlify/blobs';
+import { circuitCode } from './circuit.js';
+import { liveCircuit } from './current-season.js';
+import { identityIndex } from './league-identity.js';
 
 function configStore() { return getStore({ name: 'config', consistency: 'strong' }); }
 
@@ -67,6 +70,67 @@ export async function getSignature(waiverId, playerId) {
   try {
     return await getStore('waivers').get(`signature/${waiverId}/${playerId}.json`, { type: 'json' }).catch(() => null);
   } catch { return null; }
+}
+
+/**
+ * One person can hold several roster ids (one per season, see
+ * lib/league-identity.js) and a signature is stored under whichever id she
+ * was signed in as. Look across ALL her ids: return the signature that
+ * satisfies `{ season, version }` if any does, otherwise the most recent one
+ * (so callers can still show "signed for Season 1, v2").
+ */
+export async function getSignatureAcross(waiverId, ids, { season, version } = {}) {
+  const list = (ids || []).filter(Boolean);
+  if (!waiverId || !list.length) return null;
+  const sigs = (await Promise.all(list.map(id => getSignature(waiverId, id)))).filter(Boolean);
+  if (!sigs.length) return null;
+  const hit = sigs.find(s => Number(s.version) === Number(version) && String(s.season) === String(season));
+  if (hit) return hit;
+  return sigs.sort((a, b) => String(b.signedAt || '').localeCompare(String(a.signedAt || '')))[0];
+}
+
+/**
+ * Which season a player's signature is FOR. The session may have landed on a
+ * past-season team (login used to take the first roster match in blob order),
+ * so "the team I'm signed in as" is the wrong anchor: a Season 1 signature
+ * would read as current while the Season 2 captain sees the player unsigned.
+ * Rule: if the player is rostered on any team in the live season, sign for
+ * the live season; otherwise sign for the session team's season.
+ *
+ * @param {{ team?: object|null, playerTeams?: object[] }} opts
+ *   playerTeams — every team this email is on (findAllPlayerTeamsByEmail)
+ */
+export async function waiverSeasonFor({ team, playerTeams }) {
+  const live = await liveCircuit();
+  const onLive = (playerTeams || []).some(t => circuitCode((t.team || t).circuit) === live);
+  if (onLive) return live;
+  return team ? circuitCode(team.circuit) : live;
+}
+
+/**
+ * Roster players on `team` who still need to sign each active waiver for
+ * `season`, looking across every id each person holds. Used by the captain
+ * portal (to-do + reminders) and the reminder endpoint, so both agree.
+ * @returns {Promise<Array<{ id, title, version, missing: object[] }>>}
+ */
+export async function rosterWaiverGaps(team, season) {
+  const roster = (team?.roster || []).filter(p => p.id && !p.archived && !p.pendingAdd);
+  const active = await getActiveWaivers();
+  if (!active.length || !roster.length) return [];
+  const index = await identityIndex();
+  const out = [];
+  for (const w of active) {
+    const sigs = await listSignatures(w.id);
+    const missing = roster.filter(p => {
+      const ids = index.idsFor(p.id);
+      return !ids.some(id => {
+        const s = sigs[id];
+        return s && Number(s.version) === Number(w.version) && String(s.season) === String(season);
+      });
+    });
+    if (missing.length) out.push({ id: w.id, title: w.title, version: w.version, missing });
+  }
+  return out;
 }
 
 /** Satisfied = signed the current version for the current season (any method). */

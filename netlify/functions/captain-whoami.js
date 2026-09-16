@@ -6,7 +6,7 @@ import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { findAllLeaderTeamsByEmail } from './lib/captain-auth.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
 import { circuitCode } from './lib/circuit.js';
-import { getActiveWaivers, listSignatures } from './lib/waiver.js';
+import { rosterWaiverGaps } from './lib/waiver.js';
 import { isAdminEmail } from './lib/admin-auth.js';
 
 export default async (req) => {
@@ -54,21 +54,19 @@ export default async (req) => {
 
   // Waiver gaps — roster players who still need to sign each active waiver,
   // so the captain Home to-do can remind them.
+  // Looks across every roster id a person holds (lib/waiver.js
+  // rosterWaiverGaps), so a returning player who signed while logged in as
+  // her old-season self still counts once she signs for this season.
   let waiverGaps = [];
   if (teamEntry && t) {
     const season = circuitCode(t.circuit);
-    const roster = (t.roster || []).filter(p => p.id);
-    const active = await getActiveWaivers();
-    for (const w of active) {
-      const sigs = await listSignatures(w.id);
-      const missing = roster.filter(p => {
-        const s = sigs[p.id];
-        return !(s && s.version === w.version && String(s.season) === String(season));
-      });
-      if (missing.length) {
-        waiverGaps.push({ id: w.id, title: w.title, missing: missing.length, names: missing.map(p => p.name).slice(0, 8) });
-      }
-    }
+    const gaps = await rosterWaiverGaps(t, season).catch(() => []);
+    waiverGaps = gaps.map(g => ({
+      id: g.id, title: g.title, missing: g.missing.length,
+      names: g.missing.map(p => p.name).slice(0, 8),
+      playerIds: g.missing.map(p => p.id),
+      noEmail: g.missing.filter(p => !p.email).length,
+    }));
   }
 
   return new Response(JSON.stringify({

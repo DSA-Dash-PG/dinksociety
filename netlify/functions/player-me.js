@@ -9,7 +9,8 @@ import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
-import { getActiveWaivers, getSignature, isWaiverSatisfied } from './lib/waiver.js';
+import { getActiveWaivers, getSignatureAcross, isWaiverSatisfied, waiverSeasonFor } from './lib/waiver.js';
+import { identityIdsFor } from './lib/league-identity.js';
 import { isAdminEmail } from './lib/admin-auth.js';
 import { getTeamAvailability } from './lib/availability.js';
 import { getOrganizer } from './lib/organizers.js';
@@ -286,7 +287,8 @@ export default async (req) => {
   schedule.sort((a, b) => a.week - b.week);
 
   // Every team this player is rostered on, for the team switcher.
-  const myTeams = (await findAllPlayerTeamsByEmail(myEmail)).map(({ team }) => ({
+  const allMyTeams = await findAllPlayerTeamsByEmail(myEmail);
+  const myTeams = allMyTeams.map(({ team }) => ({
     id: team.id,
     name: team.name,
     division: team.division || null,
@@ -302,14 +304,20 @@ export default async (req) => {
   // notices the admin sent to players.
   const announcements = await getRelevantAnnouncements({ teamId, division, limit: 3, audiences: ['players'] });
 
-  // Liability waivers — each active waiver must be signed for the current
-  // season + version. Returns the full list with a `required` flag per waiver.
+  // Liability waivers — each active waiver must be signed for the LIVE season
+  // (if this player is rostered in it) at the current version. The lookup runs
+  // across every roster id this person holds, because a signature is stored
+  // under whichever id she was signed in as at the time. Returns the full
+  // list with a `required` flag per waiver.
   const activeWaivers = await getActiveWaivers();
+  const waiverSeason = activeWaivers.length ? await waiverSeasonFor({ team, playerTeams: allMyTeams }) : circuit;
+  const myIds = activeWaivers.length ? await identityIdsFor(playerId) : [playerId];
   const waivers = await Promise.all(activeWaivers.map(async w => {
-    const sig = await getSignature(w.id, playerId);
-    const satisfied = isWaiverSatisfied({ waiver: w, signature: sig, season: circuit });
+    const sig = await getSignatureAcross(w.id, myIds, { season: waiverSeason, version: w.version });
+    const satisfied = isWaiverSatisfied({ waiver: w, signature: sig, season: waiverSeason });
     return {
       id: w.id, title: w.title, text: w.text, version: w.version,
+      season: waiverSeason,
       required: !satisfied,
       signedAt: sig?.signedAt || null,
       method: sig?.method || null,

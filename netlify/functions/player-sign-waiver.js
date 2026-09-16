@@ -5,8 +5,8 @@
 // POST body: { waiverId, signedName, agree:true, version }
 
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
-import { circuitCode } from './lib/circuit.js';
-import { getWaiverById, recordSignature } from './lib/waiver.js';
+import { getWaiverById, recordSignature, waiverSeasonFor } from './lib/waiver.js';
+import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -21,7 +21,10 @@ export default async (req) => {
   if (!verified.valid) return unauthResponse(verified.error);
   const ctx = verified.payload;
   const { playerId, team, player } = ctx;
-  const season = circuitCode(team.circuit);
+  // Same season rule as player-me (live season if rostered in it), so what
+  // the gate asked for is what gets recorded — and what the captain sees.
+  const playerTeams = player?.email ? await findAllPlayerTeamsByEmail(player.email).catch(() => []) : [];
+  const season = await waiverSeasonFor({ team: team || null, playerTeams });
 
   let body;
   try { body = await req.json(); } catch { return json({ error: 'invalid JSON body' }, 400); }

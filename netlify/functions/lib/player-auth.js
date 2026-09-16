@@ -5,7 +5,8 @@
 
 import { getStore } from '@netlify/blobs';
 import { normalizeEmail } from './identity.js';
-import { isTestTeam } from './circuit.js';
+import { isTestTeam, circuitCode } from './circuit.js';
+import { liveCircuit } from './current-season.js';
 import { getJSON } from './retry.js';
 import { getLiteByEmail, getLiteById } from './ladder-players.js';
 
@@ -79,22 +80,38 @@ export async function consumePlayerToken(token) {
 }
 
 // ===== Resolve a player by their roster email =====
-// Returns { playerId, teamId, name, team } or null. First roster match wins.
+// Returns { playerId, teamId, name, team } or null.
+//
+// A returning player is on one roster per season, so "first roster match"
+// (blob-listing order) could sign her in as her Season 1 self: old team on
+// the Home tab, and the waiver gate satisfied by last season's signature
+// while her new captain saw her as unsigned. Prefer a team in the LIVE
+// season, then the newest season, then whatever matched first.
 export async function findPlayerByEmail(rawEmail) {
   const norm = normalizeEmail(rawEmail);
   if (!norm) return null;
   const store = getStore('teams');
   const { blobs } = await store.list({ prefix: 'team/' });
   // Parallelize the blob reads — each get is an independent network call, so a
-  // serial for-loop was paying N round-trips. Preserve first-match order.
+  // serial for-loop was paying N round-trips.
   const teams = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null)));
+  const matches = [];
   for (const team of teams) {
     if (!team?.roster) continue;
     const entry = team.roster.find(p =>
       (p.normalizedEmail && p.normalizedEmail === norm) ||
       ((p.email || '').toLowerCase() === norm)
     );
-    if (entry) return { playerId: entry.id, teamId: team.id, name: entry.name, team };
+    if (entry) matches.push({ playerId: entry.id, teamId: team.id, name: entry.name, team });
+  }
+  if (matches.length) {
+    if (matches.length === 1) return matches[0];
+    const live = await liveCircuit().catch(() => null);
+    const onLive = matches.find(m => !isTestTeam(m.team) && circuitCode(m.team.circuit) === live);
+    if (onLive) return onLive;
+    const ROMAN = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+    const rank = m => { const i = ROMAN.indexOf(circuitCode(m.team.circuit)); return isTestTeam(m.team) ? -2 : i; };
+    return matches.slice().sort((a, b) => rank(b) - rank(a))[0];
   }
   // Not on any team roster — fall back to a "lite" ladder-only account. Teams
   // always win (checked first), which is what makes migration-to-team seamless.
