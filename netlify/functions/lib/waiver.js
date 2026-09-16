@@ -128,7 +128,11 @@ export async function rosterWaiverGaps(team, season) {
         return s && Number(s.version) === Number(w.version) && String(s.season) === String(season);
       });
     });
-    if (missing.length) out.push({ id: w.id, title: w.title, version: w.version, missing });
+    const signed = roster.filter(p => !missing.includes(p)).map(p => {
+      const s = index.idsFor(p.id).map(id => sigs[id]).find(x => x && Number(x.version) === Number(w.version) && String(x.season) === String(season));
+      return { ...p, signedAt: s?.signedAt || null, method: s?.method || null, signedName: s?.signedName || null };
+    });
+    out.push({ id: w.id, title: w.title, version: w.version, missing, signed });
   }
   return out;
 }

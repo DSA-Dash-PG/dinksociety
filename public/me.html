@@ -760,7 +760,10 @@
       <p class="login__note" style="margin-top:16px">Already have an account? <a href="#" id="show-login" style="color:var(--color-lime)">Sign in</a></p>
     </div>
     <div id="login-step2" class="hidden">
-      <div class="login__sent"><b>✉️ Check your inbox.</b><br>A one-tap sign-in link is on the way. It expires in 15 minutes.</div>
+      <div class="login__sent"><b>✉️ Check your inbox.</b><br>Tap the sign-in link, or type the 6-digit code from the email below. Both expire in 15 minutes.</div>
+      <input class="login__in" id="login-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="6" placeholder="6-digit code" style="margin-top:14px;letter-spacing:0.3em;font-weight:800;font-size:20px">
+      <button class="login__btn" id="login-code-btn">Sign in with code</button>
+      <div id="login-code-err" class="login__err hidden" style="margin-top:10px"></div>
       <p class="login__note" style="margin-top:14px">Nothing after a minute or two? If you're new to Dink Society, <a href="#" id="show-register-2" style="color:var(--color-lime)">create a ladder account</a> instead — sign-in links only go to emails we already know.</p>
     </div>
     <p class="login__note" id="login-foot">New here? Use “Create a ladder account” above. On a league team but no link arrives? Ask your captain to add your email to the roster.</p>
@@ -1600,6 +1603,26 @@
     }
   });
   $('login-email').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-btn').click(); });
+  // Code sign-in — the in-app alternative to the link (the link opens the
+  // system browser, which never signs the installed app in).
+  $('login-code-btn').addEventListener('click', async () => {
+    const email = ($('login-email').value || $('reg-email')?.value || '').trim();
+    const code = ($('login-code').value || '').replace(/\D/g, '');
+    const err = $('login-code-err');
+    if (code.length !== 6) { err.textContent = 'Enter the 6-digit code from the email.'; err.classList.remove('hidden'); return; }
+    const btn = $('login-code-btn'); btn.disabled = true; btn.textContent = 'Checking…';
+    try {
+      const res = await fetch(API + '/player-code-verify', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'That code didn’t work.');
+      err.classList.add('hidden');
+      location.replace(NEXT_AFTER_LOGIN || '/me.html');
+    } catch (e) {
+      err.textContent = e.message; err.classList.remove('hidden');
+      btn.disabled = false; btn.textContent = 'Sign in with code';
+    }
+  });
+  $('login-code').addEventListener('keydown', e => { if (e.key === 'Enter') $('login-code-btn').click(); });
 
   // ---- register (ladder-only / no team) ----
   (function setupRegister() {

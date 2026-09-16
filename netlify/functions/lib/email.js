@@ -455,7 +455,7 @@ export function renderAvailabilityReminder({ playerName, teamName, teamEmoji, op
  * @param {string} playerName - The player's name
  * @returns {string} HTML email body
  */
-export function renderPlayerMagicLink(magicUrl, playerName) {
+export function renderPlayerMagicLink(magicUrl, playerName, code) {
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
       <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
@@ -464,11 +464,15 @@ export function renderPlayerMagicLink(magicUrl, playerName) {
         Tap below to open your player portal${playerName ? ' — see your schedule, stats, and the leaderboard:' : ':'}
       </p>
       ${playerName ? `<p style="font-size: 18px; font-weight: 700; color: #b8ff2c; margin: 0 0 28px;">${playerName}</p>` : '<div style="height:16px"></div>'}
+      ${code ? `<div style="margin: 0 0 24px; padding: 16px 18px; background: #161616; border: 1px solid #2a2a2a; border-radius: 12px;">
+        <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 8px;">Using the Dink Society app? Type this code instead</div>
+        <div style="font-size: 32px; font-weight: 800; letter-spacing: 0.22em; color: #b8ff2c; font-variant-numeric: tabular-nums;">${escapeBody(code)}</div>
+      </div>` : ''}
       <a href="${magicUrl}" style="display: inline-block; padding: 14px 32px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
         Open my portal
       </a>
       <p style="font-size: 13px; color: #555; margin-top: 28px; line-height: 1.5;">
-        This link expires in 15 minutes and can only be used once. If you didn't request it, you can safely ignore this email.
+        The link and the code expire in 15 minutes and can only be used once — whichever you use first. If you didn't request this, you can safely ignore this email.
       </p>
       <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
         The Dink Society · Southern California Pickleball League
@@ -515,7 +519,7 @@ export function renderOrganizerInvite(magicUrl, name, isResend) {
  * @param {string} teamName - The captain's team name
  * @returns {string} HTML email body
  */
-export function renderCaptainMagicLink(magicUrl, teamName) {
+export function renderCaptainMagicLink(magicUrl, teamName, code) {
   return `
     <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
       <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 32px;">THE DINK SOCIETY</div>
@@ -524,11 +528,15 @@ export function renderCaptainMagicLink(magicUrl, teamName) {
         Tap the button below to access the captain portal for:
       </p>
       <p style="font-size: 18px; font-weight: 700; color: #b8ff2c; margin: 0 0 28px;">${teamName}</p>
+      ${code ? `<div style="margin: 0 0 24px; padding: 16px 18px; background: #161616; border: 1px solid #2a2a2a; border-radius: 12px;">
+        <div style="font-size: 11px; color: #8a8a8a; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; margin-bottom: 8px;">Using the Dink Society app? Type this code instead</div>
+        <div style="font-size: 32px; font-weight: 800; letter-spacing: 0.22em; color: #b8ff2c; font-variant-numeric: tabular-nums;">${escapeBody(code)}</div>
+      </div>` : ''}
       <a href="${magicUrl}" style="display: inline-block; padding: 14px 32px; background: #b8ff2c; color: #0e0e0e; font-size: 14px; font-weight: 700; text-decoration: none; border-radius: 9999px;">
         Sign in as Captain
       </a>
       <p style="font-size: 13px; color: #555; margin-top: 28px; line-height: 1.5;">
-        This link expires in 15 minutes and can only be used once. If you didn't request it, you can safely ignore this email.
+        The link and the code expire in 15 minutes and can only be used once — whichever you use first. If you didn't request this, you can safely ignore this email.
       </p>
       <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
         The Dink Society · Southern California Pickleball League

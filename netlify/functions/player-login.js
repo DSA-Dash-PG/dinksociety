@@ -4,6 +4,7 @@
 import { findPlayerByEmail, createPlayerToken } from './lib/player-auth.js';
 import { sendEmail, renderPlayerMagicLink } from './lib/email.js';
 import { allowRequest } from './lib/rate-limit.js';
+import { issueLoginCode } from './lib/login-code.js';
 
 // Only a same-site absolute path is allowed as a post-login destination
 // (blocks open-redirects like //evil.com or https://evil.com). Mirrors the
@@ -54,10 +55,14 @@ export default async (req) => {
     const safeN = safeNext(next);
     const magicUrl = `${siteUrl}/.netlify/functions/player-link?token=${token}` + (safeN ? `&next=${encodeURIComponent(safeN)}` : '');
 
+    // Same token, two doors: tap the link, or type the code into the app
+    // (the link opens the system browser, which never signs the installed
+    // app in). Whichever is used first consumes the token.
+    const code = await issueLoginCode({ scope: 'player', email: normalized, token }).catch(() => null);
     await sendEmail({
       to: normalized,
-      subject: 'Your Dink Society sign-in link',
-      html: renderPlayerMagicLink(magicUrl, found.name),
+      subject: code ? `${code} is your Dink Society sign-in code` : 'Your Dink Society sign-in link',
+      html: renderPlayerMagicLink(magicUrl, found.name, code),
     });
 
     return json(GENERIC);

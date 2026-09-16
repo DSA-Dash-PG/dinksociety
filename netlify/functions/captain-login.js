@@ -5,6 +5,7 @@
 
 import { createMagicToken, findTeamByCaptainEmail } from './lib/captain-auth.js';
 import { sendEmail, renderCaptainMagicLink } from './lib/email.js';
+import { issueLoginCode } from './lib/login-code.js';
 
 const GENERIC_RESPONSE = {
   ok: true,
@@ -33,10 +34,12 @@ export default async (req) => {
     const siteUrl = Netlify.env.get('SITE_URL') || 'https://dinksociety.netlify.app';
     const magicUrl = `${siteUrl}/.netlify/functions/captain-link?token=${token}`;
 
+    // Same token, two doors: the link, or a 6-digit code typed into the app.
+    const code = await issueLoginCode({ scope: 'captain', email: normalized, token }).catch(() => null);
     await sendEmail({
       to: normalized,
-      subject: `Sign in to ${team.name} — The Dink Society`,
-      html: renderCaptainMagicLink(magicUrl, team.name),
+      subject: code ? `${code} is your captain sign-in code — ${team.name}` : `Sign in to ${team.name} — The Dink Society`,
+      html: renderCaptainMagicLink(magicUrl, team.name, code),
     });
 
     return json(GENERIC_RESPONSE);

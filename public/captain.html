@@ -280,6 +280,7 @@
     .ros-badge.cap { background: var(--color-lime-dim); color: var(--color-lime); }
     .ros-badge.co { background: var(--color-teal-dim); color: var(--color-teal); }
     .ros-badge.wv { background: rgba(245,166,35,0.14); color: #f5a623; }
+    .ros-badge.wv-ok { background: var(--color-teal-dim); color: var(--color-teal); }
     .ros-gtag { font-size: 9px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-full); flex-shrink: 0; }
     .ros-gtag.f { background: var(--color-gold-dim); color: var(--color-gold); }
     .ros-gtag.m { background: var(--color-teal-dim); color: var(--color-teal); }
@@ -583,7 +584,12 @@
 
       <div id="login-sent" style="display:none; background: var(--color-gold-dim, rgba(232,181,66,0.12)); border: 1px solid rgba(240,192,64,0.4); color: var(--color-gold, #f0c040); padding: 16px; border-radius: var(--radius-sm); text-align: left; font-size: 13px; line-height: 1.55;">
         <strong style="display:block; margin-bottom: 4px;">Link on the way.</strong>
-        Check the inbox for <span id="login-sent-email" style="font-weight: 600;"></span>. The link expires in 15 minutes. If it doesn't show up, check spam or make sure you're using the email on file with the Society.
+        Check the inbox for <span id="login-sent-email" style="font-weight: 600;"></span>. Tap the link, or type the 6-digit code from the email here. Both expire in 15 minutes. If it doesn't show up, check spam or make sure you're using the email on file with the Society.
+        <div style="display:flex; gap:8px; margin-top:12px;">
+          <input type="text" id="login-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6-digit code" style="flex:1; min-width:0; padding:10px 12px; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-bg); color:var(--color-text); font-family:inherit; font-size:18px; font-weight:800; letter-spacing:0.25em;">
+          <button class="ab ab--lime" id="login-code-btn" style="white-space:nowrap;">Sign in</button>
+        </div>
+        <div class="a-status" id="login-code-status" style="margin-top:8px;"></div>
       </div>
 
       <form id="login-form" onsubmit="return false;" style="text-align:left;">
@@ -795,13 +801,15 @@
         <div id="waiver-remind-wrap" style="display:none; margin-top: 14px; padding: 12px 14px; border: 1px solid rgba(245,166,35,0.35); background: rgba(245,166,35,0.08); border-radius: var(--radius-sm);">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;">
             <div style="font-size: 12px; line-height: 1.5; color: var(--color-text-muted);">
-              <b style="color:#f5a623;">✍️ <span id="waiver-remind-count">0</span> still need to sign the waiver.</b>
+              <b style="color:#f5a623;">✍️ <span id="waiver-remind-count">0</span> still need to sign the waiver</b>
+              <span id="waiver-remind-progress" style="color:var(--color-text-faint);"></span><br>
               <span id="waiver-remind-names"></span>
             </div>
             <button class="cap-btn cap-btn--primary" id="waiver-remind-btn" style="white-space:nowrap;">Send reminder</button>
           </div>
           <div style="font-size: 11px; color: var(--color-text-faint); margin-top: 6px;">Emails each unsigned player a one-tap sign-in link that opens the waiver. One reminder per player per day.</div>
         </div>
+        <div id="waiver-done-line" style="display:none; margin-top: 12px; font-size: 12px; color: var(--color-teal);"></div>
         <div style="display: flex; gap: 10px; margin-top: 16px;">
           <button class="cap-btn cap-btn--ghost" id="add-player-btn" style="width: 100%;">+ Add player</button>
         </div>
@@ -1503,6 +1511,24 @@
         btn.disabled = false;
       }
     });
+
+    // Code sign-in — the in-app alternative to tapping the link.
+    $id('login-code-btn')?.addEventListener('click', async () => {
+      const email = $id('login-email').value.trim();
+      const code = ($id('login-code').value || '').replace(/\D/g, '');
+      const st = $id('login-code-status'), btn = $id('login-code-btn');
+      if (code.length !== 6) { st.className = 'a-status is-err'; st.textContent = 'Enter the 6-digit code from the email.'; return; }
+      btn.disabled = true; st.className = 'a-status is-info'; st.textContent = 'Checking…';
+      try {
+        const res = await fetch('/.netlify/functions/captain-code-verify', { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code }) });
+        const d = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(d.error || 'That code didn’t work.');
+        location.replace('/captain.html');
+      } catch (err) {
+        st.className = 'a-status is-err'; st.textContent = err.message; btn.disabled = false;
+      }
+    });
+    $id('login-code')?.addEventListener('keydown', e => { if (e.key === 'Enter') $id('login-code-btn').click(); });
 
     // Handle redirect error params from the magic-link consumer
     (function handleAuthErrors() {
@@ -3636,7 +3662,10 @@
       const lead = isCap(p) || p.isCoCaptain;
       const badge = isCap(p) ? '<span class="ros-badge cap">Captain</span>'
         : p.isCoCaptain ? '<span class="ros-badge co">Co-captain</span>' : '';
-      const wtag = waiverUnsignedIds().has(p.id) ? '<span class="ros-badge wv" title="Hasn\u2019t signed the waiver yet">Waiver</span>' : '';
+      const wsig = waiverSignedMap().get(p.id);
+      const wtag = waiverUnsignedIds().has(p.id)
+        ? '<span class="ros-badge wv" title="Hasn\u2019t signed the waiver yet">Waiver</span>'
+        : (wsig ? `<span class="ros-badge wv-ok" title="Signed ${escapeAttr(fmtSignedAt(wsig.signedAt))}${wsig.method === 'paper' ? ' (paper)' : ''}">Signed ✓</span>` : '');
       const gtag = p.gender === 'F' ? '<span class="ros-gtag f">W</span>'
         : p.gender === 'M' ? '<span class="ros-gtag m">M</span>'
         : '<span class="ros-gtag none">no gender</span>';
@@ -3701,16 +3730,34 @@
       for (const wg of (state.me?.waiverGaps || [])) for (const id of (wg.playerIds || [])) s.add(id);
       return s;
     }
+    function waiverSignedMap() {
+      const m = new Map();
+      for (const wg of (state.me?.waiverGaps || [])) for (const s of (wg.signed || [])) if (!m.has(s.id)) m.set(s.id, s);
+      return m;
+    }
+    function fmtSignedAt(iso) {
+      try { return iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''; } catch { return ''; }
+    }
     function renderWaiverRemind() {
       const wrap = $id('waiver-remind-wrap'); if (!wrap) return;
       const ids = waiverUnsignedIds();
       const active = new Set(activeRoster().map(p => p.id));
       const missing = [...ids].filter(id => active.has(id));
-      if (!missing.length) { wrap.style.display = 'none'; return; }
+      const done = $id('waiver-done-line');
+      if (!missing.length) {
+        wrap.style.display = 'none';
+        const gaps = state.me?.waiverGaps || [];
+        const total = gaps.reduce((n, g) => Math.max(n, g.total || 0), 0);
+        if (done) { done.style.display = total ? '' : 'none'; done.textContent = total ? `✅ Waiver signed by all ${total} players.` : ''; }
+        return;
+      }
+      if (done) done.style.display = 'none';
       const byId = new Map((state.roster || []).map(p => [p.id, p]));
       const short = n => { const q = String(n || '').trim().split(/\s+/); return q[0] + (q[1] ? ' ' + q[1][0] + '.' : ''); };
       const names = missing.map(id => short(byId.get(id)?.name || '')).filter(Boolean);
       $id('waiver-remind-count').textContent = missing.length;
+      const signedN = waiverSignedMap().size;
+      $id('waiver-remind-progress').textContent = ` · ${signedN} of ${signedN + missing.length} signed`;
       $id('waiver-remind-names').textContent = names.slice(0, 6).join(', ') + (names.length > 6 ? '…' : '');
       const noEmail = missing.filter(id => !byId.get(id)?.email).length;
       const btn = $id('waiver-remind-btn');
@@ -4906,7 +4953,7 @@
         if (!wg.missing) continue;
         tasks.push({
           cls: 'info', ic: '✍️',
-          t: `${wg.missing} ${wg.missing === 1 ? 'player needs' : 'players need'} to sign the waiver`,
+          t: `${wg.missing} ${wg.missing === 1 ? 'player needs' : 'players need'} to sign the waiver${wg.total ? ` (${wg.signedCount || 0}/${wg.total} done)` : ''}`,
           d: `${escapeHtml(wg.title)} · ${escapeHtml((wg.names || []).map(n => n.split(' ')[0]).join(', '))}${wg.missing > (wg.names || []).length ? '…' : ''}`,
           due: { cls: 'teal', txt: 'Remind them' },
           go: () => {

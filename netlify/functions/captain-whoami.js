@@ -66,6 +66,10 @@ export default async (req) => {
       names: g.missing.map(p => p.name).slice(0, 8),
       playerIds: g.missing.map(p => p.id),
       noEmail: g.missing.filter(p => !p.email).length,
+      // Who HAS signed — so the captain sees progress, not just the gap.
+      signedCount: (g.signed || []).length,
+      total: g.missing.length + (g.signed || []).length,
+      signed: (g.signed || []).map(p => ({ id: p.id, name: p.name, signedAt: p.signedAt, method: p.method })),
     }));
   }
 

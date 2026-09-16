@@ -155,6 +155,17 @@ export async function requirePlayer(req) {
     return null;
   }
 
+  // A session is pinned to the identity it was created with — which goes
+  // stale. Kevin Vu signed in on 9/9 before his captain rostered him, so his
+  // 30-day cookie still said "ladder-only, no team": no schedule, no roster,
+  // and no waiver gate, however many times he opened the portal. Same story
+  // for a returning player whose cookie predates their new-season roster.
+  // Re-resolve by email now and then and upgrade the session in place when
+  // a team (or a newer-season team) has appeared. A manual team switch
+  // (player-switch-team) is respected: we only move a session that has no
+  // team, or whose team is from an older season than the one found.
+  await maybeRefreshSession(sessionStore, sessionId, session);
+
   // Teamless (lite) ladder-only account: resolve from the ladder-players store
   // instead of a team roster. Email on the record must still match the session.
   if (!session.teamId) {
@@ -184,6 +195,36 @@ export async function requirePlayer(req) {
   const pEmail = (player.normalizedEmail || (player.email || '').toLowerCase());
   if (pEmail && pEmail !== session.email) return null;
   return { session: { id: sessionId, email: session.email }, playerId: session.playerId, teamId: session.teamId, team, player };
+}
+
+const RESOLVE_EVERY_MS = 6 * 60 * 60 * 1000;
+const ROMAN_ORDER = ['I','II','III','IV','V','VI','VII','VIII','IX','X'];
+function seasonRankOf(team) { return team ? ROMAN_ORDER.indexOf(circuitCode(team.circuit)) : -1; }
+
+async function maybeRefreshSession(sessionStore, sessionId, session) {
+  try {
+    const last = session.resolvedAt ? Date.parse(session.resolvedAt) : 0;
+    if (session.teamId && Date.now() - last < RESOLVE_EVERY_MS) return;
+    if (!session.email) return;
+    const found = await findPlayerByEmail(session.email);
+    let changed = false;
+    if (found && found.teamId && (found.teamId !== session.teamId || found.playerId !== session.playerId)) {
+      let current = null;
+      if (session.teamId) current = await getJSON(getStore('teams'), `team/${session.teamId}.json`).catch(() => null);
+      const stillOnCurrent = !!current?.roster?.some(p => p.id === session.playerId);
+      // Move when: no team yet, dropped from the old roster, or a newer season exists.
+      if (!session.teamId || !stillOnCurrent || seasonRankOf(found.team) > seasonRankOf(current)) {
+        session.playerId = found.playerId;
+        session.teamId = found.teamId;
+        changed = true;
+      }
+    }
+    session.resolvedAt = new Date().toISOString();
+    await sessionStore.setJSON(`session/${sessionId}.json`, session).catch(() => null);
+    if (changed) console.log(`player session ${sessionId.slice(0, 6)}… re-pointed to team ${session.teamId}`);
+  } catch (e) {
+    console.warn('maybeRefreshSession skipped:', e?.message || e);
+  }
 }
 
 export function unauthResponse() {
