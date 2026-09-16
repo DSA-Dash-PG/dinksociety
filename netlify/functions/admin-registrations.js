@@ -45,6 +45,7 @@ export default async (req) => {
     const projected = all.map(r => ({
       id: r.id,
       circuit: r.circuit,
+      seasonId: r.seasonId ?? null,
       division: r.division,
       divisionLabel: r.divisionLabel,
       path: r.path,

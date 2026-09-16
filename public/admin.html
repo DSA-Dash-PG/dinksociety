@@ -254,6 +254,11 @@
     .a-status.is-info { display: block; background: var(--color-teal-dim); color: var(--color-teal); }
     .a-status.is-ok { display: block; background: var(--color-teal-dim); color: var(--color-teal); }
     .a-status.is-err { display: block; background: var(--color-red-dim); color: var(--color-red); }
+    /* Transient toast for background saves (roster add/edit/remove) */
+    .a-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(12px); z-index: 2000; padding: 10px 16px; border-radius: 9999px; font-size: 12px; font-weight: 600; background: var(--color-surface-2); color: var(--color-text); border: 1px solid var(--color-border); box-shadow: 0 8px 24px rgba(0,0,0,0.4); opacity: 0; pointer-events: none; transition: opacity 0.15s, transform 0.15s; max-width: calc(100vw - 32px); }
+    .a-toast.is-open { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .a-toast.is-err { background: var(--color-red-dim); color: var(--color-red); border-color: var(--color-red); }
+    .a-toast.is-ok { background: var(--color-teal-dim); color: var(--color-teal); border-color: var(--color-teal); }
 
     .empty { text-align: center; padding: 40px 20px; color: var(--color-text-faint); font-size: 12px; }
     .loading { text-align: center; padding: 40px 20px; color: var(--color-text-faint); font-size: 12px; }
@@ -851,6 +856,7 @@
               <select id="rf-dv" style="padding:6px 10px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:10px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);">
                 <option value="all">All divisions</option>
               </select>
+              <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--color-text-muted);white-space:nowrap;"><input type="checkbox" id="rf-all" style="width:auto;min-height:0;"> All seasons</label>
             </div>
           </div>
           <div class="ac ac--flush"><div id="reg-table"><div class="loading">Loading registrations…</div></div></div>
@@ -976,6 +982,7 @@
               <option value="">Any login</option><option value="never">Never logged in</option><option value="active">Has logged in</option>
             </select>
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);white-space:nowrap;"><input type="checkbox" id="pl-arch" checked style="width:auto;min-height:0;"> Show archived</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);white-space:nowrap;"><input type="checkbox" id="pl-all" style="width:auto;min-height:0;"> All seasons</label>
           </div>
           <div style="overflow-x:auto;">
             <table id="pl-table" style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -2307,6 +2314,9 @@
     };
     try { localStorage.setItem(SEASON_LS_KEY, season.id); } catch (e) {}
     renderSeasonLabel();
+    // Teams tab: its season dropdown lands on the working season on first
+    // paint only — reset that so a sidebar switch re-lands it.
+    { const ssel = $id('teams-season-filter'); if (ssel) delete ssel.dataset.ready; TEAMS_SEASON = ''; }
     if (!opts.silent) {
       // Divisions belong to a season, so they move with it — then re-render
       // whatever tab is open so nothing on screen still shows the old season.
@@ -2845,10 +2855,20 @@
     if (isNaN(d)) return '—';
     return '<span title="' + aEsc(s) + '">' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + '</span>';
   }
+  // Roster rows for the season the sidebar is working in (every row carries the
+  // season code of the team it came from). "All seasons" lifts the scope.
+  function plInWorkingSeason(p) {
+    if (p.seasonId && p.seasonId === adminSeasonId()) return true;
+    return teamSeasonCode(p) === adminCircuit();
+  }
+  function plScoped() {
+    const all = $id('pl-all') && $id('pl-all').checked;
+    return all ? PL_DATA : PL_DATA.filter(plInWorkingSeason);
+  }
   function plRows() {
     const q = ($id('pl-q').value || '').trim().toLowerCase();
     const tf = $id('pl-team').value, lf = $id('pl-login').value, showArch = $id('pl-arch').checked;
-    let r = PL_DATA.filter(p => {
+    let r = plScoped().filter(p => {
       if (!showArch && p.archived) return false;
       if (tf && p.teamName !== tf) return false;
       if (lf === 'never' && p.lastLoginAt) return false;
@@ -2875,8 +2895,18 @@
       '</tr>';
     }).join('') || '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-faint);">No players match.</td></tr>';
     const never = r.filter(p => !p.lastLoginAt).length;
-    $id('pl-foot').textContent = 'Showing ' + r.length + ' of ' + PL_DATA.length + ' players' + (never ? ' · ' + never + ' never logged in' : '');
+    const scoped = plScoped();
+    $id('pl-foot').textContent = 'Showing ' + r.length + ' of ' + scoped.length + ' players' +
+      (scoped.length !== PL_DATA.length ? ' in ' + adminSeasonName() : '') +
+      (never ? ' · ' + never + ' never logged in' : '');
     $$('#pl-body .pl-copy').forEach(b => b.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(b.dataset.c); const o = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = o, 1000); });
+  }
+  function plTeamOptions() {
+    const sel = $id('pl-team'); if (!sel) return;
+    const cur = sel.value;
+    const teams = Array.from(new Set(plScoped().map(p => p.teamName).filter(Boolean))).sort();
+    sel.innerHTML = '<option value="">All teams (' + teams.length + ')</option>' + teams.map(t => '<option' + (t === cur ? ' selected' : '') + '>' + aEsc(t) + '</option>').join('');
+    if (!teams.includes(cur)) sel.value = '';
   }
   function plExport() {
     const r = plRows(), head = ['Name', 'Team', 'Division', 'Captain', 'Archived', 'Email', 'Phone', 'Last logged in'];
@@ -2890,6 +2920,7 @@
     if (!PL_WIRED) {
       PL_WIRED = true;
       ['pl-q', 'pl-team', 'pl-login', 'pl-arch'].forEach(id => { const el = $id(id); el && el.addEventListener(id === 'pl-q' ? 'input' : 'change', plRender); });
+      $id('pl-all') && $id('pl-all').addEventListener('change', () => { plTeamOptions(); plRender(); });
       $id('pl-export') && ($id('pl-export').onclick = plExport);
       $$('#pl-table th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; if (PL_SORT === k) PL_DIR = -PL_DIR; else { PL_SORT = k; PL_DIR = 1; } plRender(); });
     }
@@ -2898,8 +2929,7 @@
       const d = await res.json();
       if (!res.ok) throw new Error(d.error || 'Failed');
       PL_DATA = d.players || [];
-      const teams = Array.from(new Set(PL_DATA.map(p => p.teamName))).sort();
-      $id('pl-team').innerHTML = '<option value="">All teams (' + teams.length + ')</option>' + teams.map(t => '<option>' + aEsc(t) + '</option>').join('');
+      plTeamOptions();
       const s = d.stats || {};
       const card = (n, l) => '<div style="background:var(--color-surface-2);border-radius:8px;padding:10px 14px;min-width:90px;"><div style="font-size:20px;font-weight:700;">' + n + '</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-faint);">' + l + '</div></div>';
       $id('pl-stats').innerHTML = card(s.total || 0, 'Players') + card(s.withPhone || 0, 'With phone') + card(s.neverLoggedIn || 0, 'Never logged in') + card(s.archived || 0, 'Archived');
@@ -3649,13 +3679,32 @@
     }
   }
 
+  // Which season a registration belongs to. Circuit I registrations predate
+  // the `circuit` field, so a record with no season at all is Season 1's.
+  function regSeasonCode(r) {
+    const raw = r && (r.circuit || r.seasonId);
+    if (!raw) return 'I';
+    return teamSeasonCode({ circuit: raw }) || 'I';
+  }
+  function regInWorkingSeason(r) {
+    if (r && r.seasonId && r.seasonId === adminSeasonId()) return true;
+    return regSeasonCode(r) === adminCircuit();
+  }
+
   function filterAndShowReg() {
     let f = [...allRegistrations];
     const sf = $id('rf-st').value, df = $id('rf-dv').value;
+    // Scoped to the working season in the sidebar unless "All seasons" is on.
+    const allSeasons = $id('rf-all') && $id('rf-all').checked;
+    if (!allSeasons) f = f.filter(regInWorkingSeason);
     if (sf !== 'all') f = f.filter(r => r.status === sf);
     if (df !== 'all') f = f.filter(r => r.division === df);
 
-    if (!f.length) { $id('reg-table').innerHTML = '<div class="empty">No registrations match.</div>'; return; }
+    if (!f.length) {
+      const hidden = allSeasons ? 0 : allRegistrations.length - allRegistrations.filter(regInWorkingSeason).length;
+      $id('reg-table').innerHTML = '<div class="empty">No registrations match' + (hidden ? ' for ' + h(adminSeasonName()) + '. ' + hidden + ' from other seasons are hidden — tick “All seasons” to show them.' : '.') + '</div>';
+      return;
+    }
 
     $id('reg-table').innerHTML = '<table class="at"><thead><tr><th>Name</th><th>Type</th><th>Division</th><th>Status</th><th>League Fee</th><th>Payments</th><th>Balance</th><th>Contact</th><th>Date</th><th>Actions</th></tr></thead><tbody>' +
       f.map(r => {
@@ -4409,6 +4458,7 @@
 
   $id('rf-st').addEventListener('change', filterAndShowReg);
   $id('rf-dv').addEventListener('change', filterAndShowReg);
+  $id('rf-all') && $id('rf-all').addEventListener('change', filterAndShowReg);
 
   // ═══════════════════════════════════════════════════════════
   // TEAMS — live from admin-teams endpoint + slide-out panel
@@ -4843,7 +4893,31 @@
   function ppStatus(msg, err) {
     const s = $id('pp-status'); if (!s) return;
     s.textContent = msg || '';
-    s.style.color = err ? 'var(--color-red)' : 'var(--color-text-faint)';
+    // .a-status is display:none until it carries an is-* class — without this
+    // every "Adding…" / "Request failed" message was invisible.
+    s.classList.remove('is-info', 'is-err', 'is-ok');
+    if (msg) s.classList.add(err ? 'is-err' : 'is-info');
+  }
+  // Bottom-of-screen toast for work that finishes after the popup has closed.
+  let _toastTimer = null;
+  function adminToast(msg, kind, ms) {
+    let el = $id('admin-toast');
+    if (!el) { el = document.createElement('div'); el.id = 'admin-toast'; el.className = 'a-toast'; document.body.appendChild(el); }
+    el.textContent = msg;
+    el.className = 'a-toast is-open' + (kind ? ' is-' + kind : '');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('is-open'), ms || (kind === 'err' ? 6000 : 2500));
+  }
+  // Re-fetch teams without blanking the grid to "Loading…" first, so a
+  // background save doesn't flash the page. Falls back to a full render if
+  // nothing is drawn yet.
+  async function refreshTeamsQuiet() {
+    try {
+      const data = await apiJSON('/.netlify/functions/admin-teams');
+      allTeams = data.teams || [];
+      showTeamCards();
+      populateXferSelects();
+    } catch (_) { await renderTeams(); }
   }
   function closePlayerPop() { $id('player-pop').classList.remove('is-open'); if ((location.hash || '').startsWith('#player/')) setHash('teams'); }
   window.closePlayerPop = closePlayerPop;
@@ -4906,41 +4980,67 @@
     const phone = $id('pp-phone').value.trim();
     const gender = $id('pp-gender').value;
     const dupr = $id('pp-dupr').value.trim();
+    // Field edits + Sub flag go through the full-roster PUT. Sub is mutually
+    // exclusive with captain/co-captain; captain/co-captain promotions use the
+    // dedicated actions below (they anchor the login identity).
+    const roster = (t.roster || []).map(x => {
+      if (x.id !== p.id) return x;
+      const base = { ...x, name, email: email || null, phone: phone || null, gender, dupr: dupr || null };
+      if (PP_ROLE === 'sub') { base.isSub = true; base.isCaptain = false; base.isCoCaptain = false; }
+      else base.isSub = false;
+      return base;
+    });
+    const oldRole = p.isCaptain ? 'captain' : p.isCoCaptain ? 'cocaptain' : p.isSub ? 'sub' : 'player';
+    const newRole = PP_ROLE;
+    // Optimistic: the server side of a roster save (welcome emails, standings
+    // rebuild, activity log) takes several seconds. Show the change now, close
+    // the popup, and reconcile with the server when it answers.
+    const snapshot = t.roster;
+    t.roster = roster.map(x => {
+      if (x.id !== p.id) return x;
+      const r = { ...x };
+      if (newRole === 'captain') { r.isCaptain = true; r.isCoCaptain = false; r.isSub = false; }
+      else if (newRole === 'cocaptain') { r.isCoCaptain = true; r.isCaptain = false; r.isSub = false; }
+      else if (newRole === 'player') { r.isCoCaptain = false; r.isSub = false; }
+      return r;
+    });
+    closePlayerPop();
+    showTeamCards();
+    adminToast('Saving ' + name + '…');
     try {
-      // Field edits + Sub flag go through the full-roster PUT. Sub is mutually
-      // exclusive with captain/co-captain; captain/co-captain promotions use the
-      // dedicated actions below (they anchor the login identity).
-      const roster = (t.roster || []).map(x => {
-        if (x.id !== p.id) return x;
-        const base = { ...x, name, email: email || null, phone: phone || null, gender, dupr: dupr || null };
-        if (PP_ROLE === 'sub') { base.isSub = true; base.isCaptain = false; base.isCoCaptain = false; }
-        else base.isSub = false;
-        return base;
-      });
       await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(t.id), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roster }),
       });
-      const oldRole = p.isCaptain ? 'captain' : p.isCoCaptain ? 'cocaptain' : p.isSub ? 'sub' : 'player';
-      if (PP_ROLE !== oldRole) {
-        if (PP_ROLE === 'captain') await ppAction('set-captain', { playerId: p.id });
-        else if (PP_ROLE === 'cocaptain') await ppAction('set-cocaptain', { playerId: p.id });
-        else if (PP_ROLE === 'player' && oldRole === 'cocaptain') await ppAction('remove-cocaptain', {});
+      if (newRole !== oldRole) {
+        if (newRole === 'captain') await ppAction('set-captain', { playerId: p.id });
+        else if (newRole === 'cocaptain') await ppAction('set-cocaptain', { playerId: p.id });
+        else if (newRole === 'player' && oldRole === 'cocaptain') await ppAction('remove-cocaptain', {});
       }
-      closePlayerPop();
-      await renderTeams();
-    } catch (e) { ppStatus(e.message || 'Save failed', true); btn.disabled = false; }
+      adminToast('Saved ' + name, 'ok');
+    } catch (e) {
+      t.roster = snapshot;
+      adminToast('Save failed: ' + (e.message || 'unknown error'), 'err');
+    }
+    await refreshTeamsQuiet();
   }
 
   async function removePlayerFromPop() {
     const t = PP_TEAM, p = PP_PLAYER; if (!t || !p) return;
     if (p.isCaptain) { ppStatus('Reassign the captain role before removing this player.', true); return; }
     if (!confirm('Remove ' + (p.name || 'this player') + ' from ' + t.name + '? Their stats are kept and they can be restored later.')) return;
-    const btn = $id('pp-remove'); btn.disabled = true; ppStatus('Removing…');
+    const snapshot = t.roster;
+    t.roster = (t.roster || []).map(x => x.id === p.id ? { ...x, archived: true, isCoCaptain: false } : x);
+    closePlayerPop();
+    showTeamCards();
+    adminToast('Removing ' + (p.name || 'player') + '…');
     try {
       await ppAction('archive-player', { playerId: p.id });
-      closePlayerPop();
-      await renderTeams();
-    } catch (e) { ppStatus(e.message || 'Remove failed', true); btn.disabled = false; }
+      adminToast('Removed ' + (p.name || 'player'), 'ok');
+    } catch (e) {
+      t.roster = snapshot;
+      adminToast('Remove failed: ' + (e.message || 'unknown error'), 'err');
+    }
+    await refreshTeamsQuiet();
   }
 
   function openAddPop(teamId) {
@@ -4976,12 +5076,16 @@
   // stats. The directory below is every roster entry the league has ever had;
   // picking someone reuses their player id and email, which is what makes their
   // history follow them onto the new team.
+  //
+  // include=ladder adds people known only to the ladder side. A ladder regular
+  // joining a team is the same person, and picking them here keeps that one
+  // identity instead of minting a league copy with no ladder history.
   let PLAYER_DIR = null, PLAYER_DIR_LOADING = null, PP_LINKED = null;
 
   function loadPlayerDirectory() {
     if (PLAYER_DIR) return Promise.resolve(PLAYER_DIR);
     if (PLAYER_DIR_LOADING) return PLAYER_DIR_LOADING;
-    PLAYER_DIR_LOADING = apiJSON('/.netlify/functions/admin-players')
+    PLAYER_DIR_LOADING = apiJSON('/.netlify/functions/admin-players?include=ladder')
       .then(d => {
         // One row per person: newest season wins, but keep any contact detail
         // an older row has and a newer one is missing.
@@ -5004,7 +5108,17 @@
             seasons,
           });
         }
-        PLAYER_DIR = [...byKey.values()].sort((a, b) => a.name.localeCompare(b.name));
+        // Ladder history is derived from ALL of a person's rows, not just the
+        // winning one: a league row outranks a ladder row, and spreading it
+        // would otherwise drop the ladder detail for someone who does both.
+        PLAYER_DIR = [...byKey.values()].map(rec => {
+          const rows = rec.seasons || [rec];
+          return {
+            ...rec,
+            onLadder: rows.some(x => x.source === 'ladder' || x.ladderNights > 0),
+            ladderNights: rows.reduce((n, x) => Math.max(n, x.ladderNights || 0), 0),
+          };
+        }).sort((a, b) => a.name.localeCompare(b.name));
         return PLAYER_DIR;
       })
       .catch(() => { PLAYER_DIR = []; return PLAYER_DIR; })
@@ -5049,15 +5163,20 @@
       if (!entry || !entry.id) { ppStatus('Can’t restore — no player id on that roster entry.', true); return; }
       if (btn) btn.disabled = true;
       ppStatus('Restoring ' + (m.name || 'player') + '…');
+      const t = PP_TEAM, snapshot = t.roster;
+      t.roster = (t.roster || []).map(x => x.id === entry.id ? { ...x, archived: false } : x);
+      close();
+      closePlayerPop();
+      showTeamCards();
+      adminToast('Restoring ' + (m.name || 'player') + '…');
       try {
         await ppAction('restore-player', { playerId: entry.id });
-        close();
-        closePlayerPop();
-        await renderTeams();
+        adminToast('Restored ' + (m.name || 'player'), 'ok');
       } catch (e) {
-        if (btn) btn.disabled = false;
-        ppStatus(e.message || 'Restore failed', true);
+        t.roster = snapshot;
+        adminToast('Restore failed: ' + (e.message || 'unknown error'), 'err');
       }
+      await refreshTeamsQuiet();
     };
 
     const draw = () => {
@@ -5071,7 +5190,12 @@
       }
       list.innerHTML = matches.map((m, i) => {
         const seasons = [...new Set((m.seasons || [m]).map(x => teamSeasonCode(x)).filter(Boolean))];
-        const meta = [m.teamName || null, seasons.length ? seasons.map(seasonNameForCode).join(', ') : null, m.email || null]
+        // A ladder-only player has no team or season, so without this their row
+        // would read as a bare name and look like a stranger.
+        const ladder = m.onLadder
+          ? (m.ladderNights ? 'Ladder · ' + m.ladderNights + ' night' + (m.ladderNights === 1 ? '' : 's') : 'Ladder player')
+          : null;
+        const meta = [m.teamName || null, seasons.length ? seasons.map(seasonNameForCode).join(', ') : null, ladder, m.email || null]
           .filter(Boolean).join(' · ');
         // Already on the team we're adding to: say so instead of hiding them.
         if (m.onTeam) {
@@ -5174,14 +5298,24 @@
       if (PP_LINKED.playerId) newP.id = PP_LINKED.playerId;
       if (!newP.email && PP_LINKED.email) newP.email = PP_LINKED.email;
     }
+    const roster = [...(t.roster || []), newP];
+    // Optimistic: show them on the card right away; the server (welcome email,
+    // standings rebuild) can take several seconds to answer.
+    const snapshot = t.roster;
+    t.roster = [...(t.roster || []), { ...newP, id: newP.id || ('tmp_' + Date.now()) }];
+    closePlayerPop();
+    showTeamCards();
+    adminToast('Adding ' + name + '…');
     try {
-      const roster = [...(t.roster || []), newP];
       await apiJSON('/.netlify/functions/admin-teams?id=' + encodeURIComponent(t.id), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ roster }),
       });
-      closePlayerPop();
-      await renderTeams();
-    } catch (e) { ppStatus(e.message || 'Add failed', true); btn.disabled = false; }
+      adminToast('Added ' + name + ' to ' + t.name, 'ok');
+    } catch (e) {
+      t.roster = snapshot;
+      adminToast('Add failed: ' + (e.message || 'unknown error'), 'err');
+    }
+    await refreshTeamsQuiet();
   }
 
   // Close the player popup when clicking the dimmed backdrop (link is per-open).
