@@ -973,13 +973,16 @@
               <button class="ab ab--lime ab--sm" id="pl-export" style="font-size:10px;">Export CSV</button>
             </div>
           </div>
-          <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;">Every rostered league player with contact details. Includes archived &amp; removed players; excludes the test/demo season. Admin only.</p>
+          <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;">Every rostered league player with contact details. Includes archived &amp; removed players; excludes the test/demo season. Admin only. The <b>Emails</b> column shows who has opted out of league announcements — flip it when someone asks to be taken off the list, or send them their own preferences link.</p>
           <div id="pl-stats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
             <input id="pl-q" type="text" placeholder="Search name, team, email, phone…" style="flex:1;min-width:180px;" aria-label="Search players">
             <select id="pl-team" aria-label="Filter by team" style="max-width:180px;"></select>
             <select id="pl-login" aria-label="Filter by login" style="max-width:150px;">
               <option value="">Any login</option><option value="never">Never logged in</option><option value="active">Has logged in</option>
+            </select>
+            <select id="pl-sub" aria-label="Filter by email opt-in" style="max-width:170px;">
+              <option value="">Any email status</option><option value="out">Opted out</option><option value="in">Subscribed</option>
             </select>
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);white-space:nowrap;"><input type="checkbox" id="pl-arch" checked style="width:auto;min-height:0;"> Show archived</label>
             <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--color-text-muted);white-space:nowrap;"><input type="checkbox" id="pl-all" style="width:auto;min-height:0;"> All seasons</label>
@@ -992,6 +995,7 @@
                 <th data-k="email" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">EMAIL</th>
                 <th data-k="phone" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">PHONE</th>
                 <th data-k="lastLoginAt" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);">LAST LOGIN</th>
+                <th data-k="subKey" style="text-align:left;cursor:pointer;padding:8px 10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);" title="League announcement emails">EMAILS</th>
               </tr></thead>
               <tbody id="pl-body"></tbody>
             </table>
@@ -2851,6 +2855,73 @@
   // PLAYERS — master roster with contact info (admin-players)
   // ═══════════════════════════════════════════════════════════
   let PL_DATA = [], PL_SORT = 'name', PL_DIR = 1, PL_WIRED = false;
+  // Email opt-in/out per normalized email (admin-notify-prefs lookup). Missing
+  // = default = subscribed to everything.
+  let PL_PREFS = {};
+  function plNormEmail(e) { return String(e || '').trim().toLowerCase(); }
+  // 'in' | 'league-off' | 'out'
+  function plSubState(p) {
+    const pr = PL_PREFS[plNormEmail(p.email)];
+    if (!pr) return 'in';
+    if (pr.all === false) return 'out';
+    if (pr.types && pr.types.league === false) return 'league-off';
+    return 'in';
+  }
+  function plSubChip(p) {
+    if (!p.email) return '<span style="color:var(--color-text-faint);">—</span>';
+    const st = plSubState(p);
+    const pr = PL_PREFS[plNormEmail(p.email)];
+    const who = pr && pr.setBy && pr.setBy !== 'player' ? 'by ' + pr.setBy : (pr ? 'by the player' : '');
+    const when = pr && pr.updatedAt ? new Date(pr.updatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const tip = pr ? aEsc([who, when, pr.note].filter(Boolean).join(' · ')) : 'Gets league announcements';
+    const chip = st === 'out'
+      ? '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(239,68,68,.15);color:#f87171;white-space:nowrap;">UNSUBSCRIBED</span>'
+      : st === 'league-off'
+        ? '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--color-amber-dim,rgba(245,158,11,.15));color:#f0c040;white-space:nowrap;">LEAGUE OFF</span>'
+        : '<span title="' + tip + '" style="font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:var(--color-lime-dim);color:var(--color-lime);white-space:nowrap;">SUBSCRIBED</span>';
+    const e = aEsc(plNormEmail(p.email)), n = aEsc(p.name || '');
+    const flip = st === 'in'
+      ? '<button class="ab ab--ghost ab--sm pl-sub-btn" data-e="' + e + '" data-n="' + n + '" data-act="out" style="font-size:10px;padding:2px 8px;" title="Stop all optional emails to this address">Opt out</button>'
+      : '<button class="ab ab--ghost ab--sm pl-sub-btn" data-e="' + e + '" data-n="' + n + '" data-act="in" style="font-size:10px;padding:2px 8px;" title="Turn optional emails back on">Re-subscribe</button>';
+    const link = '<button class="ab ab--ghost ab--sm pl-sub-btn" data-e="' + e + '" data-n="' + n + '" data-act="link" style="font-size:10px;padding:2px 8px;" title="Email this player their own manage / unsubscribe link">Send link</button>';
+    return '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">' + chip + flip + link + '</div>';
+  }
+  async function plLoadPrefs() {
+    const emails = Array.from(new Set(PL_DATA.map(p => plNormEmail(p.email)).filter(Boolean)));
+    if (!emails.length) { PL_PREFS = {}; return; }
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-notify-prefs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'lookup', emails }),
+      });
+      PL_PREFS = d.prefs || {};
+    } catch (e) { console.warn('prefs lookup failed', e); PL_PREFS = {}; }
+    PL_DATA.forEach(p => { p.subKey = plSubState(p); });
+  }
+  async function plSubAction(btn) {
+    const email = btn.dataset.e, name = btn.dataset.n, act = btn.dataset.act;
+    if (!email) return;
+    if (act === 'out' && !confirm('Opt ' + (name || email) + ' out of all optional emails (league announcements, ladder announcements, reminders, recaps)?\n\nThey will still get confirmations, lineup and availability emails for anything they are registered for.')) return;
+    if (act === 'link' && !confirm('Email ' + (name || email) + ' their personal email-preferences link?')) return;
+    const orig = btn.textContent; btn.disabled = true; btn.textContent = '…';
+    try {
+      const payload = act === 'link'
+        ? { action: 'send-link', email, name }
+        : { action: 'set', email, all: act === 'in' };
+      const d = await apiJSON('/.netlify/functions/admin-notify-prefs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+      });
+      if (act === 'link') { btn.textContent = 'Sent ✓'; setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500); return; }
+      if (d.prefs) {
+        const isDefault = d.prefs.all !== false && !Object.values(d.prefs.types || {}).some(v => v === false);
+        if (isDefault) delete PL_PREFS[email]; else PL_PREFS[email] = d.prefs;
+      }
+      PL_DATA.forEach(p => { if (plNormEmail(p.email) === email) p.subKey = plSubState(p); });
+      plRender();
+    } catch (e) {
+      alert('Could not update: ' + (e.message || 'unknown error'));
+      btn.disabled = false; btn.textContent = orig;
+    }
+  }
   function plFmtLogin(s) {
     if (!s) return '<span style="font-size:11px;font-weight:700;padding:1px 7px;border-radius:5px;background:var(--color-amber-dim,rgba(245,158,11,.15));color:#f0c040;">Never</span>';
     const d = new Date(s);
@@ -2870,8 +2941,11 @@
   function plRows() {
     const q = ($id('pl-q').value || '').trim().toLowerCase();
     const tf = $id('pl-team').value, lf = $id('pl-login').value, showArch = $id('pl-arch').checked;
+    const sf = $id('pl-sub') ? $id('pl-sub').value : '';
     let r = plScoped().filter(p => {
       if (!showArch && p.archived) return false;
+      if (sf === 'out' && plSubState(p) === 'in') return false;
+      if (sf === 'in' && plSubState(p) !== 'in') return false;
       if (tf && p.teamName !== tf) return false;
       if (lf === 'never' && p.lastLoginAt) return false;
       if (lf === 'active' && !p.lastLoginAt) return false;
@@ -2894,14 +2968,18 @@
         '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + (p.email ? '<a href="mailto:' + aEsc(p.email) + '" style="color:var(--color-teal);text-decoration:none;">' + aEsc(p.email) + '</a>' + cp(p.email, 'email') : '<span style="color:var(--color-text-faint);">—</span>') + '</td>' +
         '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + (p.phone ? aEsc(p.phone) + cp(p.phone, 'phone') : '<span style="color:var(--color-text-faint);">—</span>') + '</td>' +
         '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + plFmtLogin(p.lastLoginAt) + '</td>' +
+        '<td style="padding:9px 10px;border-bottom:1px solid var(--color-border);">' + plSubChip(p) + '</td>' +
       '</tr>';
-    }).join('') || '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-faint);">No players match.</td></tr>';
+    }).join('') || '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--color-text-faint);">No players match.</td></tr>';
     const never = r.filter(p => !p.lastLoginAt).length;
+    const out = r.filter(p => plSubState(p) !== 'in').length;
     const scoped = plScoped();
     $id('pl-foot').textContent = 'Showing ' + r.length + ' of ' + scoped.length + ' players' +
       (scoped.length !== PL_DATA.length ? ' in ' + adminSeasonName() : '') +
-      (never ? ' · ' + never + ' never logged in' : '');
+      (never ? ' · ' + never + ' never logged in' : '') +
+      (out ? ' · ' + out + ' opted out of emails' : '');
     $$('#pl-body .pl-copy').forEach(b => b.onclick = () => { navigator.clipboard && navigator.clipboard.writeText(b.dataset.c); const o = b.textContent; b.textContent = '✓'; setTimeout(() => b.textContent = o, 1000); });
+    $$('#pl-body .pl-sub-btn').forEach(b => b.onclick = () => plSubAction(b));
   }
   function plTeamOptions() {
     const sel = $id('pl-team'); if (!sel) return;
@@ -2911,17 +2989,17 @@
     if (!teams.includes(cur)) sel.value = '';
   }
   function plExport() {
-    const r = plRows(), head = ['Name', 'Team', 'Division', 'Captain', 'Archived', 'Email', 'Phone', 'Last logged in'];
-    const lines = [head.join(',')].concat(r.map(p => [p.name, p.teamName, p.divisionLabel || '', p.isCaptain ? 'Yes' : '', p.archived ? 'Yes' : '', p.email || '', p.phone || '', p.lastLoginAt || 'Never'].map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')));
+    const r = plRows(), head = ['Name', 'Team', 'Division', 'Captain', 'Archived', 'Email', 'Phone', 'Last logged in', 'Emails'];
+    const lines = [head.join(',')].concat(r.map(p => [p.name, p.teamName, p.divisionLabel || '', p.isCaptain ? 'Yes' : '', p.archived ? 'Yes' : '', p.email || '', p.phone || '', p.lastLoginAt || 'Never', p.email ? ({ in: 'Subscribed', out: 'Unsubscribed', 'league-off': 'League off' })[plSubState(p)] : ''].map(x => '"' + String(x).replace(/"/g, '""') + '"').join(',')));
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' }), u = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = u; a.download = 'dink-society-players.csv'; a.click(); URL.revokeObjectURL(u);
   }
   async function renderPlayers() {
     const body = $id('pl-body');
-    body.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-text-faint);">Loading…</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--color-text-faint);">Loading…</td></tr>';
     if (!PL_WIRED) {
       PL_WIRED = true;
-      ['pl-q', 'pl-team', 'pl-login', 'pl-arch'].forEach(id => { const el = $id(id); el && el.addEventListener(id === 'pl-q' ? 'input' : 'change', plRender); });
+      ['pl-q', 'pl-team', 'pl-login', 'pl-arch', 'pl-sub'].forEach(id => { const el = $id(id); el && el.addEventListener(id === 'pl-q' ? 'input' : 'change', plRender); });
       $id('pl-all') && $id('pl-all').addEventListener('change', () => { plTeamOptions(); plRender(); });
       $id('pl-export') && ($id('pl-export').onclick = plExport);
       $$('#pl-table th[data-k]').forEach(th => th.onclick = () => { const k = th.dataset.k; if (PL_SORT === k) PL_DIR = -PL_DIR; else { PL_SORT = k; PL_DIR = 1; } plRender(); });
@@ -2936,8 +3014,14 @@
       const card = (n, l) => '<div style="background:var(--color-surface-2);border-radius:8px;padding:10px 14px;min-width:90px;"><div style="font-size:20px;font-weight:700;">' + n + '</div><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--color-text-faint);">' + l + '</div></div>';
       $id('pl-stats').innerHTML = card(s.total || 0, 'Players') + card(s.withPhone || 0, 'With phone') + card(s.neverLoggedIn || 0, 'Never logged in') + card(s.archived || 0, 'Archived');
       plRender();
+      // Opt-in/out status is a second, cheaper call — draw the table first,
+      // then paint the chips in.
+      await plLoadPrefs();
+      const optedOut = new Set(PL_DATA.filter(p => plSubState(p) !== 'in').map(p => plNormEmail(p.email))).size;
+      $id('pl-stats').innerHTML += card(optedOut, 'Opted out');
+      plRender();
     } catch (e) {
-      body.innerHTML = '<tr><td colspan="5" style="padding:20px;text-align:center;color:var(--color-red);">Couldn’t load players. <a href="#" onclick="renderPlayers();return false" style="color:var(--color-lime);">Retry</a></td></tr>';
+      body.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--color-red);">Couldn’t load players. <a href="#" onclick="renderPlayers();return false" style="color:var(--color-lime);">Retry</a></td></tr>';
     }
   }
   window.renderPlayers = renderPlayers;
@@ -4240,7 +4324,7 @@
       // the portal message is already delivered by the time this returns.
       status.textContent = 'Posted to ' + r.teamCount + ' team' + (r.teamCount === 1 ? '' : 's') +
         (r.recipients ? (r.queued
-          ? ' · ' + r.recipients + ' email' + (r.recipients === 1 ? '' : 's') + ' going out now in the background (a minute or two)'
+          ? ' · ' + r.recipients + ' email' + (r.recipients === 1 ? '' : 's') + ' going out now in the background (a minute or two) — anyone who unsubscribed is skipped automatically'
           : ' · but the email sender could not be started — ' + r.recipients + ' emails NOT sent')
         : (r.emailed ? ' · ' + r.emailed + ' emails sent' : ''));
       if (r.recipients && !r.queued) status.className = 'a-status is-err';

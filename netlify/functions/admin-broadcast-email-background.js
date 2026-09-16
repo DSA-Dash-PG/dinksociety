@@ -10,13 +10,20 @@
 // emailed and no record of who.
 //
 // Progress is written back onto the broadcast record: emailed, failed,
-// firstError, emailStatus ('sending' → 'done'), so the admin UI can show it.
+// optedOut, firstError, emailStatus ('sending' → 'done'), so the admin UI can
+// show it.
+//
+// Every send goes through sendNotify({ category: 'league' }) — so a player who
+// hit "Unsubscribe from all" (or turned off League announcements) is skipped,
+// and everyone else gets the manage/unsubscribe footer + List-Unsubscribe
+// headers. Before this, broadcasts used raw sendEmail and nobody could opt out.
 //
 // POST body: { broadcastId }
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { sendEmail, renderAdminMessage } from './lib/email.js';
+import { renderAdminMessage } from './lib/email.js';
+import { sendNotify } from './lib/notify-prefs.js';
 import { listAllTeams, recipientEmails, getEmailTemplate, siteUrl } from './admin-messages.js';
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -65,7 +72,7 @@ export default async (req) => {
   const wanted = new Set(Array.isArray(rec.teamIds) ? rec.teamIds : []);
   const teams = (await listAllTeams('')).filter(t => wanted.has(t.id));
 
-  let emailed = 0, failed = 0, firstError = null;
+  let emailed = 0, failed = 0, optedOut = 0, firstError = null;
   // De-dupe across teams: a player rostered twice still gets one email.
   const seen = new Set();
   for (const team of teams) {
@@ -76,11 +83,12 @@ export default async (req) => {
     for (const to of recipientEmails(team, rec.audience || 'captains')) {
       if (seen.has(to)) continue;
       seen.add(to);
-      let ok = false;
+      let ok = false, skipped = false;
       // Resend allows ~2 requests/second; back off and retry once on a limit.
-      for (let attempt = 0; attempt < 3 && !ok; attempt++) {
+      for (let attempt = 0; attempt < 3 && !ok && !skipped; attempt++) {
         try {
-          await sendEmail({ to, subject, html, attachments: mailAttachments });
+          const r = await sendNotify({ to, category: 'league', subject, html, attachments: mailAttachments });
+          if (r && r.skipped) { skipped = true; break; }
           ok = true;
         } catch (e) {
           const msg = String(e && e.message || e);
@@ -92,11 +100,12 @@ export default async (req) => {
         }
       }
       if (ok) emailed++;
-      if ((emailed + failed) % 5 === 0) await save({ emailed, failed, firstError });
+      if (skipped) { optedOut++; continue; } // no Resend call happened — no need to pace
+      if ((emailed + failed) % 5 === 0) await save({ emailed, failed, optedOut, firstError });
       await sleep(550);
     }
   }
 
-  await save({ emailed, failed, firstError, emailStatus: 'done', emailFinishedAt: new Date().toISOString() });
-  return json({ ok: true, emailed, failed, firstError });
+  await save({ emailed, failed, optedOut, firstError, emailStatus: 'done', emailFinishedAt: new Date().toISOString() });
+  return json({ ok: true, emailed, failed, optedOut, firstError });
 };

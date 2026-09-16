@@ -18,6 +18,7 @@ import {
   listThread, appendMessage, getReads, setRead, unreadCount, generateId,
 } from './lib/messages.js';
 import { circuitCode, isTestTeam } from './lib/circuit.js';
+import { activeRoster } from './lib/roster.js';
 
 // Load the admin-configured email appearance (logo/accent/header/button/footer).
 async function getEmailTemplate() {
@@ -70,8 +71,11 @@ async function listAllTeams(circuit) {
 }
 
 // Resolve which email addresses to notify for a team, given the audience.
+// Only players actually on the roster (not archived, not a pending add) are
+// emailed — a Season 1 player who was archived off a returning team's roster
+// used to still get every broadcast.
 function recipientEmails(team, audience) {
-  const roster = team.roster || [];
+  const roster = activeRoster(team);
   const lc = (e) => (e || '').toString().trim().toLowerCase();
   // Canonical roster email lives in normalizedEmail (stamped on save); the raw
   // `email` field is often blank. Read both, matching the rest of the codebase.

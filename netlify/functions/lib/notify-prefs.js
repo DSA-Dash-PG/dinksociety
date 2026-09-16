@@ -1,13 +1,19 @@
 // netlify/functions/lib/notify-prefs.js
 // Per-player email notification preferences + the gate/footer used by every
-// ladder notification send.
+// optional notification send — ladder AND league.
 //
-//   notify-prefs   pref/<email>.json   { email, all, types:{...}, updatedAt }
+//   notify-prefs   pref/<email>.json   { email, all, types:{...}, updatedAt,
+//                                        setBy?, note? }
 //
 // Default (no record) = opted in to everything. `all:false` is the master
-// unsubscribe. Only the OPTIONAL "going-forward" categories are toggleable.
-// Registration confirmations ("you're in" / "pay your spot") are MANDATORY for
-// a paid signup — they always send and aren't shown on the manage page.
+// unsubscribe and stops EVERY optional category, league broadcasts included.
+// Only the OPTIONAL "going-forward" categories are toggleable. Transactional
+// mail (registration confirmations, lineup/availability, waiver nudges,
+// magic links) is MANDATORY — it always sends and isn't shown on the manage
+// page.
+//
+// Admins can flip a player's prefs from the Players tab
+// (admin-notify-prefs.js) when someone replies "take me off the list".
 //
 // The manage link is a stateless HMAC token over the email (stable, not
 // single-use) so an unsubscribe link keeps working — unlike the one-tap action
@@ -25,6 +31,7 @@ function store() { return getStore({ name: STORE, consistency: 'strong' }); }
 // The notification categories a player can toggle. Keep keys stable — they're
 // persisted and referenced by the manage page.
 export const NOTIFY_TYPES = [
+  { key: 'league',      label: 'League announcements',     desc: 'Season news, pre-season write-ups and broadcasts from the league.' },
   { key: 'new_ladders', label: 'New ladder announcements', desc: 'When a new ladder opens for registration.' },
   { key: 'reminders',   label: 'Roster reminders',         desc: 'Reminders before a night you’re registered for.' },
   { key: 'waitlist',    label: 'Waitlist & spot alerts',   desc: 'When a spot opens for you off the waitlist.' },
@@ -66,11 +73,32 @@ export async function getPrefs(email) {
   const rec = e ? await store().get(key(e), { type: 'json' }).catch(() => null) : null;
   const types = {};
   for (const k of TYPE_KEYS) types[k] = rec?.types?.[k] !== false; // default true
-  return { email: e, all: rec?.all !== false, types };
+  return {
+    email: e, all: rec?.all !== false, types,
+    updatedAt: rec?.updatedAt || null, setBy: rec?.setBy || null, note: rec?.note || null,
+  };
 }
 
-/** Persist prefs. `all` is the master switch; `types` is a partial map. */
-export async function setPrefs(email, { all, types } = {}) {
+/** Read prefs for many emails at once → { [email]: prefs }. Admin Players tab. */
+export async function getPrefsMany(emails) {
+  const out = {};
+  const uniq = [...new Set((emails || []).map(normalizeEmail).filter(Boolean))];
+  // Small concurrency cap — the store is fine with it and it keeps a 200-row
+  // Players tab under a second.
+  for (let i = 0; i < uniq.length; i += 20) {
+    const chunk = uniq.slice(i, i + 20);
+    const res = await Promise.all(chunk.map(e => getPrefs(e).catch(() => null)));
+    chunk.forEach((e, j) => { if (res[j]) out[e] = res[j]; });
+  }
+  return out;
+}
+
+/**
+ * Persist prefs. `all` is the master switch; `types` is a partial map.
+ * `setBy` ('player' | admin email) and `note` are an audit trail so you can see
+ * later whether the player unsubscribed themselves or an admin did it for them.
+ */
+export async function setPrefs(email, { all, types, setBy, note } = {}) {
   const e = normalizeEmail(email);
   if (!e) return null;
   const cur = await getPrefs(e);
@@ -79,7 +107,9 @@ export async function setPrefs(email, { all, types } = {}) {
     all: all == null ? cur.all : !!all,
     types: { ...cur.types },
     updatedAt: new Date().toISOString(),
+    setBy: setBy || 'player',
   };
+  if (note) next.note = String(note).slice(0, 200);
   if (types) for (const k of TYPE_KEYS) if (k in types) next.types[k] = !!types[k];
   await store().setJSON(key(e), next);
   return next;
@@ -97,26 +127,47 @@ export async function wantsEmail(email, category) {
   return p.types[category] !== false;
 }
 
-/** Footer with manage + one-click unsubscribe links, appended to every gated email. */
-export function prefsFooter(email) {
+/** Manage + one-click unsubscribe URLs for a recipient. */
+export function prefsLinks(email) {
   const t = manageToken(email);
   const base = siteUrl();
   const manage = `${base}/.netlify/functions/ladder-prefs?t=${encodeURIComponent(t)}`;
   const unsub = `${manage}&all=0&go=1`;
+  return { manage, unsub };
+}
+
+/** Footer with manage + one-click unsubscribe links, appended to every gated email. */
+export function prefsFooter(email) {
+  const { manage, unsub } = prefsLinks(email);
   return `<div style="margin-top:18px;padding-top:14px;border-top:1px solid #1f1f1f;font-size:11px;color:#5e625c;line-height:1.7">
+    You're getting this because you play with The Dink Society.
     <a href="${manage}" style="color:#8a8a8a;text-decoration:underline">Manage email preferences</a> &nbsp;·&nbsp; <a href="${unsub}" style="color:#8a8a8a;text-decoration:underline">Unsubscribe from all</a>
   </div>`;
 }
 
 /**
+ * RFC 8058 headers so Gmail / Apple Mail / Outlook show their native
+ * "Unsubscribe" button. The one-click POST lands on the same ladder-prefs
+ * endpoint and flips the master switch.
+ */
+export function prefsHeaders(email) {
+  const { unsub } = prefsLinks(email);
+  return {
+    'List-Unsubscribe': `<${unsub}>`,
+    'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+  };
+}
+
+/**
  * Gate + footer wrapper around sendEmail for player-facing notifications.
  * Skips the send if the recipient opted out of `category`; otherwise appends the
- * manage/unsubscribe footer. Organizer/operational mail can pass category=null
- * to always send with no footer.
+ * manage/unsubscribe footer and List-Unsubscribe headers. Organizer/operational
+ * mail can pass category=null to always send with no footer.
  * Returns { skipped } or whatever sendEmail returns.
  */
-export async function sendNotify({ to, category, subject, html, from, replyTo }) {
+export async function sendNotify({ to, category, subject, html, from, replyTo, attachments }) {
   if (category && !(await wantsEmail(to, category))) return { skipped: true, to };
   const body = category ? html + prefsFooter(to) : html;
-  return sendEmail({ to, from, replyTo, subject, html: body });
+  const headers = category ? prefsHeaders(to) : undefined;
+  return sendEmail({ to, from, replyTo, subject, html: body, attachments, headers });
 }

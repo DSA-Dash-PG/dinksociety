@@ -25,7 +25,7 @@ function getResend() {
  *   K'CHN Player of the Week mailer, which sends as dink@dinksociety.app). Any
  *   override must still be on a Resend-verified domain (dinksociety.app is).
  */
-export async function sendEmail({ to, subject, html, replyTo, from, attachments }) {
+export async function sendEmail({ to, subject, html, replyTo, from, attachments, headers }) {
   // Default sender for all Dink Society notifications is dink@dinksociety.app.
   // A per-send `from` wins; otherwise EMAIL_FROM (if set) or the dink@ default.
   const rawFrom = from || process.env.EMAIL_FROM || 'dink@dinksociety.app';
@@ -54,6 +54,11 @@ export async function sendEmail({ to, subject, html, replyTo, from, attachments 
 
   if (Array.isArray(attachments) && attachments.length) {
     payload.attachments = attachments;
+  }
+
+  // Custom headers (List-Unsubscribe etc.) — Resend passes them through as-is.
+  if (headers && typeof headers === 'object' && Object.keys(headers).length) {
+    payload.headers = headers;
   }
 
   const result = await r.emails.send(payload);
@@ -1112,4 +1117,23 @@ export function renderWaiverReminder({ playerName, captainName, teamName, teamEm
 export function waiverReminderSubject({ teamName, waiverTitles }) {
   const t = (waiverTitles || []).filter(Boolean);
   return t.length === 1 ? `Please sign: ${t[0]} — ${teamName}` : `Please sign your Dink Society waiver — ${teamName}`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// EMAIL PREFERENCES — "here's your manage link" (sent by an admin from the
+// Players tab when a player asks how to stop getting league mail)
+// ═══════════════════════════════════════════════════════════════
+
+export function renderPrefsLink({ playerName, manageUrl, unsubUrl }) {
+  return `
+    <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 40px 20px; background: #0e0e0e; color: #f5f5f5;">
+      <div style="font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #f5f5f5; margin-bottom: 28px;">THE DINK SOCIETY</div>
+      <h1 style="font-size: 22px; font-weight: 800; color: #f5f5f5; margin: 0 0 14px; line-height: 1.25;">Your email preferences</h1>
+      <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">Hey ${escapeBody(playerName || 'there')} — you asked about the emails you get from us. Pick exactly what you want below. Confirmations and match-night emails for anything you're registered for always come through; everything else is up to you.</p>
+      ${_btn(manageUrl, 'Manage my email preferences →')}
+      <p style="font-size: 13px; color: #777; margin-top: 18px; line-height: 1.5;">Want none of the optional stuff? <a href="${unsubUrl}" style="color:#8a8a8a;text-decoration:underline;">Unsubscribe from all</a> in one tap.</p>
+      <div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #2a2a2a; font-size: 11px; color: #555;">
+        The Dink Society · This link is yours — it keeps working, so hang onto it.
+      </div>
+    </div>`;
 }

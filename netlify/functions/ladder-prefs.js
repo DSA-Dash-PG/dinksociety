@@ -1,13 +1,16 @@
 // netlify/functions/ladder-prefs.js
 // No-login email preferences page, reached from the footer of any optional
-// ladder notification. The link carries a stable HMAC token over the email
-// (lib/notify-prefs.js) — no session needed.
+// notification (ladder or league). The link carries a stable HMAC token over
+// the email (lib/notify-prefs.js) — no session needed.
 //
 //   GET  ?t=<token>              → the preferences form
 //   GET  ?t=<token>&all=0&go=1   → one-click "unsubscribe from all optional"
+//   POST ?t=<token>&all=0&go=1   → same, from the mail client's native
+//                                  Unsubscribe button (RFC 8058 one-click)
 //   POST (form: t + t_<key>…)    → save per-type choices
 //
-// Registration confirmations are mandatory and never appear here.
+// Transactional mail (confirmations, lineups, waivers) is mandatory and never
+// appears here.
 
 import { NOTIFY_TYPES, emailFromToken, getPrefs, setPrefs, manageToken } from './lib/notify-prefs.js';
 
@@ -36,9 +39,9 @@ function page(inner) {
   .center{text-align:center}
   .foot{margin-top:30px;padding-top:16px;border-top:1px solid #222;font-size:11px;color:#555}
 </style></head><body><div class="card">
-  <div class="wm">THE DINK SOCIETY <span class="l">· LADDER</span></div>
+  <div class="wm">THE DINK SOCIETY <span class="l">· EMAIL</span></div>
   ${inner}
-  <div class="foot">Registration confirmations for ladders you sign up for are always sent.</div>
+  <div class="foot">Confirmations, lineup and availability emails for anything you’re registered for are always sent.</div>
 </div></body></html>`;
 }
 
@@ -52,7 +55,7 @@ function formPage(email, prefs, saved) {
   return page(`
     ${saved ? '<div style="background:rgba(184,255,44,.12);border:1px solid rgba(184,255,44,.3);color:#b8ff2c;font-size:13px;font-weight:700;border-radius:10px;padding:11px 14px;margin-bottom:18px">✓ Saved. Your preferences are updated.</div>' : ''}
     <h1>Email preferences</h1>
-    <p class="sub">Choose what we send to <b>${esc(email)}</b>. Untick anything you’d rather not get — you’ll still get confirmations for ladders you sign up for.</p>
+    <p class="sub">Choose what we send to <b>${esc(email)}</b>. Untick anything you’d rather not get — you’ll still get confirmations and match-night emails for anything you’re signed up for.</p>
     <form method="POST" action="/.netlify/functions/ladder-prefs">
       <input type="hidden" name="t" value="${esc(tok)}">
       ${rows}
@@ -66,13 +69,22 @@ function formPage(email, prefs, saved) {
 export default async (req) => {
   const url = new URL(req.url);
 
+  // RFC 8058 one-click: mail clients POST to the List-Unsubscribe URL with the
+  // token in the query string and "List-Unsubscribe=One-Click" as the body.
+  if (req.method === 'POST' && url.searchParams.get('all') === '0' && url.searchParams.get('go') === '1') {
+    const email = emailFromToken(url.searchParams.get('t'));
+    if (!email) return new Response('invalid token', { status: 400 });
+    await setPrefs(email, { all: false, setBy: 'player', note: 'one-click unsubscribe (mail client)' });
+    return new Response('unsubscribed', { status: 200 });
+  }
+
   if (req.method === 'POST') {
     const form = new URLSearchParams(await req.text());
     const email = emailFromToken(form.get('t'));
     if (!email) return html(page('<h1>Link expired</h1><p class="sub">This preferences link isn’t valid. Open the link from a recent email again.</p>'), 400);
     const types = {};
     for (const t of NOTIFY_TYPES) types[t.key] = form.get(`t_${t.key}`) != null;
-    await setPrefs(email, { all: true, types });
+    await setPrefs(email, { all: true, types, setBy: 'player' });
     const prefs = await getPrefs(email);
     return html(formPage(email, prefs, true));
   }
@@ -82,13 +94,13 @@ export default async (req) => {
 
   // One-click unsubscribe from all optional emails.
   if (url.searchParams.get('all') === '0' && url.searchParams.get('go') === '1') {
-    await setPrefs(email, { all: false });
+    await setPrefs(email, { all: false, setBy: 'player', note: 'unsubscribe link' });
     const tok = manageToken(email);
     return html(page(`
       <div class="center">
         <div class="ok">✓</div>
         <h1>You’re unsubscribed</h1>
-        <p class="sub">We won’t send optional ladder emails to <b>${esc(email)}</b> anymore. You’ll still get confirmations for any ladder you sign up for.</p>
+        <p class="sub">We won’t send league announcements or optional ladder emails to <b>${esc(email)}</b> anymore. You’ll still get confirmations and match-night emails for anything you’re signed up for.</p>
         <a class="btn" href="/.netlify/functions/ladder-prefs?t=${encodeURIComponent(tok)}">Manage individual preferences</a>
       </div>`));
   }
