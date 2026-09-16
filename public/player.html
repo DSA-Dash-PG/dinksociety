@@ -315,6 +315,7 @@
     let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
     let SEASON_NAME = null;   // filled from the season record, for the chips
     let ALL_SEASONS = [];     // every public season, for the cross-season fallback
+    let CURRENT_SEASON = null; // the season the site is on right now (js/season.js)
     // The season record being viewed (start date, tag) — for copy that names it.
     function seasonRec() { return (ALL_SEASONS || []).find(x => x && x.id === SEASON_ID) || null; }
     function seasonNameNow() { return SEASON_NAME || (seasonRec() && seasonRec().name) || 'This season'; }
@@ -401,6 +402,22 @@
 
       document.title = `${rosterPlayer.name} · The Dink Society`;
       const teamSlug = slug(team.name);
+
+      // Viewing a past season? Still say where they play NOW. Look them up on
+      // the current season's rosters (same email first, then same name).
+      rosterPlayer._current = null;
+      if (CURRENT_SEASON && CURRENT_SEASON.id && CURRENT_SEASON.id !== SEASON_ID) {
+        try {
+          const cr = await fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(CURRENT_SEASON.id));
+          const cd = cr.ok ? await cr.json().catch(() => null) : null;
+          const em = String(rosterPlayer.email || '').trim().toLowerCase();
+          const same = pp => pp && !pp.archived && ((em && String(pp.email || '').trim().toLowerCase() === em) || pp.name === playerName);
+          for (const ct of ((cd && cd.teams) || [])) {
+            const hit = (ct.roster || []).find(same);
+            if (hit) { rosterPlayer._current = { team: ct, player: hit, seasonName: CURRENT_SEASON.name || CURRENT_SEASON.label || 'Current season', seasonId: CURRENT_SEASON.id }; break; }
+          }
+        } catch {}
+      }
 
       // Update back link to point at the team page
       const back = document.getElementById('back-link');
@@ -680,12 +697,24 @@
       // Meta line (team · gender · city) sits under the name; only non-empty parts.
       const genderTxt = rp.gender === 'F' ? 'Female' : rp.gender === 'M' ? 'Male' : '';
       const roleTxt = rp.isCaptain ? 'Captain' : rp.isCoCaptain ? 'Co-Captain' : '';
-      const metaLine = [
+      // When this profile is being viewed as a past season, the meta line leads
+      // with where they play NOW, and the season being viewed gets its own line.
+      const cur = rp._current;
+      const curRole = cur ? (cur.player.isCaptain ? 'Captain' : cur.player.isCoCaptain ? 'Co-Captain' : '') : '';
+      const metaLine = (cur ? [
+        `<a href="/team?id=${slug(cur.team.name)}">${esc(cur.team.name)}</a>${cur.team.emoji ? ' ' + cur.team.emoji : ''}`,
+        genderTxt ? esc(genderTxt) : '',
+        curRole,
+        rp.city ? esc(rp.city) : '',
+      ] : [
         `<a href="/team?id=${teamSlug}${LINK_SUFFIX}">${esc(team.name)}</a>${team.emoji ? ' ' + team.emoji : ''}`,
         genderTxt ? esc(genderTxt) : '',
         roleTxt,
         rp.city ? esc(rp.city) : '',
-      ].filter(Boolean).join(' · ');
+      ]).filter(Boolean).join(' · ');
+      const viewingLine = cur
+        ? `<div style="font-size:11px;color:var(--color-text-faint);margin-top:4px">Viewing ${esc(seasonNameNow())} · played for <a href="/team?id=${teamSlug}${LINK_SUFFIX}" style="color:var(--color-teal);text-decoration:none;font-weight:700">${esc(team.name)}</a>${roleTxt ? ' · ' + roleTxt : ''}</div>`
+        : '';
 
       // Vitals bar — only show boxes that actually have a value.
       const vital = (lbl, val) => `<div class="mlp-vital"><div class="mlp-vital__lbl">${lbl}</div><div class="mlp-vital__val">${esc(String(val))}</div></div>`;
@@ -706,7 +735,7 @@
           <div class="mlp-photo" style="--ph:${color}">${avatarInner}</div>
           <div class="mlp-hero__id">
             <h1 class="mlp-hero__name ${nameSizeClass(rp.name)}">${esc(rp.name)}</h1>
-            <div class="mlp-hero__meta">${metaLine}</div>
+            <div class="mlp-hero__meta">${metaLine}</div>${viewingLine}
             ${pills.length ? `<div class="pp-hero__pills" style="margin-top:10px">${pills.join('')}</div>` : ''}
           </div>
           <div class="mlp-hero__dsr">
@@ -924,18 +953,51 @@
         }
 
       } else {
-        /* No game data yet — show a pending card */
-        html += `<div class="pp-card" style="text-align:center;padding:var(--space-8);">
-          <div style="font-size:32px;margin-bottom:var(--space-3)">📊</div>
-          <div style="font-size:14px;font-weight:700;margin-bottom:var(--space-2)">Stats pending</div>
-          <div style="font-size:12px;color:var(--color-text-faint)">${(() => {
-            const sr = seasonRec() || {}; const nm = esc(seasonNameNow()); const st = seasonStartText();
-            const started = sr.startDate && sr.startDate <= new Date().toISOString().slice(0, 10);
-            return started ? `No games recorded for ${nm} yet — stats land here after the first match night.`
-                           : `Game stats will appear here once ${nm} begins${st ? ' on ' + esc(st) : ''}.`;
-          })()}</div>
-          ${history.length ? `<div style="font-size:11px;color:var(--color-text-faint);margin-top:var(--space-3)">Looking for a past season? Tap a row under Season History.</div>` : ''}
-        </div>`;
+        /* No game data for this season yet. Don't leave the page blank: roll
+           up every past season into a Career panel, with a one-line note about
+           when this season's numbers start landing. */
+        const pendingNote = (() => {
+          const sr = seasonRec() || {}; const nm = esc(seasonNameNow()); const st = seasonStartText();
+          const started = sr.startDate && sr.startDate <= new Date().toISOString().slice(0, 10);
+          return started ? `No games recorded for ${nm} yet — this season's stats land after the first match night.`
+                         : `${nm} stats will appear here once it begins${st ? ' on ' + esc(st) : ''}.`;
+        })();
+        const played = history.filter(h => (h.stats?.gamesPlayed || 0) > 0);
+        if (played.length) {
+          const sum = k => played.reduce((n, h) => n + (Number(h.stats?.[k]) || 0), 0);
+          const has = k => played.some(h => h.stats?.[k] != null);
+          const gp = sum('gamesPlayed'), gw = sum('gamesWon'), gl = sum('gamesLost'), mp = sum('matchesPlayed');
+          const ps = has('ps') ? sum('ps') : null, pa = has('pa') ? sum('pa') : null;
+          const diff = (ps != null && pa != null) ? ps - pa : null;
+          const ptPct = (ps != null && pa != null && ps + pa > 0) ? Math.round(ps / (ps + pa) * 1000) / 10 : null;
+          const bestDsr = played.reduce((m, h) => (h.stats?.composite != null && (m == null || h.stats.composite > m)) ? h.stats.composite : m, null);
+          const byType = t => played.reduce((a, h) => { const b = h.stats?.byType?.[t]; if (b) { a.p += b.played || 0; a.w += b.won || 0; } return a; }, { p: 0, w: 0 });
+          const gLbl = ranks.myGender === 'F' ? "Women's" : "Men's";
+          const gT = byType(ranks.myGender === 'F' ? 'womens' : 'mens'), xT = byType('mixed');
+          const seasonsTxt = played.length + ' season' + (played.length === 1 ? '' : 's');
+          const card = (val, lbl, sub, cls = '') => `<div class="mlp-card ${cls}"><div class="mlp-card__val">${val}</div><div class="mlp-card__lbl">${lbl}</div>${sub ? `<div class="mlp-card__sub">${sub}</div>` : ''}</div>`;
+          html += `<div class="mlp-panel">
+            <div class="mlp-panel__h">Career Stats</div>
+            <div style="font-size:11px;color:var(--color-text-faint);margin:-10px 0 14px">${pendingNote} Showing ${seasonsTxt} of league play.</div>
+            <div class="mlp-cards mlp-cards--4">
+              ${card(`<span class="val--green">${pct(gw, gp)}%</span>`, 'Games Won %', `${gw} W – ${gl} L`)}
+              ${card(`<span>${gp}</span>`, 'Games Played', `${mp} match${mp === 1 ? '' : 'es'} · ${seasonsTxt}`)}
+              ${card(`<span class="val--teal">${ptPct != null ? ptPct + '%' : '—'}</span>`, 'Points Won %', ps != null ? `${ps} – ${pa}` : 'not tracked')}
+              ${card(`<span class="${bestDsr != null ? 'val--lime' : 'is-na'}">${bestDsr != null ? Number(bestDsr).toFixed(1) : 'N/A'}</span>`, 'Best Season DSR', bestDsr != null ? 'end of season' : 'not tracked')}
+            </div>
+            <div class="mlp-cards mlp-cards--3">
+              ${card(`<span>${gT.p ? pct(gT.w, gT.p) + '%' : '—'}</span>`, `${gLbl} Doubles`, gT.p ? `${gT.w}–${gT.p - gT.w}` : 'no games')}
+              ${card(`<span>${xT.p ? pct(xT.w, xT.p) + '%' : '—'}</span>`, 'Mixed Doubles', xT.p ? `${xT.w}–${xT.p - xT.w}` : 'no games')}
+              ${card(`<span class="${diff == null ? '' : diff >= 0 ? 'val--green' : 'val--red'}">${diff == null ? '—' : (diff >= 0 ? '+' : '') + diff}</span>`, 'Point Diff', diff == null ? 'not tracked' : 'career')}
+            </div>
+          </div>`;
+        } else {
+          html += `<div class="pp-card" style="text-align:center;padding:var(--space-8);">
+            <div style="font-size:32px;margin-bottom:var(--space-3)">📊</div>
+            <div style="font-size:14px;font-weight:700;margin-bottom:var(--space-2)">Stats pending</div>
+            <div style="font-size:12px;color:var(--color-text-faint)">${pendingNote}</div>
+          </div>`;
+        }
       }
 
       /* ── SEASON HISTORY ── */
@@ -1190,7 +1252,7 @@
     }
 
     (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
-      if (S) { SEASON_ID = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; ALL_SEASONS = S.all || []; }
+      if (S) { SEASON_ID = S.id; CIRCUIT = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; ALL_SEASONS = S.all || []; CURRENT_SEASON = S.current || null; }
     }).catch(() => {}).then(() =>
     load()).catch(e => { console.error('player load failed', e); const pr = document.getElementById('page-root'); if (pr) pr.innerHTML = '<div class="pp-loading">Couldn’t load this player. <a href="#" onclick="location.reload();return false" style="color:var(--color-lime);font-weight:700">Retry</a></div>'; });
   })();

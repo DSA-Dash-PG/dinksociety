@@ -267,6 +267,12 @@ async function pastSeasonRows(ids, currentCircuit, seen, awardsOut = []) {
             gamesLost:     p.gamesLost,
             matchesPlayed: p.matchesPlayed,
             byType:        p.byType,
+            // Points + end-of-season rating, so a career roll-up on the
+            // profile can show more than a W–L line.
+            ps:            p.ps ?? null,
+            pa:            p.pa ?? null,
+            diff:          p.diff ?? null,
+            composite:     p.composite ?? null,
           },
         });
       }

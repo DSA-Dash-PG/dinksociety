@@ -61,6 +61,10 @@ export default async (req) => {
           gamesLost:     stats.gamesLost,
           matchesPlayed: stats.matchesPlayed,
           byType:        stats.byType,
+          ps:            stats.ps ?? null,
+          pa:            stats.pa ?? null,
+          diff:          stats.diff ?? null,
+          composite:     stats.composite ?? null,
           // partners not snapshotted (IDs only useful within a season)
         },
       });
