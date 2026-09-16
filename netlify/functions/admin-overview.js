@@ -8,10 +8,19 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { circuitCode } from './lib/circuit.js';
+
+// Which season a registration belongs to. Season 1 registrations predate the
+// `circuit` field, so a record with no season at all counts as Season 1.
+function regCode(r) {
+  const raw = r && (r.circuit || r.seasonId);
+  return raw ? circuitCode(raw) : 'I';
+}
 
 // Live division list from the seasons store: [{ id, label, capacity }]
-// De-duplicated by id, across all non-archived seasons.
-async function getSeasonDivisions() {
+// Scoped to the working season when one is given (by id or circuit code);
+// otherwise de-duplicated across all non-archived seasons.
+async function getSeasonDivisions(seasonId, code) {
   try {
     const store = getStore('seasons');
     const { blobs } = await store.list();
@@ -26,7 +35,11 @@ async function getSeasonDivisions() {
       } catch {
         continue;
       }
-      if (season.status === 'archived') continue;
+      if (seasonId || code) {
+        const matches = (seasonId && season.id === seasonId)
+          || (code && circuitCode(season.circuit || season.id) === code);
+        if (!matches) continue;
+      } else if (season.status === 'archived') continue;
       for (const d of season.divisions || []) {
         if (!d || !d.id || seen.has(d.id)) continue;
         seen.add(d.id);
@@ -48,6 +61,14 @@ export default async (req) => {
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
 
+  // Working season from the admin sidebar. Without it the Overview rolled up
+  // every season's registrations, money and division fill into one number.
+  const url = new URL(req.url);
+  const seasonId = url.searchParams.get('season') || '';
+  const code = url.searchParams.get('circuit')
+    ? circuitCode(url.searchParams.get('circuit'))
+    : (seasonId ? circuitCode(seasonId) : '');
+
   try {
     const regStore = getStore('registrations');
     const momentsStore = getStore('moments');
@@ -57,17 +78,18 @@ export default async (req) => {
     const { blobs: confirmedBlobs } = await regStore.list({ prefix: 'confirmed/' });
     const { blobs: pendingBlobs } = await regStore.list({ prefix: 'pending/' });
 
+    const inSeason = r => !code || (seasonId && r?.seasonId === seasonId) || regCode(r) === code;
     const confirmed = (await Promise.all(
       confirmedBlobs.map(b => regStore.get(b.key, { type: 'json' }))
-    )).filter(Boolean);
+    )).filter(Boolean).filter(inSeason);
     const pending = (await Promise.all(
       pendingBlobs.map(b => regStore.get(b.key, { type: 'json' }))
-    )).filter(Boolean);
+    )).filter(Boolean).filter(inSeason);
 
     const allRegs = [...confirmed, ...pending];
 
     // Live divisions from Admin → Seasons
-    const seasonDivisions = await getSeasonDivisions();
+    const seasonDivisions = await getSeasonDivisions(seasonId, code);
 
     // Stats
     const teams = confirmed.filter(r => r?.path === 'team').length;

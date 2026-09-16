@@ -39,10 +39,11 @@ const DEFAULTS = {
   emailTemplate: { accentColor: '#b8ff2c', headerText: 'THE DINK SOCIETY', buttonLabel: 'Open captain portal', footerText: 'The Dink Society · Southern California Pickleball League', logoUrl: '' },
   // Liability waivers — players sign each enabled one on login; editing a
   // waiver's text bumps its version, forcing everyone to re-sign that waiver.
-  // Two seeded: the league's own + the Dink House venue form.
+  // Seeded: the league's own + one per venue (Dink House, South End Racquet Club).
   waivers: [
     { id: 'league',     title: 'The Dink Society — Liability Waiver & Release', text: '', version: 0, enabled: false },
     { id: 'dink-house', title: 'Dink House — Participant Waiver & Release',     text: '', version: 0, enabled: false },
+    { id: 'south-end',  title: 'South End Racquet Club — Participant Waiver & Release', text: '', version: 0, enabled: false },
   ],
 };
 
