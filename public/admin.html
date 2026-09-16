@@ -3834,7 +3834,7 @@
 
   async function refreshMsgBadge() {
     try {
-      const data = await apiJSON('/.netlify/functions/admin-messages');
+      const data = await apiJSON('/.netlify/functions/admin-messages?circuit=' + encodeURIComponent(adminCircuit()));
       _msgInbox = data.inbox || [];
       const badge = $id('sb-msg-ct');
       if (badge) {
@@ -3866,7 +3866,7 @@
   async function loadInbox() {
     const box = $id('msg-inbox');
     try {
-      const data = await apiJSON('/.netlify/functions/admin-messages');
+      const data = await apiJSON('/.netlify/functions/admin-messages?circuit=' + encodeURIComponent(adminCircuit()));
       _msgInbox = data.inbox || [];
       const badge = $id('sb-msg-ct');
       if (badge) {
@@ -4211,7 +4211,7 @@
     if (!body && !ready.length) { status.style.display = 'block'; status.className = 'a-status is-err'; status.textContent = 'Add a message or at least one attachment.'; return; }
 
     const payload = {
-      action: 'broadcast', scope, subject, body, bodyHtml,
+      action: 'broadcast', scope, subject, body, bodyHtml, circuit: adminCircuit(),
       attachmentIds: ready.map(a => a.id),
       audience: $id('bc-audience').value, sendEmail: $id('bc-email').checked,
     };
@@ -4234,7 +4234,14 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       });
       status.className = 'a-status is-ok';
-      status.textContent = 'Sent to ' + r.teamCount + ' team' + (r.teamCount === 1 ? '' : 's') + (r.emailed ? ' · ' + r.emailed + ' email' + (r.emailed === 1 ? '' : 's') + ' sent' : '');
+      // Emails go out in the background (see admin-broadcast-email-background) —
+      // the portal message is already delivered by the time this returns.
+      status.textContent = 'Posted to ' + r.teamCount + ' team' + (r.teamCount === 1 ? '' : 's') +
+        (r.recipients ? (r.queued
+          ? ' · ' + r.recipients + ' email' + (r.recipients === 1 ? '' : 's') + ' going out now in the background (a minute or two)'
+          : ' · but the email sender could not be started — ' + r.recipients + ' emails NOT sent')
+        : (r.emailed ? ' · ' + r.emailed + ' emails sent' : ''));
+      if (r.recipients && !r.queued) status.className = 'a-status is-err';
       $id('bc-body-rich').innerHTML = ''; $id('bc-subject').value = '';
       _bcAttachments = []; bcRenderChips();
       loadInbox();

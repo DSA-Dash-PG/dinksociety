@@ -17,6 +17,7 @@ import {
 import {
   listThread, appendMessage, getReads, setRead, unreadCount, generateId,
 } from './lib/messages.js';
+import { circuitCode, isTestTeam } from './lib/circuit.js';
 
 // Load the admin-configured email appearance (logo/accent/header/button/footer).
 async function getEmailTemplate() {
@@ -52,13 +53,20 @@ function siteUrl() {
     || process.env.SITE_URL || 'https://dinksociety.netlify.app';
 }
 
-async function listAllTeams() {
+// Teams for the working season (by circuit code). Without the filter the
+// inbox and every "All teams" broadcast covered every season at once.
+async function listAllTeams(circuit) {
   const store = getStore('teams');
   const { blobs } = await store.list({ prefix: 'team/' }).catch(() => ({ blobs: [] }));
   const teams = await Promise.all(
     blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null))
   );
-  return teams.filter(Boolean);
+  const code = circuit ? circuitCode(circuit) : '';
+  return teams.filter(Boolean).filter(t => {
+    if (!code) return true;
+    if (code !== 'TEST' && isTestTeam(t)) return false;
+    return circuitCode(t.circuit || t.seasonId) === code;
+  });
 }
 
 // Resolve which email addresses to notify for a team, given the audience.
@@ -113,8 +121,8 @@ export default async (req) => {
       });
     }
 
-    // Inbox overview
-    const teams = await listAllTeams();
+    // Inbox overview — scoped to the working season when the client says which.
+    const teams = await listAllTeams(url.searchParams.get('circuit') || '');
     const rows = await Promise.all(teams.map(async (t) => {
       const messages = await listThread(t.id);
       const reads = await getReads(t.id);
@@ -182,7 +190,7 @@ export default async (req) => {
   if (action === 'broadcast') {
     const {
       subject, body: rawText, bodyHtml: rawHtml, scope, division, teamIds,
-      audience = 'captains', sendEmail: doEmail, attachmentIds,
+      audience = 'captains', sendEmail: doEmail, attachmentIds, circuit,
     } = body;
 
     // Rich body (sanitized) takes precedence; derive a plain-text copy for
@@ -200,7 +208,7 @@ export default async (req) => {
       return json({ error: 'Add a message or at least one attachment.' }, 400);
     }
 
-    const all = await listAllTeams();
+    const all = await listAllTeams(circuit || '');
     let targets;
     if (scope === 'teams') {
       const set = new Set(teamIds || []);
@@ -212,51 +220,53 @@ export default async (req) => {
     }
     if (!targets.length) return json({ error: 'No teams matched the targeting.' }, 400);
 
-    const template = await getEmailTemplate();
-    // Resend attachments fetch each file by hosted URL at send time.
-    const mailAttachments = attachments.map(a => ({ filename: a.filename, path: a.url }));
-
     const broadcastId = generateId('bc_');
     // Stored thread body keeps the subject inline (plain) for legacy readers;
     // bodyHtml carries the rich version when present.
     const composedBody = subject?.trim() && text ? `${subject.trim()}\n\n${text}` : text;
-    let emailed = 0;
     for (const team of targets) {
       await appendMessage({
         teamId: team.id, from: 'admin', authorName: 'League Admin',
         authorEmail: admin.email, body: composedBody, bodyHtml: safeHtml || null,
         attachments, broadcastId,
       });
-      if (doEmail) {
-        const tos = recipientEmails(team, audience);
-        for (const to of tos) {
-          try {
-            await sendEmail({
-              to,
-              subject: subject?.trim() ? `${subject.trim()} — The Dink Society` : `Update from The Dink Society`,
-              html: renderAdminMessage({
-                subject, bodyHtml: safeHtml, body: text, teamName: team.name,
-                portalUrl: `${site}/captain.html`, template, attachments,
-              }),
-              attachments: mailAttachments,
-            });
-            emailed++;
-          } catch (e) { console.error('broadcast email failed:', e); }
-        }
-      }
     }
 
-    // Log the broadcast
+    // Emails are NOT sent here. Sixty players × one Resend call each (rate
+    // limited to ~2/s) blew straight through the 10s function limit and the
+    // admin got a 504 with half the league emailed. The broadcast record below
+    // is the work order; admin-broadcast-email-background picks it up and
+    // sends with no time limit, updating the record as it goes.
+    const recipients = doEmail
+      ? targets.reduce((n, t) => n + recipientEmails(t, audience).length, 0)
+      : 0;
+
+    // Log the broadcast (also the queue record for the background sender)
     try {
       await getStore('broadcasts').setJSON(`broadcast/${broadcastId}.json`, {
         id: broadcastId, subject: subject || null, body: text, bodyHtml: safeHtml || null,
         attachments, scope, division: division || null,
-        teamIds: scope === 'teams' ? (teamIds || []) : null, audience, sentEmail: !!doEmail,
-        teamCount: targets.length, emailed, sentBy: admin.email, sentAt: new Date().toISOString(),
+        teamIds: targets.map(t => t.id), audience, sentEmail: !!doEmail,
+        teamCount: targets.length, recipients, emailed: 0, failed: 0,
+        emailStatus: doEmail ? (recipients ? 'queued' : 'none') : 'none',
+        sentBy: admin.email, sentAt: new Date().toISOString(),
       });
     } catch (e) { console.error('broadcast log failed:', e); }
 
-    return json({ ok: true, broadcastId, teamCount: targets.length, emailed });
+    let queued = false;
+    if (doEmail && recipients) {
+      try {
+        const r = await fetch(`${site}/.netlify/functions/admin-broadcast-email-background`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', cookie: req.headers.get('cookie') || '' },
+          body: JSON.stringify({ broadcastId }),
+        });
+        queued = r.status === 202 || r.ok;
+        if (!queued) console.error('background email kick-off failed:', r.status);
+      } catch (e) { console.error('background email kick-off failed:', e); }
+    }
+
+    return json({ ok: true, broadcastId, teamCount: targets.length, emailed: 0, recipients, queued });
   }
 
   // ── Mark a thread read ─────────────────────────────────────
@@ -271,3 +281,4 @@ export default async (req) => {
 };
 
 export const config = { path: '/.netlify/functions/admin-messages' };
+export { listAllTeams, recipientEmails, resolveAttachments, getEmailTemplate, siteUrl };
