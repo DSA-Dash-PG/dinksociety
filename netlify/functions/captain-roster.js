@@ -14,7 +14,7 @@ import { circuitCode } from './lib/circuit.js';
 import { buildLeagueIndex, playedBefore, playedForTeam } from './lib/league-players.js';
 import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 
-const MAX_ROSTER_SIZE = 20;
+// No roster size cap — rosters are unlimited; every add still goes through admin approval.
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -39,10 +39,6 @@ export default async (req) => {
 
       const body = await req.json();
       const roster = Array.isArray(body.roster) ? body.roster : [];
-
-      if (roster.length > MAX_ROSTER_SIZE) {
-        return json({ error: `Roster cannot exceed ${MAX_ROSTER_SIZE} players` }, 400);
-      }
 
       // Validate each entry. Only NAME is strictly required so the captain can
       // build the roster incrementally — gender and email are completed over
