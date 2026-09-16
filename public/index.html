@@ -47,6 +47,29 @@
   #recap .recap-head__in{max-width:var(--max-w);margin:0 auto;padding:96px var(--gutter) 4px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;}
   #recap .recap-head h1{font-size:clamp(1.8rem,1rem+3vw,3rem);font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;line-height:1;margin-top:12px;color:var(--color-text);}
   #recap .recap-head h1 .lime{color:var(--color-lime);}
+  /* Preseason countdown (replaces "SEASON N STARTS <DATE>.") */
+  #recap .cd{display:flex;align-items:flex-end;justify-content:space-between;gap:22px 32px;flex-wrap:wrap;width:100%;}
+  #recap .cd__kick{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--color-teal);}
+  #recap .cd__dot{width:7px;height:7px;border-radius:50%;background:var(--color-teal);}
+  #recap .cd__sub{margin-top:12px;font-size:13px;color:var(--color-text-muted);font-weight:600;}
+  #recap .cd__clock{display:flex;align-items:flex-start;gap:8px;}
+  #recap .cd__unit{min-width:86px;background:var(--color-surface);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 10px 10px;text-align:center;}
+  #recap .cd__num{font-size:44px;font-weight:900;font-style:italic;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;color:var(--color-text);}
+  #recap .cd__unit--sec .cd__num{color:var(--color-lime);}
+  #recap .cd__cap{margin-top:6px;font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--color-text-faint);}
+  #recap .cd__sep{font-size:34px;font-weight:900;color:var(--color-text-faint);padding-top:12px;}
+  #recap .cd__clock.tick .cd__unit--sec{animation:cdtick .35s ease-out;}
+  @keyframes cdtick{0%{border-color:var(--color-lime);box-shadow:0 0 0 3px rgba(184,255,44,.12);}100%{border-color:rgba(255,255,255,.14);box-shadow:none;}}
+  #recap .cd.is-soon .cd__unit{border-color:rgba(184,255,44,.35);}
+  #recap .cd.is-soon .cd__kick{color:var(--color-lime);}
+  #recap .cd.is-soon .cd__dot{background:var(--color-lime);animation:cdpulse 1.4s infinite;}
+  #recap .cd__live{display:none;align-items:center;gap:10px;background:var(--color-lime);color:#0e0e0e;border-radius:9999px;padding:12px 22px;font-weight:900;font-style:italic;text-transform:uppercase;font-size:18px;letter-spacing:.02em;}
+  #recap .cd__live i{width:10px;height:10px;border-radius:50%;background:#0e0e0e;animation:cdpulse 1.2s infinite;}
+  #recap .cd.is-live .cd__clock{display:none;}
+  #recap .cd.is-live .cd__live{display:flex;}
+  @keyframes cdpulse{50%{opacity:.35;}}
+  @media(prefers-reduced-motion:reduce){#recap .cd *{animation:none!important;}}
+  @media(max-width:700px){#recap .cd__clock{width:100%;gap:6px;}#recap .cd__unit{flex:1;min-width:0;padding:10px 4px 8px;border-radius:12px;}#recap .cd__num{font-size:30px;}#recap .cd__sep{display:none;}#recap .cd__live{width:100%;justify-content:center;}}
   #recap .weeknav{display:flex;gap:6px;flex-wrap:wrap;}
   #recap .weeknav span{font-size:12px;font-weight:800;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--color-border);color:var(--color-text-faint);cursor:pointer;transition:background .12s,color .12s,border-color .12s;}
   #recap .weeknav span:not(.on):hover{border-color:var(--color-lime);color:var(--color-text);}
@@ -422,6 +445,68 @@
       if (d <= new Date()) return nm + ' IS <span class="lime">UNDERWAY.</span>';
       var when = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toUpperCase();
       return nm + ' STARTS <span class="lime">' + when + '.</span>';
+    }
+
+    // ── Preseason countdown ──
+    // Counts down to the season's first serve: the earliest scheduled match, or
+    // 7:00 PM on the season start date if nothing has a time yet. Only runs
+    // before any week is final and never for a finished season.
+    var CD_TIMER = null;
+    function mountCountdown(titleEl, sched){
+      if (SEASON_TAG === 'Final' || !SEASON_START) return;
+      var first = null;
+      ((sched && sched.weeks) || []).forEach(function(w){
+        (w.matches || []).forEach(function(m){
+          var ts = m.scheduledAt ? Date.parse(m.scheduledAt) : NaN;
+          if (!isNaN(ts) && (!first || ts < first.ts)) first = { ts: ts, venue: m.venue || null };
+        });
+      });
+      var target = first ? first.ts : Date.parse(SEASON_START + 'T19:00:00');
+      if (isNaN(target)) return;
+      // Once the first night is well past with nothing final, keep the plain "UNDERWAY" title.
+      if (Date.now() - target > 12 * 3600 * 1000) return;
+
+      var nm = String(SEASON_NAME || 'The season').toUpperCase();
+      var d = new Date(target);
+      var sub = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) +
+        ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) +
+        (first && first.venue ? ' · ' + esc(first.venue) : '');
+      var box = titleEl.parentNode;
+      box.style.flex = '1 1 100%';
+      box.innerHTML =
+        '<div class="cd" id="rc-cd">' +
+          '<div>' +
+            '<div class="cd__kick"><span class="cd__dot"></span><span id="cd-kick">Countdown to first serve</span></div>' +
+            '<h1 id="rc-title"></h1>' +
+            '<div class="cd__sub">' + sub + '</div>' +
+          '</div>' +
+          '<div class="cd__clock" id="cd-clock" role="timer" aria-live="off">' +
+            '<div class="cd__unit"><div class="cd__num" data-u="d">00</div><div class="cd__cap">Days</div></div><div class="cd__sep">:</div>' +
+            '<div class="cd__unit"><div class="cd__num" data-u="h">00</div><div class="cd__cap">Hours</div></div><div class="cd__sep">:</div>' +
+            '<div class="cd__unit"><div class="cd__num" data-u="m">00</div><div class="cd__cap">Minutes</div></div><div class="cd__sep">:</div>' +
+            '<div class="cd__unit cd__unit--sec"><div class="cd__num" data-u="s">00</div><div class="cd__cap">Seconds</div></div>' +
+          '</div>' +
+          '<div class="cd__live"><i></i>' + esc(SEASON_NAME || 'The season') + ' is live</div>' +
+        '</div>';
+      var cd = document.getElementById('rc-cd'), h1 = document.getElementById('rc-title'),
+          kick = document.getElementById('cd-kick'), clock = document.getElementById('cd-clock'),
+          nums = clock.querySelectorAll('.cd__num');
+      function pad(n){ return (n < 10 ? '0' : '') + n; }
+      function tick(){
+        var ms = Math.max(0, target - Date.now());
+        var live = ms <= 0, soon = !live && ms < 86400000;
+        cd.classList.toggle('is-live', live);
+        cd.classList.toggle('is-soon', soon);
+        kick.textContent = live ? 'First serve' : soon ? 'Game night' : 'Countdown to first serve';
+        h1.innerHTML = live ? nm + ' IS <span class="lime">UNDERWAY.</span>' : nm + ' <span class="lime">STARTS</span>';
+        var s = Math.floor(ms / 1000), v = { d: Math.floor(s / 86400), h: Math.floor(s % 86400 / 3600), m: Math.floor(s % 3600 / 60), s: s % 60 };
+        for (var i = 0; i < nums.length; i++) nums[i].textContent = pad(v[nums[i].getAttribute('data-u')]);
+        clock.classList.remove('tick'); void clock.offsetWidth; clock.classList.add('tick');
+        if (live && CD_TIMER) { clearInterval(CD_TIMER); CD_TIMER = null; }
+      }
+      if (CD_TIMER) clearInterval(CD_TIMER);
+      tick();
+      CD_TIMER = setInterval(tick, 1000);
     }
 
     function recapTitleHtml(w){
@@ -815,6 +900,7 @@
         var t0=document.getElementById('rc-title');
         if(t0) t0.innerHTML=preseasonTitleHtml();
         var wn=document.getElementById('rc-weeknav'); if(wn) wn.innerHTML='';
+        if(t0) mountCountdown(t0, sched);
       }
 
       // Standings — first division in the blob
