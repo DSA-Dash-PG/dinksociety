@@ -4950,7 +4950,18 @@
       '<div class="arow"><div class="af"><label>Phone</label><input id="pp-phone" value="' + h(p.phone || '') + '"></div>' +
         '<div class="af"><label>DUPR</label><input id="pp-dupr" value="' + h(p.dupr || '') + '"></div></div>' +
       '<div class="a-status" id="pp-status" style="margin:6px 0 0;"></div>' +
+      // Transfer: hidden until "Move to team" is clicked. Goes through
+      // admin-transfer so it lands in the Transfer Log like any other trade.
+      '<div id="pp-xfer" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-surface-2);">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">Move to team</div>' +
+        '<div class="arow"><div class="af" style="grid-column:1/-1"><label>To team</label><select id="pp-xfer-team"></select></div></div>' +
+        '<div class="arow"><div class="af" style="grid-column:1/-1"><label>Note (optional)</label><input id="pp-xfer-note" placeholder="e.g. Off-season trade"></div></div>' +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;">' +
+          '<button class="ab ab--outline ab--sm" id="pp-xfer-cancel">Cancel</button>' +
+          '<button class="ab ab--primary ab--sm" id="pp-xfer-go">Confirm transfer</button></div>' +
+      '</div>' +
       '<div class="pp-foot"><button class="ab ab--danger ab--sm" id="pp-remove">Remove from team</button>' +
+        '<button class="ab ab--outline ab--sm" id="pp-xfer-open" title="Move this player to another team — recorded in the Transfer Log">⇄ Move to team</button>' +
         '<span style="flex:1"></span>' +
         '<button class="ab ab--outline ab--sm" onclick="closePlayerPop()">Cancel</button>' +
         '<button class="ab ab--primary ab--sm" id="pp-save">Save</button></div>';
@@ -4966,6 +4977,20 @@
     }));
     $id('pp-remove').addEventListener('click', removePlayerFromPop);
     $id('pp-save').addEventListener('click', savePlayerFromPop);
+    $id('pp-xfer-open').addEventListener('click', () => {
+      if (p.isCaptain) { ppStatus('The captain can’t be transferred — promote someone else to Captain first.', true); return; }
+      const sel = $id('pp-xfer-team');
+      const code = teamSeasonCode(t);
+      const dests = allTeams.filter(x => x.id !== t.id && teamSeasonCode(x) === code)
+        .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+      sel.innerHTML = '<option value="">— select team —</option>' +
+        dests.map(x => '<option value="' + h(x.id) + '">' + h(x.name) + (x.divisionLabel || x.division ? ' · ' + h(x.divisionLabel || x.division) : '') + '</option>').join('');
+      $id('pp-xfer').style.display = 'block';
+      $id('pp-xfer-open').style.display = 'none';
+      ppStatus('');
+    });
+    $id('pp-xfer-cancel').addEventListener('click', () => { $id('pp-xfer').style.display = 'none'; $id('pp-xfer-open').style.display = ''; });
+    $id('pp-xfer-go').addEventListener('click', transferPlayerFromPop);
     $id('player-pop').classList.add('is-open');
     setHash('player/' + teamId + '/' + playerId);
   }
@@ -5020,6 +5045,34 @@
     } catch (e) {
       t.roster = snapshot;
       adminToast('Save failed: ' + (e.message || 'unknown error'), 'err');
+    }
+    await refreshTeamsQuiet();
+  }
+
+  async function transferPlayerFromPop() {
+    const t = PP_TEAM, p = PP_PLAYER; if (!t || !p) return;
+    const toTeamId = $id('pp-xfer-team').value;
+    const note = $id('pp-xfer-note').value.trim();
+    if (!toTeamId) { ppStatus('Pick a team to move them to.', true); return; }
+    const to = allTeams.find(x => x.id === toTeamId); if (!to) return;
+    if (!confirm('Transfer ' + (p.name || 'this player') + ' from ' + t.name + ' to ' + to.name + '? This is recorded in the Transfer Log.')) return;
+    // Optimistic: they leave this card and appear on the other one right away.
+    const snapFrom = t.roster, snapTo = to.roster;
+    t.roster = (t.roster || []).filter(x => x.id !== p.id);
+    to.roster = [...(to.roster || []), { ...p, isCaptain: false, isCoCaptain: false }];
+    closePlayerPop();
+    showTeamCards();
+    adminToast('Transferring ' + (p.name || 'player') + ' to ' + to.name + '…');
+    try {
+      await apiJSON('/.netlify/functions/admin-transfer', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'direct', fromTeamId: t.id, toTeamId, playerId: p.id, note }),
+      });
+      adminToast((p.name || 'Player') + ' moved to ' + to.name + ' ✓', 'ok');
+      loadTransferLog();
+    } catch (e) {
+      t.roster = snapFrom; to.roster = snapTo;
+      adminToast('Transfer failed: ' + (e.message || 'unknown error'), 'err');
     }
     await refreshTeamsQuiet();
   }
