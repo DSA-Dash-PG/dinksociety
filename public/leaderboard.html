@@ -239,6 +239,10 @@
     .ladder-chip { display:inline-block; margin-left:8px; padding:2px 8px; border-radius:var(--radius-full); font-size:9px; font-weight:800; letter-spacing:0.06em; text-transform:uppercase; vertical-align:1px; }
     .ladder-chip--team { background:var(--color-lime-dim); color:var(--color-lime); }
     .ladder-chip--fa { background:var(--color-teal-dim); color:var(--color-teal); }
+    /* On a team, but not in the season being viewed (e.g. a Season 1 player
+       browsing Season 2) — team name + season tag, dimmed. */
+    .ladder-chip--past { background:var(--color-surface-3); color:var(--color-text-muted); }
+    .ladder-chip--past small { opacity:.7; font-weight:700; margin-left:4px; }
     .ladder-cta-btn { display:inline-block; margin-top:14px; padding:10px 18px; border-radius:var(--radius-full); background:var(--color-teal); color:#06231d; font-size:12px; font-weight:800; text-decoration:none; }
     .streak-table { width:100%; border-collapse:collapse; font-size:12px; }
     .streak-table th { text-align:left; padding:8px; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; border-bottom:1px solid var(--color-border-strong); }
@@ -1068,20 +1072,44 @@
   }
 
   // ── LADDER (open-play rankings from public-ladder-stats) ─────────
-  // Ranked by the ladder rule: wins → point diff → Dink Rating. League
-  // players get their team chip (matched by name); everyone else shows
-  // as Free Agent — which doubles as a recruiting signal.
+  // Ranked by the ladder rule: wins → point diff → Dink Rating. The team chip
+  // comes from public-ladder-teams, which resolves each ladder id to a league
+  // roster by IDENTITY (roster id / email across every season) — never by
+  // display name. "Free agent" now means the league has no roster entry for
+  // that person at all.
   async function loadLadderTab() {
     const el = $('ladder-content'); if (!el) return;
-    if (state.ladder) { renderLadder(); return; }
-    try {
-      const [r] = await Promise.all([
-        fetch('/.netlify/functions/public-ladder-stats'),
-        state.playerStats ? Promise.resolve() : loadPlayerStats(),
-      ]);
-      state.ladder = r.ok ? await r.json() : { hasData:false };
-    } catch { state.ladder = { hasData:false }; }
+    if (!state.ladder) {
+      try {
+        const r = await fetch('/.netlify/functions/public-ladder-stats');
+        state.ladder = r.ok ? await r.json() : { hasData:false };
+      } catch { state.ladder = { hasData:false }; }
+    }
+    renderLadder();                 // paint immediately (chips fill in below)
+    await ensureLadderTeams();
     renderLadder();
+  }
+  // Team lookup for every ladder id on the board, keyed by the season being
+  // viewed (the chip prefers a roster in THAT season). Re-fetched on switch.
+  async function ensureLadderTeams() {
+    const rows = state.ladder?.leaderboard || [];
+    const ids = [...new Set(rows.map(r => r.id).filter(Boolean))];
+    if (!ids.length) { state.ladderTeams = { circuit: state.circuit, map: {} }; return; }
+    if (state.ladderTeams && state.ladderTeams.circuit === state.circuit) return;
+    try {
+      const r = await fetch('/.netlify/functions/public-ladder-teams?circuit=' + encodeURIComponent(state.circuit) + '&ids=' + encodeURIComponent(ids.join(',')));
+      const j = r.ok ? await r.json() : { teams:{} };
+      state.ladderTeams = { circuit: state.circuit, map: j.teams || {} };
+    } catch { state.ladderTeams = { circuit: state.circuit, map: {} }; }
+  }
+  function ladderChip(r) {
+    const lt = state.ladderTeams;
+    if (!lt || lt.circuit !== state.circuit) return '';   // still resolving — no guess
+    const t = lt.map[r.id];
+    if (!t) return '<span class="ladder-chip ladder-chip--fa">Free agent</span>';
+    if (t.current) return '<span class="ladder-chip ladder-chip--team">' + esc(t.name) + '</span>';
+    const tag = String(t.season || '').replace(/^Season\s+/i, 'S');
+    return '<span class="ladder-chip ladder-chip--past" title="' + esc(t.season || '') + '">' + esc(t.name) + '<small>' + esc(tag) + '</small></span>';
   }
   function renderLadder() {
     const el = $('ladder-content'); if (!el) return;
@@ -1094,15 +1122,9 @@
         '<a class="ladder-cta-btn" href="/ladders.html">See upcoming ladder nights →</a></div>';
       return;
     }
-    // name → team chip map from league player stats (loaded alongside).
-    const teamByName = {};
-    playerList().forEach(p => { if (p.name) teamByName[p.name.trim().toLowerCase()] = p.teamName || ''; });
     const rankColor = i => i === 0 ? 'var(--color-gold)' : 'var(--color-text-faint)';
     const body = rows.map((r, i) => {
-      const team = teamByName[String(r.name || '').trim().toLowerCase()] || '';
-      const chip = team
-        ? '<span class="ladder-chip ladder-chip--team">' + esc(team) + '</span>'
-        : '<span class="ladder-chip ladder-chip--fa">Free agent</span>';
+      const chip = ladderChip(r);
       return '<tr>' +
         '<td style="width:30px;font-weight:800;color:' + rankColor(i) + ';">' + (i + 1) + '</td>' +
         '<td><b>' + esc(r.name || '') + '</b>' + chip + '</td>' +
