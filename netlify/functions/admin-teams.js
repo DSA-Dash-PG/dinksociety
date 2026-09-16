@@ -214,7 +214,7 @@ export default async (req) => {
           ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),
           // Pending captain adds are owned by the approvals endpoint — a plain
           // roster save must not silently approve them by dropping the flag.
-          ...(prev?.pendingAdd ? { pendingAdd: prev.pendingAdd, pendingAddAt: prev.pendingAddAt || null, pendingAddBy: prev.pendingAddBy || null } : {}),
+          ...(prev?.pendingAdd ? { pendingAdd: true, pendingAddAt: prev.pendingAddAt || null, pendingAddBy: prev.pendingAddBy || null, ...(prev.pendingAddFrom ? { pendingAddFrom: prev.pendingAddFrom } : {}) } : {}),
         };
       }).filter(p => p.name);
     }
@@ -271,7 +271,7 @@ export default async (req) => {
         : body.roster
           ? `Roster replaced (${(team.roster || []).length} players)`
           : `Team settings updated (${Object.keys(body).filter(k => allowed.includes(k)).join(', ') || 'fields'})`,
-    }}).catch(err => console.error('logActivity after team save failed:', err));
+    }).catch(err => console.error('logActivity after team save failed:', err));
 
     // The team blob is the source of truth for the name, but the name is also
     // SNAPSHOTTED into schedule matches, score records, and lineup records when
