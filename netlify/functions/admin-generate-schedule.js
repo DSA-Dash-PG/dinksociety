@@ -22,8 +22,8 @@ export default async (req) => {
   const admin = verified.payload;
 
   try {
-    // bracketOnly: write ONLY the Wk6â€“8 Rivalry/Playoff/Championship placeholders
-    // without touching the round-robin â€” used to add the bracket to a live season.
+    // bracketOnly: write ONLY the Wk6–8 Rivalry/Playoff/Championship placeholders
+    // without touching the round-robin — used to add the bracket to a live season.
     const { circuit, division, teams, courts = [], bracketOnly = false } = await req.json();
     if (!circuit || !division || !Array.isArray(teams) || teams.length < 2) {
       return json({ error: 'circuit, division, and at least 2 teams required' }, 400);
@@ -39,10 +39,10 @@ export default async (req) => {
     let weeksGenerated = 0;
 
     if (!bracketOnly) {
-      // â”€â”€ Guard: never regenerate over results â”€â”€
+      // ── Guard: never regenerate over results ──
       // A full generate overwrites every week file for this division. If any
       // match already has a finalized score (or a score sheet exists), this is a
-      // season that has been played â€” refuse outright. There is no "force".
+      // season that has been played — refuse outright. There is no "force".
       const { blobs: existingBlobs } = await store.list({ prefix: `schedule/${circuit}/${division}/` });
       const existingFiles = [];
       let finalized = 0;
@@ -58,7 +58,7 @@ export default async (req) => {
       });
       if (finalized > 0 || sheetBlobs.length > 0) {
         return json({
-          error: `Season ${circuit} Â· ${division} already has results (${finalized} finalized match(es), ${sheetBlobs.length} score sheet(s)). ` +
+          error: `Season ${circuit} · ${division} already has results (${finalized} finalized match(es), ${sheetBlobs.length} score sheet(s)). ` +
             `Generating would wipe them, so it was blocked. Check the season selected in the admin sidebar.`,
         }, 409);
       }
@@ -106,7 +106,7 @@ export default async (req) => {
       weeksGenerated = schedule.length;
     }
 
-    // â”€â”€ Bracket weeks (Rivalry / Playoffs / Championship) â”€â”€
+    // ── Bracket weeks (Rivalry / Playoffs / Championship) ──
     // Placeholders carry phase + seed metadata; teams resolve from standings.
     const bracket = buildBracketWeeks({ circuit, division, numTeams });
     let bracketWeeks = 0;

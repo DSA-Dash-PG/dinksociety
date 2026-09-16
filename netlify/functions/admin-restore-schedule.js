@@ -13,9 +13,9 @@
 // By default only divisions that look wiped are restored: the schedule has NO
 // finalized matches but the score store has finalized sheets for that division.
 //
-// GET  ?circuit=I                      â†’ dry run, shows what would be restored
-// GET  ?circuit=I&division=3.5M        â†’ dry run, one division (forces it even if not wiped)
-// GET  ?circuit=I&apply=1              â†’ writes the week files + rebuilds standings
+// GET  ?circuit=I                      → dry run, shows what would be restored
+// GET  ?circuit=I&division=3.5M        → dry run, one division (forces it even if not wiped)
+// GET  ?circuit=I&apply=1              → writes the week files + rebuilds standings
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
@@ -41,7 +41,7 @@ export default async (req) => {
     const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
     const backupStore = getStore('schedule-backups');
 
-    // â”€â”€ 1. Every score sheet for this circuit, grouped by division â†’ week â”€â”€
+    // ── 1. Every score sheet for this circuit, grouped by division → week ──
     const { blobs: scoreBlobs } = await scoresStore.list({ prefix: `score/m_${circuit}_` });
     const scoresByDiv = {};
     for (const b of scoreBlobs) {
@@ -55,7 +55,7 @@ export default async (req) => {
       ((scoresByDiv[div] ||= {})[week] ||= []).push(s);
     }
 
-    // â”€â”€ 2. Current (regenerated) schedule files, grouped by division â†’ week â”€â”€
+    // ── 2. Current (regenerated) schedule files, grouped by division → week ──
     const { blobs: schedBlobs } = await scheduleStore.list({ prefix: `schedule/${circuit}/` });
     const schedByDiv = {};
     for (const b of schedBlobs) {
@@ -79,7 +79,7 @@ export default async (req) => {
 
       if (!onlyDiv && !wiped) {
         report.push({ division: div, skipped: true,
-          reason: `schedule still has ${finalizedOnSchedule} finalized match(es) â€” not wiped`,
+          reason: `schedule still has ${finalizedOnSchedule} finalized match(es) — not wiped`,
           finalizedSheets, finalizedOnSchedule });
         continue;
       }
@@ -142,7 +142,7 @@ export default async (req) => {
 
         divReport.weeks.push({
           week,
-          matches: rows.map(r => `${r.teamA.name} ${r.scoreA ?? '-'}â€“${r.scoreB ?? '-'} ${r.teamB.name}${r.finalizedAt ? '' : ' (not final)'}`),
+          matches: rows.map(r => `${r.teamA.name} ${r.scoreA ?? '-'}–${r.scoreB ?? '-'} ${r.teamB.name}${r.finalizedAt ? '' : ' (not final)'}`),
           keptPlaceholders: keptPlaceholders.length,
           droppedRegeneratedRows: dropped,
         });

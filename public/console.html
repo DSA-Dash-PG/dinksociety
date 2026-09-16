@@ -29,6 +29,12 @@ a{color:inherit;text-decoration:none}
 .sb__filter{display:flex;gap:3px;margin:11px 11px 3px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rf);padding:3px}
 .sb__filter button{flex:1;padding:6px 6px;border-radius:var(--rf);font-size:10px;font-weight:700;color:var(--faint);transition:all .15s}
 .sb__filter button.on{background:var(--lime);color:var(--inv)}
+.sb__season{display:none;margin:11px 11px 0}
+.sb__season>span{display:block;font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--faint);font-weight:800;margin-bottom:5px}
+.sb__season select{width:100%;padding:9px 10px;border-radius:var(--r);border:1px solid var(--border2);background:var(--s2);color:var(--text);font:inherit;font-size:13px;font-weight:600}
+.sb__season.is-off select{border-color:var(--gold);color:var(--gold)}
+.mob-bar__season{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--teal);margin-left:8px}
+.mob-bar__season.is-off{color:var(--gold)}
 .sb__nav{flex:1;overflow-y:auto;padding:6px 8px 16px}
 .grp{margin-top:4px}
 .grp.hide{display:none}
@@ -71,13 +77,20 @@ iframe{width:100%;height:100%;border:0;display:block;background:var(--bg)}
 </head>
 <body>
 <div class="mob-bar">
-  <span class="mob-bar__brand">Dink Society Admin</span>
+  <span><span class="mob-bar__brand">Dink Society Admin</span><span class="mob-bar__season" id="mob-season"></span></span>
   <button class="mob-bar__ham" id="ham" aria-label="Open menu" aria-expanded="false">☰</button>
 </div>
 <div class="mob-overlay" id="overlay"></div>
 <div class="shell">
   <aside class="sb" id="sb">
     <div class="sb__brand"><span class="sb__logo">Dink Society</span><span class="sb__tag">Admin</span></div>
+    <!-- Working season: same browser-remembered choice admin.html uses
+         (localStorage ds-admin-season). admin.html hides its own sidebar when
+         embedded here, so the picker has to live in this shell. -->
+    <label class="sb__season" id="sb-season-wrap">
+      <span>Working season</span>
+      <select id="sb-season"></select>
+    </label>
     <div class="sb__filter">
       <button data-f="all" class="on" onclick="setFilter('all')">All</button>
       <button data-f="l" onclick="setFilter('l')">League</button>
@@ -175,6 +188,47 @@ $('ham')?.addEventListener('click',()=>{
   $('ham').setAttribute('aria-expanded',open?'true':'false');
 });
 $('overlay')?.addEventListener('click',closeDrawer);
+// ── Working season picker ──
+const SEASON_LS_KEY='ds-admin-season';
+let SEASONS=[], CURRENT_SEASON=null;
+function savedSeason(){ try{ return localStorage.getItem(SEASON_LS_KEY); }catch(e){ return null; } }
+function renderSeasonPicker(){
+  const wrap=$('sb-season-wrap'), sel=$('sb-season'), mob=$('mob-season');
+  const list=SEASONS.filter(s=>s&&s.id);
+  if(!list.length){ wrap.style.display='none'; if(mob) mob.textContent=''; return; }
+  let working=list.find(s=>s.id===savedSeason())
+    || (CURRENT_SEASON && list.find(s=>s.id===CURRENT_SEASON.id))
+    || list.find(s=>s.status!=='archived'&&s.isTest!==true) || list[0];
+  const esc=v=>String(v??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  sel.innerHTML=list.map(s=>{
+    const isCur=CURRENT_SEASON&&CURRENT_SEASON.id===s.id;
+    const tag=isCur?' · live':s.status==='archived'?' · archived':s.isTest?' · test':'';
+    return `<option value="${esc(s.id)}">${esc(s.name||s.label||s.id)}${tag}</option>`;
+  }).join('');
+  sel.value=working.id;
+  const off=!(CURRENT_SEASON&&CURRENT_SEASON.id===working.id);
+  wrap.style.display='block';
+  wrap.classList.toggle('is-off',off);
+  if(mob){ mob.textContent=(working.name||working.id)+(off?' ⚠':''); mob.classList.toggle('is-off',off); }
+}
+async function loadSeasons(){
+  try{
+    const r=await fetch('/.netlify/functions/admin-seasons',{credentials:'include'});
+    if(!r.ok) return;
+    const d=await r.json();
+    SEASONS=d.seasons||[]; CURRENT_SEASON=d.current||null;
+    renderSeasonPicker();
+  }catch(e){}
+}
+$('sb-season').addEventListener('change',()=>{
+  try{ localStorage.setItem(SEASON_LS_KEY,$('sb-season').value); }catch(e){}
+  renderSeasonPicker();
+  // Reload the embedded page so every tab re-fetches for the new season.
+  const frame=$('frame');
+  try{ frame.contentWindow.location.reload(); }catch(e){ frame.src=frame.src; }
+  closeDrawer();
+});
+loadSeasons();
 // initial
 (function(){
   const init=fromHash(); renderNav();
