@@ -4099,12 +4099,16 @@
 
     async function openTransferModal(player) {
       closeTransferModal();
-      // Fetch all teams for destination list
+      // Destination list: teams in THIS team's season. public-teams defaults
+      // to Season 1 when no season is given, which is why Season 2 captains
+      // were offered Season 1 teams.
       let teams = [];
       try {
-        const res = await fetch('/.netlify/functions/public-teams');
+        const me = state.me.team || {};
+        const seasonKey = me.seasonId || (me.circuit ? 'circuit-' + String(me.circuit).toLowerCase() : '');
+        const res = await fetch('/.netlify/functions/public-teams' + (seasonKey ? '?season=' + encodeURIComponent(seasonKey) : ''));
         const data = await res.json();
-        teams = (data.teams || []).filter(t => t.id !== state.me.team.id);
+        teams = (data.teams || []).filter(t => t.id !== me.id);
       } catch {}
 
       const teamOpts = teams.map(t => `<option value="${escapeAttr(t.id)}">${escapeAttr(t.name)}</option>`).join('');
