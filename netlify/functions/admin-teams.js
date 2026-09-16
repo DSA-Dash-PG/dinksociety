@@ -170,14 +170,19 @@ export default async (req) => {
     const canonical = circuitCode(team.circuit || team.seasonId);
     if (team.circuit !== canonical) team.circuit = canonical;
 
+    // Ids present before this save — anything else in the result is someone
+    // the admin has just introduced, and they get welcomed like any other add.
+    // Declared out here because the welcome step below runs OUTSIDE the roster
+    // block; when it lived inside, that step threw a ReferenceError after the
+    // blob was already written, so every roster add/edit saved but returned a
+    // 500 and the admin UI never closed the popup or refreshed.
+    const priorIds = new Set((team.roster || []).map(x => x && x.id).filter(Boolean));
+
     // Handle roster replacement (full roster array)
     if (body.roster && Array.isArray(body.roster)) {
       // Archive state is owned by the archive/restore actions — preserve it from
       // the stored roster by id so a plain roster save can't flip or wipe it.
       const prevById = new Map((team.roster || []).map(x => [x.id, x]));
-      // Ids present before this save — anything else in the result is someone
-      // the admin has just introduced, and they get welcomed like any other add.
-      const priorIds = new Set((team.roster || []).map(x => x && x.id).filter(Boolean));
       team.roster = body.roster.map(p => {
         const prev = prevById.get(p.id) || null;
         // Bio profile: merge any admin-supplied fields onto the stored profile
@@ -207,6 +212,9 @@ export default async (req) => {
           ...(prev?.pendingProfile ? { pendingProfile: prev.pendingProfile } : {}),
           ...(prev?.photo ? { photo: prev.photo } : {}),
           ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),
+          // Pending captain adds are owned by the approvals endpoint — a plain
+          // roster save must not silently approve them by dropping the flag.
+          ...(prev?.pendingAdd ? { pendingAdd: prev.pendingAdd, pendingAddAt: prev.pendingAddAt || null, pendingAddBy: prev.pendingAddBy || null } : {}),
         };
       }).filter(p => p.name);
     }
@@ -263,7 +271,7 @@ export default async (req) => {
         : body.roster
           ? `Roster replaced (${(team.roster || []).length} players)`
           : `Team settings updated (${Object.keys(body).filter(k => allowed.includes(k)).join(', ') || 'fields'})`,
-    });
+    }}).catch(err => console.error('logActivity after team save failed:', err));
 
     // The team blob is the source of truth for the name, but the name is also
     // SNAPSHOTTED into schedule matches, score records, and lineup records when
