@@ -22,8 +22,8 @@ export default async (req) => {
   const admin = verified.payload;
 
   try {
-    // bracketOnly: write ONLY the Wk6–8 Rivalry/Playoff/Championship placeholders
-    // without touching the round-robin — used to add the bracket to a live season.
+    // bracketOnly: write ONLY the Wk6â€“8 Rivalry/Playoff/Championship placeholders
+    // without touching the round-robin â€” used to add the bracket to a live season.
     const { circuit, division, teams, courts = [], bracketOnly = false } = await req.json();
     if (!circuit || !division || !Array.isArray(teams) || teams.length < 2) {
       return json({ error: 'circuit, division, and at least 2 teams required' }, 400);
@@ -39,6 +39,38 @@ export default async (req) => {
     let weeksGenerated = 0;
 
     if (!bracketOnly) {
+      // â”€â”€ Guard: never regenerate over results â”€â”€
+      // A full generate overwrites every week file for this division. If any
+      // match already has a finalized score (or a score sheet exists), this is a
+      // season that has been played â€” refuse outright. There is no "force".
+      const { blobs: existingBlobs } = await store.list({ prefix: `schedule/${circuit}/${division}/` });
+      const existingFiles = [];
+      let finalized = 0;
+      for (const b of existingBlobs) {
+        const d = await store.get(b.key, { type: 'json' }).catch(() => null);
+        if (!d) continue;
+        existingFiles.push({ key: b.key, data: d });
+        finalized += (d.matches || []).filter(m => m.finalizedAt).length;
+      }
+      const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
+      const { blobs: sheetBlobs } = await scoresStore.list({
+        prefix: `score/m_${circuit}_${String(division).toLowerCase()}_`,
+      });
+      if (finalized > 0 || sheetBlobs.length > 0) {
+        return json({
+          error: `Season ${circuit} Â· ${division} already has results (${finalized} finalized match(es), ${sheetBlobs.length} score sheet(s)). ` +
+            `Generating would wipe them, so it was blocked. Check the season selected in the admin sidebar.`,
+        }, 409);
+      }
+
+      // Snapshot whatever is there before overwriting (placeholders, hand edits).
+      if (existingFiles.length) {
+        const backups = getStore('schedule-backups');
+        for (const f of existingFiles) {
+          await backups.setJSON(`generate-${now}/${f.key}`, f.data);
+        }
+      }
+
       const schedule = generateRoundRobin(teams);
 
       // Rotate the 2-court sets (A=1&2, B=3&6, C=5&7) across the season so every
@@ -74,7 +106,7 @@ export default async (req) => {
       weeksGenerated = schedule.length;
     }
 
-    // ── Bracket weeks (Rivalry / Playoffs / Championship) ──
+    // â”€â”€ Bracket weeks (Rivalry / Playoffs / Championship) â”€â”€
     // Placeholders carry phase + seed metadata; teams resolve from standings.
     const bracket = buildBracketWeeks({ circuit, division, numTeams });
     let bracketWeeks = 0;
