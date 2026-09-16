@@ -1310,13 +1310,14 @@
             <h1 class="am-title">The Drop</h1>
             <div class="am-actions">
               <button class="ab ab--lime ab--sm" id="drop-generate-btn">✨ Draft with Claude</button>
-              <button class="ab ab--outline ab--sm" id="drop-new-btn">+ New week</button>
+              <select id="drop-new-kind" class="ab ab--outline ab--sm" style="padding-right:26px;" title="Which edition to create"></select>
+              <button class="ab ab--outline ab--sm" id="drop-new-btn">+ New edition</button>
             </div>
           </div>
-          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:640px;">The weekly editorial. The Tuesday task drafts each week from the stats; you review, edit, and <b>Approve &amp; Publish</b> here. Nothing reaches the homepage, email, or portals until you publish.</p>
+          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:640px;">The season's editorial. One edition per game week, plus specials — <b>Pre-Season</b> before Week 1, a <b>Championship Preview</b> before the final, or anything else you want to slot in. The Friday task drafts each week from the stats; you review, edit, and <b>Approve &amp; Publish</b> here. Nothing reaches the homepage, email, or portals until you publish.</p>
 
           <div class="ac">
-            <div class="ac__h"><h2 class="ac__t">Weeks</h2><span class="ac__s" id="drop-list-status"></span></div>
+            <div class="ac__h"><h2 class="ac__t">Editions</h2><span class="ac__s" id="drop-list-status"></span></div>
             <div id="drop-weeks"><div class="loading">Loading…</div></div>
           </div>
 
@@ -1327,7 +1328,8 @@
               <span class="ac__s" id="drop-ed-saved"></span>
             </div>
             <div class="arow">
-              <div class="af" style="max-width:120px;"><label for="drop-f-week">Week #</label><input type="number" id="drop-f-week" min="1" max="20"></div>
+              <div class="af" style="max-width:170px;"><label for="drop-f-edition">Edition</label><input type="text" id="drop-f-edition" readonly style="opacity:.8;"></div>
+              <div class="af" id="drop-f-special-wrap" style="max-width:240px;display:none;"><label for="drop-f-label">Special name <span style="font-weight:400;opacity:.7">· sorts after week</span></label><div style="display:flex;gap:6px;"><input type="text" id="drop-f-label" maxlength="60" autocomplete="off"><input type="number" id="drop-f-after" min="-1" max="52" style="max-width:64px;" title="-1 = before Week 1"></div></div>
               <div class="af"><label for="drop-f-kicker">Kicker</label><input type="text" id="drop-f-kicker" placeholder="The Drop · Week 5" autocomplete="off"></div>
               <div class="af"><label for="drop-f-byline">Byline</label><input type="text" id="drop-f-byline" placeholder="By The Society Desk" autocomplete="off"></div>
             </div>
@@ -7637,10 +7639,40 @@
   // ═══════════════════════════════════════════════════════════
   // THE DROP — weekly editorial composer (wired to admin-drop)
   // ═══════════════════════════════════════════════════════════
-  var DROP = { circuit: adminCircuit(), week: null, record: null, stories: [], live: null, wired: false, cover: null, gallery: [] };
+  var DROP = { edition: null, week: null, after: null, record: null, stories: [], live: null, wired: false, cover: null, gallery: [] };
+  // The composer follows the sidebar's working season. Reading it live (not once
+  // at load) is what stops every Season 2 Drop from being filed under Season 1.
+  function dropCircuit(){ return adminCircuit(); }
+  function dropApi(q){ return '/.netlify/functions/admin-drop?circuit='+encodeURIComponent(dropCircuit())+(q||''); }
+  // An EDITION is the unit, not a week: 'week-3' for a numbered week, or a slug
+  // for a special ('preseason', 'championship-preview', anything custom). Mirrors
+  // parseEdition() / SPECIALS in lib/drop.js.
+  var DROP_SPECIALS = {
+    'preseason':            { label:'Pre-Season',           after:-1 },
+    'championship-preview': { label:'Championship Preview', after:null }  // after = last regular week, chosen at create
+  };
+  function dSlug(v){ return String(v||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40); }
+  function dIsWeek(ed){ return /^week-\d+$/.test(String(ed||'')); }
+  function dWeekNum(ed){ var m=String(ed||'').match(/^week-(\d+)$/); return m? Number(m[1]) : null; }
+  // Label for an edition id; specials use the label the record carries (or the preset).
+  function dEdLabel(ed, rec){ if(rec&&rec.label) return rec.label; var n=dWeekNum(ed); if(n!=null) return 'Week '+n; var p=DROP_SPECIALS[ed]; return p? p.label : String(ed||'').replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
+  function dEdKicker(ed, rec){ return 'The Drop · '+dEdLabel(ed, rec); }
+  // Populate the "new edition" picker: every game week the season has, then the
+  // specials, then Custom. Weeks that already exist are still listed (opening
+  // one just edits it).
+  function dFillNewKind(){
+    var sel=$d('drop-new-kind'); if(!sel) return;
+    var n = (typeof workingWeeks==='function') ? workingWeeks() : 8;
+    var html='';
+    for(var w=1; w<=n; w++) html+='<option value="week-'+w+'">Week '+w+'</option>';
+    html+='<option value="preseason">Pre-Season</option>';
+    html+='<option value="championship-preview">Championship Preview</option>';
+    html+='<option value="custom">Custom special…</option>';
+    sel.innerHTML=html;
+  }
   function dpUrl(id){ return '/.netlify/functions/drop-photo-serve?id='+encodeURIComponent(id); }
   function dpUpload(file){
-    var fd=new FormData(); fd.append('file',file); fd.append('circuit',DROP.circuit); fd.append('week', DROP.week||$d('drop-f-week').value||'');
+    var fd=new FormData(); fd.append('file',file); fd.append('circuit',dropCircuit()); fd.append('week', DROP.week!=null?DROP.week:'0');
     return fetch('/.netlify/functions/drop-photo-upload',{method:'POST',body:fd,credentials:'include'}).then(function(r){ return r.json(); });
   }
   // ── Focal point picker ────────────────────────────────────────────────
@@ -7820,7 +7852,7 @@
     if(!DROP.wired) wireDrop();
     var box=$d('drop-weeks'); var st=$d('drop-list-status');
     if(st) st.textContent='Loading…';
-    apiJSON('/.netlify/functions/admin-drop').then(function(d){
+    apiJSON(dropApi()).then(function(d){
       var weeks=(d&&d.weeks)||[];
       if(st) st.textContent = weeks.length? '' : 'No weeks yet';
       var draftCt = weeks.filter(function(w){return w.status!=='published';}).length;
@@ -7829,25 +7861,37 @@
       if(!weeks.length){ box.innerHTML='<div class="empty">No Drops yet. “✨ Draft with Claude” builds this week from the stats.</div>'; return; }
       box.innerHTML = weeks.map(function(w){
         var cls = w.status==='published'?'published':'draft';
-        return '<div class="drop-weekrow" data-wk="'+w.week+'">'
-          +'<span class="wk">Week '+w.week+'</span>'
+        return '<div class="drop-weekrow" data-ed="'+dEsc(w.edition||('week-'+w.week))+'">'
+          +'<span class="wk">'+dEsc(dEdLabel(w.edition||('week-'+w.week), w))+'</span>'
           +'<span class="ti">'+dEsc(w.title||'Untitled')+'</span>'
           +(w.generatedBy==='auto'?'<span class="auto">auto-draft</span>':'')
           +'<span class="drop-chip '+cls+'">'+dEsc(w.status||'draft')+'</span></div>';
       }).join('');
-      box.querySelectorAll('.drop-weekrow').forEach(function(row){ row.addEventListener('click',function(){ openDropWeek(row.dataset.wk); }); });
+      box.querySelectorAll('.drop-weekrow').forEach(function(row){ row.addEventListener('click',function(){ openDropWeek(row.dataset.ed); }); });
     }).catch(function(){ if(st) st.textContent='Failed to load'; });
+    dFillNewKind();
   }
-  function openDropWeek(week){
-    apiJSON('/.netlify/functions/admin-drop?week='+encodeURIComponent(week)).then(function(d){
-      var rec = d && d.record; DROP.week=Number(week); DROP.record=rec; DROP.live=d&&d.livePerformers;
+  // Show/hide the special-edition fields (name + sort position) for the open edition.
+  function dSetEditionFields(ed, rec){
+    $d('drop-f-edition').value = dEdLabel(ed, rec) + (dIsWeek(ed) ? '' : '  ·  '+ed);
+    var wrap=$d('drop-f-special-wrap'); if(!wrap) return;
+    if(dIsWeek(ed)){ wrap.style.display='none'; return; }
+    wrap.style.display='';
+    $d('drop-f-label').value = (rec&&rec.label) || dEdLabel(ed, rec);
+    var after = (rec && rec.after!=null) ? rec.after : (DROP.after!=null ? DROP.after : ((DROP_SPECIALS[ed]&&DROP_SPECIALS[ed].after!=null) ? DROP_SPECIALS[ed].after : Math.max(0, ((typeof workingWeeks==='function')?workingWeeks():8)-2)));
+    $d('drop-f-after').value = after;
+  }
+  function openDropWeek(edition){
+    var ed = String(edition||''); if(/^\d+$/.test(ed)) ed = (ed==='0') ? 'preseason' : 'week-'+ed;
+    apiJSON(dropApi('&edition='+encodeURIComponent(ed))).then(function(d){
+      var rec = d && d.record; DROP.edition=ed; DROP.week=dWeekNum(ed); DROP.after=(rec&&rec.after!=null)?rec.after:null; DROP.record=rec; DROP.live=d&&d.livePerformers;
       $d('drop-editor').style.display='';
-      $d('drop-ed-week').textContent='Week '+week;
+      $d('drop-ed-week').textContent=dEdLabel(ed, rec);
       var stt=(rec&&rec.status)||'draft'; var stEl=$d('drop-ed-status');
       stEl.textContent=stt; stEl.className='drop-chip '+(stt==='published'?'published':'draft');
       $d('drop-ed-saved').textContent = rec&&rec.updatedAt ? 'Saved '+new Date(rec.updatedAt).toLocaleString() : 'New';
-      $d('drop-f-week').value=week;
-      $d('drop-f-kicker').value=(rec&&rec.kicker)||'The Drop · Week '+week;
+      dSetEditionFields(ed, rec);
+      $d('drop-f-kicker').value=(rec&&rec.kicker)||dEdKicker(ed, rec);
       $d('drop-f-byline').value=(rec&&rec.byline)||'By The Society Desk';
       $d('drop-f-title').value=(rec&&rec.title)||'';
       $d('drop-f-dek').value=(rec&&rec.dek)||'';
@@ -8016,7 +8060,11 @@
   });
   function collectDrop(){
     return {
-      week: Number($d('drop-f-week').value)||DROP.week,
+      circuit: dropCircuit(),
+      edition: DROP.edition,
+      week: DROP.week,
+      label: dIsWeek(DROP.edition) ? undefined : ($d('drop-f-label').value.trim() || undefined),
+      after: dIsWeek(DROP.edition) ? undefined : (function(){ var v=$d('drop-f-after').value; return v===''? undefined : Number(v); })(),
       kicker: $d('drop-f-kicker').value.trim(),
       byline: $d('drop-f-byline').value.trim(),
       title: $d('drop-f-title').value.trim(),
@@ -8045,9 +8093,9 @@
   }
   function saveDrop(){
     var isPub = !!(DROP.record && DROP.record.status==='published');
-    if(isPub && !confirm('Update the live Week '+DROP.week+' article now?\n\nThe changes go public immediately. The league is NOT emailed or notified.')) return;
+    if(isPub && !confirm('Update the live '+dEdLabel(DROP.edition, DROP.record)+' article now?\n\nThe changes go public immediately. The league is NOT emailed or notified.')) return;
     var btn=$d('drop-save-btn'); if(!btnBusy(btn, isPub?'Updating…':'Saving…')) return;
-    apiJSON('/.netlify/functions/admin-drop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:'save-draft'},collectDrop()))})
+    apiJSON(dropApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:'save-draft'},collectDrop()))})
       .then(function(){ dropStatus(isPub ? '✓ Updated live — league not notified' : '✓ Draft saved'); $d('drop-ed-saved').textContent='Saved '+new Date().toLocaleString(); renderDrop(); })
       .catch(function(e){ dropStatus(e.message||'Save failed',false); })
       .finally(function(){ btnDone(btn); });
@@ -8056,26 +8104,43 @@
     if(!confirm('Approve & publish this week’s Drop? This pushes it live and (if checked) emails players + posts the portal announcement.')) return;
     var btn=$d('drop-publish-btn'); if(!btnBusy(btn,'Publishing…')) return;
     var payload=Object.assign({action:'publish',channels:{email:$d('drop-ch-email').checked,portal:$d('drop-ch-portal').checked}},collectDrop());
-    apiJSON('/.netlify/functions/admin-drop',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      .then(function(d){ var b=d&&d.broadcast; var msg='✓ Published'; if(b){ msg+=' · emailed '+b.emailed+'/'+(b.recipients!=null?b.recipients:b.emailed)+' across '+b.teamCount+' teams'; if(b.failed){ msg+=' · '+b.failed+' failed: '+(b.firstError||'unknown error'); } } dropStatus(msg, !(b&&b.failed)); renderDrop(); openDropWeek(payload.week); })
+    apiJSON(dropApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+      .then(function(d){ var b=d&&d.broadcast; var msg='✓ Published'; if(b){ msg+=' · emailed '+b.emailed+'/'+(b.recipients!=null?b.recipients:b.emailed)+' across '+b.teamCount+' teams'; if(b.failed){ msg+=' · '+b.failed+' failed: '+(b.firstError||'unknown error'); } } dropStatus(msg, !(b&&b.failed)); renderDrop(); openDropWeek(payload.edition); })
       .catch(function(e){ dropStatus(e.message||'Publish failed',false); })
       .finally(function(){ btnDone(btn); });
   }
   function generateDrop(force){
     var btn = force?$d('drop-regen-btn'):$d('drop-generate-btn'); if(!btnBusy(btn,'Drafting…')) return;
-    var body={force:!!force}; if(DROP.week&&force) body.week=DROP.week;
+    var body={force:!!force, circuit:dropCircuit()}; if(DROP.week!=null&&force) body.week=DROP.week;
+    if(force && !dIsWeek(DROP.edition)){ alert('"Draft with Claude" only drafts numbered weeks from the stats. Specials (pre-season, championship preview) are written by hand or from the Friday task.'); btnDone(btn); return; }
     apiJSON('/.netlify/functions/admin-drop-generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
-      .then(function(d){ if(d&&d.ok){ renderDrop(); openDropWeek(d.week); } else { alert('Could not draft: '+((d&&d.reason)||'no played week yet')); } })
+      .then(function(d){ if(d&&d.ok){ renderDrop(); openDropWeek(d.edition||('week-'+d.week)); } else { alert('Could not draft: '+((d&&d.reason)||'no played week yet')); } })
       .catch(function(e){ alert(e.message||'Draft failed'); })
       .finally(function(){ btnDone(btn); });
   }
   function newDropWeek(){
-    var w=prompt('Week number for the new Drop?'); if(!w) return; w=parseInt(w,10); if(!w) return;
-    DROP.week=w; DROP.record=null; DROP.stories=[]; DROP.cover=null; DROP.gallery=[];
+    var kind = ($d('drop-new-kind')&&$d('drop-new-kind').value) || 'week-1';
+    var ed = kind, label = null, after = null;
+    if(kind==='custom'){
+      var nm = prompt('Name for this special edition? (e.g. "Playoff Preview", "Mid-Season Report")'); if(!nm) return;
+      ed = dSlug(nm); if(!ed || dIsWeek(ed) || /^\d+$/.test(ed)){ alert('Pick a name that is not just a number.'); return; }
+      label = nm.trim();
+      var af = prompt('Sorts after which week? (-1 = before Week 1)', String(Math.max(0, workingWeeks()-2))); if(af==null) return;
+      after = Number(af); if(!Number.isInteger(after)) after = 0;
+    } else if(kind==='championship-preview'){
+      // Default: after the last regular-season week (bracket set, final still to play).
+      var af2 = prompt('Championship Preview sorts after which week? (the last regular-season week)', String(Math.max(0, workingWeeks()-2))); if(af2==null) return;
+      after = Number(af2); if(!Number.isInteger(after)) after = workingWeeks()-2;
+    }
+    // If that edition already exists, just open it rather than blanking it.
+    var existing = Array.prototype.slice.call(document.querySelectorAll('#drop-weeks .drop-weekrow')).some(function(r){ return r.dataset.ed===ed; });
+    if(existing){ openDropWeek(ed); return; }
+    DROP.edition=ed; DROP.week=dWeekNum(ed); DROP.after=after; DROP.record=null; DROP.stories=[]; DROP.cover=null; DROP.gallery=[];
     $d('drop-editor').style.display='';
-    $d('drop-ed-week').textContent='Week '+w; var stEl=$d('drop-ed-status'); stEl.textContent='new'; stEl.className='drop-chip draft';
+    $d('drop-ed-week').textContent=label||dEdLabel(ed); var stEl=$d('drop-ed-status'); stEl.textContent='new'; stEl.className='drop-chip draft';
     $d('drop-ed-saved').textContent='Unsaved';
-    $d('drop-f-week').value=w; $d('drop-f-kicker').value='The Drop · Week '+w; $d('drop-f-byline').value='By The Society Desk';
+    dSetEditionFields(ed, label?{label:label,after:after}:null);
+    $d('drop-f-kicker').value='The Drop · '+(label||dEdLabel(ed)); $d('drop-f-byline').value='By The Society Desk';
     $d('drop-f-title').value=''; $d('drop-f-dek').value=''; $d('drop-f-lead').innerHTML=''; $d('drop-f-teams').value='';
     renderStories(); renderPerformers(null); renderDropCover(); renderDropGallery();
     dSetActionLabels(false);
@@ -8099,7 +8164,7 @@
     });
     var sv=$d('drop-save-btn'); if(sv) sv.addEventListener('click',saveDrop);
     var pb=$d('drop-publish-btn'); if(pb) pb.addEventListener('click',publishDropWeek);
-    var pv=$d('drop-preview-btn'); if(pv) pv.addEventListener('click',function(){ if(DROP.week) window.open('/drop.html?week='+DROP.week+'&preview=1','_blank'); });
+    var pv=$d('drop-preview-btn'); if(pv) pv.addEventListener('click',function(){ if(DROP.edition) window.open('/drop.html?edition='+encodeURIComponent(DROP.edition)+'&preview=1','_blank'); });
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -8261,6 +8326,9 @@
   // PLAYER OF THE WEEK — K'CHN award emails (wired to admin-potw)
   // ═══════════════════════════════════════════════════════════
   var POTW = { week:null, wired:false };
+  // Every call carries the sidebar's working season — without it the endpoint
+  // answered for Season 1 no matter which season was selected.
+  function potwApi(q){ return '/.netlify/functions/admin-potw?circuit='+encodeURIComponent(adminCircuit())+(q||''); }
   function potwFirst(n){ return String(n||'').trim().split(/\s+/)[0]||n; }
   function setPotwBadge(n){ var b=$d('sb-potw-ct'); if(b){ if(n>0){ b.textContent=n; b.style.display=''; } else b.style.display='none'; } }
   function updatePotwBadge(records){
@@ -8268,13 +8336,13 @@
   }
   // Lightweight badge refresh — runs at startup without opening the tab.
   function refreshPotwBadge(){
-    apiJSON('/.netlify/functions/admin-potw?summary=1').then(function(d){ setPotwBadge((d&&d.unsent)||0); }).catch(function(){});
+    apiJSON(potwApi('&summary=1')).then(function(d){ setPotwBadge((d&&d.unsent)||0); }).catch(function(){});
   }
   function renderPotw(){
     if(!POTW.wired) wirePotw();
     var box=$d('potw-weeks'); var st=$d('potw-list-status');
     if(st) st.textContent='Loading…';
-    apiJSON('/.netlify/functions/admin-potw').then(function(d){
+    apiJSON(potwApi()).then(function(d){
       var weeks=(d&&d.weeks)||[];
       var ts=$d('potw-autosend'); if(ts) ts.checked=!!(d&&d.autoSend);
       if(st) st.textContent = weeks.length? '' : 'No weeks drafted yet';
@@ -8294,7 +8362,7 @@
     }).catch(function(){ if(st) st.textContent='Failed to load'; });
   }
   function openPotwWeek(week){
-    apiJSON('/.netlify/functions/admin-potw?week='+encodeURIComponent(week)).then(function(d){
+    apiJSON(potwApi('&week='+encodeURIComponent(week))).then(function(d){
       POTW.week=Number(week); $d('potw-detail').style.display=''; $d('potw-d-week').textContent=week;
       renderPotwWinners((d&&d.records)||[]);
       $d('potw-detail').scrollIntoView({behavior:'smooth',block:'start'});
@@ -8344,7 +8412,7 @@
     if(POTW.week==null) return;
     if(!confirm('Send this Player of the Week email now? It goes out from dink@dinksociety.app.')) return;
     btn.disabled=true; var old=btn.textContent; btn.textContent='Sending…';
-    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send',week:POTW.week,winnerKey:winnerKey})})
+    api(potwApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send',week:POTW.week,winnerKey:winnerKey})})
       .then(function(r){ return r.json().then(function(j){ return {ok:r.ok,j:j}; }); })
       .then(function(res){
         if(res.ok && res.j.ok){ openPotwWeek(POTW.week); }
@@ -8357,7 +8425,7 @@
     var label = past ? 'Draft week' : '✨ Draft this week';
     if(b){ b.disabled=true; b.textContent='Drafting…'; }
     var payload={action:'generate'}; if(past) payload.week=week;
-    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    api(potwApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
       .then(function(r){ return r.json(); })
       .then(function(j){
         if(b){ b.disabled=false; b.textContent=label; }
@@ -8377,7 +8445,7 @@
     if(POTW.week==null){ alert('Open a week first.'); return; }
     if(!confirm('Send all ready Player of the Week emails for Week '+POTW.week+' now? They go out from dink@dinksociety.app.')) return;
     var b=$d('potw-sendall-btn'); if(b){ b.disabled=true; b.textContent='Sending…'; }
-    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-all',week:POTW.week})})
+    api(potwApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'send-all',week:POTW.week})})
       .then(function(r){ return r.json(); })
       .then(function(j){
         if(b){ b.disabled=false; b.textContent='Send all ready'; }
@@ -8388,7 +8456,7 @@
   function toggleAutoSend(on, el){
     if(on && !confirm('Turn ON auto-send? Every Wednesday both Player of the Week emails will be sent automatically from dink@dinksociety.app with no review step.')){ el.checked=false; return; }
     el.disabled=true;
-    api('/.netlify/functions/admin-potw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-autosend',enabled:on})})
+    api(potwApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'set-autosend',enabled:on})})
       .then(function(r){ return r.json(); })
       .then(function(j){ el.disabled=false; if(j&&j.ok){ el.checked=!!j.autoSend; } else { alert('Could not save setting.'); el.checked=!on; } })
       .catch(function(e){ el.disabled=false; el.checked=!on; alert('Could not save: '+(e.message||e)); });

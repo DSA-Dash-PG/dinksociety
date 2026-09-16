@@ -11,9 +11,12 @@
 //   POST action=send         → { week, winnerKey } send one winner's email now,
 //                              as dink@dinksociety.app with reply-to there
 //
-// Mirrors admin-drop.js: cookie-authed admin only, circuit defaults to 'I'.
+// Mirrors admin-drop.js: cookie-authed admin only. `circuit` comes from the
+// admin's working season (query param); with none given it falls back to the
+// LIVE season, never a hardcoded 'I'.
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { liveCircuit } from './lib/current-season.js';
 import {
   prepareWeeklyPotwApproval, sendApprovedPotw, sendAllPending,
   listPendingForWeek, listPreparedWeeks,
@@ -49,7 +52,7 @@ function toAdmin(rec) {
 
 export default async (req) => {
   const url = new URL(req.url);
-  const circuit = (url.searchParams.get('circuit') || 'I').trim();
+  const circuit = (url.searchParams.get('circuit') || '').trim() || await liveCircuit();
 
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);

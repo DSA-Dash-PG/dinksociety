@@ -22,7 +22,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import {
-  getDrop, saveDraft, publishDrop, unpublishDrop, listDrops,
+  getDrop, saveDraft, publishDrop, unpublishDrop, listDrops, parseEdition,
 } from './lib/drop.js';
 import { livePerformers } from './lib/drop-insights.js';
 import { appendMessage, generateId } from './lib/messages.js';
@@ -54,19 +54,32 @@ async function getEmailTemplate() {
   } catch { return null; }
 }
 
-async function listAllTeams() {
+// Teams for ONE season only. The teams store holds every season side by side,
+// and a Drop broadcast that walked all of them would email Season 1 rosters
+// about Season 2 — so match on the resolved circuit code (a team's `circuit`
+// or `seasonId`, whichever it carries).
+async function listSeasonTeams(circuit) {
+  const code = circuitCode(circuit);
   const store = getStore('teams');
   const { blobs } = await store.list({ prefix: 'team/' }).catch(() => ({ blobs: [] }));
   const teams = await Promise.all(blobs.map(b => store.get(b.key, { type: 'json' }).catch(() => null)));
-  return teams.filter(Boolean);
+  return teams.filter(t => t && circuitCode(t.circuit || t.seasonId) === code);
+}
+
+// An edition id: `week-<n>` (or a bare number) for a numbered week, or a slug
+// such as `preseason` / `championship-preview`. Bodies may send either
+// `edition` (preferred) or the legacy `week`.
+function editionOf(body) {
+  const ed = parseEdition(body?.edition ?? body?.week);
+  return ed ? ed.id : null;
 }
 
 // Compose + send the publish broadcast: a portal announcement to every team
 // thread plus (optionally) an email to players, both linking to the article.
 async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'players' } = {}) {
   const site = siteUrl();
-  const link = `${site}/drop.html?week=${rec.week}`;
-  const subject = rec.kicker || `The Drop · Week ${rec.week}`;
+  const link = `${site}/drop.html?edition=${encodeURIComponent(rec.edition)}`;
+  const subject = rec.kicker || `The Drop · ${rec.label || 'Week ' + rec.week}`;
   const teaser = rec.dek || htmlToPlain(rec.leadHtml || '').slice(0, 200);
   const text = `${rec.title}\n\n${teaser}\n\nRead the full Drop: ${link}`;
   const coverHtml = (rec.cover && rec.cover.id)
@@ -77,7 +90,7 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
     + (teaser ? `<p>${escapeHtml(teaser)}</p>` : '')
     + `<p><a href="${link}">Read the full Drop →</a></p>`;
 
-  const teams = await listAllTeams();
+  const teams = await listSeasonTeams(rec.circuit);
   const broadcastId = generateId('bc_');
   const template = await getEmailTemplate();
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -120,7 +133,7 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
       audience: 'players', sentEmail: !!doEmail, teamCount: teams.length,
       recipients, emailed, failed, firstError,
       sentBy: rec.sentBy || 'desk@dinksociety.app', sentAt: new Date().toISOString(),
-      kind: 'drop', dropWeek: rec.week,
+      kind: 'drop', dropWeek: rec.week, dropEdition: rec.edition,
     });
   } catch (e) { console.error('drop broadcast log failed:', e); }
 
@@ -159,9 +172,10 @@ export default async (req) => {
       const expected = ingestToken();
       const given = req.headers.get('x-drop-token') || body.token || '';
       if (!expected || given !== expected) return json({ error: 'Bad or missing ingest token' }, 401);
-      if (!body.week) return json({ error: 'week required' }, 400);
-      const rec = await saveDraft(body.circuit || circuit, body.week, { ...body, generatedBy: 'auto' }, 'scheduled-task');
-      return json({ ok: true, status: rec.status, week: rec.week, circuit: rec.circuit });
+      const wk = editionOf(body);
+      if (wk == null) return json({ error: 'edition (or week) required' }, 400);
+      const rec = await saveDraft(body.circuit || circuit, wk, { ...body, generatedBy: 'auto' }, 'scheduled-task');
+      return json({ ok: true, status: rec.status, edition: rec.edition, week: rec.week, circuit: rec.circuit });
     }
 
     // Everything else is admin-only.
@@ -170,22 +184,24 @@ export default async (req) => {
     const admin = verified.payload;
 
     if (body.action === 'save-draft') {
-      if (!body.week) return json({ error: 'week required' }, 400);
-      const rec = await saveDraft(body.circuit || circuit, body.week, body, admin.email);
+      const wk = editionOf(body);
+      if (wk == null) return json({ error: 'edition (or week) required' }, 400);
+      const rec = await saveDraft(body.circuit || circuit, wk, body, admin.email);
       return json({ ok: true, record: rec });
     }
 
     if (body.action === 'publish') {
-      if (!body.week) return json({ error: 'week required' }, 400);
+      const wk = editionOf(body);
+      if (wk == null) return json({ error: 'edition (or week) required' }, 400);
       const code = circuitCode(body.circuit || circuit);
-      const existing = await getDrop(code, body.week);
-      if (!existing) return json({ error: 'No draft to publish for that week' }, 404);
+      const existing = await getDrop(code, wk);
+      if (!existing) return json({ error: 'No draft to publish for that edition' }, 404);
       // If the composer sent edits, persist them first.
       if (body.title || body.leadHtml || body.storylines || body.cover || body.gallery) {
-        await saveDraft(code, body.week, body, admin.email);
+        await saveDraft(code, wk, body, admin.email);
       }
       const performers = await livePerformers(code);
-      const rec = await publishDrop(code, body.week, admin.email, performers);
+      const rec = await publishDrop(code, wk, admin.email, performers);
       const channels = body.channels || { email: true, portal: true };
       let broadcast = null;
       if (channels.email || channels.portal) {
@@ -195,8 +211,9 @@ export default async (req) => {
     }
 
     if (body.action === 'unpublish') {
-      if (!body.week) return json({ error: 'week required' }, 400);
-      const rec = await unpublishDrop(body.circuit || circuit, body.week);
+      const wk = editionOf(body);
+      if (wk == null) return json({ error: 'edition (or week) required' }, 400);
+      const rec = await unpublishDrop(body.circuit || circuit, wk);
       return json({ ok: true, record: rec });
     }
 
@@ -208,9 +225,9 @@ export default async (req) => {
     const verified = await verifyAdminSession(req);
     if (!verified.valid) return unauthResponse(verified.error);
 
-    const week = url.searchParams.get('week');
-    if (week) {
-      const rec = await getDrop(circuit, week);
+    const ed = parseEdition(url.searchParams.get('edition') ?? url.searchParams.get('week'));
+    if (ed) {
+      const rec = await getDrop(circuit, ed.id);
       // Attach a live performers preview so the composer can show what will be snapshotted.
       const preview = await livePerformers(circuit);
       return json({ record: rec, livePerformers: preview });
@@ -219,7 +236,8 @@ export default async (req) => {
     return json({
       circuit: circuitCode(circuit),
       weeks: recs.map(r => ({
-        week: r.week, status: r.status, title: r.title,
+        edition: r.edition, week: r.week, label: r.label, short: r.short, order: r.order, after: r.after ?? null,
+        status: r.status, title: r.title,
         updatedAt: r.updatedAt, publishedAt: r.publishedAt, generatedBy: r.generatedBy,
       })),
     });

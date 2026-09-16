@@ -14,7 +14,35 @@
 // Everything here is pure — `now` is injected — so the flip is unit-testable
 // rather than something you find out about on the night.
 
+import { getStore } from '@netlify/blobs';
 import { seasonCircuitCode } from './circuit.js';
+
+/**
+ * The live circuit CODE, resolved from the season records — for scheduled
+ * functions and admin endpoints that have no page telling them which season
+ * is on. Season 1's crons hardcoded 'I', which is how Season 2's Player of the
+ * Week drafts kept landing under Season 1. Falls back to 'I' only when there
+ * are no season records at all.
+ */
+export async function liveCircuit(now = Date.now()) {
+  try {
+    const store = getStore('seasons');
+    const { blobs } = await store.list();
+    const seasons = [];
+    for (const b of blobs || []) {
+      const raw = await store.get(b.key).catch(() => null);
+      if (!raw) continue;
+      try {
+        const s = JSON.parse(raw);
+        if (s.isTest === true || s.status === 'archived') continue;
+        seasons.push(s);
+      } catch { /* skip malformed */ }
+    }
+    return currentSeasonInfo(seasons, now)?.circuit || 'I';
+  } catch {
+    return 'I';
+  }
+}
 
 /** How far ahead of its start date a season becomes the live one. */
 export const FLIP_LEAD_DAYS = 7;

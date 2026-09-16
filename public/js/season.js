@@ -128,6 +128,7 @@
       circuit: code,
       name: chosen.name || chosen.label || (code === 'TEST' ? 'Test Season' : 'Season ' + ((ROMAN.indexOf(code) + 1) || code)),
       startDate: chosen.startDate || null,
+      weeks: Number(chosen.weeks) || null,   // season length, so pages stop hardcoding 8
       isCurrent: isCurrent,
       isUpcoming: isUpcoming,
       // "Past" only when we know what current is, this isn't it, and it isn't

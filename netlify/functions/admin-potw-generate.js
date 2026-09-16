@@ -10,6 +10,7 @@
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { prepareWeeklyPotwApproval } from './lib/potw-email.js';
+import { liveCircuit } from './lib/current-season.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -25,7 +26,9 @@ export default async (req) => {
   let body = {};
   try { body = await req.json(); } catch {}
   try {
-    const result = await prepareWeeklyPotwApproval('I', { force: !!body.force });
+    // The admin's working season wins; otherwise whichever season is live.
+    const circuit = (body.circuit || '').trim() || await liveCircuit();
+    const result = await prepareWeeklyPotwApproval(circuit, { force: !!body.force });
     return json(result, 200);
   } catch (e) {
     console.error('admin-potw-generate failed:', e);

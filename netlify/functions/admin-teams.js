@@ -49,7 +49,7 @@ function generatePlayerId() {
  * + season — never email alone, which would reach across seasons.
  */
 async function findLinkedRegistration(team) {
-  const regStore = getStore('registrations');
+  const regStore = getStore({ name: 'registrations', consistency: 'strong' });
   const wantEmail = (team.captainEmail || '').toLowerCase().trim();
   const wantSeason = circuitCode(team.circuit || team.seasonId);
 
@@ -114,7 +114,13 @@ export default async (req) => {
   const admin = verified.payload;
 
   const url = new URL(req.url);
-  const store = getStore('teams');
+  // STRONG consistency, deliberately. With the default (eventual) reads, the
+  // list the admin re-fetches right after a save can still be the PRE-save
+  // roster; reopening that card and saving again wrote removed players back
+  // onto the team — and duplicated anyone re-added in between. Every admin
+  // read→edit→save loop on a team goes through this store, so it must read
+  // its own writes.
+  const store = getStore({ name: 'teams', consistency: 'strong' });
   const seasonStore = getStore('seasons');
   const teamId = url.searchParams.get('id');
 

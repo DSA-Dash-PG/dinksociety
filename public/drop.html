@@ -351,8 +351,11 @@
     function rec(w,l){ return (w==null?0:w)+'–'+(l==null?0:l); }
     function qs(k){ return new URLSearchParams(location.search).get(k); }
 
-    var TOTAL_WEEKS = 8;
-    var reqWeek = qs('week');
+    var TOTAL_WEEKS = 8;                       // overwritten from the season record once it resolves
+    // An edition id: 'week-3' or a special's slug ('preseason', 'championship-preview').
+    // ?week=N is the legacy form and still works.
+    var reqEdition = qs('edition') || (qs('week') ? (qs('week')==='0' ? 'preseason' : 'week-'+qs('week')) : null);
+    function edLabel(d){ return (d && d.label) || (d && d.week!=null ? 'Week '+d.week : 'The Drop'); }
     var DROP_PLAYERS = null; // players aggregate (composite + rankDelta + gender), for live Top Movers
 
     // Top Performers tab switcher (delegated — survives root.innerHTML swaps).
@@ -364,14 +367,17 @@
       wrap.querySelectorAll('.dp-perfpanel').forEach(function(p){ p.classList.toggle('on', p.getAttribute('data-tab')===k); });
     });
 
-    function renderWeekpick(current, publishedWeeks){
+    // The picker lists every PUBLISHED edition in reading order — specials
+    // (Pre, Final…) slot in wherever their sort order puts them.
+    function renderWeekpick(currentEdition, editions){
       var el = document.getElementById('dp-weekpick'); if(!el) return;
-      var pub = {}; (publishedWeeks||[]).forEach(function(w){ pub[w]=1; });
-      var html = '';
-      for(var w=1; w<=TOTAL_WEEKS; w++){
-        if(pub[w]){ html += '<a href="/drop.html?week='+w+'" class="'+(w===current?'on':'')+'">'+w+'</a>'; }
-      }
-      el.innerHTML = html;
+      el.innerHTML = (editions||[]).map(function(e){
+        var id = e.edition || ('week-'+e.week);
+        var isWeek = e.week != null;
+        var txt = isWeek ? String(e.week) : (e.short || edLabel(e));
+        return '<a href="/drop.html?edition='+encodeURIComponent(id)+'" class="'+(id===currentEdition?'on':'')+'" title="'+esc(edLabel(e))+'"'
+          + (isWeek ? '' : ' style="width:auto;padding:0 9px;"') + '>'+esc(txt)+'</a>';
+      }).join('');
     }
 
     function storyTagClass(kind){
@@ -683,7 +689,7 @@
       var heroGalleryId = (drop.cover && drop.cover.id) ? null : (hero ? hero.id : null);
       var leadBody = leadWithPhotos(Lhtml(drop.leadHtml), drop.gallery, heroGalleryId);
 
-      var kick = esc(drop.kicker||('Week '+drop.week));
+      var kick = esc(drop.kicker||edLabel(drop));
       var byline = esc(drop.byline||'By The Society Desk');
       var metaBits = '<span>·</span><span>'+esc(dateStr(drop.publishedAt))+'</span>'
         + '<span>·</span><span>'+esc((drop.readMins||4)+' min read')+'</span>';
@@ -729,7 +735,11 @@
           + '</div>';
       }
 
-      var tease = '<div class="tease"><div class="eyebrow">Next Drop · Tuesday</div><h3>The week after never waits</h3>'
+      // Season 2 plays Thursday nights, so the next Drop lands Friday morning;
+      // Season 1 (Mondays) published on Tuesdays. Pre-season tees up Week 1.
+      var nextDay = (DROP_CIRCUIT === 'I') ? 'Tuesday' : 'Friday';
+      var teaseH3 = (drop.edition==='preseason') ? 'Week One is next' : (drop.week==null ? 'Back to the grind' : 'The week after never waits');
+      var tease = '<div class="tease"><div class="eyebrow">Next Drop · '+nextDay+'</div><h3>'+teaseH3+'</h3>'
         + '<p>New results, new storylines. We\'ll have the word the morning after game night.</p>'
         + '<a class="cta" href="/">Back to Weekly Recap</a></div>';
 
@@ -747,7 +757,7 @@
         + galleryHtml(drop.gallery)
         + '<div class="wrap"><div class="col">' + tease + '</div></div>';
 
-      document.title = 'The Drop · '+(drop.kicker||('Week '+drop.week))+' — The Dink Society';
+      document.title = 'The Drop · '+(drop.kicker||edLabel(drop))+' — The Dink Society';
       if(window.DSEntity && IDX) window.DSEntity.mount(root, IDX);
     }
 
@@ -772,9 +782,10 @@
       var sid  = (S && S.id) || 'circuit-i';
       DROP_CIRCUIT = code;
       var c    = '&circuit=' + encodeURIComponent(code);
+      if (S && Number(S.weeks) > 0) TOTAL_WEEKS = Number(S.weeks);
       var api = reqPreview
-        ? ('/.netlify/functions/admin-drop?week=' + encodeURIComponent(reqWeek||'') + c)
-        : ('/.netlify/functions/public-drop?circuit=' + encodeURIComponent(code) + (reqWeek?('&week='+encodeURIComponent(reqWeek)):''));
+        ? ('/.netlify/functions/admin-drop?edition=' + encodeURIComponent(reqEdition||'') + c)
+        : ('/.netlify/functions/public-drop?circuit=' + encodeURIComponent(code) + (reqEdition?('&edition='+encodeURIComponent(reqEdition)):''));
       return Promise.all([
       getJSON(api, !!reqPreview),
       getJSON('/.netlify/functions/public-drop?view=index' + c),
@@ -793,15 +804,15 @@
           });
         }
       } catch(e){ IDX = null; }
-      var pubWeeks = (idx && idx.weeks ? idx.weeks.map(function(w){ return w.week; }) : []);
+      var pubEds = (idx && idx.editions) ? idx.editions : ((idx && idx.weeks) ? idx.weeks.map(function(w){ return { edition:'week-'+w.week, week:w.week }; }) : []);
       // Preview: admin-drop returns {record, livePerformers}. Normal: public-drop returns {drop}.
       var dropObj = null;
       if(reqPreview){
         if(data && data.record){ dropObj = data.record; var pf=dropObj.performers; if(!pf || !pf.potw || (!pf.potw.men && !pf.potw.women)) dropObj.performers = data.livePerformers || pf; }
       } else if(data && !data.empty && data.drop){ dropObj = data.drop; }
-      if(!dropObj){ showEmpty(reqPreview ? 'Nothing to preview yet — save the draft first, and make sure you are logged into admin in this browser.' : (data && data.message)); renderWeekpick(-1, pubWeeks); return; }
+      if(!dropObj){ showEmpty(reqPreview ? 'Nothing to preview yet — save the draft first, and make sure you are logged into admin in this browser.' : (data && data.message)); renderWeekpick(null, pubEds); return; }
       render(dropObj);
-      renderWeekpick(dropObj.week, pubWeeks);
+      renderWeekpick(dropObj.edition || ('week-'+dropObj.week), pubEds);
     });
     }).catch(function(){});
   })();
