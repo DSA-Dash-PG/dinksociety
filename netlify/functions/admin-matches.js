@@ -14,7 +14,11 @@ export default async (req) => {
   const admin = verified.payload;
 
   const url = new URL(req.url);
-  const store = getStore('schedule');
+  // STRONG consistency: "Save week" PATCHes each match back-to-back, and each
+  // PATCH re-reads the same week file. With eventual reads, a PATCH could read
+  // the file from before the previous one wrote and overwrite it — which is how
+  // one match in a week kept its old time/venue while the others changed.
+  const store = getStore({ name: 'schedule', consistency: 'strong' });
 
   // ========== GET ==========
   if (req.method === 'GET') {

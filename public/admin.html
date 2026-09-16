@@ -6430,6 +6430,9 @@
         '<div class="we-fld"><label>End time</label><select id="we-end">' + endOpts + '</select></div>' +
         '<div class="we-fld"><label>Venue</label><select id="we-venue">' + venueOpts + '</select></div>' +
         '<div class="we-hint">All matches in a week start at the same time. Courts are set per match below.</div>' +
+        '<label class="we-all" style="flex-basis:100%;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-muted);cursor:pointer;">' +
+          '<input type="checkbox" id="we-all" style="width:16px;height:16px;accent-color:var(--color-lime);">' +
+          'Also apply this start time, end time &amp; venue to every other week (keeps each week\'s own date and courts; final matches untouched)</label>' +
       '</div>' +
       '<div class="we-head"><span>Home</span><span></span><span>Away</span><span>Courts</span><span></span></div>' +
       '<div id="we-rows">' + rowsHTML + '</div>' +
@@ -6485,6 +6488,8 @@
       scheduledAt = new Date(p[0], p[1] - 1, p[2], t.h, t.m).toISOString();
     }
     const startTime = scheduledAt ? timeStr : null;
+    const applyAll = !!(card.querySelector('#we-all') || {}).checked;
+    if (applyAll && !scheduledAt) return setErr('Set this week\'s date first — the time is applied to the other weeks from it.');
 
     const rowEls = [...card.querySelectorAll('#we-rows .we-row')].filter(r => !r.dataset.fin);
     const desired = [];
@@ -6537,6 +6542,38 @@
           });
         }
         done++; prog();
+      }
+
+      // ── Apply time / end / venue to every other week ──
+      if (applyAll) {
+        const t = parseTime12(timeStr) || { h: 19, m: 0 };
+        const start = (workingStartDate() || '').split('-').map(Number);
+        const others = (weeks || []).filter(w => w.week !== wk.week);
+        const skipped = [];
+        let n = 0;
+        for (const ow of others) {
+          let base = plannedWeekDate(ow);
+          if (!base && start.length === 3) base = new Date(start[0], start[1] - 1, start[2] + 7 * (ow.week - 1));
+          if (!base) { skipped.push('Wk ' + ow.week + ' (no date)'); continue; }
+          const at = new Date(base.getFullYear(), base.getMonth(), base.getDate(), t.h, t.m).toISOString();
+          setSeasonWeekDate(ow.week, at);
+          for (const m of (ow.matches || [])) {
+            if (m.finalizedAt) continue;
+            if (status) { status.textContent = 'Applying to week ' + ow.week + '…'; status.style.color = 'var(--color-text-faint)'; }
+            try {
+              await apiJSON('/.netlify/functions/admin-matches?matchId=' + encodeURIComponent(m.id), {
+                method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ scheduledAt: at, startTime: timeStr, endTime: endStr, venue }),
+              });
+              n++;
+            } catch (e) { skipped.push('Wk ' + ow.week + ' ' + ((m.teamA && m.teamA.name) || m.bracketSlot || m.id)); }
+          }
+        }
+        await apiJSON('/.netlify/functions/admin-settings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ weekDates: SETTINGS.weekDates }),
+        });
+        if (skipped.length) alert('Applied to ' + n + ' match(es). Skipped: ' + skipped.join(', '));
       }
       renderSched();
       if (typeof renderAllGames === 'function') renderAllGames();
