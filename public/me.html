@@ -13,6 +13,8 @@
 <script src="/js/live-poll.js"></script>
 <script src="/ladder-profile-view.js"></script>
 <script src="/js/ds-ui.js"></script>
+<script src="/js/player-share.js"></script>
+<script src="/js/shirt-size.js"></script>
 <script src="/badges.js?v=3"></script>
 <script src="/js/universal-search.js" defer></script>
 <style>
@@ -1119,6 +1121,7 @@
         <label class="pf-row"><span>Plays</span><select id="pf-plays">${opt('', bio.plays || '')}${opt('Right Handed', bio.plays)}${opt('Left Handed', bio.plays)}${opt('Both', bio.plays)}</select></label>
         <label class="pf-row"><span>City</span><input id="pf-city" maxlength="60" value="${esc(bio.city || '')}"></label>
         <label class="pf-row"><span>Home court</span><input id="pf-court" maxlength="80" value="${esc(bio.homeCourt || '')}"></label>
+        <div id="pf-shirt-slot"></div>
 
         <button class="pf-btn pf-btn--full" id="pf-save">${me.lite ? 'Save' : 'Submit for approval'}</button>
         <div class="pf-status pf-status--main" id="pf-save-status"></div>
@@ -1126,6 +1129,9 @@
           ? 'Your gender saves right away; bio changes go live once an admin approves them.'
           : 'Changes go live once a league admin approves them.'}</div>
       </div>`;
+
+    // Shirt size (js/shirt-size.js) — saves on tap, no approval, private to the league.
+    if (window.DSShirt) window.DSShirt.mountPlayer($('pf-shirt-slot'));
 
     // Photo wiring
     let pickedPhoto = null;
@@ -2366,11 +2372,13 @@
       ${lite ? '' : `<div class="seg__b ${homeSeg === 'league' ? 'is-active' : ''}" data-h="league">League</div>`}
       ${hasLadderTab ? `<div class="seg__b ${homeSeg === 'ladder' ? 'is-active' : ''}" data-h="ladder">Ladder</div>` : ''}
     </div>`;
-    const html = mehead + announce + segHtml
+    // Team-share card (js/player-share.js) — a player's own balance with their captain.
+    const html = mehead + announce + '<div id="ds-share-slot"></div>' + segHtml
       + `<div id="h-week" class="${homeSeg === 'week' ? '' : 'hidden'}">${weekHtml}</div>`
       + (lite ? '' : `<div id="h-league" class="${homeSeg === 'league' ? '' : 'hidden'}">${leagueHtml}</div>`)
       + (hasLadderTab ? `<div id="h-ladder" class="${homeSeg === 'ladder' ? '' : 'hidden'}">${ladderHtml}</div>` : '');
     $('v-home').innerHTML = html;
+    if (window.DSShare) window.DSShare.mount();
     $('v-home').querySelectorAll('.seg__b[data-h]').forEach(b => b.addEventListener('click', () => {
       const which = b.dataset.h;
       try { localStorage.setItem('ds-home-seg', which); } catch {}

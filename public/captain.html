@@ -24,6 +24,7 @@
 (function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css">
   <script src="/js/short-name.js"></script>
+  <script src="/js/captain-split.js"></script>
   <style>
     /* ═══════════════════════════════════════════════════════════
        CAPTAIN PORTAL — Night-Match Design System
@@ -835,6 +836,15 @@
         </div>
         <div id="billing-area"><div class="empty-state">Loading&hellip;</div></div>
         <div class="cap-status" id="billing-status"></div>
+      </div>
+
+      <!-- SPLIT WITH YOUR TEAM — rendered by /js/captain-split.js -->
+      <div class="cap-card">
+        <div class="cap-card__header">
+          <h2 class="cap-card__title">Split with your team</h2>
+          <span class="cap-card__sub" id="split-sub">Work out what each player owes you</span>
+        </div>
+        <div id="split-area"><div class="empty-state">Loading&hellip;</div></div>
       </div>
     </section>
 
@@ -1676,6 +1686,7 @@
     const money = (n) => '$' + Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
 
     async function loadBalance() {
+      if (window.DSSplit) window.DSSplit.load(); // "Split with your team" card (js/captain-split.js)
       const area = $id('billing-area');
       area.innerHTML = '<div class="empty-state">Loading&hellip;</div>';
       try {
@@ -1721,7 +1732,15 @@
         return;
       }
 
-      area.innerHTML = rows + `
+      // Deposit option chosen at signup but nothing logged yet — say so, so a
+      // $700 balance doesn't look like a mistake to a captain who "picked $250".
+      const dep = Number(b.depositAmount || 0);
+      const depNote = b.paymentType === 'deposit' && dep > 0 && paid < dep
+        ? `<div style="margin-top:14px;background:rgba(240,192,64,0.08);border:1px solid rgba(240,192,64,0.3);border-left:3px solid var(--color-gold,#f0c040);padding:12px 14px;border-radius:0 10px 10px 0;font-size:13px;color:var(--color-text-faint);line-height:1.55;">
+            <strong style="color:var(--color-text);">Your ${money(dep)} deposit hasn't been recorded yet.</strong> Already sent it? Reply to your confirmation email or write to dink@dinksociety.app and we'll log it — your balance updates as soon as it's in.
+          </div>` : '';
+
+      area.innerHTML = rows + depNote + `
         <button class="cap-btn cap-btn--gold" id="pay-balance-btn" style="margin-top:18px;width:100%;">Pay ${money(balance)} now</button>
         <p style="font-size:12px;color:var(--color-text-faint);margin:10px 0 0;text-align:center;">Secure payment via Stripe. Have a discount code? Enter it on the next screen.</p>`;
 

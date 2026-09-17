@@ -7,6 +7,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
+import { paidTotal, balanceOf } from './lib/registrations.js';
 
 async function findRegistration(regStore, id) {
   const keys = [`confirmed/${id}.json`, `pending/${id}.json`, id];
@@ -38,11 +39,12 @@ export default async (req) => {
     return new Response(JSON.stringify({ hasRegistration: false }), { status: 200, headers });
   }
 
+  // Balance is fee minus RECORDED payments — never the cached reg.balanceDue,
+  // which used to be stamped as (fee − deposit) before the deposit was paid.
   const totalPrice = Number(reg.totalPrice ?? reg.price ?? 0);
-  const amountPaid = Number(reg.amountPaid ?? 0);
-  const balanceDue = Math.max(0, Number(reg.balanceDue ?? (totalPrice - amountPaid)));
-  const paymentStatus = reg.paymentStatus
-    || (balanceDue <= 0 && amountPaid > 0 ? 'paid_in_full' : amountPaid > 0 ? 'partial' : 'unpaid');
+  const amountPaid = paidTotal(reg);
+  const balanceDue = balanceOf(reg);
+  const paymentStatus = balanceDue <= 0 && amountPaid > 0 ? 'paid_in_full' : amountPaid > 0 ? 'partial' : 'unpaid';
 
   return new Response(JSON.stringify({
     hasRegistration: true,
@@ -51,6 +53,10 @@ export default async (req) => {
     balanceDue,
     paymentStatus,
     discountApplied: Number(reg.discountApplied || 0),
+    // Deposit terms, so the portal can say "deposit of $250 was due at signup".
+    paymentType: reg.paymentType || null,
+    depositAmount: reg.depositAmount != null ? Number(reg.depositAmount) : null,
+    balanceDueDate: reg.balanceDueDate || null,
     currency: 'usd',
   }), { status: 200, headers });
 };

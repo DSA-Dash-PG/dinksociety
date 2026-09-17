@@ -1,0 +1,204 @@
+// netlify/functions/lib/team-split-math.js
+// Pure money + ledger maths for the captain "Split with your team" feature.
+// No storage, auth or request handling here — see lib/team-split.js for that.
+//
+// EVERYTHING is integer cents. There is no rounding up to the dollar: a flat
+// amount is divided to the exact cent and any leftover pennies are handed out
+// one at a time (the payee — the captain — takes the smaller share), so the
+// shares always add back up to exactly the amount the captain typed.
+//
+// Two modes:
+//   flat     the captain types an amount; it is split across the player set
+//            (the live active roster until the roster locks, then the frozen
+//            `lockedPlayerIds`). A per-player override pins one player to a
+//            fixed amount and the rest share what is left.
+//   pergame  the captain sets a rate; each player owes rate x games they
+//            actually played in FINALIZED matches — every week of the season,
+//            playoffs included.
+
+import { SLOT_KEYS, normalizeScore } from './score-helpers.js';
+
+export const MAX_AMOUNT_CENTS = 100000 * 100; // $100,000 sanity cap
+export const MAX_RATE_CENTS = 100 * 100;      // $100 a game sanity cap
+export const PAY_METHODS = ['venmo', 'cash', 'zelle', 'other'];
+
+/** Dollars (number or string like "4.25" / "$700") -> integer cents, or null. */
+export function toCents(v) {
+  if (v == null || v === '') return null;
+  const s = String(v).replace(/[$,\s]/g, '');
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
+  const [d, f = ''] = s.split('.');
+  return Number(d) * 100 + Number((f + '00').slice(0, 2));
+}
+
+/** Integer cents -> "$77.78" (always two decimals unless a whole dollar). */
+export function fmtCents(c) {
+  const n = Math.round(Number(c) || 0);
+  const neg = n < 0, a = Math.abs(n);
+  const dollars = Math.floor(a / 100).toLocaleString('en-US');
+  const cents = a % 100;
+  return (neg ? '-' : '') + '$' + dollars + (cents ? '.' + String(cents).padStart(2, '0') : '');
+}
+
+/** "@Some-Handle " -> "Some-Handle", or null when it isn't a plausible handle. */
+export function normalizeHandle(h) {
+  const s = String(h || '').trim().replace(/^@+/, '');
+  return /^[A-Za-z0-9_-]{1,40}$/.test(s) ? s : null;
+}
+
+/**
+ * Split totalCents across ids to the exact cent. Leftover pennies go to the
+ * ids EARLIEST in the list, so put whoever should pay least LAST.
+ */
+export function splitEvenly(totalCents, ids) {
+  const out = {};
+  const n = ids.length;
+  if (!n) return out;
+  const total = Math.max(0, Math.round(totalCents));
+  const base = Math.floor(total / n);
+  let extra = total - base * n;
+  for (const id of ids) { out[id] = base + (extra > 0 ? 1 : 0); if (extra > 0) extra--; }
+  return out;
+}
+
+/**
+ * Flat-mode shares.
+ * @returns {{ shares: Record<string, number>, unassignedCents: number }}
+ *   unassignedCents > 0 only when every player is overridden and the overrides
+ *   don't add up to the amount (nobody left to absorb the difference).
+ */
+export function flatShares({ amountCents, playerIds, overrides = {}, payeeId = null }) {
+  const amount = Math.max(0, Math.round(amountCents || 0));
+  const shares = {};
+  let pinned = 0;
+  const free = [];
+  for (const id of playerIds) {
+    const o = overrides[id];
+    if (Number.isInteger(o) && o >= 0) { shares[id] = o; pinned += o; }
+    else free.push(id);
+  }
+  // Payee last -> the captain never picks up a rounding penny.
+  free.sort((a, b) => (a === payeeId) - (b === payeeId));
+  const rest = Math.max(0, amount - pinned);
+  Object.assign(shares, splitEvenly(rest, free));
+  return { shares, unassignedCents: free.length ? 0 : rest };
+}
+
+/**
+ * Games each of OUR players actually played in one match: a slot counts when
+ * the agreed (canonical) score is complete. Unplayed / unscored slots are free.
+ * @returns {Record<string, number>} playerId -> games
+ */
+export function countGames({ lineup, score, championship = false }) {
+  const counts = {};
+  if (!lineup?.games || !score?.games) return counts;
+  normalizeScore(score, championship);
+  for (const slot of SLOT_KEYS) {
+    const g = score.games[slot];
+    if (!Number.isInteger(g?.home) || !Number.isInteger(g?.away)) continue;
+    const picks = lineup.games[slot];
+    if (!picks) continue;
+    for (const pid of [picks.p1, picks.p2]) if (pid) counts[pid] = (counts[pid] || 0) + 1;
+  }
+  return counts;
+}
+
+function sumPayments(list) {
+  return (list || []).reduce((s, p) => s + (Number.isInteger(p?.cents) ? p.cents : 0), 0);
+}
+
+/**
+ * Build the full ledger.
+ * @param split  the stored split record
+ * @param team   the team blob (roster used for names / payee / active set)
+ * @param tabs   pergame only: [{ matchId, week, phase, counts: {pid: n} }]
+ */
+export function buildLedger({ split, team, tabs = [] }) {
+  const roster = (team?.roster || []).filter(p => p && p.id);
+  const byId = new Map(roster.map(p => [p.id, p]));
+  const capEmail = String(team?.captainEmail || '').toLowerCase();
+  const payee = roster.find(p => p.isCaptain)
+    || roster.find(p => capEmail && String(p.email || '').toLowerCase() === capEmail) || null;
+  const payeeId = payee?.id || null;
+  const active = roster.filter(p => !p.archived && !p.pendingAdd).map(p => p.id);
+
+  const mode = split?.mode === 'pergame' ? 'pergame' : 'flat';
+  const owed = {};        // pid -> cents
+  const games = {};       // pid -> total games (pergame)
+  const weeks = {};       // pid -> [{ week, games, cents }]
+  let unassignedCents = 0;
+
+  if (mode === 'flat') {
+    const locked = Array.isArray(split?.lockedPlayerIds) && split.lockedPlayerIds.length;
+    const ids = (locked ? split.lockedPlayerIds : active).filter(id => byId.has(id));
+    const r = flatShares({ amountCents: split?.amountCents || 0, playerIds: ids, overrides: split?.overrides || {}, payeeId });
+    Object.assign(owed, r.shares);
+    unassignedCents = r.unassignedCents;
+  } else {
+    const rate = Math.max(0, Math.round(split?.rateCents || 0));
+    const sorted = [...tabs].sort((a, b) => (a.week || 0) - (b.week || 0));
+    for (const t of sorted) {
+      for (const [pid, n] of Object.entries(t.counts || {})) {
+        if (!byId.has(pid) || !n) continue;
+        games[pid] = (games[pid] || 0) + n;
+        owed[pid] = (owed[pid] || 0) + n * rate;
+        (weeks[pid] = weeks[pid] || []).push({ week: t.week, phase: t.phase || null, games: n, cents: n * rate });
+      }
+    }
+    // Everyone on the active roster gets a row even before they play.
+    for (const id of active) if (!(id in owed)) owed[id] = 0;
+  }
+
+  // Anyone with money recorded against them keeps a row even if they owe nothing now.
+  for (const pid of Object.keys(split?.payments || {})) if (byId.has(pid) && !(pid in owed)) owed[pid] = 0;
+
+  const rows = Object.keys(owed).map(pid => {
+    const p = byId.get(pid);
+    const self = pid === payeeId;
+    const payments = self ? [] : (split?.payments?.[pid] || []);
+    const owedCents = owed[pid];
+    const paidCents = self ? owedCents : sumPayments(payments);
+    const balanceCents = owedCents - paidCents;
+    const claim = (!self && split?.claims?.[pid]) || null;
+    const status = self ? 'self'
+      : balanceCents > 0 ? (claim ? 'claim' : 'owes')
+      : (owedCents > 0 || paidCents > 0) ? 'paid' : 'none';
+    return {
+      playerId: pid, name: p.name || 'Player', self, isSub: !!p.isSub, archived: !!p.archived,
+      hasEmail: !!p.email,
+      overrideCents: mode === 'flat' && Number.isInteger(split?.overrides?.[pid]) ? split.overrides[pid] : null,
+      games: games[pid] || 0, weeks: weeks[pid] || [],
+      owedCents, paidCents, balanceCents, claim, status, payments,
+      lastNudgedOn: split?.nudges?.[pid] || null,
+    };
+  });
+
+  const order = { claim: 0, owes: 1, none: 2, paid: 3, self: 4 };
+  rows.sort((a, b) => (order[a.status] - order[b.status]) || a.name.localeCompare(b.name));
+
+  const totalCents = rows.reduce((s, r) => s + r.owedCents, 0);
+  const outstandingCents = rows.reduce((s, r) => s + Math.max(0, r.balanceCents), 0);
+  return {
+    mode, payeeId, payeeName: payee?.name || null,
+    rows, unassignedCents,
+    totals: {
+      totalCents, outstandingCents,
+      collectedCents: totalCents - outstandingCents,
+      gamesBilled: rows.reduce((s, r) => s + r.games, 0),
+      claims: rows.filter(r => r.status === 'claim').length,
+      owing: rows.filter(r => r.balanceCents > 0).length,
+    },
+  };
+}
+
+/** The slice of a ledger one player is allowed to see: their own row only. */
+export function playerView(ledger, playerId) {
+  const r = ledger.rows.find(x => x.playerId === playerId);
+  if (!r) return null;
+  return {
+    mode: ledger.mode, self: r.self,
+    owedCents: r.owedCents, paidCents: r.paidCents, balanceCents: r.balanceCents,
+    games: r.games, weeks: r.weeks, claim: r.claim, status: r.status,
+    payments: r.payments.map(p => ({ cents: p.cents, at: p.at, method: p.method })),
+  };
+}

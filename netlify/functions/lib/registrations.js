@@ -69,3 +69,28 @@ export async function findRegistration(regStore, id) {
   }
   return null;
 }
+
+/**
+ * What the team still owes, from recorded payments ONLY.
+ *
+ * `reg.balanceDue` on disk is a cache and it lied: register-checkout used to
+ * stamp it as (fee − deposit) at signup, before a dollar arrived, so a team
+ * that picked the $250 deposit option and never paid showed a $450 balance
+ * with no payment on record. Every reader goes through here now — the
+ * balance is always fee minus what's actually been logged.
+ */
+export function paidTotal(reg) {
+  if (!reg) return 0;
+  if (Array.isArray(reg.manualPayments) || reg.stripeAmountPaid !== undefined) {
+    const stripeAmt = Number(reg.stripeAmountPaid || 0);
+    const manual = (reg.manualPayments || []).reduce((s, p) => s + Number(p.amount || 0), 0);
+    // Legacy single-object payment that hasn't been migrated yet.
+    const legacy = (!Array.isArray(reg.manualPayments) && reg.manualPayment) ? Number(reg.amountPaid || 0) : 0;
+    return stripeAmt + manual + legacy;
+  }
+  return Number(reg.amountPaid || 0);
+}
+export function balanceOf(reg) {
+  const total = Number(reg?.totalPrice ?? reg?.price ?? 0);
+  return Math.max(0, total - paidTotal(reg));
+}

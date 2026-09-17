@@ -10,6 +10,7 @@
 // The ID is 20 hex chars, effectively unguessable.
 
 import { getStore } from '@netlify/blobs';
+import { paidTotal, balanceOf } from './lib/registrations.js';
 
 export default async (req, context) => {
   const headers = {
@@ -59,7 +60,7 @@ export default async (req, context) => {
       division: reg.division,
       divisionLabel: reg.divisionLabel,
       path: reg.path,
-      amountPaid: reg.amountPaid || null,
+      amountPaid: paidTotal(reg) || null,
       createdAt: reg.createdAt,
       confirmedAt: reg.confirmedAt || null,
       // Payment terms — no account details, just what was asked for / is owed.
@@ -67,7 +68,12 @@ export default async (req, context) => {
       paymentStatus: reg.paymentStatus || null,
       totalPrice: reg.totalPrice || reg.price || null,
       depositAmount: reg.depositAmount != null ? reg.depositAmount : null,
-      balanceDue: reg.balanceDue != null ? reg.balanceDue : null,
+      // What's actually still owed (fee − recorded payments) …
+      balanceDue: balanceOf(reg),
+      // … and what will be owed once the deposit lands — for the "send your
+      // deposit, then $X is due by <date>" copy while the deposit is pending.
+      balanceAfterDeposit: reg.balanceAfterDeposit != null ? reg.balanceAfterDeposit
+        : Math.max(0, Number(reg.totalPrice || reg.price || 0) - Number(reg.depositAmount || 0)),
       balanceDueDate: reg.balanceDueDate || null,
     };
 

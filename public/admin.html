@@ -180,6 +180,16 @@
     .pm-section { margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--color-border); }
     .pm-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
     .pm-lbl { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; font-weight: 700; color: var(--color-text-faint); }
+    /* Modal text/number fields — same look as the .af admin forms (they were unstyled white boxes). */
+    .pm-modal input[type="text"], .pm-modal input[type="number"], .pm-modal input[type="email"], .pm-modal input[type="date"], .pm-modal select, .pm-modal textarea {
+      padding: 10px 12px; border: 1px solid var(--color-border-strong); border-radius: var(--radius-md); font-size: 13px; font-family: inherit; font-weight: 500;
+      background: var(--color-surface-2); color: var(--color-text); box-sizing: border-box; transition: border-color 0.12s, box-shadow 0.12s; -moz-appearance: textfield;
+    }
+    .pm-modal input::placeholder { color: var(--color-text-faint); }
+    .pm-modal input:focus, .pm-modal select:focus, .pm-modal textarea:focus { outline: none; border-color: var(--color-teal); box-shadow: 0 0 0 3px var(--color-teal-dim); }
+    .pm-modal input[type="number"]::-webkit-outer-spin-button, .pm-modal input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+    .pm-deposit { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+    .pm-deposit__meta { font-size: 11px; color: var(--color-text-muted); margin-top: 3px; }
     .pm-pay-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 12px; }
     .pm-pay-row + .pm-pay-row { border-top: 1px solid var(--color-border); }
     .pm-methods { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
@@ -622,6 +632,8 @@
     }
   </style>
   <script src="/badges.js?v=3"></script>
+  <script src="/js/admin-splits.js"></script>
+  <script src="/js/shirt-size.js"></script>
 </head>
 <body data-page="admin">
 <script>/*ds-embed-mode*/(function(){try{if(new URLSearchParams(location.search).get("embed")!=="1")return;document.documentElement.classList.add("embed");var st=document.createElement("style");st.textContent="html.embed .sb,html.embed .am-bottomnav,html.embed #mob-overlay,html.embed #mob-av{display:none!important}html.embed .admin-shell{grid-template-columns:1fr!important}";document.head.appendChild(st);}catch(e){}})();</script>
@@ -974,6 +986,8 @@
             </div>
           </div>
           <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;">Every rostered league player with contact details. Includes archived &amp; removed players; excludes the test/demo season. Admin only. The <b>Emails</b> column shows who has opted out of league announcements — flip it when someone asks to be taken off the list, or send them their own preferences link.</p>
+          <!-- Shirt sizes — league-wide order sheet (js/shirt-size.js) -->
+          <div id="shirt-admin"></div>
           <div id="pl-stats" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px;"></div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
             <input id="pl-q" type="text" placeholder="Search name, team, email, phone…" style="flex:1;min-width:180px;" aria-label="Search players">
@@ -2995,6 +3009,7 @@
     const a = document.createElement('a'); a.href = u; a.download = 'dink-society-players.csv'; a.click(); URL.revokeObjectURL(u);
   }
   async function renderPlayers() {
+    if (window.DSShirt) window.DSShirt.mountAdmin($id('shirt-admin'));
     const body = $id('pl-body');
     body.innerHTML = '<tr><td colspan="6" style="padding:20px;text-align:center;color:var(--color-text-faint);">Loading…</td></tr>';
     if (!PL_WIRED) {
@@ -4362,6 +4377,14 @@
     const totalPaid = stripeAmt + payments.reduce((s, p) => s + (p.amount || 0), 0);
     const balance = Math.max(0, totalPrice - totalPaid);
     const teamName = reg.team?.name || reg.agent?.name || 'Registration';
+    // Deposit terms from signup. "Received" = at least the deposit has been
+    // logged; otherwise the team picked the deposit option and nothing has
+    // been recorded yet — that's the case that used to hide as a $450 balance.
+    const depositAmt = reg.paymentType === 'deposit' && reg.depositAmount > 0 && reg.depositAmount < totalPrice ? Number(reg.depositAmount) : 0;
+    const depositReceived = depositAmt > 0 && totalPaid >= depositAmt;
+    const dueLabel = reg.balanceDueDate ? new Date(reg.balanceDueDate + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    // Default amount: the unpaid deposit if there is one, else the balance.
+    const defaultAmt = depositAmt > 0 && !depositReceived ? depositAmt : (balance > 0 ? balance : '');
 
     const modal = $id('pm-modal-inner');
     modal.innerHTML = [
@@ -4388,6 +4411,18 @@
           </div>
         </div>
       </div>`,
+
+      // Deposit terms (what they chose at signup vs what's actually been logged)
+      depositAmt > 0 ? `<div class="pm-section pm-deposit">
+        <div>
+          <div class="pm-lbl">Deposit option</div>
+          <div class="pm-deposit__meta">$${depositAmt} due at signup${reg.paymentMethod === 'venmo' ? ' via Venmo' : ''} · remaining $${Math.max(0, totalPrice - depositAmt)}${dueLabel ? ' due by ' + dueLabel : ''}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="${depositReceived ? 'p p--paid' : 'p p--unpaid'}">${depositReceived ? 'Deposit received' : 'Not received'}</span>
+          ${!depositReceived ? `<button class="ab ab--teal ab--sm" id="pm-log-deposit" title="Prefill a $${depositAmt} ${reg.paymentMethod === 'venmo' ? 'Venmo' : ''} payment below">Log $${depositAmt} deposit</button>` : ''}
+        </div>
+      </div>` : '',
 
       // Stripe deposit (read-only)
       stripeAmt > 0 ? `<div class="pm-section">
@@ -4427,7 +4462,7 @@
         </div>
         <div style="margin-top:12px;">
           <div class="pm-lbl" style="margin-bottom:4px;">Amount ($)</div>
-          <input type="number" id="pm-amount" min="0" step="1" value="${balance > 0 ? balance : ''}" placeholder="0" style="width:100%;box-sizing:border-box;" autocomplete="off">
+          <input type="number" id="pm-amount" min="0" step="1" value="${defaultAmt}" placeholder="0" style="width:100%;box-sizing:border-box;" autocomplete="off">
         </div>
         <div style="margin-top:10px;">
           <div class="pm-lbl" style="margin-bottom:4px;">Note <span style="text-transform:none;letter-spacing:0;font-weight:400;">(optional)</span></div>
@@ -4458,6 +4493,17 @@
       const price = parseFloat(modal.querySelector('#pm-price-input').value);
       if (isNaN(price) || price < 0) { alert('Enter a valid price.'); return; }
       await pmApiCall({ action: 'set-price', id: _pmRegId, price });
+    });
+
+    // "Log deposit" shortcut — prefills the form; admin still hits Add Payment.
+    const logDep = modal.querySelector('#pm-log-deposit');
+    if (logDep) logDep.addEventListener('click', () => {
+      _pmEditId = null;
+      modal.querySelector('#pm-amount').value = depositAmt;
+      modal.querySelector('#pm-note').value = reg.venmo && reg.venmo.note ? reg.venmo.note : 'Deposit';
+      const radio = modal.querySelector(`input[name="pm-method"][value="${reg.paymentMethod === 'venmo' ? 'venmo' : 'other'}"]`);
+      if (radio) { radio.checked = true; modal.querySelectorAll('.pm-method').forEach(l => l.classList.toggle('is-selected', l.querySelector('input').checked)); }
+      modal.querySelector('#pm-submit').focus();
     });
 
     // Method radio highlight
@@ -4502,7 +4548,7 @@
       modal.querySelector('#pm-form-title').textContent = 'Add Payment';
       modal.querySelector('#pm-submit').textContent = 'Add Payment';
       modal.querySelector('#pm-form-cancel').style.display = 'none';
-      modal.querySelector('#pm-amount').value = balance > 0 ? balance : '';
+      modal.querySelector('#pm-amount').value = defaultAmt;
       modal.querySelector('#pm-note').value = '';
       modal.querySelectorAll('input[name="pm-method"]').forEach(r => { r.checked = false; });
       modal.querySelectorAll('.pm-method').forEach(l => l.classList.remove('is-selected'));
@@ -5696,7 +5742,13 @@
 
       /* ── ADMIN TOOLS ── */
       '<div class="ac__h tdp-anchor" id="sec-tools" style="margin:24px 0 10px;"><span class="ac__t">Admin tools</span></div>' +
-      viewAsBlock;
+      viewAsBlock +
+      /* ── TEAM FEE SPLIT — private, read-only (js/admin-splits.js). Teams are never told admins can see this. ── */
+      '<div style="margin-bottom:14px;padding:12px 14px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:var(--radius-sm);">' +
+        '<div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:8px;">🔒 Team fee split — private to admins, read-only</div>' +
+        '<div id="tdp-split"></div>' +
+      '</div>';
+    if (window.DSAdminSplits) window.DSAdminSplits.mount(t.id, $id('tdp-split'));
 
     // Jump nav (mobile): scroll the panel body to a section.
     body.querySelectorAll('.tdp-jump button').forEach(b => b.addEventListener('click', () => {

@@ -166,7 +166,10 @@
             var v = reg.venmo;
             var handle = '@' + String(v.handle || 'dink-society').replace(/^@/, '');
             // Paying the whole fee up front → never call it a "deposit".
-            var payingFull = !(reg.balanceDue > 0);
+            // What remains AFTER the deposit lands (balanceDue itself is the full
+            // fee until a payment is actually recorded).
+            var afterDeposit = reg.balanceAfterDeposit != null ? reg.balanceAfterDeposit : reg.balanceDue;
+            var payingFull = !(afterDeposit > 0);
             document.querySelector('.success').classList.add('success--venmo');
             document.getElementById('s-badge').textContent = payingFull ? 'Spot held · payment pending' : 'Spot held · deposit pending';
             document.getElementById('s-title').textContent = 'Almost in.';
@@ -179,8 +182,8 @@
             if (v.url) document.getElementById('v-open').href = v.url;
             setText('s-amount', '$' + (v.amount != null ? v.amount : '') + (payingFull ? ' via Venmo (pending)' : ' deposit via Venmo (pending)'));
             setText('v-title', payingFull ? 'Send your payment on Venmo' : 'Send your deposit on Venmo');
-            if (reg.balanceDue > 0) {
-              document.getElementById('v-balance').textContent = '$' + reg.balanceDue;
+            if (afterDeposit > 0) {
+              document.getElementById('v-balance').textContent = '$' + afterDeposit;
               if (reg.balanceDueDate) {
                 var dd = new Date(reg.balanceDueDate + 'T12:00:00');
                 if (!isNaN(dd.getTime())) document.getElementById('v-due').textContent = 'by ' + dd.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });

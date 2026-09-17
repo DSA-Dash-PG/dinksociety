@@ -296,7 +296,13 @@ export default async (req) => {
       totalPrice: totalPrice,
       paymentType: isTeam && amountDueNow < totalPrice ? 'deposit' : 'full',
       depositAmount: amountDueNow,
-      balanceDue: balanceDue,
+      // Nothing has been paid yet. balanceDue is the FULL fee until a payment
+      // is recorded (Stripe webhook or an admin logging Venmo/Zelle/cash);
+      // balanceAfterDeposit is what will remain once the deposit lands and is
+      // only used for the "then $X is due by <date>" copy.
+      amountPaid: 0,
+      balanceDue: totalPrice,
+      balanceAfterDeposit: balanceDue,
       balanceDueDate: balanceDue > 0 ? balanceDueDate : null,
       team: path === 'team' ? team : undefined,
       agent: path === 'agent' ? agent : undefined,

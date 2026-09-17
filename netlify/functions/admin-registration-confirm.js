@@ -11,7 +11,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { json, findRegistration, migratePayments, recalcPayments } from './lib/registrations.js';
+import { json, findRegistration, migratePayments, recalcPayments, paidTotal, balanceOf } from './lib/registrations.js';
 import { sendEmail } from './lib/email.js';
 import { fmtDueDate } from './lib/payment-terms.js';
 import { normalizeEmail, normalizePhone } from './lib/identity.js';
@@ -51,6 +51,13 @@ export async function run(body, admin) {
     });
     recalcPayments(reg);
     if (reg.paymentType === 'deposit') reg.depositPaid = Math.min(reg.amountPaid, reg.depositAmount || reg.amountPaid);
+  }
+
+  // Keep the cached balance honest even on a plain Confirm with no payment
+  // logged — it used to carry the signup-time (fee − deposit) number.
+  if (!(rp && parseFloat(rp.amount) > 0)) {
+    migratePayments(reg);
+    recalcPayments(reg);
   }
 
   // Mark as confirmed
@@ -145,8 +152,8 @@ async function sendVenmoConfirmedEmail(reg) {
   const name = isTeam ? (reg.team?.captain || reg.team?.players?.[0]?.name || '') : (reg.agent?.name || '');
   const siteUrl = process.env.SITE_URL || '';
   const total = reg.totalPrice || reg.price || 0;
-  const paid = reg.amountPaid || 0;
-  const balance = reg.balanceDue != null ? reg.balanceDue : Math.max(0, total - paid);
+  const paid = paidTotal(reg);
+  const balance = balanceOf(reg);
   const dueLabel = fmtDueDate(reg.balanceDueDate);
   const seasonLabel = reg.circuit === 'I' ? 'Season 1' : (reg.circuit || 'the league');
   try {

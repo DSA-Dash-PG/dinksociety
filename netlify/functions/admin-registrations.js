@@ -3,6 +3,7 @@
 // Admin-only — returns more than the public registration-lookup endpoint.
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
+import { paidTotal, balanceOf } from './lib/registrations.js';
 export default async (req) => {
   const verified = await verifyAdminSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
@@ -50,10 +51,12 @@ export default async (req) => {
       divisionLabel: r.divisionLabel,
       path: r.path,
       status: r.status || 'pending',
-      amountPaid: r.amountPaid,
+      amountPaid: paidTotal(r),
       totalPrice: r.totalPrice ?? r.price ?? null,
       depositPaid: r.depositPaid ?? null,
-      balanceDue: r.balanceDue ?? null,
+      // Computed from recorded payments — the stored field was stamped as
+      // (fee − deposit) at signup and went stale (see lib/registrations.js).
+      balanceDue: balanceOf(r),
       balanceDueDate: r.balanceDueDate ?? null,
       paymentType: r.paymentType ?? null,
       paymentStatus: r.paymentStatus ?? null,
