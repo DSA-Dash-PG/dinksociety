@@ -49,8 +49,8 @@ export function recalcPayments(reg) {
   const stripeAmt = reg.stripeAmountPaid || 0;
   const manualTotal = (reg.manualPayments || []).reduce((s, p) => s + (p.amount || 0), 0);
   reg.amountPaid = stripeAmt + manualTotal;
-  reg.balanceDue = Math.max(0, (reg.totalPrice || 0) - reg.amountPaid);
-  const total = reg.totalPrice || 0;
+  const total = owedTotal(reg); // fee minus any Stripe promo discount
+  reg.balanceDue = Math.max(0, total - reg.amountPaid);
   reg.paymentStatus = total > 0 && reg.amountPaid >= total ? 'paid'
     : reg.amountPaid > 0 ? 'partial' : 'unpaid';
 }
@@ -90,7 +90,26 @@ export function paidTotal(reg) {
   }
   return Number(reg.amountPaid || 0);
 }
-export function balanceOf(reg) {
+/**
+ * What the team is actually on the hook for.
+ *
+ * Two kinds of discount exist and they are stored differently:
+ *  - LEAGUE discount (admin lowers the fee in the Payments modal): totalPrice
+ *    itself becomes the discounted number; the pre-discount price is kept in
+ *    `listPrice` (+ `priceNote`) purely so the discount can be SHOWN.
+ *  - STRIPE promo code: totalPrice stays at list and `discountApplied` holds
+ *    the amount Stripe took off, so it has to be subtracted here — otherwise
+ *    the promo amount comes back as a balance the team never owed.
+ */
+export function owedTotal(reg) {
   const total = Number(reg?.totalPrice ?? reg?.price ?? 0);
-  return Math.max(0, total - paidTotal(reg));
+  return Math.max(0, total - Number(reg?.discountApplied || 0));
+}
+/** League discount to display: list price minus the admin-set fee (0 if none). */
+export function leagueDiscount(reg) {
+  const list = Number(reg?.listPrice || 0), total = Number(reg?.totalPrice ?? reg?.price ?? 0);
+  return list > total ? list - total : 0;
+}
+export function balanceOf(reg) {
+  return Math.max(0, owedTotal(reg) - paidTotal(reg));
 }

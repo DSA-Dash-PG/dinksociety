@@ -7,7 +7,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
-import { paidTotal, balanceOf } from './lib/registrations.js';
+import { paidTotal, balanceOf, leagueDiscount } from './lib/registrations.js';
 
 async function findRegistration(regStore, id) {
   const keys = [`confirmed/${id}.json`, `pending/${id}.json`, id];
@@ -52,7 +52,11 @@ export default async (req) => {
     amountPaid,
     balanceDue,
     paymentStatus,
-    discountApplied: Number(reg.discountApplied || 0),
+    discountApplied: Number(reg.discountApplied || 0), // Stripe promo code
+    // League discount: an admin lowered this team's fee. totalPrice is already the
+    // discounted number; listPrice is what it was, so the card can show both.
+    listPrice: leagueDiscount(reg) > 0 ? Number(reg.listPrice) : null,
+    leagueDiscount: leagueDiscount(reg),
     // Deposit terms, so the portal can say "deposit of $250 was due at signup".
     paymentType: reg.paymentType || null,
     depositAmount: reg.depositAmount != null ? Number(reg.depositAmount) : null,

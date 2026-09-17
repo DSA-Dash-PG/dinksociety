@@ -4375,7 +4375,10 @@
       : reg.manualPayment ? [{ id: 'mp_legacy', amount: reg.amountPaid || 0, ...reg.manualPayment }] : [];
     const totalPrice = reg.totalPrice || 0;
     const totalPaid = stripeAmt + payments.reduce((s, p) => s + (p.amount || 0), 0);
-    const balance = Math.max(0, totalPrice - totalPaid);
+    const promoOff = Number(reg.discountApplied || 0);            // Stripe promo code
+    const owed = Math.max(0, totalPrice - promoOff);
+    const leagueOff = Number(reg.listPrice || 0) > totalPrice ? Number(reg.listPrice) - totalPrice : 0; // admin lowered the fee
+    const balance = Math.max(0, owed - totalPaid);
     const teamName = reg.team?.name || reg.agent?.name || 'Registration';
     // Deposit terms from signup. "Received" = at least the deposit has been
     // logged; otherwise the team picked the deposit option and nothing has
@@ -4403,12 +4406,16 @@
             <button class="ab ab--ghost ab--sm" id="pm-price-edit-btn">Edit</button>
           </div>
         </div>
+        ${leagueOff > 0 ? `<div style="margin-top:6px;font-size:11px;color:var(--color-text-muted);">List price $${reg.listPrice} · <span style="color:var(--color-gold);font-weight:700;">league discount −$${leagueOff}</span>${reg.priceNote ? ' · ' + h(reg.priceNote) : ''}</div>` : ''}
+        ${promoOff > 0 ? `<div style="margin-top:6px;font-size:11px;color:var(--color-text-muted);"><span style="color:var(--color-gold);font-weight:700;">Promo code −$${promoOff}</span> at Stripe checkout · team owes $${owed}</div>` : ''}
         <div id="pm-price-form" style="display:none;margin-top:10px;">
           <div style="display:flex;gap:8px;align-items:center;">
             <input type="number" id="pm-price-input" value="${totalPrice}" min="0" step="1" style="width:110px;" autocomplete="off">
             <button class="ab ab--teal ab--sm" id="pm-price-save">Save</button>
             <button class="ab ab--outline ab--sm" id="pm-price-cancel">Cancel</button>
           </div>
+          <input type="text" id="pm-price-note" maxlength="140" value="${h(reg.priceNote || '')}" placeholder="Reason, if this is a discount (e.g. returning-team discount)" style="width:100%;box-sizing:border-box;margin-top:8px;" autocomplete="off">
+          <div style="margin-top:6px;font-size:11px;color:var(--color-text-faint);">Lowering the fee gives the team a discount: their balance, the captain's Billing card and their team split all follow the new number. The captain sees “League discount”, never this note.</div>
         </div>
       </div>`,
 
@@ -4492,7 +4499,7 @@
     modal.querySelector('#pm-price-save').addEventListener('click', async () => {
       const price = parseFloat(modal.querySelector('#pm-price-input').value);
       if (isNaN(price) || price < 0) { alert('Enter a valid price.'); return; }
-      await pmApiCall({ action: 'set-price', id: _pmRegId, price });
+      await pmApiCall({ action: 'set-price', id: _pmRegId, price, note: modal.querySelector('#pm-price-note').value });
     });
 
     // "Log deposit" shortcut — prefills the form; admin still hits Add Payment.

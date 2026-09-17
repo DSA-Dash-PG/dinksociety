@@ -53,6 +53,9 @@ export default async (req) => {
       status: r.status || 'pending',
       amountPaid: paidTotal(r),
       totalPrice: r.totalPrice ?? r.price ?? null,
+      listPrice: r.listPrice ?? null,          // pre-discount fee, when an admin lowered it
+      priceNote: r.priceNote ?? null,
+      discountApplied: r.discountApplied ?? 0, // Stripe promo code
       depositPaid: r.depositPaid ?? null,
       // Computed from recorded payments — the stored field was stamped as
       // (fee − deposit) at signup and went stale (see lib/registrations.js).

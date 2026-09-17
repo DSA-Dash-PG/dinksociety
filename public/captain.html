@@ -1709,11 +1709,16 @@
       const balance = Number(b.balanceDue || 0);
       const paid = Number(b.amountPaid || 0);
       const total = Number(b.totalPrice || 0);
+      // League discount: an admin lowered this team's fee. `total` is already the discounted fee.
+      const leagueOff = Number(b.leagueDiscount || 0);
 
       const rows = `
         <div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--color-text-faint);font-size:14px;">
-          <span>Team fee</span><span style="color:var(--color-text);font-weight:600;">${money(total)}</span>
+          <span>Team fee</span><span style="color:var(--color-text);font-weight:600;">${money(leagueOff > 0 ? b.listPrice : total)}</span>
         </div>
+        ${leagueOff > 0 ? `<div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--color-text-faint);font-size:14px;">
+          <span>League discount</span><span style="color:var(--color-gold);font-weight:600;">−${money(leagueOff)}</span>
+        </div>` : ''}
         ${b.discountApplied > 0 ? `<div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--color-text-faint);font-size:14px;">
           <span>Discount applied</span><span style="color:var(--color-gold);font-weight:600;">−${money(b.discountApplied)}</span>
         </div>` : ''}

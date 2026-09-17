@@ -82,6 +82,9 @@ export default async (req) => {
         const paid = session.amount_total ? session.amount_total / 100 : 0;
         const discount = (session.total_details?.amount_discount || 0) / 100;
         reg.amountPaid = Number(reg.amountPaid || 0) + paid;
+        // Keep the promo amount on the record: balances are derived as
+        // fee − discountApplied − payments (lib/registrations.js owedTotal).
+        if (discount > 0) reg.discountApplied = Number(reg.discountApplied || 0) + discount;
         const totalFee = Number(reg.totalPrice || reg.price || reg.amountPaid);
         // A discount on the balance settles the remainder in full.
         reg.balanceDue = discount > 0 ? 0 : Math.max(0, totalFee - reg.amountPaid);

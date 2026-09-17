@@ -20,7 +20,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
-import { findRegistration } from './lib/registrations.js';
+import { findRegistration, owedTotal } from './lib/registrations.js';
 import { logActivity } from './lib/activity-log.js';
 import { getSplit, saveSplit, newSplit, loadLedger, publicConfig } from './lib/team-split.js';
 import { toCents, fmtCents, normalizeHandle, MAX_AMOUNT_CENTS, MAX_RATE_CENTS, PAY_METHODS } from './lib/team-split-math.js';
@@ -40,7 +40,7 @@ async function teamFeeCents(team) {
     if (!team.registrationId) return null;
     const found = await findRegistration(getStore('registrations'), team.registrationId);
     const reg = found?.reg;
-    const total = Number(reg?.totalPrice ?? reg?.price ?? 0);
+    const total = owedTotal(reg); // the fee this team actually owes — league or promo discount included
     return total > 0 ? Math.round(total * 100) : null;
   } catch { return null; }
 }
