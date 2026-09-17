@@ -1746,10 +1746,13 @@
           </div>` : '';
 
       area.innerHTML = rows + depNote + `
-        <button class="cap-btn cap-btn--gold" id="pay-balance-btn" style="margin-top:18px;width:100%;">Pay ${money(balance)} now</button>
-        <p style="font-size:12px;color:var(--color-text-faint);margin:10px 0 0;text-align:center;">Secure payment via Stripe. Have a discount code? Enter it on the next screen.</p>`;
+        ${b.cardEnabled
+          ? `<button class="cap-btn cap-btn--gold" id="pay-balance-btn" style="margin-top:18px;width:100%;">Pay ${money(balance)} now</button>`
+          : `<a class="cap-btn cap-btn--gold" href="${escapeAttr(b.venmoUrl || 'https://venmo.com/u/dink-society')}" target="_blank" rel="noopener" style="margin-top:18px;width:100%;box-sizing:border-box;">Pay ${money(balance)} on Venmo</a>
+             <p style="font-size:12px;color:var(--color-text-faint);margin:10px 0 0;text-align:center;">Send it to <strong style="color:var(--color-text);">@${escapeHtml(b.venmoHandle || 'dink-society')}</strong> with your team name in the note. Your balance updates here once the league logs it.</p>`}`;
 
-      $id('pay-balance-btn').addEventListener('click', startBalancePayment);
+      // Card checkout only exists while Stripe is switched on (CARD_PAYMENTS_ENABLED).
+      $id('pay-balance-btn')?.addEventListener('click', startBalancePayment);
     }
 
     async function startBalancePayment() {

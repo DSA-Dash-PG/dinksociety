@@ -8,6 +8,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { paidTotal, balanceOf, leagueDiscount } from './lib/registrations.js';
+import { CARD_PAYMENTS_ENABLED, VENMO_HANDLE, venmoProfileUrl } from './lib/payment-terms.js';
 
 async function findRegistration(regStore, id) {
   const keys = [`confirmed/${id}.json`, `pending/${id}.json`, id];
@@ -61,6 +62,11 @@ export default async (req) => {
     paymentType: reg.paymentType || null,
     depositAmount: reg.depositAmount != null ? Number(reg.depositAmount) : null,
     balanceDueDate: reg.balanceDueDate || null,
+    // How the balance gets paid. Card (Stripe) is off unless CARD_PAYMENTS_ENABLED=true;
+    // otherwise the Billing card points the captain at the league's Venmo.
+    cardEnabled: CARD_PAYMENTS_ENABLED,
+    venmoHandle: VENMO_HANDLE,
+    venmoUrl: venmoProfileUrl(),
     currency: 'usd',
   }), { status: 200, headers });
 };
