@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cards · The Dink Society</title>
+  <meta name="description" content="Player of the Week, stat leaders, results and ladder cards — auto-filled from the season's numbers, ready to post." />
+  <meta property="og:title" content="Cards · The Dink Society" />
+  <meta property="og:description" content="Player of the Week, stat leaders, results and ladder cards — auto-filled from the season's numbers." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="The Dink Society" />
+  <meta property="og:url" content="https://dinksociety.app/cards" />
+  <meta property="og:image" content="https://dinksociety.app/.netlify/functions/og-image?p=cards" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="stylesheet" href="/css/shared.css" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})();</script>
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <script src="/js/season.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
+  <style>
+    /* ── Cards studio ─────────────────────────────────────────────────── */
+    :root{ --cd-mono:'IBM Plex Mono',ui-monospace,monospace; --cd-gold:#f0b429; --cd-red:#ed1c24; --cd-dim:#2c322c; --cd-dim2:#3a423a; }
+    #cd{ display:grid; grid-template-columns:320px 1fr; min-height:100vh; padding-top:64px; }
+    @media(max-width:960px){ #cd{ grid-template-columns:1fr; } #cd .rail{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--color-border); } }
+
+    /* rail */
+    #cd .rail{ border-right:1px solid var(--color-border); padding:22px 18px 40px; background:var(--color-surface); position:sticky; top:64px; height:calc(100vh - 64px); overflow:auto; }
+    #cd .rail h1{ font-size:26px; font-weight:800; text-transform:uppercase; margin:0 0 2px; line-height:1; letter-spacing:-.01em; }
+    #cd .rail .sub{ font-family:var(--cd-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-faint); margin-bottom:16px; }
+    #cd .grp{ font-family:var(--cd-mono); font-size:9px; letter-spacing:.16em; text-transform:uppercase; color:var(--color-text-faint); margin:16px 0 8px; }
+    #cd .tpl{ display:block; width:100%; text-align:left; border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); border-radius:9px; padding:10px 12px; margin-bottom:6px; cursor:pointer; font:600 13px/1.3 Inter,sans-serif; }
+    #cd .tpl small{ display:block; font-size:11px; color:var(--color-text-faint); font-weight:500; margin-top:2px; }
+    #cd .tpl.on{ border-color:var(--color-lime); color:var(--color-text); background:var(--color-lime-ghost); }
+    #cd .ctl{ display:flex; gap:6px; flex-wrap:wrap; }
+    #cd .ctl button{ border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); border-radius:999px; padding:6px 11px; font:700 11px Inter,sans-serif; cursor:pointer; }
+    #cd .ctl button.on{ background:var(--color-text); color:var(--color-bg); border-color:var(--color-text); }
+    #cd .field{ margin-top:10px; }
+    #cd .field label{ display:block; font-family:var(--cd-mono); font-size:9px; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-faint); margin-bottom:5px; }
+    #cd .field select, #cd .field textarea, #cd .field input{ width:100%; background:var(--color-bg); border:1px solid var(--color-border); color:var(--color-text); border-radius:8px; padding:9px 10px; font:500 13px/1.45 Inter,sans-serif; }
+    #cd .field textarea{ resize:vertical; }
+    #cd .drop{ border:1px dashed var(--color-border); border-radius:9px; padding:12px; text-align:center; color:var(--color-text-faint); font-size:12px; margin-top:10px; cursor:pointer; }
+    #cd .drop.has{ border-color:var(--color-teal); color:var(--color-teal); }
+    #cd .dl{ margin-top:16px; width:100%; border:0; background:var(--color-lime); color:#0e0e0e; border-radius:999px; padding:13px; font:800 13px Inter,sans-serif; text-transform:uppercase; letter-spacing:.06em; cursor:pointer; }
+    #cd .dl[disabled]{ opacity:.5; cursor:default; }
+    #cd .dl.sec{ background:transparent; border:1px solid var(--color-border); color:var(--color-text-muted); margin-top:8px; }
+    #cd .hint{ margin-top:14px; font-size:12px; color:var(--color-text-faint); line-height:1.5; }
+    #cd .status{ font-family:var(--cd-mono); font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:var(--color-text-faint); margin-top:10px; min-height:14px; }
+
+    /* stage */
+    #cd .stage{ padding:26px 22px 80px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+    #cd .cap{ font-family:var(--cd-mono); font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-faint); align-self:flex-start; }
+    #cd .frame{ position:relative; overflow:hidden; border-radius:6px; box-shadow:0 30px 80px rgba(0,0,0,.55); flex:none; background:#0e0e0e; }
+    #cd .frame.empty{ display:grid; place-items:center; color:var(--color-text-faint); font-size:13px; }
+
+    /* ── the card itself: fixed 1080 wide, dark always (it's a poster) ── */
+    .card{ position:absolute; top:0; left:0; transform-origin:0 0; width:1080px; padding:64px; display:flex; flex-direction:column; color:#f5f5f5; font-family:Inter,system-ui,sans-serif; background:#0e0e0e; -webkit-font-smoothing:antialiased; }
+    .card .photo{ position:absolute; inset:0; background:radial-gradient(900px 700px at 70% 20%,rgba(23,215,176,.20),transparent 60%),radial-gradient(700px 600px at 10% 90%,rgba(184,255,44,.14),transparent 60%),linear-gradient(180deg,#141a14 0%,#0e0e0e 100%); background-size:cover; background-position:center top; }
+    .card .fade{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(14,14,14,.10) 26%,rgba(14,14,14,.92) 60%,#0e0e0e 76%); }
+    .card .fade.top{ background:linear-gradient(180deg,rgba(14,14,14,.55),#0e0e0e 42%); }
+    .card > *{ position:relative; }
+    .card .disp{ font-weight:800; text-transform:uppercase; line-height:.92; letter-spacing:-.025em; }
+    .card .mono{ font-family:var(--cd-mono); font-size:19px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#9aa39a; }
+    .card .mono b{ color:#f5f5f5; font-weight:600; }
+    .card .lime{ color:#b8ff2c; } .card .teal{ color:#17d7b0; } .card .gold{ color:var(--cd-gold); } .card .faint{ color:#5f675f; }
+    .card .hdr{ display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+    .card .brand{ font-weight:800; text-transform:uppercase; font-size:22px; line-height:1; text-align:right; letter-spacing:-.01em; white-space:nowrap; }
+    .card .brand b{ color:#b8ff2c; }
+    .card .brand small{ display:block; font-family:var(--cd-mono); font-size:12px; letter-spacing:.22em; color:#5f675f; font-weight:600; margin-top:5px; }
+    .card .ftr{ margin-top:auto; display:flex; justify-content:space-between; align-items:flex-end; gap:20px; padding-top:28px; border-top:2px solid rgba(255,255,255,.08); }
+    .card .sd{ display:inline-block; height:56px; width:auto; border-radius:8px; }
+    .card .rank{ font-weight:800; font-size:190px; line-height:.8; color:var(--cd-gold); letter-spacing:-.06em; }
+    .card .rank small{ font-size:.28em; vertical-align:top; margin-left:2px; letter-spacing:0; }
+    .card .name{ font-size:88px; }
+    .card .name.long{ font-size:72px; }
+    .card .name.xl{ font-size:60px; }
+    .card .bars{ margin-top:30px; }
+    .card .bar{ display:grid; grid-template-columns:170px 1fr 170px; gap:26px; align-items:center; padding:11px 0; }
+    .card .bar .k{ font-family:var(--cd-mono); font-size:17px; letter-spacing:.16em; text-transform:uppercase; color:#9aa39a; }
+    .card .bar .t{ height:16px; background:rgba(255,255,255,.08); border-radius:3px; position:relative; overflow:hidden; }
+    .card .bar .t i{ position:absolute; top:0; bottom:0; left:0; background:#b8ff2c; border-radius:3px; }
+    .card .bar .t.diff i{ left:50%; } .card .bar .t.diff i.neg{ left:auto; right:50%; background:#ff5c47; }
+    .card .bar .v{ font-weight:800; font-size:48px; text-align:right; line-height:1; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+    .card .dots{ display:flex; gap:10px; flex-wrap:wrap; }
+    .card .dot{ width:30px; height:30px; border-radius:50%; background:var(--cd-dim); flex:none; }
+    .card .dot.w,.card .dot.h{ background:#b8ff2c; } .card .dot.a{ background:#17d7b0; } .card .dot.l{ background:var(--cd-dim2); } .card .dot.o{ background:transparent; border:3px solid var(--cd-dim2); }
+    .card .gap{ width:22px; flex:none; }
+    .card .blk{ width:52px; height:24px; border-radius:4px; background:#b8ff2c; flex:none; }
+    .card .blk.o{ background:transparent; border:3px solid var(--cd-dim2); }
+    .card .ctx{ font-size:28px; line-height:1.45; color:#f5f5f5; margin-top:28px; max-width:920px; font-weight:500; }
+    .card .ctx.m{ color:#9aa39a; }
+    .card .h2{ font-size:96px; margin-top:34px; }
+    .card .rows{ margin-top:30px; }
+    .card .row{ display:grid; grid-template-columns:56px 1fr 1fr 130px; gap:20px; align-items:center; padding:14px 0; border-bottom:2px solid rgba(255,255,255,.06); }
+    .card .row .n{ font-weight:800; font-size:38px; color:#5f675f; line-height:1; }
+    .card .row.top .n{ color:var(--cd-gold); }
+    .card .row .who{ font-weight:800; font-size:36px; text-transform:uppercase; line-height:1; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .card .row .who small{ display:block; font-family:var(--cd-mono); font-size:14px; letter-spacing:.12em; color:#5f675f; margin-top:6px; text-transform:uppercase; letter-spacing:.1em; }
+    .card .row .t{ height:16px; background:rgba(255,255,255,.08); border-radius:3px; position:relative; overflow:hidden; }
+    .card .row .t i{ position:absolute; top:0; bottom:0; left:0; background:#f5f5f5; border-radius:3px; }
+    .card .row.top .t i{ background:var(--cd-gold); }
+    .card .row .v{ font-weight:800; font-size:46px; text-align:right; line-height:1; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
+    .card .row.top .v{ color:var(--cd-gold); }
+    .card .mrow{ padding:24px 0; border-bottom:2px solid rgba(255,255,255,.06); }
+    .card .mrow:last-child{ border-bottom:0; }
+    .card .mrow .nm{ font-weight:800; font-size:40px; text-transform:uppercase; line-height:.95; display:flex; justify-content:space-between; align-items:baseline; gap:20px; letter-spacing:-.02em; }
+    .card .mrow .nm .s{ font-size:56px; flex:none; }
+    .card .mrow .nm .vs{ color:#5f675f; font-weight:500; margin:0 .2em; }
+    .card .mrow .dots{ margin-top:14px; }
+    .card .mrow .mono{ margin-top:12px; font-size:17px; }
+    .card .hl{ padding:24px 0; border-bottom:2px solid rgba(255,255,255,.06); }
+    .card .hl:last-child{ border-bottom:0; }
+    .card .hl .k{ font-family:var(--cd-mono); font-size:16px; letter-spacing:.16em; color:#b8ff2c; text-transform:uppercase; }
+    .card .hl .h{ font-weight:800; font-size:60px; text-transform:uppercase; line-height:.95; margin:8px 0 10px; letter-spacing:-.03em; }
+    .card .hl p{ margin:0; font-size:26px; line-height:1.4; color:#9aa39a; font-weight:500; }
+    .card .hl p b{ color:#f5f5f5; font-weight:600; }
+    .card .cbr{ display:grid; gap:8px; align-items:center; }
+    .card .cbr .cd{ width:24px; height:24px; border-radius:50%; background:var(--cd-dim); }
+    .card .cbr .cd.on{ background:#b8ff2c; } .card .cbr .cd.top{ background:var(--cd-gold); }
+    .card .av{ width:150px; height:150px; border-radius:50%; object-fit:cover; border:4px solid #b8ff2c; background:#1d1d1d; flex:none; }
+  </style>
+</head>
+<body>
+  <div data-partial="nav"></div>
+
+  <main id="cd">
+    <aside class="rail">
+      <h1>Cards</h1>
+      <div class="sub">Auto-filled from the numbers · ready to post</div>
+
+      <div class="grp">League</div>
+      <button class="tpl" data-c="potw">SuprDupr Player of the Week<small>one card per winner · men's + women's</small></button>
+      <button class="tpl" data-c="leaders">Stat leaders<small>DSR · Diff · Pts · top six</small></button>
+      <button class="tpl" data-c="results">How it ended<small>every match, dots + match points</small></button>
+      <button class="tpl" data-c="totw">Team of the Week<small>the night in 12 dots</small></button>
+      <button class="tpl" data-c="highlights">Highlights<small>auto-picked stat lines</small></button>
+      <div class="grp">Ladders</div>
+      <button class="tpl" data-c="podium">Ladder night podium<small>filled blocks = wins, in round order</small></button>
+      <button class="tpl" data-c="courts">Court by round<small>who held court 1, who climbed</small></button>
+
+      <div class="grp">Options</div>
+      <div class="ctl" id="cd-ratio"><button data-r="45" class="on">4:5</button><button data-r="11">1:1</button><button data-r="916">9:16</button></div>
+      <div class="ctl" id="cd-gender" style="margin-top:6px"><button data-g="men" class="on">Men's</button><button data-g="women">Women's</button></div>
+      <div class="ctl" id="cd-metric" style="margin-top:6px"><button data-m="dsr" class="on">DSR</button><button data-m="diff">Diff</button><button data-m="pts">Pts</button></div>
+      <div class="field" id="cd-weekf"><label>Week</label><select id="cd-week"></select></div>
+      <div class="field" id="cd-eventf" style="display:none"><label>Ladder night</label><select id="cd-event"></select></div>
+      <div class="field" id="cd-whof" style="display:none"><label>Player</label><select id="cd-who"></select></div>
+      <div class="field"><label>Context line · auto-written, editable</label><textarea id="cd-ctx" rows="3"></textarea></div>
+      <div class="drop" id="cd-drop">Drop a photo · or click to choose<input type="file" id="cd-file" accept="image/*" hidden></div>
+      <button class="dl" id="cd-dl">Download PNG</button>
+      <button class="dl sec" id="cd-link">Copy link to this card</button>
+      <div class="status" id="cd-status"></div>
+      <div class="hint">Photos come from the player's profile when they have one; drop a different one anytime. Nothing you change here is saved — the link always regenerates the card from the live numbers.</div>
+    </aside>
+
+    <section class="stage">
+      <div class="cap" id="cd-cap">Preview · exports at 1080 × 1350</div>
+      <div class="frame empty" id="cd-frame">Loading…</div>
+    </section>
+  </main>
+
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+
+  <script>
+  (function () {
+    'use strict';
+    var $ = function (id) { return document.getElementById(id); };
+    var qs = new URLSearchParams(location.search);
+    var S = {
+      card: qs.get('card') || 'potw',
+      ratio: qs.get('ratio') || '45',
+      gender: qs.get('g') || 'men',
+      metric: qs.get('metric') || 'dsr',
+      week: Number(qs.get('week')) || null,
+      who: qs.get('who') || null,
+      event: qs.get('event') || null,
+      ctx: qs.get('ctx') || null,      // a hand-edited context line survives in the link
+      photo: null,                     // dropped photo (data URL), never saved
+    };
+    var SEASON = { id: 'circuit-i', code: 'I', name: 'Season 1' };
+    var LB = null, GD = {}, LADDERS = null, NIGHT = {};
+    var H = { '45': 1350, '11': 1080, '916': 1920 };
+
+    function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function short(n) { var p = String(n || '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[p.length - 1][0] + '.' : (p[0] || ''); }
+    function first(n) { return String(n || '').trim().split(/\s+/)[0] || ''; }
+    function fmtDate(iso, o) { if (!iso) return ''; var d = new Date(iso); if (isNaN(d)) { d = new Date(iso + 'T12:00:00'); if (isNaN(d)) return ''; } return d.toLocaleDateString('en-US', o || { weekday: 'short', month: 'short', day: 'numeric' }); }
+    function signed(n) { n = Number(n) || 0; return (n > 0 ? '+' : '') + n; }
+    function status(t) { $('cd-status').textContent = t || ''; }
+    function slug(s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+    function seasonNo() { var R = { I: 1, II: 2, III: 3, IV: 4, V: 5, VI: 6, VII: 7, VIII: 8, IX: 9, X: 10 }; return R[SEASON.code] || SEASON.code; }
+    function setCtx(v) { var el = $('cd-ctx'); if (el.value !== v) el.value = v; }
+
+    // ── data ──
+    function loadLB() {
+      if (LB) return Promise.resolve(LB);
+      return fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(SEASON.code)).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { LB = d || { empty: true }; return LB; });
+    }
+    function loadGD(week) {
+      var k = String(week || 'pick');
+      if (GD[k]) return Promise.resolve(GD[k]);
+      return fetch('/.netlify/functions/public-gameday?season=' + encodeURIComponent(SEASON.id) + (week ? '&week=' + week : '')).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { GD[k] = d || { matches: [] }; if (d && d.week) GD[String(d.week)] = d; return GD[k]; });
+    }
+    function loadLadders() {
+      if (LADDERS) return Promise.resolve(LADDERS);
+      return fetch('/.netlify/functions/public-ladders').then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { LADDERS = (d && d.completed) || []; return LADDERS; });
+    }
+    function loadNight(id) {
+      if (NIGHT[id]) return Promise.resolve(NIGHT[id]);
+      return fetch('/.netlify/functions/public-ladder-night?event=' + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { NIGHT[id] = d; return d; });
+    }
+
+    // ── ladder night → per-player rounds ──
+    function nightStats(n) {
+      var by = {};
+      var rounds = (n && n.play && n.play.rounds) || [];
+      var nCourts = Math.max(1, (n && n.event && n.event.courts) || 0, rounds.reduce(function (m, r) { return Math.max(m, (r.courts || []).length); }, 0));
+      rounds.forEach(function (r, ri) {
+        (r.courts || []).forEach(function (c) {
+          if (!c.score || c.score.t1 == null || c.score.t2 == null) return;
+          var w1 = c.score.t1 > c.score.t2;
+          var courtNo = Number(c.court) || ((r.courts || []).indexOf(c) + 1);
+          [['team1', w1, c.score.t1, c.score.t2], ['team2', !w1, c.score.t2, c.score.t1]].forEach(function (t) {
+            (c[t[0]] || []).forEach(function (pl) {
+              var k = pl.id || pl.name; if (!by[k]) by[k] = { id: pl.id, name: pl.name, gender: pl.gender, w: 0, l: 0, pf: 0, pa: 0, rounds: [] };
+              var p = by[k]; if (t[1]) p.w++; else p.l++; p.pf += t[2]; p.pa += t[3];
+              p.rounds[ri] = { court: courtNo, win: t[1] };
+            });
+          });
+        });
+      });
+      var list = Object.keys(by).map(function (k) { return by[k]; });
+      list.forEach(function (p) { p.diff = p.pf - p.pa; });
+      list.sort(function (a, b) { return (b.w - a.w) || (b.diff - a.diff); });
+      return { players: list, rounds: rounds.length, courts: nCourts, courtNames: n && n.play && n.play.courtNames };
+    }
+
+    // ── shared chrome ──
+    function brand(sub) { return '<div class="brand">The Dink<b>Society</b><small>' + esc(sub || 'dinksociety.app') + '</small></div>'; }
+    function hdr(left, sub) { return '<div class="hdr"><div class="mono">' + left + '</div>' + brand(sub) + '</div>'; }
+    function sdLogo() { return '<img class="sd" src="/img/suprdupr.png" alt="SuprDupr">'; }
+    function photoLayer(url, ph) { return '<div class="photo"' + (url ? ' style="background-image:url(' + esc(url) + ')"' : '') + '></div>'; }
+    function dotsFrom(games, total) {
+      var out = ''; for (var i = 0; i < total; i++) { var g = games[i]; out += '<span class="dot ' + (g == null ? 'o' : g ? 'w' : 'l') + '"></span>'; } return out;
+    }
+
+    // ── context writers (templated; edit in the box) ──
+    function ctxPotw(w, wk) {
+      var bits = [];
+      if (w.l === 0 && w.w > 0) bits.push('a perfect ' + w.w + '–0 night');
+      else bits.push(w.w + '–' + w.l + ' on the night');
+      if (w.diff != null) bits.push(signed(w.diff) + ' on points');
+      if (w.dsr != null) bits.push('a ' + w.dsr + ' DSR, top of the ' + (S.gender === 'women' ? "women's" : "men's") + ' board');
+      return first(w.name) + ' turned in ' + bits.join(', ') + ' in Week ' + wk + '.';
+    }
+    function ctxTotw(t, m) {
+      var p = mp(m), home = m.home.id === t.id;
+      var opp = home ? m.away.name : m.home.name;
+      var g = home ? m.gamesHome + '–' + m.gamesAway : m.gamesAway + '–' + m.gamesHome;
+      var pts = home ? m.pointsHome + '–' + m.pointsAway : m.pointsAway + '–' + m.pointsHome;
+      return t.name + ' beat ' + opp + ' ' + (home ? p[0] + '–' + p[1] : p[1] + '–' + p[0]) + ', taking ' + g + ' games and outscoring them ' + pts + '.';
+    }
+
+    // ── league helpers ──
+    function mp(m) { if (m.mpHome != null && m.mpAway != null) return [m.mpHome, m.mpAway]; return [(m.round1 && m.round1.homePoints || 0) + (m.round2 && m.round2.homePoints || 0), (m.round1 && m.round1.awayPoints || 0) + (m.round2 && m.round2.awayPoints || 0)]; }
+    var SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
+    function matchDots(m) {
+      var by = {}; (m.games || []).forEach(function (g) { by[g.slot] = g.homeWin ? 'h' : 'a'; });
+      return SLOTS.map(function (s, i) { return (i === 6 ? '<span class="gap"></span>' : '') + '<span class="dot ' + (by[s] || 'o') + '"></span>'; }).join('');
+    }
+    function weekPerf(wk) { return ((LB && LB.weeklyTopPerformers) || []).find(function (w) { return Number(w.week) === Number(wk); }) || null; }
+    function teamOfWeek(gd) {
+      var best = null;
+      (gd.matches || []).forEach(function (m) {
+        if (!(m.games || []).length) return;
+        var p = mp(m);
+        [[m.home, p[0], p[1], m.gamesHome - m.gamesAway, m.pointsHome - m.pointsAway], [m.away, p[1], p[0], m.gamesAway - m.gamesHome, m.pointsAway - m.pointsHome]].forEach(function (t) {
+          var c = { id: t[0].id, name: t[0].name, emoji: t[0].emoji, mp: t[1], mpa: t[2], gd: t[3], pd: t[4], match: m };
+          if (!best || c.mp > best.mp || (c.mp === best.mp && c.gd > best.gd) || (c.mp === best.mp && c.gd === best.gd && c.pd > best.pd)) best = c;
+        });
+      });
+      return best;
+    }
+
+    // ── renderers: each returns inner HTML for .card ──
+    function rPotw(wk, gd) {
+      var perf = weekPerf(wk); if (!perf) return null;
+      var list = S.gender === 'women' ? perf.women : perf.men;
+      var w = (S.who && list.find(function (x) { return slug(x.name) === S.who || x.playerId === S.who; })) || list[0];
+      if (!w) return null;
+      var gamesLine = [];
+      // per-game W/L in order from the box scores (this player's confirmed games)
+      (gd.matches || []).forEach(function (m) { (m.games || []).forEach(function (g) {
+        var onH = (g.homePlayers || []).some(function (n) { return n === w.name; }), onA = (g.awayPlayers || []).some(function (n) { return n === w.name; });
+        if (onH) gamesLine.push(g.homeWin); else if (onA) gamesLine.push(!g.homeWin);
+      }); });
+      if (!gamesLine.length) gamesLine = Array(w.w).fill(true).concat(Array(w.l).fill(false));
+      var photo = S.photo || w.photoUrl || null;
+      var ctx = S.ctx != null ? S.ctx : ctxPotw(w, wk);
+      setCtx(ctx);
+      var maxPts = Math.max(w.ps || 0, 44);
+      return photoLayer(photo) + '<div class="fade"></div>' +
+        hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Player of the Week</b>') +
+        '<div style="margin-top:auto;display:flex;align-items:flex-end;gap:26px"><div class="rank">1<small>st</small></div><div style="min-width:0">' +
+          '<div class="disp name' + (w.name.length > 16 ? (w.name.length > 22 ? ' xl' : ' long') : '') + '">' + esc(w.name) + '</div>' +
+          '<div class="mono" style="margin-top:12px">' + esc(w.teamName || '') + ' · ' + (S.gender === 'women' ? "Women's" : "Men's") + ' · <span class="lime">SuprDupr Player of the Week</span></div></div></div>' +
+        '<div class="bars">' +
+          '<div class="bar"><span class="k">Games</span><div class="dots">' + dotsFrom(gamesLine, gamesLine.length) + '</div><span class="v">' + w.w + '–' + w.l + '</span></div>' +
+          '<div class="bar"><span class="k">DSR</span><div class="t"><i style="width:' + Math.min(100, w.dsr || 0) + '%"></i></div><span class="v">' + (w.dsr != null ? w.dsr : '—') + '</span></div>' +
+          '<div class="bar"><span class="k">Point diff</span><div class="t diff"><i class="' + ((w.diff || 0) < 0 ? 'neg' : '') + '" style="width:' + Math.min(50, Math.abs(w.diff || 0) / 44 * 50) + '%"></i></div><span class="v">' + signed(w.diff) + '</span></div>' +
+          '<div class="bar"><span class="k">Points</span><div class="t"><i style="width:' + Math.min(100, (w.ps || 0) / maxPts * 100) + '%"></i></div><span class="v">' + (w.ps != null ? w.ps : '—') + '</span></div>' +
+        '</div>' +
+        '<div class="ctx">' + esc(ctx) + '</div>' +
+        '<div class="ftr"><div class="mono">Presented by</div>' + sdLogo() + '</div>';
+    }
+
+    function rLeaders(wk) {
+      var perf = weekPerf(wk); if (!perf || !perf.leaders) return null;
+      var list = ((perf.leaders[S.gender === 'women' ? 'women' : 'men'] || {})[S.metric]) || [];
+      if (!list.length) return null;
+      var key = S.metric === 'pts' ? 'ps' : S.metric;
+      var label = S.metric === 'dsr' ? 'DSR' : S.metric === 'diff' ? 'Point diff' : 'Points';
+      var top = Math.max.apply(null, list.map(function (p) { return Math.abs(Number(p[key]) || 0); })) || 1;
+      var ctx = S.ctx != null ? S.ctx : (short(list[0].name) + ' leads the ' + (S.gender === 'women' ? "women's" : "men's") + ' ' + label.toLowerCase() + ' board for Week ' + wk + '.');
+      setCtx(ctx);
+      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+        hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Leaders</b>') +
+        '<div class="disp h2">' + esc(label) + '<br><span class="lime">Top ' + list.length + '</span></div>' +
+        '<div class="mono" style="margin-top:12px">' + (S.gender === 'women' ? "Women's" : "Men's") + ' · Week ' + wk + '</div>' +
+        '<div class="rows">' + list.map(function (p, i) {
+          var v = Number(p[key]) || 0;
+          return '<div class="row' + (i === 0 ? ' top' : '') + '"><span class="n">' + (i + 1) + '</span><span class="who">' + esc(short(p.name)) + '<small>' + esc(p.teamName || '') + ' · ' + p.w + '–' + p.l + '</small></span><div class="t"><i style="width:' + Math.max(4, Math.abs(v) / top * 100) + '%"></i></div><span class="v">' + (S.metric === 'diff' ? signed(v) : v) + '</span></div>';
+        }).join('') + '</div>' +
+        '<div class="ctx m">' + esc(ctx) + '</div>' +
+        '<div class="ftr"><div class="mono">' + (S.metric === 'dsr' ? 'DSR · Dink Society Rating' : 'Full leaderboard · dinksociety.app/leaderboard') + '</div>' + sdLogo() + '</div>';
+    }
+
+    function rResults(wk, gd) {
+      var ms = (gd.matches || []).filter(function (m) { return (m.games || []).length; }); if (!ms.length) return null;
+      var first = ms.map(function (m) { return m.scheduledAt; }).filter(Boolean).sort()[0];
+      var ctx = S.ctx != null ? S.ctx : '';
+      setCtx(ctx);
+      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+        hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Results</b>') +
+        '<div class="disp h2">How it<br><span class="lime">ended</span></div>' +
+        '<div class="mono" style="margin-top:12px">' + esc(fmtDate(first)) + (gd.venue ? ' · ' + esc(gd.venue) : '') + ' · <span class="lime">●</span> home <span class="teal">●</span> away</div>' +
+        '<div style="margin-top:26px">' + ms.map(function (m) {
+          var p = mp(m);
+          return '<div class="mrow"><div class="nm"><span><span class="lime">' + esc(m.home.name) + '</span><span class="vs">v</span>' + esc(m.away.name) + '</span><span class="s"><span class="lime">' + p[0] + '</span>–' + p[1] + '</span></div>' +
+            '<div class="dots">' + matchDots(m) + '</div>' +
+            '<div class="mono">Games <b>' + m.gamesHome + '–' + m.gamesAway + '</b> · Rally <b>' + m.pointsHome + '–' + m.pointsAway + '</b></div></div>';
+        }).join('') + '</div>' +
+        (ctx ? '<div class="ctx m">' + esc(ctx) + '</div>' : '') +
+        '<div class="ftr"><div class="mono">Full board · dinksociety.app/live</div><div class="mono faint">One dot per game</div></div>';
+    }
+
+    function rTotw(wk, gd) {
+      var t = teamOfWeek(gd); if (!t) return null;
+      var m = t.match, home = m.home.id === t.id;
+      var ctx = S.ctx != null ? S.ctx : ctxTotw(t, m);
+      setCtx(ctx);
+      var g = home ? [m.gamesHome, m.gamesAway] : [m.gamesAway, m.gamesHome];
+      var pd = home ? m.pointsHome - m.pointsAway : m.pointsAway - m.pointsHome;
+      var perf = weekPerf(wk), potw = [];
+      if (perf) { (perf.men || []).slice(0, 1).concat((perf.women || []).slice(0, 1)).forEach(function (w) { if (w.teamId === t.id || w.teamName === t.name) potw.push(short(w.name)); }); }
+      return photoLayer(S.photo) + '<div class="fade"></div>' +
+        hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Team of the Week</b>') +
+        '<div style="margin-top:auto"><div class="mono lime" style="font-size:22px">' + (t.emoji ? esc(t.emoji) + ' ' : '') + 'Team of the Week</div>' +
+          '<div class="disp" style="font-size:' + (t.name.length > 14 ? 96 : 120) + 'px;margin-top:10px">' + esc(t.name) + '</div>' +
+          '<div class="mono" style="margin-top:14px">Beat ' + esc(home ? m.away.name : m.home.name) + ' <b>' + t.mp + '–' + t.mpa + '</b> · ' + g[0] + ' of 12 games · ' + (home ? m.pointsHome + '–' + m.pointsAway : m.pointsAway + '–' + m.pointsHome) + ' on points</div>' +
+          '<div class="dots" style="margin-top:26px">' + matchDots(home ? m : { games: (m.games || []).map(function (x) { return { slot: x.slot, homeWin: !x.homeWin }; }) }) + '</div></div>' +
+        '<div class="bars" style="margin-top:30px">' +
+          '<div class="bar"><span class="k">Match pts</span><div class="t"><i style="width:' + (t.mp / 4 * 100) + '%"></i></div><span class="v">' + t.mp + '–' + t.mpa + '</span></div>' +
+          '<div class="bar"><span class="k">Games</span><div class="t"><i style="width:' + (g[0] / 12 * 100) + '%"></i></div><span class="v">' + g[0] + '–' + g[1] + '</span></div>' +
+          '<div class="bar"><span class="k">Point diff</span><div class="t diff"><i class="' + (pd < 0 ? 'neg' : '') + '" style="width:' + Math.min(50, Math.abs(pd) / 80 * 50) + '%"></i></div><span class="v">' + signed(pd) + '</span></div>' +
+        '</div>' +
+        '<div class="ctx m">' + esc(ctx) + (potw.length ? ' ' + potw.join(' and ') + ' took Player of the Week on the same night.' : '') + '</div>' +
+        '<div class="ftr"><div class="mono">Standings · dinksociety.app/standings</div>' + brand() + '</div>';
+    }
+
+    function rHighlights(wk, gd) {
+      var ms = (gd.matches || []).filter(function (m) { return (m.games || []).length; }); if (!ms.length) return null;
+      var games = [];
+      ms.forEach(function (m) { (m.games || []).forEach(function (g) { games.push({ m: m, g: g, margin: Math.abs(g.home - g.away), win: g.homeWin ? g.homePlayers : g.awayPlayers, lose: g.homeWin ? g.awayPlayers : g.homePlayers, sc: g.homeWin ? g.home + '–' + g.away : g.away + '–' + g.home, loserScore: Math.min(g.home, g.away) }); }); });
+      var items = [];
+      var pickles = games.filter(function (x) { return x.loserScore === 0; });
+      if (pickles.length) { var p = pickles[0]; items.push({ k: pickles.length === 1 ? 'Only pickle of the night' : pickles.length + ' pickles · here\'s one', h: p.sc, p: '<b>' + esc(p.win.map(short).join(' & ')) + '</b> over ' + esc(p.lose.map(short).join(' & ')) + ', R' + p.g.round + ' ' + (p.g.type === 'WD' ? "women's" : p.g.type === 'MD' ? "men's" : 'mixed') + '.' }); }
+      var perf = weekPerf(wk);
+      if (perf) { var all = (perf.men || []).concat(perf.women || []).sort(function (a, b) { return b.dsr - a.dsr; }); if (all[0]) items.push({ k: 'Highest DSR · either division', h: String(all[0].dsr), p: '<b>' + esc(all[0].name) + '</b> — ' + all[0].w + '–' + all[0].l + ', ' + signed(all[0].diff) + ' on points for ' + esc(all[0].teamName || '') + '.' }); }
+      var tight = games.filter(function (x) { return x.margin > 0; }).sort(function (a, b) { return a.margin - b.margin || b.loserScore - a.loserScore; })[0];
+      if (tight) items.push({ k: 'Tightest game', h: tight.sc, p: '<b>' + esc(tight.win.map(short).join(' & ')) + '</b> held off ' + esc(tight.lose.map(short).join(' & ')) + (tight.m.courtA ? ' on Court ' + tight.m.courtA : '') + '.' });
+      var big = ms.slice().sort(function (a, b) { return Math.abs(b.pointsHome - b.pointsAway) - Math.abs(a.pointsHome - a.pointsAway); })[0];
+      if (big) { var p2 = mp(big), hw = big.pointsHome >= big.pointsAway; items.push({ k: 'Widest margin', h: (hw ? p2[0] + '–' + p2[1] : p2[1] + '–' + p2[0]), p: '<b>' + esc(hw ? big.home.name : big.away.name) + '</b> over ' + esc(hw ? big.away.name : big.home.name) + ', ' + (hw ? big.gamesHome + '–' + big.gamesAway : big.gamesAway + '–' + big.gamesHome) + ' in games and ' + signed(Math.abs(big.pointsHome - big.pointsAway)) + ' on points.' }); }
+      var ctx = S.ctx != null ? S.ctx : ''; setCtx(ctx);
+      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+        hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Highlights</b>') +
+        '<div class="disp h2">Highlights</div>' +
+        '<div class="mono" style="margin-top:10px">' + games.length + ' games · ' + ms.length + ' matches · one night</div>' +
+        '<div style="margin-top:16px">' + items.slice(0, 4).map(function (it) { return '<div class="hl"><div class="k">' + esc(it.k) + '</div><div class="h">' + esc(it.h) + '</div><p>' + it.p + '</p></div>'; }).join('') + '</div>' +
+        (ctx ? '<div class="ctx m">' + esc(ctx) + '</div>' : '') +
+        '<div class="ftr"><div class="mono">Read The Drop · dinksociety.app/drop</div>' + brand() + '</div>';
+    }
+
+    function rPodium(n) {
+      var st = nightStats(n); if (!st.players.length) return null;
+      var top = st.players.slice(0, 8);
+      var ev = n.event || {};
+      var ctx = S.ctx != null ? S.ctx : (st.players.length + ' players · ' + st.rounds + ' rounds · filled blocks are wins, in round order.');
+      setCtx(ctx);
+      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+        hdr('Ladders · ' + esc(fmtDate(ev.date)) + ' · <b>Final ladder</b>', 'dinksociety.app/ladders') +
+        '<div class="disp h2">' + esc(ev.name || 'The ladder') + '<br><span class="lime">Top ' + top.length + '</span></div>' +
+        '<div class="mono" style="margin-top:12px">' + (ev.place ? esc(ev.place) + ' · ' : '') + st.players.length + ' players · ' + st.rounds + ' rounds</div>' +
+        '<div class="rows">' + top.map(function (p, i) {
+          var blocks = ''; for (var r = 0; r < st.rounds; r++) { var x = p.rounds[r]; blocks += '<span class="blk' + (x ? (x.win ? '' : ' o') : ' o') + '"' + (x ? '' : ' style="opacity:.35"') + '></span>'; }
+          return '<div class="row' + (i === 0 ? ' top' : '') + '" style="grid-template-columns:56px 1fr auto 130px"><span class="n">' + (i + 1) + '</span><span class="who">' + esc(short(p.name)) + '<small>' + signed(p.diff) + '</small></span><div class="dots" style="gap:8px">' + blocks + '</div><span class="v">' + p.w + '–' + p.l + '</span></div>';
+        }).join('') + '</div>' +
+        '<div class="ctx m">' + esc(ctx) + '</div>' +
+        '<div class="ftr"><div class="mono">Next ladder · dinksociety.app/ladders</div>' + brand('dinksociety.app/ladders') + '</div>';
+    }
+
+    function rCourts(n) {
+      var st = nightStats(n); if (!st.players.length || st.rounds < 2) return null;
+      var ev = n.event || {};
+      // The three most interesting climbs: the top finisher, the biggest riser, the biggest faller.
+      var withArc = st.players.filter(function (p) { return p.rounds.filter(Boolean).length >= 2; }).map(function (p) {
+        var rs = p.rounds.filter(Boolean); var top1 = rs.filter(function (x) { return x.court === 1; }).length;
+        var startC = rs[0].court, endC = rs[rs.length - 1].court, worst = Math.max.apply(null, rs.map(function (x) { return x.court; }));
+        var story = top1 >= Math.ceil(st.rounds * .75) ? 'Court 1 in ' + top1 + ' of ' + st.rounds + ' rounds' : endC < startC ? 'Court ' + startC + ' to Court ' + endC : worst > endC ? 'Fell to ' + worst + ', climbed back to ' + endC : 'Held Court ' + endC;
+        return { p: p, top1: top1, climb: startC - endC, story: story };
+      });
+      var picks = []; var seen = {};
+      var add = function (x) { if (x && !seen[x.p.name]) { seen[x.p.name] = 1; picks.push(x); } };
+      add(withArc.slice().sort(function (a, b) { return b.top1 - a.top1; })[0]);
+      add(withArc.slice().sort(function (a, b) { return b.climb - a.climb; })[0]);
+      add(withArc.slice().sort(function (a, b) { return (b.p.w - a.p.w); }).filter(function (x) { return !seen[x.p.name]; })[0]);
+      var ctx = S.ctx != null ? S.ctx : 'Winners move up a court, losers move down.'; setCtx(ctx);
+      var cn = function (c) { return (st.courtNames && st.courtNames[c - 1]) ? String(st.courtNames[c - 1]) : 'C' + c; };
+      var cols = 'grid-template-columns:70px repeat(' + st.rounds + ',34px)';
+      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+        hdr('Ladders · ' + esc(fmtDate(ev.date)) + ' · <b>Court by round</b>', 'dinksociety.app/ladders') +
+        '<div class="disp h2">Court by<br><span class="lime">round</span></div>' +
+        '<div class="mono" style="margin-top:12px">' + esc(ctx) + '</div>' +
+        '<div style="margin-top:30px">' + picks.map(function (x) {
+          var out = '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:20px"><span class="disp" style="font-size:40px;color:var(--cd-gold)">' + esc(short(x.p.name)) + '</span><span style="font-size:22px;color:#9aa39a">' + esc(x.story) + '</span></div><div class="cbr" style="' + cols + ';margin-bottom:30px">';
+          for (var c = 1; c <= st.courts; c++) { out += '<span class="mono" style="font-size:13px;color:#5f675f;line-height:24px;white-space:nowrap;overflow:hidden">' + esc(cn(c)) + '</span>'; for (var r = 0; r < st.rounds; r++) { var rr = x.p.rounds[r]; var on = rr && rr.court === c; out += '<span class="cd' + (on ? (c === 1 ? ' top' : ' on') : '') + '"></span>'; } }
+          return out + '</div>';
+        }).join('') +
+        '<div class="cbr" style="' + cols + '"><span></span>' + Array.apply(null, Array(st.rounds)).map(function (_, i) { return '<span class="mono" style="font-size:13px;color:#5f675f;text-align:center">' + (i + 1) + '</span>'; }).join('') + '</div></div>' +
+        '<div class="ftr"><div class="mono">' + esc(cn(1)) + ' is the top court</div>' + brand('dinksociety.app/ladders') + '</div>';
+    }
+
+    // ── controls ──
+    var LEAGUE = { potw: 1, leaders: 1, results: 1, totw: 1, highlights: 1 };
+    function syncControls() {
+      document.querySelectorAll('#cd .tpl').forEach(function (b) { b.classList.toggle('on', b.dataset.c === S.card); });
+      document.querySelectorAll('#cd-ratio button').forEach(function (b) { b.classList.toggle('on', b.dataset.r === S.ratio); });
+      document.querySelectorAll('#cd-gender button').forEach(function (b) { b.classList.toggle('on', b.dataset.g === S.gender); });
+      document.querySelectorAll('#cd-metric button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === S.metric); });
+      $('cd-gender').style.display = (S.card === 'potw' || S.card === 'leaders') ? '' : 'none';
+      $('cd-metric').style.display = S.card === 'leaders' ? '' : 'none';
+      $('cd-weekf').style.display = LEAGUE[S.card] ? '' : 'none';
+      $('cd-eventf').style.display = LEAGUE[S.card] ? 'none' : '';
+      $('cd-whof').style.display = S.card === 'potw' ? '' : 'none';
+      $('cd-cap').textContent = 'Preview · exports at 1080 × ' + H[S.ratio];
+    }
+    function writeUrl() {
+      var u = new URL(location.href); var p = u.searchParams;
+      p.set('card', S.card); p.set('ratio', S.ratio);
+      if (LEAGUE[S.card]) { if (S.week) p.set('week', S.week); p.delete('event'); } else { if (S.event) p.set('event', S.event); p.delete('week'); }
+      if (S.card === 'potw' || S.card === 'leaders') p.set('g', S.gender); else p.delete('g');
+      if (S.card === 'leaders') p.set('metric', S.metric); else p.delete('metric');
+      if (S.card === 'potw' && S.who) p.set('who', S.who); else p.delete('who');
+      if (S.ctx != null) p.set('ctx', S.ctx); else p.delete('ctx');
+      if (SEASON.id && SEASON.id !== 'circuit-i') p.set('season', SEASON.id);
+      history.replaceState(null, '', u);
+    }
+
+    function fillWeeks(gd) {
+      var sel = $('cd-week'), ws = (gd.weeks || []).filter(function (w) { return w.status !== 'upcoming'; });
+      if (!ws.length) ws = gd.week ? [{ week: gd.week, date: null }] : [];
+      sel.innerHTML = ws.map(function (w) { return '<option value="' + w.week + '">Week ' + w.week + (w.date ? ' · ' + fmtDate(w.date, { month: 'short', day: 'numeric' }) : '') + '</option>'; }).join('');
+      if (!S.week) S.week = ws.length ? ws[ws.length - 1].week : gd.week;
+      sel.value = S.week;
+    }
+    function fillEvents(list) {
+      var sel = $('cd-event');
+      sel.innerHTML = list.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(fmtDate(e.date, { month: 'short', day: 'numeric' })) + ' · ' + esc(e.name) + '</option>'; }).join('');
+      if (!S.event && list.length) S.event = list[0].id;
+      sel.value = S.event;
+    }
+    function fillWho(wk) {
+      var perf = weekPerf(wk), sel = $('cd-who');
+      var list = perf ? (S.gender === 'women' ? perf.women : perf.men) : [];
+      sel.innerHTML = list.map(function (w, i) { return '<option value="' + esc(slug(w.name)) + '">' + (i + 1) + '. ' + esc(w.name) + ' · ' + w.dsr + '</option>'; }).join('');
+      if (!S.who || !list.some(function (w) { return slug(w.name) === S.who; })) S.who = list.length ? slug(list[0].name) : null;
+      if (S.who) sel.value = S.who;
+    }
+
+    function show(html) {
+      var f = $('cd-frame'), h = H[S.ratio];
+      var maxW = Math.min(560, f.parentElement.clientWidth - 8), scale = maxW / 1080;
+      f.classList.remove('empty');
+      f.style.width = Math.round(1080 * scale) + 'px'; f.style.height = Math.round(h * scale) + 'px';
+      f.innerHTML = '<div class="card" id="cd-card" style="height:' + h + 'px;transform:scale(' + scale + ')">' + html + '</div>';
+      $('cd-dl').disabled = false;
+    }
+    function showEmpty(t) { var f = $('cd-frame'); f.className = 'frame empty'; f.style.width = '560px'; f.style.height = '360px'; f.textContent = t; $('cd-dl').disabled = true; }
+
+    function render() {
+      syncControls(); status('');
+      if (LEAGUE[S.card]) {
+        return loadLB().then(function () { return loadGD(S.week); }).then(function (gd) {
+          fillWeeks(gd);
+          if (String(gd.week) !== String(S.week)) return loadGD(S.week).then(function (g2) { return g2; });
+          return gd;
+        }).then(function (gd) {
+          if (S.card === 'potw') fillWho(S.week);
+          var html = S.card === 'potw' ? rPotw(S.week, gd) : S.card === 'leaders' ? rLeaders(S.week) : S.card === 'results' ? rResults(S.week, gd) : S.card === 'totw' ? rTotw(S.week, gd) : rHighlights(S.week, gd);
+          writeUrl();
+          if (!html) return showEmpty('Nothing to show for Week ' + S.week + ' yet — scores post once both captains confirm.');
+          show(html);
+        }).catch(function (e) { showEmpty('Could not load: ' + (e.message || e)); });
+      }
+      return loadLadders().then(function (list) {
+        fillEvents(list);
+        if (!S.event) { showEmpty('No finished ladder nights yet.'); return; }
+        return loadNight(S.event).then(function (n) {
+          var html = S.card === 'podium' ? rPodium(n) : rCourts(n);
+          writeUrl();
+          if (!html) return showEmpty('No scored rounds for that night.');
+          show(html);
+        });
+      }).catch(function (e) { showEmpty('Could not load: ' + (e.message || e)); });
+    }
+
+    // ── wiring ──
+    document.querySelectorAll('#cd .tpl').forEach(function (b) { b.addEventListener('click', function () { S.card = b.dataset.c; S.ctx = null; S.who = null; render(); }); });
+    $('cd-ratio').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.ratio = b.dataset.r; render(); });
+    $('cd-gender').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.gender = b.dataset.g; S.ctx = null; S.who = null; render(); });
+    $('cd-metric').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.metric = b.dataset.m; S.ctx = null; render(); });
+    $('cd-week').addEventListener('change', function () { S.week = Number(this.value); S.ctx = null; S.who = null; render(); });
+    $('cd-event').addEventListener('change', function () { S.event = this.value; S.ctx = null; render(); });
+    $('cd-who').addEventListener('change', function () { S.who = this.value; S.ctx = null; S.photo = null; render(); });
+    var ctxTimer = null;
+    $('cd-ctx').addEventListener('input', function () { S.ctx = this.value; clearTimeout(ctxTimer); ctxTimer = setTimeout(render, 250); });
+    $('cd-drop').addEventListener('click', function () { $('cd-file').click(); });
+    $('cd-file').addEventListener('change', function () { readPhoto(this.files && this.files[0]); });
+    ['dragover', 'dragenter'].forEach(function (ev) { $('cd-drop').addEventListener(ev, function (e) { e.preventDefault(); }); });
+    $('cd-drop').addEventListener('drop', function (e) { e.preventDefault(); readPhoto(e.dataTransfer.files && e.dataTransfer.files[0]); });
+    function readPhoto(file) {
+      if (!file || !/^image\//.test(file.type)) return;
+      var rd = new FileReader();
+      rd.onload = function () { S.photo = rd.result; $('cd-drop').classList.add('has'); $('cd-drop').firstChild.textContent = 'Photo set · click to change'; render(); };
+      rd.readAsDataURL(file);
+    }
+    $('cd-link').addEventListener('click', function () {
+      writeUrl();
+      navigator.clipboard.writeText(location.href).then(function () { status('Link copied'); }).catch(function () { status(location.href); });
+    });
+    $('cd-dl').addEventListener('click', function () {
+      var node = $('cd-card'); if (!node || !window.htmlToImage) return;
+      status('Rendering…'); $('cd-dl').disabled = true;
+      // Capture at natural size (the scale transform lives on the node; strip it for the render).
+      var prev = node.style.transform; node.style.transform = 'none';
+      htmlToImage.toPng(node, { pixelRatio: 2, width: 1080, height: H[S.ratio], cacheBust: true, style: { transform: 'none' } })
+        .then(function (url) {
+          var a = document.createElement('a');
+          a.download = 'dinksociety-' + S.card + (S.week ? '-week' + S.week : '') + (S.who ? '-' + S.who : '') + '.png';
+          a.href = url; a.click(); status('Saved');
+        })
+        .catch(function (e) { status('Export failed: ' + (e.message || e)); })
+        .then(function () { node.style.transform = prev; $('cd-dl').disabled = false; });
+    });
+    window.addEventListener('resize', function () { if ($('cd-card')) render(); });
+
+    // Season first (?season= pins one), then the card the URL asked for.
+    var pinned = qs.get('season');
+    var ready = window.dsSeason ? window.dsSeason().then(function (Sx) {
+      if (!Sx) return;
+      if (pinned) { var hit = (Sx.all || []).find(function (s) { return s.id === pinned || String(s.circuit || '').toUpperCase() === String(pinned).toUpperCase(); }); if (hit) { SEASON = { id: hit.id, code: String(hit.circuit || 'I').toUpperCase(), name: hit.name }; return; } }
+      SEASON = { id: Sx.id, code: String(Sx.circuit || 'I').toUpperCase(), name: Sx.name };
+    }).catch(function () {}) : Promise.resolve();
+    ready.then(render);
+  })();
+  </script>
+</body>
+</html>

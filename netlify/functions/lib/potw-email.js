@@ -255,6 +255,7 @@ export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeT
   const fn = firstName(w.name);
   const winRate = (Number(w.w) + Number(w.l)) > 0 ? Math.round((Number(w.w) / (Number(w.w) + Number(w.l))) * 100) + '%' : '—';
   const url = profileUrl(w.name, w.teamName);
+  const cardUrl = `${siteUrl()}/cards?card=potw&week=${encodeURIComponent(week)}&g=${w.gender === 'F' ? 'women' : 'men'}&who=${encodeURIComponent(String(w.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))}&season=${encodeURIComponent(String(circuit || 'I'))}`;
   const statCell = (num, lab) => `<td style="background:#161616;border:1px solid #2a2a2a;border-radius:10px;padding:14px 10px;text-align:center;width:25%"><div style="font-size:24px;font-weight:800;color:#b8ff2c;line-height:1">${esc(num)}</div><div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#8a8a8a;margin-top:7px">${esc(lab)}</div></td>`;
   const capLine = captainIntro
     ? `<p style="font-size:14px;color:#b8ff2c;line-height:1.6;margin:0 0 22px;padding:12px 14px;background:#161616;border-left:3px solid #b8ff2c;border-radius:6px">${esc(captainIntro)}</p>`
@@ -291,6 +292,7 @@ export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeT
     ${statCell(`${Number(w.diff) >= 0 ? '+' : ''}${w.diff}`, 'Pt diff')}
   </tr></table>
   <a href="${esc(url)}" style="display:inline-block;padding:14px 32px;background:#b8ff2c;color:#0e0e0e;font-size:14px;font-weight:800;text-decoration:none;border-radius:9999px;margin:14px 0 4px">View your player profile &rarr;</a>
+  <a href="${esc(cardUrl)}" style="display:inline-block;padding:13px 30px;border:1px solid #2a2a2a;color:#f5f5f5;font-size:14px;font-weight:700;text-decoration:none;border-radius:9999px;margin:14px 0 4px 8px">Your award card &rarr;</a>
   <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:18px;margin:26px 0 10px">
     <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#b8ff2c;margin-bottom:8px"><span style="color:#fff">\u{1F455}</span> Claim your SuprDupr jersey</div>
     <p style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0">${sizeBlurb}</p>
