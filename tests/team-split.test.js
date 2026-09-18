@@ -141,3 +141,32 @@ test('a player view is their own row only — no teammates, no totals', () => {
   assert.ok(!flat.includes('Priya') && !flat.includes('totals') && !flat.includes('secret') && !flat.includes('cap@x.com'));
   assert.equal(playerView(buildLedger({ split, team }), 'nobody'), null);
 });
+
+test('per game with a buy-in: the buy-in is the floor, games draw it down, overage bills per game', () => {
+  const split = { mode: 'pergame', rateCents: 500, buyInCents: 5000, payments: { p1: [{ id: 'b', cents: 5000 }], p2: [{ id: 'c', cents: 5000 }] } };
+  const tabs = [
+    { matchId: 'm1', week: 1, counts: { p1: 4, p2: 6, gone: 2 } },
+    { matchId: 'm2', week: 2, counts: { p2: 6 } },
+  ];
+  const L = buildLedger({ split, team, tabs });
+  const by = Object.fromEntries(L.rows.map(r => [r.playerId, r]));
+  // p1: 4 games = $20 used, $30 of the buy-in left, paid the $50 → settled
+  assert.deepEqual([by.p1.owedCents, by.p1.usedCents, by.p1.buyInLeftCents, by.p1.balanceCents, by.p1.status], [5000, 2000, 3000, 0, 'paid']);
+  // p2: 12 games = $60 → buy-in used up, owes the $10 overage
+  assert.deepEqual([by.p2.owedCents, by.p2.usedCents, by.p2.buyInLeftCents, by.p2.balanceCents, by.p2.status], [6000, 6000, 0, 1000, 'owes']);
+  // captain owes the buy-in too, self-covered
+  assert.deepEqual([by.cap.owedCents, by.cap.status], [5000, 'self']);
+  // someone who left after playing still owes the buy-in; a never-played pending add has no row
+  assert.equal(by.gone.owedCents, 5000);
+  assert.equal(by.wait, undefined);
+  assert.equal(L.buyInCents, 5000);
+  const v = playerView(L, 'p2');
+  assert.deepEqual([v.buyInCents, v.usedCents, v.buyInLeftCents], [5000, 6000, 0]);
+});
+
+test('per game without a buy-in is unchanged', () => {
+  const L = buildLedger({ split: { mode: 'pergame', rateCents: 425 }, team, tabs: [{ matchId: 'm1', week: 1, counts: { p1: 3 } }] });
+  const p1 = L.rows.find(r => r.playerId === 'p1');
+  assert.deepEqual([p1.owedCents, p1.buyInLeftCents, L.buyInCents], [1275, 0, 0]);
+  assert.equal(L.rows.find(r => r.playerId === 'p2').owedCents, 0);
+});

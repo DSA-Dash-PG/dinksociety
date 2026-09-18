@@ -1,5 +1,5 @@
 // netlify/functions/potw-email-cron.js
-// Netlify SCHEDULED function — silently DRAFTS the weekly K'CHN Player of the
+// Netlify SCHEDULED function — silently DRAFTS the weekly SuprDupr Player of the
 // Week congratulation emails into the admin "Player of the Week" section. Nothing
 // is sent to a member: Richard reviews each draft and taps Send in the admin
 // panel (which delivers from dink@dinksociety.app with replies routed there).

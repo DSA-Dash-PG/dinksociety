@@ -56,6 +56,7 @@ export default async (req) => {
     teamName: ctx.team.name || null,
     share,
     rateCents: ledger.mode === 'pergame' ? (split.rateCents || 0) : null,
+    buyInCents: ledger.mode === 'pergame' ? (split.buyInCents || 0) : 0,
     collect: ledger.mode === 'pergame' ? (split.collect || 'weekly') : null,
     payTo: {
       name: ledger.payeeName || 'your captain',

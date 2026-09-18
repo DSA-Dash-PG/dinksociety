@@ -24,7 +24,7 @@
       if (!res.ok) throw new Error(d.error || 'Could not load');
       if (!d.config) { el.innerHTML = '<div style="font-size:12px;color:var(--color-text-faint);">This captain hasn’t set up a split.</div>'; return; }
       const c = d.config, L = d.ledger, T = L.totals;
-      const head = (L.mode === 'flat' ? `Flat · ${fmt(c.amountCents)} split` : `Per game · ${fmt(c.rateCents)} a game · ${T.gamesBilled} games billed`)
+      const head = (L.mode === 'flat' ? `Flat · ${fmt(c.amountCents)} split` : `Per game · ${fmt(c.rateCents)} a game${c.buyInCents ? ' · ' + fmt(c.buyInCents) + ' buy-in' : ''} · ${T.gamesBilled} games billed`)
         + (c.enabled ? '' : ' · <span style="color:#ff5c47">turned off</span>')
         + (c.venmoHandle ? ` · @${esc(c.venmoHandle)}` : '')
         + (L.mode === 'flat' ? (c.lockedAt ? ` · locked ${shortDate(c.lockedAt)}` : ' · not locked') : '');

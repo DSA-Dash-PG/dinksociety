@@ -1,5 +1,5 @@
 // netlify/functions/lib/potw-email.js
-// Core logic + templates for the weekly K'CHN Player of the Week congratulation
+// Core logic + templates for the weekly SuprDupr Player of the Week congratulation
 // emails. Mirrors The Drop: a scheduled cron prepares a draft, but NOTHING is
 // sent to a member until Richard taps "Approve & send" in the approval email.
 //
@@ -155,7 +155,7 @@ function modelId() {
   return (typeof Netlify !== 'undefined' && Netlify.env.get('DROP_MODEL')) || process.env.DROP_MODEL || 'claude-sonnet-4-6';
 }
 
-const COPY_SYSTEM = `You write short, warm, celebratory copy for "The Dink Society", a Monday-night pickleball league, announcing the weekly "K'CHN Player of the Week" award (K'CHN is the league sponsor).
+const COPY_SYSTEM = `You write short, warm, celebratory copy for "The Dink Society", a Monday-night pickleball league, announcing the weekly "SuprDupr Player of the Week" award (SuprDupr sponsors the award).
 House rules, follow exactly:
 - NEVER use the em dash character. Recast the sentence instead.
 - Use the player's first name only. Never a bare surname.
@@ -194,9 +194,9 @@ function templateCopy(w, week) {
         : `${fn}, a perfect ${w.w}-0 night. You're Player of the Week \u{1F3C6}`)
     : (female
         ? `Nice cooking, ${fn}. The week was yours \u{1F948}`
-        : `${fn}, you're the K'CHN Player of the Week \u{1F44F}`);
+        : `${fn}, you're the SuprDupr Player of the Week \u{1F44F}`);
   const winRate = (Number(w.w) + Number(w.l)) > 0 ? Math.round((Number(w.w) / (Number(w.w) + Number(w.l))) * 100) : null;
-  const lead = `${fn} turned in one of the standout nights of Week ${week}, going ${w.w}-${w.l}${winRate === 100 ? ' for a flawless sheet' : ''} with a ${w.diff >= 0 ? '+' : ''}${w.diff} point differential and a league-leading DSR of ${w.dsr}. That kind of night earns the loudest honor we hand out: K'CHN Player of the Week. Congratulations.`;
+  const lead = `${fn} turned in one of the standout nights of Week ${week}, going ${w.w}-${w.l}${winRate === 100 ? ' for a flawless sheet' : ''} with a ${w.diff >= 0 ? '+' : ''}${w.diff} point differential and a league-leading DSR of ${w.dsr}. That kind of night earns the loudest honor we hand out: SuprDupr Player of the Week. Congratulations.`;
   return { subject, lead };
 }
 
@@ -263,17 +263,17 @@ export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeT
   const sizeBlurb = sizeToken
     ? (currentSize
         ? `Got it, your size is <b style="color:#fff">${esc(currentSize)}</b>. Tap a different size below if you need to change it.`
-        : `Your Player of the Week shirt is sponsored by <b style="color:#fff">K'CHN</b>. Tap your size below and we'll have it ready to present to you on game day.`)
-    : `Your Player of the Week shirt is sponsored by <b style="color:#fff">K'CHN</b>. Reply with your size and we'll have it ready to present to you on game day.`;
+        : `Your Player of the Week shirt is sponsored by <b style="color:#fff">SuprDupr</b>. Tap your size below and we'll have it ready to present to you on game day.`)
+    : `Your Player of the Week shirt is sponsored by <b style="color:#fff">SuprDupr</b>. Reply with your size and we'll have it ready to present to you on game day.`;
   return `<div style="background:#0e0e0e;font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#f5f5f5;max-width:600px;margin:0 auto;padding:40px 26px">
   ${capLine}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:30px">
     <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#f5f5f5">THE DINK SOCIETY</span>
-    <span style="font-size:11px;color:#8a8a8a;font-weight:600">PRESENTED BY <b style="color:#b8ff2c;font-weight:800;letter-spacing:.04em">K'CHN</b></span>
+    <span style="font-size:11px;color:#8a8a8a;font-weight:600">PRESENTED BY <b style="color:#b8ff2c;font-weight:800;letter-spacing:.04em">SuprDupr</b></span>
   </div>
-  <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#b8ff2c;background:rgba(184,255,44,.10);border:1px solid rgba(184,255,44,.30);padding:7px 12px;border-radius:9999px;margin-bottom:18px">${chefEmoji(w.gender)} K'CHN Player of the Week &middot; Week ${esc(week)}</span>
+  <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#b8ff2c;background:rgba(184,255,44,.10);border:1px solid rgba(184,255,44,.30);padding:7px 12px;border-radius:9999px;margin-bottom:18px">${chefEmoji(w.gender)} SuprDupr Player of the Week &middot; Week ${esc(week)}</span>
   <div style="width:64px;height:64px;border-radius:9999px;background:linear-gradient(135deg,#243b00,#0e0e0e);border:2px solid #b8ff2c;text-align:center;line-height:64px;font-size:22px;font-weight:800;color:#b8ff2c;margin:0 0 22px">${esc(initials(w.name))}</div>
-  <h1 style="font-size:30px;font-weight:800;line-height:1.12;margin:0 0 8px;color:#f5f5f5;letter-spacing:-.01em">Nice cooking,<br><span style="font-style:italic;text-transform:uppercase">${esc(fn)}.</span></h1>
+  <h1 style="font-size:30px;font-weight:800;line-height:1.12;margin:0 0 8px;color:#f5f5f5;letter-spacing:-.01em">Nice work,<br><span style="font-style:italic;text-transform:uppercase">${esc(fn)}.</span></h1>
   <p style="font-size:14px;color:#8a8a8a;margin:0 0 24px">${esc(w.teamName)}</p>
   <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 14px">${esc(lead)}</p>
   <table role="presentation" style="width:100%;border-collapse:separate;border-spacing:8px;margin:18px 0 8px"><tr>
@@ -284,12 +284,12 @@ export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeT
   </tr></table>
   <a href="${esc(url)}" style="display:inline-block;padding:14px 32px;background:#b8ff2c;color:#0e0e0e;font-size:14px;font-weight:800;text-decoration:none;border-radius:9999px;margin:14px 0 4px">View your player profile &rarr;</a>
   <div style="background:#161616;border:1px solid #2a2a2a;border-radius:12px;padding:18px;margin:26px 0 10px">
-    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#b8ff2c;margin-bottom:8px"><span style="color:#fff">\u{1F455}</span> Claim your K'CHN jersey</div>
+    <div style="font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#b8ff2c;margin-bottom:8px"><span style="color:#fff">\u{1F455}</span> Claim your SuprDupr jersey</div>
     <p style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0">${sizeBlurb}</p>
     <div style="margin-top:12px">${sizeButtons}</div>
   </div>
   <p style="font-size:13px;color:#8a8a8a;line-height:1.6;margin:20px 0 0">\u{1F4F8} We'll present your award courtside before next game day and grab a quick photo for the league feed. Wear the grin. You earned it.</p>
-  <div style="margin-top:34px;padding-top:18px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6"><b style="color:#8a8a8a;font-weight:700">THE DINK SOCIETY</b> &middot; Season 1 &middot; Player of the Week presented by K'CHN</div>
+  <div style="margin-top:34px;padding-top:18px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6"><b style="color:#8a8a8a;font-weight:700">THE DINK SOCIETY</b> &middot; Season 1 &middot; Player of the Week presented by SuprDupr</div>
 </div>`;
 }
 
@@ -347,7 +347,7 @@ export async function prepareWeeklyPotwApproval(circuit = 'I', { force = false, 
     const rcpt = await resolveRecipient(w);
     const { subject, lead } = await generateCopy(w, week, label);
     const captainIntro = rcpt.recipientType === 'captain'
-      ? `Hi ${firstName(rcpt.captainName || 'captain')}, ${firstName(w.name)} is this week's K'CHN Player of the Week. Could you pass this along and grab their shirt size?`
+      ? `Hi ${firstName(rcpt.captainName || 'captain')}, ${firstName(w.name)} is this week's SuprDupr Player of the Week. Could you pass this along and grab their shirt size?`
       : '';
     const sizeToken = signSizeToken({ circuit: code, week, winnerKey: w.winnerKey });
     const html = renderCongratsEmail({

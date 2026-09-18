@@ -1,5 +1,5 @@
 // netlify/functions/potw-size.js
-// PUBLIC one-tap shirt-size capture for the K'CHN Player of the Week email.
+// PUBLIC one-tap shirt-size capture for the SuprDupr Player of the Week email.
 //
 //   GET ?t=<sizeToken>&size=<XS|S|M|L|XL|2XL>
 //     → verify the signed token (circuit/week/winnerKey), record the size against
@@ -36,11 +36,11 @@ function page({ title, heading, body, sizeRow }) {
   .wm{font-size:.7rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5e625c;margin-top:28px}
 </style></head>
 <body><div class="box">
-  <div class="tag">K'CHN Player of the Week</div>
+  <div class="tag">SuprDupr Player of the Week</div>
   <h1>${esc(heading)}</h1>
   <p>${body}</p>
   ${sizeRow || ''}
-  <div class="wm">The Dink Society &middot; presented by K'CHN</div>
+  <div class="wm">The Dink Society &middot; presented by SuprDupr</div>
 </div></body></html>`, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 
@@ -71,14 +71,14 @@ export default async (req) => {
     return page({
       title: 'Size saved',
       heading: `Locked in, ${name}!`,
-      body: `Your K'CHN jersey size is <b style="color:#fff">${esc(size)}</b>. We'll have it ready to present courtside on game day. Tap a different size below if you need to change it.`,
+      body: `Your SuprDupr jersey size is <b style="color:#fff">${esc(size)}</b>. We'll have it ready to present courtside on game day. Tap a different size below if you need to change it.`,
       sizeRow,
     });
   }
   return page({
     title: 'Pick your size',
     heading: `Pick your shirt size, ${name}`,
-    body: `Your Player of the Week jersey is sponsored by K'CHN. Tap your size and we'll have it ready for you.`,
+    body: `Your Player of the Week jersey is sponsored by SuprDupr. Tap your size and we'll have it ready for you.`,
     sizeRow,
   });
 };

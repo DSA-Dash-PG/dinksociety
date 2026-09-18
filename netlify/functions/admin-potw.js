@@ -1,5 +1,5 @@
 // netlify/functions/admin-potw.js
-// Admin side of the K'CHN Player of the Week emails.
+// Admin side of the SuprDupr Player of the Week emails.
 //
 //   GET                      → { weeks:[{week,preparedAt}], week, records:[...] }
 //                              (records = the selected/latest week's winners, with

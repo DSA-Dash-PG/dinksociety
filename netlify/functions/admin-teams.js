@@ -268,6 +268,20 @@ export default async (req) => {
         console.error('rebuildStandings after division move failed:', err));
     }
 
+    // Same division, but the registration's copy of the division NAME has drifted
+    // from the team's (it is only text, stamped at sign-up / move time). Heal it on
+    // any team save so emails and the Registrations tab stop showing the old name.
+    if (!divisionChanged && team.division && team.divisionLabel) {
+      try {
+        const hit = await findLinkedRegistration(team);
+        if (hit && hit.reg.division === team.division && hit.reg.divisionLabel !== team.divisionLabel) {
+          hit.reg.divisionLabel = team.divisionLabel;
+          hit.reg.updatedAt = new Date().toISOString();
+          await hit.store.set(hit.key, JSON.stringify(hit.reg));
+        }
+      } catch (err) { console.error('Registration division label heal failed:', err); }
+    }
+
     await logActivity({
       type: body.roster ? 'roster.replaced' : 'team.updated',
       actor: { email: admin.email, role: 'admin' },

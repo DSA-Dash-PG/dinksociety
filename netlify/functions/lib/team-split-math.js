@@ -15,6 +15,11 @@
 //   pergame  the captain sets a rate; each player owes rate x games they
 //            actually played in FINALIZED matches — every week of the season,
 //            playoffs included.
+//            Optional BUY-IN (`buyInCents`): a flat amount every player owes up
+//            front to be on the team. Per-game charges draw it down; once it is
+//            used up the player owes the overage game by game. So a player owes
+//            max(buy-in, games x rate) — the buy-in is a floor, not an extra,
+//            and an unused remainder is not refunded.
 
 import { SLOT_KEYS, normalizeScore } from './score-helpers.js';
 
@@ -126,6 +131,8 @@ export function buildLedger({ split, team, tabs = [] }) {
   const owed = {};        // pid -> cents
   const games = {};       // pid -> total games (pergame)
   const weeks = {};       // pid -> [{ week, games, cents }]
+  const used = {};        // pid -> cents of per-game charges so far (pergame)
+  let buyIn = 0;          // pergame: flat amount each player owes up front
   let unassignedCents = 0;
 
   if (mode === 'flat') {
@@ -136,17 +143,20 @@ export function buildLedger({ split, team, tabs = [] }) {
     unassignedCents = r.unassignedCents;
   } else {
     const rate = Math.max(0, Math.round(split?.rateCents || 0));
+    buyIn = Math.max(0, Math.round(split?.buyInCents || 0));
     const sorted = [...tabs].sort((a, b) => (a.week || 0) - (b.week || 0));
     for (const t of sorted) {
       for (const [pid, n] of Object.entries(t.counts || {})) {
         if (!byId.has(pid) || !n) continue;
         games[pid] = (games[pid] || 0) + n;
-        owed[pid] = (owed[pid] || 0) + n * rate;
+        used[pid] = (used[pid] || 0) + n * rate;
         (weeks[pid] = weeks[pid] || []).push({ week: t.week, phase: t.phase || null, games: n, cents: n * rate });
       }
     }
-    // Everyone on the active roster gets a row even before they play.
-    for (const id of active) if (!(id in owed)) owed[id] = 0;
+    // Everyone on the active roster gets a row even before they play — and owes
+    // the buy-in from day one. Someone who has left only owes it if they played.
+    for (const id of active) if (!(id in used)) used[id] = 0;
+    for (const id of Object.keys(used)) owed[id] = Math.max(used[id], buyIn);
   }
 
   // Anyone with money recorded against them keeps a row even if they owe nothing now.
@@ -168,6 +178,9 @@ export function buildLedger({ split, team, tabs = [] }) {
       hasEmail: !!p.email,
       overrideCents: mode === 'flat' && Number.isInteger(split?.overrides?.[pid]) ? split.overrides[pid] : null,
       games: games[pid] || 0, weeks: weeks[pid] || [],
+      // pergame + buy-in: what their games have cost so far, and how much of the buy-in is left
+      usedCents: used[pid] || 0,
+      buyInLeftCents: buyIn > 0 && pid in used ? Math.max(0, buyIn - used[pid]) : 0,
       owedCents, paidCents, balanceCents, claim, status, payments,
       lastNudgedOn: split?.nudges?.[pid] || null,
     };
@@ -179,7 +192,7 @@ export function buildLedger({ split, team, tabs = [] }) {
   const totalCents = rows.reduce((s, r) => s + r.owedCents, 0);
   const outstandingCents = rows.reduce((s, r) => s + Math.max(0, r.balanceCents), 0);
   return {
-    mode, payeeId, payeeName: payee?.name || null,
+    mode, payeeId, payeeName: payee?.name || null, buyInCents: buyIn,
     rows, unassignedCents,
     totals: {
       totalCents, outstandingCents,
@@ -199,6 +212,7 @@ export function playerView(ledger, playerId) {
     mode: ledger.mode, self: r.self,
     owedCents: r.owedCents, paidCents: r.paidCents, balanceCents: r.balanceCents,
     games: r.games, weeks: r.weeks, claim: r.claim, status: r.status,
+    usedCents: r.usedCents, buyInLeftCents: r.buyInLeftCents, buyInCents: ledger.buyInCents || 0,
     payments: r.payments.map(p => ({ cents: p.cents, at: p.at, method: p.method })),
   };
 }

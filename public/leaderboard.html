@@ -154,7 +154,7 @@
     .col-opt {}
     @media(max-width:720px){ .col-opt { display:none; } .rank-table { font-size:11px; } }
 
-    /* ── K'CHN TOP CHEFS ───────────────────────────────────────────── */
+    /* ── SUPRDUPR PLAYER OF THE WEEK ───────────────────────────────────────────── */
     .kchn-logo { display:inline-flex; align-items:center; background:#000; border:1px solid rgba(255,255,255,0.12); border-radius:7px; padding:5px 11px; }
     .kchn-logo span { font-size:16px; font-weight:900; color:#f0d020; letter-spacing:0.06em; font-style:italic; }
     .kchn-header { display:flex; align-items:center; gap:12px; margin-bottom:var(--space-5); }
@@ -285,10 +285,6 @@
       <div class="lb-heroL">
         <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
         <h1 class="page-hero__title" id="lb-title">Leaderboard</h1>
-        <div class="page-hero__presented">
-          <span class="page-hero__presented-label">Presented by</span>
-          <div class="kchn-logo"><span>K'CHN</span></div>
-        </div>
       </div>
       <!-- Season MVPs — filled by renderHero() for the season they belong to. -->
       <div class="lb-mvp" id="lb-mvp" hidden></div>
@@ -310,9 +306,9 @@
       <button class="lb-sub is-active" data-section="rankings">Players</button>
       <button class="lb-sub" data-section="leaders">🎯 Team Leaders</button>
     </div>
-    <!-- Awards sub-toggle: Top Chefs vs Hot Streaks -->
+    <!-- Awards sub-toggle: Player of the Week vs Hot Streaks -->
     <div class="lb-subseg" data-subfor="awards">
-      <button class="lb-sub is-active" data-section="topchefs">👨‍🍳 K'CHN Top Chefs</button>
+      <button class="lb-sub is-active" data-section="topchefs">🏆 SuprDupr Player of the Week</button>
       <button class="lb-sub" data-section="streaks">🔥 Hot Streaks</button>
     </div>
     <div class="lb-controls">
@@ -336,7 +332,7 @@
       <div id="leaders-content"><div class="empty-state">Loading…</div></div>
     </section>
 
-    <!-- K'CHN TOP CHEFS -->
+    <!-- SUPRDUPR PLAYER OF THE WEEK -->
     <section class="lb-section" data-section="topchefs">
       <div id="topchefs-content"><div class="empty-state">Loading…</div></div>
     </section>
@@ -422,27 +418,37 @@
   }
 
   // ── Data ─────────────────────────────────────────────────────────
+  // Every load is tagged with the season it was fetched for; a response that
+  // lands after the user (or dsSeason) switched seasons is discarded instead of
+  // overwriting the newer season's data. That race is what showed Season 1
+  // stats under the Season 2 filter until you toggled back and forth.
   async function loadPlayerStats() {
+    const c = state.circuit;
+    let out;
     try {
-      const r = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}&view=players`);
-      state.playerStats = r.ok ? await r.json() : { empty:true };
-    } catch { state.playerStats = { empty:true }; }
+      const r = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(c)}&view=players`);
+      out = r.ok ? await r.json() : { empty:true };
+    } catch { out = { empty:true }; }
+    if (state.circuit === c) state.playerStats = out;
   }
   async function loadStandings() {
+    const c = state.circuit;
+    let out;
     try {
-      let r = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(state.circuit)}`);
+      let r = await fetch(`/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(c)}`);
       if (!r.ok) throw 0;
-      state.standings = await r.json();
-      if (state.standings?.empty) {
-        r = await fetch(`/.netlify/functions/public-standings?season=${encodeURIComponent(seasonIdOf(state.circuit))}`);
-        if (r.ok) { const d = await r.json(); if (!d.empty) state.standings = d; }
+      out = await r.json();
+      if (out?.empty) {
+        r = await fetch(`/.netlify/functions/public-standings?season=${encodeURIComponent(seasonIdOf(c))}`);
+        if (r.ok) { const d = await r.json(); if (!d.empty) out = d; }
       }
     } catch {
       try {
-        const r = await fetch(`/.netlify/functions/public-standings?season=${encodeURIComponent(seasonIdOf(state.circuit))}`);
-        state.standings = r.ok ? await r.json() : { empty:true };
-      } catch { state.standings = { empty:true }; }
+        const r = await fetch(`/.netlify/functions/public-standings?season=${encodeURIComponent(seasonIdOf(c))}`);
+        out = r.ok ? await r.json() : { empty:true };
+      } catch { out = { empty:true }; }
     }
+    if (state.circuit === c) state.standings = out;
   }
   async function loadPotw() {
     try {
@@ -778,22 +784,22 @@
     }
   }
 
-  // ── K'CHN TOP CHEFS ───────────────────────────────────────────────
+  // ── SUPRDUPR PLAYER OF THE WEEK ───────────────────────────────────────────────
   function renderTopChefs() {
     const el = $('topchefs-content');
     let html = '';
 
-    // K'CHN header
+    // SuprDupr header
     html += `<div class="lb-card">
       <div class="kchn-header">
-        <div class="kchn-logo"><span>K'CHN</span></div>
+        <div class="kchn-logo"><span>SuprDupr</span></div>
         <div>
-          <h2 class="kchn-title">Top Chefs</h2>
-          <p class="kchn-sub">Top performers each week · Presented by K'CHN</p>
+          <h2 class="kchn-title">Player of the Week</h2>
+          <p class="kchn-sub">Top performers each week · Presented by SuprDupr</p>
         </div>
       </div>`;
 
-    // Weekly Top Chefs — gender-split winners, newest week first, collapsible
+    // Weekly Players of the Week — gender-split winners, newest week first, collapsible
     const wtp = state.standings?.weeklyTopPerformers || [];
     if (wtp.length) {
       const openMap = getChefOpen(wtp);
@@ -807,7 +813,7 @@
     }
     html += `</div>`;
 
-    // Season top chefs split by gender
+    // Season leaders split by gender
     if (!state.playerStats || state.playerStats.empty) {
       html += `<div class="lb-card">${noData()}</div>`;
       el.innerHTML = html; return;
@@ -838,7 +844,7 @@
 
     html += `<div class="chefs-grid">
       <div class="lb-card">
-        <h2 class="lb-card__title">🔥 Top Male Chefs</h2>
+        <h2 class="lb-card__title">🔥 Top Male Players</h2>
         <p class="lb-card__sub">Season leaders · win rate</p>
         <table class="rank-table">
           <thead><tr><th>#</th><th>Player</th><th class="r">W–L</th><th class="r">Win%</th></tr></thead>
@@ -846,7 +852,7 @@
         </table>
       </div>
       <div class="lb-card">
-        <h2 class="lb-card__title">🔥 Top Female Chefs</h2>
+        <h2 class="lb-card__title">🔥 Top Female Players</h2>
         <p class="lb-card__sub">Season leaders · win rate</p>
         <table class="rank-table">
           <thead><tr><th>#</th><th>Player</th><th class="r">W–L</th><th class="r">Win%</th></tr></thead>
@@ -905,8 +911,8 @@
 
     const body = open
       ? `<div class="pow-cols">
-           ${column(week.men, "Men's chef", LIME, 'var(--color-lime-ghost)')}
-           ${column(week.women, "Women's chef", TEAL, 'var(--color-teal-dim)')}
+           ${column(week.men, "Men's winner", LIME, 'var(--color-lime-ghost)')}
+           ${column(week.women, "Women's winner", TEAL, 'var(--color-teal-dim)')}
          </div>`
       : `<div class="pow-collapsed">${chip(week.men && week.men[0], LIME)}${chip(week.women && week.women[0], TEAL)}</div>`;
 
@@ -919,7 +925,7 @@
     </div>`;
   }
 
-  // Collapse state for weekly Top Chefs — persisted; newest week open by default.
+  // Collapse state for weekly Players of the Week — persisted; newest week open by default.
   function getChefOpen(weeks) {
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem('ds-chef-open') || '{}'); } catch {}
@@ -1162,7 +1168,12 @@
   });
 
   // ── Section activation ───────────────────────────────────────────
+  // Set once dsSeason() has settled which season is current. Until then no
+  // data is fetched — readUrl() → activate() used to kick off a Season 1 load
+  // before the current season resolved to Season 2.
+  let SEASON_READY = false;
   function ensureDataThenRender() {
+    if (!SEASON_READY) return;
     if (!state.playerStats && !state._loading) {
       state._loading = true;
       Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
@@ -1249,6 +1260,7 @@
       $('circuit-select').value = state.circuit;
     }
   }).catch(() => {}).then(() => {
+    SEASON_READY = true;
     loadSeasonOptions();
     return Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
       renderHero(); renderAll();

@@ -120,6 +120,7 @@
       mode: cfg?.mode || 'flat',
       amount: cfg?.amountCents ? dollars(cfg.amountCents) : (d.teamFeeCents ? dollars(d.teamFeeCents) : ''),
       rate: cfg?.rateCents ? dollars(cfg.rateCents) : '',
+      buyIn: cfg?.buyInCents ? dollars(cfg.buyInCents) : '',
       collect: cfg?.collect || 'weekly',
       venmoHandle: cfg?.venmoHandle || '',
     };
@@ -136,12 +137,14 @@
         : `<div class="spl-result"><div class="spl-result__l">Each player owes</div><div class="spl-result__b">${n ? fmt(Math.floor(c / n)) + (c % n ? ' – ' + fmt(Math.floor(c / n) + 1) : '') : '—'}</div><div class="spl-result__s">${esc(evenText(c, n))}<br>You count as one of the ${n}.</div></div>`;
     } else {
       const r = toCents(dr.rate);
+      const bi = toCents(dr.buyIn);
+      const buyInLine = bi && r ? `<br><b style="color:var(--color-text)">${fmt(bi)} buy-in</b> × ${n} players = ${fmt(bi * n)} up front · covers each player's first ${Math.floor(bi / r)} game${Math.floor(bi / r) === 1 ? '' : 's'}, then it's per game.` : '';
       const tot = r == null ? null : r * seasonGames;
       const gap = (tot != null && d.teamFeeCents) ? tot - d.teamFeeCents : null;
       result = `<div class="spl-result"><div class="spl-result__l">If your team plays ${SEASON_NIGHTS} nights</div><div class="spl-result__b" style="${gap != null && gap < 0 ? 'color:var(--color-red)' : ''}">${tot == null ? '—' : fmt(tot)}</div><div class="spl-result__s">${
         tot == null ? 'Type a price per game.'
           : `${seasonGames} player-games × ${fmt(r)}` + (gap == null ? '' : gap < 0 ? ` · <b style="color:var(--color-red)">${fmt(-gap)} short of your ${fmt(d.teamFeeCents)} fee</b>` : ` · covers your ${fmt(d.teamFeeCents)} fee${gap ? ' with ' + fmt(gap) + ' to spare' : ''}`)
-      }<br>A match night is 12 games × 2 players = ${GAMES_PER_NIGHT} player-games, whatever your roster size.</div></div>`;
+      }<br>A match night is 12 games × 2 players = ${GAMES_PER_NIGHT} player-games, whatever your roster size.${buyInLine}</div></div>`;
     }
 
     $('split-area').innerHTML = `
@@ -152,7 +155,9 @@
       : `
         <div class="spl-fld"><label for="spl-rate">Price per game</label><div class="spl-inp"><span>$</span><input id="spl-rate" inputmode="decimal" autocomplete="off" value="${esc(dr.rate)}" placeholder="4.17"></div>
           ${suggest ? `<button type="button" class="spl-chip" id="spl-suggest">Use ${fmt(suggest)} — covers the ${fmt(d.teamFeeCents)} fee</button>` : ''}
-          <p class="spl-hint">Players pay for the games they actually play, all season long — playoffs included. Tabs update on their own once a match night is finalized.</p></div>`}
+          <p class="spl-hint">Players pay for the games they actually play, all season long — playoffs included. Tabs update on their own once a match night is finalized.</p></div>
+        <div class="spl-fld"><label for="spl-buyin">Buy-in to be on the team <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span></label><div class="spl-inp"><span>$</span><input id="spl-buyin" inputmode="decimal" autocomplete="off" value="${esc(dr.buyIn)}" placeholder="50"></div>
+          <p class="spl-hint">Everyone owes this up front. Their games draw it down at your per-game price; once it's used up, they owe the rest game by game. It's a minimum, not an extra — a player who plays less than it covers doesn't get the difference back.</p></div>`}
       ${result}
       ${flat ? '' : `<div class="spl-fld"><label>Collect</label><div class="spl-seg" id="spl-collect" style="margin:0"><button data-c="weekly" class="${dr.collect === 'weekly' ? 'on' : ''}">After each week</button><button data-c="season" class="${dr.collect === 'season' ? 'on' : ''}">End of season</button></div></div>`}
       <div class="spl-fld"><label for="spl-venmo">Your Venmo handle</label><div class="spl-inp"><span>@</span><input id="spl-venmo" autocomplete="off" autocapitalize="off" spellcheck="false" style="font-size:15px" value="${esc(dr.venmoHandle)}" placeholder="your-handle"></div>
@@ -166,7 +171,7 @@
       ${msgHtml()}`;
 
     const keep = (id, key) => { const el = $(id); if (el) el.addEventListener('input', () => { dr[key] = el.value; refreshResult(); }); };
-    keep('spl-amount', 'amount'); keep('spl-rate', 'rate'); keep('spl-venmo', 'venmoHandle');
+    keep('spl-amount', 'amount'); keep('spl-rate', 'rate'); keep('spl-buyin', 'buyIn'); keep('spl-venmo', 'venmoHandle');
     $('spl-mode').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { dr.mode = b.dataset.m; setMsg(); renderSetup(); }));
     $('spl-collect')?.querySelectorAll('button').forEach(b => b.addEventListener('click', () => { dr.collect = b.dataset.c; renderSetup(); }));
     $('spl-suggest')?.addEventListener('click', () => { dr.rate = dollars(suggest); renderSetup(); });
@@ -186,7 +191,7 @@
     const dr = S.draft, btn = $('spl-save');
     if (btn) btn.disabled = true;
     try {
-      S.data = await api(API, { action: 'save', enabled, mode: dr.mode, amount: dr.amount, rate: dr.rate, collect: dr.collect, venmoHandle: dr.venmoHandle });
+      S.data = await api(API, { action: 'save', enabled, mode: dr.mode, amount: dr.amount, rate: dr.rate, buyIn: dr.buyIn, collect: dr.collect, venmoHandle: dr.venmoHandle });
       S.editing = false; S.draft = null;
       setMsg('ok', enabled ? 'Saved. Email everyone their share when you’re ready.' : 'Split turned off.');
       render();
@@ -196,7 +201,11 @@
   // ════════ LEDGER ════════
   function rowDetail(r, L) {
     if (r.self) return 'You · your share is covered';
-    if (L.mode === 'pergame') return `${r.games} game${r.games === 1 ? '' : 's'} × ${fmt(S.data.config.rateCents)} = ${fmt(r.owedCents)}` + (r.paidCents ? ` · paid ${fmt(r.paidCents)}` : '');
+    if (L.mode === 'pergame') {
+      const gamesBit = `${r.games} game${r.games === 1 ? '' : 's'} × ${fmt(S.data.config.rateCents)} = ${fmt(r.usedCents)}`;
+      const buyBit = !L.buyInCents ? '' : r.buyInLeftCents > 0 ? ` · ${fmt(r.buyInLeftCents)} of ${fmt(L.buyInCents)} buy-in left` : ' · buy-in used up';
+      return gamesBit + buyBit + (r.paidCents ? ` · paid ${fmt(r.paidCents)}` : '');
+    }
     if (r.status === 'claim') return `Says they paid ${fmt(r.claim.cents)} · ${shortDate(r.claim.at)}`;
     if (r.paidCents && r.balanceCents > 0) return `Paid ${fmt(r.paidCents)} of ${fmt(r.owedCents)}`;
     if (r.status === 'paid') return 'Settled';
@@ -228,7 +237,8 @@
         ${r.overrideCents != null ? `<button class="spl-link" data-act="override-clear" data-p="${pid}">back to even</button>` : ''}</div>
         <p class="spl-hint">A sub who pays less, or 0 to leave someone out. Everyone else's share rebalances to the cent.</p>` : '';
     const nudge = r.balanceCents > 0 ? `<h4>Reminder</h4>${r.hasEmail ? `<button class="cap-btn cap-btn--ghost" data-act="nudge-one" data-p="${pid}">Email ${esc(r.name.split(' ')[0])} a reminder</button>` : '<span>No email on file for this player.</span>'}` : '';
-    return `<div class="spl-drawer"><div class="spl-kv"><span>Owes in total</span><span>${fmt(r.owedCents)}</span></div><div class="spl-kv"><span>Paid</span><span>${fmt(r.paidCents)}</span></div><div class="spl-kv"><span>Balance</span><span>${fmt(r.balanceCents)}</span></div>${weeks}${pays}${record}${override}${nudge}</div>`;
+    const buyKv = L.mode === 'pergame' && L.buyInCents ? `<div class="spl-kv"><span>Buy-in</span><span>${fmt(L.buyInCents)}</span></div><div class="spl-kv"><span>Games so far</span><span>${fmt(r.usedCents)}</span></div>` : '';
+    return `<div class="spl-drawer">${buyKv}<div class="spl-kv"><span>Owes in total</span><span>${fmt(r.owedCents)}</span></div><div class="spl-kv"><span>Paid</span><span>${fmt(r.paidCents)}</span></div><div class="spl-kv"><span>Balance</span><span>${fmt(r.balanceCents)}</span></div>${weeks}${pays}${record}${override}${nudge}</div>`;
   }
 
   function renderLedger() {
@@ -241,7 +251,7 @@
 
     const summary = flat
       ? `<b>${fmt(cfg.amountCents)}</b> split across ${L.rows.length} player${L.rows.length === 1 ? '' : 's'}`
-      : `<b>${fmt(cfg.rateCents)}</b> a game · ${T.gamesBilled} game${T.gamesBilled === 1 ? '' : 's'} billed so far`;
+      : `<b>${fmt(cfg.rateCents)}</b> a game${cfg.buyInCents ? ` · <b>${fmt(cfg.buyInCents)}</b> buy-in` : ''} · ${T.gamesBilled} game${T.gamesBilled === 1 ? '' : 's'} billed so far`;
     const lockNote = !flat ? ''
       : cfg.lockedAt
         ? `<div class="spl-note"><span>🔒</span><div><b>Shares locked</b> ${shortDate(cfg.lockedAt)}${cfg.lockedBy === 'roster-lock' ? ' when your roster locked' : ''}. Roster changes no longer move anyone's share. <button class="spl-link" data-act="unlock">${d.rosterLocked ? 'Re-sync to current roster' : 'Unlock'}</button></div></div>`

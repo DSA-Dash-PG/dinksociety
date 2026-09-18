@@ -215,7 +215,7 @@
     (Array.isArray(opts.awards) ? opts.awards : []).forEach(function (a) {
       var sn = a.season != null ? String(a.season) : null;
       var tag = sn && CS && sn !== CS ? seasonLabel(sn) : '';
-      push('potw', 'Week ' + a.week + ' ' + (a.type === 'womens' ? "Women's" : "Men's") + ' Chef',
+      push('potw', 'Week ' + a.week + ' ' + (a.type === 'womens' ? "Women's" : "Men's") + ' Player of the Week',
         [tag, fmtDate(a.date), (a.w != null ? a.w + 'W–' + a.l + 'L' : ''), (a.diff != null ? (a.diff >= 0 ? '+' : '') + a.diff + ' pt diff' : '')].filter(Boolean).join(' · '), a.date,
         { domain: 'league', season: sn });
     });

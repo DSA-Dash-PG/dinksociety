@@ -22,7 +22,7 @@ function getResend() {
  *   attachments use Resend's shape: `path` (a hosted URL Resend fetches) or
  *   `content` (base64). We use `path` pointing at broadcast-files-serve.
  *   `from` overrides the default EMAIL_FROM sender for this one send (used by the
- *   K'CHN Player of the Week mailer, which sends as dink@dinksociety.app). Any
+ *   SuprDupr Player of the Week mailer, which sends as dink@dinksociety.app). Any
  *   override must still be on a Resend-verified domain (dinksociety.app is).
  */
 export async function sendEmail({ to, subject, html, replyTo, from, attachments, headers }) {

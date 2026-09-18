@@ -28,7 +28,7 @@ function json(body, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' } });
 }
 
-function renderShareEmail({ kind, playerName, captainName, teamName, teamEmoji, season, row, mode, rateCents, venmoHandle, portalUrl }) {
+function renderShareEmail({ kind, playerName, captainName, teamName, teamEmoji, season, row, mode, rateCents, buyInCents = 0, venmoHandle, portalUrl }) {
   const first = esc(String(playerName || '').split(' ')[0] || 'there');
   const cap = esc(captainName || 'your captain');
   const owe = fmtCents(Math.max(0, row.balanceCents));
@@ -36,7 +36,12 @@ function renderShareEmail({ kind, playerName, captainName, teamName, teamEmoji, 
   const lead = kind === 'nudge'
     ? `${cap} is still waiting on your share of the ${esc(teamName)} team fee.`
     : `${cap} has split the ${esc(teamName)} team fee${season ? ' for ' + esc(season) : ''}. Here’s your part.`;
-  const how = mode === 'pergame'
+  const paidBit = row.paidCents ? ` · ${fmtCents(row.paidCents)} already paid` : '';
+  const how = mode === 'pergame' && buyInCents > 0
+    ? (row.usedCents > buyInCents
+      ? `${row.games} games × ${fmtCents(rateCents)} = ${fmtCents(row.usedCents)}. Your ${fmtCents(buyInCents)} buy-in covered the first part; the rest is collected game by game${paidBit}. Only finished match nights count.`
+      : `${fmtCents(buyInCents)} buy-in to be on the team. It covers your games at ${fmtCents(rateCents)} each — ${row.games} played so far, ${fmtCents(row.buyInLeftCents)} of it left${paidBit}. Once it's used up you pay per game.`)
+    : mode === 'pergame'
     ? `${row.games} game${row.games === 1 ? '' : 's'} played × ${fmtCents(rateCents)} a game = ${fmtCents(row.owedCents)}${row.paidCents ? ` · ${fmtCents(row.paidCents)} already paid` : ''}. Your tab grows as you play — only finished match nights count.`
     : `Your share of the team amount is ${fmtCents(row.owedCents)}${row.paidCents ? ` · ${fmtCents(row.paidCents)} already paid` : ''}.`;
   const venmo = venmoHandle
@@ -99,7 +104,7 @@ export default async (req) => {
           : `Your team share: ${fmtCents(row.balanceCents)} — ${team.name}`,
         html: renderShareEmail({
           kind, playerName: player.name, captainName: ledger.payeeName, teamName: team.name, teamEmoji: team.emoji || '',
-          season: seasonName(team.circuit), row, mode: ledger.mode, rateCents: split.rateCents, venmoHandle: split.venmoHandle, portalUrl,
+          season: seasonName(team.circuit), row, mode: ledger.mode, rateCents: split.rateCents, buyInCents: ledger.buyInCents || 0, venmoHandle: split.venmoHandle, portalUrl,
         }),
       });
       split.nudges[row.playerId] = today;

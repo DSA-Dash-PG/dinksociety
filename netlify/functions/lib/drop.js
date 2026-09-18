@@ -212,7 +212,7 @@ function normPerformers(p = {}) {
     name: String(x.name || '').slice(0, 80),
     teamName: x.teamName ? String(x.teamName).slice(0, 80) : null,
     w: x.w ?? null, l: x.l ?? null, dsr: x.dsr ?? null, diff: x.diff ?? null, ps: x.ps ?? null,
-    isChef: x.isChef !== false, // K'CHN chef badge
+    isChef: x.isChef !== false, // SuprDupr chef badge
   } : null;
   // A ranked leaderboard row (Top Performers tabs). Slimmer than `player`.
   const row = (x) => x ? {

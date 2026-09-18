@@ -1,5 +1,5 @@
 // netlify/functions/potw-approve.js
-// One-tap approval endpoint for the weekly K'CHN Player of the Week emails.
+// One-tap approval endpoint for the weekly SuprDupr Player of the Week emails.
 //
 // Two-step on purpose:
 //   GET  ?t=<token>  → peek the token (does NOT consume) and render a confirm
@@ -32,7 +32,7 @@ function confirmPage(token, rec) {
 h1{font-size:1.35rem;margin:0 0 10px}p{color:#9a9e97;line-height:1.55;font-size:.95rem;margin:0 0 22px}
 button{font-family:inherit;font-size:.95rem;font-weight:800;border:0;cursor:pointer;border-radius:9999px;padding:14px 30px;background:${ACCENT};color:#0e0e0e}
 .wm{font-size:.7rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#5e625c;margin-top:26px}</style></head>
-<body><div class="box"><div class="tag">K'CHN Player of the Week &middot; Week ${esc(rec.week)}</div>
+<body><div class="box"><div class="tag">SuprDupr Player of the Week &middot; Week ${esc(rec.week)}</div>
 <h1>Send ${esc(firstName(w.name))}'s award email?</h1>
 <p>This sends the branded congrats email ${toLine}. You'll be BCC'd. This can only be done once.</p>
 <form method="POST"><input type="hidden" name="t" value="${esc(token)}"><button type="submit">Approve &amp; send now</button></form>

@@ -1418,7 +1418,7 @@
               <button class="ab ab--lime ab--sm" id="potw-generate-btn" title="Draft the latest completed week">✨ Draft this week</button>
             </div>
           </div>
-          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:680px;">The weekly K'CHN Player of the Week congratulation emails. The Wednesday task drafts each winner from the stats; you review and <b>Send</b> here. Emails go out as <b>dink@dinksociety.app</b> and any reply lands in that inbox. Winners pick their shirt size with one tap and it shows up below.</p>
+          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:680px;">The weekly SuprDupr Player of the Week congratulation emails. The Wednesday task drafts each winner from the stats; you review and <b>Send</b> here. Emails go out as <b>dink@dinksociety.app</b> and any reply lands in that inbox. Winners pick their shirt size with one tap and it shows up below.</p>
 
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Weeks</h2><span class="ac__s" id="potw-list-status"></span></div>
@@ -1850,6 +1850,16 @@
   // ─── State ─────────────────────────────────────────────────
   let SETTINGS = {};
   let DIVISIONS = []; // { id, name } from seasons
+  // A registration's division NAME, looked up from its own season by division id.
+  // The label stored on the registration is only text copied at sign-up / move
+  // time and can go stale (Big Dink Energy kept "3.0 - 3.999" after moving to
+  // 3.5+ Mixed) — the id is the truth, so resolve the name from it when we can.
+  function regDivisionLabel(r) {
+    if (!r) return '';
+    const season = (typeof SEASONS !== 'undefined' ? SEASONS : []).find(s => s.id === r.seasonId);
+    const hit = ((season && season.divisions) || []).find(d => d.id === r.division) || DIVISIONS.find(d => d.id === r.division);
+    return (hit && (hit.name || hit.id)) || r.divisionLabel || r.division || '';
+  }
   let allTeams = [];
   let allRegistrations = [];
   const METHOD_LABELS = { zelle: 'Zelle', venmo: 'Venmo', cash: 'Cash', other: 'Other', stripe: 'Stripe' };
@@ -3758,7 +3768,7 @@
 
       $id('ov-activity').innerHTML = recent.length ? recent.map(r => {
         const dot = r.status === 'confirmed' ? 'g' : r.status === 'pending' ? 'y' : 'b';
-        return '<div class="ai"><div class="ai__dot ai__dot--' + dot + '"></div><div><div>' + h(r.displayName) + ' · <span class="p p--' + (r.status || 'pending') + '">' + (r.status || 'pending') + '</span></div><div class="ai__time">' + h(r.divisionLabel || r.division) + ' · ' + fd(r.createdAt) + '</div></div></div>';
+        return '<div class="ai"><div class="ai__dot ai__dot--' + dot + '"></div><div><div>' + h(r.displayName) + ' · <span class="p p--' + (r.status || 'pending') + '">' + (r.status || 'pending') + '</span></div><div class="ai__time">' + h(regDivisionLabel(r)) + ' · ' + fd(r.createdAt) + '</div></div></div>';
       }).join('') : '<div class="empty">No recent activity.</div>';
     } catch (e) {
       $id('ov-stats').innerHTML = '<div class="empty">Failed to load overview: ' + h(e.message) + '</div>';
@@ -3839,7 +3849,7 @@
         actBtns.push('<button class="ab ab--ghost ab--sm reg-act" data-act="edit-contact" data-id="' + h(r.id) + '">Edit</button>');
         actBtns.push('<button class="ab ab--danger ab--sm reg-act" data-act="delete" data-id="' + h(r.id) + '">Delete</button>');
         const stCol = '<span class="p p--' + st + '">' + st + '</span>' + (isVenmo && st === 'pending' ? ' <span class="p" style="background:rgba(61,149,206,0.15);color:#3d95ce;" title="Waiting on $' + h(r.venmo?.amount || r.depositAmount || '') + ' via Venmo' + (r.venmo?.note ? ' — note: ' + h(r.venmo.note) : '') + '">Venmo · $' + h(r.venmo?.amount || r.depositAmount || '?') + '</span>' : '');
-        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(r.divisionLabel || r.division) + '</td><td>' + stCol + '</td><td style="font-size:12px;">' + feeCol + '</td><td>' + paidCol + '</td><td>' + balCol + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
+        return '<tr style="cursor:default"><td>' + nm + '</td><td><span class="p p--' + (r.path || 'team') + '">' + (r.path === 'team' ? 'Team' : 'Agent') + '</span></td><td>' + h(regDivisionLabel(r)) + '</td><td>' + stCol + '</td><td style="font-size:12px;">' + feeCol + '</td><td>' + paidCol + '</td><td>' + balCol + '</td><td style="font-size:11px;color:var(--color-text-muted)">' + h(em) + '</td><td style="font-size:10px;color:var(--color-text-faint)">' + fd(r.createdAt) + '</td><td><div style="display:flex;gap:4px;flex-wrap:wrap;">' + actBtns.join('') + '</div></td></tr>';
       }).join('') + '</tbody></table>';
     wireRegActions();
   }
@@ -8174,8 +8184,8 @@
     if(!p){ box.innerHTML='<div class="empty" style="font-size:12px;">No performer data yet.</div>'; return; }
     function pf(label,x){ if(!x) return ''; return '<div class="pf"><h6>'+label+'</h6><b>'+dEsc(x.name)+'</b>'+(x.teamName?' · '+dEsc(x.teamName):'')+(x.dsr!=null?'<br>DSR '+dEsc(x.dsr):'')+(x.w!=null?' · '+x.w+'–'+x.l:'')+'</div>'; }
     var html='';
-    html+=pf("K'CHN POTW · M", p.potw&&p.potw.men);
-    html+=pf("K'CHN POTW · F", p.potw&&p.potw.women);
+    html+=pf("SuprDupr POTW · M", p.potw&&p.potw.men);
+    html+=pf("SuprDupr POTW · F", p.potw&&p.potw.women);
     if(p.teamOfWeek) html+='<div class="pf"><h6>Team of the Week</h6><b>'+(p.teamOfWeek.emoji?dEsc(p.teamOfWeek.emoji)+' ':'')+dEsc(p.teamOfWeek.name)+'</b>'+(p.teamOfWeek.record?' · '+dEsc(p.teamOfWeek.record):'')+'</div>';
     // Top Performers — tabbed (DSR / Best Diff / Most Pts), top 5 M & F
     var tp = p.topPerformers;
@@ -8466,7 +8476,7 @@
   }
 
   // ═══════════════════════════════════════════════════════════
-  // PLAYER OF THE WEEK — K'CHN award emails (wired to admin-potw)
+  // PLAYER OF THE WEEK — SuprDupr award emails (wired to admin-potw)
   // ═══════════════════════════════════════════════════════════
   var POTW = { week:null, wired:false };
   // Every call carries the sidebar's working season — without it the endpoint

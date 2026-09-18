@@ -73,12 +73,6 @@
 (function () {
   'use strict';
 
-  var SPONSOR_MSGS = [
-    'Live scoring presented by <b>K’CHN</b>',
-    '<b>Point of the night</b> brought to you by K’CHN',
-    'Post-match at <b>K’CHN</b> — show your paddle, get 15% off'
-  ];
-
   var TUCK_KEY = 'ds-ticker-tucked';   // remembers a manual dismiss for the session
 
   // ---------- helpers ----------
@@ -94,9 +88,6 @@
   function shortCourt(m) {
     if (m.courtA && m.courtB) return 'Cts ' + m.courtA + ' & ' + m.courtB;
     return (m.court || '').replace('Courts ', 'Cts ');
-  }
-  function kchn() {
-    return '<span class="ds-kchn">K’CHN</span>';
   }
   function timeAgo(iso) {
     if (!iso) return '';
@@ -226,11 +217,6 @@
     '</span>';
   }
 
-  function sponsorItem(i) {
-    return '<span class="ds-tick-item is-sponsor">' + kchn() +
-      '<span class="msg">' + SPONSOR_MSGS[i % SPONSOR_MSGS.length] + '</span></span>';
-  }
-
   function phaseItem(d) {
     if (d.phase !== 'rivalry') return '';
     return '<span class="ds-tick-item">' +
@@ -239,13 +225,12 @@
     '</span>';
   }
 
-  // A short slate (3 matches) makes a stubby loop — pad with movers, the
-  // phase note, and a K'CHN slot after each match.
+  // A short slate (3 matches) makes a stubby loop — pad with movers and the
+  // phase note.
   function buildRun(d) {
-    var out = [], s = 0;
+    var out = [];
     (d.matches || []).forEach(function (m, i) {
       out.push(matchItem(m));
-      out.push(sponsorItem(s++));
       if ((d.movers || [])[i]) out.push(moverItem(d.movers[i]));
     });
     var ph = phaseItem(d);
@@ -269,9 +254,6 @@
     root.innerHTML =
       '<div class="ds-tick-brand"><span class="ds-livedot"></span>Dink Society<span class="lbl">LIVE</span></div>' +
       '<div class="ds-tick-meta">' + meta + '</div>' +
-      '<div class="ds-tick-meta" style="gap:9px">' +
-        '<span class="ds-presented">Presented by</span>' + kchn() +
-      '</div>' +
       '<div class="ds-tick-viewport"><div class="ds-tick-track">' + run + run + '</div></div>' +
       '<button class="ds-tick-close" type="button" aria-label="Hide live ticker">×</button>';
 
@@ -356,7 +338,6 @@
         '<span class="wk">Week ' + d.week +
           (d.phase === 'rivalry' ? ' · <span class="rival">' + esc(d.phaseLabel || 'Rivalry Week') + '</span>' : '') +
         '</span>' +
-        '<span class="spon"><span class="ds-presented">Presented by</span>' + kchn() + '</span>' +
       '</div>' +
       '<div class="ds-lc-rows">' + rows + '</div>' +
       '<div class="ds-lc-foot">' +

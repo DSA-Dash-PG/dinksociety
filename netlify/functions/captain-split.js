@@ -6,7 +6,7 @@
 //
 //   GET                       → { config, ledger, rosterLocked, teamFeeCents }
 //   POST { action, ... }
-//     save           { enabled?, mode, amount?, rate?, collect?, venmoHandle? }
+//     save           { enabled?, mode, amount?, rate?, buyIn?, collect?, venmoHandle? }
 //     override       { playerId, amount | null }      flat: pin / unpin one share
 //     lock | unlock                                    flat: freeze / thaw the player set
 //     pay            { playerId, amount? , method?, note? }   amount omitted = full balance
@@ -81,6 +81,10 @@ export default async (req) => {
       const c = toCents(body.rate);
       if (c == null || c > MAX_RATE_CENTS) return json({ error: 'Enter a price per game, like 4.25.' }, 400);
       split.rateCents = c;
+      // Optional flat buy-in that the per-game charges draw down. Blank / 0 = none.
+      const b = body.buyIn == null || String(body.buyIn).trim() === '' ? 0 : toCents(body.buyIn);
+      if (b == null || b > MAX_AMOUNT_CENTS) return json({ error: 'Enter the buy-in like 50 — or leave it blank for none.' }, 400);
+      split.buyInCents = b;
       split.collect = body.collect === 'season' ? 'season' : 'weekly';
     }
     if (body.venmoHandle != null && String(body.venmoHandle).trim() !== '') {
@@ -95,7 +99,7 @@ export default async (req) => {
     await saveSplit(split, actor.email);
     await logActivity({
       type: 'split.saved', actor, team,
-      details: `${team.name}: team split ${split.enabled ? 'set to' : 'turned off —'} ${mode === 'flat' ? 'flat ' + fmtCents(split.amountCents) : fmtCents(split.rateCents) + ' per game'}`,
+      details: `${team.name}: team split ${split.enabled ? 'set to' : 'turned off —'} ${mode === 'flat' ? 'flat ' + fmtCents(split.amountCents) : fmtCents(split.rateCents) + ' per game' + (split.buyInCents ? ' with a ' + fmtCents(split.buyInCents) + ' buy-in' : '')}`,
     }).catch(() => {});
     return respond(team, split);
   }

@@ -143,7 +143,7 @@ export default async (req) => {
     man: pow.men?.[0] || null,
   } : null;
 
-  // K'CHN Top Chefs — weekly winners feed for the portal Leaders tab
+  // SuprDupr Top Chefs — weekly winners feed for the portal Leaders tab
   const chefWeeks = (standings?.weeklyTopPerformers || []).map(w => ({
     week: w.week,
     women: (w.women || []).slice(0, 3),

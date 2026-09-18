@@ -1,7 +1,7 @@
 // netlify/functions/lib/potw-size-token.js
 //
 // Stateless signed tokens for the one-tap "claim your shirt size" buttons in the
-// K'CHN Player of the Week congrats email. Each winner's email carries a token
+// SuprDupr Player of the Week congrats email. Each winner's email carries a token
 // encoding { circuit, week, winnerKey }, HMAC-signed so a player can record their
 // size with one tap but nobody can forge a size submission for another winner.
 //

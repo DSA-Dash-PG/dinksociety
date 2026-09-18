@@ -113,7 +113,7 @@
       if (d.dsr != null) stats.push('<span><b>'+esc(d.dsr)+'</b><i>DSR</i></span>');
       if (d.rec)         stats.push('<span><b>'+esc(d.rec)+'</b><i>Rec</i></span>');
       if (d.diff != null)stats.push('<span><b>'+(d.diff>0?'+':'')+esc(d.diff)+'</b><i>Diff</i></span>');
-      return '<div class="ds-entcard__h"><span class="ds-entcard__av '+(/^f/i.test(d.gender)?'f':'m')+'">'+esc(initials(d.name))+(d.isChef?'<i class="chef">👨‍🍳</i>':'')+'</span>'
+      return '<div class="ds-entcard__h"><span class="ds-entcard__av '+(/^f/i.test(d.gender)?'f':'m')+'">'+esc(initials(d.name))+(d.isChef?'<i class="chef">🏆</i>':'')+'</span>'
         + '<div><div class="ds-entcard__nm">'+esc(d.name)+'</div>'+(d.teamName?'<div class="ds-entcard__sub">'+esc(d.teamName)+'</div>':'')+'</div></div>'
         + (stats.length?'<div class="ds-entcard__stats">'+stats.join('')+'</div>':'')
         + '<div class="ds-entcard__go">View player →</div>';

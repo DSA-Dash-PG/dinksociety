@@ -1,6 +1,6 @@
 // netlify/functions/lib/potw-token.js
 // Single-use tokens for the one-tap "Approve & send" links in the weekly
-// K'CHN Player of the Week approval email. Same keyless model as
+// SuprDupr Player of the Week approval email. Same keyless model as
 // lib/ladder-token.js: an unguessable random id stored in a blob, marked used
 // on first consume. No HMAC secret — security rests on the 48-hex-char id plus
 // strong-consistency mark-used-before-acting.
