@@ -59,7 +59,7 @@
     .card{ position:absolute; top:0; left:0; transform-origin:0 0; width:1080px; padding:64px; display:flex; flex-direction:column; color:#f5f5f5; font-family:Inter,system-ui,sans-serif; background:#0e0e0e; -webkit-font-smoothing:antialiased; }
     .card .photo{ position:absolute; inset:0; background:radial-gradient(900px 700px at 70% 20%,rgba(23,215,176,.20),transparent 60%),radial-gradient(700px 600px at 10% 90%,rgba(184,255,44,.14),transparent 60%),linear-gradient(180deg,#141a14 0%,#0e0e0e 100%); background-size:cover; background-position:center top; }
     .card .fade{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(14,14,14,.10) 26%,rgba(14,14,14,.92) 60%,#0e0e0e 76%); }
-    .card .fade.top{ background:linear-gradient(180deg,rgba(14,14,14,.55),#0e0e0e 42%); }
+    .card .fade.top{ background:linear-gradient(180deg,rgba(14,14,14,.12) 18%,rgba(14,14,14,.88) 46%,#0e0e0e 58%); }
     .card > *{ position:relative; }
     .card .disp{ font-weight:800; text-transform:uppercase; line-height:.92; letter-spacing:-.025em; }
     .card .mono{ font-family:var(--cd-mono); font-size:19px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:#9aa39a; }
@@ -70,6 +70,7 @@
     .card .brand b{ color:#b8ff2c; }
     .card .brand small{ display:block; font-family:var(--cd-mono); font-size:12px; letter-spacing:.22em; color:#5f675f; font-weight:600; margin-top:5px; }
     .card .ftr{ margin-top:auto; display:flex; justify-content:space-between; align-items:flex-end; gap:20px; padding-top:28px; border-top:2px solid rgba(255,255,255,.08); }
+    .card.hero .ftr{ margin-top:40px; }
     .card .sd{ display:inline-block; height:56px; width:auto; border-radius:8px; }
     .card .rank{ font-weight:800; font-size:190px; line-height:.8; color:var(--cd-gold); letter-spacing:-.06em; }
     .card .rank small{ font-size:.28em; vertical-align:top; margin-left:2px; letter-spacing:0; }
@@ -92,6 +93,7 @@
     .card .ctx{ font-size:28px; line-height:1.45; color:#f5f5f5; margin-top:28px; max-width:920px; font-weight:500; }
     .card .ctx.m{ color:#9aa39a; }
     .card .h2{ font-size:96px; margin-top:34px; }
+    .card .h2.lift{ margin-top:auto; }
     .card .rows{ margin-top:30px; }
     .card .row{ display:grid; grid-template-columns:56px 1fr 1fr 130px; gap:20px; align-items:center; padding:14px 0; border-bottom:2px solid rgba(255,255,255,.06); }
     .card .row .n{ font-weight:800; font-size:38px; color:#5f675f; line-height:1; }
@@ -258,7 +260,8 @@
       else bits.push(w.w + '–' + w.l + ' on the night');
       if (w.diff != null) bits.push(signed(w.diff) + ' on points');
       if (w.dsr != null) bits.push('a ' + w.dsr + ' DSR, top of the ' + (S.gender === 'women' ? "women's" : "men's") + ' board');
-      return first(w.name) + ' turned in ' + bits.join(', ') + ' in Week ' + wk + '.';
+      var lead = (S._place && S._place > 1) ? first(w.name) + ' was ' + S._place + (['', 'st', 'nd', 'rd'][S._place] || 'th') + ' on the ' + (S.gender === 'women' ? "women's" : "men's") + ' board with ' : first(w.name) + ' turned in ';
+      return lead + bits.join(', ') + ' in Week ' + wk + '.';
     }
     function ctxTotw(t, m) {
       var p = mp(m), home = m.home.id === t.id;
@@ -295,6 +298,8 @@
       var list = S.gender === 'women' ? perf.women : perf.men;
       var w = (S.who && list.find(function (x) { return slug(x.name) === S.who || x.playerId === S.who; })) || list[0];
       if (!w) return null;
+      var place = list.indexOf(w) + 1, ord = ['', 'st', 'nd', 'rd'][place] || 'th';
+      var gLabel = S.gender === 'women' ? "Women's" : "Men's";
       var gamesLine = [];
       // per-game W/L in order from the box scores (this player's confirmed games)
       (gd.matches || []).forEach(function (m) { (m.games || []).forEach(function (g) {
@@ -303,14 +308,15 @@
       }); });
       if (!gamesLine.length) gamesLine = Array(w.w).fill(true).concat(Array(w.l).fill(false));
       var photo = S.photo || w.photoUrl || null;
+      S._place = place;
       var ctx = S.ctx != null ? S.ctx : ctxPotw(w, wk);
       setCtx(ctx);
       var maxPts = Math.max(w.ps || 0, 44);
-      return photoLayer(photo) + '<div class="fade"></div>' +
-        hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Player of the Week</b>') +
-        '<div style="margin-top:auto;display:flex;align-items:flex-end;gap:26px"><div class="rank">1<small>st</small></div><div style="min-width:0">' +
+      return '<div class="hero-flag"></div>' + photoLayer(photo) + '<div class="fade"></div>' +
+        hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>' + (place === 1 ? 'Player of the Week' : gLabel + ' top ' + list.length) + '</b>') +
+        '<div style="margin-top:auto;display:flex;align-items:flex-end;gap:26px"><div class="rank">' + place + '<small>' + ord + '</small></div><div style="min-width:0">' +
           '<div class="disp name' + (w.name.length > 16 ? (w.name.length > 22 ? ' xl' : ' long') : '') + '">' + esc(w.name) + '</div>' +
-          '<div class="mono" style="margin-top:12px">' + esc(w.teamName || '') + ' · ' + (S.gender === 'women' ? "Women's" : "Men's") + ' · <span class="lime">SuprDupr Player of the Week</span></div></div></div>' +
+          '<div class="mono" style="margin-top:12px">' + esc(w.teamName || '') + ' · ' + gLabel + ' · ' + (place === 1 ? '<span class="lime">SuprDupr Player of the Week</span>' : '<span class="lime">' + place + ord + ' on the week\'s board</span>') + '</div></div></div>' +
         '<div class="bars">' +
           '<div class="bar"><span class="k">Games</span><div class="dots">' + dotsFrom(gamesLine, gamesLine.length) + '</div><span class="v">' + w.w + '–' + w.l + '</span></div>' +
           '<div class="bar"><span class="k">DSR</span><div class="t"><i style="width:' + Math.min(100, w.dsr || 0) + '%"></i></div><span class="v">' + (w.dsr != null ? w.dsr : '—') + '</span></div>' +
@@ -318,7 +324,7 @@
           '<div class="bar"><span class="k">Points</span><div class="t"><i style="width:' + Math.min(100, (w.ps || 0) / maxPts * 100) + '%"></i></div><span class="v">' + (w.ps != null ? w.ps : '—') + '</span></div>' +
         '</div>' +
         '<div class="ctx">' + esc(ctx) + '</div>' +
-        '<div class="ftr"><div class="mono">Presented by</div>' + sdLogo() + '</div>';
+        '<div class="ftr"><div class="mono">' + (place === 1 ? 'Presented by' : 'Player of the Week presented by') + '</div>' + sdLogo() + '</div>';
     }
 
     function rLeaders(wk) {
@@ -328,11 +334,11 @@
       var key = S.metric === 'pts' ? 'ps' : S.metric;
       var label = S.metric === 'dsr' ? 'DSR' : S.metric === 'diff' ? 'Point diff' : 'Points';
       var top = Math.max.apply(null, list.map(function (p) { return Math.abs(Number(p[key]) || 0); })) || 1;
-      var ctx = S.ctx != null ? S.ctx : (short(list[0].name) + ' leads the ' + (S.gender === 'women' ? "women's" : "men's") + ' ' + label.toLowerCase() + ' board for Week ' + wk + '.');
+      var ctx = S.ctx != null ? S.ctx : (short(list[0].name) + ' leads the ' + (S.gender === 'women' ? "women's" : "men's") + ' ' + (S.metric === 'dsr' ? 'DSR' : label.toLowerCase()) + ' board for Week ' + wk + '.');
       setCtx(ctx);
-      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade top"></div>' +
         hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Leaders</b>') +
-        '<div class="disp h2">' + esc(label) + '<br><span class="lime">Top ' + list.length + '</span></div>' +
+        '<div class="disp h2 lift">' + esc(label) + '<br><span class="lime">Top ' + list.length + '</span></div>' +
         '<div class="mono" style="margin-top:12px">' + (S.gender === 'women' ? "Women's" : "Men's") + ' · Week ' + wk + '</div>' +
         '<div class="rows">' + list.map(function (p, i) {
           var v = Number(p[key]) || 0;
@@ -347,9 +353,9 @@
       var first = ms.map(function (m) { return m.scheduledAt; }).filter(Boolean).sort()[0];
       var ctx = S.ctx != null ? S.ctx : '';
       setCtx(ctx);
-      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade top"></div>' +
         hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Results</b>') +
-        '<div class="disp h2">How it<br><span class="lime">ended</span></div>' +
+        '<div class="disp h2 lift">How it<br><span class="lime">ended</span></div>' +
         '<div class="mono" style="margin-top:12px">' + esc(fmtDate(first)) + (gd.venue ? ' · ' + esc(gd.venue) : '') + ' · <span class="lime">●</span> home <span class="teal">●</span> away</div>' +
         '<div style="margin-top:26px">' + ms.map(function (m) {
           var p = mp(m);
@@ -370,7 +376,7 @@
       var pd = home ? m.pointsHome - m.pointsAway : m.pointsAway - m.pointsHome;
       var perf = weekPerf(wk), potw = [];
       if (perf) { (perf.men || []).slice(0, 1).concat((perf.women || []).slice(0, 1)).forEach(function (w) { if (w.teamId === t.id || w.teamName === t.name) potw.push(short(w.name)); }); }
-      return photoLayer(S.photo) + '<div class="fade"></div>' +
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade"></div>' +
         hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Team of the Week</b>') +
         '<div style="margin-top:auto"><div class="mono lime" style="font-size:22px">' + (t.emoji ? esc(t.emoji) + ' ' : '') + 'Team of the Week</div>' +
           '<div class="disp" style="font-size:' + (t.name.length > 14 ? 96 : 120) + 'px;margin-top:10px">' + esc(t.name) + '</div>' +
@@ -399,9 +405,9 @@
       var big = ms.slice().sort(function (a, b) { return Math.abs(b.pointsHome - b.pointsAway) - Math.abs(a.pointsHome - a.pointsAway); })[0];
       if (big) { var p2 = mp(big), hw = big.pointsHome >= big.pointsAway; items.push({ k: 'Widest margin', h: (hw ? p2[0] + '–' + p2[1] : p2[1] + '–' + p2[0]), p: '<b>' + esc(hw ? big.home.name : big.away.name) + '</b> over ' + esc(hw ? big.away.name : big.home.name) + ', ' + (hw ? big.gamesHome + '–' + big.gamesAway : big.gamesAway + '–' + big.gamesHome) + ' in games and ' + signed(Math.abs(big.pointsHome - big.pointsAway)) + ' on points.' }); }
       var ctx = S.ctx != null ? S.ctx : ''; setCtx(ctx);
-      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade top"></div>' +
         hdr('Season ' + seasonNo() + ' · Week ' + wk + ' · <b>Highlights</b>') +
-        '<div class="disp h2">Highlights</div>' +
+        '<div class="disp h2 lift">Highlights</div>' +
         '<div class="mono" style="margin-top:10px">' + games.length + ' games · ' + ms.length + ' matches · one night</div>' +
         '<div style="margin-top:16px">' + items.slice(0, 4).map(function (it) { return '<div class="hl"><div class="k">' + esc(it.k) + '</div><div class="h">' + esc(it.h) + '</div><p>' + it.p + '</p></div>'; }).join('') + '</div>' +
         (ctx ? '<div class="ctx m">' + esc(ctx) + '</div>' : '') +
@@ -414,9 +420,9 @@
       var ev = n.event || {};
       var ctx = S.ctx != null ? S.ctx : (st.players.length + ' players · ' + st.rounds + ' rounds · filled blocks are wins, in round order.');
       setCtx(ctx);
-      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade top"></div>' +
         hdr('Ladders · ' + esc(fmtDate(ev.date)) + ' · <b>Final ladder</b>', 'dinksociety.app/ladders') +
-        '<div class="disp h2">' + esc(ev.name || 'The ladder') + '<br><span class="lime">Top ' + top.length + '</span></div>' +
+        '<div class="disp h2 lift">' + esc(ev.name || 'The ladder') + '<br><span class="lime">Top ' + top.length + '</span></div>' +
         '<div class="mono" style="margin-top:12px">' + (ev.place ? esc(ev.place) + ' · ' : '') + st.players.length + ' players · ' + st.rounds + ' rounds</div>' +
         '<div class="rows">' + top.map(function (p, i) {
           var blocks = ''; for (var r = 0; r < st.rounds; r++) { var x = p.rounds[r]; blocks += '<span class="blk' + (x ? (x.win ? '' : ' o') : ' o') + '"' + (x ? '' : ' style="opacity:.35"') + '></span>'; }
@@ -444,9 +450,9 @@
       var ctx = S.ctx != null ? S.ctx : 'Winners move up a court, losers move down.'; setCtx(ctx);
       var cn = function (c) { return (st.courtNames && st.courtNames[c - 1]) ? String(st.courtNames[c - 1]) : 'C' + c; };
       var cols = 'grid-template-columns:70px repeat(' + st.rounds + ',34px)';
-      return photoLayer(S.photo) + '<div class="fade top"></div>' +
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade top"></div>' +
         hdr('Ladders · ' + esc(fmtDate(ev.date)) + ' · <b>Court by round</b>', 'dinksociety.app/ladders') +
-        '<div class="disp h2">Court by<br><span class="lime">round</span></div>' +
+        '<div class="disp h2 lift">Court by<br><span class="lime">round</span></div>' +
         '<div class="mono" style="margin-top:12px">' + esc(ctx) + '</div>' +
         '<div style="margin-top:30px">' + picks.map(function (x) {
           var out = '<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:8px;gap:20px"><span class="disp" style="font-size:40px;color:var(--cd-gold)">' + esc(short(x.p.name)) + '</span><span style="font-size:22px;color:#9aa39a">' + esc(x.story) + '</span></div><div class="cbr" style="' + cols + ';margin-bottom:30px">';
@@ -509,7 +515,8 @@
       var maxW = Math.min(560, f.parentElement.clientWidth - 8), scale = maxW / 1080;
       f.classList.remove('empty');
       f.style.width = Math.round(1080 * scale) + 'px'; f.style.height = Math.round(h * scale) + 'px';
-      f.innerHTML = '<div class="card" id="cd-card" style="height:' + h + 'px;transform:scale(' + scale + ')">' + html + '</div>';
+      var hero = html.indexOf('hero-flag') === 0 || html.indexOf('<div class="hero-flag"></div>') === 0;
+      f.innerHTML = '<div class="card' + (hero ? ' hero' : '') + '" id="cd-card" style="height:' + h + 'px;transform:scale(' + scale + ')">' + html.replace('<div class="hero-flag"></div>', '') + '</div>';
       $('cd-dl').disabled = false;
     }
     function showEmpty(t) { var f = $('cd-frame'); f.className = 'frame empty'; f.style.width = '560px'; f.style.height = '360px'; f.textContent = t; $('cd-dl').disabled = true; }
