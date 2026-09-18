@@ -22,12 +22,11 @@ import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import {
-  getDrop, saveDraft, publishDrop, unpublishDrop, listDrops, parseEdition,
+  getDrop, saveDraft, publishDrop, unpublishDrop, listDrops, parseEdition, markBroadcast,
 } from './lib/drop.js';
 import { livePerformers } from './lib/drop-insights.js';
 import { appendMessage, generateId } from './lib/messages.js';
 import { renderAdminMessage, htmlToPlain } from './lib/email.js';
-import { sendNotify } from './lib/notify-prefs.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -73,9 +72,12 @@ function editionOf(body) {
   return ed ? ed.id : null;
 }
 
-// Compose + send the publish broadcast: a portal announcement to every team
-// thread plus (optionally) an email to players, both linking to the article.
-async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'players' } = {}) {
+// Compose + fire the publish broadcast: a portal announcement to every team
+// thread (inline — six writes, fast) plus the player emails, which are queued
+// to admin-broadcast-email-background. Sending ~70 emails inline blew through
+// the 10s function limit: the request 504'd, the admin saw "Publish failed",
+// clicked again, and every captain got the announcement twice a minute apart.
+async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = 'players' } = {}) {
   const site = siteUrl();
   const link = `${site}/drop.html?edition=${encodeURIComponent(rec.edition)}`;
   const subject = rec.kicker || `The Drop · ${rec.label || 'Week ' + rec.week}`;
@@ -91,10 +93,6 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
 
   const teams = await listSeasonTeams(rec.circuit);
   const broadcastId = generateId('bc_');
-  const template = await getEmailTemplate();
-  const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  let recipients = 0, emailed = 0, failed = 0, skipped = 0, firstError = null;
-  const seen = new Set();   // one email per person, even if rostered on two teams
 
   for (const team of teams) {
     // Portal announcement (shows on player + captain portals via announcements.js).
@@ -103,45 +101,39 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
       authorEmail: rec.sentBy || 'desk@dinksociety.app',
       body: `${subject}\n\n${text}`, bodyHtml, broadcastId,
     });
-    if (doEmail) {
-      const tos = recipientEmails(team, audience).filter(e => !seen.has(e));
-      tos.forEach(e => seen.add(e));
-      recipients += tos.length;
-      for (const to of tos) {
-        try {
-          // Through the notify gate: a player who unsubscribed from league
-          // broadcasts is skipped, and the manage/unsubscribe footer is added.
-          const r = await sendNotify({
-            to, category: 'league', subject: `${subject} — The Dink Society`,
-            html: renderAdminMessage({ subject, bodyHtml, body: text, teamName: team.name, portalUrl: link, template }),
-          });
-          if (r && r.skipped) { skipped++; continue; }
-          emailed++;
-          await sleep(120);  // stay under Resend's per-second send limit on big blasts
-        } catch (e) {
-          failed++;
-          if (!firstError) firstError = e.message || String(e);
-          console.error('drop email failed:', e);
-        }
-      }
-    }
   }
-  if (doEmail) console.log(`drop broadcast week ${rec.week} [circuit ${rec.circuit}]: ${teams.length} teams, ${recipients} recipients, ${emailed} sent, ${skipped} opted out, ${failed} failed${firstError ? ' · first error: ' + firstError : ''}`);
 
-  // Log to the broadcasts store so it surfaces as a league announcement, gated
-  // to players (the recap is for everyone).
-  try {
-    await getStore('broadcasts').setJSON(`broadcast/${broadcastId}.json`, {
-      id: broadcastId, subject, body: text, bodyHtml,
-      attachments: [], scope: 'all', division: null, teamIds: null,
-      audience: 'players', sentEmail: !!doEmail, teamCount: teams.length,
-      recipients, emailed, skipped, failed, firstError,
-      sentBy: rec.sentBy || 'desk@dinksociety.app', sentAt: new Date().toISOString(),
-      kind: 'drop', dropWeek: rec.week, dropEdition: rec.edition,
-    });
-  } catch (e) { console.error('drop broadcast log failed:', e); }
+  // Count unique recipients across the season's teams (for the record/UI).
+  const seen = new Set();
+  for (const team of teams) for (const e of recipientEmails(team, audience)) seen.add(e);
+  const recipients = doEmail ? seen.size : 0;
 
-  return { broadcastId, circuit: rec.circuit, teamCount: teams.length, recipients, emailed, skipped, failed, firstError };
+  // The broadcast record is both the announcement log and the work order for
+  // the background sender (same shape admin-messages uses).
+  await getStore('broadcasts').setJSON(`broadcast/${broadcastId}.json`, {
+    id: broadcastId, subject, body: text, bodyHtml,
+    attachments: [], scope: 'all', division: null,
+    teamIds: teams.map(t => t.id), audience, sentEmail: !!doEmail,
+    teamCount: teams.length, recipients, emailed: 0, failed: 0, optedOut: 0,
+    emailStatus: doEmail ? (recipients ? 'queued' : 'none') : 'none',
+    sentBy: rec.sentBy || 'desk@dinksociety.app', sentAt: new Date().toISOString(),
+    kind: 'drop', dropWeek: rec.week, dropEdition: rec.edition, circuit: rec.circuit,
+  });
+
+  let queued = false;
+  if (doEmail && recipients) {
+    try {
+      const r = await fetch(`${site}/.netlify/functions/admin-broadcast-email-background`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', cookie: req.headers.get('cookie') || '' },
+        body: JSON.stringify({ broadcastId }),
+      });
+      queued = r.status === 202 || r.ok;
+      if (!queued) console.error('drop background email kick-off failed:', r.status);
+    } catch (e) { console.error('drop background email kick-off failed:', e); }
+  }
+  console.log(`drop broadcast ${rec.edition} [circuit ${rec.circuit}]: ${teams.length} teams, ${recipients} recipients, email ${queued ? 'queued' : (doEmail ? 'NOT queued' : 'off')}`);
+  return { broadcastId, circuit: rec.circuit, teamCount: teams.length, recipients, queued, emailed: 0, failed: 0 };
 }
 
 function recipientEmails(team, audience) {
@@ -205,13 +197,18 @@ export default async (req) => {
         await saveDraft(code, wk, body, admin.email);
       }
       const performers = await livePerformers(code);
-      const rec = await publishDrop(code, wk, admin.email, performers);
       const channels = body.channels || { email: true, portal: true };
+      // Idempotent: a second Publish on an edition that already broadcast is a
+      // no-op unless the admin explicitly asks to re-notify (rebroadcast:true).
+      const alreadyBroadcast = existing.status === 'published' && !!existing.broadcastId;
+      const wantBroadcast = (channels.email || channels.portal) && (!alreadyBroadcast || body.rebroadcast === true);
+      let rec = await publishDrop(code, wk, admin.email, performers);
       let broadcast = null;
-      if (channels.email || channels.portal) {
-        broadcast = await broadcastDrop(rec, { sendEmail: !!channels.email, audience: body.audience || 'players' });
+      if (wantBroadcast) {
+        broadcast = await broadcastDrop(rec, req, { sendEmail: !!channels.email, audience: body.audience || 'players' });
+        rec = (await markBroadcast(code, wk, broadcast.broadcastId)) || rec;
       }
-      return json({ ok: true, record: rec, broadcast });
+      return json({ ok: true, record: rec, broadcast, alreadyBroadcast: alreadyBroadcast && !wantBroadcast });
     }
 
     if (body.action === 'unpublish') {

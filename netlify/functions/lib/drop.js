@@ -328,6 +328,17 @@ export async function publishDrop(circuit, edition, who = null, performers = nul
   return rec;
 }
 
+/** Stamp the broadcast that went out for an edition, without touching the
+ * editorial fields (saveDraft would rebuild them from the input). */
+export async function markBroadcast(circuit, edition, broadcastId) {
+  const code = circuitCode(circuit);
+  const existing = await getDrop(code, edition);
+  if (!existing) return null;
+  const rec = { ...existing, broadcastId, broadcastAt: new Date().toISOString() };
+  await store().setJSON(dropKey(code, existing.edition), rec);
+  return rec;
+}
+
 /** Revert a published edition back to draft (un-publish). */
 export async function unpublishDrop(circuit, edition) {
   const code = circuitCode(circuit);
