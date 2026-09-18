@@ -546,9 +546,32 @@
         for (const [wk, vals] of Object.entries(avgByWeek)) {
           leagueAvg[wk] = Math.round(vals.reduce((s, v) => s + v, 0) / vals.length * 10) / 10;
         }
+        // League envelope — so the axes are the LEAGUE's, not this player's.
+        // Rank mode runs #1 → #<pool size> (everyone rated that week, same
+        // pools as the provisional ranks); DSR mode spans the league's lowest
+        // → highest rating. A #25-of-40 player then plots in the bottom half
+        // rather than pinned to the floor, and a 24.6 sits where it really is.
+        const pool = { all: 0, gender: 0, mixed: 0 };
+        const range = { all: [Infinity, -Infinity], gender: [Infinity, -Infinity], mixed: [Infinity, -Infinity] };
+        const perWeek = {};
+        const span = (k, v) => { if (v == null) return; if (v < range[k][0]) range[k][0] = v; if (v > range[k][1]) range[k][1] = v; };
+        for (const p of allP) {
+          const sameGender = norm(p.gender) === myGender;
+          for (const h of (p.dsrHistory || [])) {
+            const w = (perWeek[h.week] ||= { all: 0, gender: 0, mixed: 0 });
+            if (h.rankProv != null) w.all = Math.max(w.all, h.rankProv);
+            if (sameGender && h.gRankProv != null) w.gender = Math.max(w.gender, h.gRankProv);
+            if (h.xRankProv != null) w.mixed = Math.max(w.mixed, h.xRankProv);
+            span('all', h.dsr); span('gender', sameGender ? h.gDsr : null); span('mixed', h.xDsr);
+          }
+        }
+        for (const w of Object.values(perWeek)) for (const k of Object.keys(pool)) pool[k] = Math.max(pool[k], w[k]);
+        for (const k of Object.keys(range)) if (!isFinite(range[k][0])) range[k] = null;
         trend = {
           hist: myHist,
           leagueAvg,
+          pool,
+          range,
           genderLabel: myGender === 'F' ? "Women's" : "Men's",
           totalWeeks: Math.max(8, ...myHist.map(h => h.week)),
         };
@@ -1131,12 +1154,23 @@
         return out;
       };
 
+      // Axis bounds come from the LEAGUE (trend.pool / trend.range), not from
+      // this player's own points — the chart is "where am I in the league",
+      // so a #25 player must not look like #1-of-1. The player's own values
+      // are only folded in as a safety net when the league data is missing.
       function bounds() {
         let vals = [];
         for (const k of Object.keys(SERIES)) if (show[k]) vals = vals.concat(pts(k).map(p => p.val));
         if (mode === 'rank') {
-          const hi = Math.max(10, ...(vals.length ? vals : [10]));
-          return { lo: 1, hi };
+          let hi = 0;
+          for (const k of Object.keys(SERIES)) if (show[k]) hi = Math.max(hi, (trend.pool || {})[k] || 0);
+          hi = Math.max(hi, ...(vals.length ? vals : [0]));
+          return { lo: 1, hi: Math.max(hi, 2) };
+        }
+        for (const k of Object.keys(SERIES)) {
+          if (!show[k]) continue;
+          const r = (trend.range || {})[k];
+          if (r) vals.push(r[0], r[1]);
         }
         for (const [, avg] of Object.entries(trend.leagueAvg || {})) vals.push(avg);
         if (!vals.length) vals = [0, 100];
@@ -1167,6 +1201,9 @@
           const y = yFor(v, b);
           s += `<line x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}" stroke="var(--color-border)" stroke-width="1"/>`;
           s += `<text x="${PL - 8}" y="${y + 3.5}" text-anchor="end" font-size="10" fill="var(--color-text-faint)" font-weight="600">${mode === 'rank' ? '#' + Math.round(v) : v.toFixed(0)}</text>`;
+        }
+        if (mode === 'rank') {
+          s += `<text x="${W - PR}" y="${H - PB - 6}" text-anchor="end" font-size="9.5" fill="var(--color-text-faint)" font-weight="700" letter-spacing="0.06em">${Math.round(b.hi)} RATED</text>`;
         }
         const lastWk = Math.max(...trend.hist.map(h => h.week));
         if (lastWk < TOTAL) {
