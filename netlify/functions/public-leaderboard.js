@@ -47,7 +47,39 @@ async function serveAggregate(circuit, storeName, key) {
       message: 'No data yet for this season. Standings populate as matches finalize.',
     });
   }
+  await fillPhotos(data);
   return json({ circuit, ...data });
+}
+
+// Profile photos, resolved at read time from the photo store. The standings
+// blob only carries a photoUrl for players whose roster entry had a photo stamp
+// when it was last rebuilt — anyone who uploaded a photo afterwards showed as
+// initials on the home page, leaderboard and cards until the next rebuild.
+// One list() over img/ gives every id that has a photo; fill the gaps here.
+async function fillPhotos(data) {
+  let ids = null;
+  const has = async (id) => {
+    if (ids === null) {
+      ids = new Map();
+      try {
+        const { blobs } = await getStore('player-photos').list({ prefix: 'img/' });
+        for (const b of blobs || []) { const k = b.key.slice(4); if (k) ids.set(k, b.etag || ''); }
+      } catch { /* no store yet */ }
+    }
+    return ids.has(id) ? ids.get(id) : null;
+  };
+  const url = (id, v) => `/.netlify/functions/player-photo-serve?id=${encodeURIComponent(id)}&v=${encodeURIComponent(v || '')}`;
+  const fix = async (e) => {
+    if (!e || e.photoUrl || !e.playerId) return;
+    const v = await has(e.playerId);
+    if (v !== null) e.photoUrl = url(e.playerId, v);
+  };
+  for (const wk of data.weeklyTopPerformers || []) {
+    for (const e of wk.men || []) await fix(e);
+    for (const e of wk.women || []) await fix(e);
+    if (wk.leaders) for (const g of ['men', 'women']) { const L = wk.leaders[g]; if (L) for (const k of Object.keys(L)) for (const e of L[k] || []) await fix(e); }
+  }
+  if (data.players && typeof data.players === 'object') for (const e of Object.values(data.players)) await fix(e);
 }
 
 async function serveSchedule(circuit) {
