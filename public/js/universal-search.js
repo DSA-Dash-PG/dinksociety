@@ -50,6 +50,7 @@
 .ds-srch-dsr{font-size:15px;font-weight:800;color:var(--color-lime);flex:none;font-variant-numeric:tabular-nums}
 .ds-srch-dsr.teal{color:var(--color-teal)}
 .ds-srch-dsr small{font-size:8px;color:var(--color-text-faint);font-weight:700}
+.ds-srch-season{display:inline-block;font-size:9px;font-weight:800;letter-spacing:.06em;color:var(--color-text-faint);background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;padding:1px 5px;margin-left:6px;vertical-align:middle;}
 .ds-srch-rank{font-size:10px;font-weight:800;color:var(--color-text-muted);background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:9999px;padding:3px 7px;flex:none;margin-left:8px}
 .ds-srch-empty{padding:30px 18px;text-align:center;color:var(--color-text-faint);font-size:13px;line-height:1.6}
 .ds-srch-empty .big{font-size:14px;color:var(--color-text-muted);margin-bottom:3px}
@@ -98,7 +99,7 @@
   }
 
   var overlay, input, resEl, scopesEl;
-  var SEASON, SUF, idx = null, loading = null, SCOPE = 'all', SEL = 0, FLAT = [];
+  var SUF = '', idx = null, loading = null, SCOPE = 'all', SEL = 0, FLAT = [];
 
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]; }); }
   function slugify(s) { return String(s == null ? '' : s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
@@ -106,34 +107,78 @@
   function color(n) { var h = 0, s = String(n || ''); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; var c = ['#b8ff2c', '#17d7b0', '#f0c040', '#ff6fb5', '#3b9eff', '#a78bfa']; return c[h % c.length]; }
   function teamEmoji(n) { return (idx && idx.emojiBy[n]) || '🏓'; }
 
-  function load() {
-    if (idx) return Promise.resolve(idx);
-    if (loading) return loading;
-    loading = Promise.all([
-      fetch('/.netlify/functions/public-leaderboard?view=players' + SUF).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-      fetch('/.netlify/functions/public-ladder-stats').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+  // Roman code for a season record / id ('season-2' → 'II').
+  function codeOf(sv) {
+    var c = sv && sv.circuit; if (c && /^(TEST|[IVX]+)$/i.test(String(c))) return String(c).toUpperCase();
+    var t = String((sv && (sv.id || sv)) || '').replace(/^(circuit|season)-/i, '').toUpperCase();
+    var R = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'];
+    return /^\d+$/.test(t) ? (R[Number(t)] || t) : (t || 'I');
+  }
+  function shortTag(sv) { var c = codeOf(sv); var R = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']; var n = R.indexOf(c); return c === 'TEST' ? 'Test' : (n > 0 ? 'S' + n : c); }
+
+  // Index ONE season: its teams + rosters + player stats.
+  function loadSeason(sv, isCurrent) {
+    var id = sv.id, code = codeOf(sv), suf = isCurrent ? '' : '&season=' + encodeURIComponent(id), tag = shortTag(sv);
+    return Promise.all([
+      fetch('/.netlify/functions/public-leaderboard?view=players&circuit=' + encodeURIComponent(code)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+      fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
     ]).then(function (res) {
-      var pj = res[0], tj = res[1], lj = res[2], teams = (tj && tj.teams) || [];
-      var emojiBy = {}, capBy = {};
+      var pj = res[0], tj = res[1], teams = (tj && tj.teams) || [];
+      var capBy = {}, emojiBy = {};
       teams.forEach(function (t) { emojiBy[t.name] = t.emoji || '🏓'; capBy[t.name] = t.captain || ((t.roster || []).find(function (r) { return r.isCaptain; }) || {}).name || ''; });
       var raw = (pj && (pj.players || pj.rows || pj)) || [];
       var arr = Array.isArray(raw) ? raw : Object.keys(raw || {}).map(function (k) { return raw[k]; });
-      var players = arr.map(function (p) {
-        return { name: p.name, team: p.teamName, gender: p.gender, dsr: (p.composite != null ? Number(p.composite) : (p.dsr != null ? Number(p.dsr) : null)), cap: (capBy[p.teamName] === p.name), href: '/player?name=' + encodeURIComponent(p.name) + '&team=' + slugify(p.teamName) + SUF };
-      }).filter(function (p) { return p.name && p.team; });
+      var statBy = {};
+      arr.forEach(function (p) { if (p && p.name) statBy[String(p.name).toLowerCase() + '|' + String(p.teamName || '').toLowerCase()] = p; });
+      var mk = function (name, teamName, gender, p) {
+        return { name: name, team: teamName, gender: gender || (p && p.gender) || '', season: tag, seasonId: id, current: isCurrent,
+          dsr: (p && p.composite != null ? Number(p.composite) : (p && p.dsr != null ? Number(p.dsr) : null)),
+          cap: (capBy[teamName] === name), emoji: emojiBy[teamName] || '🏓',
+          href: '/player?name=' + encodeURIComponent(name) + '&team=' + slugify(teamName) + suf };
+      };
+      var players = [], seen = {};
+      // Rosters first — a rostered player with no games yet still shows up.
+      teams.forEach(function (t) { (t.roster || []).forEach(function (r) {
+        if (!r || !r.name) return; var k = String(r.name).toLowerCase() + '|' + String(t.name).toLowerCase();
+        if (seen[k]) return; seen[k] = true; players.push(mk(r.name, t.name, r.gender, statBy[k]));
+      }); });
+      // Then anyone in the stats feed who isn't on a roster any more.
+      arr.forEach(function (p) {
+        if (!p || !p.name || !p.teamName) return; var k = String(p.name).toLowerCase() + '|' + String(p.teamName).toLowerCase();
+        if (seen[k]) return; seen[k] = true; players.push(mk(p.name, p.teamName, p.gender, p));
+      });
       players.filter(function (p) { return p.dsr != null; }).sort(function (a, b) { return b.dsr - a.dsr; }).forEach(function (p, i) { p.rank = i + 1; });
-      // Ladder Challengers players (no league team, e.g. manually-added ladder-only
-      // participants) — searchable site-wide too, not just league rosters. Deduped
-      // against league players by exact name match so a player in both isn't listed
-      // twice; no rank badge here since the Leaderboard's own ranked/NQ split is
-      // computed separately (10-game floor) and we don't want a second value that
-      // could drift out of sync with it.
+      var teamRows = teams.map(function (t) { return { name: t.name, emoji: emojiBy[t.name], cap: capBy[t.name], players: (t.roster || []).length, season: tag, seasonId: id, current: isCurrent, href: '/team?id=' + slugify(t.name) + suf }; });
+      return { players: players, teams: teamRows };
+    });
+  }
+
+  // Everything, every season: the index is the union of each season's teams,
+  // rosters and stats (current season listed first), plus ladder-only players.
+  function load() {
+    if (idx) return Promise.resolve(idx);
+    if (loading) return loading;
+    var seasonsP = window.dsSeason ? window.dsSeason().catch(function () { return null; }) : Promise.resolve(null);
+    loading = seasonsP.then(function (S) {
+      var all = (S && S.all && S.all.length) ? S.all.slice() : [{ id: 'circuit-i', circuit: 'I', name: 'Season 1' }];
+      var curId = (S && S.current && S.current.id) || (S && S.id) || null;
+      all = all.filter(function (x) { return x && x.id && x.isTest !== true && !/test/i.test(x.id); });
+      // Current season first, then newest → oldest.
+      all.sort(function (a, b) { var ac = a.id === curId ? 1 : 0, bc = b.id === curId ? 1 : 0; if (ac !== bc) return bc - ac; return String(b.startDate || '').localeCompare(String(a.startDate || '')); });
+      return Promise.all(all.map(function (sv) { return loadSeason(sv, sv.id === curId).catch(function () { return { players: [], teams: [] }; }); }))
+        .then(function (parts) {
+          return fetch('/.netlify/functions/public-ladder-stats').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+            .then(function (lj) { return { parts: parts, lj: lj }; });
+        });
+    }).then(function (o) {
+      var players = [], teams = [], emojiBy = {};
+      o.parts.forEach(function (pt) { players = players.concat(pt.players); teams = teams.concat(pt.teams); });
+      teams.forEach(function (t) { if (!emojiBy[t.name]) emojiBy[t.name] = t.emoji; });
       var leagueNames = {}; players.forEach(function (p) { leagueNames[p.name.toLowerCase()] = true; });
-      var lraw = (lj && lj.leaderboard) || [];
+      var lraw = (o.lj && o.lj.leaderboard) || [];
       var ladderPlayers = lraw.filter(function (p) { return p.name && !leagueNames[String(p.name).toLowerCase()]; })
         .map(function (p) { return { name: p.name, gender: p.gender, dr: (p.dr != null ? Number(p.dr) : null), isLadder: true, href: '/profile?ladderId=' + encodeURIComponent(p.id) }; });
-      idx = { players: players, ladderPlayers: ladderPlayers, teams: teams.map(function (t) { return { name: t.name, emoji: emojiBy[t.name], cap: capBy[t.name], players: (t.roster || []).length }; }), emojiBy: emojiBy };
+      idx = { players: players, ladderPlayers: ladderPlayers, teams: teams, emojiBy: emojiBy };
       return idx;
     });
     return loading;
@@ -146,10 +191,10 @@
     if (!idx) return { players: [], teams: [] };
     // Default (empty-query) suggestions stay league-only — ranked by DSR, which
     // ladder players don't have. Typed queries search across both pools.
-    if (!q) { if (SCOPE !== 'teams') players = idx.players.filter(function (p) { return p.dsr != null; }).slice(0, 6); if (SCOPE !== 'players') teams = idx.teams.slice(0, 6); return { players: players, teams: teams, sug: true }; }
+    if (!q) { if (SCOPE !== 'teams') players = idx.players.filter(function (p) { return p.current && p.dsr != null; }).sort(function (a, b) { return b.dsr - a.dsr; }).slice(0, 6); if (SCOPE !== 'players') teams = idx.teams.filter(function (t) { return t.current; }).slice(0, 6); return { players: players, teams: teams, sug: true }; }
     var allPlayers = idx.players.concat(idx.ladderPlayers || []);
-    if (SCOPE !== 'teams') players = allPlayers.map(function (p) { return { p: p, s: score(p.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s || ((b.p.dsr || 0) - (a.p.dsr || 0)); }).slice(0, 8).map(function (x) { return x.p; });
-    if (SCOPE !== 'players') teams = idx.teams.map(function (t) { return { t: t, s: score(t.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s; }).slice(0, 4).map(function (x) { return x.t; });
+    if (SCOPE !== 'teams') players = allPlayers.map(function (p) { return { p: p, s: score(p.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s || ((b.p.current ? 1 : 0) - (a.p.current ? 1 : 0)) || ((b.p.dsr || 0) - (a.p.dsr || 0)); }).slice(0, 12).map(function (x) { return x.p; });
+    if (SCOPE !== 'players') teams = idx.teams.map(function (t) { return { t: t, s: score(t.name, q) }; }).filter(function (x) { return x.s > 0; }).sort(function (a, b) { return b.s - a.s || ((b.t.current ? 1 : 0) - (a.t.current ? 1 : 0)); }).slice(0, 8).map(function (x) { return x.t; });
     return { players: players, teams: teams, sug: false };
   }
 
@@ -172,7 +217,7 @@
         } else {
           html += '<div class="ds-srch-row" data-i="' + i + '">' +
             '<div class="ds-srch-av" style="background:' + color(p.team) + '">' + esc(initials(p.name)) + '</div>' +
-            '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(p.name, q) + '</div><div class="ds-srch-sub">' + teamEmoji(p.team) + ' ' + esc(p.team) + (g ? ' · ' + g : '') + (p.cap ? ' · <span class="cp">Captain</span>' : '') + '</div></div>' +
+            '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(p.name, q) + (p.season && !p.current ? ' <span class="ds-srch-season">' + esc(p.season) + '</span>' : '') + '</div><div class="ds-srch-sub">' + esc(p.emoji || teamEmoji(p.team)) + ' ' + esc(p.team) + (g ? ' · ' + g : '') + (p.cap ? ' · <span class="cp">Captain</span>' : '') + '</div></div>' +
             (p.dsr != null ? '<div class="ds-srch-dsr' + (p.gender === 'F' ? ' teal' : '') + '">' + p.dsr.toFixed(1) + ' <small>DSR</small></div>' : '') +
             (p.rank != null ? '<div class="ds-srch-rank">#' + p.rank + '</div>' : '') + '</div>';
         }
@@ -184,7 +229,7 @@
         var i = flat.length; flat.push({ kind: 'team', item: t });
         html += '<div class="ds-srch-row" data-i="' + i + '">' +
           '<div class="ds-srch-tav">' + esc(t.emoji || '🏓') + '</div>' +
-          '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(t.name, q) + '</div><div class="ds-srch-sub">' + (t.players ? t.players + ' players' : 'Team') + (t.cap ? ' · Captain ' + esc(t.cap) : '') + '</div></div></div>';
+          '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(t.name, q) + (t.season && !t.current ? ' <span class="ds-srch-season">' + esc(t.season) + '</span>' : '') + '</div><div class="ds-srch-sub">' + (t.players ? t.players + ' players' : 'Team') + (t.cap ? ' · Captain ' + esc(t.cap) : '') + '</div></div></div>';
       });
     }
     resEl.innerHTML = html; FLAT = flat; SEL = 0; paint();
@@ -215,8 +260,6 @@
     input = document.getElementById('ds-srch-input');
     resEl = document.getElementById('ds-srch-results');
     scopesEl = document.getElementById('ds-srch-scopes');
-    SEASON = new URLSearchParams(location.search).get('season') || 'circuit-i';
-    SUF = SEASON === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON);
 
     input.addEventListener('input', render);
     Array.prototype.forEach.call(overlay.querySelectorAll('[data-srch-close]'), function (c) { c.addEventListener('click', close); });
