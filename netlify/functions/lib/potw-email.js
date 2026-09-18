@@ -277,11 +277,11 @@ export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeT
   ${capLine}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:30px">
     <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#f5f5f5">THE DINK SOCIETY</span>
-    <span style="font-size:11px;color:#8a8a8a;font-weight:600;display:inline-flex;align-items:center;gap:8px">PRESENTED BY <img src="https://dinksociety.app/img/suprdupr.png" alt="SuprDupr" width="88" style="height:25px;width:88px;border-radius:4px;vertical-align:middle"></span>
+    <img src="https://dinksociety.app/img/suprdupr.png" alt="SuprDupr" width="88" style="height:25px;width:88px;border-radius:4px;vertical-align:middle">
   </div>
   <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#b8ff2c;background:rgba(184,255,44,.10);border:1px solid rgba(184,255,44,.30);padding:7px 12px;border-radius:9999px;margin-bottom:18px">${chefEmoji(w.gender)} SuprDupr Player of the Week &middot; Week ${esc(week)}</span>
   <div style="width:64px;height:64px;border-radius:9999px;background:linear-gradient(135deg,#243b00,#0e0e0e);border:2px solid #b8ff2c;text-align:center;line-height:64px;font-size:22px;font-weight:800;color:#b8ff2c;margin:0 0 22px">${esc(initials(w.name))}</div>
-  <h1 style="font-size:30px;font-weight:800;line-height:1.12;margin:0 0 8px;color:#f5f5f5;letter-spacing:-.01em">Nice work,<br><span style="font-style:italic;text-transform:uppercase">${esc(fn)}.</span></h1>
+  <h1 style="font-size:30px;font-weight:800;line-height:1.12;margin:0 0 8px;color:#f5f5f5;letter-spacing:-.01em">Nice work, <span style="font-style:italic;text-transform:uppercase">${esc(fn)}.</span></h1>
   <p style="font-size:14px;color:#8a8a8a;margin:0 0 24px">${esc(w.teamName)}</p>
   <p style="font-size:15px;color:#cfcfcf;line-height:1.7;margin:0 0 14px">${esc(lead)}</p>
   <table role="presentation" style="width:100%;border-collapse:separate;border-spacing:8px;margin:18px 0 8px"><tr>
