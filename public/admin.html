@@ -8504,10 +8504,24 @@
         else {
           box.innerHTML = weeks.map(function(w){
             return '<div class="drop-weekrow" data-wk="'+w.week+'"><span class="wk">Week '+w.week+'</span>'
-              +'<span class="ti">K\'CHN Player of the Week</span>'
-              +'<span class="drop-chip draft">drafted</span></div>';
+              +'<span class="ti">SuprDupr Player of the Week</span>'
+              +'<span class="drop-chip draft">drafted</span>'
+              +'<button class="ab ab--outline ab--sm" data-del="'+w.week+'" title="Remove this draft" style="margin-left:8px;">Remove</button></div>';
           }).join('');
-          box.querySelectorAll('.drop-weekrow').forEach(function(row){ row.addEventListener('click',function(){ openPotwWeek(row.dataset.wk); }); });
+          box.querySelectorAll('.drop-weekrow').forEach(function(row){ row.addEventListener('click',function(e){ if(e.target.closest('[data-del]')) return; openPotwWeek(row.dataset.wk); }); });
+          box.querySelectorAll('[data-del]').forEach(function(btn){ btn.addEventListener('click',function(e){
+            e.stopPropagation(); var wk=btn.dataset.del;
+            if(!confirm('Remove the Week '+wk+' Player of the Week draft for '+((WORKING&&WORKING.name)||'this season')+'? Nothing is emailed.')) return;
+            apiJSON(potwApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete-week',week:Number(wk)})})
+              .then(function(){ POTW.week=null; var d=$d('potw-detail'); if(d) d.style.display='none'; renderPotw(); refreshPotwBadge(); })
+              .catch(function(err){
+                if(/already-sent/i.test(err.message||'') && confirm('Some of those emails were already sent. Remove the draft anyway?')){
+                  return apiJSON(potwApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'delete-week',week:Number(wk),force:true})})
+                    .then(function(){ POTW.week=null; var d=$d('potw-detail'); if(d) d.style.display='none'; renderPotw(); refreshPotwBadge(); });
+                }
+                alert('Could not remove: '+(err.message||err));
+              });
+          }); });
         }
       }
       if(d&&d.week!=null){ POTW.week=d.week; $d('potw-detail').style.display=''; $d('potw-d-week').textContent=d.week; renderPotwWinners(d.records||[]); }

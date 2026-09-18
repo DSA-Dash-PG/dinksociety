@@ -21,6 +21,7 @@ import { siteUrl } from './ladder-notify.js';
 import { normalizeEmail } from './identity.js';
 import { createPotwToken } from './potw-token.js';
 import { signSizeToken } from './potw-size-token.js';
+import { circuitCode, seasonName } from './circuit.js';
 
 const STATE_STORE = 'potw-emails';
 function stateStore() { return getStore({ name: STATE_STORE, consistency: 'strong' }); }
@@ -74,7 +75,9 @@ function firstName(name) {
  * or null if there are no weekly performers yet.
  */
 export async function fetchLatestWinners(circuit = 'I', targetWeek = null) {
-  const res = await fetch(`${siteUrl()}/.netlify/functions/public-leaderboard`, {
+  // The circuit MUST ride along — without it public-leaderboard answers for
+  // Season 1, which is how Season 1's Week 8 got drafted under Season 2.
+  const res = await fetch(`${siteUrl()}/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(circuitCode(circuit))}`, {
     headers: { 'Cache-Control': 'no-cache' },
   });
   if (!res.ok) throw new Error(`public-leaderboard ${res.status}`);
@@ -105,17 +108,22 @@ export async function fetchLatestWinners(circuit = 'I', targetWeek = null) {
  * @returns {{ to:string|null, recipientType:'player'|'captain'|'none',
  *             playerEmail:string|null, captainName:string|null, captainEmail:string|null }}
  */
-export async function resolveRecipient(winner) {
+export async function resolveRecipient(winner, circuit = null) {
   const teams = getStore('teams');
+  const code = circuit ? circuitCode(circuit) : null;
+  const sameSeason = (t) => !code || circuitCode(t.circuit || t.seasonId) === code;
   let team = null;
   try {
     if (winner.teamId) {
       team = await teams.get(`team/${winner.teamId}.json`, { type: 'json' }).catch(() => null);
+      if (team && !sameSeason(team)) team = null;
     }
     if (!team) {
+      // Team names repeat across seasons (Big Dink Energy is in both), so the
+      // name match is restricted to the circuit the award belongs to.
       const { blobs } = await teams.list({ prefix: 'team/' });
       const all = await Promise.all(blobs.map(b => teams.get(b.key, { type: 'json' }).catch(() => null)));
-      team = all.find(t => t && (t.id === winner.teamId || t.name === winner.teamName)) || null;
+      team = all.find(t => t && sameSeason(t) && (t.id === winner.teamId || t.name === winner.teamName)) || null;
     }
   } catch { team = null; }
 
@@ -243,7 +251,7 @@ const SIZE_PILL = (s) => `<span style="display:inline-block;border:1px solid #2a
  *   sizeToken wires the one-tap shirt-size buttons to the public potw-size
  *   endpoint. currentSize highlights the size already on file (if any).
  */
-export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeToken, currentSize }) {
+export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeToken, currentSize, circuit = 'I' }) {
   const fn = firstName(w.name);
   const winRate = (Number(w.w) + Number(w.l)) > 0 ? Math.round((Number(w.w) / (Number(w.w) + Number(w.l))) * 100) + '%' : '—';
   const url = profileUrl(w.name, w.teamName);
@@ -289,7 +297,7 @@ export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeT
     <div style="margin-top:12px">${sizeButtons}</div>
   </div>
   <p style="font-size:13px;color:#8a8a8a;line-height:1.6;margin:20px 0 0">\u{1F4F8} We'll present your award courtside before next game day and grab a quick photo for the league feed. Wear the grin. You earned it.</p>
-  <div style="margin-top:34px;padding-top:18px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6"><b style="color:#8a8a8a;font-weight:700">THE DINK SOCIETY</b> &middot; Season 1 &middot; Player of the Week presented by SuprDupr</div>
+  <div style="margin-top:34px;padding-top:18px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6"><b style="color:#8a8a8a;font-weight:700">THE DINK SOCIETY</b> &middot; ${esc(seasonName(circuit))} &middot; Player of the Week presented by SuprDupr</div>
 </div>`;
 }
 
@@ -344,14 +352,14 @@ export async function prepareWeeklyPotwApproval(circuit = 'I', { force = false, 
     // Preserve anything already captured for this winner (a submitted shirt size,
     // a prior send) so a re-draft never wipes it.
     const prev = await loadPending(code, week, w.winnerKey);
-    const rcpt = await resolveRecipient(w);
+    const rcpt = await resolveRecipient(w, code);
     const { subject, lead } = await generateCopy(w, week, label);
     const captainIntro = rcpt.recipientType === 'captain'
       ? `Hi ${firstName(rcpt.captainName || 'captain')}, ${firstName(w.name)} is this week's SuprDupr Player of the Week. Could you pass this along and grab their shirt size?`
       : '';
     const sizeToken = signSizeToken({ circuit: code, week, winnerKey: w.winnerKey });
     const html = renderCongratsEmail({
-      winner: w, week, lead, captainIntro, sizeToken, currentSize: prev?.size?.value || null,
+      winner: w, week, lead, captainIntro, sizeToken, currentSize: prev?.size?.value || null, circuit: code,
     });
 
     // Approve-by-email tokens are only minted when we actually notify (the admin
@@ -441,6 +449,18 @@ export async function listPendingForWeek(circuit, week) {
   const recs = (await Promise.all(blobs.map(b => s.get(b.key, { type: 'json' }).catch(() => null)))).filter(Boolean);
   recs.sort((a, b) => (a.winnerKey === 'men' ? 0 : 1) - (b.winnerKey === 'men' ? 0 : 1));
   return recs;
+}
+
+/** Delete a prepared week (marker + pending records) for a circuit. Used to
+ * clear a draft that was filed under the wrong season. Sent records are kept
+ * unless force is set. */
+export async function deletePreparedWeek(circuit, week, { force = false } = {}) {
+  const code = String(circuit), s = stateStore();
+  const recs = await listPendingForWeek(code, week);
+  if (!force && recs.some(r => r.status === 'sent')) return { ok: false, reason: 'has-sent' };
+  for (const r of recs) await s.delete(pendingKey(code, Number(week), r.winnerKey)).catch(() => {});
+  await s.delete(markerKey(code, Number(week))).catch(() => {});
+  return { ok: true, removed: recs.length };
 }
 
 /** Every prepared week for a circuit, newest first (from the markers). */

@@ -49,8 +49,8 @@
     const s = d.share;
     const buy = s.buyInCents || 0;
     const weeks = s.mode === 'pergame'
-      ? (buy ? `<div class="shr__kv"><span>Buy-in to be on the team</span><span>${fmt(buy)}</span></div>` : '') + s.weeks.map(w => `<div class="shr__kv"><span>Week ${esc(w.week)}${w.phase ? ' · ' + esc(w.phase) : ''} · ${w.games} game${w.games === 1 ? '' : 's'}</span><span>${fmt(w.cents)}</span></div>`).join('')
-        + `<div class="shr__kv tot"><span>Games · ${s.games} × ${fmt(d.rateCents)}</span><span>${fmt(s.usedCents)}</span></div>`
+      ? (buy ? `<div class="shr__kv"><span>Buy-in to be on the team</span><span>${fmt(buy)}</span></div>` : '') + s.weeks.map(w => `<div class="shr__kv"><span>Week ${esc(w.week)}${w.phase ? ' · ' + esc(w.phase) : ''} · ${w.games} game${w.games === 1 ? '' : 's'}${w.pricing === 'week' ? ' · flat' : ' × ' + fmt(w.rateCents)}</span><span>${fmt(w.cents)}</span></div>`).join('')
+        + `<div class="shr__kv tot"><span>${s.playerRate?.mode === 'week' ? 'Your price · ' + fmt(s.playerRate.cents) + ' a week' : 'Games · ' + s.games}</span><span>${fmt(s.usedCents)}</span></div>`
         + (buy ? `<div class="shr__kv"><span>${s.buyInLeftCents > 0 ? 'Buy-in still unused' : 'Buy-in used up — now per game'}</span><span>${s.buyInLeftCents > 0 ? fmt(s.buyInLeftCents) : '✓'}</span></div><div class="shr__kv tot"><span>Your total so far</span><span>${fmt(s.owedCents)}</span></div>` : '')
       : `<div class="shr__kv"><span>Your share of the team amount</span><span>${fmt(s.owedCents)}</span></div>`;
     const pays = s.payments.map(p => `<div class="shr__kv"><span>Paid ${shortDate(p.at)} · ${esc(p.method)}</span><span style="color:var(--color-lime)">−${fmt(p.cents)}</span></div>`).join('');
@@ -61,7 +61,7 @@
     const s = d.share, to = d.payTo;
     if (s.self) return '';                                    // the captain is the payee
     if (s.owedCents <= 0 && s.paidCents <= 0) return '';      // nothing billed yet
-    const sub = `${esc(d.teamName || 'Your team')}${s.mode === 'pergame' ? ' · ' + fmt(d.rateCents) + ' a game' + (s.buyInCents ? ' · ' + fmt(s.buyInCents) + ' buy-in' : '') : ''}`;
+    const sub = `${esc(d.teamName || 'Your team')}${s.mode === 'pergame' ? ' · ' + (s.playerRate ? fmt(s.playerRate.cents) + (s.playerRate.mode === 'week' ? ' a week' : ' a game') : fmt(d.rateCents) + ' a game') + (s.buyInCents ? ' · ' + fmt(s.buyInCents) + ' buy-in' : '') : ''}`;
     if (s.balanceCents <= 0) {
       return `<div class="shr" id="share"><div class="shr__ok"><span>✅</span><span><b>You're settled with ${esc(to.name)}.</b> ${fmt(s.paidCents)} paid${s.balanceCents < 0 ? ' · ' + fmt(-s.balanceCents) + ' credit toward future games' : ''}.</span></div></div>`;
     }

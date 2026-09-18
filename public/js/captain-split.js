@@ -128,6 +128,7 @@
     const flat = dr.mode === 'flat';
     const seasonGames = GAMES_PER_NIGHT * SEASON_NIGHTS;
     const suggest = d.teamFeeCents ? Math.ceil(d.teamFeeCents / seasonGames) : null;
+    const lastWk = (cfg?.mode === 'pergame' && d.ledger?.lastPlayedWeek) || 0;
 
     let result = '';
     if (flat) {
@@ -155,6 +156,7 @@
       : `
         <div class="spl-fld"><label for="spl-rate">Price per game</label><div class="spl-inp"><span>$</span><input id="spl-rate" inputmode="decimal" autocomplete="off" value="${esc(dr.rate)}" placeholder="4.17"></div>
           ${suggest ? `<button type="button" class="spl-chip" id="spl-suggest">Use ${fmt(suggest)} — covers the ${fmt(d.teamFeeCents)} fee</button>` : ''}
+          ${lastWk > 0 ? `<p class="spl-hint" style="color:var(--color-gold)">Week${lastWk > 1 ? 's 1–' + lastWk : ' 1'} ${lastWk > 1 ? 'have' : 'has'} already been played and keep${lastWk > 1 ? '' : 's'} the price billed at the time — a new price applies from Week ${lastWk + 1} on.</p>` : ''}
           <p class="spl-hint">Players pay for the games they actually play, all season long — playoffs included. Tabs update on their own once a match night is finalized.</p></div>
         <div class="spl-fld"><label for="spl-buyin">Buy-in to be on the team <span style="text-transform:none;letter-spacing:0;font-weight:600">(optional)</span></label><div class="spl-inp"><span>$</span><input id="spl-buyin" inputmode="decimal" autocomplete="off" value="${esc(dr.buyIn)}" placeholder="50"></div>
           <p class="spl-hint">Everyone owes this up front. Their games draw it down at your per-game price; once it's used up, they owe the rest game by game. It's a minimum, not an extra — a player who plays less than it covers doesn't get the difference back.</p></div>`}
@@ -202,7 +204,12 @@
   function rowDetail(r, L) {
     if (r.self) return 'You · your share is covered';
     if (L.mode === 'pergame') {
-      const gamesBit = `${r.games} game${r.games === 1 ? '' : 's'} × ${fmt(S.data.config.rateCents)} = ${fmt(r.usedCents)}`;
+      const rates = [...new Set(r.weeks.map(w => w.rateCents))];
+      const gamesBit = r.playerRate?.mode === 'week'
+        ? `${r.weeks.length} week${r.weeks.length === 1 ? '' : 's'} × ${fmt(r.playerRate.cents)} = ${fmt(r.usedCents)} · own price`
+        : r.playerRate?.mode === 'game'
+        ? `${r.games} game${r.games === 1 ? '' : 's'} × ${fmt(r.playerRate.cents)} = ${fmt(r.usedCents)} · own price`
+        : `${r.games} game${r.games === 1 ? '' : 's'}${rates.length === 1 ? ' × ' + fmt(rates[0]) : ''} = ${fmt(r.usedCents)}`;
       const buyBit = !L.buyInCents ? '' : r.buyInLeftCents > 0 ? ` · ${fmt(r.buyInLeftCents)} of ${fmt(L.buyInCents)} buy-in left` : ' · buy-in used up';
       return gamesBit + buyBit + (r.paidCents ? ` · paid ${fmt(r.paidCents)}` : '');
     }
@@ -224,7 +231,14 @@
     if (r.self) return '';
     const pid = esc(r.playerId);
     const weeks = L.mode === 'pergame' && r.weeks.length
-      ? `<h4>Their tab</h4>` + r.weeks.map(w => `<div class="spl-kv"><span>Week ${esc(w.week)}${w.phase ? ' · ' + esc(w.phase) : ''} · ${w.games} game${w.games === 1 ? '' : 's'}</span><span>${fmt(w.cents)}</span></div>`).join('') : '';
+      ? `<h4>Their tab</h4>` + r.weeks.map(w => `<div class="spl-kv"><span>Week ${esc(w.week)}${w.phase ? ' · ' + esc(w.phase) : ''} · ${w.games} game${w.games === 1 ? '' : 's'}${w.pricing === 'week' ? ' · flat' : ' × ' + fmt(w.rateCents)}</span><span>${fmt(w.cents)}</span></div>`).join('') : '';
+    const priceMode = r.playerRate?.mode || 'week';
+    const playerPrice = L.mode === 'pergame' ? `<h4>Their own price</h4><div class="spl-mini">
+        <select id="spl-prm-${pid}" aria-label="Priced per"><option value="week"${priceMode === 'week' ? ' selected' : ''}>per week played</option><option value="game"${priceMode === 'game' ? ' selected' : ''}>per game</option></select>
+        <input id="spl-prc-${pid}" inputmode="decimal" placeholder="${priceMode === 'week' ? '12' : '3.50'}" value="${r.playerRate ? dollars(r.playerRate.cents) : ''}" aria-label="Their price">
+        <button class="cap-btn cap-btn--ghost" data-act="player-rate" data-p="${pid}">Set</button>
+        ${r.playerRate ? `<button class="spl-link" data-act="player-rate-clear" data-p="${pid}">back to team rate</button>` : ''}</div>
+        <p class="spl-hint">Overrides the team rate for this player only — e.g. a flat $12 for any week they play, whatever the game count. Applies to their whole season.</p>` : '';
     const pays = r.payments.length
       ? `<h4>Payments recorded</h4>` + r.payments.map(p => `<div class="spl-kv"><span>${shortDate(p.at)} · ${esc(p.method)}${p.note ? ' · ' + esc(p.note) : ''} <button class="spl-link red" data-act="undo-pay" data-p="${pid}" data-pay="${esc(p.id)}">undo</button></span><span>${fmt(p.cents)}</span></div>`).join('') : '';
     const record = `<h4>Record a payment</h4><div class="spl-mini">
@@ -238,7 +252,7 @@
         <p class="spl-hint">A sub who pays less, or 0 to leave someone out. Everyone else's share rebalances to the cent.</p>` : '';
     const nudge = r.balanceCents > 0 ? `<h4>Reminder</h4>${r.hasEmail ? `<button class="cap-btn cap-btn--ghost" data-act="nudge-one" data-p="${pid}">Email ${esc(r.name.split(' ')[0])} a reminder</button>` : '<span>No email on file for this player.</span>'}` : '';
     const buyKv = L.mode === 'pergame' && L.buyInCents ? `<div class="spl-kv"><span>Buy-in</span><span>${fmt(L.buyInCents)}</span></div><div class="spl-kv"><span>Games so far</span><span>${fmt(r.usedCents)}</span></div>` : '';
-    return `<div class="spl-drawer">${buyKv}<div class="spl-kv"><span>Owes in total</span><span>${fmt(r.owedCents)}</span></div><div class="spl-kv"><span>Paid</span><span>${fmt(r.paidCents)}</span></div><div class="spl-kv"><span>Balance</span><span>${fmt(r.balanceCents)}</span></div>${weeks}${pays}${record}${override}${nudge}</div>`;
+    return `<div class="spl-drawer">${buyKv}<div class="spl-kv"><span>Owes in total</span><span>${fmt(r.owedCents)}</span></div><div class="spl-kv"><span>Paid</span><span>${fmt(r.paidCents)}</span></div><div class="spl-kv"><span>Balance</span><span>${fmt(r.balanceCents)}</span></div>${weeks}${pays}${record}${override}${playerPrice}${nudge}</div>`;
   }
 
   function renderLedger() {
@@ -249,9 +263,13 @@
     const rows = L.rows.filter(want);
     const count = (f) => L.rows.filter(r => f === 'owes' ? (r.balanceCents > 0 && r.status !== 'claim') : f === 'claim' ? r.status === 'claim' : (r.status === 'paid' || r.self)).length;
 
+    const hist = (L.rateHistory || []).slice().sort((a, b) => a.fromWeek - b.fromWeek);
+    const rateHist = hist.length > 1
+      ? ' (' + hist.map((h, i) => { const to = hist[i + 1] ? hist[i + 1].fromWeek - 1 : null; return (to == null ? `from Week ${h.fromWeek}` : h.fromWeek === to ? `Week ${h.fromWeek}` : `Weeks ${h.fromWeek}–${to}`) + ' ' + fmt(h.rateCents); }).join(', ') + ')'
+      : '';
     const summary = flat
       ? `<b>${fmt(cfg.amountCents)}</b> split across ${L.rows.length} player${L.rows.length === 1 ? '' : 's'}`
-      : `<b>${fmt(cfg.rateCents)}</b> a game${cfg.buyInCents ? ` · <b>${fmt(cfg.buyInCents)}</b> buy-in` : ''} · ${T.gamesBilled} game${T.gamesBilled === 1 ? '' : 's'} billed so far`;
+      : `<b>${fmt(cfg.rateCents)}</b> a game${rateHist}${cfg.buyInCents ? ` · <b>${fmt(cfg.buyInCents)}</b> buy-in` : ''} · ${T.gamesBilled} game${T.gamesBilled === 1 ? '' : 's'} billed so far`;
     const lockNote = !flat ? ''
       : cfg.lockedAt
         ? `<div class="spl-note"><span>🔒</span><div><b>Shares locked</b> ${shortDate(cfg.lockedAt)}${cfg.lockedBy === 'roster-lock' ? ' when your roster locked' : ''}. Roster changes no longer move anyone's share. <button class="spl-link" data-act="unlock">${d.rosterLocked ? 'Re-sync to current roster' : 'Unlock'}</button></div></div>`
@@ -313,6 +331,9 @@
         setMsg();
       } else if (a === 'override' || a === 'override-clear') {
         S.data = await api(API, { action: 'override', playerId: pid, amount: a === 'override' ? $('spl-ovr-' + pid).value : null });
+        setMsg();
+      } else if (a === 'player-rate' || a === 'player-rate-clear') {
+        S.data = await api(API, { action: 'player-rate', playerId: pid, mode: a === 'player-rate' ? $('spl-prm-' + pid).value : null, amount: a === 'player-rate' ? $('spl-prc-' + pid).value : null });
         setMsg();
       } else if (a === 'undo-pay') {
         S.data = await api(API, { action: 'undo-pay', playerId: pid, paymentId: el.dataset.pay });

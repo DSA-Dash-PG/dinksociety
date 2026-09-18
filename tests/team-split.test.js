@@ -170,3 +170,42 @@ test('per game without a buy-in is unchanged', () => {
   assert.deepEqual([p1.owedCents, p1.buyInLeftCents, L.buyInCents], [1275, 0, 0]);
   assert.equal(L.rows.find(r => r.playerId === 'p2').owedCents, 0);
 });
+
+import { rateForWeek, applyRateChange } from '../netlify/functions/lib/team-split-math.js';
+
+test('a rate change applies from the next unplayed week; played weeks keep their rate', () => {
+  const split = { mode: 'pergame', rateCents: 450 };
+  // Weeks 1–2 played, captain moves to $5
+  split.rateHistory = applyRateChange(split, 500, 2); split.rateCents = 500;
+  assert.deepEqual(split.rateHistory, [{ fromWeek: 1, rateCents: 450 }, { fromWeek: 3, rateCents: 500 }]);
+  assert.equal(rateForWeek(split, 1), 450); assert.equal(rateForWeek(split, 2), 450); assert.equal(rateForWeek(split, 3), 500); assert.equal(rateForWeek(split, 8), 500);
+  // Changes mind before Week 3 is played → replaces the pending change, no history noise
+  split.rateHistory = applyRateChange(split, 475, 2); split.rateCents = 475;
+  assert.deepEqual(split.rateHistory, [{ fromWeek: 1, rateCents: 450 }, { fromWeek: 3, rateCents: 475 }]);
+  // Back to the old rate → the pending change simply disappears
+  split.rateHistory = applyRateChange(split, 450, 2); split.rateCents = 450;
+  assert.deepEqual(split.rateHistory, [{ fromWeek: 1, rateCents: 450 }]);
+  // Nothing played yet → the new rate is just THE rate
+  assert.deepEqual(applyRateChange({ rateCents: 450 }, 600, 0), [{ fromWeek: 1, rateCents: 600 }]);
+});
+
+test('ledger prices each week at the rate in force, and a player can have their own price', () => {
+  const split = {
+    mode: 'pergame', rateCents: 500, rateHistory: [{ fromWeek: 1, rateCents: 450 }, { fromWeek: 3, rateCents: 500 }],
+    playerRates: { p2: { mode: 'week', cents: 1200 }, gone: { mode: 'game', cents: 300 } },
+  };
+  const tabs = [
+    { matchId: 'm1', week: 1, counts: { p1: 3, p2: 4, gone: 2 } },
+    { matchId: 'm3', week: 3, counts: { p1: 3, p2: 1 } },
+  ];
+  const L = buildLedger({ split, team, tabs });
+  const by = Object.fromEntries(L.rows.map(r => [r.playerId, r]));
+  assert.equal(by.p1.owedCents, 3 * 450 + 3 * 500);              // team rate per week
+  assert.deepEqual(by.p1.weeks.map(w => w.rateCents), [450, 500]);
+  assert.equal(by.p2.owedCents, 2400);                            // $12 flat for each week she played, games ignored
+  assert.deepEqual(by.p2.weeks.map(w => [w.pricing, w.cents]), [['week', 1200], ['week', 1200]]);
+  assert.equal(by.gone.owedCents, 600);                           // own per-game rate
+  assert.equal(L.lastPlayedWeek, 3);
+  assert.deepEqual(by.p2.playerRate, { mode: 'week', cents: 1200 });
+  assert.deepEqual(playerView(L, 'p2').playerRate, { mode: 'week', cents: 1200 });
+});

@@ -8,6 +8,7 @@
 //   POST { action, ... }
 //     save           { enabled?, mode, amount?, rate?, buyIn?, collect?, venmoHandle? }
 //     override       { playerId, amount | null }      flat: pin / unpin one share
+//     player-rate    { playerId, mode: 'week'|'game'|null, amount }   pergame: a player's own price
 //     lock | unlock                                    flat: freeze / thaw the player set
 //     pay            { playerId, amount? , method?, note? }   amount omitted = full balance
 //     undo-pay       { playerId, paymentId }
@@ -22,8 +23,8 @@ import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { findRegistration, owedTotal } from './lib/registrations.js';
 import { logActivity } from './lib/activity-log.js';
-import { getSplit, saveSplit, newSplit, loadLedger, publicConfig } from './lib/team-split.js';
-import { toCents, fmtCents, normalizeHandle, MAX_AMOUNT_CENTS, MAX_RATE_CENTS, PAY_METHODS } from './lib/team-split-math.js';
+import { getSplit, saveSplit, newSplit, loadLedger, loadTabs, publicConfig } from './lib/team-split.js';
+import { toCents, fmtCents, normalizeHandle, applyRateChange, MAX_AMOUNT_CENTS, MAX_RATE_CENTS, PAY_METHODS } from './lib/team-split-math.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -80,6 +81,13 @@ export default async (req) => {
     } else {
       const c = toCents(body.rate);
       if (c == null || c > MAX_RATE_CENTS) return json({ error: 'Enter a price per game, like 4.25.' }, 400);
+      // A changed rate only applies to weeks not yet played: weeks with a
+      // finalized match keep the rate they were billed at (rateHistory).
+      if (c !== Math.round(split.rateCents || 0) || !Array.isArray(split.rateHistory)) {
+        const { tabs } = await loadTabs(team, split, { useCache: true });
+        const lastPlayedWeek = tabs.reduce((m, t) => Math.max(m, Number(t.week) || 0), 0);
+        split.rateHistory = applyRateChange(split, c, lastPlayedWeek);
+      }
       split.rateCents = c;
       // Optional flat buy-in that the per-game charges draw down. Blank / 0 = none.
       const b = body.buyIn == null || String(body.buyIn).trim() === '' ? 0 : toCents(body.buyIn);
@@ -116,6 +124,21 @@ export default async (req) => {
       const c = toCents(body.amount);
       if (c == null || c > MAX_AMOUNT_CENTS) return json({ error: 'Enter an amount like 35 or 35.50 — or leave it blank to go back to an even share.' }, 400);
       split.overrides[player.id] = c;
+    }
+    await saveSplit(split, actor.email);
+    return respond(team, split);
+  }
+
+  if (action === 'player-rate') {
+    if (!player) return json({ error: 'Player not found on this team.' }, 404);
+    split.playerRates = split.playerRates || {};
+    if (!body.mode || body.amount == null || body.amount === '') {
+      delete split.playerRates[player.id];
+    } else {
+      const mode = body.mode === 'week' ? 'week' : body.mode === 'game' ? 'game' : null;
+      const c = toCents(body.amount);
+      if (!mode || c == null || c > MAX_AMOUNT_CENTS) return json({ error: 'Enter their price like 12 (per week) or 3.50 (per game).' }, 400);
+      split.playerRates[player.id] = { mode, cents: c, setAt: new Date().toISOString(), by: actor.email };
     }
     await saveSplit(split, actor.email);
     return respond(team, split);

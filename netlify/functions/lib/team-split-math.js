@@ -15,6 +15,10 @@
 //   pergame  the captain sets a rate; each player owes rate x games they
 //            actually played in FINALIZED matches — every week of the season,
 //            playoffs included.
+//            The rate can change from a given week on (`rateHistory`, see
+//            rateForWeek) — weeks already played keep the rate they were billed
+//            at. A player can have their own price (`playerRates[pid]`): a flat
+//            amount per week they play, or their own per-game rate.
 //            Optional BUY-IN (`buyInCents`): a flat amount every player owes up
 //            front to be on the team. Per-game charges draw it down; once it is
 //            used up the player owes the overage game by game. So a player owes
@@ -108,6 +112,45 @@ export function countGames({ lineup, score, championship = false }) {
   return counts;
 }
 
+/**
+ * The per-game rate in force for a given week. `rateHistory` is
+ * [{ fromWeek, rateCents }] — the entry with the largest fromWeek <= week wins.
+ * No history → the single `rateCents` applies to every week.
+ */
+export function rateForWeek(split, week) {
+  const hist = Array.isArray(split?.rateHistory) ? split.rateHistory : [];
+  let rate = Math.max(0, Math.round(split?.rateCents || 0));
+  let best = -Infinity;
+  for (const h of hist) {
+    const from = Number(h?.fromWeek);
+    if (Number.isInteger(from) && from <= (week ?? 1) && from > best && Number.isInteger(h.rateCents)) { best = from; rate = h.rateCents; }
+  }
+  if (best === -Infinity && hist.length) {
+    // week is before the earliest entry — use the earliest known rate
+    const first = [...hist].sort((a, b) => a.fromWeek - b.fromWeek)[0];
+    if (Number.isInteger(first?.rateCents)) rate = first.rateCents;
+  }
+  return Math.max(0, rate);
+}
+
+/**
+ * Change the rate so it applies only to weeks not yet played.
+ * lastPlayedWeek = highest week this team has a finalized match in (0 = none).
+ * Returns the new rateHistory; `rateCents` should be set to newRate alongside.
+ */
+export function applyRateChange(split, newRateCents, lastPlayedWeek) {
+  const current = Math.max(0, Math.round(split?.rateCents || 0));
+  let hist = Array.isArray(split?.rateHistory) ? split.rateHistory.filter(h => Number.isInteger(h?.fromWeek) && Number.isInteger(h?.rateCents)) : [];
+  if (!hist.length) hist = [{ fromWeek: 1, rateCents: current }];
+  const fromWeek = Math.max(1, (lastPlayedWeek || 0) + 1);
+  // Drop any entries at or after the effective week (they never billed anything), then add the new one.
+  hist = hist.filter(h => h.fromWeek < fromWeek);
+  if (!hist.length) return [{ fromWeek: 1, rateCents: newRateCents }];
+  if (hist[hist.length - 1].rateCents === newRateCents) return hist.sort((a, b) => a.fromWeek - b.fromWeek);
+  hist.push({ fromWeek, rateCents: newRateCents });
+  return hist.sort((a, b) => a.fromWeek - b.fromWeek);
+}
+
 function sumPayments(list) {
   return (list || []).reduce((s, p) => s + (Number.isInteger(p?.cents) ? p.cents : 0), 0);
 }
@@ -133,6 +176,7 @@ export function buildLedger({ split, team, tabs = [] }) {
   const weeks = {};       // pid -> [{ week, games, cents }]
   const used = {};        // pid -> cents of per-game charges so far (pergame)
   let buyIn = 0;          // pergame: flat amount each player owes up front
+  let lastPlayedWeek = 0; // pergame: highest week with a finalized match
   let unassignedCents = 0;
 
   if (mode === 'flat') {
@@ -142,17 +186,27 @@ export function buildLedger({ split, team, tabs = [] }) {
     Object.assign(owed, r.shares);
     unassignedCents = r.unassignedCents;
   } else {
-    const rate = Math.max(0, Math.round(split?.rateCents || 0));
     buyIn = Math.max(0, Math.round(split?.buyInCents || 0));
+    const playerRates = split?.playerRates || {};
     const sorted = [...tabs].sort((a, b) => (a.week || 0) - (b.week || 0));
     for (const t of sorted) {
+      const weekRate = rateForWeek(split, t.week);
       for (const [pid, n] of Object.entries(t.counts || {})) {
         if (!byId.has(pid) || !n) continue;
+        // A player's own price beats the team rate: a flat amount for any week
+        // they play, or their own per-game rate.
+        const pr = playerRates[pid];
+        const custom = pr && Number.isInteger(pr.cents) && (pr.mode === 'week' || pr.mode === 'game');
+        const cents = custom ? (pr.mode === 'week' ? pr.cents : n * pr.cents) : n * weekRate;
         games[pid] = (games[pid] || 0) + n;
-        used[pid] = (used[pid] || 0) + n * rate;
-        (weeks[pid] = weeks[pid] || []).push({ week: t.week, phase: t.phase || null, games: n, cents: n * rate });
+        used[pid] = (used[pid] || 0) + cents;
+        (weeks[pid] = weeks[pid] || []).push({
+          week: t.week, phase: t.phase || null, games: n, cents,
+          rateCents: custom ? pr.cents : weekRate, pricing: custom ? pr.mode : 'game',
+        });
       }
     }
+    lastPlayedWeek = tabs.reduce((m, t) => Math.max(m, Number(t.week) || 0), 0);
     // Everyone on the active roster gets a row even before they play — and owes
     // the buy-in from day one. Someone who has left only owes it if they played.
     for (const id of active) if (!(id in used)) used[id] = 0;
@@ -180,6 +234,7 @@ export function buildLedger({ split, team, tabs = [] }) {
       games: games[pid] || 0, weeks: weeks[pid] || [],
       // pergame + buy-in: what their games have cost so far, and how much of the buy-in is left
       usedCents: used[pid] || 0,
+      playerRate: mode === 'pergame' && split?.playerRates?.[pid] && Number.isInteger(split.playerRates[pid].cents) ? { mode: split.playerRates[pid].mode, cents: split.playerRates[pid].cents } : null,
       buyInLeftCents: buyIn > 0 && pid in used ? Math.max(0, buyIn - used[pid]) : 0,
       owedCents, paidCents, balanceCents, claim, status, payments,
       lastNudgedOn: split?.nudges?.[pid] || null,
@@ -192,7 +247,8 @@ export function buildLedger({ split, team, tabs = [] }) {
   const totalCents = rows.reduce((s, r) => s + r.owedCents, 0);
   const outstandingCents = rows.reduce((s, r) => s + Math.max(0, r.balanceCents), 0);
   return {
-    mode, payeeId, payeeName: payee?.name || null, buyInCents: buyIn,
+    mode, payeeId, payeeName: payee?.name || null, buyInCents: buyIn, lastPlayedWeek,
+    rateHistory: mode === 'pergame' && Array.isArray(split?.rateHistory) ? split.rateHistory : null,
     rows, unassignedCents,
     totals: {
       totalCents, outstandingCents,
@@ -213,6 +269,7 @@ export function playerView(ledger, playerId) {
     owedCents: r.owedCents, paidCents: r.paidCents, balanceCents: r.balanceCents,
     games: r.games, weeks: r.weeks, claim: r.claim, status: r.status,
     usedCents: r.usedCents, buyInLeftCents: r.buyInLeftCents, buyInCents: ledger.buyInCents || 0,
+    playerRate: r.playerRate,
     payments: r.payments.map(p => ({ cents: p.cents, at: p.at, method: p.method })),
   };
 }

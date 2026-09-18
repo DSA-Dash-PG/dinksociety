@@ -42,7 +42,7 @@ function renderShareEmail({ kind, playerName, captainName, teamName, teamEmoji, 
       ? `${row.games} games × ${fmtCents(rateCents)} = ${fmtCents(row.usedCents)}. Your ${fmtCents(buyInCents)} buy-in covered the first part; the rest is collected game by game${paidBit}. Only finished match nights count.`
       : `${fmtCents(buyInCents)} buy-in to be on the team. It covers your games at ${fmtCents(rateCents)} each — ${row.games} played so far, ${fmtCents(row.buyInLeftCents)} of it left${paidBit}. Once it's used up you pay per game.`)
     : mode === 'pergame'
-    ? `${row.games} game${row.games === 1 ? '' : 's'} played × ${fmtCents(rateCents)} a game = ${fmtCents(row.owedCents)}${row.paidCents ? ` · ${fmtCents(row.paidCents)} already paid` : ''}. Your tab grows as you play — only finished match nights count.`
+    ? `${row.games} game${row.games === 1 ? '' : 's'} played${row.playerRate ? ` at your price of ${fmtCents(row.playerRate.cents)} ${row.playerRate.mode === 'week' ? 'a week' : 'a game'}` : ''} = ${fmtCents(row.usedCents)}${paidBit}. Your tab grows as you play — only finished match nights count.`
     : `Your share of the team amount is ${fmtCents(row.owedCents)}${row.paidCents ? ` · ${fmtCents(row.paidCents)} already paid` : ''}.`;
   const venmo = venmoHandle
     ? `<p style="font-size: 13px; color: #cfcfcf; line-height: 1.6; margin: 16px 0 0;">Paying by Venmo? Send it to <a href="${venmoProfileUrl(venmoHandle)}" style="color:#b8ff2c;font-weight:700;">@${esc(venmoHandle)}</a>, then tap <strong>I paid</strong> in the portal so ${cap} knows to look.</p>`

@@ -17,6 +17,7 @@
 
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { liveCircuit } from './lib/current-season.js';
+import { deletePreparedWeek } from './lib/potw-email.js';
 import {
   prepareWeeklyPotwApproval, sendApprovedPotw, sendAllPending,
   listPendingForWeek, listPreparedWeeks,
@@ -105,6 +106,13 @@ export default async (req) => {
     if (body.action === 'send-all') {
       if (!body.week) return json({ error: 'week required' }, 400);
       const out = await sendAllPending(circuit, Number(body.week), admin.email);
+      return json({ ok: true, ...out });
+    }
+
+    if (body.action === 'delete-week') {
+      if (!body.week) return json({ error: 'week required' }, 400);
+      const out = await deletePreparedWeek(circuit, Number(body.week), { force: !!body.force });
+      if (!out.ok) return json({ error: out.reason === 'has-sent' ? 'That week has already-sent emails. Pass force to remove anyway.' : out.reason }, 409);
       return json({ ok: true, ...out });
     }
 

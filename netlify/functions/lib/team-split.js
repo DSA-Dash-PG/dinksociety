@@ -6,7 +6,9 @@
 //   {
 //     teamId, enabled, mode: 'flat' | 'pergame',
 //     amountCents,                    // flat: amount being split
-//     rateCents,                      // pergame: price per game played
+//     rateCents,                      // pergame: current price per game played
+//     rateHistory: [{ fromWeek, rateCents }],   // pergame: rate changes apply from the next unplayed week
+//     playerRates: { [playerId]: { mode: 'week'|'game', cents } },  // pergame: a player's own price
 //     buyInCents,                     // pergame: optional flat buy-in the per-game charges draw down
 //     collect: 'weekly' | 'season',   // pergame: when the captain collects (display only)
 //     venmoHandle,                    // the captain's handle — players pay the CAPTAIN
@@ -171,6 +173,7 @@ export function publicConfig(split) {
   return {
     enabled: !!split.enabled, mode: split.mode, amountCents: split.amountCents || 0,
     rateCents: split.rateCents || 0, buyInCents: split.buyInCents || 0, collect: split.collect || 'weekly',
+    rateHistory: Array.isArray(split.rateHistory) ? split.rateHistory : null,
     venmoHandle: split.venmoHandle || null,
     lockedAt: split.lockedAt || null, lockedBy: split.lockedBy || null,
     announcedAt: split.announcedAt || null, updatedAt: split.updatedAt || null, updatedBy: split.updatedBy || null,
