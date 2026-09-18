@@ -65,6 +65,9 @@
     #lv .ngrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
     #lv .ng .strip{ margin-top:7px; }
     #lv .ng .rlab{ width:20px; color:var(--color-text-faint); font-size:10px; }
+    #lv .nglab{ line-height:1.5; }
+    #lv .nglab .vs{ color:var(--color-text-faint); }
+    #lv .nglab .ct{ color:var(--color-text-faint); white-space:nowrap; }
     #lv .strip{ display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
     #lv .strip .gap{ width:14px; }
     #lv .d{ width:16px; height:16px; border-radius:50%; background:var(--lv-dim); flex:none; position:relative; }
@@ -271,15 +274,14 @@
       '</div>';
     }
 
-    function abbr(name) { var w = String(name || '').split(/\s+/); return w.length > 1 ? w.map(function (x) { return x[0]; }).join('').slice(0, 4).toUpperCase() : String(name || '').slice(0, 8); }
     function nightGrid(d) {
       var ms = d.matches || [];
       return '<div class="ngrid">' + ms.map(function (m) {
         var by = slotMap(m);
         var row = function (from) { return SLOTS.slice(from, from + 6).map(function (s) { return '<span class="d ' + ((by[s] && by[s].kind) || 'o') + '"></span>'; }).join(''); };
         var p = mp(m);
-        return '<div class="ng"><div class="mono"><span class="lime">' + esc(abbr(m.home.name)) + '</span> v <span class="teal">' + esc(abbr(m.away.name)) + '</span>' +
-          (m.status === 'final' ? ' · ' + p[0] + '–' + p[1] : courts(m) ? ' · ' + esc(courts(m).replace('Courts ', 'Cts ')) : '') + '</div>' +
+        return '<div class="ng"><div class="mono nglab"><span class="lime">' + esc(m.home.name) + '</span> <span class="vs">v</span> <span class="teal">' + esc(m.away.name) + '</span>' +
+          (m.status === 'final' ? ' <span class="ct">· ' + p[0] + '–' + p[1] + '</span>' : courts(m) ? ' <span class="ct">· ' + esc(courts(m).replace('Courts ', 'Cts ')) + '</span>' : '') + '</div>' +
           '<div class="strip"><span class="rlab mono">R1</span>' + row(0) + '</div>' +
           '<div class="strip"><span class="rlab mono">R2</span>' + row(6) + '</div></div>';
       }).join('') + '</div>';
@@ -292,8 +294,8 @@
         live.map(function (m) {
           var c = m.current;
           return '<div class="ct"><div class="k"><span class="mono"><b>' + esc(courts(m).replace('Courts ', 'Cts ')) + '</b> · R' + c.round + ' G' + c.gameNum + ' ' + typeLabel(c.type) + '</span><span class="mono lime">● In play</span></div>' +
-            '<div class="side"><span>' + esc(pair(c.homePlayers) || m.home.name) + '</span><span class="tm">' + esc(abbr(m.home.name)) + '</span></div>' +
-            '<div class="side"><span>' + esc(pair(c.awayPlayers) || m.away.name) + '</span><span class="tm">' + esc(abbr(m.away.name)) + '</span></div></div>';
+            '<div class="side"><span>' + esc(pair(c.homePlayers) || m.home.name) + '</span><span class="tm">' + esc(m.home.name) + '</span></div>' +
+            '<div class="side"><span>' + esc(pair(c.awayPlayers) || m.away.name) + '</span><span class="tm">' + esc(m.away.name) + '</span></div></div>';
         }).join('') + '</div></div>';
     }
 
