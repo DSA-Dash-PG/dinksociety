@@ -91,8 +91,15 @@ export async function loadTabs(team, split, { useCache = false } = {}) {
   const scheduleStore = getStore({ name: 'schedule', consistency: 'strong' });
   const lineupStore = getStore({ name: 'lineups', consistency: 'strong' });
   const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
-  const prefix = `schedule/${circuitCode(team.circuit)}/${team.division}/`;
-  const { blobs } = await scheduleStore.list({ prefix }).catch(() => ({ blobs: [] }));
+  // List by CIRCUIT only and pick the division out of the key ourselves. The
+  // division id contains a "+" ("3.5+Mix"); in the list() prefix it travels in a
+  // query string, where "+" reads as a space, so a full-prefix list came back
+  // empty and every tab showed 0 games (2026-09-18, Week 1). Direct get() calls
+  // with "+" in the path are fine — only list prefixes are affected.
+  const circuitPrefix = `schedule/${circuitCode(team.circuit)}/`;
+  const prefix = `${circuitPrefix}${team.division}/`;
+  const listed = await scheduleStore.list({ prefix: circuitPrefix }).catch(() => ({ blobs: [] }));
+  const blobs = (listed.blobs || []).filter(b => b.key.startsWith(prefix));
 
   const cache = split.gamesCache || {};
   const nextCache = {};
