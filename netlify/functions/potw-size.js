@@ -40,7 +40,7 @@ function page({ title, heading, body, sizeRow }) {
   <h1>${esc(heading)}</h1>
   <p>${body}</p>
   ${sizeRow || ''}
-  <div class="wm">The Dink Society &middot; presented by SuprDupr</div>
+  <div class="wm">The Dink Society &middot; presented by <img src="/img/suprdupr.png" alt="SuprDupr" style="height:18px;width:auto;border-radius:3px;vertical-align:middle"></div>
 </div></body></html>`, { status: 200, headers: { 'Content-Type': 'text/html; charset=utf-8' } });
 }
 

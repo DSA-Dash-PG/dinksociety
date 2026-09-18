@@ -269,7 +269,7 @@ export function renderCongratsEmail({ winner: w, week, lead, captainIntro, sizeT
   ${capLine}
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:30px">
     <span style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#f5f5f5">THE DINK SOCIETY</span>
-    <span style="font-size:11px;color:#8a8a8a;font-weight:600">PRESENTED BY <b style="color:#b8ff2c;font-weight:800;letter-spacing:.04em">SuprDupr</b></span>
+    <span style="font-size:11px;color:#8a8a8a;font-weight:600;display:inline-flex;align-items:center;gap:8px">PRESENTED BY <img src="https://dinksociety.app/img/suprdupr.png" alt="SuprDupr" width="88" style="height:25px;width:88px;border-radius:4px;vertical-align:middle"></span>
   </div>
   <span style="display:inline-block;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#b8ff2c;background:rgba(184,255,44,.10);border:1px solid rgba(184,255,44,.30);padding:7px 12px;border-radius:9999px;margin-bottom:18px">${chefEmoji(w.gender)} SuprDupr Player of the Week &middot; Week ${esc(week)}</span>
   <div style="width:64px;height:64px;border-radius:9999px;background:linear-gradient(135deg,#243b00,#0e0e0e);border:2px solid #b8ff2c;text-align:center;line-height:64px;font-size:22px;font-weight:800;color:#b8ff2c;margin:0 0 22px">${esc(initials(w.name))}</div>
