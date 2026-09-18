@@ -26,9 +26,8 @@ import {
 } from './lib/drop.js';
 import { livePerformers } from './lib/drop-insights.js';
 import { appendMessage, generateId } from './lib/messages.js';
-import {
-  sendEmail, renderAdminMessage, htmlToPlain,
-} from './lib/email.js';
+import { renderAdminMessage, htmlToPlain } from './lib/email.js';
+import { sendNotify } from './lib/notify-prefs.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -94,7 +93,8 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
   const broadcastId = generateId('bc_');
   const template = await getEmailTemplate();
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-  let recipients = 0, emailed = 0, failed = 0, firstError = null;
+  let recipients = 0, emailed = 0, failed = 0, skipped = 0, firstError = null;
+  const seen = new Set();   // one email per person, even if rostered on two teams
 
   for (const team of teams) {
     // Portal announcement (shows on player + captain portals via announcements.js).
@@ -104,14 +104,18 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
       body: `${subject}\n\n${text}`, bodyHtml, broadcastId,
     });
     if (doEmail) {
-      const tos = recipientEmails(team, audience);
+      const tos = recipientEmails(team, audience).filter(e => !seen.has(e));
+      tos.forEach(e => seen.add(e));
       recipients += tos.length;
       for (const to of tos) {
         try {
-          await sendEmail({
-            to, subject: `${subject} — The Dink Society`,
+          // Through the notify gate: a player who unsubscribed from league
+          // broadcasts is skipped, and the manage/unsubscribe footer is added.
+          const r = await sendNotify({
+            to, category: 'league', subject: `${subject} — The Dink Society`,
             html: renderAdminMessage({ subject, bodyHtml, body: text, teamName: team.name, portalUrl: link, template }),
           });
+          if (r && r.skipped) { skipped++; continue; }
           emailed++;
           await sleep(120);  // stay under Resend's per-second send limit on big blasts
         } catch (e) {
@@ -122,7 +126,7 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
       }
     }
   }
-  if (doEmail) console.log(`drop broadcast week ${rec.week}: ${recipients} recipients, ${emailed} sent, ${failed} failed${firstError ? ' · first error: ' + firstError : ''}`);
+  if (doEmail) console.log(`drop broadcast week ${rec.week} [circuit ${rec.circuit}]: ${teams.length} teams, ${recipients} recipients, ${emailed} sent, ${skipped} opted out, ${failed} failed${firstError ? ' · first error: ' + firstError : ''}`);
 
   // Log to the broadcasts store so it surfaces as a league announcement, gated
   // to players (the recap is for everyone).
@@ -131,13 +135,13 @@ async function broadcastDrop(rec, { sendEmail: doEmail = true, audience = 'playe
       id: broadcastId, subject, body: text, bodyHtml,
       attachments: [], scope: 'all', division: null, teamIds: null,
       audience: 'players', sentEmail: !!doEmail, teamCount: teams.length,
-      recipients, emailed, failed, firstError,
+      recipients, emailed, skipped, failed, firstError,
       sentBy: rec.sentBy || 'desk@dinksociety.app', sentAt: new Date().toISOString(),
       kind: 'drop', dropWeek: rec.week, dropEdition: rec.edition,
     });
   } catch (e) { console.error('drop broadcast log failed:', e); }
 
-  return { broadcastId, teamCount: teams.length, recipients, emailed, failed, firstError };
+  return { broadcastId, circuit: rec.circuit, teamCount: teams.length, recipients, emailed, skipped, failed, firstError };
 }
 
 function recipientEmails(team, audience) {
