@@ -91,25 +91,28 @@ export async function loadTabs(team, split, { useCache = false } = {}) {
   const scheduleStore = getStore({ name: 'schedule', consistency: 'strong' });
   const lineupStore = getStore({ name: 'lineups', consistency: 'strong' });
   const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
-  // List by CIRCUIT only and pick the division out of the key ourselves. The
-  // division id contains a "+" ("3.5+Mix"); in the list() prefix it travels in a
-  // query string, where "+" reads as a space, so a full-prefix list came back
-  // empty and every tab showed 0 games (2026-09-18, Week 1). Direct get() calls
-  // with "+" in the path are fine — only list prefixes are affected.
-  const circuitPrefix = `schedule/${circuitCode(team.circuit)}/`;
-  const prefix = `${circuitPrefix}${team.division}/`;
-  const listed = await scheduleStore.list({ prefix: circuitPrefix }).catch(() => ({ blobs: [] }));
-  const blobs = (listed.blobs || []).filter(b => b.key.startsWith(prefix));
+  // Read the week files DIRECTLY, the way captain-schedule.js / captain-score.js
+  // do (week 1..12 covers the season plus bracket and make-up weeks). A list()
+  // by prefix returned nothing here on 2026-09-18 even though the files exist —
+  // the division id carries a "+" ("3.5+Mix") and the listing never matched it —
+  // so no listing at all: get() by exact key is what the rest of the app trusts.
+  const circuit = circuitCode(team.circuit);
+  const weekFiles = [];
+  for (let week = 1; week <= 12; week++) {
+    const key = `schedule/${circuit}/${team.division}/week-${week}.json`;
+    const wf = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
+    if (wf?.matches) weekFiles.push({ key, wf, weekNo: week });
+  }
 
   const cache = split.gamesCache || {};
   const nextCache = {};
   const tabs = [];
-  for (const b of blobs) {
-    const wf = await scheduleStore.get(b.key, { type: 'json' }).catch(() => null);
-    for (const m of (wf?.matches || [])) {
+  const diag = { circuit, division: team.division, weekFiles: weekFiles.map(w => w.key), matches: [] };
+  for (const { wf, weekNo } of weekFiles) {
+    for (const m of (wf.matches || [])) {
       if (!m?.finalizedAt || !m.id) continue;
       if (m.teamA?.id !== team.id && m.teamB?.id !== team.id) continue;
-      const week = m.week ?? wf.week ?? null;
+      const week = m.week ?? wf.week ?? weekNo;
       const hit = cache[m.id];
       let counts;
       if (useCache && hit && hit.finalizedAt === m.finalizedAt) {
@@ -120,6 +123,7 @@ export async function loadTabs(team, split, { useCache = false } = {}) {
           scoresStore.get(`score/${m.id}.json`, { type: 'json' }).catch(() => null),
         ]);
         counts = countGames({ lineup, score, championship: !!m.championship });
+        diag.matches.push({ id: m.id, week, finalizedAt: m.finalizedAt, hasLineup: !!lineup?.games, hasScore: !!score?.games, counts });
       }
       nextCache[m.id] = { finalizedAt: m.finalizedAt, week, phase: m.phase || null, counts };
       tabs.push({ matchId: m.id, week, phase: m.phase || null, counts });
@@ -127,7 +131,7 @@ export async function loadTabs(team, split, { useCache = false } = {}) {
   }
   const cacheChanged = JSON.stringify(cache) !== JSON.stringify(nextCache);
   split.gamesCache = nextCache;
-  return { tabs, cacheChanged };
+  return { tabs, cacheChanged, diag };
 }
 
 /**
@@ -142,10 +146,12 @@ export async function loadLedger(team, { useCache = false, split: given = null }
   let rosterLocked = false;
   let tabs = [];
 
+  let diag = null;
   if (split.mode === 'pergame') {
     const r = await loadTabs(team, split, { useCache });
     tabs = r.tabs;
     dirty = r.cacheChanged;
+    diag = r.diag;
   } else {
     rosterLocked = await isRosterLocked(team);
     if (rosterLocked && !split.lockedAt && split.enabled) {
@@ -156,7 +162,7 @@ export async function loadLedger(team, { useCache = false, split: given = null }
     }
   }
   if (dirty) await saveSplit(split).catch(e => console.warn('team-split lazy save skipped:', e?.message || e));
-  return { split, ledger: buildLedger({ split, team, tabs }), rosterLocked };
+  return { split, ledger: buildLedger({ split, team, tabs }), rosterLocked, diag };
 }
 
 /** Config fields safe to send to a captain / admin. */

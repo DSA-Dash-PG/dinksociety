@@ -47,9 +47,9 @@ async function teamFeeCents(team) {
 
 const activeCount = (team) => (team.roster || []).filter(p => p && p.id && !p.archived && !p.pendingAdd).length;
 
-async function respond(team, split) {
-  const { ledger, rosterLocked } = await loadLedger(team, { split });
-  return json({ ok: true, config: publicConfig(split), ledger, rosterLocked, teamFeeCents: await teamFeeCents(team), activeCount: activeCount(team) });
+async function respond(team, split, debug = false) {
+  const { ledger, rosterLocked, diag } = await loadLedger(team, { split });
+  return json({ ok: true, config: publicConfig(split), ledger, rosterLocked, teamFeeCents: await teamFeeCents(team), activeCount: activeCount(team), ...(debug ? { diag } : {}) });
 }
 
 export default async (req) => {
@@ -62,7 +62,7 @@ export default async (req) => {
   if (req.method === 'GET') {
     const split = await getSplit(team.id);
     if (!split) return json({ ok: true, config: null, ledger: null, rosterLocked: false, teamFeeCents: await teamFeeCents(team), activeCount: activeCount(team) });
-    return respond(team, split);
+    return respond(team, split, new URL(req.url).searchParams.get('debug') === '1'); // ?debug=1 → per-match tab diagnostics
   }
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 
