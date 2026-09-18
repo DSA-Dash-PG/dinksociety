@@ -22,7 +22,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html-to-image/1.11.11/html-to-image.min.js"></script>
   <style>
     /* ── Cards studio ─────────────────────────────────────────────────── */
-    :root{ --cd-mono:'IBM Plex Mono',ui-monospace,monospace; --cd-gold:#f0b429; --cd-red:#ed1c24; --cd-dim:#2c322c; --cd-dim2:#3a423a; }
+    :root{ --cd-mono:'IBM Plex Mono',ui-monospace,monospace; --cd-gold:#b8ff2c; --cd-red:#ed1c24; --cd-dim:#2c322c; --cd-dim2:#3a423a; }
     #cd{ display:grid; grid-template-columns:320px 1fr; min-height:100vh; padding-top:64px; }
     @media(max-width:960px){ #cd{ grid-template-columns:1fr; } #cd .rail{ position:static; height:auto; border-right:0; border-bottom:1px solid var(--color-border); } }
 
@@ -58,7 +58,7 @@
     /* ── the card itself: fixed 1080 wide, dark always (it's a poster) ── */
     .card{ position:absolute; top:0; left:0; transform-origin:0 0; width:1080px; padding:64px; display:flex; flex-direction:column; color:#f5f5f5; font-family:Inter,system-ui,sans-serif; background:#0e0e0e; -webkit-font-smoothing:antialiased; }
     .card .photo{ position:absolute; inset:0; background:radial-gradient(900px 700px at 70% 20%,rgba(23,215,176,.20),transparent 60%),radial-gradient(700px 600px at 10% 90%,rgba(184,255,44,.14),transparent 60%),linear-gradient(180deg,#141a14 0%,#0e0e0e 100%); background-size:cover; background-position:center top; }
-    .card .fade{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(14,14,14,.10) 26%,rgba(14,14,14,.92) 60%,#0e0e0e 76%); }
+    .card .fade{ position:absolute; inset:0; background:linear-gradient(180deg,rgba(14,14,14,.06) 34%,rgba(14,14,14,.88) 62%,#0e0e0e 76%); }
     .card .fade.top{ background:linear-gradient(180deg,rgba(14,14,14,.12) 18%,rgba(14,14,14,.88) 46%,#0e0e0e 58%); }
     .card > *{ position:relative; }
     .card .disp{ font-weight:800; text-transform:uppercase; line-height:.92; letter-spacing:-.025em; }
@@ -149,6 +149,7 @@
       <div class="ctl" id="cd-ratio"><button data-r="45" class="on">4:5</button><button data-r="11">1:1</button><button data-r="916">9:16</button></div>
       <div class="ctl" id="cd-gender" style="margin-top:6px"><button data-g="men" class="on">Men's</button><button data-g="women">Women's</button></div>
       <div class="ctl" id="cd-metric" style="margin-top:6px"><button data-m="dsr" class="on">DSR</button><button data-m="diff">Diff</button><button data-m="pts">Pts</button></div>
+      <div class="ctl" id="cd-focal" style="margin-top:6px" title="Which part of the photo stays visible"><button data-f="top">Photo · top</button><button data-f="center" class="on">Center</button><button data-f="bottom">Bottom</button></div>
       <div class="field" id="cd-whof" style="display:none"><label>Player</label><select id="cd-who"></select></div>
       <div class="field"><label>Context line · auto-written, editable</label><textarea id="cd-ctx" rows="3"></textarea></div>
       <div class="drop" id="cd-drop">Drop a photo · or click to choose<input type="file" id="cd-file" accept="image/*" hidden></div>
@@ -182,6 +183,7 @@
       event: qs.get('event') || null,
       ctx: qs.get('ctx') || null,      // a hand-edited context line survives in the link
       photo: null,                     // dropped photo (data URL), never saved
+      focal: qs.get('focal') || 'center',
     };
     var SEASON = { id: 'circuit-i', code: 'I', name: 'Season 1' };
     var LB = null, GD = {}, LADDERS = null, NIGHT = {};
@@ -249,7 +251,7 @@
     function brand(sub) { return '<div class="brand">The Dink<b>Society</b><small>' + esc(sub || 'dinksociety.app') + '</small></div>'; }
     function hdr(left, sub) { return '<div class="hdr"><div class="mono">' + left + '</div>' + brand(sub) + '</div>'; }
     function sdLogo() { return '<img class="sd" src="/img/suprdupr.png" alt="SuprDupr">'; }
-    function photoLayer(url, ph) { return '<div class="photo"' + (url ? ' style="background-image:url(' + esc(url) + ')"' : '') + '></div>'; }
+    function photoLayer(url, ph) { return '<div class="photo"' + (url ? ' style="background-image:url(' + esc(url) + ');background-position:center ' + esc(S.focal) + '"' : '') + '></div>'; }
     function dotsFrom(games, total) {
       var out = ''; for (var i = 0; i < total; i++) { var g = games[i]; out += '<span class="dot ' + (g == null ? 'o' : g ? 'w' : 'l') + '"></span>'; } return out;
     }
@@ -260,8 +262,9 @@
       if (w.l === 0 && w.w > 0) bits.push('a perfect ' + w.w + '–0 night');
       else bits.push(w.w + '–' + w.l + ' on the night');
       if (w.diff != null) bits.push(signed(w.diff) + ' on points');
-      if (w.dsr != null) bits.push('a ' + w.dsr + ' DSR, top of the ' + (S.gender === 'women' ? "women's" : "men's") + ' board');
-      var lead = (S._place && S._place > 1) ? first(w.name) + ' was ' + S._place + (['', 'st', 'nd', 'rd'][S._place] || 'th') + ' on the ' + (S.gender === 'women' ? "women's" : "men's") + ' board with ' : first(w.name) + ' turned in ';
+      var top = !S._place || S._place === 1;
+      if (w.dsr != null) bits.push('a ' + w.dsr + ' DSR' + (top ? ', top of the ' + (S.gender === 'women' ? "women's" : "men's") + ' board' : ''));
+      var lead = top ? first(w.name) + ' turned in ' : first(w.name) + ' finished ' + S._place + (['', 'st', 'nd', 'rd'][S._place] || 'th') + ' on the ' + (S.gender === 'women' ? "women's" : "men's") + ' board with ';
       return lead + bits.join(', ') + ' in Week ' + wk + '.';
     }
     function ctxTotw(t, m) {
@@ -471,6 +474,7 @@
       document.querySelectorAll('#cd-ratio button').forEach(function (b) { b.classList.toggle('on', b.dataset.r === S.ratio); });
       document.querySelectorAll('#cd-gender button').forEach(function (b) { b.classList.toggle('on', b.dataset.g === S.gender); });
       document.querySelectorAll('#cd-metric button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === S.metric); });
+      document.querySelectorAll('#cd-focal button').forEach(function (b) { b.classList.toggle('on', b.dataset.f === S.focal); });
       $('cd-gender').style.display = (S.card === 'potw' || S.card === 'leaders') ? '' : 'none';
       $('cd-metric').style.display = S.card === 'leaders' ? '' : 'none';
       $('cd-weekf').style.display = LEAGUE[S.card] ? '' : 'none';
@@ -486,6 +490,7 @@
       if (S.card === 'leaders') p.set('metric', S.metric); else p.delete('metric');
       if (S.card === 'potw' && S.who) p.set('who', S.who); else p.delete('who');
       if (S.ctx != null) p.set('ctx', S.ctx); else p.delete('ctx');
+      if (S.focal !== 'center') p.set('focal', S.focal); else p.delete('focal');
       if (SEASON.id && SEASON.id !== 'circuit-i') p.set('season', SEASON.id);
       history.replaceState(null, '', u);
     }
@@ -553,6 +558,7 @@
     document.querySelectorAll('#cd .tpl').forEach(function (b) { b.addEventListener('click', function () { S.card = b.dataset.c; S.ctx = null; S.who = null; render(); }); });
     $('cd-ratio').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.ratio = b.dataset.r; render(); });
     $('cd-gender').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.gender = b.dataset.g; S.ctx = null; S.who = null; render(); });
+    $('cd-focal').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.focal = b.dataset.f; render(); });
     $('cd-metric').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.metric = b.dataset.m; S.ctx = null; render(); });
     $('cd-week').addEventListener('change', function () { S.week = Number(this.value); S.ctx = null; S.who = null; render(); });
     $('cd-event').addEventListener('change', function () { S.event = this.value; S.ctx = null; render(); });
