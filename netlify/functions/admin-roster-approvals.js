@@ -23,32 +23,7 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { circuitCode, seasonName } from './lib/circuit.js';
 import { normalizeEmail } from './lib/identity.js';
 import { isTestTeam } from './lib/circuit.js';
-import { logActivity } from './lib/activity-log.js';
-import { sendEmail, renderRosterAddDecision } from './lib/email.js';
-import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
-
-const VALID_ID = /^[a-zA-Z0-9_-]{1,64}$/;
-
-function siteUrl() {
-  return (typeof Netlify !== 'undefined' && Netlify.env.get('SITE_URL'))
-    || process.env.SITE_URL || 'https://dinksociety.app';
-}
-
-/**
- * Who hears about this decision: the captain, any co-captains, and whoever
- * actually submitted the request (a co-captain may have added them). Deduped,
- * lowercased, and never sent to an empty address.
- */
-function leaderEmails(team, requestedBy) {
-  const set = new Set();
-  const add = (e) => { const x = String(e || '').trim().toLowerCase(); if (x && x.includes('@')) set.add(x); };
-  add(team.captainEmail);
-  for (const p of (team.roster || [])) {
-    if ((p.isCaptain || p.isCoCaptain) && p.email) add(p.email);
-  }
-  add(requestedBy);
-  return [...set];
-}
+import { decideRosterAdd, RosterApprovalError } from './lib/roster-approvals.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -123,83 +98,23 @@ export default async (req) => {
   }
 
   // ── POST: rule on one ──
+  // The decision itself lives in lib/roster-approvals.js so the one-tap email
+  // links (approval-decide.js) and this tab do exactly the same thing.
   if (req.method === 'POST') {
     let body;
     try { body = await req.json(); } catch { return json({ error: 'Bad JSON' }, 400); }
-    const { teamId, playerId, action } = body || {};
-    if (!VALID_ID.test(String(teamId || ''))) return json({ error: 'teamId required' }, 400);
-    if (!VALID_ID.test(String(playerId || ''))) return json({ error: 'playerId required' }, 400);
-    if (!['approve', 'reject'].includes(action)) return json({ error: 'action must be approve or reject' }, 400);
-
-    const key = `team/${teamId}.json`;
-    const team = await store.get(key, { type: 'json', consistency: 'strong' }).catch(() => null);
-    if (!team) return json({ error: 'Team not found' }, 404);
-
-    const roster = Array.isArray(team.roster) ? team.roster : [];
-    const player = roster.find(p => p && p.id === playerId);
-    if (!player) return json({ error: 'Player not found on this team' }, 404);
-    if (!player.pendingAdd) return json({ error: 'That player is not awaiting approval' }, 409);
-
-    const requestedBy = player.pendingAddBy || null;
-
-    if (action === 'approve') {
-      delete player.pendingAdd;
-      delete player.pendingAddAt;
-      delete player.pendingAddBy;
-      player.approvedAt = new Date().toISOString();
-      player.approvedBy = admin.payload?.email || 'admin';
-      team.roster = roster;
-    } else {
-      team.roster = roster.filter(p => p.id !== playerId);
-    }
-
-    team.rosterUpdatedAt = new Date().toISOString();
-    await store.setJSON(key, team);
-
-    // Tell the captain. A request that vanishes without a word is worse than no
-    // approval step at all — they'd re-add the player and wonder why nothing
-    // sticks. Email is best-effort: a send failure must not undo the decision.
-    const note = typeof body.note === 'string' ? body.note.trim().slice(0, 400) : '';
-    const to = leaderEmails(team, requestedBy);
-    if (to.length) {
-      const html = renderRosterAddDecision({
-        approved: action === 'approve',
-        playerName: player.name || 'Your player',
-        teamName: team.name || 'your team',
-        teamEmoji: team.emoji || '',
-        seasonName: seasonName(team.circuit || team.seasonId),
-        note,
-        portalUrl: `${siteUrl()}/captain.html`,
-        adminEmail: 'dink@dinksociety.app',
+    const { teamId, playerId, action, note } = body || {};
+    try {
+      const out = await decideRosterAdd({
+        teamId, playerId, action, note,
+        adminEmail: admin.payload?.email || null,
       });
-      const subject = action === 'approve'
-        ? `${player.name || 'Your player'} is on your ${team.name || 'team'} roster`
-        : `Roster request declined \u2014 ${player.name || 'your player'}`;
-      try {
-        await sendEmail({ to, subject, html, replyTo: 'dink@dinksociety.app' });
-      } catch (err) {
-        console.error('roster-approval email failed:', err?.message || err);
-      }
+      return json({ ok: true, action: out.action, playerId: out.playerId, teamId: out.teamId, notified: out.notified });
+    } catch (err) {
+      if (err instanceof RosterApprovalError) return json({ error: err.message }, err.status);
+      console.error('admin-roster-approvals POST error:', err);
+      return json({ error: 'Action failed', detail: err.message }, 500);
     }
-
-    // Approved means they are actually ON the roster now — that is the moment
-    // the player hears from us. A rejection sends nothing to the player, who
-    // never knew they were requested.
-    if (action === 'approve') {
-      await sendRosterWelcomesSafe({
-        teamId,
-        playerIds: [playerId],
-        addedByName: player.pendingAddBy || team.captainName || '',
-      });
-    }
-
-    await logActivity({
-      type: action === 'approve' ? 'roster.add.approved' : 'roster.add.rejected',
-      actor: { email: admin.payload?.email || null, role: 'admin' },
-      target: { teamId, teamName: team.name || '', playerId, playerName: player.name || '' },
-    }).catch(() => {});
-
-    return json({ ok: true, action, playerId, teamId, notified: to.length });
   }
 
   return json({ error: 'Method not allowed' }, 405);

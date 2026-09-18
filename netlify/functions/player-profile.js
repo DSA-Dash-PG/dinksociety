@@ -95,6 +95,7 @@ export default async (req) => {
       if (!isAdmin && Object.keys(patch).length) {
         await notifyAdminsPendingProfile({
           playerName: rec.name, teamName: 'Ladder player', submittedBy, what: 'bio update',
+          teamId: null, playerId, entry: { ...rec, ...next },
         });
       }
       return new Response(JSON.stringify({
@@ -132,6 +133,7 @@ export default async (req) => {
     if (!isAdmin) {
       await notifyAdminsPendingProfile({
         playerName: entry.name, teamName: team.name, submittedBy, what: 'bio update',
+        teamId, playerId, entry,
       });
     }
 

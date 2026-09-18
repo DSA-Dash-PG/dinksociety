@@ -13,6 +13,7 @@ import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/ide
 import { circuitCode } from './lib/circuit.js';
 import { buildLeagueIndex, playedBefore, playedForTeam } from './lib/league-players.js';
 import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
+import { notifyAdminsPendingRosterAdd } from './lib/roster-approvals.js';
 
 // No roster size cap — rosters are unlimited; every add still goes through admin approval.
 
@@ -72,6 +73,10 @@ export default async (req) => {
         ? (await buildLeagueIndex().catch(() => ({ byEmail: new Map() }))).byEmail
         : new Map();
       const autoAddedNow = [];
+      // Ids queued for league approval ON THIS SAVE — the admins get one
+      // "approve / deny" email per person, right now, instead of finding out
+      // when they next open the console.
+      const requestedNow = [];
 
       for (const p of roster) {
         if (!p || typeof p !== 'object') continue;
@@ -135,6 +140,7 @@ export default async (req) => {
             });
           } else {
             const from = known ? (known.stints[0] || null) : null;
+            requestedNow.push(id);
             pendingState = {
               pendingAdd: true,
               pendingAddAt: new Date().toISOString(),
@@ -212,6 +218,13 @@ export default async (req) => {
           playerIds: autoAddedNow.map(p => p.id),
           addedByName: ctx.user?.name || ctx.team?.captainName || '',
         });
+      }
+
+      // Tell the league about each new approval request — with the player's
+      // details and one-tap Approve / Deny links. Best-effort, never fails the save.
+      for (const pid of requestedNow) {
+        const player = cleaned.find(p => p.id === pid);
+        if (player) await notifyAdminsPendingRosterAdd({ team: updated, player });
       }
 
       return json({

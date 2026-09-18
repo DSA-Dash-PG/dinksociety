@@ -5,10 +5,13 @@
 // pending uploads (pending/<playerId>) are never exposed publicly.
 //
 // Admins preview a pending photo via player-photo-serve?id=<playerId>&pending=1
-// (admin session required for the pending variant).
+// (admin session required for the pending variant) — or, from the approval
+// email, with &t=<view token> (lib/approval-token.js) so the <img> renders in
+// the inbox without a sign-in. The token must be for this exact player.
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession } from './lib/auth.js';
+import { peekApprovalToken } from './lib/approval-token.js';
 import { identityIdsFor } from './lib/league-identity.js';
 
 const VALID_ID = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -26,8 +29,16 @@ export default async (req) => {
     // Pending preview is admin-only.
     let key = `img/${id}`;
     if (wantPending) {
-      const admin = await verifyAdminSession(req);
-      if (!admin.valid) return new Response('Unauthorized', { status: 401 });
+      const viewTok = url.searchParams.get('t');
+      let allowed = false;
+      if (viewTok) {
+        const rec = await peekApprovalToken(viewTok);
+        allowed = !!rec && rec.action === 'view' && rec.playerId === id;
+      }
+      if (!allowed) {
+        const admin = await verifyAdminSession(req);
+        if (!admin.valid) return new Response('Unauthorized', { status: 401 });
+      }
       key = `pending/${id}`;
     }
 

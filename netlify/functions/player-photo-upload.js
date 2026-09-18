@@ -115,6 +115,8 @@ export default async (req) => {
         });
         await notifyAdminsPendingProfile({
           playerName: rec.name, teamName: 'Ladder player', submittedBy: 'player', what: 'new photo',
+          teamId: null, playerId,
+          entry: { ...rec, pendingProfile: { ...(rec.pendingProfile || {}), photo: stamp, submittedBy: 'player', submittedAt: updatedAt } },
         });
       }
       return new Response(JSON.stringify({ ok: true, playerId, status: isAdmin ? 'live' : 'pending', updatedAt }), { status: 200, headers });
@@ -159,6 +161,7 @@ export default async (req) => {
     if (!isAdmin) {
       await notifyAdminsPendingProfile({
         playerName: entry.name, teamName: team.name, submittedBy: entry.pendingProfile?.submittedBy || 'player', what: 'new photo',
+        teamId, playerId, entry,
       });
     }
 
