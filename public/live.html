@@ -411,6 +411,7 @@ body.is-idle > *:not(.idle){display:none}
   <p id="idleSub">No matches scheduled.</p>
 </div>
 
+<script src="/js/season.js"></script>
 <script src="/js/live-poll.js"></script>
 <script src="/js/ds-ticker.js"></script>
 <script>
@@ -418,7 +419,11 @@ body.is-idle > *:not(.idle){display:none}
   'use strict';
 
   var DEMO = new URLSearchParams(location.search).has('demo');
-  var ENDPOINT = '/.netlify/functions/public-gameday?season=circuit-i';
+  // The board follows the CURRENT season (season.js), or a ?season= pin. It
+  // was hardcoded to circuit-i, so on Season 2 it polled Season 1's schedule.
+  var SEASON_ID = new URLSearchParams(location.search).get('season') || null;
+  function endpoint() { return '/.netlify/functions/public-gameday?season=' + encodeURIComponent(SEASON_ID || 'circuit-i'); }
+  var ENDPOINT = endpoint();
   var FEED_ROWS = 4;          // results that fit without scrolling
   var PANEL_MS  = 14000;      // how long each rotating panel holds
   var sn   = DSTicker.shortName;
@@ -713,13 +718,19 @@ body.is-idle > *:not(.idle){display:none}
     renderPanels(d);
   }
 
-  // the bottom strip is the shared component; the board is this page's own render
+  // the bottom strip is the shared component; the board is this page's own render.
+  // Season first, then mount — so the very first poll already targets the
+  // right season instead of flashing Season 1.
+  var seasonReady = (SEASON_ID || !window.dsSeason)
+    ? Promise.resolve()
+    : window.dsSeason().then(function (S) { if (S && S.id) { SEASON_ID = S.id; ENDPOINT = endpoint(); } }).catch(function () {});
+  seasonReady.then(function () {
   DSTicker.mount({
     strip: document.getElementById('ds-ticker'),
     card: null,
 
     // ?demo=1 runs the simulator against the stub; otherwise go live
-    source: DEMO ? 'stub' : { url: ENDPOINT },
+    source: DEMO ? 'stub' : { url: function () { return ENDPOINT; } },
     onData: renderBoard          // real hook — see render() in ds-ticker.js
   });
 
@@ -744,9 +755,18 @@ body.is-idle > *:not(.idle){display:none}
         return r.json();
       })
       .then(function (d) {
+        var sub = document.getElementById('idleSub');
         if (!d || !d.matches || !d.matches.length) {
-          document.getElementById('idleSub').textContent =
-            d && d.message ? d.message : 'No matches scheduled tonight.';
+          sub.textContent = d && d.message ? d.message : 'No matches scheduled tonight.';
+        } else if (!d.gameNight) {
+          // Matches exist but none are tonight — say when the next ones are
+          // instead of sitting on "Connecting…" forever.
+          var next = d.matches.map(function (m) { return m.scheduledAt ? new Date(m.scheduledAt) : null; })
+            .filter(function (x) { return x && !isNaN(x) && x.getTime() > Date.now() - 6 * 3600 * 1000; })
+            .sort(function (a, b) { return a - b; })[0];
+          sub.textContent = next
+            ? 'No matches tonight. Next up: Week ' + d.week + ' · ' + next.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+            : 'No matches tonight.';
         }
       })
       .catch(function (e) {
@@ -755,6 +775,7 @@ body.is-idle > *:not(.idle){display:none}
         console.error('[live] endpoint unreachable:', e);
       });
   }
+  }); // seasonReady
 
   // clock
   function tick() {

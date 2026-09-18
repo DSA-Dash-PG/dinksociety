@@ -15,13 +15,21 @@
 
 <script>
 (function () {
+  // Follow the CURRENT season (season.js is loaded by the nav partial). It
+  // was hardcoded to circuit-i, so the ticker never saw Season 2's schedule.
+  var SEASON_ID = 'circuit-i';
+  function url() { return '/.netlify/functions/public-gameday?season=' + encodeURIComponent(SEASON_ID); }
   function boot() {
     if (!window.DSTicker) return;
-    window.DSTicker.mount({
-      strip: document.getElementById('ds-ticker'),
-      card: document.getElementById('ds-livecard'),   // null on pages without one
-
-      source: { url: '/.netlify/functions/public-gameday?season=circuit-i' }
+    var ready = window.dsSeason
+      ? window.dsSeason().then(function (S) { if (S && S.id) SEASON_ID = S.id; }).catch(function () {})
+      : Promise.resolve();
+    ready.then(function () {
+      window.DSTicker.mount({
+        strip: document.getElementById('ds-ticker'),
+        card: document.getElementById('ds-livecard'),   // null on pages without one
+        source: { url: url }
+      });
     });
   }
   if (document.readyState === 'loading') {
