@@ -186,7 +186,7 @@
       focal: qs.get('focal') || 'center',
     };
     var SEASON = { id: 'circuit-i', code: 'I', name: 'Season 1' };
-    var LB = null, GD = {}, LADDERS = null, NIGHT = {};
+    var LB = null, GD = {}, LADDERS = null, NIGHT = {}, PHOTOS = null;
     var H = { '45': 1350, '11': 1080, '916': 1920 };
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -211,6 +211,18 @@
       return fetch('/.netlify/functions/public-gameday?season=' + encodeURIComponent(SEASON.id) + (week ? '&week=' + week : '')).then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) { GD[k] = d || { matches: [] }; if (d && d.week) GD[String(d.week)] = d; return GD[k]; });
     }
+    // Profile photos straight from the roster feed (resolved live from the photo
+    // store), so a photo uploaded after the last standings rebuild still shows.
+    function loadPhotos() {
+      if (PHOTOS) return Promise.resolve(PHOTOS);
+      return fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON.id)).then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) {
+          PHOTOS = {};
+          ((d && d.teams) || []).forEach(function (t) { (t.roster || []).forEach(function (p) { if (p && p.name && p.photoUrl) PHOTOS[String(p.name).toLowerCase()] = p.photoUrl; }); });
+          return PHOTOS;
+        }).catch(function () { PHOTOS = {}; return PHOTOS; });
+    }
+    function profilePhoto(name, fallback) { return (PHOTOS && PHOTOS[String(name || '').toLowerCase()]) || fallback || null; }
     function loadLadders() {
       if (LADDERS) return Promise.resolve(LADDERS);
       return fetch('/.netlify/functions/public-ladders').then(function (r) { return r.ok ? r.json() : null; })
@@ -311,7 +323,7 @@
         if (onH) gamesLine.push(g.homeWin); else if (onA) gamesLine.push(!g.homeWin);
       }); });
       if (!gamesLine.length) gamesLine = Array(w.w).fill(true).concat(Array(w.l).fill(false));
-      var photo = S.photo || w.photoUrl || null;
+      var photo = S.photo || profilePhoto(w.name, w.photoUrl);
       S._place = place;
       var ctx = S.ctx != null ? S.ctx : ctxPotw(w, wk);
       setCtx(ctx);
@@ -530,7 +542,7 @@
     function render() {
       syncControls(); status('');
       if (LEAGUE[S.card]) {
-        return loadLB().then(function () { return loadGD(S.week); }).then(function (gd) {
+        return loadLB().then(loadPhotos).then(function () { return loadGD(S.week); }).then(function (gd) {
           fillWeeks(gd);
           if (String(gd.week) !== String(S.week)) return loadGD(S.week).then(function (g2) { return g2; });
           return gd;
