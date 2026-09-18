@@ -84,12 +84,16 @@ export default async (req) => {
       return etagJson(req, emptyPayload(seasonId, 'No schedule published yet.'));
     }
 
+    // ---- 1b. every week of the season, for the week strip on /live ----
+    // { week, date, phase, phaseLabel, status: 'final' | 'live' | 'upcoming' }
+    const weekList = summarizeWeeks(weeks);
+
     // ---- 2. pick the week ----
     const picked = weekParam
       ? weeks.filter(w => w.week === weekParam)
       : pickWeek(weeks);
     if (!picked.length) {
-      return etagJson(req, emptyPayload(seasonId, 'No matches found for that week.'));
+      return etagJson(req, { ...emptyPayload(seasonId, 'No matches found for that week.'), week: weekParam, weeks: weekList });
     }
 
     const week = picked[0].week;
@@ -165,6 +169,22 @@ export default async (req) => {
       const r2 = dec?.computed?.round2 || null;
       const gamesConfirmed = games.length;
 
+      // Every slot that is NOT confirmed yet, with pairings once lineups are
+      // public — so the board can show the whole night (both rounds) up front
+      // instead of only what's been scored. No times: nothing knows when a
+      // game starts, and captains often enter scores well after the fact.
+      const upcoming = SLOT_KEYS
+        .filter(slot => statusBySlot[slot] !== 'confirmed')
+        .map(slot => ({
+          slot,
+          round: slot.startsWith('r1') ? 1 : 2,
+          gameNum: Number(slot.slice(-1)),
+          type: SLOT_TYPE[slot],
+          homePlayers: lineupsVisible ? pairNames(lgA[slot]) : [],
+          awayPlayers: lineupsVisible ? pairNames(lgB[slot]) : [],
+          entered: !!(score?.games?.[slot] && (Number.isInteger(score.games[slot].home) || Number.isInteger(score.games[slot].away))),
+        }));
+
       // "on court now" — the first unconfirmed slot, if we may show names
       const current = (!final && nextSlot && lineupsVisible && (lgA[nextSlot] || lgB[nextSlot]))
         ? {
@@ -203,6 +223,7 @@ export default async (req) => {
         home: teamSide(homeId, m.teamA, m.emojiA, m.seedLabelA, teamMeta),
         away: teamSide(awayId, m.teamB, m.emojiB, m.seedLabelB, teamMeta),
         games,
+        upcoming,
         current,
         gamesHome,
         gamesAway,
@@ -243,6 +264,7 @@ export default async (req) => {
     return etagJson(req, {
       season: seasonId,
       week,
+      weeks: weekList,
       phase,
       phaseLabel: phaseLabel || (phase === 'rivalry' ? 'Rivalry Week' : null),
       gameNight: anyToday,
@@ -263,6 +285,35 @@ export default async (req) => {
 // ---------------------------------------------------------------------------
 
 // Prefer the week that is happening now, then the first unfinished one.
+function summarizeWeeks(weeks) {
+  const now = Date.now();
+  const byWeek = new Map();
+  for (const w of weeks) {
+    if (!byWeek.has(w.week)) byWeek.set(w.week, []);
+    byWeek.get(w.week).push(w);
+  }
+  return [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([num, group]) => {
+    const ms = group.flatMap(g => g.matches);
+    const dates = ms.map(m => m.scheduledAt).filter(Boolean).map(d => Date.parse(d)).filter(n => !Number.isNaN(n));
+    const first = dates.length ? Math.min(...dates) : null;
+    const allFinal = ms.length > 0 && ms.every(m => m.finalizedAt);
+    const anyScored = ms.some(m => m.finalizedAt);
+    const live = ms.some(m => !m.finalizedAt && m.scheduledAt &&
+      Date.parse(m.scheduledAt) <= now && now - Date.parse(m.scheduledAt) < RECENT_MS);
+    const past = first != null && now - first > PUBLIC_MS;
+    const status = live ? 'live' : (allFinal || (past && anyScored)) ? 'final' : past ? 'final' : 'upcoming';
+    return {
+      week: num,
+      date: first != null ? new Date(first).toISOString() : null,
+      venue: ms.find(m => m.venue)?.venue || null,
+      phase: group.find(g => g.phase)?.phase || 'regular',
+      phaseLabel: group.find(g => g.phaseLabel)?.phaseLabel || null,
+      status,
+      matches: ms.length,
+    };
+  });
+}
+
 function pickWeek(weeks) {
   const now = Date.now();
   const byWeek = new Map();
