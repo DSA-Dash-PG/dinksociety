@@ -1332,7 +1332,7 @@
               <button class="ab ab--outline ab--sm" id="drop-new-btn">+ New edition</button>
             </div>
           </div>
-          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:640px;">The season's editorial. One edition per game week, plus specials — <b>Pre-Season</b> before Week 1, a <b>Championship Preview</b> before the final, or anything else you want to slot in. The Friday task drafts each week from the stats; you review, edit, and <b>Approve &amp; Publish</b> here. Nothing reaches the homepage, email, or portals until you publish.</p>
+          <p style="font-size:11px;color:var(--color-text-faint);margin:-4px 0 14px;line-height:1.5;max-width:640px;">The season's editorial. One edition per game week, plus a <b>Week N Preview</b> before each week (the Wednesday task drafts it), <b>Pre-Season</b> before Week 1, a <b>Championship Preview</b> before the final, or anything else you want to slot in. The Friday task drafts each week's recap from the stats; you review, edit, and <b>Approve &amp; Publish</b> here. Nothing reaches the homepage, email, or portals until you publish.</p>
 
           <div class="ac">
             <div class="ac__h"><h2 class="ac__t">Editions</h2><span class="ac__s" id="drop-list-status"></span></div>
@@ -7806,9 +7806,11 @@
   };
   function dSlug(v){ return String(v||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40); }
   function dIsWeek(ed){ return /^week-\d+$/.test(String(ed||'')); }
+  // 'week-3-preview' → 3. A preview is a special that sorts just before its week.
+  function dPreviewWeek(ed){ var m=String(ed||'').match(/^week-(\d+)-preview$/); return m? Number(m[1]) : null; }
   function dWeekNum(ed){ var m=String(ed||'').match(/^week-(\d+)$/); return m? Number(m[1]) : null; }
   // Label for an edition id; specials use the label the record carries (or the preset).
-  function dEdLabel(ed, rec){ if(rec&&rec.label) return rec.label; var n=dWeekNum(ed); if(n!=null) return 'Week '+n; var p=DROP_SPECIALS[ed]; return p? p.label : String(ed||'').replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
+  function dEdLabel(ed, rec){ if(rec&&rec.label) return rec.label; var n=dWeekNum(ed); if(n!=null) return 'Week '+n; var pv=dPreviewWeek(ed); if(pv!=null) return 'Week '+pv+' Preview'; var p=DROP_SPECIALS[ed]; return p? p.label : String(ed||'').replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();}); }
   function dEdKicker(ed, rec){ return 'The Drop · '+dEdLabel(ed, rec); }
   // Populate the "new edition" picker: every game week the season has, then the
   // specials, then Custom. Weeks that already exist are still listed (opening
@@ -7819,6 +7821,8 @@
     var html='';
     for(var w=1; w<=n; w++) html+='<option value="week-'+w+'">Week '+w+'</option>';
     html+='<option value="preseason">Pre-Season</option>';
+    // Previews: written before the week is played (Pre-Season doubles as the Week 1 preview).
+    for(var pw=2; pw<=n; pw++) html+='<option value="week-'+pw+'-preview">Week '+pw+' Preview</option>';
     html+='<option value="championship-preview">Championship Preview</option>';
     html+='<option value="custom">Custom special…</option>';
     sel.innerHTML=html;
@@ -8266,7 +8270,7 @@
   function generateDrop(force){
     var btn = force?$d('drop-regen-btn'):$d('drop-generate-btn'); if(!btnBusy(btn,'Drafting…')) return;
     var body={force:!!force, circuit:dropCircuit()}; if(DROP.week!=null&&force) body.week=DROP.week;
-    if(force && !dIsWeek(DROP.edition)){ alert('"Draft with Claude" only drafts numbered weeks from the stats. Specials (pre-season, championship preview) are written by hand or from the Friday task.'); btnDone(btn); return; }
+    if(force && !dIsWeek(DROP.edition)){ alert('"Draft with Claude" only drafts numbered weeks from the stats. Previews and specials (pre-season, championship preview) come from the Wednesday / Friday tasks or are written by hand.'); btnDone(btn); return; }
     apiJSON('/.netlify/functions/admin-drop-generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
       .then(function(d){ if(d&&d.ok){ renderDrop(); openDropWeek(d.edition||('week-'+d.week)); } else { alert('Could not draft: '+((d&&d.reason)||'no played week yet')); } })
       .catch(function(e){ alert(e.message||'Draft failed'); })
@@ -8281,6 +8285,8 @@
       label = nm.trim();
       var af = prompt('Sorts after which week? (-1 = before Week 1)', String(Math.max(0, workingWeeks()-2))); if(af==null) return;
       after = Number(af); if(!Number.isInteger(after)) after = 0;
+    } else if(dPreviewWeek(kind)!=null){
+      after = dPreviewWeek(kind)-1;   // sorts just before its week
     } else if(kind==='championship-preview'){
       // Default: after the last regular-season week (bracket set, final still to play).
       var af2 = prompt('Championship Preview sorts after which week? (the last regular-season week)', String(Math.max(0, workingWeeks()-2))); if(af2==null) return;

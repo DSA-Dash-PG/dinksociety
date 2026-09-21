@@ -45,6 +45,20 @@ export const SPECIALS = {
   'championship-preview': { label: 'Championship Preview', short: 'Final', after: null },
 };
 
+// Weekly previews — "Week 2 Preview" is the slug `week-2-preview`: a special
+// that sorts just BEFORE its week (after = N-1 → order N-0.5), so the picker
+// reads Pre · 1 · 2P · 2 · 3P · 3 … and the homepage teaser flips from the
+// Week 1 recap to the Week 2 preview as soon as it publishes, then to Week 2.
+// The pre-season edition is effectively the Week 1 preview, so N starts at 2.
+const PREVIEW_RE = /^week-(\d{1,2})-preview$/;
+export function previewWeek(edition) {
+  const m = PREVIEW_RE.exec(String(edition || '').trim().toLowerCase());
+  return m ? parseInt(m[1], 10) : null;
+}
+export function previewMeta(n) {
+  return { label: `Week ${n} Preview`, short: `${n}P`, after: n - 1 };
+}
+
 const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 export function slugify(v) {
   return String(v || '').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
@@ -85,7 +99,8 @@ function editionMeta(ed, input = {}, existing = null) {
   if (ed.week != null) {
     return { edition: ed.id, week: ed.week, slug: null, label: `Week ${ed.week}`, short: String(ed.week), order: ed.week, after: null };
   }
-  const preset = SPECIALS[ed.slug] || {};
+  const pw = previewWeek(ed.slug);
+  const preset = pw != null ? previewMeta(pw) : (SPECIALS[ed.slug] || {});
   const label = String(input.label || existing?.label || preset.label || ed.slug.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())).slice(0, 60);
   const afterRaw = input.after ?? existing?.after ?? preset.after;
   const after = Number.isFinite(+afterRaw) ? Math.round(+afterRaw) : 99;   // unknown → end of list
