@@ -8263,7 +8263,7 @@
     var isPub = !!(DROP.record && DROP.record.status==='published');
     var payload=Object.assign({action:'publish',rebroadcast:isPub,channels:{email:$d('drop-ch-email').checked,portal:$d('drop-ch-portal').checked}},collectDrop());
     apiJSON(dropApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
-      .then(function(d){ var b=d&&d.broadcast; var msg='✓ Published'; if(d&&d.alreadyBroadcast){ msg+=' · league already notified for this edition (not re-sent)'; } else if(b){ msg+=' · posted to '+b.teamCount+' team portals'; if(b.recipients){ msg+= b.queued ? ' · '+b.recipients+' emails sending in the background' : ' · ⚠ email send did not start ('+b.recipients+' recipients)'; } } dropStatus(msg, !(b&&b.recipients&&!b.queued)); renderDrop(); openDropWeek(payload.edition); })
+      .then(function(d){ var b=d&&d.broadcast; var msg='✓ Published'; if(d&&d.alreadyBroadcast){ msg+=' · league already notified for this edition (not re-sent)'; } else if(b){ msg+=' · posted to '+b.teamCount+' team portals'; if(b.recipients){ msg+= b.queued ? ' · emailing '+b.recipients+' players in the background' : ' · ⚠ email send did not start ('+b.recipients+' recipients)'; } else if(b.teamCount){ msg+=' · ⚠ 0 email recipients found'; } if(b.noEmail){ msg+=' · '+b.noEmail+' no email'+(b.noEmailNames&&b.noEmailNames.length?' ('+b.noEmailNames.slice(0,6).join(', ')+(b.noEmailNames.length>6?', …':'')+')':''); } } dropStatus(msg, !(b&&b.recipients&&!b.queued)); renderDrop(); openDropWeek(payload.edition); })
       .catch(function(e){ dropStatus(e.message||'Publish failed',false); })
       .finally(function(){ btnDone(btn); });
   }

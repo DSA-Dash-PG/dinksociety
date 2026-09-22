@@ -181,13 +181,17 @@ function normStoryline(s = {}) {
   };
 }
 
-// "Around the League" — a short summary for every team, so even swept teams get
-// a bright spot. Each entry is { team, blurb }.
+// "Around the League" — a summary for every team, so even swept teams get a
+// bright spot. Each entry is { team, blurb }. The blurb cap used to be 600
+// chars, which silently cut the Season 2 pre-season team reports mid-sentence
+// (they run 500–650 each and the Week One reports longer still). 2,000 leaves
+// room for a real paragraph; the composer already holds one team per line.
+const TEAM_BLURB_MAX = 2000;
 function normTeamReports(input) {
   if (!Array.isArray(input)) return [];
   return input.slice(0, 24).map(r => ({
     team: String(r?.team || '').slice(0, 80),
-    blurb: String(r?.blurb || '').slice(0, 600),
+    blurb: String(r?.blurb || '').slice(0, TEAM_BLURB_MAX),
   })).filter(r => r.team && r.blurb);
 }
 

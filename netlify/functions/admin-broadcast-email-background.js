@@ -80,7 +80,13 @@ export default async (req) => {
       subject: rec.subject, bodyHtml: rec.bodyHtml || '', body: rec.body || '', teamName: team.name,
       portalUrl: `${site}/captain.html`, template, attachments,
     });
-    for (const to of recipientEmails(team, rec.audience || 'captains')) {
+    // A Drop broadcast pins its resolved per-team list on the record (roster
+    // email → identity-layer fallback), so the send matches the count the
+    // admin was shown. Message-center broadcasts still resolve here.
+    const tos = (rec.recipientsByTeam && Array.isArray(rec.recipientsByTeam[team.id]))
+      ? rec.recipientsByTeam[team.id]
+      : recipientEmails(team, rec.audience || 'captains');
+    for (const to of tos) {
       if (seen.has(to)) continue;
       seen.add(to);
       let ok = false, skipped = false;

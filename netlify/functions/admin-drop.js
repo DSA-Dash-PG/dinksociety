@@ -27,6 +27,9 @@ import {
 import { livePerformers } from './lib/drop-insights.js';
 import { appendMessage, generateId } from './lib/messages.js';
 import { renderAdminMessage, htmlToPlain } from './lib/email.js';
+import { activeRoster } from './lib/roster.js';
+import { normalizeEmail } from './lib/identity.js';
+import { listRosterEntries, getIdentityMap, groupEntries } from './lib/league-identity.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -103,10 +106,20 @@ async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = '
     });
   }
 
-  // Count unique recipients across the season's teams (for the record/UI).
+  // Resolve every team's recipient list ONCE, here, and pin it on the record.
+  // Week 1 of Season 2 went out as "emailed 0/0 across 6 teams": the old
+  // per-team lookup read only `p.email`, but Season 2 roster entries carry the
+  // address in `normalizedEmail` (or nowhere at all — players added through
+  // the picker only have an email on their Season 1 entry). So the count came
+  // back 0, the background sender was never kicked off, and nobody got the
+  // Drop. The list below reads both fields and falls back to the person's
+  // other roster entries via the identity layer; the sender uses the same
+  // list, so the count and the send can't disagree again.
+  const resolved = await resolveRecipients(teams, audience);
   const seen = new Set();
-  for (const team of teams) for (const e of recipientEmails(team, audience)) seen.add(e);
+  for (const list of Object.values(resolved.byTeam)) for (const e of list) seen.add(e);
   const recipients = doEmail ? seen.size : 0;
+  const noEmail = resolved.noEmail;
 
   // The broadcast record is both the announcement log and the work order for
   // the background sender (same shape admin-messages uses).
@@ -114,6 +127,7 @@ async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = '
     id: broadcastId, subject, body: text, bodyHtml,
     attachments: [], scope: 'all', division: null,
     teamIds: teams.map(t => t.id), audience, sentEmail: !!doEmail,
+    recipientsByTeam: resolved.byTeam, noEmail, noEmailNames: resolved.noEmailNames,
     teamCount: teams.length, recipients, emailed: 0, failed: 0, optedOut: 0,
     emailStatus: doEmail ? (recipients ? 'queued' : 'none') : 'none',
     sentBy: rec.sentBy || 'desk@dinksociety.app', sentAt: new Date().toISOString(),
@@ -132,23 +146,64 @@ async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = '
       if (!queued) console.error('drop background email kick-off failed:', r.status);
     } catch (e) { console.error('drop background email kick-off failed:', e); }
   }
-  console.log(`drop broadcast ${rec.edition} [circuit ${rec.circuit}]: ${teams.length} teams, ${recipients} recipients, email ${queued ? 'queued' : (doEmail ? 'NOT queued' : 'off')}`);
-  return { broadcastId, circuit: rec.circuit, teamCount: teams.length, recipients, queued, emailed: 0, failed: 0 };
+  console.log(`drop broadcast ${rec.edition} [circuit ${rec.circuit}]: ${teams.length} teams, ${recipients} recipients, ${noEmail} without an email, email ${queued ? 'queued' : (doEmail ? 'NOT queued' : 'off')}`);
+  return { broadcastId, circuit: rec.circuit, teamCount: teams.length, recipients, noEmail, noEmailNames: resolved.noEmailNames, queued, emailed: 0, failed: 0 };
 }
 
-function recipientEmails(team, audience) {
-  const roster = team.roster || [];
-  const lc = (e) => (e || '').toString().trim().toLowerCase();
-  const out = new Set();
-  if (audience === 'players') {
-    for (const p of roster) if (p.email) out.add(lc(p.email));
-    if (team.captainEmail) out.add(lc(team.captainEmail));
-  } else {
-    if (team.captainEmail) out.add(lc(team.captainEmail));
-    const cap = roster.find(p => p.isCaptain);
-    if (cap?.email) out.add(lc(cap.email));
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Per-team recipient lists for a Drop broadcast.
+//
+// Returns { byTeam: { [teamId]: [email, …] }, noEmail, noEmailNames }.
+//
+// Who: the team's ACTIVE roster (lib/roster.js — archived players and pending
+// adds are not on the team) plus the captain address on the team record.
+// Which address: `normalizedEmail` first, then raw `email`; if the entry has
+// neither, any other roster entry the identity layer says is the same person
+// (their Season 1 entry, a linked id). Whoever still has no address is counted
+// in `noEmail` so the admin status line can say so instead of hiding it.
+async function resolveRecipients(teams, audience) {
+  // id → email for every roster entry across every season, grouped into people.
+  let idsFor = (id) => [id];
+  const emailById = new Map();
+  try {
+    const [entries, map] = await Promise.all([listRosterEntries(), getIdentityMap()]);
+    for (const e of entries) {
+      const em = e.normalizedEmail || normalizeEmail(e.email);
+      if (em && EMAIL_RE.test(em)) emailById.set(e.id, em);
+    }
+    const { canonicalOf, membersOf } = groupEntries(entries, map);
+    idsFor = (id) => { const c = canonicalOf[id]; return c ? (membersOf[c] || [id]) : [id]; };
+  } catch (e) {
+    console.error('drop recipients: identity lookup failed, using roster emails only:', e.message);
   }
-  return [...out].filter(e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+  const emailOf = (p) => {
+    const direct = p.normalizedEmail || normalizeEmail(p.email);
+    if (direct && EMAIL_RE.test(direct)) return direct;
+    for (const id of idsFor(p.id)) { const em = emailById.get(id); if (em) return em; }
+    return null;
+  };
+
+  const byTeam = {};
+  let noEmail = 0; const noEmailNames = [];
+  for (const team of teams) {
+    const roster = activeRoster(team);
+    const out = new Set();
+    const cap = normalizeEmail(team.captainEmail);
+    if (cap && EMAIL_RE.test(cap)) out.add(cap);
+    const want = audience === 'players'
+      ? roster
+      : audience === 'cocaptains'
+        ? roster.filter(p => p.isCaptain || p.isCoCaptain)
+        : roster.filter(p => p.isCaptain);
+    for (const p of want) {
+      const em = emailOf(p);
+      if (em) out.add(em);
+      else { noEmail++; noEmailNames.push(`${p.name || p.id} (${team.name || team.id})`); }
+    }
+    byTeam[team.id] = [...out];
+  }
+  return { byTeam, noEmail, noEmailNames };
 }
 
 function escapeHtml(s) {
