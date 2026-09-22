@@ -247,12 +247,14 @@ async function buildGameLog(circuit, playerId, teamId, psData, ids = [playerId])
         continue;
       }
 
-      if (match.championship || match.phase === 'championship') {
-        const a = match.scoreA, b = match.scoreB;
-        if (Number.isFinite(a) && Number.isFinite(b) && a !== b) {
-          const my = isHome ? a : b, their = isHome ? b : a;
-          champ = { won: my > their, week: wf.week ?? null, opponentTeamName: oppTeam?.name || null };
-        }
+      // Bracket placement. Week 8 has TWO championship-flagged matches (gold
+      // AND bronze both play win-by-2), so "won a championship match" is not
+      // "champion" — read the bracket slot the schedule generator stamped
+      // (lib/bracket.js), mirroring computeBracketFinish on the home page:
+      // gold → 1st/2nd, bronze → 3rd/4th, consolation → 5th/6th.
+      const placed = bracketPlace(match, isHome);
+      if (placed && (!champ || placed.place < champ.place)) {
+        champ = { ...placed, week: wf.week ?? null, opponentTeamName: oppTeam?.name || null };
       }
 
       const [myLineup, oppLineup, score] = await Promise.all([
@@ -316,6 +318,26 @@ async function buildGameLog(circuit, playerId, teamId, psData, ids = [playerId])
     || String(a.date || '').localeCompare(String(b.date || ''))
     || SLOT_KEYS.indexOf(a.slot) - SLOT_KEYS.indexOf(b.slot));
   return { games, upcoming, champ };
+}
+
+// Where a finalized bracket match leaves this team: { place, label, medal, won }.
+// null for round-robin / semifinal / unfinished matches.
+const PLACE_LABEL = { 1: 'Gold', 2: 'Silver', 3: 'Bronze', 4: '4th', 5: '5th', 6: '6th' };
+const PLACE_MEDAL = { 1: '🥇', 2: '🥈', 3: '🥉' };
+function bracketPlace(match, isHome) {
+  const a = match.scoreA, b = match.scoreB;
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a === b) return null;
+  const won = (isHome ? a : b) > (isHome ? b : a);
+  const slot = String(match.bracketSlot || '').toLowerCase();
+  const medal = `${match.medal || ''} ${match.bracketGroup || match.gameLabel || ''}`;
+  const place = String(match.placeLabel || '');
+  let top = null;
+  if (slot === 'gold' || /🥇|gold/i.test(medal)) top = 1;
+  else if (slot === 'bronze' || /🥉|bronze/i.test(medal)) top = 3;
+  else if (slot === 'consolation' || /5th/i.test(place) || /consolation/i.test(medal)) top = 5;
+  if (top == null) return null;
+  const p = won ? top : top + 1;
+  return { place: p, label: PLACE_LABEL[p], medal: PLACE_MEDAL[p] || null, won, champion: p === 1 };
 }
 
 /**
@@ -516,7 +538,7 @@ async function buildSeasonPackage(code, playerId, ids, psData, history) {
       }
     }
   } catch {}
-  if (log.champ) finish = { ...(finish || {}), champion: log.champ.won, finalist: true };
+  if (log.champ) finish = { ...(finish || {}), place: log.champ.place, label: log.champ.label, medal: log.champ.medal, champion: log.champ.place === 1, finalist: log.champ.place <= 2, medalist: log.champ.place <= 3 };
 
   // ── Partners for this season (named) ──
   const partners = Object.entries(stat.partners || {}).map(([pid, v]) => {
@@ -608,11 +630,12 @@ function buildCareer(seasons, careerAwards, identity) {
   for (const s of played) for (const g of s.games) {
     const ph = g.championship ? 'championship' : g.phase;
     const rk = stageRank[ph] || 0;
-    if (rk && (!biggestStage || rk > biggestStage._rk)) biggestStage = { _rk: rk, phase: ph, circuit: s.circuit, seasonLabel: s.seasonLabel, week: g.week, opponentTeamName: g.opponentTeamName, champion: s.finish?.champion ?? null };
+    if (rk && (!biggestStage || rk > biggestStage._rk)) biggestStage = { _rk: rk, phase: ph, circuit: s.circuit, seasonLabel: s.seasonLabel, week: g.week, opponentTeamName: g.opponentTeamName, champion: s.finish?.champion ?? null, place: s.finish?.place ?? null, label: s.finish?.label ?? null };
   }
   if (biggestStage) delete biggestStage._rk;
   const finals = played.filter(s => s.finish?.finalist).length;
   const titles = played.filter(s => s.finish?.champion === true).length;
+  const medals = { gold: titles, silver: played.filter(s => s.finish?.place === 2).length, bronze: played.filter(s => s.finish?.place === 3).length };
   // Every award on a stats row is a Player of the Week (lib/standings.js attachAwards).
   const potw = (careerAwards || []).length;
 
@@ -636,7 +659,7 @@ function buildCareer(seasons, careerAwards, identity) {
     points: { ps, pa, diff, wonPct: (ps != null && pa != null && ps + pa > 0) ? Math.round(ps / (ps + pa) * 1000) / 10 : null },
     clutch: { w: cW, g: cG },
     peak,
-    hardware: { finals, titles, potw, awards: (careerAwards || []).length },
+    hardware: { finals, titles, medals, potw, awards: (careerAwards || []).length },
     splits: { gender: splitSum('gender'), mixed: splitSum('mixed') },
     highlights: { bestWeek, longestStreak, peak, biggestStage },
     rows: played.map(s => ({

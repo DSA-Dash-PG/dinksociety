@@ -662,10 +662,11 @@
     const TYPE_LBL = { womens: "Women's", mens: "Men's", mixed: 'Mixed' };
     const playerHref = (name, teamName, code) => `/player?team=${teamName ? slug(teamName) : ''}&name=${encodeURIComponent(name || '')}${suffixForCode(code)}`;
     const teamHref = (teamName, code) => `/team?id=${slug(teamName || '')}${suffixForCode(code)}`;
+    // Bracket finish: Gold · Silver · Bronze · 4th · 5th · 6th (from the medal
+    // round). Before a bracket resolves, the regular-season rank stands in.
     const finishText = (f) => {
       if (!f) return null;
-      if (f.champion === true) return '🏆 Champion';
-      if (f.finalist) return '🥈 Finalist';
+      if (f.place != null) return `${f.medal ? f.medal + ' ' : ''}${f.label || f.place}`;
       if (f.rank != null) { const n = f.rank, sfx = n === 1 ? 'st' : n === 2 ? 'nd' : n === 3 ? 'rd' : 'th'; return `${n}${sfx}${f.teams ? ' of ' + f.teams : ''}${f.division ? ' · ' + f.division : ''}`; }
       return null;
     };
@@ -885,7 +886,8 @@
       if (!c || !c.seasons) return '<div class="ml-empty">No league play yet.</div>';
       const tile = (lbl, val, sub, cls = '') => `<div class="ss-tile"><div class="ss-tile__lbl">${lbl}</div><div class="ss-tile__val ${cls}">${val}</div>${sub ? `<div class="ss-tile__sub">${sub}</div>` : ''}</div>`;
       const hw = c.hardware || {};
-      const hwParts = [hw.titles ? `${hw.titles} title${hw.titles === 1 ? '' : 's'}` : null, hw.finals ? `${hw.finals} final${hw.finals === 1 ? '' : 's'}` : null, hw.potw ? `${hw.potw} POTW` : null].filter(Boolean);
+      const md = hw.medals || {};
+      const hwParts = [md.gold ? `🥇×${md.gold}` : null, md.silver ? `🥈×${md.silver}` : null, md.bronze ? `🥉×${md.bronze}` : null, hw.potw ? `${hw.potw} POTW` : null].filter(Boolean);
       const strip = `<div class="ss-strip">
         ${tile('Career record', rec(c.record.w, c.record.l), `<b>${c.record.pct}%</b> · ${c.record.matches} matches · ${c.seasons} season${c.seasons === 1 ? '' : 's'}`, 'val--green')}
         ${tile('Peak DSR', c.peak ? fmtDsr(c.peak.dsr) : '—', c.peak ? `${esc(c.peak.seasonLabel)}${c.peak.week ? ' · Wk ' + c.peak.week : ''}` : '', 'val--lime')}
@@ -914,7 +916,7 @@
             <td>${r.clutchG ? `${r.clutchW}/${r.clutchG}` : '—'}</td>
             <td>${finishText(r.finish) ? `<span class="fin">${esc(finishText(r.finish))}</span>` : (r.circuit === curCode && !r.finalized ? '<span style="color:var(--color-text-faint)">—</span>' : '—')}</td>
           </tr>`).join('')}</tbody>
-          <tfoot><tr><td>Career</td><td>${rec(c.record.w, c.record.l)}</td><td>${c.record.pct}%</td><td>${signed(c.points.diff)}</td><td colspan="2" style="font-size:10px;color:var(--color-text-faint);font-weight:600">peak ${c.peak ? fmtDsr(c.peak.dsr) : '—'}</td><td>${c.clutch.g ? `${c.clutch.w}/${c.clutch.g}` : '—'}</td><td>${hw.titles ? '🏆×' + hw.titles : hw.finals ? '🥈×' + hw.finals : '—'}</td></tr></tfoot>
+          <tfoot><tr><td>Career</td><td>${rec(c.record.w, c.record.l)}</td><td>${c.record.pct}%</td><td>${signed(c.points.diff)}</td><td colspan="2" style="font-size:10px;color:var(--color-text-faint);font-weight:600">peak ${c.peak ? fmtDsr(c.peak.dsr) : '—'}</td><td>${c.clutch.g ? `${c.clutch.w}/${c.clutch.g}` : '—'}</td><td>${[md.gold ? '🥇×' + md.gold : null, md.silver ? '🥈×' + md.silver : null, md.bronze ? '🥉×' + md.bronze : null].filter(Boolean).join(' ') || '—'}</td></tr></tfoot>
         </table></div></div>`;
 
       // Splits + highlights
@@ -933,7 +935,7 @@
         ${h.bestWeek ? hl('🔥', `Best week · ${rec(h.bestWeek.w, h.bestWeek.l)} (${signed(h.bestWeek.diff)})`, `${esc(h.bestWeek.seasonLabel)} Wk ${h.bestWeek.week}${h.bestWeek.opponentTeamName ? ' vs ' + esc(h.bestWeek.opponentTeamName) : ''}`) : ''}
         ${h.longestStreak ? hl('📈', `Longest win streak · ${h.longestStreak.n}`, esc(h.longestStreak.seasonLabel)) : ''}
         ${h.peak ? hl('⭐', `Highest rating · ${fmtDsr(h.peak.dsr)}`, `${esc(h.peak.seasonLabel)}${h.peak.week ? ' · Wk ' + h.peak.week : ''}`) : ''}
-        ${h.biggestStage ? hl(h.biggestStage.champion ? '🏆' : '🎯', `Biggest stage · ${h.biggestStage.phase === 'championship' ? (h.biggestStage.champion ? 'Won the final' : 'Played the final') : h.biggestStage.phase === 'playoff' ? 'Playoffs' : 'Rivalry Week'}`, `${esc(h.biggestStage.seasonLabel)}${h.biggestStage.opponentTeamName ? ' vs ' + esc(h.biggestStage.opponentTeamName) : ''}`) : ''}
+        ${h.biggestStage ? hl(h.biggestStage.place === 1 ? '🥇' : h.biggestStage.place === 2 ? '🥈' : h.biggestStage.place === 3 ? '🥉' : '🎯', `Biggest stage · ${h.biggestStage.phase === 'championship' ? (h.biggestStage.label ? 'Medal night · ' + esc(h.biggestStage.label) : 'Medal night') : h.biggestStage.phase === 'playoff' ? 'Playoffs' : 'Rivalry Week'}`, `${esc(h.biggestStage.seasonLabel)}${h.biggestStage.opponentTeamName ? ' vs ' + esc(h.biggestStage.opponentTeamName) : ''}`) : ''}
         ${!h.bestWeek && !h.longestStreak && !h.peak && !h.biggestStage ? '<div class="ml-empty">Highlights land after the first match night.</div>' : ''}
       </div>`;
 
