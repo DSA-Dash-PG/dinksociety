@@ -16,6 +16,32 @@
 import { getStore } from '@netlify/blobs';
 import { PROFILE_FIELDS } from './profile.js';
 import { getLiteById, updateLite, isLiteId } from './ladder-players.js';
+import { setPlayerInfo } from './player-directory.js';
+
+/** Clean pending name (same rules player-profile.js validates with). */
+function pendingName(pp) {
+  const n = pp && typeof pp.name === 'string' ? pp.name.replace(/\s+/g, ' ').trim() : '';
+  return n && n.length >= 2 && n.length <= 60 ? n : null;
+}
+
+/**
+ * Keep every per-season stats aggregate in step with a renamed player so the
+ * leaderboard, The Drop's name links and hover cards show the new name without
+ * waiting for the next standings rebuild. Best-effort — never throws.
+ */
+export async function patchStatsName(playerId, name) {
+  try {
+    const st = getStore('player-stats');
+    const { blobs } = await st.list({ prefix: 'player-stats/' });
+    await Promise.all(blobs.map(async (b) => {
+      const doc = await st.get(b.key, { type: 'json', consistency: 'strong' }).catch(() => null);
+      const row = doc && doc.players && doc.players[playerId];
+      if (!row || row.name === name) return;
+      row.name = name;
+      await st.setJSON(b.key, doc);
+    }));
+  } catch (e) { console.warn('[profile-approvals] stats name patch failed:', e?.message || e); }
+}
 
 export const VALID_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -56,6 +82,12 @@ export async function decideProfileChange({ teamId, playerId, action }) {
         else nextProfile[f] = v;
       }
       next.profile = nextProfile;
+      const nm = pendingName(pp);
+      if (nm && nm !== rec.name) {
+        next.name = nm;
+        try { await setPlayerInfo(playerId, { name: nm }); }
+        catch (e) { console.warn('[profile-approvals] directory name save failed:', e?.message || e); }
+      }
       if (pp.photo) {
         const blob = await photoStore.getWithMetadata(`pending/${playerId}`, { type: 'arrayBuffer' }).catch(() => null);
         if (blob && blob.data) {
@@ -95,6 +127,14 @@ export async function decideProfileChange({ teamId, playerId, action }) {
     }
     entry.profile = nextProfile;
 
+    var renamedTo = null;
+    const nm = pendingName(pp);
+    if (nm && nm !== entry.name) {
+      entry.previousNames = [...(entry.previousNames || []), { name: entry.name, changedAt: new Date().toISOString(), by: pp.submittedBy || 'player' }].slice(-5);
+      entry.name = nm;
+      renamedTo = nm;
+    }
+
     if (pp.photo) {
       const blob = await photoStore.getWithMetadata(`pending/${playerId}`, { type: 'arrayBuffer' }).catch(() => null);
       if (blob && blob.data) {
@@ -112,6 +152,7 @@ export async function decideProfileChange({ teamId, playerId, action }) {
   delete entry.pendingProfile;
   team.updatedAt = new Date().toISOString();
   await teamsStore.setJSON(teamKey, team);
+  if (renamedTo) await patchStatsName(playerId, renamedTo);
 
   return { ok: true, action, playerId, name: entry.name || '', teamName: team.name || '' };
 }

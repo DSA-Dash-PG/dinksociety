@@ -25,7 +25,7 @@ function siteUrl() {
     || process.env.SITE_URL || 'https://dinksociety.app';
 }
 
-const FIELD_LABELS = { height: 'Height', dob: 'Date of birth', plays: 'Plays', city: 'City', homeCourt: 'Home court' };
+const FIELD_LABELS = { name: 'Name', height: 'Height', dob: 'Date of birth', plays: 'Plays', city: 'City', homeCourt: 'Home court' };
 
 function initials(name) {
   return String(name || '?').replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase() || '?';
@@ -81,9 +81,10 @@ export async function notifyAdminsPendingProfile({ playerName, teamName, submitt
     let changesHtml = '';
     if (pp) {
       const rows = [];
-      for (const f of PROFILE_FIELDS) {
+      const cmpFields = ('name' in pp ? ['name'] : []).concat(PROFILE_FIELDS);
+      for (const f of cmpFields) {
         if (!(f in pp)) continue;
-        const cur = (entry.profile || {})[f];
+        const cur = f === 'name' ? entry.name : (entry.profile || {})[f];
         const next = pp[f];
         const curTxt = cur ? escAttr(cur) : '<span style="color:#666;">&mdash;</span>';
         const nextTxt = (next === '' || next == null) ? '<span style="color:#ff9d8f;">(cleared)</span>' : `<b style="color:#fff;">${escAttr(next)}</b>`;

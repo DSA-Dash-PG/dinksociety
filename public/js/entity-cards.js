@@ -45,8 +45,19 @@
     teams.forEach(function(t){ if(t) addTeam(t.name, t.id, t.emoji, t.divisionLabel); });
     Object.keys(teamStat).forEach(function(nm){ addTeam(nm, null, null, null); });
 
+    // One-word roster names (e.g. "Yolie") link only when they can't be
+    // mistaken for something else: 4+ letters, capitalised, and not the first
+    // name of any other player or a word in a team name. Matching is
+    // case-sensitive + whole-word, so "Yolie" never hits ordinary prose.
+    var firstNames = {}, teamWords = {};
+    players.forEach(function(p){ var n = p && p.name ? String(p.name).trim() : ''; if (n.indexOf(' ') > 0) firstNames[n.split(/\s+/)[0]] = 1; });
+    Object.keys(info).forEach(function(nm){ String(nm).split(/\s+/).forEach(function(w){ teamWords[w] = 1; }); });
+    function oneWordOk(n){ return /^[A-Z][A-Za-z'\u00C0-\u017F-]{3,}$/.test(n) && !firstNames[n] && !teamWords[n]; }
+
     players.forEach(function(p){
-      if (!p || !p.name || p.name.indexOf(' ') < 1 || seen['p:'+p.name]) return; seen['p:'+p.name] = 1;
+      if (!p || !p.name || seen['p:'+p.name]) return;
+      if (p.name.indexOf(' ') < 1 && !oneWordOk(p.name)) return;
+      seen['p:'+p.name] = 1;
       var dsr = (p.composite!=null) ? Math.round(p.composite*10)/10 : (p.dsr!=null ? p.dsr : null);
       var isChef = Array.isArray(p.awards) && p.awards.length > 0;
       info[p.name] = { kind:'player', name:p.name, href:playerHref(p.name, p.teamName), teamName: p.teamName||'', dsr:dsr, rec:((p.gamesWon||0)+'–'+(p.gamesLost||0)), diff:(p.diff!=null?p.diff:null), gender:p.gender||'', isChef:isChef };

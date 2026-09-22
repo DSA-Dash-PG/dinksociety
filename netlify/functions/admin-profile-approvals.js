@@ -41,12 +41,13 @@ export default async (req) => {
         for (const p of (team.roster || [])) {
           const pp = p.pendingProfile;
           if (!pp) continue;
-          const hasFieldChange = PROFILE_FIELDS.some(f => f in pp);
+          const hasFieldChange = PROFILE_FIELDS.some(f => f in pp) || 'name' in pp;
           const photoPending = !!pp.photo;
           if (!hasFieldChange && !photoPending) continue;
 
           const current = {};
           const proposed = {};
+          if ('name' in pp) { current.name = p.name || null; proposed.name = pp.name ?? ''; }
           for (const f of PROFILE_FIELDS) {
             const cur = (p.profile || {})[f] ?? null;
             current[f] = cur;
@@ -73,10 +74,11 @@ export default async (req) => {
       for (const rec of await listLitePlayers().catch(() => [])) {
         const pp = rec.pendingProfile;
         if (!pp) continue;
-        const hasFieldChange = PROFILE_FIELDS.some(f => f in pp);
+        const hasFieldChange = PROFILE_FIELDS.some(f => f in pp) || 'name' in pp;
         const photoPending = !!pp.photo;
         if (!hasFieldChange && !photoPending) continue;
         const current = {}; const proposed = {};
+        if ('name' in pp) { current.name = rec.name || null; proposed.name = pp.name ?? ''; }
         for (const f of PROFILE_FIELDS) {
           current[f] = (rec.profile || {})[f] ?? null;
           if (f in pp) proposed[f] = pp[f] ?? '';

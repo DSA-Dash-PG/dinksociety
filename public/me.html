@@ -1105,6 +1105,9 @@
           </div>
         </div>
 
+        <label class="pf-row"><span>Name</span><input id="pf-name" maxlength="60" autocomplete="name" value="${esc(me.name || '')}"></label>
+        <div class="pf-hint">First and last name, the way you want it on the leaderboard and in The Drop. Changes go to the league for a quick approval.</div>
+
         ${me.lite
           ? `<label class="pf-row"><span>Gender</span><select id="pf-gender">
                <option value=""${!me.gender ? ' selected' : ''}>Select…</option>
@@ -1177,6 +1180,10 @@
       try {
         // A ladder-only player can also set their own gender here.
         const payload = { playerId: me.playerId, teamId: me.teamId || '', profile };
+        const nmEl = document.getElementById('pf-name');
+        const nm = nmEl ? nmEl.value.replace(/\s+/g, ' ').trim() : '';
+        if (nmEl && !nm) throw new Error('Name can’t be blank.');
+        if (nm && nm !== (me.name || '')) payload.name = nm;
         const gSel = document.getElementById('pf-gender');
         if (gSel && gSel.value) payload.gender = gSel.value;
         const r = await fetch(API + '/player-profile', {
@@ -1186,7 +1193,10 @@
         const d = await r.json().catch(() => ({}));
         if (!r.ok) throw new Error(d.error || 'Save failed');
         st.style.color = 'var(--color-teal)';
-        st.textContent = d.status === 'live' ? 'Saved!' : '⏳ Submitted for admin approval.';
+        if (d.nameChanged && d.name) me.name = d.name;
+        st.textContent = d.status === 'live'
+          ? (d.nameChanged ? 'Saved — name updated!' : 'Saved!')
+          : (d.namePending ? '⏳ Name change sent for admin approval.' : '⏳ Submitted for admin approval.');
       } catch (e) { st.style.color = 'var(--color-red)'; st.textContent = e.message; }
       btn.disabled = false;
     });
