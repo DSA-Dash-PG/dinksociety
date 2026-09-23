@@ -42,6 +42,7 @@ function store() {
 // null → the composer supplies it, defaulting to the last regular-season week).
 export const SPECIALS = {
   'preseason':            { label: 'Pre-Season',           short: 'Pre',   after: -1 },
+  'team-breakdowns':      { label: 'Team Breakdowns',      short: 'Teams', after: null },
   'championship-preview': { label: 'Championship Preview', short: 'Final', after: null },
 };
 
@@ -105,7 +106,10 @@ function editionMeta(ed, input = {}, existing = null) {
   const afterRaw = input.after ?? existing?.after ?? preset.after;
   const after = Number.isFinite(+afterRaw) ? Math.round(+afterRaw) : 99;   // unknown → end of list
   const short = String(input.short || existing?.short || preset.short || label.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 5));
-  return { edition: ed.id, week: null, slug: ed.slug, label, short, order: after + 0.5, after };
+  // Team Breakdowns sorts after the same week's preview (Pre · 1 · 2P · Teams · 2 …)
+  // so it becomes the homepage teaser when it publishes mid-week.
+  const bump = ed.slug === 'team-breakdowns' ? 0.75 : 0.5;
+  return { edition: ed.id, week: null, slug: ed.slug, label, short, order: after + bump, after };
 }
 
 /** Default kicker for an edition ("The Drop · Week 3", "The Drop · Pre-Season"). */
@@ -173,6 +177,11 @@ function normStoryline(s = {}) {
   return {
     tag: String(s.tag || '').slice(0, 40),
     tagKind,
+    // Optional: the team this storyline is ABOUT (exact team name). When set the
+    // article renders the live Breakdown card under the copy (the same block the
+    // team page's Overview shows — record, roster DSR bars, game-type split,
+    // clutch) linking to the team page. Used by the Team Breakdowns edition.
+    team: String(s.team || '').trim().slice(0, 80),
     title: String(s.title || '').slice(0, 200),
     html: cleanHtml(s.html),
     chips,
@@ -199,7 +208,7 @@ function normTeamReports(input) {
 // admin edit). Does NOT set status/performers — see saveDraft/publishDrop.
 function normEditorial(input = {}) {
   const storylines = Array.isArray(input.storylines)
-    ? input.storylines.slice(0, 6).map(normStoryline).filter(s => s.title || s.html)
+    ? input.storylines.slice(0, 8).map(normStoryline).filter(s => s.title || s.html)
     : [];
   const leadHtml = cleanHtml(input.leadHtml);
   return {

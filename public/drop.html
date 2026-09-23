@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <link rel="stylesheet" href="/css/shared-nav.css" />
+  <link rel="stylesheet" href="/css/team-breakdown.css" />
   <!-- Resolves which season this page shows (?season= / ?circuit=, else the
        current one, which flips a week before its start date). -->
   <script src="/js/season.js"></script>
@@ -102,6 +103,9 @@
   #drop .story .chips{ display:flex; gap:8px; flex-wrap:wrap; margin-top:12px; }
   #drop .chip{ display:inline-flex; align-items:baseline; gap:6px; font-size:12px; color:var(--color-text-muted); background:var(--color-surface-2); border:1px solid var(--color-border); padding:3px 10px; border-radius:999px; }
   #drop .chip b{ color:var(--color-text); }
+
+  /* team breakdown card: /css/team-breakdown.css */
+  #drop .story .dsb{ margin:18px 0 4px; }
 
   /* around the league */
   #drop .leaguegrid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0 6px; }
@@ -330,6 +334,7 @@
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
   <script src="/js/entity-cards.js"></script>
+  <script src="/js/team-breakdown.js"></script>
   <script>
   (function () {
     var SN = (typeof shortName === 'function') ? shortName : function (s) { return s || ''; };
@@ -658,15 +663,60 @@
           }).join('') + '</div>'
         : '';
       var cls = 'story' + (imgs.length ? (i%2 ? ' flip' : '') : ' nophoto');
+      var sid = 'story-'+(i+1) + (s.team ? '-'+teamSlug(s.team) : '');
       // Photo(s) come first in source so the float takes effect and the copy wraps.
-      return '<article class="'+cls+'">'
+      return '<article class="'+cls+'" id="'+sid+'">'
         + '<div class="num">'+('0'+(i+2)).slice(-2)+'</div>'
         + (s.tag?'<span class="kicker '+storyTagClass(s.tagKind)+'">'+esc(s.tag)+'</span>':'')
         + (s.title?'<h4>'+L(s.title)+'</h4>':'')
         + '<div class="bodycopy">'+Lhtml(s.html)+'</div>'
         + photo
         + (chips?'<div class="chips">'+chips+'</div>':'')
+        + (s.team ? scoutCardHtml(s.team) : '')
         + '</article>';
+    }
+
+    /* ── Team breakdown card ────────────────────────────────────────────
+       A storyline that names a team (storyline.team) gets the live Breakdown
+       card (js/team-breakdown.js) under the copy — the same block the team
+       page shows on its Overview tab — built from the teams / players /
+       standings payloads already loaded for the entity index. */
+    var SCOUT = { teams: [], standings: null };
+    function teamSlug(n){ return (window.DSBreakdown && window.DSBreakdown.slug) ? window.DSBreakdown.slug(n) : String(n||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+    function scoutFindTeam(name){
+      var n = String(name||'').trim().toLowerCase(); if(!n) return null;
+      var t = (SCOUT.teams||[]).find(function(x){ return String(x.name||'').trim().toLowerCase()===n; });
+      if(t) return t;
+      var sl = teamSlug(name);
+      return (SCOUT.teams||[]).find(function(x){ return teamSlug(x.name)===sl; }) || null;
+    }
+    function scoutStanding(team){
+      var st = SCOUT.standings; if(!st || !st.divisions || !team) return null;
+      var out = null;
+      Object.keys(st.divisions).forEach(function(dk){
+        var div = st.divisions[dk]; (div.teams||[]).forEach(function(t){
+          if(out) return;
+          if((team.id && t.teamId===team.id) || String(t.teamName||'').toLowerCase()===String(team.name||'').toLowerCase()) out = { row:t, n:(div.teams||[]).length };
+        });
+      });
+      return out;
+    }
+    function scoutPlayers(team){
+      if(!DROP_PLAYERS || !team) return [];
+      var nm = String(team.name||'').toLowerCase();
+      return Object.keys(DROP_PLAYERS).map(function(k){ return DROP_PLAYERS[k]; }).filter(function(p){
+        return p && ((team.id && p.teamId===team.id) || String(p.teamName||'').toLowerCase()===nm);
+      });
+    }
+    function scoutCardHtml(teamName){
+      if(!window.DSBreakdown) return '';
+      var team = scoutFindTeam(teamName) || { name: teamName };
+      var stx = scoutStanding(team);
+      return window.DSBreakdown.html({
+        team: team, players: scoutPlayers(team), row: stx ? stx.row : null, divCount: stx ? stx.n : 0,
+        header: true, teamHref: '/team?id='+encodeURIComponent(teamSlug(team.name)),
+        shortName: SN, playerHref: function(n){ return window.DSEntity ? window.DSEntity.playerHref(n, team.name) : '/player?name='+encodeURIComponent(n); }
+      });
     }
 
     // Lightbox for gallery photos (delegated so it survives root re-renders).
@@ -723,7 +773,10 @@
       var rest = (drop.storylines||[]).slice(0);
       var stories = '';
       if(rest.length){
-        stories = '<div class="sec-head"><h3>Also This Week</h3><span class="rule"></span><span class="count">'+rest.length+' storyline'+(rest.length>1?'s':'')+'</span></div>'
+        var allTeams = rest.every(function(s){ return s && s.team; });
+        var secTitle = allTeams ? 'Team Breakdowns' : 'Also This Week';
+        var secCount = allTeams ? rest.length+' team'+(rest.length>1?'s':'') : rest.length+' storyline'+(rest.length>1?'s':'');
+        stories = '<div class="sec-head"><h3>'+secTitle+'</h3><span class="rule"></span><span class="count">'+secCount+'</span></div>'
           + rest.map(storyHtml).join('');
       }
 
@@ -733,7 +786,7 @@
       if(trs.length){
         league = '<div class="sec-head"><h3>Around the League</h3><span class="rule"></span><span class="count">'+trs.length+' team'+(trs.length>1?'s':'')+'</span></div>'
           + '<div class="leaguegrid">'
-          + trs.map(function(r){ return '<div class="teamrep"><div class="teamrep__nm">'+entTeam(r.team)+'</div><div class="teamrep__bl">'+L(r.blurb)+'</div></div>'; }).join('')
+          + trs.map(function(r){ return '<div class="teamrep" id="around-'+teamSlug(r.team)+'"><div class="teamrep__nm">'+entTeam(r.team)+'</div><div class="teamrep__bl">'+L(r.blurb)+'</div></div>'; }).join('')
           + '</div>';
       }
 
@@ -762,6 +815,9 @@
 
       document.title = 'The Drop · '+(drop.kicker||edLabel(drop))+' — The Dink Society';
       if(window.DSEntity && IDX) window.DSEntity.mount(root, IDX);
+      // Deep links from team News tabs (#story-3-bonkerz, #around-bonkerz) —
+      // the article renders after load, so the browser's own hash jump misses.
+      if(location.hash){ var tgt = document.getElementById(location.hash.slice(1)); if(tgt) setTimeout(function(){ tgt.scrollIntoView({ behavior:'smooth', block:'start' }); }, 60); }
     }
 
     function dateStr(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric',year:'numeric'}); }catch(e){ return ''; } }
@@ -798,6 +854,8 @@
     ]).then(function(res){
       var data = res[0], idx = res[1], pl = res[2], st = res[3], tm = res[4];
       DROP_PLAYERS = (pl && pl.players) ? pl.players : null;
+      SCOUT.teams = (tm && tm.teams) ? tm.teams : [];
+      SCOUT.standings = st || null;
       try {
         if(window.DSEntity){
           IDX = window.DSEntity.buildIndex({
