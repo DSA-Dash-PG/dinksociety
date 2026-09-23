@@ -823,10 +823,13 @@
         <!-- OVERVIEW -->
         <section class="admin-section is-active" data-section="overview">
           <div class="am-head"><h1 class="am-title">Overview</h1><span class="ov-circuit-label" style="font-size:10px;color:var(--color-text-faint);letter-spacing:0.1em;text-transform:uppercase;font-weight:600;" id="ov-circuit-label"></span></div>
+          <div class="ov-season" id="ov-season"></div>
           <div id="ov-actions"><div class="loading">Loading…</div></div>
           <div id="ov-appr"></div>
-          <div id="ov-tonight"></div>
-          <div class="stats-row" id="ov-stats"><div class="loading">Loading overview…</div></div>
+          <div id="ov-week"></div>
+          <div id="ov-last"></div>
+          <div id="ov-standings"></div>
+          <div id="ov-stats" style="display:none"></div>
           <div class="gd__lbl" style="margin:0 0 8px;">Quick actions</div>
           <div class="ov-qa" id="ov-qa">
             <button class="ab ab--outline ab--sm" data-qa="rebuild">↻ Rebuild standings</button>
@@ -837,10 +840,7 @@
             <button class="ab ab--outline ab--sm" data-qa="tab:teams">View as captain</button>
             <span id="ov-qa-status" style="font-size:11px;color:var(--color-text-faint);align-self:center;"></span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;" class="two-col">
-            <div class="ac"><div class="ac__h"><h2 class="ac__t">Division fill</h2></div><div id="ov-fill"><div class="loading">Loading…</div></div></div>
-            <div class="ac"><div class="ac__h"><h2 class="ac__t">Recent Activity</h2></div><div id="ov-activity"><div class="loading">Loading…</div></div></div>
-          </div>
+          <div class="ac"><div class="ac__h"><h2 class="ac__t">Recent activity</h2><button class="ab ab--ghost ab--sm" data-qa-tab="activity" style="font-size:10px;">Full log</button></div><div id="ov-activity"><div class="loading">Loading…</div></div></div>
         </section>
 
         <!-- SEASONS -->
@@ -3588,12 +3588,63 @@
     if (link) link.click();
   }
 
-  function renderOVActions(data, gd) {
+  function renderOVActions(data, gd, pulse, potw, drop, roster, profile, xfer) {
     const el = $id('ov-actions');
     if (!el) return;
     const s = data.stats || {};
     const items = [];
     const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+
+    // Waivers — anyone rostered who hasn't signed a current active waiver.
+    const wv = (pulse && pulse.waivers) || [];
+    const wMiss = [];
+    const seenW = new Set();
+    wv.forEach(w => (w.missing || []).forEach(p => { if (!seenW.has(p.playerId)) { seenW.add(p.playerId); wMiss.push(p); } }));
+    if (wMiss.length) {
+      const byTeam = {};
+      wMiss.forEach(p => { (byTeam[p.teamName] ||= []).push(p.name); });
+      items.push({ cls: 'warn', ico: '✍️', tab: 'players', btn: 'Waivers',
+        t: plural(wMiss.length, 'player') + ' missing a waiver',
+        s: Object.entries(byTeam).slice(0, 4).map(([t, ns]) => h(t) + ' (' + ns.length + ')').join(' &nbsp;·&nbsp; ') + (Object.keys(byTeam).length > 4 ? ' &nbsp;·&nbsp; +' + (Object.keys(byTeam).length - 4) + ' more teams' : '') });
+    }
+    // Availability — a team with several outs, or almost no responses, is a lineup problem waiting to happen.
+    const av = (pulse && pulse.availability) || [];
+    const avBad = av.filter(t => !t.final && t.total && (t.out >= 4 || (t.in + t.out) / t.total < 0.4));
+    if (avBad.length && gd && gd.week) {
+      items.push({ cls: 'warn', ico: '📅', tab: 'schedule', btn: 'Schedule',
+        t: plural(avBad.length, 'team') + ' with thin availability · Week ' + gd.week,
+        s: avBad.map(t => h(t.name) + ' — ' + (t.in + t.out) + '/' + t.total + ' answered' + (t.out ? ', ' + t.out + ' out' : '')).join(' &nbsp;·&nbsp; ') });
+    }
+    // Standings behind the scores.
+    const st = pulse && pulse.standings;
+    if (st && st.stale) {
+      items.push({ cls: 'warn', ico: '📊', tab: 'scores', btn: 'Score entry',
+        t: 'Standings are ' + plural(st.staleCount, 'match') + ' behind',
+        s: 'Last rebuilt ' + h(fdt(st.lastUpdated)) + ' — use “Rebuild standings” below.' });
+    }
+    // Approvals waiting.
+    const nR = roster ? (roster.count ?? (roster.pending || []).length) : 0;
+    const nP = profile ? (profile.pending || []).length : 0;
+    const nX = xfer ? (xfer.requests || []).length : 0;
+    if (nR + nP + nX) {
+      items.push({ ico: '✅', tab: nX && !nR && !nP ? 'teams' : 'approvals', btn: 'Review',
+        t: plural(nR + nP + nX, 'approval') + ' waiting',
+        s: [nR ? plural(nR, 'roster add') : '', nP ? plural(nP, 'profile change') : '', nX ? plural(nX, 'transfer request') : ''].filter(Boolean).join(' &nbsp;·&nbsp; ') });
+    }
+    // Last week's POTW not sent / Drop not published.
+    if (gd && gd.week > 1) {
+      const last = gd.week - 1;
+      if (potw && potw.week === last) {
+        const pend = (potw.records || []).filter(r => r.status === 'pending');
+        if (pend.length) items.push({ ico: '🏆', tab: 'potw', btn: 'Player of the Week', t: plural(pend.length, 'Player of the Week email') + ' not sent · Week ' + last, s: pend.map(r => h(r.name || '')).join(' &nbsp;·&nbsp; ') });
+      } else if (potw && !(potw.weeks || []).some(w => w.week === last)) {
+        items.push({ ico: '🏆', tab: 'potw', btn: 'Player of the Week', t: 'Week ' + last + ' Player of the Week not drafted yet', s: 'Generate it from the Player of the Week tab once scores are final.' });
+      }
+      const dr = drop && (drop.weeks || []).find(w => Number(w.week) === last);
+      if (drop && (!dr || dr.status !== 'published')) {
+        items.push({ ico: '📰', tab: 'drop', btn: 'The Drop', t: 'The Drop · Week ' + last + (dr ? ' is still a ' + h(dr.status) : ' has no draft'), s: dr && dr.title ? h(dr.title) : 'Captains and players read it Friday morning.' });
+      }
+    }
 
     if (gd && gd.week) {
       const nl = (gd.lineupLocks && gd.lineupLocks.notLocked) || [];
@@ -3672,26 +3723,177 @@
     }
   }
 
-  function renderOVTonight(gd) {
-    const el = $id('ov-tonight');
-    if (!el) return;
+  // ── Season header line: week N of M · next match · venue · playoffs countdown ──
+  function renderOVSeason(gd, pulse) {
+    const el = $id('ov-season'); if (!el) return;
+    const weeks = workingWeeks();
+    const week = (pulse && pulse.week) || (gd && gd.week) || null;
+    const next = pulse && pulse.nextMatchAt ? new Date(pulse.nextMatchAt) : null;
+    const venues = (pulse && pulse.venues) || [];
+    const parts = [];
+    parts.push('<b>' + h(adminSeasonName()) + '</b>');
+    if (week) parts.push('Week <b>' + week + '</b> of ' + weeks);
+    if (next && !isNaN(next)) {
+      const days = Math.ceil((next - Date.now()) / 86400000);
+      parts.push('Next match <b>' + h(next.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })) + ' ' + h(next.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })) + '</b>' + (days > 0 ? ' <span class="sub">(in ' + days + ' day' + (days === 1 ? '' : 's') + ')</span>' : days === 0 ? ' <span class="sub">(tonight)</span>' : ''));
+    }
+    if (venues.length) parts.push(h(venues.join(' / ')));
+    if (week && weeks >= 6) {
+      const po = weeks - 2; // Rivalry Wk (weeks-2), Playoffs (weeks-1), Championship (weeks)
+      if (week < po) parts.push('<span class="sub">Playoffs start Week ' + po + ' · ' + (po - week) + ' week' + (po - week === 1 ? '' : 's') + ' away</span>');
+      else parts.push('<span class="sub">' + (week === po ? 'Rivalry Week' : week === po + 1 ? 'Playoffs' : 'Championship') + '</span>');
+    }
+    el.innerHTML = parts.join(' <span class="sep">·</span> ');
+  }
+
+  // ── This week: what can go wrong before match night ──
+  function renderOVWeek(gd, pulse, ovData) {
+    const el = $id('ov-week'); if (!el) return;
     if (!gd || !gd.week) { el.innerHTML = ''; return; }
+    const week = gd.week;
     const k = gd.kpis || {}, ll = gd.lineupLocks || {};
-    const locksCls = (ll.totalTeams && ll.lockedTeams === ll.totalTeams) ? 'done' : 'warn';
-    el.innerHTML =
-      '<div class="gd" style="margin-bottom:18px;">' +
-        '<div class="gd__lbl" style="margin-top:0;display:flex;justify-content:space-between;align-items:center;">Tonight · Week ' + gd.week +
-          ' <button class="gd__refresh" id="ov-refresh-btn">↻ Refresh</button></div>' +
-        '<div class="gd__kpis" style="grid-template-columns:repeat(5,1fr);">' +
-          '<div class="gd__kpi"><div class="gd__kn">' + (k.total || 0) + '</div><div class="gd__kl">Matches</div></div>' +
-          '<div class="gd__kpi"><div class="gd__kn live">' + (k.live || 0) + '</div><div class="gd__kl">Live</div></div>' +
-          '<div class="gd__kpi"><div class="gd__kn done">' + (k.final || 0) + '</div><div class="gd__kl">Final</div></div>' +
-          '<div class="gd__kpi"><div class="gd__kn warn">' + (k.toStart || 0) + '</div><div class="gd__kl">To start</div></div>' +
-          '<div class="gd__kpi"><div class="gd__kn ' + locksCls + '">' + (ll.lockedTeams || 0) + '/' + (ll.totalTeams || 0) + '</div><div class="gd__kl">Locked</div></div>' +
-        '</div>' +
-        (gd.standingsUpdatedAt ? '<div class="ov-health" style="margin:6px 2px 0;">Standings last rebuilt ' + h(fdt(gd.standingsUpdatedAt)) + '</div>' : '') +
+    const lockedIds = new Set();
+    const notLockedIds = new Set((ll.notLocked || []).map(x => x.team && x.team.id).filter(Boolean));
+    (gd.matches || []).forEach(m => { if (m.aLocked && m.teamA) lockedIds.add(m.teamA.id); if (m.bLocked && m.teamB) lockedIds.add(m.teamB.id); });
+
+    const av = (pulse && pulse.availability) || [];
+    const avTot = av.reduce((a, t) => a + t.total, 0), avIn = av.reduce((a, t) => a + t.in, 0), avOut = av.reduce((a, t) => a + t.out, 0);
+    const avResp = avIn + avOut;
+    const waivers = (pulse && pulse.waivers) || [];
+    const wMissing = new Map(); // teamName → unsigned count (unique player+waiver)
+    let wTotalMissing = 0;
+    const missingKeys = new Set();
+    waivers.forEach(w => (w.missing || []).forEach(p => {
+      const key = w.id + ':' + p.playerId;
+      if (missingKeys.has(key)) return; missingKeys.add(key);
+      wMissing.set(p.teamName, (wMissing.get(p.teamName) || 0) + 1); wTotalMissing++;
+    }));
+    const bal = (ovData && ovData.balanceTeams) || [];
+    const balByName = new Map(bal.map(b => [b.name, b.due]));
+    const balTotal = bal.reduce((a, b) => a + b.due, 0);
+
+    const locksCls = (ll.totalTeams && ll.lockedTeams === ll.totalTeams) ? 'ok' : 'warn';
+    const avCls = avTot === 0 ? '' : (avResp / avTot >= 0.75 ? 'ok' : avResp / avTot >= 0.4 ? 'warn' : 'bad');
+    const wCls = wTotalMissing === 0 ? 'ok' : wTotalMissing <= 5 ? 'warn' : 'bad';
+
+    let h1 = '<div class="gd" style="margin-bottom:18px;">' +
+      '<div class="gd__lbl" style="margin-top:0;display:flex;justify-content:space-between;align-items:center;">This week · Week ' + week +
+        ' <button class="gd__refresh" id="ov-refresh-btn">↻ Refresh</button></div>' +
+      '<div class="ov-chk">' +
+        '<div class="ov-chk__i" data-qa-tab="schedule"><div class="ov-chk__l">Matches</div><div class="ov-chk__v">' + (k.total || 0) + '</div><div class="ov-chk__s">' + (k.live || 0) + ' live · ' + (k.final || 0) + ' final · ' + (k.toStart || 0) + ' to start</div></div>' +
+        '<div class="ov-chk__i" data-qa-tab="schedule"><div class="ov-chk__l">Availability</div><div class="ov-chk__v ' + avCls + '">' + avResp + '<span style="font-size:11px;color:var(--color-text-faint);font-weight:700">/' + avTot + '</span></div><div class="ov-chk__s">' + avIn + ' in · ' + avOut + ' out · ' + (avTot - avResp) + ' no response</div></div>' +
+        '<div class="ov-chk__i" data-qa-tab="schedule"><div class="ov-chk__l">Lineups locked</div><div class="ov-chk__v ' + locksCls + '">' + (ll.lockedTeams || 0) + '<span style="font-size:11px;color:var(--color-text-faint);font-weight:700">/' + (ll.totalTeams || 0) + '</span></div><div class="ov-chk__s">' + (notLockedIds.size ? notLockedIds.size + ' still open' : 'all set') + '</div></div>' +
+        '<div class="ov-chk__i" data-qa-tab="players"><div class="ov-chk__l">Waivers</div><div class="ov-chk__v ' + wCls + '">' + (wTotalMissing ? wTotalMissing + ' missing' : '✓') + '</div><div class="ov-chk__s">' + (waivers.length ? waivers.map(w => h(String(w.title || w.id).replace(/ waiver$/i, '')) + ' ' + w.signed + '/' + w.total).join(' · ') : 'no active waivers') + '</div></div>' +
+        '<div class="ov-chk__i" data-qa-tab="registrations"><div class="ov-chk__l">Balance due</div><div class="ov-chk__v ' + (balTotal > 0 ? 'bad' : 'ok') + '">$' + balTotal.toLocaleString() + '</div><div class="ov-chk__s">' + (bal.length ? bal.length + ' team' + (bal.length === 1 ? '' : 's') + ' owing' : 'everyone paid') + '</div></div>' +
       '</div>';
+
+    // Per-team readiness table
+    const teams = new Map();
+    av.forEach(t => { const cur = teams.get(t.teamId) || { id: t.teamId, name: t.name, division: t.division, in: 0, out: 0, none: 0, total: 0, final: t.final }; cur.in += t.in; cur.out += t.out; cur.none += t.none; cur.total = Math.max(cur.total, t.total); teams.set(t.teamId, cur); });
+    (gd.matches || []).forEach(m => [m.teamA, m.teamB].forEach(t => { if (t && t.id && !teams.has(t.id)) teams.set(t.id, { id: t.id, name: t.name, division: m.division, in: 0, out: 0, none: 0, total: 0, final: m.final }); }));
+    const rows = [...teams.values()].sort((a, b) => (a.division || '').localeCompare(b.division || '') || a.name.localeCompare(b.name));
+    if (rows.length) {
+      h1 += '<div class="ov-card"><table class="ovt"><thead><tr><th>Team</th><th class="num">Avail</th><th>Lineup</th><th class="num">Waivers</th><th class="num">Balance</th></tr></thead><tbody>' +
+        rows.map(t => {
+          const resp = t.in + t.out;
+          const avC = t.total ? (t.out > 3 ? 'bad' : resp / t.total >= 0.6 ? 'ok' : 'warn') : 'faint';
+          const locked = lockedIds.has(t.id), open = notLockedIds.has(t.id);
+          const wm = wMissing.get(t.name) || 0;
+          const due = balByName.get(t.name) || 0;
+          return '<tr>' +
+            '<td><span class="tm">' + h(t.name) + '</span> <span class="faint" style="font-size:10px">' + h(t.division || '') + '</span></td>' +
+            '<td class="num ' + avC + '" title="' + t.in + ' in · ' + t.out + ' out · ' + t.none + ' no response">' + (t.total ? resp + '/' + t.total + (t.out ? ' <span class="bad" style="font-size:10px">' + t.out + ' out</span>' : '') : '—') + '</td>' +
+            '<td>' + (t.final ? '<span class="faint">final</span>' : locked ? '<span class="ok">✓ locked</span>' : open ? '<span class="warn">open</span>' : '<span class="faint">—</span>') + '</td>' +
+            '<td class="num ' + (wm ? 'warn' : 'ok') + '">' + (wm ? wm + ' unsigned' : '✓') + '</td>' +
+            '<td class="num ' + (due ? 'bad' : 'ok') + '">' + (due ? '$' + due.toLocaleString() : '✓') + '</td>' +
+          '</tr>';
+        }).join('') + '</tbody></table></div>';
+    }
+    h1 += '</div>';
+    el.innerHTML = h1;
     $id('ov-refresh-btn')?.addEventListener('click', renderOV);
+  }
+
+  // ── Last week: is it closed out? scores → standings → POTW → The Drop ──
+  function renderOVLast(gd, pulse, potw, drop) {
+    const el = $id('ov-last'); if (!el) return;
+    const week = gd && gd.week;
+    if (!week || week <= 1) { el.innerHTML = ''; return; }
+    const last = week - 1;
+    const piAll = gd.priorIncomplete || [];
+    const st = (pulse && pulse.standings) || {};
+    const potwRecs = potw && potw.week === last ? (potw.records || []) : [];
+    const potwPrepared = !!(potw && (potw.weeks || []).some(w => w.week === last));
+    const potwUnsent = potwRecs.filter(r => r.status === 'pending').length;
+    const potwSent = potwRecs.filter(r => r.status === 'sent').length;
+    const dropRec = drop && (drop.weeks || []).find(w => Number(w.week) === last);
+    const dropNext = drop && (drop.weeks || []).find(w => Number(w.week) === week);
+
+    const scoresCls = piAll.length ? 'bad' : 'ok';
+    const stCls = st.stale ? 'warn' : 'ok';
+    const potwCls = !potwPrepared ? 'warn' : potwUnsent ? 'warn' : 'ok';
+    const dropCls = !dropRec ? 'warn' : dropRec.status === 'published' ? 'ok' : 'warn';
+
+    el.innerHTML = '<div class="gd" style="margin-bottom:18px;">' +
+      '<div class="gd__lbl" style="margin-top:0;">Closing out · Week ' + last + '</div>' +
+      '<div class="ov-chk">' +
+        '<div class="ov-chk__i" data-qa-tab="scores"><div class="ov-chk__l">Scores</div><div class="ov-chk__v ' + scoresCls + '">' + (piAll.length ? piAll.length + ' missing' : '✓ all final') + '</div><div class="ov-chk__s">' + (piAll.length ? piAll.slice(0, 3).map(x => 'Wk ' + x.week + ' ' + h(x.name)).join(' · ') + (piAll.length > 3 ? ' · +' + (piAll.length - 3) : '') : 'every match through Week ' + last + ' is finalized') + '</div></div>' +
+        '<div class="ov-chk__i" data-qa="rebuild"><div class="ov-chk__l">Standings</div><div class="ov-chk__v ' + stCls + '">' + (st.stale ? st.staleCount + ' behind' : '✓ current') + '</div><div class="ov-chk__s">' + (st.lastUpdated ? 'rebuilt ' + h(fdt(st.lastUpdated)) : 'never rebuilt') + (st.stale ? ' · tap to rebuild' : '') + '</div></div>' +
+        '<div class="ov-chk__i" data-qa-tab="potw"><div class="ov-chk__l">Player of the Week</div><div class="ov-chk__v ' + potwCls + '">' + (!potwPrepared ? 'not drafted' : potwUnsent ? potwUnsent + ' unsent' : potwSent ? '✓ sent' : '✓') + '</div><div class="ov-chk__s">' + (potwRecs.length ? potwRecs.map(r => h(r.name || '')).filter(Boolean).join(' · ') : 'Week ' + last + ' winners') + '</div></div>' +
+        '<div class="ov-chk__i" data-qa-tab="drop"><div class="ov-chk__l">The Drop</div><div class="ov-chk__v ' + dropCls + '">' + (!dropRec ? 'no draft' : dropRec.status === 'published' ? '✓ published' : h(dropRec.status)) + '</div><div class="ov-chk__s">' + (dropRec ? 'Wk ' + last + (dropRec.title ? ' · ' + h(dropRec.title) : '') : 'Week ' + last + ' edition') + (dropNext ? ' · Wk ' + week + ' ' + h(dropNext.status) : '') + '</div></div>' +
+      '</div></div>';
+  }
+
+  // ── Standings snapshot with movement since last completed week ──
+  function renderOVStandings(pulse) {
+    const el = $id('ov-standings'); if (!el) return;
+    const st = pulse && pulse.standings;
+    const divs = (st && st.divisions) || [];
+    if (!divs.length || !divs.some(d => d.teams.length)) { el.innerHTML = ''; return; }
+    const played = divs.some(d => d.teams.some(t => t.matchesPlayed > 0));
+    el.innerHTML = '<div class="gd__lbl" style="margin-top:0;display:flex;justify-content:space-between;align-items:center;">Standings' + (pulse.completedWeeks ? ' · through Week ' + pulse.completedWeeks : '') +
+        ' <button class="gd__refresh" data-qa-tab="scores">Score entry →</button></div>' +
+      '<div class="ov-grid">' + divs.map(d =>
+        '<div class="ov-card"><div class="ov-card__h"><span class="ov-card__t">' + h(d.label || d.id) + '</span><span class="ov-card__s">' + (played ? 'movement since last week' : 'no matches yet') + '</span></div>' +
+        '<table class="ovt"><thead><tr><th>#</th><th>Team</th><th class="num">Record</th><th class="num">Pts</th><th class="num">Diff</th><th class="num">Wk</th></tr></thead><tbody>' +
+        d.teams.map(t => {
+          const mv = t.delta == null ? '<span class="same">—</span>' : t.delta > 0 ? '<span class="up">▲' + t.delta + '</span>' : t.delta < 0 ? '<span class="down">▼' + Math.abs(t.delta) + '</span>' : '<span class="same">·</span>';
+          return '<tr><td class="faint">' + t.rank + '</td><td><span class="tm">' + h(t.name) + '</span></td>' +
+            '<td class="num">' + t.wins + '-' + t.losses + (t.ties ? '-' + t.ties : '') + '</td>' +
+            '<td class="num">' + t.matchPointsFor + '</td>' +
+            '<td class="num ' + (t.pointDiff > 0 ? 'ok' : t.pointDiff < 0 ? 'bad' : 'faint') + '">' + (t.pointDiff > 0 ? '+' : '') + t.pointDiff + '</td>' +
+            '<td class="num">' + mv + '</td></tr>';
+        }).join('') + '</tbody></table></div>').join('') + '</div>';
+  }
+
+  // ── Approvals queue: everything waiting on a yes/no, in one row ──
+  function renderOVApprovals(roster, profile, xfer) {
+    const el = $id('ov-appr'); if (!el) return;
+    const r = roster ? (roster.count ?? (roster.pending || []).length) : null;
+    const p = profile ? (profile.pending || []).length : null;
+    const x = xfer ? (xfer.requests || []).length : null;
+    const item = (label, n, tab) => '<div class="ov-appr__i' + (n ? ' has' : '') + '" data-qa-tab="' + tab + '"><b>' + (n == null ? '?' : n) + '</b> ' + label + '</div>';
+    el.innerHTML = '<div class="gd__lbl" style="margin-top:0;">Waiting on you</div><div class="ov-appr">' +
+      item('roster adds', r, 'approvals') + item('profile changes', p, 'approvals') + item('transfer requests', x, 'teams') +
+      '</div>';
+  }
+
+  // ── Season-scoped activity from the real activity log ──
+  const OV_ACT_ICON = { lineup: '🔒', score: '📝', match: '🏁', player: '👤', availability: '📅', waiver: '✍️', transfer: '⇄', captain: '★', cocaptain: '☆', team: '🏓', roster: '👥', contact: '✉️' };
+  function renderOVActivity(log) {
+    const el = $id('ov-activity'); if (!el) return;
+    const circuit = adminCircuit();
+    const events = ((log && log.events) || []).filter(e => !(e.type || '').includes('login') && (!e.circuit || e.circuit === circuit)).slice(0, 14);
+    if (!events.length) { el.innerHTML = '<div class="empty">Nothing yet this season.</div>'; return; }
+    el.innerHTML = events.map(e => {
+      const grp = (e.type || '').split('.')[0];
+      const label = AL_LABELS[e.type] || (e.type || '').replace(/[._-]/g, ' ');
+      const who = e.player?.name || (e.actor?.email || '');
+      return '<div class="ai"><div style="width:18px;text-align:center;flex-shrink:0;font-size:12px;">' + (OV_ACT_ICON[grp] || '•') + '</div><div style="min-width:0">' +
+        '<div><b style="font-weight:700">' + h(label) + '</b>' + (e.team?.name ? ' · ' + h(e.team.name) : '') + (who ? ' <span style="color:var(--color-text-faint)">· ' + h(who) + '</span>' : '') + '</div>' +
+        (e.details ? '<div style="font-size:11px;color:var(--color-text-muted);margin-top:1px;">' + h(e.details) + '</div>' : '') +
+        '<div class="ai__time">' + h(fdt(e.at)) + (e.week ? ' · Wk ' + h(e.week) : '') + '</div></div></div>';
+    }).join('');
   }
 
   // Quick actions (static buttons, wired once)
@@ -3753,46 +3955,46 @@
   });
 
   async function renderOV() {
-    const [ovRes, gdRes] = await Promise.allSettled([
-      apiJSON('/.netlify/functions/admin-overview?season=' + encodeURIComponent(adminSeasonId()) + '&circuit=' + encodeURIComponent(adminCircuit())),
-      apiJSON('/.netlify/functions/admin-gameday?circuit=' + encodeURIComponent(adminCircuit())),
+    const circuit = adminCircuit();
+    const q = encodeURIComponent(circuit);
+    const get = p => apiJSON(p);
+    const res = await Promise.allSettled([
+      get('/.netlify/functions/admin-overview?season=' + encodeURIComponent(adminSeasonId()) + '&circuit=' + q),
+      get('/.netlify/functions/admin-gameday?circuit=' + q),
+      get('/.netlify/functions/admin-season-pulse?circuit=' + q),
+      get('/.netlify/functions/admin-potw?circuit=' + q),
+      get('/.netlify/functions/admin-drop?circuit=' + q),
+      get('/.netlify/functions/admin-roster-approvals'),
+      get('/.netlify/functions/admin-profile-approvals'),
+      get('/.netlify/functions/admin-transfer?status=pending'),
+      get('/.netlify/functions/admin-activity-log?limit=80'),
     ]);
-    if (ovRes.status === 'rejected') {
-      $id('ov-stats').innerHTML = '<div class="empty">Failed to load overview: ' + h(ovRes.reason && ovRes.reason.message) + '</div>';
-      $id('ov-actions').innerHTML = '';
-      $id('ov-tonight').innerHTML = '';
+    const v = i => res[i].status === 'fulfilled' ? res[i].value : null;
+    const [data, gd, pulse, potw, drop, roster, profile, xfer, log] = [0,1,2,3,4,5,6,7,8].map(v);
+    res.forEach((r, i) => { if (r.status === 'rejected') console.warn('overview fetch ' + i + ' failed:', r.reason && r.reason.message); });
+    if (!data && !gd) {
+      $id('ov-actions').innerHTML = '<div class="empty">Failed to load overview: ' + h((res[0].reason && res[0].reason.message) || 'unknown error') + '</div>';
       return;
     }
     try {
-      const data = ovRes.value;
-      const gd = gdRes.status === 'fulfilled' ? gdRes.value : null;
-      const s = data.stats || {};
-      const fill = data.divisionFill || [];
-      const recent = data.recent || [];
+      const s = (data && data.stats) || {};
+      if (data) $id('sb-reg-ct').textContent = (s.teams || 0) + (s.agents || 0);
 
-      renderOVActions(data, gd);
-      renderOVTonight(gd);
+      renderOVSeason(gd, pulse);
+      renderOVActions(data || {}, gd, pulse, potw, drop, roster, profile, xfer);
+      renderOVApprovals(roster, profile, xfer);
+      renderOVWeek(gd, pulse, data);
+      renderOVLast(gd, pulse, potw, drop);
+      renderOVStandings(pulse);
+      renderOVActivity(log);
 
-      $id('sb-reg-ct').textContent = (s.teams || 0) + (s.agents || 0);
-      $id('ov-stats').innerHTML =
-        '<div class="sc"><div class="sc__l">Teams</div><div class="sc__v">' + (s.teams || 0) + '</div><div class="sc__sub">' + (s.teamCapacity || '—') + ' capacity</div></div>' +
-        '<div class="sc"><div class="sc__l">Free agents</div><div class="sc__v sc__v--teal">' + (s.agents || 0) + '</div><div class="sc__sub">waiting for draft</div></div>' +
-        '<div class="sc"><div class="sc__l">Collected</div><div class="sc__v sc__v--gold">$' + (s.revenue || 0).toLocaleString() + '</div><div class="sc__sub">of $' + (s.totalFees || 0).toLocaleString() + ' total</div></div>' +
-        '<div class="sc"><div class="sc__l">Balance Due</div><div class="sc__v" style="color:' + ((s.balanceDue || 0) > 0 ? 'var(--color-red,#e53e3e)' : 'var(--color-teal)') + '">$' + (s.balanceDue || 0).toLocaleString() + '</div><div class="sc__sub">outstanding</div></div>' +
-        '<div class="sc"><div class="sc__l">Photos</div><div class="sc__v">' + (s.photos || 0) + '</div></div>';
-
-      $id('ov-fill').innerHTML = fill.length ? fill.map(f => {
-        const p = Math.min(100, Math.round(f.filled / (f.capacity || 6) * 100));
-        const co = p >= 100 ? 'var(--color-teal)' : 'var(--color-lime)';
-        return '<div class="fb"><div class="fb__h"><strong>' + h(f.label) + '</strong><span>' + f.filled + '/' + f.capacity + '</span></div><div class="fb__track"><div class="fb__fill" style="width:' + p + '%;background:' + co + ';"></div></div></div>';
-      }).join('') : '<div class="empty">No divisions yet.</div>';
-
-      $id('ov-activity').innerHTML = recent.length ? recent.map(r => {
-        const dot = r.status === 'confirmed' ? 'g' : r.status === 'pending' ? 'y' : 'b';
-        return '<div class="ai"><div class="ai__dot ai__dot--' + dot + '"></div><div><div>' + h(r.displayName) + ' · <span class="p p--' + (r.status || 'pending') + '">' + (r.status || 'pending') + '</span></div><div class="ai__time">' + h(regDivisionLabel(r)) + ' · ' + fd(r.createdAt) + '</div></div></div>';
-      }).join('') : '<div class="empty">No recent activity.</div>';
+      // Any element tagged data-qa-tab jumps to that tab; data-qa="rebuild" reuses the quick action.
+      const sec = document.querySelector('[data-section="overview"]');
+      sec.querySelectorAll('[data-qa-tab]').forEach(b => { if (!b.dataset.wired) { b.dataset.wired = '1'; b.addEventListener('click', () => gotoTab(b.dataset.qaTab)); } });
+      sec.querySelectorAll('.ov-chk__i[data-qa="rebuild"]').forEach(b => { if (!b.dataset.wired) { b.dataset.wired = '1'; b.addEventListener('click', () => $id('ov-qa')?.querySelector('[data-qa="rebuild"]')?.click()); } });
     } catch (e) {
-      $id('ov-stats').innerHTML = '<div class="empty">Failed to load overview: ' + h(e.message) + '</div>';
+      console.error(e);
+      $id('ov-actions').innerHTML = '<div class="empty">Failed to render overview: ' + h(e.message) + '</div>';
     }
   }
 
@@ -8743,6 +8945,42 @@
   .gd__pill.final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
   .gd__pill.awaiting { background: var(--color-gold-dim); color: var(--color-gold); }
   .gd__refresh { font-size: 11px; color: var(--color-teal); cursor: pointer; background: none; border: none; font-family: inherit; font-weight: 700; letter-spacing: 0; text-transform: none; }
+
+  /* Overview — season header line, week tables, standings */
+  .ov-season { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; font-size: 12px; color: var(--color-text-muted); margin: -8px 0 18px; }
+  .ov-season b { color: var(--color-text); font-weight: 700; }
+  .ov-season .sep { color: var(--color-text-faint); }
+  .ov-season .sub { font-size: 11px; color: var(--color-text-faint); }
+  .ovt { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .ovt th { text-align: left; font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; padding: 6px 8px; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+  .ovt td { padding: 7px 8px; border-bottom: 1px solid var(--color-border); vertical-align: middle; }
+  .ovt tr:last-child td { border-bottom: none; }
+  .ovt td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ovt th.num { text-align: right; }
+  .ovt .tm { font-weight: 700; color: var(--color-text); white-space: nowrap; }
+  .ovt .ok { color: var(--color-teal); font-weight: 700; }
+  .ovt .warn { color: var(--color-gold); font-weight: 700; }
+  .ovt .bad { color: var(--color-red); font-weight: 700; }
+  .ovt .faint { color: var(--color-text-faint); }
+  .ovt .up { color: var(--color-teal); font-weight: 800; } .ovt .down { color: var(--color-red); font-weight: 800; } .ovt .same { color: var(--color-text-faint); }
+  .ov-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 18px; }
+  .ov-card { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 12px 14px; }
+  .ov-card__h { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .ov-card__t { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+  .ov-card__s { font-size: 11px; color: var(--color-text-faint); }
+  .ov-chk { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-bottom: 12px; }
+  .ov-chk__i { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; flex-direction: column; gap: 3px; cursor: pointer; }
+  .ov-chk__i:hover { border-color: var(--color-border-strong); }
+  .ov-chk__l { font-size: 8px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-faint); font-weight: 700; }
+  .ov-chk__v { font-size: 18px; font-weight: 800; line-height: 1.1; }
+  .ov-chk__v.ok { color: var(--color-teal); } .ov-chk__v.warn { color: var(--color-gold); } .ov-chk__v.bad { color: var(--color-red); }
+  .ov-chk__s { font-size: 10px; color: var(--color-text-faint); line-height: 1.35; }
+  .ov-appr { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+  .ov-appr__i { display: flex; align-items: center; gap: 8px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-full); padding: 6px 12px 6px 8px; font-size: 12px; color: var(--color-text-muted); cursor: pointer; }
+  .ov-appr__i b { display: inline-block; min-width: 20px; text-align: center; border-radius: 9999px; padding: 1px 6px; font-size: 11px; background: var(--color-surface-3); color: var(--color-text-faint); }
+  .ov-appr__i.has b { background: var(--color-gold); color: var(--color-text-inverse); }
+  .ov-appr__i.has { border-color: rgba(240,192,64,0.4); color: var(--color-text); }
+  @media (max-width: 800px) { .ov-grid { grid-template-columns: 1fr; } .ovt th, .ovt td { padding: 6px 5px; } }
 
   /* Overview — action required panel */
   .ova { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
