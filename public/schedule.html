@@ -152,7 +152,7 @@
 
     /* card top: court + status */
     .match-top {
-      display: flex; align-items: center; justify-content: space-between;
+      display: flex; align-items: flex-start; justify-content: space-between; gap: 8px;
       padding: 9px 12px; border-bottom: 1px solid var(--color-divider);
     }
     .match-court {
@@ -160,6 +160,21 @@
       color: var(--color-text-faint); display: flex; align-items: center; gap: 6px;
     }
     .court-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .match-where { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+    .match-venue {
+      font-size: 9.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--color-text-faint); opacity: 0.75; padding-left: 12px;
+    }
+    /* Countdown to game time — only on the up-next week */
+    .m-countdown, .week-countdown {
+      display: inline-flex; align-items: center; white-space: nowrap; font-variant-numeric: tabular-nums;
+      font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase;
+      color: var(--color-lime); background: var(--color-lime-ghost);
+      border: 1px solid rgba(184,255,44,0.3); border-radius: var(--radius-full); padding: 3px 9px;
+    }
+    .m-countdown { margin-top: 6px; }
+    .week-countdown { font-size: 10px; padding: 3px 10px; }
+    .m-countdown.is-live, .week-countdown.is-live { color: var(--color-bg); background: var(--color-lime); border-color: var(--color-lime); }
     .match-badge {
       font-size: 9.5px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
       padding: 3px 9px; border-radius: var(--radius-full);
@@ -205,6 +220,7 @@
     .m-result.tie { color: #e0b34a; }
     .m-center.up .m-vs { font-size: 11px; font-weight: 800; letter-spacing: 0.16em; color: var(--color-text-faint); }
     .m-center.up .m-start { font-size: 10px; color: var(--color-text-faint); margin-top: 3px; }
+    .m-center.up { min-width: 96px; }
 
     /* serve / side rules */
     .m-serves { margin: 0 12px 12px; border: 1px solid var(--color-divider); border-radius: 9px; overflow: hidden; }
@@ -439,6 +455,63 @@
       }
       return null;
     }
+    /* ── Countdown to game time ─────────────────────────────────── */
+    // A match's start = its own scheduledAt, else the week's night + the
+    // published start time. Shown for the up-next week only, within 7 days.
+    const COUNTDOWN_WINDOW_MS = 7 * 24 * 3600 * 1000;
+    const COUNTDOWN_LIVE_MS   = 3 * 3600 * 1000;   // keep "In progress" up for 3h after start
+    function parseClock(label) {
+      const m = /(\d{1,2})(?::(\d{2}))?\s*([AP]M)/i.exec(label || '');
+      if (!m) return null;
+      let h = (+m[1]) % 12;
+      if (m[3].toUpperCase() === 'PM') h += 12;
+      return { h, mi: +(m[2] || 0) };
+    }
+    function matchStartDate(m, n, weeksData) {
+      if (m && m.scheduledAt) { const d = new Date(m.scheduledAt); if (!isNaN(d)) return d; }
+      const d = new Date(weekNightDate(n, weeksData));
+      const c = parseClock(matchStartLabel(m));
+      if (!c || isNaN(d)) return null;
+      d.setHours(c.h, c.mi, 0, 0);
+      return d;
+    }
+    function weekStartDate(matches, n, weeksData) {
+      const starts = (matches || []).map(m => matchStartDate(m, n, weeksData)).filter(Boolean);
+      if (starts.length) return new Date(Math.min(...starts.map(d => d.getTime())));
+      return matchStartDate(null, n, weeksData);
+    }
+    function countdownActive(start) {
+      if (!start) return false;
+      const diff = start.getTime() - Date.now();
+      return diff <= COUNTDOWN_WINDOW_MS && diff > -COUNTDOWN_LIVE_MS;
+    }
+    function countdownText(start) {
+      const diff = start.getTime() - Date.now();
+      if (diff <= 0) return 'In progress';
+      const s = Math.floor(diff / 1000);
+      const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), mi = Math.floor((s % 3600) / 60), sec = s % 60;
+      const two = v => String(v).padStart(2, '0');
+      if (d > 0)  return `Starts in ${d}d ${h}h ${mi}m`;
+      if (h > 0)  return `Starts in ${h}h ${two(mi)}m ${two(sec)}s`;
+      return `Starts in ${mi}m ${two(sec)}s`;
+    }
+    function countdownHTML(start, cls) {
+      if (!countdownActive(start)) return '';
+      const live = start.getTime() - Date.now() <= 0;
+      return `<span class="${cls}${live ? ' is-live' : ''}" data-countdown="${start.toISOString()}">${countdownText(start)}</span>`;
+    }
+    function tickCountdowns() {
+      document.querySelectorAll('[data-countdown]').forEach(el => {
+        const start = new Date(el.dataset.countdown);
+        if (isNaN(start)) return;
+        const diff = start.getTime() - Date.now();
+        if (diff <= -COUNTDOWN_LIVE_MS) { el.remove(); return; }
+        el.textContent = countdownText(start);
+        el.classList.toggle('is-live', diff <= 0);
+      });
+    }
+    setInterval(tickCountdowns, 1000);
+
     function formatWeekDate(n, weeksData) {
       return weekNightDate(n, weeksData).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
     }
@@ -546,6 +619,7 @@
               </div>
               <div class="week-right">
                 ${phasePill}
+                ${next ? countdownHTML(weekStartDate((wData && wData.matches) || wMatches, n, weeksData), 'week-countdown') : ''}
                 ${badge}
                 <span class="week-chevron">▾</span>
               </div>
@@ -616,7 +690,7 @@
             <div class="m-result${tie ? ' tie' : ''}">${result}</div>
           </div>`;
         } else {
-          center = `<div class="m-center up"><div class="m-vs">VS</div><div class="m-start">${esc(matchStartLabel(m))}</div></div>`;
+          center = `<div class="m-center up"><div class="m-vs">VS</div><div class="m-start">${esc(matchStartLabel(m))}</div>${next ? countdownHTML(matchStartDate(m, weekNum, weeksData), 'm-countdown') : ''}</div>`;
         }
 
         const sideAWin = isFinal && m.homeRoundPts > m.awayRoundPts;
@@ -637,7 +711,7 @@
         return `
           <div class="match-entry${isFinal ? ' is-final' : ''}">
             <div class="match-top">
-              <span class="match-court"><span class="court-dot" style="background:${meta.color}"></span>${esc(meta.label)}${m.venue ? ' · ' + esc(m.venue) : ''}</span>
+              <div class="match-where"><span class="match-court"><span class="court-dot" style="background:${meta.color}"></span>${esc(meta.label)}</span>${m.venue ? `<span class="match-venue">${esc(m.venue)}</span>` : ''}</div>
               ${badge}
             </div>
             <div class="match-teams">
@@ -705,7 +779,7 @@
           ${gamesLine}<div class="m-result${tie ? ' tie' : ''}">${result}</div>
         </div>`;
       } else {
-        center = `<div class="m-center up"><div class="m-vs">VS</div><div class="m-start">${esc(matchStartLabel(m))}</div></div>`;
+        center = `<div class="m-center up"><div class="m-vs">VS</div><div class="m-start">${esc(matchStartLabel(m))}</div>${next ? countdownHTML(matchStartDate(m, weekNum, weeksData), 'm-countdown') : ''}</div>`;
       }
 
       // Status hint: projected vs locked (hidden once final).
@@ -733,7 +807,7 @@
       return `
         <div class="match-entry${isFinal ? ' is-final' : ''}">
           <div class="match-top">
-            <span class="match-court"><span class="court-dot" style="background:${meta.color}"></span>${esc(meta.label)}${m.venue ? ' · ' + esc(m.venue) : ''}</span>
+            <div class="match-where"><span class="match-court"><span class="court-dot" style="background:${meta.color}"></span>${esc(meta.label)}</span>${m.venue ? `<span class="match-venue">${esc(m.venue)}</span>` : ''}</div>
             ${badge}
           </div>
           <div class="match-teams">

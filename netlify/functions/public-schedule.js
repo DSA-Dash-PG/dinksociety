@@ -58,7 +58,7 @@ export default async (req) => {
             const tm = (teamsByDiv[div] ||= new Map());
             if (m.teamA?.id) tm.set(m.teamA.id, { id: m.teamA.id, name: m.teamA.name });
             if (m.teamB?.id) tm.set(m.teamB.id, { id: m.teamB.id, name: m.teamB.name });
-            pushPublicMatch(weekMap, w, div, m, emojiById);
+            pushPublicMatch(weekMap, w, div, m, emojiById, undefined, emojiByName);
           }
         }
       }
@@ -83,7 +83,7 @@ export default async (req) => {
           realMatches: realByDiv[div], bracketMatches, teamList, numTeams,
         });
         for (const m of resolved) {
-          pushPublicMatch(weekMap, m.week, div, m, emojiById, m);
+          pushPublicMatch(weekMap, m.week, div, m, emojiById, m, emojiByName);
         }
       }
 
@@ -169,10 +169,13 @@ async function loadTeamEmojis(seasonId) {
       try {
         const team = JSON.parse(raw);
         if (shouldHideTestRecord(team, seasonId)) continue;
+        if (!team.emoji) continue;
+        // Team ids are unique across seasons, so an id hit is always the right
+        // record — don't let a missing/mismatched seasonId stamp hide the logo.
+        if (team.id) byId[team.id] = team.emoji;
+        // Name lookup stays season-scoped (names repeat season to season).
         if (team.seasonId && team.seasonId !== seasonId) continue;
         if (!team.seasonId && seasonId !== 'circuit-i') continue;
-        if (!team.emoji) continue;
-        if (team.id) byId[team.id] = team.emoji;
         if (team.name) byName[team.name.toLowerCase()] = team.emoji;
       } catch {}
     }
@@ -183,7 +186,7 @@ async function loadTeamEmojis(seasonId) {
 // Map a raw schedule match (round-robin OR resolved bracket) into the public
 // shape and push it onto weekMap[w]. When `br` (the resolved bracket match) is
 // passed, phase/seed metadata is attached and the week is tagged with its phase.
-function pushPublicMatch(weekMap, w, division, m, emojiById, br) {
+function pushPublicMatch(weekMap, w, division, m, emojiById, br, emojiByName = {}) {
   if (!weekMap[w]) weekMap[w] = { week: w, division, matches: [] };
   if (br) {
     weekMap[w].phase = br.phase || weekMap[w].phase || null;
@@ -204,8 +207,10 @@ function pushPublicMatch(weekMap, w, division, m, emojiById, br) {
     teamB: tB?.name || tbd,
     teamAId: tA?.id || null,
     teamBId: tB?.id || null,
-    emojiA: (tA?.id && emojiById[tA.id]) || '',
-    emojiB: (tB?.id && emojiById[tB.id]) || '',
+    // Id first; fall back to the season's team of the same name when the
+    // schedule snapshot carries a stale id (team re-seeded after scheduling).
+    emojiA: (tA?.id && emojiById[tA.id]) || (tA?.name && emojiByName[tA.name.toLowerCase()]) || '',
+    emojiB: (tB?.id && emojiById[tB.id]) || (tB?.name && emojiByName[tB.name.toLowerCase()]) || '',
     court: m.court || null,
     venue: m.venue || null,
     courtA: m.courtA ?? null,

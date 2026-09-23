@@ -423,6 +423,21 @@
     .ss-approval--done .ss-approval__value { color: var(--color-teal); }
     .ss-approval__time { font-size: 10px; color: var(--color-text-faint); margin-top: 2px; }
 
+    /* Who's who card — home/away, who enters vs confirms, serve/side per round */
+    .ss-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .ss-role { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 12px 14px; }
+    .ss-role.is-mine { border-color: rgba(184,255,44,0.45); background: var(--color-lime-ghost); }
+    .ss-role__tag { display: flex; align-items: center; gap: 6px; font-size: 9px; letter-spacing: 0.14em; text-transform: uppercase; font-weight: 800; color: var(--color-text-faint); }
+    .ss-role__you { color: var(--color-bg); background: var(--color-lime); border-radius: var(--radius-full); padding: 1px 7px; font-size: 8.5px; }
+    .ss-role.is-mine .ss-role__tag { color: var(--color-lime); }
+    .ss-role__name { font-size: 14px; font-weight: 800; margin: 4px 0 9px; line-height: 1.2; }
+    .ss-role__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--color-text-muted); }
+    .ss-role__list li { display: flex; align-items: center; gap: 8px; }
+    .ss-role__list li.is-key { color: var(--color-text); font-weight: 600; }
+    .ss-role__ico { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 20px; padding: 0 6px; border-radius: var(--radius-full); background: var(--color-bg); border: 1px solid var(--color-border); font-size: 9.5px; font-weight: 800; letter-spacing: 0.06em; color: var(--color-text); flex-shrink: 0; }
+    .ss-role.is-mine .ss-role__ico { border-color: rgba(184,255,44,0.35); }
+    .ss-round__sub b, .ssm-round__title b { color: var(--color-text); }
+    @media (max-width: 420px) { .ss-role__name { font-size: 13px; } .ss-role__list { font-size: 11.5px; } }
     .ss-banner { background: var(--color-surface-2); border: 1px solid var(--color-border); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 12px; color: var(--color-text-muted); margin-bottom: 16px; line-height: 1.6; }
     .ss-banner strong { color: var(--color-text); }
     .ss-banner--final { background: var(--color-lime-ghost); border-color: rgba(184,255,44,0.15); color: var(--color-lime); }
@@ -2616,8 +2631,8 @@
 
       const renderRound = (round) => {
         const serveNote = round === 1
-          ? 'Home team serves first &middot; Away team chooses side'
-          : 'Home team chooses side &middot; Away team serves first';
+          ? `<b>${escapeHtml(homeName)}</b> (Home) serves first &middot; <b>${escapeHtml(awayName)}</b> (Away) chooses side`
+          : `<b>${escapeHtml(homeName)}</b> (Home) chooses side &middot; <b>${escapeHtml(awayName)}</b> (Away) serves first`;
 
         const pairSts = (c.pairStatuses || []).filter(p => p.round === round);
 
@@ -2835,6 +2850,7 @@
             <div class="scoresheet__meta">Week ${data.match.week} &middot; ${escapeHtml(data.match.court || '—')}${data.match.championship ? ' &middot; First to 11, win by 2' : ''}</div>
           </div>
           ${banner}
+          ${renderRoleCard(data)}
           ${renderRound(1)}
           ${renderRound(2)}
           ${totals}
@@ -2974,6 +2990,30 @@
       return isHome
         ? '<span class="ss-pill ss-pill--empty">—</span>'
         : '<span class="ss-pill ss-pill--empty">Waiting on home team</span>';
+    }
+
+    // Who's who: home/away with what each captain does tonight. Shown above
+    // the scoresheet (desktop + mobile) so nobody has to guess who enters
+    // scores, who confirms, who serves first or who picks side.
+    function renderRoleCard(data) {
+      const homeName = data.match?.home?.name || 'Home team';
+      const awayName = data.match?.away?.name || 'Away team';
+      const isHome = data.myRole === 'home';
+      const col = (side, name) => {
+        const mine = (side === 'home') === isHome;
+        const home = side === 'home';
+        return `
+          <div class="ss-role ss-role--${side}${mine ? ' is-mine' : ''}">
+            <div class="ss-role__tag">${home ? 'Home' : 'Away'}${mine ? '<span class="ss-role__you">You</span>' : ''}</div>
+            <div class="ss-role__name">${escapeHtml(name)}</div>
+            <ul class="ss-role__list">
+              <li class="is-key"><span class="ss-role__ico">${home ? '✎' : '✓'}</span>${home ? 'Enters every score' : 'Confirms each score'}</li>
+              <li><span class="ss-role__ico">R1</span>${home ? 'Serves first' : 'Chooses side'}</li>
+              <li><span class="ss-role__ico">R2</span>${home ? 'Chooses side' : 'Serves first'}</li>
+            </ul>
+          </div>`;
+      };
+      return `<div class="ss-roles">${col('home', homeName)}${col('away', awayName)}</div>`;
     }
 
     function renderScoresheetBanner(data) {
@@ -4733,8 +4773,8 @@
           ${gameCard(g1, round)}${gameCard(g2, round)}</div>`;
       };
       const roundTitle = (r) => r === 1
-        ? '<h3 class="ssm-round__title">Round 1 &mdash; Home team serves first &middot; Away team chooses side</h3>'
-        : '<h3 class="ssm-round__title">Round 2 &mdash; Home team chooses side &middot; Away team serves first</h3>';
+        ? `<h3 class="ssm-round__title">Round 1 &mdash; <b>${escapeHtml(homeName)}</b> serves first &middot; <b>${escapeHtml(awayName)}</b> chooses side</h3>`
+        : `<h3 class="ssm-round__title">Round 2 &mdash; <b>${escapeHtml(homeName)}</b> chooses side &middot; <b>${escapeHtml(awayName)}</b> serves first</h3>`;
 
       // match math from server-computed values, oriented to my team
       const roundBlock = (label, r) => {
@@ -4809,6 +4849,7 @@
       area.innerHTML = `
         <div class="scoresheet ${bar ? 'ssm-pad' : ''}" style="padding:0;border:none;background:none;">
           ${renderScoresheetBanner(data)}
+          ${renderRoleCard(data)}
           ${roundTitle(1)}
           ${setBlock(1, 1, 2)}${setBlock(1, 3, 4)}${setBlock(1, 5, 6)}
           ${roundTitle(2)}
