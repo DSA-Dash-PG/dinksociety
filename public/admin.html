@@ -537,18 +537,20 @@
     .tc2 .tc2-meta .p--season { margin: 0; background: none; border: 1px dashed var(--color-border); color: var(--color-text-faint); }
     .tc2 .tc2-meta .p--season:hover { color: var(--color-text); border-color: var(--color-text-muted); box-shadow: none; }
     .tc2 .gcol { margin-top: 10px; }
-    .tc2 .gcol .glab { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); margin: 0 0 6px 2px; }
-    .tc2 .tc2-addrow { margin-top: 10px; }
-    .chips { display: flex; flex-wrap: wrap; gap: 5px; }
-    .pchip { font-size: 11px; padding: 3px 10px; border-radius: var(--radius-full); background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); white-space: nowrap; line-height: 1.5; cursor: pointer; transition: border-color 0.12s, color 0.12s; }
-    .pchip:hover { border-color: var(--color-border-strong); color: var(--color-text); }
-    .pchip.cap, .pchip.co { color: var(--color-text); font-weight: 600; }
-    .pchip .mk { font-weight: 800; margin-left: 3px; }
-    .pchip.cap .mk { color: var(--color-lime); } .pchip.co .mk { color: var(--color-teal); }
-    .pchip.add { border-style: dashed; border-color: var(--color-border-strong); color: var(--color-text-muted); background: none; font-weight: 700; }
+    .tc2 .gcol .glab { font-size: 9px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); margin: 0 0 4px 2px; }
+    .tc2 .tc2-addrow { margin-top: 10px; display: flex; }
+    /* Roster: a plain two-column list. Captain / co-captain first, then A–Z. */
+    .plist { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+    .prow { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 4px 6px 4px 2px; border-radius: 6px; font-size: 12px; color: var(--color-text-muted); cursor: pointer; line-height: 1.3; }
+    .prow:hover { background: var(--color-surface-2); color: var(--color-text); }
+    .prow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+    .prow.cap, .prow.co { color: var(--color-text); font-weight: 700; }
+    .prow .mk { flex-shrink: 0; font-weight: 800; width: 12px; text-align: center; color: var(--color-text-faint); }
+    .prow.cap .mk { color: var(--color-lime); } .prow.co .mk { color: var(--color-teal); }
+    .prow.subp { color: var(--color-text-faint); }
+    .prow.subp .mk { width: auto; font-size: 8px; letter-spacing: 0.06em; background: var(--color-surface-3); padding: 1px 4px; border-radius: 4px; }
+    .pchip.add { font-size: 11px; padding: 4px 12px; border-radius: var(--radius-full); border: 1px dashed var(--color-border-strong); color: var(--color-text-muted); background: none; font-weight: 700; cursor: pointer; }
     .pchip.add:hover { color: var(--color-lime); border-color: var(--color-lime); }
-    .pchip.subp { border-style: dashed; color: var(--color-text-faint); }
-    .pchip.subp .mk { font-size: 8px; letter-spacing: 0.06em; font-weight: 800; color: var(--color-text-faint); background: var(--color-surface-3); padding: 1px 4px; border-radius: 4px; }
 
     /* Scroll lock while any modal / side panel is open — without it, touch
        scrolling inside the sheet chains to the page behind it on phones. */
@@ -5036,13 +5038,17 @@
       const color = t.color || '#666';
       const logo = (t.emoji && t.emoji.trim()) ? h(t.emoji.trim()) : h(initials(t.name));
 
-      const pchip = p => {
+      const prow = p => {
         const cls = p.isCaptain ? ' cap' : p.isCoCaptain ? ' co' : p.isSub ? ' subp' : '';
-        const mk = p.isCaptain ? '<span class="mk">★</span>' : p.isCoCaptain ? '<span class="mk">☆</span>' : p.isSub ? '<span class="mk">SUB</span>' : '';
-        return '<span class="pchip' + cls + '" data-team="' + h(t.id) + '" data-player="' + h(p.id) + '">' + h(p.name) + mk + '</span>';
+        const mk = p.isCaptain ? '★' : p.isCoCaptain ? '☆' : p.isSub ? 'SUB' : '';
+        return '<div class="prow' + cls + '" data-team="' + h(t.id) + '" data-player="' + h(p.id) + '">' +
+          (mk ? '<span class="mk">' + mk + '</span>' : '<span class="mk"></span>') +
+          '<span class="nm">' + h(p.name) + '</span></div>';
       };
+      const rank = p => p.isCaptain ? 0 : p.isCoCaptain ? 1 : p.isSub ? 3 : 2;
+      const byRole = (a, b) => rank(a) - rank(b) || (a.name || '').localeCompare(b.name || '');
       const gcol = (label, list) => list.length
-        ? '<div class="gcol"><div class="glab">' + label + ' · ' + list.length + '</div><div class="chips">' + list.map(pchip).join('') + '</div></div>'
+        ? '<div class="gcol"><div class="glab">' + label + ' · ' + list.length + '</div><div class="plist">' + list.slice().sort(byRole).map(prow).join('') + '</div></div>'
         : '';
       // Card shows what you need to find a team and tap a player. Delete lives
       // in the team panel (tap the card); season move stays here since it's
@@ -5073,7 +5079,7 @@
       e.stopPropagation();
       openSeasonMove(el, el.dataset.moveseason);
     }));
-    grid.querySelectorAll('.pchip[data-player]').forEach(el => el.addEventListener('click', e => {
+    grid.querySelectorAll('.prow[data-player]').forEach(el => el.addEventListener('click', e => {
       e.stopPropagation();
       openPlayerPop(el.dataset.team, el.dataset.player);
     }));
