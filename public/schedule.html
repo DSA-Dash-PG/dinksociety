@@ -317,6 +317,20 @@
     }
     .m-hint.locked { color: var(--color-teal); border-color: rgba(45,212,191,0.25); }
 
+    /* ── Team filter on: one match per week, so lay the WEEKS out as a
+       grid (3 across on desktop, 2 on tablet, 1 on phones) instead of a
+       tall stack of mostly-empty full-width rows. ─────────────────── */
+    #weeks-list.is-team { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+    #weeks-list.is-team .week-card { margin-bottom: 0; }
+    #weeks-list.is-team .week-header { padding: var(--space-3) var(--space-4); align-items: flex-start; gap: 8px; }
+    #weeks-list.is-team .week-left { flex-direction: column; align-items: flex-start; gap: 2px; min-width: 0; }
+    #weeks-list.is-team .week-right { flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    #weeks-list.is-team .week-body { padding: var(--space-3); }
+    #weeks-list.is-team .matches-grid { grid-template-columns: 1fr; }
+    #weeks-list.is-team .week-collapsed-summary { padding: var(--space-2) var(--space-4) var(--space-3); }
+    @media (max-width: 1000px) { #weeks-list.is-team { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 640px)  { #weeks-list.is-team { grid-template-columns: 1fr; } }
+
     /* ── Mobile ──────────────────────────────────────────────────── */
     @media (max-width: 720px) {
       .date-strip { padding: var(--space-3) var(--space-4); }
@@ -577,7 +591,10 @@
       if (selectedTeam) {
         weekNums = weekNums.filter(n => teamMatches(weeksData?.find(w => w.week === n)).length > 0);
       }
+      // Grid layout only when a team is picked and more than one week shows.
+      $id('weeks-list').classList.toggle('is-team', !!selectedTeam && weekNums.length > 1);
       if (!weekNums.length) {
+        $id('weeks-list').classList.remove('is-team');
         $id('weeks-list').innerHTML = `<p class="week-tbd" style="text-align:center;padding:28px 12px;">No games found for this team yet.</p>`;
         return;
       }
