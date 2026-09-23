@@ -77,6 +77,7 @@
   .scm-grid button:active{ background:rgba(184,255,44,.16);border-color:var(--lime); }
   .scm-bk{ color:var(--red)!important; }
   .scm-set{ background:var(--lime)!important;color:#000!important;font-size:.85rem!important; }
+  .scm-clear{ width:100%;margin-top:10px;min-height:44px; }
   /* control-bar demoted (rare/destructive) actions */
   .demoted{ text-align:center;margin:2px 0 10px; } .demoted a{ font-size:.68rem;font-weight:800;color:var(--fnt);cursor:pointer;text-decoration:underline; }
   /* Standings — tonight's ranked list (also used by the retired Kitchen fun-stats cards) */
@@ -355,7 +356,7 @@ function render(){
   else h+=`<div class="ov" style="text-align:right">${finished?'Finalized':'Viewing round '+(VR+1)}</div>`;
   h+=`</div>`;
   if(isCurrent) h+=`<div class="tbar"><i id="tf" style="width:${timer/roundSecs()*100}%;background:${timer<=60?'#ff5c47':timer<=180?'#ffcc00':'#b8ff2c'}"></i></div>`;
-  if(!isCurrent&&!finished&&VR<play.currentRound) h+=`<div class="banner" style="background:rgba(240,204,0,.08);border-color:rgba(240,204,0,.3);color:var(--gold)">Fixing a score here will regenerate round ${play.currentRound+1}'s pairings from the corrected result (you'll be asked to confirm).</div>`;
+  if(!isCurrent&&!finished&&VR<play.currentRound) h+=`<div class="banner" style="background:rgba(184,255,44,.08);border-color:rgba(184,255,44,.35);color:var(--lime)"><b>✏️ Fixing round ${VR+1}</b> — tap any court below to change its score. Round ${VR+2} will be re-drawn from the corrected result${play.rounds.length-(VR+1)>1?` (rounds ${VR+2}–${play.rounds.length} are discarded)`:''} and you'll land back on it. You'll be asked to confirm first.</div>`;
 
   // CONTROLS UP TOP — primary (timer), reshuffle, [next round | clear scores],
   // [delete round | end ladder], demoted (restart night) — all reachable
@@ -371,6 +372,7 @@ function render(){
       <button class="btn b-out" onclick="scRestartRound()">⟲ Clear scores</button></div>
       <div class="brow"><button class="btn b-red" onclick="scDeleteRound()">🗑 Delete round</button>
       <button class="btn b-red" onclick="act('finish',1)">${finishLabel}</button></div>
+      ${play.currentRound>0?`<div class="brow"><button class="btn b-out" style="width:100%" onclick="VR=${play.currentRound-1};render();window.scrollTo({top:0})">✏️ Fix a score in round ${play.currentRound} (re-draws this round)</button></div>`:''}
       <div class="brow"><button class="btn b-red" style="width:100%" onclick="scRestart()">⟲ Restart night — full reset</button></div>`;
     h+=`<div class="demoted">Restart erases every round &amp; score and returns to the roster screen (re-pulls roster, courts &amp; settings).</div>`;
   } else if(!finished){
@@ -478,7 +480,7 @@ function courtCard(c,ci,tC){
   const nm=t=>(t||[]).filter(Boolean).map(p=>esc(first(p.name))).join(' + ');
   let h=`<div class="cc ${king?'king':''}"><div class="cc-h" onclick="openScoreModal(${ci})"><div class="cc-badge" style="background:${acc.col};color:#0a0a0a">${courtLabel(c.court)}</div>`;
   h+=`<div class="cc-ti" style="color:${acc.col}">${king?'👑 Owns the Kitchen':'Court '+courtLabel(c.court)}${king?'<div class="s">Top court · Winners stay & split</div>':''}</div>`;
-  if(hb) h+=`<div class="cc-tot" style="color:${acc.col}">${sc.t1} – ${sc.t2}</div>`;
+  if(hb) h+=`<div class="cc-tot" style="color:${acc.col}">${sc.t1} – ${sc.t2}</div>${STATE.play&&!STATE.play.finished?`<div class="cc-tap" style="margin-left:0;color:var(--mut);background:transparent;border-color:rgba(255,255,255,.18)">Edit</div>`:''}`;
   else h+=`<div class="cc-tap">Tap to score</div>`;
   h+=`</div><div class="cc-cols">${panel(c.team1,0,'A')}${panel(c.team2,1,'B')}</div>`;
   if(tie) h+=`<div class="tie">Tied ${sc.t1}–${sc.t2} — who reached ${sc.t1} first? <button onclick="pickWin(${ci},'A')">${nm(c.team1)||'Team 1'}</button><button onclick="pickWin(${ci},'B')">${nm(c.team2)||'Team 2'}</button></div>`;
@@ -494,7 +496,7 @@ function courtCard(c,ci,tC){
 async function postScore(payload){
   let res=await api('/admin-ladder-score?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
   if(res.d&&res.d.requiresConfirm){
-    const ok=await dsConfirm({ title:"Fix this round?", message:res.d.error||"This will regenerate the round(s) after this one using the corrected result — any scores already entered there will be cleared.", confirmLabel:"Fix & regenerate", cancelLabel:"Cancel", danger:true });
+    const ok=await dsConfirm({ title:"Fix this score & re-draw?", message:(res.d.error||"This will regenerate the round(s) after this one using the corrected result.")+" Players keep every score from earlier rounds — only the rounds after this one are re-drawn, and any scores already entered in them are cleared.", confirmLabel:"Fix & re-draw", cancelLabel:"Cancel", danger:true });
     if(!ok) return {cancelled:true};
     res=await api('/admin-ladder-score?event='+encodeURIComponent(EID),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...payload,confirmRegenerate:true})});
   }
@@ -525,6 +527,23 @@ function renderScoreModal(){
     [1,2,3,4,5,6,7,8,9].map(n=>`<button onclick="scmDigit(${n})">${n}</button>`).join('')+
     `<button class="scm-bk" onclick="scmBack()">⌫</button><button onclick="scmDigit(0)">0</button><button class="scm-set" onclick="scmSet()">${setLabel}</button>`+
     '</div>';
+  // A court that already has a score gets a delete — blanks just this court
+  // (the round-level "Clear scores" wipes every court; this is the surgical one).
+  const hasScore=c.score&&(c.score.t1!=null||c.score.t2!=null);
+  pad.innerHTML+=hasScore?`<button class="btn b-red scm-clear" onclick="scmClear()">🗑 Delete this court's score</button>`:'';
+}
+async function scmClear(){
+  if(!SCM) return;
+  const ci=SCM.ci;
+  const round=STATE.play.rounds[VR]; const c=round&&round.courts[ci]; if(!c) return;
+  if(!(await dsConfirm({ title:"Delete this score?", message:"Clears the score on Court "+courtLabel(c.court)+" only — players stay on the court and the other courts are untouched.", confirmLabel:"Delete score", cancelLabel:"Cancel", danger:true }))) return;
+  closeScoreModal();
+  msg('','Deleting…');
+  const {d,cancelled}=await postScore({round:VR,court:ci,t1:'',t2:''});
+  if(cancelled){ msg(''); return; }
+  if(!d||!d.ok){ msg('err',(d&&d.error)||'Could not delete score.'); return; }
+  if(d.cascaded&&d.play){ STATE.play=d.play; VR=d.play.currentRound; resetTimer(); render(); msg('ok','Score deleted — later rounds regenerated.'); }
+  else { STATE.play.rounds[VR].courts[ci].score=null; render(); msg('ok','Score deleted.'); }
 }
 function scmDigit(d){ if(!SCM) return; if(SCM.buf.length>=3) return; SCM.buf=(SCM.buf==='0'?'':SCM.buf)+d; renderScoreModal(); }
 function scmBack(){ if(!SCM) return; SCM.buf=SCM.buf.slice(0,-1); renderScoreModal(); }
