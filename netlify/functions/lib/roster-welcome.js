@@ -24,7 +24,7 @@ import { createPlayerToken } from './player-auth.js';
 import { sendEmail, renderRosterWelcome, rosterWelcomeSubject } from './email.js';
 import { buildLeagueIndex, playedBefore } from './league-players.js';
 import { normalizeEmail } from './identity.js';
-import { circuitCode, seasonName, isTestTeam } from './circuit.js';
+import { circuitCode, seasonCircuitCode, seasonName, isTestTeam } from './circuit.js';
 
 const TOKEN_DAYS = 7;
 const MAX_PER_CALL = 25;
@@ -66,17 +66,59 @@ async function carryOverFor(rec, excludeTeamId) {
   return null;
 }
 
-/** The "how a league night works" strip for someone who has never played. */
-async function leagueNightFor(team) {
-  const out = { when: 'Monday nights', format: '2 rounds · 6 games', venue: '' };
+/**
+ * Resolve the season record a team plays in. `team.seasonId` is the direct key
+ * when it's set; otherwise scan the store for the season whose circuit code
+ * matches the team's. Null when there's nothing to go on.
+ */
+export async function seasonForTeam(team) {
+  const seasons = getStore('seasons');
+  if (team?.seasonId) {
+    const s = await seasons.get(team.seasonId, { type: 'json' }).catch(() => null);
+    if (s) return s;
+  }
+  const want = circuitCode(team?.circuit || team?.seasonId);
   try {
-    const seasons = getStore('seasons');
-    const id = team.seasonId || `circuit-${circuitCode(team.circuit).toLowerCase()}`;
-    const s = await seasons.get(id, { type: 'json' }).catch(() => null);
-    if (s?.weeks) out.when = `Monday nights · ${s.weeks} weeks`;
+    const { blobs } = await seasons.list();
+    for (const b of blobs || []) {
+      const s = await seasons.get(b.key, { type: 'json' }).catch(() => null);
+      if (s && seasonCircuitCode(s) === want) return s;
+    }
+  } catch { /* fall through */ }
+  return null;
+}
+
+/** "Thursday" from a YYYY-MM-DD start date, or '' when unusable. */
+export function weekdayName(startDate) {
+  const d = String(startDate || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return '';
+  const dt = new Date(d + 'T12:00:00Z');
+  if (Number.isNaN(dt.getTime())) return '';
+  return dt.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
+}
+
+/**
+ * The "how a league night works" strip + the day name used throughout the
+ * welcome. NOTHING here is hardcoded to a weekday — Season 1 played Mondays,
+ * Season 2 plays Thursdays, and the email must say whichever the season record
+ * says. `dayName` is '' when the season has no start date, and the renderer
+ * falls back to neutral wording ("league night") rather than guessing.
+ */
+export async function leagueNightFor(team) {
+  const out = { dayName: '', when: '', time: '', format: '2 rounds · 6 games', venue: '' };
+  try {
+    const s = await seasonForTeam(team);
+    if (!s) return out;
+    out.dayName = weekdayName(s.startDate);
+    if (out.dayName) {
+      out.when = `${out.dayName} nights` + (s.weeks ? ` · ${s.weeks} weeks` : '');
+    } else if (s.weeks) {
+      out.when = `${s.weeks} weeks`;
+    }
+    if (s.matchTime) out.time = String(s.matchTime);
     // Venue is never hardcoded — an empty row is dropped by the renderer.
-    if (s?.venue) out.venue = String(s.venue);
-    else if (s?.location) out.venue = String(s.location);
+    if (s.venue) out.venue = String(s.venue);
+    else if (s.location) out.venue = String(s.location);
   } catch { /* defaults are fine */ }
   return out;
 }
@@ -140,6 +182,7 @@ export async function sendRosterWelcomes({ teamId, playerIds, addedByName }) {
         returning,
         carry: returning ? await carryOverFor(rec, team.id) : null,
         night: returning ? null : night,
+        dayName: night.dayName,
         magicUrl: `${site}/.netlify/functions/player-link?token=${token}`,
         siteUrl: site,
       });

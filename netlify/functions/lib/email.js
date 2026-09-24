@@ -975,14 +975,22 @@ export function renderLineupReceipt({ teamName, teamEmoji, opponentName, oppEmoj
  * @param {{ playerName:string, teamName:string, teamEmoji?:string, seasonName:string,
  *           divisionLabel?:string, addedByName?:string, returning:boolean,
  *           carry?:{ teamName:string, seasonName:string, record?:string, dsr?:string }|null,
- *           night?:{ when?:string, format?:string, venue?:string }|null,
- *           magicUrl:string, siteUrl:string }} opts
+ *           night?:{ when?:string, time?:string, format?:string, venue?:string }|null,
+ *           dayName?:string, magicUrl:string, siteUrl:string }} opts
+ *
+ * `dayName` is the season's league night ("Thursday"), resolved from the season
+ * record — never hardcoded. When it's missing the copy falls back to neutral
+ * wording rather than naming a day that might be wrong.
  */
 export function renderRosterWelcome({
   playerName, teamName, teamEmoji, seasonName, divisionLabel,
-  addedByName, returning, carry, night, magicUrl, siteUrl,
+  addedByName, returning, carry, night, dayName, magicUrl, siteUrl,
 }) {
   const accent = '#b8ff2c';
+  const day = String(dayName || night?.dayName || '').trim();
+  const firstNight = day ? `your first ${escapeBody(day)}` : 'your first night';
+  const eachNight  = day ? `each ${escapeBody(day)}` : 'each week';
+  const beforeNight = day ? `before ${escapeBody(day)}` : 'before your first night';
   const kickerBg = returning ? '#17d7b0' : '#b8ff2c';
   const first = String(playerName || '').trim().split(/\s+/)[0] || 'there';
   const site = siteUrl || 'https://dinksociety.app';
@@ -991,7 +999,7 @@ export function renderRosterWelcome({
 
   const lede = returning
     ? `${addedBy ? escapeBody(addedBy) + ' added you to' : 'You’re back on'} <strong style="color:#f5f5f5;">${escapeBody(teamName)}</strong> for <strong style="color:#f5f5f5;">${escapeBody(seasonName)}</strong>${divLine}. Same paddle, new season.`
-    : `${addedBy ? escapeBody(addedBy) + ' added you to' : 'You’ve been added to'} <strong style="color:#f5f5f5;">${escapeBody(teamName)}</strong> for <strong style="color:#f5f5f5;">${escapeBody(seasonName)}</strong>${divLine}. Here’s everything you need before your first Monday.`;
+    : `${addedBy ? escapeBody(addedBy) + ' added you to' : 'You’ve been added to'} <strong style="color:#f5f5f5;">${escapeBody(teamName)}</strong> for <strong style="color:#f5f5f5;">${escapeBody(seasonName)}</strong>${divLine}. Here’s everything you need before ${firstNight}.`;
 
   // ── the strip under the lede ──
   const row = (label, value, color) =>
@@ -1014,6 +1022,7 @@ export function renderRosterWelcome({
   } else if (!returning && night) {
     const rows = [
       night.when ? row('When', night.when) : '',
+      night.time ? row('Time', night.time) : '',
       night.format ? row('Format', night.format) : '',
       night.venue ? row('Where', night.venue) : '',
     ].filter(Boolean).join('');
@@ -1037,8 +1046,8 @@ export function renderRosterWelcome({
     </tr>`;
 
   const availBody = returning
-    ? 'Mark yourself for each Monday. Your captain can’t put you in a lineup if you’re out — and can’t leave you out by accident if you’re in.'
-    : `Mark yourself for each Monday. It’s how ${addedBy ? escapeBody(addedBy.split(/\s+/)[0]) : 'your captain'} knows who can go in the lineup — do this one first.`;
+    ? `Mark yourself for ${eachNight}. Your captain can’t put you in a lineup if you’re out — and can’t leave you out by accident if you’re in.`
+    : `Mark yourself for ${eachNight}. It’s how ${addedBy ? escapeBody(addedBy.split(/\s+/)[0]) : 'your captain'} knows who can go in the lineup — do this one first.`;
   const lineupBody = returning
     ? 'Who you’re partnered with, which games, which court. Both teams’ lineups unlock 15 minutes before first serve.'
     : 'Who you’re partnered with, which games, which court. Both teams’ lineups unlock 15 minutes before first serve — nobody sees yours early.';
@@ -1049,7 +1058,7 @@ export function renderRosterWelcome({
 
   const readLinks = returning
     ? `Also worth a look: <a href="${site}/schedule.html" style="color:${accent};text-decoration:none;font-weight:600;">the schedule</a>, <a href="${site}/standings.html" style="color:${accent};text-decoration:none;font-weight:600;">standings</a>, and <a href="${site}/drop.html" style="color:${accent};text-decoration:none;font-weight:600;">The Drop</a> — our weekly write-up of who did what.`
-    : `Worth a read before Monday: <a href="${site}/rules.html" style="color:${accent};text-decoration:none;font-weight:600;">the rules</a>, <a href="${site}/schedule.html" style="color:${accent};text-decoration:none;font-weight:600;">the schedule</a>, and <a href="${site}/drop.html" style="color:${accent};text-decoration:none;font-weight:600;">The Drop</a> — our weekly write-up of who did what.`;
+    : `Worth a read ${beforeNight}: <a href="${site}/rules.html" style="color:${accent};text-decoration:none;font-weight:600;">the rules</a>, <a href="${site}/schedule.html" style="color:${accent};text-decoration:none;font-weight:600;">the schedule</a>, and <a href="${site}/drop.html" style="color:${accent};text-decoration:none;font-weight:600;">The Drop</a> — our weekly write-up of who did what.`;
 
   return `
     <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:36px 24px;background:#0e0e0e;color:#f5f5f5;">
@@ -1084,6 +1093,66 @@ export function rosterWelcomeSubject({ returning, teamName, seasonName }) {
     : `Welcome to The Dink Society — you’re on ${teamName}`;
 }
 
+
+// ═══════════════════════════════════════════════════════════════
+// WELCOME CORRECTION — one-off follow-up after the welcome named the wrong night
+// ═══════════════════════════════════════════════════════════════
+
+/**
+ * Short correction sent to players whose roster welcome said "Monday" when
+ * their season plays another night. Leads with the right day, time and venue;
+ * no re-telling of the whole welcome. `magicUrl` is a fresh portal link.
+ *
+ * @param {{ playerName:string, teamName:string, seasonName:string, dayName:string,
+ *           time?:string, venue?:string, weeks?:number|string, magicUrl:string, siteUrl:string }} opts
+ */
+export function renderWelcomeCorrection({
+  playerName, teamName, seasonName, dayName, time, venue, weeks, magicUrl, siteUrl,
+}) {
+  const accent = '#b8ff2c';
+  const first = String(playerName || '').trim().split(/\s+/)[0] || 'there';
+  const site = siteUrl || 'https://dinksociety.app';
+  const day = escapeBody(String(dayName || '').trim() || 'league night');
+  const row = (label, value) =>
+    `<tr><td style="padding:2px 0;">${escapeBody(label)}</td>`
+    + `<td style="padding:2px 0;text-align:right;font-weight:700;color:#f5f5f5;">${escapeBody(value)}</td></tr>`;
+  const rows = [
+    row('When', `${day}s` + (weeks ? ` · ${weeks} weeks` : '')),
+    time ? row('Time', time) : '',
+    venue ? row('Where', venue) : '',
+  ].filter(Boolean).join('');
+
+  return `
+    <div style="font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:480px;margin:0 auto;padding:36px 24px;background:#0e0e0e;color:#f5f5f5;">
+      <div style="font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#f5f5f5;margin-bottom:24px;">THE DINK SOCIETY</div>
+      <div style="display:inline-block;font-size:10px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#0e0e0e;background:#f5c542;border-radius:9999px;padding:4px 12px;margin-bottom:16px;">Quick correction</div>
+      <h1 style="font-size:21px;font-weight:800;color:#f5f5f5;margin:0 0 8px;line-height:1.25;">${escapeBody(first)}, it’s ${day}s — not Mondays.</h1>
+      <p style="font-size:14px;color:#a5a5a5;margin:0 0 22px;line-height:1.6;">Your welcome email for <strong style="color:#f5f5f5;">${escapeBody(teamName)}</strong> said league night was Monday. That was left over from last season — our mistake. <strong style="color:#f5f5f5;">${escapeBody(seasonName)}</strong> plays on <strong style="color:#f5f5f5;">${day}s</strong>. Here are the right details:</p>
+      <div style="margin:0 0 24px;padding:14px 16px;background:#161616;border-left:3px solid ${accent};border-radius:0 8px 8px 0;">
+        <div style="font-size:9.5px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:${accent};margin-bottom:8px;">League night</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;color:#cfcfcf;">${rows}</table>
+      </div>
+      <p style="font-size:14px;color:#a5a5a5;margin:0 0 18px;line-height:1.6;">Everything else in that email still stands. If you already marked your availability, double-check it’s set for the right nights.</p>
+      <a href="${magicUrl}" style="display:inline-block;padding:13px 30px;background:${accent};color:#0e0e0e;font-size:14px;font-weight:700;text-decoration:none;border-radius:9999px;">Open my portal</a>
+      <p style="font-size:12px;color:#6a6a6a;margin:10px 0 26px;line-height:1.5;">One tap — no password. The link is yours and expires in 7 days.</p>
+      <div style="padding-top:18px;border-top:1px solid #2a2a2a;">
+        <div style="font-size:13px;color:#8a8a8a;line-height:1.7;">Full dates are on <a href="${site}/schedule.html" style="color:${accent};text-decoration:none;font-weight:600;">the schedule</a>.</div>
+      </div>
+      <div style="margin-top:32px;padding-top:18px;border-top:1px solid #2a2a2a;font-size:11px;color:#555;line-height:1.6;">
+        ${escapeBody(teamName)} · The Dink Society · Southern California Pickleball League<br>
+        Sorry for the mix-up. Questions? Just reply to this email.
+      </div>
+    </div>
+  `;
+}
+
+/** Subject line that goes with renderWelcomeCorrection. */
+export function welcomeCorrectionSubject({ dayName, seasonName }) {
+  const day = String(dayName || '').trim();
+  return day
+    ? `Correction: ${seasonName} plays ${day}s, not Mondays`
+    : `Correction to your ${seasonName} welcome email`;
+}
 
 // ═══════════════════════════════════════════════════════════════
 // WAIVER reminder — captain nudges a roster player who hasn't signed

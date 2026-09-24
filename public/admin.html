@@ -1059,12 +1059,31 @@
         <!-- PROFILE APPROVALS -->
         <section class="admin-section" data-section="approvals">
           <div class="am-head"><h1 class="am-title">Approvals</h1>
-            <button class="ab ab--ghost ab--sm" onclick="renderApprovals();renderRosterAdds()" style="font-size:10px;">Refresh</button>
+            <button class="ab ab--ghost ab--sm" onclick="renderApprovals();renderRosterAdds();renderWelcomeFix()" style="font-size:10px;">Refresh</button>
           </div>
           <div class="ac" style="margin-bottom:16px;">
             <div class="ac__h"><h2 class="ac__t">Roster additions</h2></div>
             <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;line-height:1.5;">Players captains have asked to add. They are not on the roster — no lineups, no availability, not on the public team page — until you approve them here.</p>
             <div id="radd-list"><div class="loading" style="font-size:12px;">Loading…</div></div>
+          </div>
+
+          <div class="ac" style="margin-bottom:16px;">
+            <div class="ac__h"><h2 class="ac__t">Welcome email correction</h2>
+              <button class="ab ab--ghost ab--sm" onclick="renderWelcomeFix()" style="font-size:10px;">Refresh</button>
+            </div>
+            <p style="font-size:12px;color:var(--color-text-faint);margin:0 0 14px;line-height:1.5;">Players whose roster welcome said “Monday” when their season plays another night. Each gets one short correction with the right night, time and venue, plus a fresh portal link. Anyone already corrected is skipped.</p>
+            <div style="display:flex;gap:10px;align-items:center;margin:0 0 12px;flex-wrap:wrap;">
+              <label style="font-size:11px;color:var(--color-text-faint);">Welcomed in the last
+                <select id="wfix-days" onchange="renderWelcomeFix()" style="margin-left:6px;padding:4px 8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);font-size:11px;font-family:inherit;background:var(--color-surface-2);color:var(--color-text);">
+                  <option value="7">7 days</option>
+                  <option value="14" selected>14 days</option>
+                  <option value="30">30 days</option>
+                </select>
+              </label>
+              <button class="ab ab--lime ab--sm" id="wfix-send" onclick="sendWelcomeFix(this)" disabled>Send correction</button>
+              <span id="wfix-status" style="font-size:11px;color:var(--color-text-faint);"></span>
+            </div>
+            <div id="wfix-list"><div class="loading" style="font-size:12px;">Loading…</div></div>
           </div>
 
           <div class="ac">
@@ -3172,7 +3191,7 @@
     if (t === 'registrations') renderReg();
     if (t === 'teams') renderTeams();
     if (t === 'players') renderPlayers();
-    if (t === 'approvals') { renderApprovals(); renderRosterAdds(); }
+    if (t === 'approvals') { renderApprovals(); renderRosterAdds(); renderWelcomeFix(); }
     if (t === 'schedule') { renderGameday(); renderAllGames(); renderSched(); }
     if (t === 'scores') {}
     if (t === 'messages') renderMessages();
@@ -3360,6 +3379,64 @@
   }
   window.actRosterAdd = actRosterAdd;
   window.renderRosterAdds = renderRosterAdds;
+
+  // ── Welcome email correction ─────────────────────────────────────
+  // One-off: the roster welcome hardcoded "Monday" through Season 2's first
+  // weeks. Preview who was told the wrong night, then send them one correction.
+  let WFIX_COUNT = 0;
+  async function renderWelcomeFix() {
+    const box = $id('wfix-list'); if (!box) return;
+    const days = ($id('wfix-days') || {}).value || 14;
+    const btn = $id('wfix-send'); if (btn) btn.disabled = true;
+    const st = $id('wfix-status'); if (st) st.textContent = '';
+    box.innerHTML = '<div class="loading" style="font-size:12px;">Loading…</div>';
+    try {
+      const r = await api('/.netlify/functions/admin-welcome-correction?days=' + encodeURIComponent(days));
+      const d = await r.json(); if (!r.ok) throw new Error(d.error || 'Failed');
+      const list = d.recipients || [];
+      WFIX_COUNT = list.length;
+      const notes = [];
+      if (d.alreadySent) notes.push(d.alreadySent + ' already corrected');
+      if (d.skippedMonday) notes.push(d.skippedMonday + ' on a Monday season (told the truth, skipped)');
+      if (d.noNight) notes.push(d.noNight + ' on a season with no start date (skipped)');
+      if (st) st.textContent = notes.join(' · ');
+      if (!list.length) { box.innerHTML = '<div class="empty">Nobody left to correct in this window.</div>'; return; }
+      box.innerHTML = list.map(p => {
+        const when = p.welcomedAt ? new Date(p.welcomedAt).toLocaleString() : '';
+        const n = p.night || {};
+        const right = [n.dayName ? n.dayName + 's' : '', n.time, n.venue].filter(Boolean).join(' · ');
+        return `<div class="appr-card">
+          <div class="appr-card__head">
+            <div><b>${aEsc(p.name)}</b> <span class="appr-card__team">${aEsc(p.teamName)} · ${aEsc(p.seasonName)}</span></div>
+            <div class="appr-card__by">${aEsc(p.email)}${when ? ' · welcomed ' + aEsc(when) : ''}</div>
+          </div>
+          <div class="appr-diffs"><div class="appr-diff"><span class="appr-diff__l">Will say</span><span class="appr-diff__a">${aEsc(right || 'league night')}</span></div></div>
+        </div>`;
+      }).join('');
+      if (btn) { btn.disabled = false; btn.textContent = 'Send correction to ' + list.length; }
+    } catch (e) { box.innerHTML = '<div class="empty">Could not load (' + aEsc(e.message) + ').</div>'; }
+  }
+
+  async function sendWelcomeFix(btn) {
+    if (!WFIX_COUNT) return;
+    if (!confirm('Send the correction email to ' + WFIX_COUNT + ' player' + (WFIX_COUNT === 1 ? '' : 's') + '? Each gets it once.')) return;
+    const days = ($id('wfix-days') || {}).value || 14;
+    if (btn) { btn.disabled = true; btn.textContent = 'Sending…'; }
+    const st = $id('wfix-status');
+    try {
+      const r = await api('/.netlify/functions/admin-welcome-correction', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ days: Number(days) }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(d.error || 'Failed');
+      if (st) st.textContent = 'Sent ' + d.sent + (d.failed ? ' · ' + d.failed + ' failed (see console)' : '');
+      if (d.failed) console.warn('welcome-correction failures:', (d.results || []).filter(x => !x.ok));
+      renderWelcomeFix();
+    } catch (e) { alert('Failed: ' + (e.message || 'unknown error')); if (btn) { btn.disabled = false; btn.textContent = 'Send correction'; } }
+  }
+  window.renderWelcomeFix = renderWelcomeFix;
+  window.sendWelcomeFix = sendWelcomeFix;
 
   async function actApproval(teamId, playerId, action, btn) {
     if (action === 'reject' && !confirm('Discard this player’s pending changes?')) return;
@@ -8402,7 +8479,7 @@
           +'<button type="button" class="sx-rm" data-rm="'+i+'">Remove</button></div>'
         +'<div class="arow"><div class="af" style="max-width:170px;"><label>Tag</label><input type="text" class="sx-tag" value="'+dEsc(s.tag)+'" placeholder="e.g. Upset"></div>'
           +'<div class="af"><label>Headline</label><input type="text" class="sx-title" value="'+dEsc(s.title)+'"></div></div>'
-        +'<div class="af" style="max-width:340px;"><label>Team <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional · type a team name and the article adds that team's live Breakdown card (record, roster DSR bars, game-type split, clutch) linking to its team page</span></label>'
+        +'<div class="af" style="max-width:340px;"><label>Team <span style="text-transform:none;letter-spacing:0;color:var(--color-text-faint);font-weight:400;">— optional · type a team name and the article adds that team\u2019s live Breakdown card (record, roster DSR bars, game-type split, clutch) linking to its team page</span></label>'
           +'<input type="text" class="sx-team" list="drop-team-names" value="'+dEsc(s.team||'')+'" placeholder="Start typing a team…" autocomplete="off"></div>'
         +'<div class="af"><label>Body</label>'+dRichToolbarHtml()
           +'<div class="wv-edit rt-content sx-body" contenteditable="true" data-placeholder="The storyline… use the toolbar to format.">'+(s.bodyHtml||'')+'</div></div>'
