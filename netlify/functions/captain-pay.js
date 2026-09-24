@@ -28,6 +28,13 @@ export default async (req) => {
   const verified = await verifyCaptainSession(req);
   if (!verified.valid) return unauthResponse(verified.error);
   const ctx = verified.payload;
+  // Billing is head-captain only. Co-captains share the portal for lineups and
+  // scores, but the team's money stays with the captain of record.
+  if (ctx.user?.role !== 'captain') {
+    return new Response(JSON.stringify({ error: 'Only the team captain can view billing.' }), {
+      status: 403, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
+    });
+  }
 
   const headers = { 'Content-Type': 'application/json' };
   const stripeKey = process.env.STRIPE_SECRET_KEY;
