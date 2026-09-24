@@ -106,6 +106,17 @@
     .card .row.top .t i{ background:var(--cd-gold); }
     .card .row .v{ font-weight:800; font-size:46px; text-align:right; line-height:1; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
     .card .row.top .v{ color:var(--cd-gold); }
+    /* Auto-fit rows: --rs is set by fitRows() so an 8-player and a 20-player
+       ladder both fill the card without spilling past the footer. */
+    .card .rows.fit{ margin-top:calc(30px * var(--rs, 1)); }
+    .card .rows.fit .row{ padding:calc(14px * var(--rs)) 0; gap:calc(20px * var(--rs)); border-bottom-width:max(1px, calc(2px * var(--rs))); }
+    .card .rows.fit .row .n{ font-size:calc(38px * var(--rs)); }
+    .card .rows.fit .row .who{ font-size:calc(36px * var(--rs)); }
+    .card .rows.fit .row .who small{ font-size:calc(14px * var(--rs)); margin-top:calc(6px * var(--rs)); }
+    .card .rows.fit .row .v{ font-size:calc(46px * var(--rs)); }
+    .card .rows.fit .blk{ width:calc(52px * var(--rs)); height:calc(24px * var(--rs)); border-width:max(2px, calc(3px * var(--rs))); }
+    .card .rows.fit .dots{ gap:calc(8px * var(--rs)) !important; }
+    .card .h2.fit{ font-size:calc(96px * max(var(--rs, 1), .55)); }
     .card .mrow{ padding:24px 0; border-bottom:2px solid rgba(255,255,255,.06); }
     .card .mrow:last-child{ border-bottom:0; }
     .card .mrow .nm{ font-weight:800; font-size:40px; text-transform:uppercase; line-height:.95; display:flex; justify-content:space-between; align-items:baseline; gap:20px; letter-spacing:-.02em; }
@@ -441,17 +452,19 @@
 
     function rPodium(n) {
       var st = nightStats(n); if (!st.players.length) return null;
-      var top = st.players.slice(0, 8);
+      // Every player on the ladder — fitRows() shrinks the rows to fit the card,
+      // so a 20-player night reads as a full ladder, not a "Top 8".
+      var top = st.players.slice();
       var ev = n.event || {};
       var ctx = S.ctx != null ? S.ctx : (st.players.length + ' players · ' + st.rounds + ' rounds · filled blocks are wins, in round order.');
       setCtx(ctx);
       return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade top"></div>' +
         hdr('Ladders · ' + esc(fmtDate(ev.date)) + ' · <b>Final ladder</b>', 'dinksociety.app/ladders') +
-        '<div class="disp h2 lift">' + esc(ev.name || 'The ladder') + '<br><span class="lime">Top ' + top.length + '</span></div>' +
+        '<div class="disp h2 lift fit">' + esc(ev.name || 'The ladder') + '<br><span class="lime">Final ladder</span></div>' +
         '<div class="mono" style="margin-top:12px">' + (ev.place ? esc(ev.place) + ' · ' : '') + st.players.length + ' players · ' + st.rounds + ' rounds</div>' +
-        '<div class="rows">' + top.map(function (p, i) {
+        '<div class="rows fit">' + top.map(function (p, i) {
           var blocks = ''; for (var r = 0; r < st.rounds; r++) { var x = p.rounds[r]; blocks += '<span class="blk' + (x ? (x.win ? '' : ' o') : ' o') + '"' + (x ? '' : ' style="opacity:.35"') + '></span>'; }
-          return '<div class="row' + (i === 0 ? ' top' : '') + '" style="grid-template-columns:56px 1fr auto 130px"><span class="n">' + (i + 1) + '</span><span class="who">' + esc(short(p.name)) + '<small>' + signed(p.diff) + '</small></span><div class="dots" style="gap:8px">' + blocks + '</div><span class="v">' + p.w + '–' + p.l + '</span></div>';
+          return '<div class="row' + (i === 0 ? ' top' : '') + '" style="grid-template-columns:calc(56px * var(--rs, 1)) 1fr auto calc(130px * var(--rs, 1))"><span class="n">' + (i + 1) + '</span><span class="who">' + esc(short(p.name)) + '<small>' + signed(p.diff) + '</small></span><div class="dots" style="gap:8px">' + blocks + '</div><span class="v">' + p.w + '–' + p.l + '</span></div>';
         }).join('') + '</div>' +
         '<div class="ctx m">' + esc(ctx) + '</div>' +
         '<div class="ftr"><div class="mono">Next ladder · dinksociety.app/ladders</div>' + brand('dinksociety.app/ladders') + '</div>';
@@ -548,7 +561,22 @@
       f.style.width = Math.round(1080 * scale) + 'px'; f.style.height = Math.round(h * scale) + 'px';
       var hero = html.indexOf('hero-flag') === 0 || html.indexOf('<div class="hero-flag"></div>') === 0;
       f.innerHTML = '<div class="card' + (hero ? ' hero' : '') + '" id="cd-card" style="height:' + h + 'px;transform:scale(' + scale + ')">' + html.replace('<div class="hero-flag"></div>', '') + '</div>';
+      fitRows($('cd-card'), h);
       $('cd-dl').disabled = false;
+    }
+    // Shrink auto-fit rows until the card's content fits its fixed height.
+    // scrollHeight is measured in untransformed px, so the preview scale
+    // doesn't matter; the PNG export uses the same DOM, so it fits there too.
+    function fitRows(card, h) {
+      if (!card) return;
+      var rows = card.querySelector('.rows.fit'); if (!rows) return;
+      var rs = 1;
+      card.style.setProperty('--rs', '1');
+      var guard = 0;
+      while (card.scrollHeight > h + 1 && rs > 0.34 && guard++ < 40) {
+        rs = Math.round((rs - 0.03) * 100) / 100;
+        card.style.setProperty('--rs', String(rs));
+      }
     }
     function showEmpty(t) { var f = $('cd-frame'); f.className = 'frame empty'; f.style.width = '560px'; f.style.height = '360px'; f.textContent = t; $('cd-dl').disabled = true; }
 
