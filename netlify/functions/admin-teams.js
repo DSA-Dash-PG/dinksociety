@@ -20,6 +20,7 @@ import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/ide
 import { circuitCode, seasonName, seasonIdForCircuit, isCanonicalCode } from './lib/circuit.js';
 import { rebuildStandings } from './lib/standings.js';
 import { logActivity } from './lib/activity-log.js';
+import { logRosterChanges } from './lib/roster-diff.js';
 import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 
 function json(data, status = 200) {
@@ -183,6 +184,8 @@ export default async (req) => {
     // blob was already written, so every roster add/edit saved but returned a
     // 500 and the admin UI never closed the popup or refreshed.
     const priorIds = new Set((team.roster || []).map(x => x && x.id).filter(Boolean));
+    // Snapshot for the audit trail — the roster block below rebuilds team.roster.
+    const priorRoster = (team.roster || []).map(x => ({ ...x }));
 
     // Handle roster replacement (full roster array)
     if (body.roster && Array.isArray(body.roster)) {
@@ -289,15 +292,21 @@ export default async (req) => {
       } catch (err) { console.error('Registration division label heal failed:', err); }
     }
 
-    await logActivity({
-      type: body.roster ? 'roster.replaced' : 'team.updated',
+    if (body.roster && Array.isArray(body.roster)) {
+      // One event per actual change (added / removed / edited), not a blanket
+      // "Roster replaced (15 players)" that tells an auditor nothing.
+      await logRosterChanges({
+        actor: { email: admin.email, role: 'admin' },
+        team, prevRoster: priorRoster, nextRoster: team.roster,
+      });
+    }
+    if (!body.roster || ('name' in body && team.name !== oldName)) await logActivity({
+      type: 'team.updated',
       actor: { email: admin.email, role: 'admin' },
       team,
       details: ('name' in body && team.name !== oldName)
         ? `Team renamed "${oldName}" → "${team.name}"`
-        : body.roster
-          ? `Roster replaced (${(team.roster || []).length} players)`
-          : `Team settings updated (${Object.keys(body).filter(k => allowed.includes(k)).join(', ') || 'fields'})`,
+        : `Team settings updated (${Object.keys(body).filter(k => allowed.includes(k)).join(', ') || 'fields'})`,
     }).catch(err => console.error('logActivity after team save failed:', err));
 
     // The team blob is the source of truth for the name, but the name is also

@@ -13,6 +13,7 @@ import { normalizeEmail, normalizePhone, findContactCollisions } from './lib/ide
 import { circuitCode } from './lib/circuit.js';
 import { buildLeagueIndex, playedBefore, playedForTeam } from './lib/league-players.js';
 import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
+import { logRosterChanges } from './lib/roster-diff.js';
 import { notifyAdminsPendingRosterAdd } from './lib/roster-approvals.js';
 
 // No roster size cap — rosters are unlimited; every add still goes through admin approval.
@@ -213,6 +214,13 @@ export default async (req) => {
         rosterUpdatedAt: new Date().toISOString(),
       };
       await store.setJSON(teamKey, updated);
+
+      // Audit trail — captain roster saves used to leave no trace at all.
+      await logRosterChanges({
+        actor: { email: ctx.user?.email || ctx.session?.email || null, role: ctx.user?.role || 'captain' },
+        team: updated, prevRoster: ctx.team.roster || [], nextRoster: cleaned,
+        pendingIds: new Set(requestedNow),
+      });
 
       // Welcome the players who actually JOINED on this save. Anyone queued for
       // approval is deliberately left out — admin-roster-approvals welcomes
