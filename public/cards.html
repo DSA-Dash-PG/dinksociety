@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Cards · The Dink Society</title>
+  <meta name="robots" content="noindex, nofollow">
   <meta name="description" content="Player of the Week, stat leaders, results and ladder cards — auto-filled from the season's numbers, ready to post." />
   <meta property="og:title" content="Cards · The Dink Society" />
   <meta property="og:description" content="Player of the Week, stat leaders, results and ladder cards — auto-filled from the season's numbers." />
@@ -149,6 +150,7 @@
       <div class="ctl" id="cd-ratio"><button data-r="45" class="on">4:5</button><button data-r="11">1:1</button><button data-r="916">9:16</button></div>
       <div class="ctl" id="cd-gender" style="margin-top:6px"><button data-g="men" class="on">Men's</button><button data-g="women">Women's</button></div>
       <div class="ctl" id="cd-metric" style="margin-top:6px"><button data-m="dsr" class="on">DSR</button><button data-m="diff">Diff</button><button data-m="pts">Pts</button></div>
+      <div class="ctl" id="cd-photo" style="margin-top:6px" title="Use the player's profile photo, or the plain Night-Match backdrop"><button data-p="profile" class="on">Profile photo</button><button data-p="none">No photo</button></div>
       <div class="ctl" id="cd-focal" style="margin-top:6px" title="Which part of the photo stays visible"><button data-f="top">Photo · top</button><button data-f="center" class="on">Center</button><button data-f="bottom">Bottom</button></div>
       <div class="field" id="cd-whof" style="display:none"><label>Player</label><select id="cd-who"></select></div>
       <div class="field"><label>Context line · auto-written, editable</label><textarea id="cd-ctx" rows="3"></textarea></div>
@@ -156,7 +158,7 @@
       <button class="dl" id="cd-dl">Download PNG</button>
       <button class="dl sec" id="cd-link">Copy link to this card</button>
       <div class="status" id="cd-status"></div>
-      <div class="hint">Photos come from the player's profile when they have one; drop a different one anytime. Nothing you change here is saved — the link always regenerates the card from the live numbers.</div>
+      <div class="hint">Photos come from the player's profile when they have one — switch to <b>No photo</b> for a plain backdrop when the profile picture is a cartoon or avatar; drop a different one anytime. Nothing you change here is saved — the link always regenerates the card from the live numbers.</div>
     </aside>
 
     <section class="stage">
@@ -183,6 +185,10 @@
       event: qs.get('event') || null,
       ctx: qs.get('ctx') || null,      // a hand-edited context line survives in the link
       photo: null,                     // dropped photo (data URL), never saved
+      // 'profile' pulls the player's profile photo; 'none' keeps the plain
+      // backdrop — for players whose profile picture is a cartoon/avatar that
+      // doesn't fit the league look. A dropped photo still wins either way.
+      usePhoto: qs.get('photo') === 'none' ? 'none' : 'profile',
       focal: qs.get('focal') || 'center',
     };
     var SEASON = { id: 'circuit-i', code: 'I', name: 'Season 1' };
@@ -222,7 +228,10 @@
           return PHOTOS;
         }).catch(function () { PHOTOS = {}; return PHOTOS; });
     }
-    function profilePhoto(name, fallback) { return (PHOTOS && PHOTOS[String(name || '').toLowerCase()]) || fallback || null; }
+    function profilePhoto(name, fallback) {
+      if (S.usePhoto === 'none') return null;
+      return (PHOTOS && PHOTOS[String(name || '').toLowerCase()]) || fallback || null;
+    }
     function loadLadders() {
       if (LADDERS) return Promise.resolve(LADDERS);
       return fetch('/.netlify/functions/public-ladders').then(function (r) { return r.ok ? r.json() : null; })
@@ -487,6 +496,9 @@
       document.querySelectorAll('#cd-gender button').forEach(function (b) { b.classList.toggle('on', b.dataset.g === S.gender); });
       document.querySelectorAll('#cd-metric button').forEach(function (b) { b.classList.toggle('on', b.dataset.m === S.metric); });
       document.querySelectorAll('#cd-focal button').forEach(function (b) { b.classList.toggle('on', b.dataset.f === S.focal); });
+      document.querySelectorAll('#cd-photo button').forEach(function (b) { b.classList.toggle('on', b.dataset.p === S.usePhoto); });
+      // Focal point only matters when there's a photo to crop.
+      $('cd-focal').style.display = (S.usePhoto === 'none' && !S.photo) ? 'none' : '';
       $('cd-gender').style.display = (S.card === 'potw' || S.card === 'leaders') ? '' : 'none';
       $('cd-metric').style.display = S.card === 'leaders' ? '' : 'none';
       $('cd-weekf').style.display = LEAGUE[S.card] ? '' : 'none';
@@ -503,6 +515,7 @@
       if (S.card === 'potw' && S.who) p.set('who', S.who); else p.delete('who');
       if (S.ctx != null) p.set('ctx', S.ctx); else p.delete('ctx');
       if (S.focal !== 'center') p.set('focal', S.focal); else p.delete('focal');
+      if (S.usePhoto === 'none') p.set('photo', 'none'); else p.delete('photo');
       if (SEASON.id && SEASON.id !== 'circuit-i') p.set('season', SEASON.id);
       history.replaceState(null, '', u);
     }
@@ -571,6 +584,7 @@
     $('cd-ratio').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.ratio = b.dataset.r; render(); });
     $('cd-gender').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.gender = b.dataset.g; S.ctx = null; S.who = null; render(); });
     $('cd-focal').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.focal = b.dataset.f; render(); });
+    $('cd-photo').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.usePhoto = b.dataset.p; render(); });
     $('cd-metric').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.metric = b.dataset.m; S.ctx = null; render(); });
     $('cd-week').addEventListener('change', function () { S.week = Number(this.value); S.ctx = null; S.who = null; render(); });
     $('cd-event').addEventListener('change', function () { S.event = this.value; S.ctx = null; render(); });

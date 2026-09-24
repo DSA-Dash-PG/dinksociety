@@ -46,6 +46,15 @@
     #lv .top .right{ text-align:right; padding-bottom:6px; }
     #lv .livepill{ display:inline-flex; align-items:center; gap:8px; font-family:var(--lv-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--color-lime); border:1px solid var(--color-lime-dim); border-radius:999px; padding:6px 12px; margin-bottom:10px; }
     #lv .livepill.off{ color:var(--color-text-muted); border-color:var(--color-border); }
+    /* Game-night countdown to first serve — shown only on a game day, before play starts */
+    #lv .count{ display:none; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; margin:18px 0 6px; padding:18px 22px; border:1px solid var(--color-lime-dim); border-radius:16px; background:linear-gradient(90deg, rgba(184,255,44,.07), transparent 60%); }
+    #lv .count.on{ display:flex; }
+    #lv .count .k{ display:flex; flex-direction:column; gap:6px; }
+    #lv .count .t{ font-family:var(--lv-disp); font-weight:900; font-size:clamp(34px,6vw,56px); line-height:1; letter-spacing:.01em; color:var(--color-lime); font-variant-numeric:tabular-nums; }
+    #lv .count .t small{ font-size:.42em; color:var(--color-text-muted); font-weight:700; letter-spacing:.06em; margin-left:2px; }
+    #lv .count.soon .t{ animation:lvpulse-text 1.2s infinite; }
+    @keyframes lvpulse-text{ 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
+    @media (max-width:640px){ #lv .count{ padding:14px 16px; } }
     #lv .dotp{ width:7px; height:7px; border-radius:50%; background:var(--color-lime); animation:lvpulse 1.6s infinite; }
     @keyframes lvpulse{ 0%{box-shadow:0 0 0 0 rgba(184,255,44,.55)} 70%{box-shadow:0 0 0 8px rgba(184,255,44,0)} 100%{box-shadow:0 0 0 0 rgba(184,255,44,0)} }
 
@@ -158,6 +167,10 @@
       </div>
     </div>
     <div class="rule"></div>
+    <div class="count" id="lv-count" aria-live="polite">
+      <div class="k"><span class="mono" id="lv-count-lbl">First serve in</span><div class="t" id="lv-count-t">--:--:--</div></div>
+      <div class="k" style="text-align:right;align-items:flex-end;"><span class="mono" id="lv-count-when">&nbsp;</span><span class="mono" id="lv-count-venue" style="color:var(--color-text-faint)">&nbsp;</span></div>
+    </div>
     <div class="weeks" id="lv-weeks"></div>
     <div id="lv-body"><div class="empty"><div class="mono">Loading the board…</div></div></div>
   </main>
@@ -299,6 +312,57 @@
         }).join('') + '</div></div>';
     }
 
+    // ── Countdown to first serve ─────────────────────────────────────
+    // On a game day, before any match goes live, count down to the earliest
+    // scheduledAt. Ticks every second on the client; the data poll only has to
+    // refresh the target. Once a match is live (or the night is final) it hides.
+    var COUNT = { target: null, timer: null, venue: '', label: '' };
+    var GRACE_MS = 90 * 60 * 1000;   // after first serve passes with nothing live: "warming up" for 90 min, then hide
+
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
+    function sameLocalDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
+
+    function setCountdown(d, ms, isLive, allFinal, first) {
+      var box = $('lv-count');
+      var t = first ? new Date(first) : null;
+      var now = new Date();
+      var gameDay = !!(t && !isNaN(t) && (d.gameNight || sameLocalDay(t, now)));
+      var show = gameDay && !isLive && !allFinal && ms.length && (t.getTime() + GRACE_MS > now.getTime());
+      if (!show) { stopCountdown(); return; }
+      COUNT.target = t.getTime();
+      COUNT.venue = d.venue || ((d.weeks || []).find(function (w) { return w.week === d.week; }) || {}).venue || '';
+      $('lv-count-when').textContent = 'Tonight · ' + fmtTime(first) + ' first serve';
+      $('lv-count-venue').textContent = COUNT.venue;
+      box.classList.add('on');
+      tickCountdown();
+      if (!COUNT.timer) COUNT.timer = setInterval(tickCountdown, 1000);
+    }
+
+    function tickCountdown() {
+      if (COUNT.target == null) return;
+      var box = $('lv-count'), out = $('lv-count-t'), lbl = $('lv-count-lbl');
+      var left = COUNT.target - Date.now();
+      if (left <= 0) {
+        if (-left > GRACE_MS) { stopCountdown(); return; }
+        lbl.textContent = 'First serve';
+        out.innerHTML = 'Warming up';
+        box.classList.remove('soon');
+        return;
+      }
+      var s = Math.floor(left / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
+      lbl.textContent = 'First serve in';
+      out.innerHTML = h > 0
+        ? h + '<small>h</small> ' + pad2(m) + '<small>m</small> ' + pad2(sec) + '<small>s</small>'
+        : pad2(m) + '<small>m</small> ' + pad2(sec) + '<small>s</small>';
+      box.classList.toggle('soon', left < 5 * 60 * 1000);
+    }
+
+    function stopCountdown() {
+      COUNT.target = null;
+      if (COUNT.timer) { clearInterval(COUNT.timer); COUNT.timer = null; }
+      var box = $('lv-count'); if (box) box.classList.remove('on', 'soon');
+    }
+
     function weekStrip(d) {
       var ws = d.weeks || [];
       var cur = d.week;
@@ -325,6 +389,7 @@
       if (isLive) { pill.className = 'livepill'; pill.innerHTML = '<span class="dotp"></span>Live'; }
       else if (allFinal) { pill.className = 'livepill off'; pill.textContent = 'Final'; }
       else { pill.className = 'livepill off'; pill.textContent = first ? fmtTime(first) + ' first serve' : 'Scheduled'; }
+      setCountdown(d, ms, isLive, allFinal, first);
       var confirmed = ms.reduce(function (n, m) { return n + (m.gamesConfirmed || 0); }, 0), total = ms.length * 12;
       $('lv-prog').innerHTML = ms.length ? (allFinal ? '<b>' + total + '</b> games · all confirmed' : '<b>' + confirmed + ' of ' + total + '</b> games confirmed') : '&nbsp;';
 
