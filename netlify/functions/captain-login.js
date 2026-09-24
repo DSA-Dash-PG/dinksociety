@@ -3,7 +3,7 @@
 // one-tap sign-in URL. ALWAYS returns 200 with a generic success message
 // regardless of whether the email is a captain — prevents enumeration.
 
-import { createMagicToken, findTeamByCaptainEmail } from './lib/captain-auth.js';
+import { createMagicToken, findTeamByLeaderEmail } from './lib/captain-auth.js';
 import { sendEmail, renderCaptainMagicLink } from './lib/email.js';
 import { issueLoginCode } from './lib/login-code.js';
 
@@ -22,8 +22,12 @@ export default async (req) => {
       return json({ error: 'Valid email required' }, 400);
     }
 
-    // Always succeed externally. Only send the email if it's a real captain.
-    const team = await findTeamByCaptainEmail(normalized);
+    // Always succeed externally. Only send the email if it's a real team
+    // leader — the captain (team.captainEmail / isCaptain) OR a co-captain
+    // (isCoCaptain on the roster). This used to check captainEmail only, which
+    // silently sent nothing to co-captains (Bonkerz, 2026-09-24).
+    const match = await findTeamByLeaderEmail(normalized);
+    const team = match?.team || null;
     if (!team) {
       // Artificial delay to make response time uniform
       await new Promise(r => setTimeout(r, 300));
