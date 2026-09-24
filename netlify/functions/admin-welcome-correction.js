@@ -7,13 +7,27 @@
 // told the wrong night. This finds them and sends a short correction.
 //
 // Who qualifies: an active roster player (not pending, not archived), with an
-// email, welcomed within the window (`welcomedAt`), on a non-test team whose
-// season resolves to a league night that is NOT Monday — a player whose season
-// really does play Mondays was told the truth and is left alone. Each player is
-// corrected once: `welcomeCorrectedAt` is stamped after a successful send.
+// email, welcomed within the window, on a non-test team whose season resolves
+// to a league night that is NOT Monday — a player whose season really does
+// play Mondays was told the truth and is left alone. Each player is corrected
+// once: `welcomeCorrectedAt` is stamped after a successful send.
+//
+// "Welcomed within the window" comes from TWO sources, because the roster
+// entry's `welcomedAt` stamp turned out to be unreliable — until 2026-09-24
+// every roster save (captain editor, admin roster replace) rebuilt each entry
+// and dropped it. So besides the stamp, this asks Resend for every email sent
+// in the window and picks out the welcomes by subject. That is ground truth:
+// if Resend delivered a welcome to an address, the person at that address
+// saw "Monday". Resend lookups are best-effort; when the API is unreachable
+// the response says so and the stamp-only list is returned.
 //
 // GET  ?days=14 → { recipients:[…], alreadySent:n, skippedMonday:n, days }
-// POST { days } → sends to every recipient the GET would list → { sent, failed }
+// GET  ?find=marta → every roster entry whose name/email matches, with the
+//                    fields the filter looks at and WHY each one is in or out.
+//                    For "she got the email but she's not on the list".
+// POST { days, include?:["teamId:playerId"] } → sends to every recipient the
+//      GET would list, plus any `include` entries forced in by the admin (they
+//      still need an email and must not be pending/archived/already corrected).
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
@@ -26,6 +40,66 @@ import { seasonName, isTestTeam } from './lib/circuit.js';
 const DEFAULT_DAYS = 14;
 const MAX_DAYS = 60;
 const TOKEN_DAYS = 7;
+
+// Subjects roster-welcome sends (lib/email.js rosterWelcomeSubject) and the
+// one this endpoint sends. Matched by prefix so team/season names don't matter.
+const WELCOME_SUBJECT_RE = /^(Welcome to The Dink Society — you’re on |You’re back — )/;
+const CORRECTION_SUBJECT_RE = /^Correction(:| to your )/;
+const RESEND_PAGE = 100;
+const RESEND_MAX_PAGES = 30;   // 3,000 emails — far more than a fortnight of league mail
+
+function resendKey() {
+  return (typeof Netlify !== 'undefined' && Netlify.env.get('RESEND_API_KEY')) || process.env.RESEND_API_KEY || '';
+}
+
+/**
+ * Every welcome / correction Resend sent since `since`, keyed by lowercased
+ * recipient. Walks GET /emails newest-first until it passes the window.
+ * Returns { ok, welcomes: Map<email, {sentAt, subject}>, corrections: Set<email>, scanned }.
+ */
+async function resendHistory(since) {
+  const key = resendKey();
+  const out = { ok: false, welcomes: new Map(), corrections: new Set(), scanned: 0, error: null };
+  if (!key) { out.error = 'RESEND_API_KEY not set'; return out; }
+  let after = null;
+  try {
+    for (let page = 0; page < RESEND_MAX_PAGES; page++) {
+      const url = new URL('https://api.resend.com/emails');
+      url.searchParams.set('limit', String(RESEND_PAGE));
+      if (after) url.searchParams.set('after', after);
+      const r = await fetch(url, { headers: { Authorization: `Bearer ${key}` } });
+      if (!r.ok) { out.error = `Resend ${r.status}: ${(await r.text()).slice(0, 200)}`; return out; }
+      const body = await r.json();
+      const rows = Array.isArray(body?.data) ? body.data : [];
+      if (!rows.length) break;
+      let pastWindow = false;
+      for (const e of rows) {
+        out.scanned++;
+        const at = Date.parse(e.created_at || '');
+        if (Number.isFinite(at) && at < since) { pastWindow = true; continue; }
+        const subject = String(e.subject || '');
+        const tos = Array.isArray(e.to) ? e.to : [e.to];
+        for (const raw of tos) {
+          const email = normalizeEmail(String(raw || '').replace(/^.*<([^>]+)>.*$/, '$1'));
+          if (!email) continue;
+          if (WELCOME_SUBJECT_RE.test(subject)) {
+            const prev = out.welcomes.get(email);
+            if (!prev || at > Date.parse(prev.sentAt)) out.welcomes.set(email, { sentAt: e.created_at, subject });
+          } else if (CORRECTION_SUBJECT_RE.test(subject)) {
+            out.corrections.add(email);
+          }
+        }
+      }
+      if (pastWindow || body.has_more === false) break;
+      after = rows[rows.length - 1]?.id;
+      if (!after) break;
+    }
+    out.ok = true;
+  } catch (err) {
+    out.error = err?.message || String(err);
+  }
+  return out;
+}
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -48,6 +122,7 @@ function windowDays(raw) {
 /** Every player who should get the correction, plus counts of who was skipped and why. */
 async function findRecipients(days) {
   const since = Date.now() - days * 24 * 60 * 60 * 1000;
+  const history = await resendHistory(since);
   const teams = getStore('teams');
   const { blobs } = await teams.list({ prefix: 'team/' });
 
@@ -59,10 +134,19 @@ async function findRecipients(days) {
     const team = await teams.get(b.key, { type: 'json', consistency: 'strong' }).catch(() => null);
     if (!team || isTestTeam(team)) continue;
 
-    const welcomed = (team.roster || []).filter(p =>
-      p && !p.pendingAdd && !p.archived && p.welcomedAt
-      && new Date(p.welcomedAt).getTime() >= since
-      && normalizeEmail(p.email));
+    // Welcomed = stamped in the window, OR Resend says a welcome went to their
+    // address in the window. Either one is enough — the stamp can be missing
+    // (wiped by a roster save) and Resend can be unreachable.
+    const welcomed = [];
+    for (const p of (team.roster || [])) {
+      if (!p || p.pendingAdd || p.archived) continue;
+      const email = normalizeEmail(p.email);
+      if (!email) continue;
+      const stamped = p.welcomedAt && new Date(p.welcomedAt).getTime() >= since;
+      const sent = history.welcomes.get(email);
+      if (!stamped && !sent) continue;
+      welcomed.push({ p, email, welcomedAt: p.welcomedAt || sent?.sentAt || null, source: stamped ? 'stamp' : 'resend' });
+    }
     if (!welcomed.length) continue;
 
     const nightKey = team.seasonId || team.circuit || '';
@@ -72,19 +156,108 @@ async function findRecipients(days) {
     if (!night.dayName) { noNight += welcomed.length; continue; }
     if (night.dayName === 'Monday') { skippedMonday += welcomed.length; continue; }
 
-    for (const p of welcomed) {
-      if (p.welcomeCorrectedAt) { alreadySent++; continue; }
+    for (const { p, email, welcomedAt, source } of welcomed) {
+      if (p.welcomeCorrectedAt || history.corrections.has(email)) { alreadySent++; continue; }
       recipients.push({
         teamId: team.id, teamKey: b.key, teamName: team.name || 'your team',
         seasonName: seasonName(team.circuit || team.seasonId),
-        playerId: p.id, name: p.name || '', email: normalizeEmail(p.email),
-        welcomedAt: p.welcomedAt, night,
+        playerId: p.id, name: p.name || '', email,
+        welcomedAt, source, night,
       });
     }
   }
 
   recipients.sort((a, b) => String(b.welcomedAt).localeCompare(String(a.welcomedAt)));
-  return { recipients, alreadySent, skippedMonday, noNight };
+  return {
+    recipients, alreadySent, skippedMonday, noNight,
+    history: { ok: history.ok, error: history.error, scanned: history.scanned, welcomes: history.welcomes.size, corrections: history.corrections.size },
+  };
+}
+
+/**
+ * Why is (or isn't) this person on the list? Every roster entry matching the
+ * query, across all teams, with the exact fields the filter reads.
+ */
+async function explain(query, days) {
+  const q = String(query || '').trim().toLowerCase();
+  if (!q) return [];
+  const since = Date.now() - days * 24 * 60 * 60 * 1000;
+  const history = await resendHistory(since);
+  const teams = getStore('teams');
+  const { blobs } = await teams.list({ prefix: 'team/' });
+  const out = [];
+  const nightCache = new Map();
+
+  for (const b of blobs || []) {
+    const team = await teams.get(b.key, { type: 'json', consistency: 'strong' }).catch(() => null);
+    if (!team) continue;
+    for (const p of (team.roster || [])) {
+      if (!p) continue;
+      const hay = `${p.name || ''} ${p.email || ''}`.toLowerCase();
+      if (!hay.includes(q)) continue;
+
+      const nightKey = team.seasonId || team.circuit || '';
+      if (!nightCache.has(nightKey)) nightCache.set(nightKey, await leagueNightFor(team));
+      const night = nightCache.get(nightKey);
+
+      const reasons = [];
+      if (isTestTeam(team)) reasons.push('test team');
+      if (p.pendingAdd) reasons.push('still pending approval');
+      if (p.archived) reasons.push('archived from this roster');
+      if (!normalizeEmail(p.email)) reasons.push('no email on file');
+      const email = normalizeEmail(p.email);
+      const sent = email ? history.welcomes.get(email) : null;
+      const stamped = p.welcomedAt && new Date(p.welcomedAt).getTime() >= since;
+      if (!stamped && !sent) {
+        if (!p.welcomedAt) reasons.push('no welcomedAt stamp (a roster save wiped it, or the welcome never sent)' + (history.ok ? ` and Resend shows no welcome to this address in the last ${days} days` : ' — Resend history unavailable: ' + (history.error || 'unknown')));
+        else reasons.push(`welcomed ${String(p.welcomedAt).slice(0, 10)}, outside the ${days}-day window`);
+      }
+      if (p.welcomeCorrectedAt) reasons.push(`already corrected ${String(p.welcomeCorrectedAt).slice(0, 10)}`);
+      else if (email && history.corrections.has(email)) reasons.push('Resend shows a correction already went to this address');
+      if (!night.dayName) reasons.push('season has no start date, so no league night to correct to');
+      else if (night.dayName === 'Monday') reasons.push('season resolves to Monday — the welcome was right');
+
+      out.push({
+        teamId: team.id, teamName: team.name || '', seasonId: team.seasonId || null, circuit: team.circuit || null,
+        seasonName: seasonName(team.circuit || team.seasonId),
+        playerId: p.id, name: p.name || '', email: p.email || '',
+        pendingAdd: !!p.pendingAdd, archived: !!p.archived,
+        welcomedAt: p.welcomedAt || sent?.sentAt || null, welcomeSource: stamped ? 'stamp' : (sent ? 'resend' : null),
+        welcomeCorrectedAt: p.welcomeCorrectedAt || null,
+        night, eligible: reasons.length === 0, reasons,
+        // Can the admin force this one onto the send? Hard blockers only.
+        forceable: !isTestTeam(team) && !p.pendingAdd && !p.archived && !!normalizeEmail(p.email)
+          && !p.welcomeCorrectedAt && !!night.dayName && night.dayName !== 'Monday',
+      });
+    }
+  }
+  return out;
+}
+
+/** Entries the admin forced in by "teamId:playerId" — same hard blockers as above. */
+async function forcedRecipients(keys) {
+  const want = new Set((keys || []).map(String).filter(Boolean));
+  if (!want.size) return [];
+  const teams = getStore('teams');
+  const out = [];
+  for (const k of want) {
+    const [teamId, playerId] = k.split(':');
+    if (!teamId || !playerId) continue;
+    const teamKey = `team/${teamId}.json`;
+    const team = await teams.get(teamKey, { type: 'json', consistency: 'strong' }).catch(() => null);
+    if (!team || isTestTeam(team)) continue;
+    const p = (team.roster || []).find(x => x && String(x.id) === playerId);
+    if (!p || p.pendingAdd || p.archived || p.welcomeCorrectedAt || !normalizeEmail(p.email)) continue;
+    const night = await leagueNightFor(team);
+    if (!night.dayName || night.dayName === 'Monday') continue;
+    out.push({
+      teamId: team.id, teamKey, teamName: team.name || 'your team',
+      seasonName: seasonName(team.circuit || team.seasonId),
+      playerId: p.id, name: p.name || '', email: normalizeEmail(p.email),
+      welcomedAt: p.welcomedAt || null, night, forced: true,
+    });
+  }
+  return out;
 }
 
 export default async (req) => {
@@ -94,6 +267,8 @@ export default async (req) => {
   if (req.method === 'GET') {
     const url = new URL(req.url);
     const days = windowDays(url.searchParams.get('days'));
+    const find = url.searchParams.get('find');
+    if (find != null) return json({ days, query: find, matches: await explain(find, days) });
     const found = await findRecipients(days);
     return json({
       days,
@@ -101,6 +276,7 @@ export default async (req) => {
       alreadySent: found.alreadySent,
       skippedMonday: found.skippedMonday,
       noNight: found.noNight,
+      history: found.history,
       recipients: found.recipients.map(({ teamKey, ...r }) => r),
     });
   }
@@ -109,7 +285,10 @@ export default async (req) => {
     let body = {};
     try { body = await req.json(); } catch { /* empty body is fine */ }
     const days = windowDays(body.days);
-    const { recipients } = await findRecipients(days);
+    const { recipients: auto } = await findRecipients(days);
+    const forced = await forcedRecipients(body.include);
+    const seen = new Set(auto.map(r => `${r.teamId}:${r.playerId}`));
+    const recipients = auto.concat(forced.filter(r => !seen.has(`${r.teamId}:${r.playerId}`)));
     if (!recipients.length) return json({ days, sent: 0, failed: 0, results: [] });
 
     const site = siteUrl();

@@ -221,6 +221,13 @@ export default async (req) => {
           // Pending captain adds are owned by the approvals endpoint — a plain
           // roster save must not silently approve them by dropping the flag.
           ...(prev?.pendingAdd ? { pendingAdd: true, pendingAddAt: prev.pendingAddAt || null, pendingAddBy: prev.pendingAddBy || null, ...(prev.pendingAddFrom ? { pendingAddFrom: prev.pendingAddFrom } : {}) } : {}),
+          // Email + approval stamps are owned by roster-welcome / the approvals
+          // endpoint — a roster save must not wipe them (it did, which is why
+          // the welcome-correction list missed players on edited rosters).
+          ...(prev?.welcomedAt ? { welcomedAt: prev.welcomedAt } : {}),
+          ...(prev?.welcomeCorrectedAt ? { welcomeCorrectedAt: prev.welcomeCorrectedAt } : {}),
+          ...(prev?.approvedAt ? { approvedAt: prev.approvedAt, approvedBy: prev.approvedBy || null } : {}),
+          ...(prev?.returningPlayer ? { returningPlayer: true, addedAt: prev.addedAt || null, addedFrom: prev.addedFrom || null } : {}),
         };
       }).filter(p => p.name);
     }

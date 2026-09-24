@@ -190,6 +190,12 @@ export default async (req) => {
           // Archive state is owned by the archive/restore endpoint — preserve it
           // from the stored roster so an ordinary roster save can't flip or wipe it.
           ...(prev?.archived ? { archived: true, archivedAt: prev.archivedAt || null, archivedBy: prev.archivedBy || null } : {}),
+          // Email + approval stamps are owned by roster-welcome / the approvals
+          // endpoint. Dropping them here is what made the welcome-correction
+          // list miss players whose roster had been saved since their welcome.
+          ...(prev?.welcomedAt ? { welcomedAt: prev.welcomedAt } : {}),
+          ...(prev?.welcomeCorrectedAt ? { welcomeCorrectedAt: prev.welcomeCorrectedAt } : {}),
+          ...(prev?.approvedAt ? { approvedAt: prev.approvedAt, approvedBy: prev.approvedBy || null } : {}),
           ...pendingState,
         });
       }
