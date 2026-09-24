@@ -351,6 +351,10 @@
   .lus__set .g { margin:0; }
   .lus__set .g:last-child { border-bottom:none; }
   .lus__ph { display:inline-block; border:1px dashed var(--color-border-strong); border-radius:var(--radius-sm); padding:4px 8px; font-size:9px; color:var(--color-text-faint); line-height:1.4; font-style:normal; }
+  .lus__ph.lus__cd { border-color:var(--color-lime-dim); color:var(--color-text-muted); }
+  .lus__ph.lus__cd b { display:block; font-size:11px; font-weight:800; color:var(--color-lime); font-variant-numeric:tabular-nums; letter-spacing:.02em; margin-top:1px; }
+  .lus__ph.lus__cd.is-soon b { animation:lusPulse 1.2s infinite; }
+  @keyframes lusPulse { 0%,100%{ opacity:1 } 50%{ opacity:.5 } }
   .lus__foot { margin:2px 2px 4px; font-size:10px; color:var(--color-text-faint); text-align:center; }
   .lus__foot b { color:var(--color-text-muted); }
 
@@ -2784,6 +2788,45 @@
   // 3 sets per round (G1+G2 / G3+G4 / G5+G6 play simultaneously on two courts),
   // my pair left, opponent right. No lock pills or warnings — the opponent
   // column simply shows a dashed placeholder until the matchup reveals.
+  // Lineup reveal moment for a match: scheduledAt minus the season's lock
+  // offset (server default 15 min). Null when the match has no time.
+  function revealTimeFor(m) {
+    if (!m || !m.scheduledAt) return null;
+    const t = new Date(m.scheduledAt).getTime(); if (isNaN(t)) return null;
+    const off = Number(m.revealOffsetMin) || 15;
+    return t - off * 60000;
+  }
+  function fmtReveal(ms) {
+    if (ms <= 0) return 'revealing…';
+    const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), mi = Math.floor((s % 3600) / 60), sec = s % 60;
+    const p2 = n => (n < 10 ? '0' : '') + n;
+    return h ? `${h}h ${p2(mi)}m ${p2(sec)}s` : `${p2(mi)}m ${p2(sec)}s`;
+  }
+  // One ticker for every countdown cell on the page. Cheap when there are none.
+  let REVEAL_TICKER = null;
+  function startRevealTicker() {
+    if (REVEAL_TICKER) return;
+    REVEAL_TICKER = setInterval(() => {
+      const cells = document.querySelectorAll('.lus__cd');
+      if (!cells.length) return;
+      const now = Date.now();
+      let anyPast = false;
+      cells.forEach(el => {
+        const t = Number(el.dataset.t); if (!t) return;
+        const b = el.querySelector('b'); if (b) b.textContent = fmtReveal(t - now);
+        if (t <= now) anyPast = true;
+        el.classList.toggle('is-soon', t - now > 0 && t - now < 5 * 60000);
+      });
+      // Reveal time passed — pull fresh data so the opponent's names appear
+      // without waiting for the next scheduled poll. Guarded to once a minute.
+      if (anyPast && (!startRevealTicker._last || now - startRevealTicker._last > 60000)) {
+        startRevealTicker._last = now;
+        try { if (livePoller) livePoller.pollNow(); } catch (e) { /* the regular poll will catch it */ }
+      }
+    }, 1000);
+  }
+  startRevealTicker();
+
   function renderLineupSheet(next, me, withContext) {
     if (!next) return '<div class="muted">No upcoming match — the lineup shows here once your next match is scheduled.</div>';
     const ctx = withContext ? `<div class="label">Lineup <span class="sub">Week ${next.week} · vs ${esc(next.opponent.name)}</span></div>` : '';
@@ -2794,7 +2837,14 @@
     const revealed = !!lu.opp;
     const nameEl = (side, pos, isMe) =>
       `<div class="pl${isMe ? ' you' : ''}">${side && side[pos] ? esc(side[pos]) : '—'}${isMe ? '<span class="g__mine-tag">YOU</span>' : ''}</div>`;
-    const phCell = `<div class="g__pair g__pair--right"><span class="lus__ph">reveals 15 min<br>before start</span></div>`;
+    // On match day the placeholder counts down to the reveal (start − lock
+    // offset, 15 min by default) instead of the static "reveals 15 min before
+    // start". A 1s ticker (startRevealTicker) keeps every cell current.
+    const revealAt = revealTimeFor(next);
+    const matchDay = !!(next.scheduledAt && new Date(next.scheduledAt).toDateString() === new Date().toDateString());
+    const phCell = (matchDay && revealAt && revealAt > Date.now())
+      ? `<div class="g__pair g__pair--right"><span class="lus__ph lus__cd" data-t="${revealAt}">reveals in<br><b>${fmtReveal(revealAt - Date.now())}</b></span></div>`
+      : `<div class="g__pair g__pair--right"><span class="lus__ph">reveals 15 min<br>before start</span></div>`;
     const setBlock = (r, s) => {
       const rows = [2 * s - 1, 2 * s].map(gi => {
         const slot = `r${r}g${gi}`;

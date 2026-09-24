@@ -106,6 +106,10 @@
     .card .row.top .t i{ background:var(--cd-gold); }
     .card .row .v{ font-weight:800; font-size:46px; text-align:right; line-height:1; letter-spacing:-.03em; font-variant-numeric:tabular-nums; }
     .card .row.top .v{ color:var(--cd-gold); }
+    .card .row .v.diff{ font-size:38px; letter-spacing:-.02em; }
+    .card .row .v.diff.pos{ color:#17d7b0; } .card .row .v.diff.neg{ color:#9aa39a; } .card .row .v.diff.zero{ color:#5f675f; }
+    .card .row.top .v.diff{ color:#17d7b0; }
+    .card .rows.fit .row .v.diff{ font-size:calc(38px * var(--rs)); }
     /* Auto-fit rows: --rs is set by fitRows() so an 8-player and a 20-player
        ladder both fill the card without spilling past the footer. */
     .card .rows.fit{ margin-top:calc(30px * var(--rs, 1)); }
@@ -146,6 +150,7 @@
 
       <div class="field" id="cd-weekf" style="margin-top:4px"><label>Week · drives every league card</label><select id="cd-week"></select></div>
       <div class="field" id="cd-eventf" style="display:none;margin-top:4px"><label>Ladder night · drives the ladder cards</label><select id="cd-event"></select></div>
+      <div class="field" id="cd-teamf" style="display:none;margin-top:4px"><label>Team · drives the team cards</label><select id="cd-team"></select></div>
 
       <div class="grp">League</div>
       <button class="tpl" data-c="potw">SuprDupr Player of the Week<small>one card per winner · men's + women's</small></button>
@@ -153,6 +158,10 @@
       <button class="tpl" data-c="results">Every Match, Every Point<small>the full slate · dots + match points</small></button>
       <button class="tpl" data-c="totw">Team of the Week<small>the night in 12 dots</small></button>
       <button class="tpl" data-c="highlights">Highlights<small>auto-picked stat lines</small></button>
+      <div class="grp">Team</div>
+      <button class="tpl" data-c="tperf">Top Team Performers<small>the team's best by DSR · season to date</small></button>
+      <button class="tpl" data-c="tweek">Team Match Report<small>this week's result · dots + match points</small></button>
+      <button class="tpl" data-c="tsnap">Team Snapshot<small>record, rank, week-by-week form</small></button>
       <div class="grp">Ladders</div>
       <button class="tpl" data-c="podium">Ladder night podium<small>filled blocks = wins, in round order</small></button>
       <button class="tpl" data-c="courts">Court by round<small>who held court 1, who climbed</small></button>
@@ -194,6 +203,7 @@
       week: Number(qs.get('week')) || null,
       who: qs.get('who') || null,
       event: qs.get('event') || null,
+      team: qs.get('team') || null,    // team id for the Team cards
       ctx: qs.get('ctx') || null,      // a hand-edited context line survives in the link
       photo: null,                     // dropped photo (data URL), never saved
       // 'profile' pulls the player's profile photo; 'none' keeps the plain
@@ -203,7 +213,7 @@
       focal: qs.get('focal') || 'center',
     };
     var SEASON = { id: 'circuit-i', code: 'I', name: 'Season 1' };
-    var LB = null, GD = {}, LADDERS = null, NIGHT = {}, PHOTOS = null;
+    var LB = null, GD = {}, LADDERS = null, NIGHT = {}, PHOTOS = null, TEAMS = null, PS = null;
     var H = { '45': 1350, '11': 1080, '916': 1920 };
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
@@ -234,10 +244,17 @@
       if (PHOTOS) return Promise.resolve(PHOTOS);
       return fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON.id)).then(function (r) { return r.ok ? r.json() : null; })
         .then(function (d) {
+          TEAMS = ((d && d.teams) || []).slice().sort(function (a, b) { return String(a.name).localeCompare(String(b.name)); });
           PHOTOS = {};
           ((d && d.teams) || []).forEach(function (t) { (t.roster || []).forEach(function (p) { if (p && p.name && p.photoUrl) PHOTOS[String(p.name).toLowerCase()] = p.photoUrl; }); });
           return PHOTOS;
         }).catch(function () { PHOTOS = {}; return PHOTOS; });
+    }
+    // Season player-stats (composite DSR, W–L per player) — for the Team cards.
+    function loadPS() {
+      if (PS) return Promise.resolve(PS);
+      return fetch('/.netlify/functions/public-leaderboard?circuit=' + encodeURIComponent(SEASON.code) + '&view=players').then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (d) { PS = d || { players: {} }; return PS; });
     }
     function profilePhoto(name, fallback) {
       if (S.usePhoto === 'none') return null;
@@ -427,6 +444,108 @@
         '<div class="ftr"><div class="mono">Standings · dinksociety.app/standings</div>' + sdLogo() + '</div>';
     }
 
+    // ── Team cards ──────────────────────────────────────────────────
+    function teamById(id) { return (TEAMS || []).find(function (t) { return t.id === id; }) || null; }
+    function teamRow(id) {
+      var divs = (LB && LB.divisions) || {};
+      for (var k in divs) { var hit = (divs[k].teams || []).find(function (t) { return t.teamId === id; }); if (hit) return { row: hit, division: k, size: (divs[k].teams || []).length }; }
+      return null;
+    }
+    function teamPlayers(team) {
+      var all = Object.values((PS && PS.players) || {});
+      var mine = all.filter(function (p) { return p.teamId === team.id || (p.teamName && p.teamName === team.name); });
+      // Season-to-date, ranked by DSR; players with no games sink to the bottom.
+      mine.sort(function (a, b) { return (Number(b.composite) || -1) - (Number(a.composite) || -1) || (b.gamesWon || 0) - (a.gamesWon || 0); });
+      return mine;
+    }
+    function teamMatch(gd, team) {
+      return (gd.matches || []).find(function (m) { return (m.home && m.home.id === team.id) || (m.away && m.away.id === team.id); }) || null;
+    }
+    function teamHdr(team, wk, label) {
+      return hdr('Season ' + seasonNo() + (wk ? ' · Week ' + wk : '') + ' · <b>' + label + '</b>');
+    }
+    function teamTitle(team, line2) {
+      var n = team.name || 'Team';
+      return '<div class="disp h2 lift" style="font-size:' + (n.length > 18 ? 64 : n.length > 12 ? 80 : 96) + 'px">' + (team.emoji ? esc(team.emoji) + ' ' : '') + esc(n) + '<br><span class="lime">' + line2 + '</span></div>';
+    }
+
+    function rTeamPerf(wk) {
+      var team = teamById(S.team); if (!team) return null;
+      var list = teamPlayers(team).filter(function (p) { return p.gamesPlayed > 0; }).slice(0, 6);
+      if (!list.length) return null;
+      var top = Math.max.apply(null, list.map(function (p) { return Number(p.composite) || 0; })) || 1;
+      var lead = list[0];
+      var ctx = S.ctx != null ? S.ctx : (short(lead.name) + ' leads ' + team.name + ' at a ' + Number(lead.composite).toFixed(1) + ' DSR' + (list[1] ? ', with ' + short(list[1].name) + ' at ' + Number(list[1].composite).toFixed(1) + ' behind' : '') + ' through Week ' + wk + '.');
+      setCtx(ctx);
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade top"></div>' +
+        teamHdr(team, wk, 'Top Performers') +
+        teamTitle(team, 'Top Performers') +
+        '<div class="mono" style="margin-top:12px">Season to date · ranked by DSR</div>' +
+        '<div class="rows fit">' + list.map(function (p, i) {
+          var v = Number(p.composite) || 0, w = p.gamesWon || 0, l = p.gamesLost != null ? p.gamesLost : Math.max(0, (p.gamesPlayed || 0) - w);
+          return '<div class="row' + (i === 0 ? ' top' : '') + '" style="grid-template-columns:calc(56px * var(--rs, 1)) 1fr 1fr calc(130px * var(--rs, 1))"><span class="n">' + (i + 1) + '</span><span class="who">' + esc(short(p.name)) + '<small>' + w + '–' + l + (p.diff != null ? ' · ' + signed(p.diff) + ' pts' : '') + '</small></span><div class="t"><i style="width:' + Math.max(4, v / top * 100) + '%"></i></div><span class="v">' + v.toFixed(1) + '</span></div>';
+        }).join('') + '</div>' +
+        '<div class="ctx m">' + esc(ctx) + '</div>' +
+        '<div class="ftr"><div class="mono">DSR · Dink Society Rating</div>' + sdLogo() + '</div>';
+    }
+
+    function rTeamWeek(wk, gd) {
+      var team = teamById(S.team); if (!team) return null;
+      var m = teamMatch(gd, team); if (!m || !(m.games || []).length) return null;
+      var home = m.home.id === team.id, p = mp(m);
+      var us = home ? p[0] : p[1], them = home ? p[1] : p[0];
+      var g = home ? [m.gamesHome, m.gamesAway] : [m.gamesAway, m.gamesHome];
+      var pd = home ? m.pointsHome - m.pointsAway : m.pointsAway - m.pointsHome;
+      var opp = home ? m.away : m.home;
+      var won = us > them, tied = us === them;
+      var verb = won ? 'beat' : tied ? 'tied' : 'fell to';
+      var ctx = S.ctx != null ? S.ctx : (team.name + ' ' + verb + ' ' + opp.name + ' ' + us + '–' + them + ', taking ' + g[0] + ' of 12 games' + (pd ? ' and ' + (pd > 0 ? 'outscoring them by ' + pd : 'outscored by ' + Math.abs(pd)) : '') + ' in Week ' + wk + '.');
+      setCtx(ctx);
+      var perf = weekPerf(wk), stars = [];
+      if (perf) { (perf.men || []).concat(perf.women || []).forEach(function (w) { if ((w.teamId === team.id || w.teamName === team.name) && stars.length < 2) stars.push(short(w.name) + ' ' + w.w + '–' + w.l); }); }
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade"></div>' +
+        teamHdr(team, wk, 'Match Report') +
+        '<div style="margin-top:auto"><div class="mono ' + (won ? 'lime' : tied ? '' : 'gold') + '" style="font-size:22px">' + (team.emoji ? esc(team.emoji) + ' ' : '') + (won ? 'Win' : tied ? 'Draw' : 'Loss') + ' · Week ' + wk + '</div>' +
+          '<div class="disp" style="font-size:' + (team.name.length > 14 ? 88 : 110) + 'px;margin-top:10px">' + esc(team.name) + '</div>' +
+          '<div class="mono" style="margin-top:14px">' + (won ? 'Beat ' : tied ? 'Tied ' : 'Lost to ') + esc(opp.name) + ' <b>' + us + '–' + them + '</b> · ' + g[0] + ' of 12 games · ' + (home ? m.pointsHome + '–' + m.pointsAway : m.pointsAway + '–' + m.pointsHome) + ' on points</div>' +
+          '<div class="dots" style="margin-top:26px">' + matchDots(home ? m : { games: (m.games || []).map(function (x) { return { slot: x.slot, homeWin: !x.homeWin }; }) }) + '</div></div>' +
+        '<div class="bars" style="margin-top:30px">' +
+          '<div class="bar"><span class="k">Match pts</span><div class="t"><i style="width:' + (us / 4 * 100) + '%"></i></div><span class="v">' + us + '–' + them + '</span></div>' +
+          '<div class="bar"><span class="k">Games</span><div class="t"><i style="width:' + (g[0] / 12 * 100) + '%"></i></div><span class="v">' + g[0] + '–' + g[1] + '</span></div>' +
+          '<div class="bar"><span class="k">Point diff</span><div class="t diff"><i class="' + (pd < 0 ? 'neg' : '') + '" style="width:' + Math.min(50, Math.abs(pd) / 80 * 50) + '%"></i></div><span class="v">' + signed(pd) + '</span></div>' +
+        '</div>' +
+        '<div class="ctx m">' + esc(ctx) + (stars.length ? ' On the night: ' + stars.join(', ') + '.' : '') + '</div>' +
+        '<div class="ftr"><div class="mono">Full board · dinksociety.app/live</div>' + sdLogo() + '</div>';
+    }
+
+    function rTeamSnap(wk) {
+      var team = teamById(S.team); if (!team) return null;
+      var tr = teamRow(team.id); if (!tr) return null;
+      var r = tr.row;
+      var players = teamPlayers(team).filter(function (p) { return p.gamesPlayed > 0; });
+      var lead = players[0];
+      // Week-by-week form from the players' weekly game records: a week is a
+      // W when the team took more games than it lost that night.
+      var byWeek = {};
+      players.forEach(function (p) { (p.weeklyGameRecords || []).forEach(function (x) { byWeek[x.week] = byWeek[x.week] || { w: 0, l: 0 }; byWeek[x.week].w += x.w || 0; byWeek[x.week].l += x.l || 0; }); });
+      var weeks = Object.keys(byWeek).map(Number).sort(function (a, b) { return a - b; });
+      var form = weeks.map(function (k) { var x = byWeek[k]; return '<span class="blk' + (x.w > x.l ? '' : ' o') + '" title="Wk ' + k + '"></span>'; }).join('');
+      var ord = ['', 'st', 'nd', 'rd'][r.rank] || 'th';
+      var ctx = S.ctx != null ? S.ctx : (team.name + ' sit ' + r.rank + ord + ' of ' + tr.size + ' in ' + tr.division.replace(/-/g, ' ') + ' at ' + r.wins + '–' + r.losses + (r.ties ? '–' + r.ties : '') + (lead ? ', led by ' + short(lead.name) + ' at a ' + Number(lead.composite).toFixed(1) + ' DSR' : '') + ' through Week ' + wk + '.');
+      setCtx(ctx);
+      var stat = function (k, v, cls) { return '<div class="bar"><span class="k">' + k + '</span><span class="v ' + (cls || '') + '" style="text-align:right;flex:1">' + v + '</span></div>'; };
+      return '<div class="hero-flag"></div>' + photoLayer(S.photo) + '<div class="fade"></div>' +
+        teamHdr(team, wk, 'Snapshot') +
+        '<div style="margin-top:auto"><div class="mono lime" style="font-size:22px">' + (team.emoji ? esc(team.emoji) + ' ' : '') + tr.division.replace(/-/g, ' ').toUpperCase() + ' · ' + r.rank + ord + ' place</div>' +
+          '<div class="disp" style="font-size:' + (team.name.length > 14 ? 88 : 110) + 'px;margin-top:10px">' + esc(team.name) + '</div>' +
+          '<div class="disp" style="font-size:150px;line-height:.9;margin-top:18px;color:#b8ff2c">' + r.wins + '<span style="color:#5f675f">–</span>' + r.losses + (r.ties ? '<span style="color:#5f675f">–</span>' + r.ties : '') + '</div>' +
+          '<div class="mono" style="margin-top:10px">Match points ' + (r.matchPointsFor || 0) + '–' + (r.matchPointsAgainst || 0) + ' · Games ' + (r.totalGamesWon || 0) + '–' + (r.totalGamesLost || 0) + ' · ' + signed(r.pointDiff || 0) + ' on points' + (r.sweeps ? ' · ' + r.sweeps + ' sweep' + (r.sweeps === 1 ? '' : 's') : '') + '</div>' +
+          (weeks.length ? '<div class="mono" style="margin-top:26px">Week by week</div><div class="dots" style="gap:8px;margin-top:10px">' + form + '</div>' : '') + '</div>' +
+        (lead ? '<div class="mono" style="margin-top:30px">Leading the way · <b>' + esc(short(lead.name)) + '</b> ' + Number(lead.composite).toFixed(1) + ' DSR' + (players[1] ? ' · <b>' + esc(short(players[1].name)) + '</b> ' + Number(players[1].composite).toFixed(1) : '') + (players[2] ? ' · <b>' + esc(short(players[2].name)) + '</b> ' + Number(players[2].composite).toFixed(1) : '') + '</div>' : '') +
+        '<div class="ctx m">' + esc(ctx) + '</div>' +
+        '<div class="ftr"><div class="mono">Standings · dinksociety.app/standings</div>' + sdLogo() + '</div>';
+    }
+
     function rHighlights(wk, gd) {
       var ms = (gd.matches || []).filter(function (m) { return (m.games || []).length; }); if (!ms.length) return null;
       var games = [];
@@ -464,7 +583,10 @@
         '<div class="mono" style="margin-top:12px">' + (ev.place ? esc(ev.place) + ' · ' : '') + st.players.length + ' players · ' + st.rounds + ' rounds</div>' +
         '<div class="rows fit">' + top.map(function (p, i) {
           var blocks = ''; for (var r = 0; r < st.rounds; r++) { var x = p.rounds[r]; blocks += '<span class="blk' + (x ? (x.win ? '' : ' o') : ' o') + '"' + (x ? '' : ' style="opacity:.35"') + '></span>'; }
-          return '<div class="row' + (i === 0 ? ' top' : '') + '" style="grid-template-columns:calc(56px * var(--rs, 1)) 1fr auto calc(130px * var(--rs, 1))"><span class="n">' + (i + 1) + '</span><span class="who">' + esc(short(p.name)) + '<small>' + signed(p.diff) + '</small></span><div class="dots" style="gap:8px">' + blocks + '</div><span class="v">' + p.w + '–' + p.l + '</span></div>';
+          // Record and point diff side by side, same size — the diff used to be
+          // a tiny caption under the name and couldn't be read on a phone.
+          var d = Number(p.diff) || 0;
+          return '<div class="row' + (i === 0 ? ' top' : '') + '" style="grid-template-columns:calc(56px * var(--rs, 1)) 1fr auto calc(120px * var(--rs, 1)) calc(120px * var(--rs, 1))"><span class="n">' + (i + 1) + '</span><span class="who">' + esc(short(p.name)) + '</span><div class="dots" style="gap:8px">' + blocks + '</div><span class="v">' + p.w + '–' + p.l + '</span><span class="v diff ' + (d > 0 ? 'pos' : d < 0 ? 'neg' : 'zero') + '">' + signed(d) + '</span></div>';
         }).join('') + '</div>' +
         '<div class="ctx m">' + esc(ctx) + '</div>' +
         '<div class="ftr"><div class="mono">Next ladder · dinksociety.app/ladders</div>' + sdLogo() + '</div>';
@@ -503,6 +625,7 @@
 
     // ── controls ──
     var LEAGUE = { potw: 1, leaders: 1, results: 1, totw: 1, highlights: 1 };
+    var TEAM = { tperf: 1, tweek: 1, tsnap: 1 };
     function syncControls() {
       document.querySelectorAll('#cd .tpl').forEach(function (b) { b.classList.toggle('on', b.dataset.c === S.card); });
       document.querySelectorAll('#cd-ratio button').forEach(function (b) { b.classList.toggle('on', b.dataset.r === S.ratio); });
@@ -514,15 +637,17 @@
       $('cd-focal').style.display = (S.usePhoto === 'none' && !S.photo) ? 'none' : '';
       $('cd-gender').style.display = (S.card === 'potw' || S.card === 'leaders') ? '' : 'none';
       $('cd-metric').style.display = S.card === 'leaders' ? '' : 'none';
-      $('cd-weekf').style.display = LEAGUE[S.card] ? '' : 'none';
-      $('cd-eventf').style.display = LEAGUE[S.card] ? 'none' : '';
+      $('cd-weekf').style.display = (LEAGUE[S.card] || TEAM[S.card]) ? '' : 'none';
+      $('cd-eventf').style.display = (LEAGUE[S.card] || TEAM[S.card]) ? 'none' : '';
+      $('cd-teamf').style.display = TEAM[S.card] ? '' : 'none';
       $('cd-whof').style.display = S.card === 'potw' ? '' : 'none';
       $('cd-cap').textContent = 'Preview · exports at 1080 × ' + H[S.ratio];
     }
     function writeUrl() {
       var u = new URL(location.href); var p = u.searchParams;
       p.set('card', S.card); p.set('ratio', S.ratio);
-      if (LEAGUE[S.card]) { if (S.week) p.set('week', S.week); p.delete('event'); } else { if (S.event) p.set('event', S.event); p.delete('week'); }
+      if (LEAGUE[S.card] || TEAM[S.card]) { if (S.week) p.set('week', S.week); p.delete('event'); } else { if (S.event) p.set('event', S.event); p.delete('week'); }
+      if (TEAM[S.card] && S.team) p.set('team', S.team); else p.delete('team');
       if (S.card === 'potw' || S.card === 'leaders') p.set('g', S.gender); else p.delete('g');
       if (S.card === 'leaders') p.set('metric', S.metric); else p.delete('metric');
       if (S.card === 'potw' && S.who) p.set('who', S.who); else p.delete('who');
@@ -545,6 +670,12 @@
       sel.innerHTML = list.map(function (e) { return '<option value="' + esc(e.id) + '">' + esc(fmtDate(e.date, { month: 'short', day: 'numeric' })) + ' · ' + esc(e.name) + '</option>'; }).join('');
       if (!S.event && list.length) S.event = list[0].id;
       sel.value = S.event;
+    }
+    function fillTeams() {
+      var sel = $('cd-team'), list = TEAMS || [];
+      sel.innerHTML = list.map(function (t) { return '<option value="' + esc(t.id) + '">' + (t.emoji ? esc(t.emoji) + ' ' : '') + esc(t.name) + '</option>'; }).join('');
+      if (!S.team || !list.some(function (t) { return t.id === S.team; })) S.team = list.length ? list[0].id : null;
+      if (S.team) sel.value = S.team;
     }
     function fillWho(wk) {
       var perf = weekPerf(wk), sel = $('cd-who');
@@ -582,6 +713,20 @@
 
     function render() {
       syncControls(); status('');
+      if (TEAM[S.card]) {
+        return loadLB().then(loadPhotos).then(loadPS).then(function () { return loadGD(S.week); }).then(function (gd) {
+          fillWeeks(gd);
+          if (String(gd.week) !== String(S.week)) return loadGD(S.week);
+          return gd;
+        }).then(function (gd) {
+          fillTeams();
+          if (!S.team) return showEmpty('No teams in this season yet.');
+          var html = S.card === 'tperf' ? rTeamPerf(S.week) : S.card === 'tweek' ? rTeamWeek(S.week, gd) : rTeamSnap(S.week);
+          writeUrl();
+          if (!html) return showEmpty(S.card === 'tweek' ? 'No finished match for this team in Week ' + S.week + ' yet.' : 'No games on record for this team yet.');
+          show(html);
+        }).catch(function (e) { showEmpty('Could not load: ' + (e.message || e)); });
+      }
       if (LEAGUE[S.card]) {
         return loadLB().then(loadPhotos).then(function () { return loadGD(S.week); }).then(function (gd) {
           fillWeeks(gd);
@@ -616,6 +761,7 @@
     $('cd-metric').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.metric = b.dataset.m; S.ctx = null; render(); });
     $('cd-week').addEventListener('change', function () { S.week = Number(this.value); S.ctx = null; S.who = null; render(); });
     $('cd-event').addEventListener('change', function () { S.event = this.value; S.ctx = null; render(); });
+    $('cd-team').addEventListener('change', function () { S.team = this.value; S.ctx = null; render(); });
     $('cd-who').addEventListener('change', function () { S.who = this.value; S.ctx = null; S.photo = null; render(); });
     var ctxTimer = null;
     $('cd-ctx').addEventListener('input', function () { S.ctx = this.value; clearTimeout(ctxTimer); ctxTimer = setTimeout(render, 250); });

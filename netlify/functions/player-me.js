@@ -7,7 +7,7 @@ import { etagJson, PRIVATE } from './lib/http-cache.js';
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
-import { isRevealTime } from './lib/lineup-helpers.js';
+import { isRevealTime, DEFAULT_REVEAL_OFFSET_MIN } from './lib/lineup-helpers.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
 import { getActiveWaivers, getSignatureAcross, isWaiverSatisfied, waiverSeasonFor } from './lib/waiver.js';
 import { identityIdsFor } from './lib/league-identity.js';
@@ -279,6 +279,9 @@ export default async (req) => {
         championship: !!mt.championship,
         final, myMp, oppMp, result,
         myLocked, revealed, myGames, lineup, scores, availability,
+        // Minutes before scheduledAt the matchup reveals — the portal counts
+        // down to it on match day instead of saying "15 min" as a constant.
+        revealOffsetMin: DEFAULT_REVEAL_OFFSET_MIN,
         status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
       });
       }
