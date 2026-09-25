@@ -131,7 +131,7 @@ export function checkRosterDepth(roster) {
 }
 
 // Season-configurable defaults — keep in sync with UI copy in captain.html / me.html.
-export const DEFAULT_LOCK_OFFSET_MIN = 60;    // lineups hard-lock 1 hour before match start
+export const DEFAULT_LOCK_OFFSET_MIN = 30;    // lineups hard-lock 30 minutes before match start (was 60 — 2026-09-24)
 export const DEFAULT_REVEAL_OFFSET_MIN = 15;  // matchup reveals 15 minutes before match start
 
 /**

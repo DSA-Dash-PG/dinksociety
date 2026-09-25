@@ -7801,7 +7801,7 @@
     const formEl = $id('sc-form-' + matchId);
     if (!formEl) return;
     try {
-      const data = await apiJSON('/.netlify/functions/admin-scores?match=' + matchId);
+      const data = await apiJSON('/.netlify/functions/admin-scores?match=' + encodeURIComponent(matchId));
       const score = data.score || {};
       const games = score.games || {};
       const home = score.home || data.match?.home || {};
@@ -7863,7 +7863,7 @@
     if (srcBtn && !btnBusy(srcBtn, 'Saving…')) return;
     statusEl.textContent = 'Saving…'; statusEl.style.color = 'var(--color-text-faint)';
     try {
-      await apiJSON('/.netlify/functions/admin-scores?match=' + matchId, {
+      await apiJSON('/.netlify/functions/admin-scores?match=' + encodeURIComponent(matchId), {
         method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ games }),
       });
       statusEl.textContent = 'Saved ✓'; statusEl.style.color = 'var(--color-teal)';
@@ -7878,7 +7878,7 @@
     if (srcBtn && !btnBusy(srcBtn, 'Finalizing…')) return;
     statusEl.textContent = 'Finalizing…';
     try {
-      await apiJSON('/.netlify/functions/admin-scores?match=' + matchId + '&action=finalize', { method: 'POST' });
+      await apiJSON('/.netlify/functions/admin-scores?match=' + encodeURIComponent(matchId) + '&action=finalize', { method: 'POST' });
       statusEl.textContent = 'Finalized! Standings updated.'; statusEl.style.color = 'var(--color-lime)';
       loadScoreMatches();
     } catch (e) {
@@ -7892,7 +7892,7 @@
     if (srcBtn && !btnBusy(srcBtn, 'Restarting…')) return;
     statusEl.textContent = 'Restarting…';
     try {
-      await apiJSON('/.netlify/functions/admin-scores?match=' + matchId + '&action=restart', { method: 'POST' });
+      await apiJSON('/.netlify/functions/admin-scores?match=' + encodeURIComponent(matchId) + '&action=restart', { method: 'POST' });
       statusEl.textContent = 'Match restarted — fresh scoresheet.'; statusEl.style.color = 'var(--color-gold)';
       loadScoreMatches();
     } catch (e) {
@@ -7906,7 +7906,7 @@
     if (srcBtn && !btnBusy(srcBtn, 'Reopening…')) return;
     statusEl.textContent = 'Reopening…';
     try {
-      await apiJSON('/.netlify/functions/admin-scores?match=' + matchId + '&action=reopen', { method: 'POST' });
+      await apiJSON('/.netlify/functions/admin-scores?match=' + encodeURIComponent(matchId) + '&action=reopen', { method: 'POST' });
       statusEl.textContent = 'Reopened — edit scores and finalize again.'; statusEl.style.color = 'var(--color-gold)';
       loadScoreMatches();
     } catch (e) {
@@ -7925,7 +7925,7 @@
     if (panel.innerHTML) { panel.innerHTML = ''; delete lineupEditState[matchId]; return; } // toggle closed
     panel.innerHTML = '<div class="loading">Loading lineups…</div>';
     try {
-      const data = await apiJSON('/.netlify/functions/admin-edit-lineup?match=' + matchId);
+      const data = await apiJSON('/.netlify/functions/admin-edit-lineup?match=' + encodeURIComponent(matchId));
       lineupEditState[matchId] = { data, teamId: data.match.home.id };
       renderLineupEdit(matchId);
     } catch (e) {
