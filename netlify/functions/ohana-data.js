@@ -58,7 +58,7 @@ export default async (req) => {
   return json({
     signedIn: true, allowed: true,
     me: { name: v.entry?.name || '', email: v.email, canEdit: v.canEdit, owner: v.owner, onRoster: !!v.entry },
-    league: { name: league.name, venue: league.venue, night: league.night, teams: league.teams, ourTeamId: league.ourTeamId },
+    league: { name: league.name, venue: league.venue, night: league.night, teams: league.teams, ourTeamId: league.ourTeamId, photo: league.photo || null },
     weeks,
     standings: computeStandings(league),
     stats: { team: stats.team, players: stats.players, pairs: stats.pairs.slice(0, 8) },
