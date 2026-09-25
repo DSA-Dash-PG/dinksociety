@@ -48,6 +48,7 @@ export const COURT_SEQ = {
 // ── small helpers ────────────────────────────────────────────────────
 const ms = iso => (iso ? new Date(iso).getTime() : null);
 const round1 = n => (n == null || !isFinite(n) ? null : Math.round(n * 10) / 10);
+const round2 = n => (n == null || !isFinite(n) ? null : Math.round(n * 100) / 100);
 const mean = arr => (arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null);
 function median(arr) {
   if (!arr.length) return null;
@@ -172,7 +173,7 @@ export function computeMatchPace(match, score, lineups = {}, opts = {}) {
   for (const s of SLOT_KEYS) {
     const g = out[s];
     g.min = round1(g.min);
-    g.ptsPerMin = g.min && g.points != null ? round1(g.points / g.min) : null;
+    g.ptsPerMin = g.min && g.points != null ? round2(g.points / g.min) : null;
   }
 
   const list = SLOT_KEYS.map(s => out[s]);
@@ -227,7 +228,7 @@ export function computeMatchPace(match, score, lineups = {}, opts = {}) {
     medianGameMin: round1(median(mins)),
     // Excluding each court's first game (it carries warm-up / late start).
     avgPlayMin: round1(mean(timed.filter(g => !g.flags.includes('fromStart')).map(g => g.min))),
-    ptsPerMin: timed.length ? round1(timed.reduce((a, g) => a + (g.points || 0), 0) / timed.reduce((a, g) => a + g.min, 0)) : null,
+    ptsPerMin: timed.length ? round2(timed.reduce((a, g) => a + (g.points || 0), 0) / timed.reduce((a, g) => a + g.min, 0)) : null,
     fastest: byMin[0] ? slim(byMin[0]) : null,
     slowest: byMin.length ? slim(byMin[byMin.length - 1]) : null,
     entryStyle,
@@ -276,7 +277,7 @@ function finishAgg(agg) {
     courtMin: round1(agg.min),
     avgGameMin: round1(mean(agg.mins)),
     medianGameMin: round1(median(agg.mins)),
-    ptsPerMin: agg.min ? round1(agg.pts / agg.min) : null,
+    ptsPerMin: agg.min ? round2(agg.pts / agg.min) : null,
     winsAvgMin: round1(mean(agg.wins)),
     lossesAvgMin: round1(mean(agg.losses)),
     closeAvgMin: round1(mean(agg.close)),
@@ -428,9 +429,18 @@ export function buildInsights(p) {
   if (n.closeAvgMin != null && n.blowoutAvgMin != null) {
     out.push(`Games decided by 3 or fewer took ${n.closeAvgMin} min on average; blowouts (8+) took ${n.blowoutAvgMin} min.`);
   }
-  const tempo = p.teams.filter(t => t.ptsPerMin != null).sort((a, b) => b.ptsPerMin - a.ptsPerMin);
+  const tempo = p.matches.filter(m => m.ptsPerMin != null).sort((a, b) => b.ptsPerMin - a.ptsPerMin);
   if (tempo.length >= 2) {
-    out.push(`Tempo leaders: ${tempo[0].name} games moved at ${tempo[0].ptsPerMin} points/min (avg ${tempo[0].avgGameMin} min a game); ${tempo[tempo.length - 1].name} games were the grind at ${tempo[tempo.length - 1].ptsPerMin} points/min (${tempo[tempo.length - 1].avgGameMin} min).`);
+    const hi = tempo[0], lo = tempo[tempo.length - 1];
+    const pts = m => m.games.reduce((a, g) => a + (g.min != null ? g.points || 0 : 0), 0);
+    if (hi.ptsPerMin - lo.ptsPerMin < 0.1) {
+      const byLen = [...tempo].filter(m => m.totalMin != null).sort((a, b) => a.totalMin - b.totalMin);
+      if (byLen.length >= 2) {
+        const f = byLen[0], l = byLen[byLen.length - 1];
+        out.push(`Every match played at nearly the same speed (${lo.ptsPerMin}–${hi.ptsPerMin} rally points a minute), so match length came down to how close the games were: ${f.home.name} v ${f.away.name} played ${pts(f)} points, ${l.home.name} v ${l.away.name} played ${pts(l)}.`);
+      }
+    }
+    out.push(`Tempo: ${hi.home.name} v ${hi.away.name} moved at ${hi.ptsPerMin} rally points a minute (avg ${hi.avgGameMin} min a game); ${lo.home.name} v ${lo.away.name} was the grind at ${lo.ptsPerMin} (${lo.avgGameMin} min a game).`);
   }
   const rounds = p.matches.filter(m => m.round1Min != null && m.round2Min != null);
   if (rounds.length) {
@@ -441,7 +451,7 @@ export function buildInsights(p) {
   if (iron.length) out.push(`Most court time: ${iron[0].name} (${iron[0].team}) — ${iron[0].courtMin} min across ${iron[0].games} games.`);
   const lagTeams = p.teams.filter(t => t.avgConfirmLagMin != null && t.avgConfirmLagMin >= 15);
   lagTeams.forEach(t => out.push(`${t.name} took ${t.avgConfirmLagMin} min on average to confirm scores.`));
-  return out;
+  return out.map(t => t.replace(/\.\.$/, '.').replace(/\.\)\.$/, '.).'));
 }
 
 /** Compact version for the Drop generator prompt. */
