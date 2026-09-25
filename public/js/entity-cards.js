@@ -124,7 +124,7 @@
       if (d.dsr != null) stats.push('<span><b>'+esc(d.dsr)+'</b><i>DSR</i></span>');
       if (d.rec)         stats.push('<span><b>'+esc(d.rec)+'</b><i>Rec</i></span>');
       if (d.diff != null)stats.push('<span><b>'+(d.diff>0?'+':'')+esc(d.diff)+'</b><i>Diff</i></span>');
-      return '<div class="ds-entcard__h"><span class="ds-entcard__av '+(/^f/i.test(d.gender)?'f':'m')+'">'+esc(initials(d.name))+(d.isChef?'<i class="chef">🏆</i>':'')+'</span>'
+      return '<div class="ds-entcard__h"><span class="ds-entcard__av '+(/^f/i.test(d.gender)?'f':'m')+'">'+esc(initials(d.name))+(d.isChef?'<img class="chef" src="/img/suprdupr.png" alt="SuprDupr Player of the Week">':'')+'</span>'
         + '<div><div class="ds-entcard__nm">'+esc(d.name)+'</div>'+(d.teamName?'<div class="ds-entcard__sub">'+esc(d.teamName)+'</div>':'')+'</div></div>'
         + (stats.length?'<div class="ds-entcard__stats">'+stats.join('')+'</div>':'')
         + '<div class="ds-entcard__go">View player →</div>';
@@ -176,7 +176,7 @@
       + '.ds-entcard__h{display:flex;gap:11px;align-items:center;}'
       + '.ds-entcard__av,.ds-entcard__crest{width:42px;height:42px;border-radius:11px;flex:none;display:grid;place-items:center;font-weight:800;font-size:16px;position:relative;background:var(--color-surface-3,#262626);}'
       + '.ds-entcard__av.m{color:var(--color-lime,#b8ff2c);}.ds-entcard__av.f{color:var(--color-teal,#17d7b0);}'
-      + '.ds-entcard__av .chef{position:absolute;bottom:-5px;right:-5px;font-size:11px;font-style:normal;background:var(--color-gold,#f0c040);border-radius:50%;width:19px;height:19px;display:grid;place-items:center;border:2px solid var(--color-surface,#161616);}'
+      + '.ds-entcard__av .chef{position:absolute;bottom:-5px;right:-7px;display:block;width:30px;height:auto;border-radius:3px;border:1.5px solid var(--color-surface,#161616);box-sizing:border-box;}'
       + '.ds-entcard__crest{background:var(--color-lime,#b8ff2c);color:var(--color-text-inverse,#0e0e0e);font-size:20px;}'
       + '.ds-entcard__nm{font-weight:800;font-size:14px;color:var(--color-text,#f0f0ec);line-height:1.1;}'
       + '.ds-entcard__sub{font-size:11.5px;color:var(--color-text-muted,#9a9e97);margin-top:2px;}'
