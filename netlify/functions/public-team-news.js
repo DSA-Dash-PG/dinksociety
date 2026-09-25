@@ -7,7 +7,11 @@
 //   GET /.netlify/functions/public-team-news?circuit=II&team=Bonkerz
 //   GET /.netlify/functions/public-team-news?circuit=II&team=bonkerz   (slug works too)
 //     → { circuit, team, items: [ { edition, label, short, kicker, title, dek,
-//           publishedAt, href, featured, mentions: [ { where, label, title, snippet, href } ] } ] }
+//           publishedAt, href, featured, mentions: [ { where, label, title, snippet, href } ] } ],
+//         photos: [ { id, caption, credit, focal, edition, label, kicker, publishedAt, href } ] }
+//
+// `photos` = every photo on a storyline tagged to this team (storyline.team),
+// newest edition first, in the editor's order. Powers the team page Photos tab.
 //
 // `where` is one of: featured (a storyline ABOUT the team — scouting card),
 // story (named in a storyline), around (its Around the League report),
@@ -67,6 +71,7 @@ export default async (req) => {
     }
 
     const items = [];
+    const photos = [];
     for (const r of recs) {
       const edHref = '/drop?edition=' + encodeURIComponent(r.edition);
       const mentions = [];
@@ -79,6 +84,13 @@ export default async (req) => {
         const body = plain(s.html);
         if (s.team && slug(s.team) === want) {
           featured = true;
+          const imgs = (Array.isArray(s.images) && s.images.length) ? s.images : (s.image ? [s.image] : []);
+          imgs.forEach(im => {
+            if (!im || !im.id) return;
+            photos.push({ id: im.id, caption: im.caption || null, credit: im.credit || null, focal: im.focal || null,
+              edition: r.edition, label: r.label, kicker: r.kicker || null, order: r.order ?? 0,
+              publishedAt: r.publishedAt || null, href: edHref + '#' + sid });
+          });
           mentions.push({ where: 'featured', label: s.tag || 'Team report', title: s.title || '', snippet: body.slice(0, 200) + (body.length > 200 ? '…' : ''), href: edHref + '#' + sid });
           return;
         }
@@ -118,10 +130,17 @@ export default async (req) => {
       });
     }
     items.sort((a, b) => (b.order ?? 0) - (a.order ?? 0));
-    return etagJson(req, { circuit, team: teamName, items });
+    // Newest edition first; within an edition keep the editor's photo order.
+    const seen = new Set();
+    const photoList = photos
+      .map((p, i) => ({ p, i }))
+      .sort((a, b) => (b.p.order - a.p.order) || (a.i - b.i))
+      .map(x => x.p)
+      .filter(p => (seen.has(p.id) ? false : (seen.add(p.id), true)));
+    return etagJson(req, { circuit, team: teamName, items, photos: photoList });
   } catch (err) {
     console.error('public-team-news error:', err);
-    return etagJson(req, { circuit, team: teamParam, items: [], message: 'News is unavailable right now.' });
+    return etagJson(req, { circuit, team: teamParam, items: [], photos: [], message: 'News is unavailable right now.' });
   }
 };
 

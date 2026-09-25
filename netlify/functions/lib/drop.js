@@ -163,7 +163,7 @@ function normImage(x) {
 // rest as a thumbnail strip, and every storyline photo also lands in the
 // closing Week in Pictures mosaic.
 const STORY_IMG_MAX = 30;
-const GALLERY_MAX = 60;
+const GALLERY_MAX = 100;
 
 // A "Week in Pictures" gallery: an ordered list of photos (each id + caption).
 function normGallery(input) {
