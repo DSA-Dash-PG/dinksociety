@@ -334,7 +334,7 @@
     root.innerHTML =
       '<div class="ds-lc-head">' +
         '<span class="ds-livedot"></span>' +
-        '<h3>Now Playing</h3>' +
+        '<h3>' + (d.matches.some(function (m) { return m.status === 'live'; }) ? 'Now Playing' : d.matches.every(function (m) { return m.status === 'final'; }) ? 'Final' : 'Tonight') + '</h3>' +
         '<span class="wk">Week ' + d.week +
           (d.phase === 'rivalry' ? ' · <span class="rival">' + esc(d.phaseLabel || 'Rivalry Week') + '</span>' : '') +
         '</span>' +

@@ -1004,10 +1004,15 @@
       var isTbd = teamA === 'TBD' && teamB === 'TBD';
       var meta = courtMeta(m, idx);
 
+      // "Live" means the match is actually underway — status says so, or its
+      // start time has passed. Before that on game day it's "Tonight · 6:00 PM".
+      var startMs = m.scheduledAt ? new Date(m.scheduledAt).getTime() : NaN;
+      var underway = m.status === 'live' || (!isNaN(startMs) && Date.now() >= startMs);
       var badge = '';
-      if (isFinal)              badge = '<span class="dwc__badge b-final">Final</span>';
-      else if (isToday && !isTbd) badge = '<span class="dwc__badge b-live"><span class="ld"></span>Live</span>';
-      else                      badge = '<span class="dwc__badge b-up">Upcoming</span>';
+      if (isFinal)                        badge = '<span class="dwc__badge b-final">Final</span>';
+      else if (isToday && !isTbd && underway) badge = '<span class="dwc__badge b-live"><span class="ld"></span>Live</span>';
+      else if (isToday && !isTbd)         badge = '<span class="dwc__badge b-up">Tonight · ' + startLabel(m) + '</span>';
+      else                                badge = '<span class="dwc__badge b-up">Upcoming</span>';
 
       var center, aWin = false, bWin = false;
       if (isFinal && m.homeRoundPts != null){
@@ -1080,9 +1085,14 @@
       if (!matches.length) return; // nothing to show — leave hidden
       var today = isWeekToday(n, weeksData);
 
-      document.getElementById('rc-week-eyebrow').textContent = today ? 'This Week · Live' : 'Up Next · Week ' + n;
+      var anyUnderway = today && matches.some(function(m){ var t = m.scheduledAt ? new Date(m.scheduledAt).getTime() : NaN; return m.status === 'live' || (!isNaN(t) && Date.now() >= t && m.status !== 'final'); });
+      document.getElementById('rc-week-eyebrow').textContent = today ? (anyUnderway ? 'This Week · Live' : 'This Week · Tonight') : 'Up Next · Week ' + n;
+      // First serve = the earliest scheduled match that night, not the season
+      // default — Season 2 plays 6:00 at South End while the default says 7:00.
+      var firstMatch = matches.filter(function(m){ return m.scheduledAt && !isNaN(new Date(m.scheduledAt)); })
+        .sort(function(a,b){ return new Date(a.scheduledAt) - new Date(b.scheduledAt); })[0] || null;
       document.getElementById('rc-week-date').textContent =
-        weekNightDate(n, weeksData).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}) + ' · matches start ' + MATCH_START_TIME;
+        weekNightDate(n, weeksData).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}) + ' · matches start ' + (firstMatch ? startLabel(firstMatch) : MATCH_START_TIME);
       grid.innerHTML = orderMatches(matches).map(function(m, idx){ return matchCard(m, idx, today); }).join('');
       sec.style.display = '';
     }
