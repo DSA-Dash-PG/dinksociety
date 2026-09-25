@@ -26,15 +26,21 @@ export default async (req) => {
 
     const contentType = result.metadata?.contentType || 'image/jpeg';
 
-    return new Response(result.data, {
-      status: 200,
-      headers: {
-        'Content-Type': contentType,
+    // ?dl=1[&name=...] → save-as download with a readable filename (the
+    // lightbox Download button). The name is sanitized to [a-z0-9-].
+    const headers = {
+      'Content-Type': contentType,
         // Drop photos are immutable once uploaded (a new photo = a new id), so we
         // can cache hard.
-        'Cache-Control': 'public, max-age=31536000, immutable',
-      },
-    });
+      'Cache-Control': 'public, max-age=31536000, immutable',
+    };
+    if (url.searchParams.get('dl') === '1') {
+      const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg';
+      const base = String(url.searchParams.get('name') || `dink-society-${id}`).toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'dink-society-photo';
+      headers['Content-Disposition'] = `attachment; filename="${base}.${ext}"`;
+    }
+    return new Response(result.data, { status: 200, headers });
   } catch (err) {
     console.error('drop-photo-serve error:', err);
     return new Response('Error loading image', { status: 500 });

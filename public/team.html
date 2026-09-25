@@ -77,6 +77,10 @@
     #tp-lightbox .x { position: absolute; top: 14px; right: 20px; font-size: 30px; color: #fff; background: none; border: none; cursor: pointer; line-height: 1; }
     #tp-lightbox .nav { position: absolute; top: 50%; transform: translateY(-50%); font-size: 34px; color: #fff; background: rgba(255,255,255,.08); border: none; width: 46px; height: 46px; border-radius: 50%; cursor: pointer; line-height: 1; }
     #tp-lightbox .nav.prev { left: 14px; } #tp-lightbox .nav.next { right: 14px; }
+    #tp-lightbox .cap { bottom: 64px; }
+    #tp-lightbox .acts { position: absolute; bottom: 16px; left: 0; right: 0; display: flex; gap: 7px; justify-content: center; flex-wrap: wrap; }
+    #tp-lightbox .acts a, #tp-lightbox .acts button { font: inherit; font-size: 11px; font-weight: 800; padding: 9px 16px; border-radius: 9999px; border: 1px solid var(--color-border-strong); background: transparent; color: #fff; text-decoration: none; cursor: pointer; }
+    #tp-lightbox .acts .pri { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
 
     /* ── HERO (gradient band) ── */
     .a-hero { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-lg); overflow: hidden; }
@@ -807,15 +811,22 @@
     (function () {
       const lb = document.createElement('div');
       lb.id = 'tp-lightbox'; lb.setAttribute('aria-hidden', 'true');
-      lb.innerHTML = '<button class="x" type="button" aria-label="Close">&times;</button><button class="nav prev" type="button" aria-label="Previous">‹</button><img src="" alt=""><button class="nav next" type="button" aria-label="Next">›</button><div class="cap"></div>';
+      lb.innerHTML = '<button class="x" type="button" aria-label="Close">&times;</button><button class="nav prev" type="button" aria-label="Previous">‹</button><img src="" alt=""><button class="nav next" type="button" aria-label="Next">›</button><div class="cap"></div>'
+        + '<div class="acts"><a class="pri dl" href="#" download>⤓ Download</a><button class="dlall" type="button">Download all</button><button class="share" type="button">Share</button></div>';
       document.body.appendChild(lb);
       const img = lb.querySelector('img'), cap = lb.querySelector('.cap');
       let at = -1, x0 = null;
+      const slugify = t => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const teamName = () => (document.querySelector('.a-name') || {}).textContent || 'team';
+      const dlUrl = (p, i) => '/.netlify/functions/drop-photo-serve?id=' + encodeURIComponent(p.id) + '&dl=1&name=' + encodeURIComponent('dink-society-' + slugify(teamName()) + '-' + slugify(p.edition || p.label) + '-' + String(i + 1).padStart(2, '0'));
       const show = i => {
         if (!PHOTOS.length) return;
         at = (i + PHOTOS.length) % PHOTOS.length; const p = PHOTOS[at];
         img.src = '/.netlify/functions/drop-photo-serve?id=' + encodeURIComponent(p.id);
-        cap.textContent = [p.caption, p.credit, `${at + 1} / ${PHOTOS.length}`].filter(Boolean).join(' · ');
+        cap.textContent = [p.caption, p.credit, p.kicker || p.label, `${at + 1} / ${PHOTOS.length}`].filter(Boolean).join(' · ');
+        lb.querySelector('.dl').href = dlUrl(p, at);
+        lb.querySelector('.dlall').textContent = `Download all ${PHOTOS.length}`;
+        lb.querySelector('.dlall').style.display = PHOTOS.length > 1 ? '' : 'none';
         lb.classList.add('on'); lb.setAttribute('aria-hidden', 'false');
       };
       const close = () => { lb.classList.remove('on'); lb.setAttribute('aria-hidden', 'true'); img.src = ''; at = -1; };
@@ -824,6 +835,17 @@
         if (!lb.classList.contains('on')) return;
         if (e.target.closest('#tp-lightbox .prev')) return show(at - 1);
         if (e.target.closest('#tp-lightbox .next')) return show(at + 1);
+        if (e.target.closest('#tp-lightbox .dlall')) {
+          // Staggered — browsers block a burst of simultaneous downloads.
+          PHOTOS.forEach((p, i) => setTimeout(() => { const a = document.createElement('a'); a.href = dlUrl(p, i); a.download = ''; a.style.display = 'none'; document.body.appendChild(a); a.click(); a.remove(); }, i * 450));
+          return;
+        }
+        if (e.target.closest('#tp-lightbox .share')) {
+          const p = PHOTOS[at]; const url = location.origin + (p && p.href ? p.href : location.pathname + location.search);
+          if (navigator.share) { navigator.share({ title: teamName() + ' · The Drop', url }).catch(() => {}); return; }
+          if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => { cap.textContent = 'Link copied'; });
+          return;
+        }
         if (e.target === lb || e.target.closest('#tp-lightbox .x')) close();
       });
       document.addEventListener('keydown', e => {
