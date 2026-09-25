@@ -564,7 +564,11 @@
         }
         panels += `</div>`;
       }
-      panels += `</div></section>`;
+      panels += `</div>`;
+      /* Game Pace card — filled in after render from /public-pace?team= */
+      panels += `<div class="card" id="pace-card"><div class="card-head"><h3>⏱️ Game Pace</h3><span class="pill" id="pace-rank">…</span></div>
+        <div id="pace-body"><div class="tp-empty">Timing the courts…</div></div></div>`;
+      panels += `</section>`;
 
       /* ── SCHEDULE ── */
       const upcoming = myMatches.filter(m => !isFinal(m));
@@ -687,6 +691,7 @@
       document.getElementById('page-root').innerHTML = hero + panels;
       wireTabs();
       loadNews(team);
+      loadPace(team);
       // ?tab=news (or #news) opens straight onto that tab.
       const wantTab = _q.get('tab') || (location.hash ? location.hash.slice(1) : '');
       if (wantTab) { const b = document.querySelector(`.tab[data-tab="${wantTab}"]`); if (b) b.click(); }
@@ -718,6 +723,66 @@
           <a class="news-item__more" href="${esc(it.href)}">Read the edition ›</a>
         </div>`;
       }).join('');
+    }
+
+    /* ─── Game Pace: how long this team's games and matches take ─── */
+    async function loadPace(team) {
+      const body = document.getElementById('pace-body'), rk = document.getElementById('pace-rank');
+      if (!body) return;
+      let d = null;
+      try {
+        const r = await fetch('/.netlify/functions/public-pace?circuit=' + encodeURIComponent(CIRCUIT) + '&team=' + encodeURIComponent(team.name));
+        d = r.ok ? await r.json() : null;
+      } catch { d = null; }
+      if (!d || !d.team) { if (rk) rk.textContent = 'No games yet'; body.innerHTML = '<div class="tp-empty">Game pace fills in after this team\'s first game night.</div>'; return; }
+      const t = d.team, L = d.league || {};
+      const hm = m => { const h = Math.floor(m / 60), mm = Math.round(m - h * 60); return h ? `${h}h ${mm}m` : `${mm}m`; };
+      const v = x => (x == null ? '—' : x);
+      if (rk) rk.textContent = d.rank === 1 ? 'Quickest games in the league' : d.rank === d.of ? 'Longest games in the league' : `#${d.rank} of ${d.of} for pace`;
+      const diff = t.avgGameMin != null && L.avgGameMin != null ? Math.round((t.avgGameMin - L.avgGameMin) * 10) / 10 : null;
+      let h = `<div class="tile-row" style="margin-bottom:14px;">
+          <div class="tile"><div class="tile__v">${v(t.avgGameMin)}</div><div class="tile__l">Avg game (min)${diff != null ? ` · ${diff > 0 ? '+' : ''}${diff} vs league` : ''}</div></div>
+          <div class="tile"><div class="tile__v">${v(t.avgMatchMin)}</div><div class="tile__l">Avg match (min)</div></div>
+          <div class="tile"><div class="tile__v">${v(t.winsAvgMin)}</div><div class="tile__l">Avg win (min)</div></div>
+          <div class="tile"><div class="tile__v">${v(t.lossesAvgMin)}</div><div class="tile__l">Avg loss (min)</div></div>
+        </div>`;
+      const bt = t.byType || {};
+      const types = [['WOMENS', "Women's"], ['MENS', "Men's"], ['MIXED', 'Mixed']].filter(([k]) => bt[k] && bt[k].n);
+      if (types.length) {
+        const mx = Math.max(...types.map(([k]) => bt[k].avgMin || 0), ...(types.map(([k]) => (L.byType && L.byType[k] && L.byType[k].avgMin) || 0)), 1);
+        h += `<div class="roster-head" style="margin-top:4px;">By game type <span class="pill">team vs league avg</span></div>` + types.map(([k, lab]) => {
+          const lg = L.byType && L.byType[k] ? L.byType[k].avgMin : null;
+          return `<div style="display:grid;grid-template-columns:70px 1fr 90px;gap:10px;align-items:center;margin:6px 0;font-size:12px;">
+            <span style="color:var(--color-text-muted);">${lab}</span>
+            <span style="position:relative;height:12px;border-radius:6px;background:var(--color-surface-2);overflow:hidden;">
+              <i style="position:absolute;left:0;top:0;bottom:0;width:${Math.round(bt[k].avgMin / mx * 100)}%;background:var(--color-lime);border-radius:6px;"></i>
+              ${lg != null ? `<b style="position:absolute;top:-2px;bottom:-2px;left:${Math.round(lg / mx * 100)}%;width:2px;background:var(--color-text-muted);"></b>` : ''}
+            </span>
+            <span style="text-align:right;font-variant-numeric:tabular-nums;"><b>${bt[k].avgMin}</b> <span style="color:var(--color-text-faint);">/ ${v(lg)}</span></span></div>`;
+        }).join('');
+      }
+      if ((d.matches || []).length) {
+        const mx = Math.max(...d.matches.map(m => m.totalMin || 0), 1);
+        h += `<div class="roster-head" style="margin-top:16px;">Match length by week</div>` + d.matches.map(m => `
+          <div style="display:grid;grid-template-columns:minmax(130px,1.4fr) 2fr 70px;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--color-border);font-size:12.5px;">
+            <span>Wk ${m.week} · <b style="color:${m.result === 'W' ? 'var(--color-teal)' : m.result === 'L' ? 'var(--color-red)' : 'var(--color-text-muted)'}">${m.result}</b> ${m.games} vs ${esc(m.opponent)}</span>
+            <span style="height:10px;border-radius:6px;background:var(--color-surface-2);overflow:hidden;"><i style="display:block;height:100%;width:${Math.round((m.totalMin || 0) / mx * 100)}%;background:var(--color-lime);border-radius:6px;"></i></span>
+            <span style="text-align:right;font-variant-numeric:tabular-nums;"><b>${v(m.totalMin)}</b> min</span></div>`).join('');
+      }
+      const gl = (lab, g) => g ? `<div style="padding:9px 0;border-top:1px solid var(--color-border);font-size:13px;display:flex;gap:10px;align-items:baseline;">
+          <span style="flex:none;min-width:96px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);">${lab}</span>
+          <span style="flex:1;">${g.won ? 'Won' : 'Lost'} <b>${esc(g.teamScore)}</b> vs ${esc(g.opponent)}${g.teamPair ? ` · ${esc(g.teamPair)}` : ''}<br><span style="font-size:11px;color:var(--color-text-faint);">Week ${g.week} · ${esc(g.label)} ${esc(g.type)}</span></span>
+          <b style="font-variant-numeric:tabular-nums;">${g.approx ? '~' : ''}${g.min} min</b></div>` : '';
+      h += `<div class="roster-head" style="margin-top:16px;">Games to remember</div>` + gl('Quickest win', d.quickestWin) + gl('Longest game', d.longestGame) + (d.longestClutch && (!d.longestGame || d.longestClutch.slot !== d.longestGame.slot || d.longestClutch.week !== d.longestGame.week) ? gl('Longest nail-biter', d.longestClutch) : '');
+      const ct = (d.courtTime || []).slice(0, 6);
+      if (ct.length) {
+        h += `<div class="roster-head" style="margin-top:16px;">Court time · season</div>` + ct.map((p, i) => `
+          <div style="display:grid;grid-template-columns:18px 1fr auto auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--color-border);font-size:12.5px;">
+            <span style="color:var(--color-text-faint);font-weight:800;">${i + 1}</span><span><b>${esc(p.name)}</b></span>
+            <span style="color:var(--color-text-faint);">${p.games} games</span><b style="font-variant-numeric:tabular-nums;">${hm(p.courtMin)}</b></div>`).join('');
+      }
+      h += `<div style="margin-top:12px;font-size:11px;color:var(--color-text-faint);">Times come from when each score was entered — close, not exact. ~ = entered two at a time. <a href="/the-nvz${LINK_SUFFIX ? '?' + LINK_SUFFIX.slice(1) : ''}" style="color:var(--color-lime);">League pace in The NVZ ›</a></div>`;
+      body.innerHTML = h;
     }
 
     /* ─── Photos: every photo on a Drop storyline tagged to this team ─── */

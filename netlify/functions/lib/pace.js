@@ -477,6 +477,145 @@ export function paceBrief(p) {
     quickestGames: p.fastestGames.slice(0, 3),
     mostCourtTime: p.players.slice(0, 5).map(x => ({ name: x.name, team: x.team, courtMin: x.courtMin, games: x.games })),
     insights: p.insights,
+    // Story-ready pace facts: how long each winner took to close, every
+    // one- and two-point game with its clock, and each team's quickest win /
+    // longest game. The writer should lean on these first.
+    stories: p.stories || null,
+  };
+}
+
+// ── pace stories (for The Drop) ──────────────────────────────────────
+/** Games won by each side and the match winner (by games — a 2–2 tie on
+ *  match points can still be 6–6 in games, so the winner may be null). */
+export function matchResult(m) {
+  const hw = m.games.filter(g => g.winner === 'home').length;
+  const aw = m.games.filter(g => g.winner === 'away').length;
+  const hp = m.games.reduce((a, g) => a + (g.home || 0), 0);
+  const ap = m.games.reduce((a, g) => a + (g.away || 0), 0);
+  return {
+    homeGames: hw, awayGames: aw, homePts: hp, awayPts: ap,
+    winner: hw > aw ? m.home.name : aw > hw ? m.away.name : null,
+    loser: hw > aw ? m.away.name : aw > hw ? m.home.name : null,
+  };
+}
+const ord = n => n + (['th', 'st', 'nd', 'rd'][((n % 100) - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+const pairShort = names => (names || []).map(shortName).join(' & ');
+const hm = min => { const h = Math.floor(min / 60), m = Math.round(min - h * 60); return h ? `${h} hr ${m} min` : `${m} min`; };
+
+/**
+ * Plain facts, one sentence each, written so they can be lifted straight into
+ * a team storyline:
+ *   matches[] — how fast/slow each match went and how the winner closed it
+ *   clutch[]  — every game decided by 1–2 points, with its clock and rank
+ *   romps[]   — the quickest lopsided wins (margin 7+)
+ *   teams{}   — per team: week vs season pace, quickest win, longest game,
+ *               match length vs its previous weeks
+ * Durations are approximate (score-entry times). When a match's captain
+ * entered both courts' games together ('per pair'), the two games in that
+ * pair share one time — `paired: true` flags it so copy says "about".
+ */
+export function paceStories(p, history = []) {
+  if (!p || !p.night?.timedGames) return null;
+  const nightAvg = p.night.avgGameMin;
+  const all = p.matches.flatMap(m => m.games.filter(g => g.min != null).map(g => ({ g, m })));
+  const byLen = [...all].sort((a, b) => b.g.min - a.g.min);
+  const rank = x => byLen.indexOf(x) + 1;
+  const done = p.matches.filter(m => m.totalMin != null).sort((a, b) => a.totalMin - b.totalMin);
+  const nm = (m, side) => m[side].name;
+  const score = (g, m) => `${m.home.name} ${g.home}–${g.away} ${m.away.name}`;
+  const winPair = g => pairShort(g.winner === 'home' ? g.homePair : g.awayPair);
+  const losePair = g => pairShort(g.winner === 'home' ? g.awayPair : g.homePair);
+  const winTeam = (g, m) => (g.winner === 'home' ? nm(m, 'home') : nm(m, 'away'));
+  const loseTeam = (g, m) => (g.winner === 'home' ? nm(m, 'away') : nm(m, 'home'));
+  const wl = (g, m) => `${winTeam(g, m)} ${Math.max(g.home, g.away)}–${Math.min(g.home, g.away)} over ${loseTeam(g, m)}`;
+  const paired = m => m.entryStyle === 'per pair' || m.entryStyle === 'batched';
+
+  const matches = p.matches.map(m => {
+    const r = matchResult(m);
+    const pos = done.indexOf(m);
+    const tag = m.totalMin == null ? '' : pos === 0 && done.length > 1 ? ' — the fastest match of the night' : pos === done.length - 1 && done.length > 1 ? ' — the longest match of the night' : '';
+    const head = r.winner
+      ? `${r.winner} beat ${r.loser} ${Math.max(r.homeGames, r.awayGames)}–${Math.min(r.homeGames, r.awayGames)} in games`
+      : `${m.home.name} and ${m.away.name} split the games ${r.homeGames}–${r.awayGames}`;
+    const clock = m.totalMin != null ? ` in ${m.totalMin} min of court time${tag}` : '';
+    const rounds = m.round1Min != null && m.round2Min != null ? ` Round one took ${m.round1Min} min, round two ${m.round2Min}.` : '';
+    let closer = '';
+    if (r.winner) {
+      const side = r.winner === m.home.name ? 'home' : 'away';
+      const wins = m.games.filter(g => g.winner === side && g.min != null).sort((a, b) => a.min - b.min);
+      if (wins[0]) closer = ` Quickest ${r.winner} win: ${wins[0].label} ${wins[0].typeLabel}, ${Math.max(wins[0].home, wins[0].away)}–${Math.min(wins[0].home, wins[0].away)} in ${wins[0].min} min${wins[0].homePair.length ? ` (${winPair(wins[0])})` : ''}.`;
+    }
+    const prev = [];
+    for (const h of history) for (const hm of h.matches) {
+      for (const t of [m.home.name, m.away.name]) if ((hm.home.name === t || hm.away.name === t) && hm.totalMin != null && m.totalMin != null) prev.push({ team: t, week: h.week, totalMin: hm.totalMin });
+    }
+    return {
+      match: `${m.home.name} v ${m.away.name}`,
+      winner: r.winner, games: `${r.homeGames}–${r.awayGames}`, points: `${r.homePts}–${r.awayPts}`,
+      totalMin: m.totalMin, round1Min: m.round1Min, round2Min: m.round2Min, avgGameMin: m.avgGameMin,
+      pointsPlayed: r.homePts + r.awayPts, paired: paired(m),
+      line: `${head}${clock}.${rounds}${closer}`.replace(/\.\./g, '.'),
+      previous: prev,
+    };
+  });
+
+  const clutch = all.filter(x => x.g.margin != null && x.g.margin <= 2).sort((a, b) => b.g.min - a.g.min).map(x => {
+    const { g, m } = x; const rk = rank(x);
+    const vs = nightAvg != null ? round1(g.min - nightAvg) : null;
+    const where = rk === 1 ? 'the longest game of the night' : `the ${ord(rk)}-longest of ${byLen.length} games`;
+    return {
+      match: `${m.home.name} v ${m.away.name}`, slot: g.label, type: g.typeLabel, score: score(g, m), min: g.min, rank: rk, paired: paired(m),
+      line: `${g.label} ${g.typeLabel}: ${wl(g, m)}${g.homePair.length ? ` (${winPair(g)} over ${losePair(g)})` : ''}, ${paired(m) ? 'about ' : ''}${g.min} min — ${where}${vs != null && vs > 0 ? `, ${vs} min over the night's average game` : ''}.`,
+    };
+  });
+
+  const romps = all.filter(x => x.g.margin != null && x.g.margin >= 7 && !x.g.flags.includes('fromStart'))
+    .sort((a, b) => a.g.min - b.g.min).slice(0, 5).map(({ g, m }) => ({
+      match: `${m.home.name} v ${m.away.name}`, slot: g.label, type: g.typeLabel, score: score(g, m), min: g.min, paired: paired(m),
+      line: `${g.label} ${g.typeLabel}: ${wl(g, m)}${g.homePair.length ? ` (${winPair(g)})` : ''} in ${paired(m) ? 'about ' : ''}${g.min} min.`,
+    }));
+
+  const teams = {};
+  for (const t of p.teams) {
+    const mine = p.matches.filter(m => m.home.id === t.id || m.away.id === t.id);
+    const games = mine.flatMap(m => m.games.filter(g => g.min != null).map(g => ({ g, m, side: m.home.id === t.id ? 'home' : 'away' })));
+    const wins = games.filter(x => x.g.winner === x.side && !x.g.flags.includes('fromStart')).sort((a, b) => a.g.min - b.g.min);
+    // Longest game, skipping each court's first game (it carries warm-up).
+    const longest = [...games].filter(x => !x.g.flags.includes('fromStart')).sort((a, b) => b.g.min - a.g.min)[0];
+    const s = p.season?.teams.find(x => x.id === t.id);
+    const lines = [];
+    if (t.avgGameMin != null) lines.push(`${t.name} averaged ${t.avgGameMin} min a game this week${s?.avgGameMin != null && s.avgGameMin !== t.avgGameMin ? ` (season: ${s.avgGameMin})` : ''}; league average this week ${nightAvg}.`);
+    if (t.winsAvgMin != null && t.lossesAvgMin != null) lines.push(`Wins took ${t.winsAvgMin} min on average, losses ${t.lossesAvgMin}.`);
+    if (wins[0]) { const { g, m } = wins[0]; lines.push(`Quickest win: ${g.label} ${g.typeLabel}, ${Math.max(g.home, g.away)}–${Math.min(g.home, g.away)} over ${loseTeam(g, m)}${g.homePair.length ? ` (${winPair(g)})` : ''} in ${paired(m) ? 'about ' : ''}${g.min} min.`); }
+    if (longest) { const { g, m, side } = longest; const won = g.winner === side; const other = side === 'home' ? 'away' : 'home'; lines.push(`Longest game: ${g.label} ${g.typeLabel}, ${won ? 'won' : 'lost'} ${g[side]}–${g[other]} vs ${m[other].name}${g.homePair.length ? ` (${pairShort(g[side + 'Pair'])})` : ''}, ${paired(m) ? 'about ' : ''}${g.min} min.`); }
+    const thisMatch = mine[0]?.totalMin;
+    const before = history.flatMap(h => h.matches.filter(hm => (hm.home.id === t.id || hm.away.id === t.id) && hm.totalMin != null).map(hm => ({ week: h.week, totalMin: hm.totalMin })));
+    if (thisMatch != null && before.length) {
+      const last = before[before.length - 1]; const d = round1(thisMatch - last.totalMin);
+      lines.push(`Match length ${thisMatch} min vs ${last.totalMin} in Week ${last.week} (${d > 0 ? '+' : ''}${d} min).`);
+    }
+    // The team's season iron man / woman — most minutes on court so far.
+    const iron = (p.season?.players || []).filter(x => x.team === t.name && x.courtMin).sort((a, b) => b.courtMin - a.courtMin)[0];
+    if (iron) lines.push(`Most court time on the team this season: ${iron.name}, ${iron.courtMin} min (${hm(iron.courtMin)}) across ${iron.games} games.`);
+    teams[t.name] = { avgGameMin: t.avgGameMin, seasonAvgGameMin: s?.avgGameMin ?? null, matchMin: thisMatch ?? null, previousMatches: before, lines };
+  }
+
+  // Season court-time leaders — the iron men and women. Minutes played to
+  // date, how far ahead #1 is, and this week's heaviest workload.
+  const sp = (p.season?.players || []).filter(x => x.courtMin).sort((a, b) => b.courtMin - a.courtMin);
+  const courtTime = { season: null, weekLeader: null };
+  courtTime.season = sp.slice(0, 5).map((x, i) => ({
+    name: x.name, team: x.team, courtMin: x.courtMin, games: x.games, avgGameMin: x.avgGameMin, record: x.record,
+    line: `${x.name} (${x.team}): ${x.courtMin} min on court this season — ${hm(x.courtMin)} — across ${x.games} games (${x.record.w}–${x.record.l})${i === 0 && sp[1] ? `, ${round1(x.courtMin - sp[1].courtMin)} min more than anyone else in the league` : ''}.`,
+  }));
+  const wk = (p.players || []).filter(x => x.courtMin)[0];
+  if (wk) courtTime.weekLeader = `${wk.name} (${wk.team}) logged ${wk.courtMin} min across ${wk.games} games this week.`;
+
+  return {
+    note: 'Minutes come from when each score was entered — approximate. "about" = that match entered both courts together, so paired games share a time.',
+    nightAvgGameMin: nightAvg,
+    closeAvgMin: p.night.closeAvgMin, blowoutAvgMin: p.night.blowoutAvgMin,
+    matches, clutch, romps, courtTime, teams,
   };
 }
 
@@ -532,5 +671,16 @@ export async function loadPace(circuit, week = null, opts = {}) {
   }
   const seasonPaces = timedWeeks.filter(w => w <= target).flatMap(w => perWeek.get(w));
   const summary = summarizePace(perWeek.get(target), seasonPaces);
-  return { circuit: code, week: target, weeks: timedWeeks, startOffsetMin: opts.startOffsetMin ?? DEFAULT_START_OFFSET_MIN, ...summary };
+  // Every earlier week's match lengths, so the stories can say "22 minutes
+  // quicker than last Thursday" without another load.
+  const history = timedWeeks.filter(w => w < target).map(w => ({
+    week: w,
+    matches: perWeek.get(w).map(m => ({ home: m.home, away: m.away, totalMin: m.totalMin, avgGameMin: m.avgGameMin, ...matchResult(m) })),
+  }));
+  summary.stories = paceStories(summary, history);
+  const out = { circuit: code, week: target, weeks: timedWeeks, startOffsetMin: opts.startOffsetMin ?? DEFAULT_START_OFFSET_MIN, ...summary, history };
+  // Every timed match through the target week (public-pace builds the NVZ and
+  // team-page views from these). Off by default — admin payloads stay lean.
+  if (opts.withSeason) out.seasonMatches = seasonPaces;
+  return out;
 }

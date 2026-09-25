@@ -43,7 +43,13 @@ You will be given a STATS BRIEF for one week. Your job:
 1. Pick the 3–4 BEST storylines from the brief — the ones a reader would actually care about. Lead with the single biggest one.
 2. Write a lead story (2–3 short punchy paragraphs) and 2–3 shorter follow storylines.
 3. Secondary goal: make sure the standout team and players of the week get their due BY NAME, with their numbers, woven into the stories.
-4. When the brief has gamePace, weave in at least one pace angle (the marathon game, the fastest match, tempo by team, who logged the most court minutes). Call pace numbers approximate — they come from score-entry times.
+4. GAME PACE is a standing feature. When the brief has gamePace, use gamePace.stories first:
+   - How fast each winner closed its match (stories.matches[].line) — "Hitters were done in 79 minutes, the quickest match of the night".
+   - Every 1–2 point game with its clock (stories.clutch) — a long 11–10 is a grinding battle; say how long and where it ranks on the night.
+   - The quickest romps (stories.romps) — a lopsided win that took barely ten minutes.
+   - Court-time leaders (stories.courtTime) — the season's iron men and women, in minutes and hours; a player past 200 minutes is a story.
+   - Each team's lines (stories.teams[Team].lines): quickest win, longest game, week vs season pace, match length vs last week.
+   Pace is NOT its own section or storyline and never a tacked-on closing paragraph: weave it into the sentences where it adds depth — the 11–10 that took 24 minutes is part of the story of that game, the 79-minute sweep is part of how that team won. Aim for pace in the lead and in every team storyline, woven in. Pace numbers are approximate (score-entry times): write "about" when a line says so, round to the nearest minute, and never mention how long anyone took to confirm scores.
 
 Only use facts present in the brief. Do not invent scores, names, ratings, or streaks. If the brief is thin, write a shorter column rather than padding.
 

@@ -125,6 +125,25 @@
     .tvt-h2h { text-align:center; background:var(--color-surface-2); border-radius:var(--radius-md); padding:14px; margin-top:14px; }
     .tvt-h2h .lab { font-size:10px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--color-text-faint); margin-bottom:6px; }
 
+.pc-tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:16px; }
+    .pc-tile { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-md); padding:14px; text-align:center; }
+    .pc-tile .v { font-size:24px; font-weight:900; font-variant-numeric:tabular-nums; }
+    .pc-tile .v small { font-size:12px; font-weight:700; color:var(--color-text-faint); margin-left:2px; }
+    .pc-tile .l { font-size:9px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--color-text-faint); margin-top:4px; }
+    .pc-row { display:grid; grid-template-columns:22px minmax(120px,1.3fr) 2fr repeat(3,64px); gap:10px; align-items:center; padding:10px 4px; border-bottom:1px solid var(--color-divider); font-variant-numeric:tabular-nums; font-size:13px; }
+    .pc-row:last-child { border-bottom:none; }
+    .pc-row.hd { font-size:9px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--color-text-faint); padding-top:0; }
+    .pc-row .c { text-align:right; }
+    .pc-bar { height:10px; border-radius:6px; background:var(--color-surface-2); overflow:hidden; }
+    .pc-bar i { display:block; height:100%; background:var(--color-lime); border-radius:6px; }
+    .pc-bar.teal i { background:var(--color-teal); }
+    .pc-g { display:grid; grid-template-columns:1fr auto; gap:4px 12px; padding:10px 4px; border-bottom:1px solid var(--color-divider); font-size:13px; }
+    .pc-g:last-child { border-bottom:none; }
+    .pc-g .m { font-weight:900; font-variant-numeric:tabular-nums; text-align:right; }
+    .pc-g .s { grid-column:1 / -1; font-size:11px; color:var(--color-text-faint); }
+    .pc-2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+    .pc-note { text-align:center; font-size:11px; color:var(--color-text-faint); margin-top:4px; }
+    @media (max-width:640px){ .pc-row { grid-template-columns:18px 1fr 56px 56px; } .pc-row .hide-sm { display:none; } }
     .av-c { display:inline-flex; align-items:center; justify-content:center; overflow:hidden; }
     .av-c img { width:100%; height:100%; object-fit:cover; border-radius:inherit; }
     .spark { display:block; }
@@ -263,6 +282,7 @@
       ['margins','📊 Win Margins', renderMargins],
       ['partners','🤝 Partner Impact', renderPartners],
       ['sos','💪 Opponent Strength', renderSOS],
+      ['pace','⏱️ Game Pace', renderPace],
       ['rounds','⏱️ R1 vs R2', soon('Round-by-round splits need per-round player results, which aren\'t tracked yet.')],
       ['scoring','📈 Scoring Trends', soon('Weekly scored/allowed needs a per-week player series, which isn\'t exposed yet.')],
       ['weekly','🔥 Weekly Trends', soon('Weekly composite movement needs a per-week player series, which isn\'t exposed yet.')],
@@ -392,6 +412,59 @@
         body.innerHTML = (section('👨 Men\'s · Top 10',men,COLS_MEN)+section('👩 Women\'s · Top 10',women,COLS_WOMEN)) || '<div class="card"><div class="empty">No data yet.</div></div>';
       }
       search.oninput=draw; draw();
+    }
+
+    // ════════ Game Pace ════════
+    // Season-to-date pace from /public-pace?view=season: minutes per game by
+    // team, court-time leaders, the long close games and the quickest ones.
+    function renderPace(root){
+      root.innerHTML='<div class="ptitle">⏱️ Game Pace</div><div class="psub">How long the games actually take — by team, by player, by game</div><div id="paceBody"><div class="empty">Timing the courts&hellip;</div></div>';
+      var body=root.querySelector('#paceBody');
+      fetch('/.netlify/functions/public-pace?view=season&circuit='+encodeURIComponent(CIRCUIT)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}).then(function(d){
+        if(!d||d.empty||!d.teams||!d.teams.length){ body.innerHTML='<div class="card"><div class="empty"><b>No timed games yet.</b><br>Game pace fills in after the first game night.</div></div>'; return; }
+        var L=d.league||{}, bt=L.byType||{};
+        function hm(m){ var h=Math.floor(m/60), mm=Math.round(m-h*60); return h? h+'h '+mm+'m' : mm+'m'; }
+        function mn(v){ return v==null?'—':v+'<small>min</small>'; }
+        function tile(v,l){ return '<div class="pc-tile"><div class="v">'+v+'</div><div class="l">'+l+'</div></div>'; }
+        function tLink(n){ return '<a href="/team?id='+encodeURIComponent(slug(n))+LINK_SUFFIX+'" style="color:inherit;text-decoration:none;">'+esc(n)+'</a>'; }
+        var html='<div class="pc-tiles">'
+          + tile(mn(L.avgGameMin),'Avg game · league')
+          + tile(mn(L.closeAvgMin),'Close games (≤3 pts)')
+          + tile(mn(L.blowoutAvgMin),'Blowouts (8+ pts)')
+          + tile(mn(bt.WOMENS&&bt.WOMENS.avgMin),"Women's game")
+          + tile(mn(bt.MENS&&bt.MENS.avgMin),"Men's game")
+          + tile(mn(bt.MIXED&&bt.MIXED.avgMin),'Mixed game')
+          + '</div>';
+        var teams=d.teams.slice().sort(function(a,b){return (a.avgGameMin||99)-(b.avgGameMin||99);});
+        var maxG=teams.reduce(function(m,t){return Math.max(m,t.avgGameMin||0);},1);
+        html+='<div class="card"><div class="os-sec-h">🏁 Team pace · quickest games first</div>'
+          + '<div class="pc-row hd"><span>#</span><span>Team</span><span class="hide-sm"></span><span class="c">Avg game</span><span class="c">Avg match</span><span class="c hide-sm">Close gm</span></div>'
+          + teams.map(function(t,i){ return '<div class="pc-row"><span class="os-rk">'+(i+1)+'</span><span class="os-nm">'+tLink(t.name)+'</span>'
+              + '<span class="pc-bar hide-sm"><i style="width:'+Math.round((t.avgGameMin||0)/maxG*100)+'%"></i></span>'
+              + '<span class="c"><b>'+(t.avgGameMin==null?'—':t.avgGameMin)+'</b></span><span class="c">'+(t.avgMatchMin==null?'—':t.avgMatchMin)+'</span><span class="c hide-sm">'+(t.closeAvgMin==null?'—':t.closeAvgMin)+'</span></div>'; }).join('')
+          + '<div class="pc-note">Minutes. Close = games decided by 3 or fewer.</div></div>';
+        var ct=(d.courtTime||[]).slice(0,10), maxC=ct.length?ct[0].courtMin:1;
+        html+='<div class="card"><div class="os-sec-h">🔋 Court time · season</div>'
+          + '<div class="pc-row hd"><span>#</span><span>Player</span><span class="hide-sm"></span><span class="c">Minutes</span><span class="c">Games</span><span class="c hide-sm">W–L</span></div>'
+          + ct.map(function(p,i){ return '<div class="pc-row"><span class="os-rk">'+(i+1)+'</span><span><b>'+esc(p.name)+'</b><br><small style="color:var(--color-text-faint)">'+esc(p.team)+'</small></span>'
+              + '<span class="pc-bar teal hide-sm"><i style="width:'+Math.round(p.courtMin/maxC*100)+'%"></i></span>'
+              + '<span class="c"><b>'+hm(p.courtMin)+'</b></span><span class="c">'+p.games+'</span><span class="c hide-sm">'+(p.record?p.record.w+'–'+p.record.l:'')+'</span></div>'; }).join('')
+          + '</div>';
+        function gRow(g){ return '<div class="pc-g"><span><b>'+esc(g.winner)+'</b> '+esc(g.score)+' over '+esc(g.loser)+'</span><span class="m">'+(g.approx?'~':'')+g.min+' min</span>'
+          + '<span class="s">Week '+g.week+' · '+esc(g.label)+' '+esc(g.type)+(g.winPair?' · '+esc(g.winPair)+' over '+esc(g.losePair):'')+'</span></div>'; }
+        html+='<div class="pc-2"><div class="card"><div class="os-sec-h">🥵 The grinders · longest close games</div>'+((d.clutchGames||[]).map(gRow).join('')||'<div class="empty">None yet.</div>')+'</div>'
+          + '<div class="card"><div class="os-sec-h">⚡ Quickest games</div>'+((d.quickestGames||[]).map(gRow).join('')||'<div class="empty">None yet.</div>')+'</div></div>';
+        var weeks={}; (d.matches||[]).forEach(function(m){ (weeks[m.week]=weeks[m.week]||[]).push(m); });
+        var maxM=(d.matches||[]).reduce(function(m,x){return Math.max(m,x.totalMin||0);},1);
+        html+='<div class="card"><div class="os-sec-h">🕰️ Match length by week</div>'
+          + Object.keys(weeks).sort(function(a,b){return b-a;}).map(function(w){
+              return '<div class="h2h-note" style="text-align:left;margin-top:12px">Week '+w+'</div>'+weeks[w].slice().sort(function(a,b){return (a.totalMin||999)-(b.totalMin||999);}).map(function(m){
+                return '<div class="pc-row" style="grid-template-columns:minmax(150px,1.6fr) 2fr 70px"><span>'+esc(m.home)+' v '+esc(m.away)+'<br><small style="color:var(--color-text-faint)">games '+esc(m.games)+' · '+m.pointsPlayed+' pts played</small></span>'
+                  + '<span class="pc-bar"><i style="width:'+Math.round((m.totalMin||0)/maxM*100)+'%"></i></span><span class="c"><b>'+(m.totalMin==null?'—':m.totalMin)+'</b> min</span></div>'; }).join('');
+            }).join('')
+          + '</div><div class="pc-note">Times come from when each score was entered — close, not exact. ~ = entered two at a time.</div>';
+        body.innerHTML=html;
+      });
     }
 
     // ════════ Win Margins ════════
