@@ -10,6 +10,10 @@
 //   saveScores    { matchId, slots:[{no, us, them, opp:[a,b]}], notify }
 //   editMatch     { matchId, date, time, courts, note, homeTeamId, awayTeamId, notify }
 //                   notify → everyone on the roster gets the before → after.
+//   saveResult    { matchId, home, away, notify }  final games won only — for
+//                   other teams' matches (no stat sheet) or ours when we only
+//                   have the final. Blank both to clear. Our game-by-game
+//                   scores, when entered, always win over this.
 //   message       { subject, text }           email the whole team
 //
 
@@ -97,6 +101,21 @@ export default async (req) => {
       log(`scores saved for ${week.label}`);
       const r = matchResult(league, match);
       if (body.notify && r && match.slots.some(slotScored)) out.emailed = await emailResult(league, week, match, r);
+      break;
+    }
+    case 'saveResult': {
+      const hit = findMatch(league, body.matchId);
+      if (!hit) return json({ error: 'Match not found' }, 404);
+      const { week, match } = hit;
+      if (!match.home?.teamId || !match.away?.teamId) return json({ error: 'Set both teams first' }, 400);
+      const blank = (x) => x === '' || x == null;
+      if (blank(body.home) && blank(body.away)) { match.result = null; log(`cleared final for ${week.label} ${match.id}`); break; }
+      const h = Number(body.home), a = Number(body.away);
+      if (![h, a].every(n => Number.isInteger(n) && n >= 0 && n <= 30)) return json({ error: 'Enter games won for both teams' }, 400);
+      match.result = { home: h, away: a };
+      log(`final ${week.label}: ${h}-${a} (${match.id})`);
+      if (isOurs(league, match) && match.slots?.some(slotScored)) out.note = 'Game-by-game scores are in for this match, so those count instead of this final.';
+      else if (body.notify && isOurs(league, match)) out.emailed = await emailResult(league, week, match, match.result);
       break;
     }
     case 'editMatch': {

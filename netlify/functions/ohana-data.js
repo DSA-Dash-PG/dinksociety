@@ -8,7 +8,7 @@
 
 import { loadLeague, viewer, json } from './lib/ohana.js';
 import {
-  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, normSlots, isOurs, laMs,
+  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, computeStandings, normSlots, slotScored, isOurs, laMs,
 } from './lib/ohana-core.js';
 
 export default async (req) => {
@@ -33,6 +33,8 @@ export default async (req) => {
         side, opponent: teamName(league, opponentOf(league, ours)),
         startMs: laMs(matchDate(wk, ours), ours.time),
         result: r ? { us: side === 'home' ? r.home : r.away, them: side === 'home' ? r.away : r.home } : null,
+        // true when we have game-by-game scores; false = final score only (no stat sheet)
+        detailed: (ours.slots || []).some(slotScored),
         lineupSentAt: ours.lineupSentAt || null,
         slots: slots.map(s => ({ no: s.no, players: s.players.map(person), opp: s.opp, us: s.us, them: s.them })),
       };
@@ -43,6 +45,7 @@ export default async (req) => {
       others: wk.matches.filter(m => m !== ours).map(m => ({
         id: m.id, home: teamName(league, m.home), away: teamName(league, m.away),
         homeId: m.home?.teamId || null, awayId: m.away?.teamId || null, courts: m.courts, note: m.note,
+        result: matchResult(league, m),
       })),
     };
   });
@@ -57,6 +60,7 @@ export default async (req) => {
     me: { name: v.entry?.name || '', email: v.email, canEdit: v.canEdit, owner: v.owner, onRoster: !!v.entry },
     league: { name: league.name, venue: league.venue, night: league.night, teams: league.teams, ourTeamId: league.ourTeamId },
     weeks,
+    standings: computeStandings(league),
     stats: { team: stats.team, players: stats.players, pairs: stats.pairs.slice(0, 8) },
     roster: league.roster.map(p => v.canEdit ? { email: p.email, name: p.name, manager: !!p.manager } : { name: p.name, manager: !!p.manager, me: p.email === v.email }),
   });

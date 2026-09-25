@@ -167,12 +167,26 @@
         </section>
         <div class="oh-strip"><div class="oh-pills">${pills}</div></div>
         <section id="weeks">${D.weeks.map(weekCard).join('')}</section>
+        ${standingsSection()}
         ${statsSection()}
         ${rosterSection()}
         ${D.me.canEdit ? messageSection() : ''}
       `;
       bind();
     }
+
+    function othersLine(w) {
+      if (!w.others.length) return '';
+      const one = (o) => {
+        const r = o.result;
+        const h = r && r.home > r.away ? `<b style="color:var(--color-text)">${esc(o.home)}</b>` : esc(o.home);
+        const a = r && r.away > r.home ? `<b style="color:var(--color-text)">${esc(o.away)}</b>` : esc(o.away);
+        return `${o.note ? esc(o.note) + ': ' : ''}${h} ${r ? `<span style="font-variant-numeric:tabular-nums">${r.home}-${r.away}</span>` : 'vs'} ${a}`;
+      };
+      return `<div class="oh-others">${w.match ? 'Also tonight: ' : ''}${w.others.map(one).join(' · ')}</div>`;
+    }
+    const finalsBtn = (w) => D.me.canEdit && (w.others.some(o => o.homeId && o.awayId) || (w.match && !w.match.detailed))
+      ? `<button class="oh-btn sm ${open[w.id] === 'finals' ? 'pri' : ''}" data-open="finals" data-wk="${w.id}">Final scores</button>` : '';
 
     function weekCard(w) {
       const nx = nextWeekId() === w.id;
@@ -182,9 +196,9 @@
           <div class="oh-wk-label">${esc(w.label)} · ${fmtDate(w.date)}</div>
           <div class="oh-vs" style="font-size:16px">${title}</div>
           ${w.note ? `<div class="oh-meta">${esc(w.note)}</div>` : ''}
-          ${w.others.length ? `<div class="oh-others">${w.others.map(o => `${esc(o.note ? o.note + ': ' : '')}${esc(o.home)} vs ${esc(o.away)}`).join(' · ')}</div>` : ''}
-          ${D.me.canEdit && ['semis','finals'].includes(w.type) ? `<div class="oh-tools">${w.others.map(o => `<button class="oh-btn sm" data-playoff="${o.id}" data-wk="${w.id}">Set teams · ${esc(o.note || 'match')}</button>`).join('')}</div>
-            <div id="pe-${w.id}"></div>` : ''}
+          ${othersLine(w)}
+          ${D.me.canEdit ? `<div class="oh-tools">${['semis','finals'].includes(w.type) ? w.others.map(o => `<button class="oh-btn sm" data-playoff="${o.id}" data-wk="${w.id}">Set teams · ${esc(o.note || 'match')}</button>`).join('') : ''}${finalsBtn(w)}</div>
+            <div id="pe-${w.id}"></div>${editor(w)}` : ''}
         </article>`;
       }
       const m = w.match;
@@ -211,11 +225,14 @@
           ${r ? `<div class="oh-res ${cls}">${r.us}-${r.them}<span class="v">${r.us > r.them ? 'Win' : r.us < r.them ? 'Loss' : 'Tie'}</span></div>` : ''}
         </div>
         ${hasLineup ? `<div class="oh-lineup">${games}</div>` : `<div class="oh-pending">Lineup not posted yet — you'll get an email when it is.</div>`}
+        ${r && !m.detailed ? `<div class="oh-pending">Final score only — no game-by-game sheet.</div>` : ''}
+        ${othersLine(w)}
         ${hasLineup && !D.me.canEdit ? `<div class="oh-you">${mine.length ? `You're in <b>${mine.length} game${mine.length === 1 ? '' : 's'}</b>: ${mine.map(s => 'G' + s.no).join(', ')}` : `You're not in the lineup this week.`}</div>` : ''}
         ${D.me.canEdit ? `<div class="oh-tools">
             <button class="oh-btn sm ${open[w.id] === 'lineup' ? 'pri' : ''}" data-open="lineup" data-wk="${w.id}">Lineup</button>
             <button class="oh-btn sm ${open[w.id] === 'scores' ? 'pri' : ''}" data-open="scores" data-wk="${w.id}">Scores</button>
             <button class="oh-btn sm ${open[w.id] === 'match' ? 'pri' : ''}" data-open="match" data-wk="${w.id}">Date / courts</button>
+            ${finalsBtn(w)}
           </div>${editor(w)}` : ''}
       </article>`;
     }
@@ -227,6 +244,22 @@
     function editor(w) {
       const kind = open[w.id]; if (!kind) return '';
       const m = w.match;
+      if (kind === 'finals') {
+        const rows = [];
+        if (m && !m.detailed) rows.push({ id: m.id, home: m.side === 'home' ? 'South Bay Ohana' : m.opponent, away: m.side === 'home' ? m.opponent : 'South Bay Ohana',
+          result: m.result ? (m.side === 'home' ? { home: m.result.us, away: m.result.them } : { home: m.result.them, away: m.result.us }) : null, ours: true });
+        for (const o of w.others) if (o.homeId && o.awayId) rows.push(o);
+        return `<div class="oh-ed" data-ed="finals" data-wk="${w.id}">
+          <div class="lbl">Games won — from the PVTC final sheet (leave blank if not in yet)</div>
+          ${rows.map(o => `<div class="oh-ed-row sc" data-final="${o.id}" style="grid-template-columns:1fr 52px 52px 1fr">
+            <span class="pairtxt" style="text-align:right">${esc(o.home)}</span>
+            <input data-k="home" inputmode="numeric" value="${o.result ? o.result.home : ''}" aria-label="${esc(o.home)} games">
+            <input data-k="away" inputmode="numeric" value="${o.result ? o.result.away : ''}" aria-label="${esc(o.away)} games">
+            <span class="pairtxt">${esc(o.away)}</span></div>`).join('')}
+          ${m && !m.detailed ? `<label class="oh-chk"><input type="checkbox" data-notify> Email the team our final score</label>` : ''}
+          <button class="oh-btn pri" data-save="finals" data-wk="${w.id}">Save finals</button>
+          <div class="oh-msg" data-out></div></div>`;
+      }
       if (kind === 'lineup') {
         if (!D.roster.length) return `<div class="oh-ed"><div class="oh-empty">Add players to the roster first (bottom of the page).</div></div>`;
         return `<div class="oh-ed" data-ed="lineup" data-wk="${w.id}">
@@ -265,6 +298,18 @@
         <label class="oh-chk"><input type="checkbox" data-notify checked> Email the team what changed</label>
         <button class="oh-btn pri" data-save="match" data-wk="${wkId}">Save</button>
         <div class="oh-msg" data-out></div></div>`;
+    }
+
+    // ── League table ───────────────────────────────────────────────────
+    function standingsSection() {
+      const rows = D.standings || [];
+      const any = rows.some(r => r.mp);
+      const body = any ? `<table class="oh-table"><thead><tr><th>#</th><th style="text-align:left">Team</th><th>MP</th><th>W-L</th><th>Games</th><th>+/-</th></tr></thead><tbody>
+        ${rows.map(r => { const us = r.teamId === D.league.ourTeamId; return `<tr style="${us ? 'color:var(--color-lime);font-weight:700' : ''}"><td>${r.rank}</td><td style="text-align:left">${esc(r.name)}</td><td>${r.mp}</td><td>${r.mw}-${r.ml}${r.mt ? '-' + r.mt : ''}</td><td>${r.gw}-${r.gl}</td><td>${sign(r.gd)}</td></tr>`; }).join('')}
+        </tbody></table>
+        <div style="font-size:11px;color:var(--color-text-faint);margin-top:8px">Ranked by games won, then match wins. All 5 teams make the playoffs — 1st gets a semis bye.</div>`
+        : `<div class="oh-empty">Standings fill in as final scores are entered.</div>`;
+      return `<h2 class="oh-h2">League table</h2><div class="oh-card">${body}</div>`;
     }
 
     // ── Stats + roster ─────────────────────────────────────────────────
@@ -357,6 +402,17 @@
               else s[inp.dataset.k] = v === '' ? null : Number(v);
             }
             payload = { action: 'saveScores', matchId: w.match.id, slots, notify };
+          } else if (btn.dataset.save === 'finals') {
+            btn.disabled = true; out.className = 'oh-msg'; out.textContent = 'Saving…';
+            const notes = [];
+            const rows = [...ed.querySelectorAll('[data-final]')].map(row => ({ id: row.dataset.final,
+              home: row.querySelector('[data-k=home]').value.trim(), away: row.querySelector('[data-k=away]').value.trim() }));
+            if (rows.some(x => (x.home === '') !== (x.away === ''))) throw new Error('Enter both scores for each match (or leave both blank).');
+            for (const x of rows) {
+              const r = await post({ action: 'saveResult', matchId: x.id, home: x.home, away: x.away, notify });
+              if (r.note) notes.push(r.note); if (r.emailed) notes.push(emailedLine(r.emailed));
+            }
+            open[w.id] = null; await load(); flash(w.id, ['Finals saved.', ...notes].join(' ')); return;
           } else if (btn.dataset.save === 'match') {
             payload = { action: 'editMatch', matchId: ed.dataset.match, notify };
             ed.querySelectorAll('[data-f]').forEach(i => payload[i.dataset.f] = i.value);
