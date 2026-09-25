@@ -271,9 +271,28 @@
   #recap .dwc.is-open .dwc__toggle .chev{transform:rotate(180deg);}
   #recap .dwc__scores{display:none;margin-top:8px;}
   #recap .dwc.is-open .dwc__scores{display:block;}
-  #recap .dwg{display:flex;justify-content:space-between;font-size:11px;padding:3px 2px;border-bottom:1px solid var(--color-border);color:var(--color-text-muted);}
-  #recap .dwg:last-child{border-bottom:0;}
-  #recap .dwg .gl{color:var(--color-text-faint);}
+  #recap .dwg{padding:12px;text-align:center;font-size:12px;color:var(--color-text-faint);}
+  /* Game-by-game box score — same component as the Schedule page (rounds, pairs, winner in lime) */
+  #recap .m-round{margin-top:12px;}
+  #recap .m-round-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+  #recap .m-round-label{font-size:9.5px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-bg);background:var(--color-lime);padding:3px 9px;border-radius:9999px;}
+  #recap .m-round-label.r2{background:var(--color-surface);color:var(--color-text-muted);border:1px solid var(--color-border);}
+  #recap .m-games{border:1px solid var(--color-divider, var(--color-border));border-radius:8px;overflow:hidden;}
+  #recap .m-game{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:7px 9px;font-size:11.5px;}
+  #recap .m-game:nth-child(odd){background:var(--color-surface);}
+  #recap .m-game .pl{display:flex;flex-direction:column;gap:3px;min-width:0;color:var(--color-text-muted);line-height:1.25;}
+  #recap .m-game .pl.right{align-items:flex-end;text-align:right;}
+  #recap .m-game .pl a{color:var(--color-text-muted);font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;text-decoration-color:rgba(128,128,128,0.4);text-underline-offset:3px;}
+  #recap .m-game .pl a:hover{color:var(--color-text);}
+  #recap .m-game .pl.is-winner a{color:var(--color-lime);font-weight:700;text-decoration-color:rgba(184,255,44,0.45);}
+  #recap .m-game .mid{display:flex;flex-direction:column;align-items:center;min-width:56px;}
+  #recap .m-game .gtype{font-size:8px;font-weight:800;letter-spacing:0.06em;color:var(--color-text-faint);}
+  #recap .m-game .gnum{font-weight:800;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap;}
+  #recap .m-game .gnum .w{color:var(--color-lime);}
+  #recap .m-game .gnum .l{color:var(--color-text-faint);}
+  #recap .m-game .gnum .dash{color:var(--color-text-faint);margin:0 2px;}
+  #recap .m-round-sum{display:flex;justify-content:space-between;align-items:center;margin-top:7px;padding:7px 11px;border-radius:7px;background:var(--color-surface);font-size:10.5px;color:var(--color-text-muted);}
+  #recap .m-round-sum .b{font-weight:800;color:var(--color-text);font-variant-numeric:tabular-nums;}
   #recap .dweek__more{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--color-lime);}
   #recap .dweek__cta{text-align:center;padding:28px var(--gutter) 8px;}
   #recap .dweek__cta .btn{display:inline-block;background:var(--color-lime);color:var(--color-text-inverse);font-weight:800;font-size:14px;padding:13px 28px;border-radius:var(--radius-full);text-transform:uppercase;letter-spacing:.04em;}
@@ -1064,15 +1083,41 @@
         .catch(function(){ detailCache[matchId] = 'error'; body.innerHTML = '<div class="dwg">Scores unavailable right now.</div>'; });
     };
 
+    // Same box score the Schedule page shows: two rounds, each game with the
+    // pair on each side (linked to player pages), the score in the middle, the
+    // winning pair in lime, and a games/points line per round.
     function gameDetail(match){
       if (!match || !match.games || !match.games.length) return '<div class="dwg">Game-by-game scores not posted.</div>';
-      return match.games.map(function(g){
-        var label = (g.type || ('R'+(g.round||'')+' game'));
-        var score = (g.home != null && g.away != null)
-          ? '<span class="'+(g.homeWin?'':'gl')+'">'+g.home+'</span>–<span class="'+(g.homeWin?'gl':'')+'">'+g.away+'</span>'
-          : '<span class="gl">—</span>';
-        return '<div class="dwg"><span>'+esc(label)+'</span><span>'+score+'</span></div>';
+      var sn = (typeof shortName === 'function') ? shortName : function (n) { return n; };
+      var plink = function(n, teamName){ return '<a href="/player?team='+slug(teamName)+'&name='+encodeURIComponent(n)+LINK_SUFFIX+'">'+esc(sn(n))+'</a>'; };
+      var homeName = match.home && match.home.name, awayName = match.away && match.away.name;
+      var rounds = [1, 2].map(function(rn){
+        var games = match.games.filter(function(g){ return g.round === rn; });
+        if (!games.length) return '';
+        var rd = rn === 1 ? match.round1 : match.round2;
+        var ptsH = 0, ptsA = 0;
+        var rows = games.map(function(g){
+          var hp = (g.homePlayers && g.homePlayers.length) ? g.homePlayers.map(function(n){ return plink(n, homeName); }).join('') : '—';
+          var ap = (g.awayPlayers && g.awayPlayers.length) ? g.awayPlayers.map(function(n){ return plink(n, awayName); }).join('') : '—';
+          var scored = g.home != null && g.away != null;
+          var num = '<span class="gnum">—</span>';
+          if (scored) {
+            ptsH += g.home; ptsA += g.away;
+            num = '<span class="gnum"><span class="'+(g.homeWin ? 'w' : 'l')+'">'+g.home+'</span><span class="dash">–</span><span class="'+(g.homeWin ? 'l' : 'w')+'">'+g.away+'</span></span>';
+          }
+          return '<div class="m-game">'
+            + '<div class="pl'+(scored && g.homeWin ? ' is-winner' : '')+'">'+hp+'</div>'
+            + '<div class="mid"><span class="gtype">'+esc(g.type || '')+'</span>'+num+'</div>'
+            + '<div class="pl right'+(scored && !g.homeWin ? ' is-winner' : '')+'">'+ap+'</div>'
+            + '</div>';
+        }).join('');
+        var gamesH = rd && rd.homeGames != null ? rd.homeGames : '', gamesA = rd && rd.awayGames != null ? rd.awayGames : '';
+        var sum = (rd || ptsH || ptsA)
+          ? '<div class="m-round-sum"><span><span class="b">'+gamesH+'</span> games · <span class="b">'+ptsH+'</span> pts</span><span><span class="b">'+ptsA+'</span> pts · <span class="b">'+gamesA+'</span> games</span></div>'
+          : '';
+        return '<div class="m-round"><div class="m-round-head"><span class="m-round-label'+(rn === 2 ? ' r2' : '')+'">Round '+rn+'</span></div><div class="m-games">'+rows+'</div>'+sum+'</div>';
       }).join('');
+      return rounds || '<div class="dwg">Game-by-game scores not posted.</div>';
     }
 
     function render(weeksData){
