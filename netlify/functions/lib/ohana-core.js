@@ -127,6 +127,13 @@ export function findMatch(league, id) {
   return allMatches(league).find(x => x.match.id === id) || null;
 }
 /** Weeks where we have no match but the league plays (Week 1, etc.). */
+/** Teams with no match on a regular / round-robin night (the PVTC sheet's "Bye" line). */
+export function byeTeams(league, wk) {
+  if (!['regular', 'roundrobin'].includes(wk.type)) return [];
+  const playing = new Set((wk.matches || []).flatMap(m => [m.home?.teamId, m.away?.teamId]).filter(Boolean));
+  return league.teams.filter(t => !playing.has(t.id)).map(t => t.name);
+}
+
 /** A match can be moved off its week's night (rain, court swap). */
 export function matchDate(wk, m) { return (m && m.date) || wk.date; }
 

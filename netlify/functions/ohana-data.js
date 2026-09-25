@@ -8,7 +8,7 @@
 
 import { loadLeague, viewer, json } from './lib/ohana.js';
 import {
-  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, computeStandings, normSlots, slotScored, isOurs, laMs, lineupWarnings, eligibility, TYPE_LABEL,
+  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, computeStandings, normSlots, slotScored, isOurs, laMs, lineupWarnings, byeTeams, eligibility, TYPE_LABEL,
 } from './lib/ohana-core.js';
 import { DEFAULT_ANNOUNCEMENT } from './lib/ohana.js';
 
@@ -47,7 +47,7 @@ export default async (req) => {
     }
     return {
       id: wk.id, label: wk.label, date: wk.date, type: wk.type, note: wk.note,
-      bye: isByeWeek(league, wk), match,
+      bye: isByeWeek(league, wk), byes: byeTeams(league, wk), match,
       others: wk.matches.filter(m => m !== ours).map(m => ({
         id: m.id, home: teamName(league, m.home), away: teamName(league, m.away),
         homeId: m.home?.teamId || null, awayId: m.away?.teamId || null, courts: m.courts, note: m.note,

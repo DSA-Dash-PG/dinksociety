@@ -223,14 +223,15 @@
     }
 
     function othersLine(w) {
-      if (!w.others.length) return '';
+      const bye = (w.byes || []).length ? `<span style="white-space:nowrap">Bye: <b style="color:var(--color-text-muted)">${w.byes.map(esc).join(', ')}</b></span>` : '';
+      if (!w.others.length) return bye ? `<div class="oh-others">${bye}</div>` : '';
       const one = (o) => {
         const r = o.result;
         const h = r && r.ptsHome > r.ptsAway ? `<b style="color:var(--color-text)">${esc(o.home)}</b>` : esc(o.home);
         const a = r && r.ptsAway > r.ptsHome ? `<b style="color:var(--color-text)">${esc(o.away)}</b>` : esc(o.away);
         return `${o.note ? esc(o.note) + ': ' : ''}${h} ${r ? `<span style="font-variant-numeric:tabular-nums" title="Games ${r.home}-${r.away}">${r.ptsHome}-${r.ptsAway} pts</span>` : 'vs'} ${a}`;
       };
-      return `<div class="oh-others">${w.match ? 'Also tonight: ' : ''}${w.others.map(one).join(' · ')}</div>`;
+      return `<div class="oh-others">${w.match ? 'Also tonight: ' : ''}${w.others.map(one).join(' · ')}${bye ? ' · ' + bye : ''}</div>`;
     }
     const finalsBtn = (w) => D.me.canEdit && (w.others.some(o => o.homeId && o.awayId) || (w.match && !w.match.detailed))
       ? `<button class="oh-btn sm ${open[w.id] === 'finals' ? 'pri' : ''}" data-open="finals" data-wk="${w.id}">Final scores</button>` : '';
