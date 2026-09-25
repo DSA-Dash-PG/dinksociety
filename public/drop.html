@@ -275,6 +275,14 @@
   #drop .story .story-photo .fr{ overflow:hidden; border-radius:var(--radius-sm); border:1px solid var(--color-border); background:var(--color-surface-2); aspect-ratio:4/3; }
   #drop .story .story-photo:not(:has(figure + figure)) .fr{ aspect-ratio:16/9; }
   #drop .story .story-photo img{ width:100%; height:100%; object-fit:cover; display:block; }
+  #drop .story .story-photo button.fr{ display:block; width:100%; padding:0; cursor:zoom-in; }
+  #drop .story .story-photo button.fr:hover{ border-color:var(--color-lime); }
+  /* photos 3+ on a storyline — tap to open in the lightbox */
+  #drop .story .story-thumbs{ display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:8px; margin:0 0 18px; }
+  #drop .story .story-thumbs .gimg{ padding:0; aspect-ratio:1; border:1px solid var(--color-border); background:var(--color-surface-2); border-radius:var(--radius-sm); overflow:hidden; cursor:zoom-in; display:block; width:100%; }
+  #drop .story .story-thumbs .gimg:hover{ border-color:var(--color-lime); }
+  #drop .story .story-thumbs img{ width:100%; height:100%; object-fit:cover; display:block; }
+  @media(max-width:680px){ #drop .story .story-thumbs{ grid-template-columns:repeat(4,1fr); gap:6px; } }
 
   /* Week in Pictures — promoted to mid-article, mosaic */
   #drop .gallery-sec{ margin:56px 0; padding:48px 0; border-top:1px solid var(--color-border); border-bottom:1px solid var(--color-border); background:linear-gradient(180deg,var(--color-lime-ghost),transparent 58%); }
@@ -633,6 +641,18 @@
     }
     // Week in Pictures — mosaic, promoted to sit mid-article. The first tile runs
     // 2×2 and the fourth spans two columns, giving the grid some rhythm.
+    // Every photo in the edition: the Week in Pictures uploads first (in the
+    // editor's order), then each storyline's photos in story order, then the
+    // cover — deduped by id — so the closing gallery shows the whole week even
+    // when photos were only added to storylines.
+    function allWeekPhotos(drop){
+      var seen = {}, out = [];
+      function add(im){ if(im && im.id && !seen[im.id]){ seen[im.id] = 1; out.push(im); } }
+      (drop.gallery||[]).forEach(add);
+      (drop.storylines||[]).forEach(function(s){ storyImgs(s||{}).forEach(add); });
+      add(drop.cover);
+      return out;
+    }
     function galleryHtml(g){
       g = (g||[]).filter(function(im){ return im && im.id; });
       if(!g.length) return '';
@@ -640,7 +660,7 @@
         + '<div class="sec-head"><h3>Week in Pictures</h3><span class="rule"></span>'
         + '<span class="count">'+g.length+' photo'+(g.length>1?'s':'')+'</span></div><div class="gallery">'
         + g.map(function(im,i){
-            var cls = (i===0?' a':(i===3?' b':''));
+            var k = i % 10, cls = (k===0?' a':(k===3||k===7?' b':''));
             return '<div class="cellwrap'+cls+'"><button type="button" class="gimg" data-full="'+dpImg(im.id)+'" data-cap="'+esc(im.caption||'')+'">'
               + '<img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="lazy"'+focalStyle(im)+'></button></div>';
           }).join('')
@@ -657,10 +677,16 @@
     function storyHtml(s, i){
       var chips = (s.chips||[]).map(function(c){ return '<span class="chip"><span>'+esc(c.label)+'</span>'+(c.value!=null&&c.value!==''?'<b>'+esc(c.value)+'</b>':'')+'</span>'; }).join('');
       var imgs = storyImgs(s);
+      // First two photos run big; the rest go in a thumbnail strip (tap to open
+      // in the lightbox) so a 10-photo storyline doesn't become a wall of images.
+      var big = imgs.slice(0, 2), more = imgs.slice(2);
       var photo = imgs.length
-        ? '<div class="story-photo">' + imgs.map(function(im){
-            return '<figure><div class="fr"><img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="lazy"'+focalStyle(im)+'></div>'+figcap(im)+'</figure>';
+        ? '<div class="story-photo">' + big.map(function(im){
+            return '<figure><button type="button" class="gimg fr" data-full="'+dpImg(im.id)+'" data-cap="'+esc(im.caption||'')+'"><img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="lazy"'+focalStyle(im)+'></button>'+figcap(im)+'</figure>';
           }).join('') + '</div>'
+          + (more.length ? '<div class="story-thumbs">' + more.map(function(im){
+            return '<button type="button" class="gimg" data-full="'+dpImg(im.id)+'" data-cap="'+esc(im.caption||'')+'"><img src="'+dpImg(im.id)+'" alt="'+esc(im.caption||'')+'" loading="lazy"'+focalStyle(im)+'></button>';
+          }).join('') + '</div>' : '')
         : '';
       var cls = 'story' + (imgs.length ? (i%2 ? ' flip' : '') : ' nophoto');
       var sid = 'story-'+(i+1) + (s.team ? '-'+teamSlug(s.team) : '');
@@ -810,7 +836,7 @@
         + topPerfBandHtml(drop.performers)
         + '<div class="wrap"><div class="col">' + stories + '</div></div>'
         + climbersBandHtml()
-        + galleryHtml(drop.gallery)
+        + galleryHtml(allWeekPhotos(drop))
         + '<div class="wrap"><div class="col">' + tease + '</div></div>';
 
       document.title = 'The Drop · '+(drop.kicker||edLabel(drop))+' — The Dink Society';

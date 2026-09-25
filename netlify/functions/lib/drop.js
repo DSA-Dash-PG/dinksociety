@@ -158,10 +158,17 @@ function normImage(x) {
   };
 }
 
+// Photo caps. Storylines used to be capped at 4, which silently dropped every
+// photo past the fourth on save. The article shows the first two big and the
+// rest as a thumbnail strip, and every storyline photo also lands in the
+// closing Week in Pictures mosaic.
+const STORY_IMG_MAX = 30;
+const GALLERY_MAX = 60;
+
 // A "Week in Pictures" gallery: an ordered list of photos (each id + caption).
 function normGallery(input) {
   if (!Array.isArray(input)) return [];
-  return input.slice(0, 24).map(normImage).filter(Boolean);
+  return input.slice(0, GALLERY_MAX).map(normImage).filter(Boolean);
 }
 
 // Normalize a storyline into the shape the article page + composer expect.
@@ -173,7 +180,7 @@ function normStoryline(s = {}) {
   // A storyline can carry multiple photos (images[]), which the article floats
   // and wraps the copy around. Backward-compatible with the old single `image`.
   const rawImgs = Array.isArray(s.images) ? s.images : (s.image ? [s.image] : []);
-  const images = rawImgs.slice(0, 4).map(normImage).filter(Boolean);
+  const images = rawImgs.slice(0, STORY_IMG_MAX).map(normImage).filter(Boolean);
   return {
     tag: String(s.tag || '').slice(0, 40),
     tagKind,

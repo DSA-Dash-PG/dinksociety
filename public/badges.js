@@ -73,8 +73,14 @@
       '</svg>';
   }
 
+  // Season 1 (circuit 'I') POTW was presented by K'CHN; every later season by SuprDupr.
+  function isKchnSeason(season) {
+    var c = String(season == null ? '' : season).trim().toUpperCase();
+    return c === 'I' || c === '1' || c === 'CIRCUIT-I' || c === 'SEASON-1';
+  }
+
   // ── Per-badge crest art ─────────────────────────────────────────
-  function crestSvg(kind, px, tone, type) {
+  function crestSvg(kind, px, tone, type, season) {
     px = px || 120;
     if (LOGOS[kind]) return logoCrest(kind, px, tone || (DEF[kind] && DEF[kind].tone) || 'gold', LOGOS[kind]);
     var id = uid(), F = 'url(#' + id + ')';
@@ -125,7 +131,14 @@
           '<text x="60" y="100" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="9.5" fill="' + F + '" letter-spacing="1.2">BEST DRESSED</text>') + '</svg>';
       case 'potw':
       default: {
-        // SuprDupr Player of the Week — sponsor logo (680x193 red/white wordmark) sits in the ring.
+        // Season 1 awards keep the original K'CHN Player of the Week crest.
+        if (isKchnSeason(season)) {
+          return open(px) + ring(id, 'gold',
+            '<g transform="translate(60 34)" fill="' + F + '"><path d="M-14 6 L-14 -6 L-7 0 L0 -10 L7 0 L14 -6 L14 6 Z"/><rect x="-14" y="6" width="28" height="4" rx="1.5"/></g>' +
+            '<text x="60" y="72" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-style="italic" font-size="25" fill="' + F + '" letter-spacing="-0.5">K\'CHN</text>' +
+            '<text x="60" y="90" text-anchor="middle" font-family="Inter,sans-serif" font-weight="900" font-size="11" fill="' + F + '" letter-spacing="2.5">POTW</text>') + '</svg>';
+        }
+        // Season 2+: SuprDupr Player of the Week — sponsor logo (680x193 red/white wordmark) sits in the ring.
         var cpw = 'cp' + id;
         return open(px) + ring(id, 'gold',
           '<g transform="translate(60 31)" fill="' + F + '"><path d="M-14 6 L-14 -6 L-7 0 L0 -10 L7 0 L14 -6 L14 6 Z"/><rect x="-14" y="6" width="28" height="4" rx="1.5"/></g>' +
@@ -314,10 +327,10 @@
     if (!it) return '';
     var label = (DEF[it.kind] && DEF[it.kind].label) || it.title;
     // Player of the Week: the avatar badge is just the SuprDupr wordmark (no ring/crest).
-    if (it.kind === 'potw' && !LOGOS.potw) {
+    if (it.kind === 'potw' && !LOGOS.potw && !isKchnSeason(it.season)) {
       return '<span class="dsb-clip dsb-clip--logo" title="' + esc(label) + '"><img src="/img/suprdupr.png" alt="' + esc(label) + '"></span>';
     }
-    return '<span class="dsb-clip" title="' + esc(label) + '">' + crestSvg(it.kind, 46, it.tone, it.type) + '</span>';
+    return '<span class="dsb-clip" title="' + esc(label) + '">' + crestSvg(it.kind, 46, it.tone, it.type, it.season) + '</span>';
   }
 
   function heroPills(opts, domain) {
@@ -343,7 +356,7 @@
     if (!s.total) return '';
     var crests = s.items.map(function (it) {
       return '<div class="dsb-case-item">' +
-        '<div class="dsb-crest">' + crestSvg(it.kind, 78, it.tone, it.type) + '</div>' +
+        '<div class="dsb-crest">' + crestSvg(it.kind, 78, it.tone, it.type, it.season) + '</div>' +
         '<div class="dsb-case-t">' + esc(it.title) + '</div>' +
         (it.meta ? '<div class="dsb-case-m">' + esc(it.meta) + '</div>' : '') +
         '</div>';
