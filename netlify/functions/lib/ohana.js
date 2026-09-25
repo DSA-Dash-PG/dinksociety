@@ -17,10 +17,16 @@ import { normalizeEmail } from './identity.js';
 import { sendEmail } from './email.js';
 import { siteUrl } from './ladder-notify.js';
 import {
-  SLUG, seedLeague, teamName, matchDate, ourSide, opponentOf, isOurs, dateLine, gamesByPlayer,
+  SLUG, seedLeague, teamName, matchDate, ourSide, opponentOf, isOurs, dateLine, gamesByPlayer, roundOf, typeOf, TYPE_LABEL,
 } from './ohana-core.js';
 
 const KEY = `league/${SLUG}.json`;
+
+/** Shown at the top of /ohana until a manager edits or clears it. */
+export const DEFAULT_ANNOUNCEMENT = {
+  title: 'League play begins next week!',
+  body: 'The full PVTC league rules are in the Rules section below — please review them and have a copy with you. The recap covers the most important rules for the PVTC league.',
+};
 function store() { return getStore({ name: 'private-leagues', consistency: 'strong' }); }
 
 export async function loadLeague() {
@@ -93,7 +99,11 @@ function matchCard(league, wk, m) {
       <div style="font-size:17px;font-weight:800;color:#f5f5f5;margin-top:4px;">vs ${esc(opp)}</div>
       <div style="font-size:13px;color:#cfcfcf;margin-top:4px;">${esc(dateLine(matchDate(wk, m), m.time))}</div>
       <div style="font-size:12px;color:#8a8a8a;margin-top:2px;">${esc(league.venue)} · Courts ${esc(m.courts)}${m.note ? ' · ' + esc(m.note) : ''}</div>
-    </td></tr></table>`;
+    </td></tr></table>
+    <p style="font-size:12px;color:#8a8a8a;line-height:1.6;margin:-8px 0 20px;">${side === 'home'
+      ? '<b style="color:#f5f5f5">We\'re home:</b> our captain picks up the game balls and clipboards at the front desk. We serve first in Round 1; they choose sides.'
+      : '<b style="color:#f5f5f5">We\'re away:</b> they serve first in Round 1 and we choose sides. Switch in Round 2.'}
+      Lineups are exchanged 10 minutes before start. Warm-up courts aren't guaranteed — you can arrive 30 min early; the captain checks with the front desk.</p>`;
 }
 
 function lineupTable(league, m, highlight) {
@@ -101,7 +111,8 @@ function lineupTable(league, m, highlight) {
   const rows = (m.slots || []).filter(s => s.players.some(Boolean)).map(s => {
     const mine = highlight && s.players.includes(highlight);
     const pair = s.players.map(nameOf).filter(Boolean).join(' & ') || 'TBD';
-    return `<tr><td style="padding:5px 0;color:#8a8a8a;width:44px;">G${s.no}</td><td style="padding:5px 0;color:${mine ? TEAL : '#cfcfcf'};${mine ? 'font-weight:700;' : ''}">${esc(pair)}</td></tr>`;
+    const head = (s.no === 1 || s.no === 7) ? `<tr><td colspan="2" style="padding:${s.no === 1 ? 4 : 12}px 0 4px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#666;">Round ${roundOf(s.no)}</td></tr>` : '';
+    return `${head}<tr><td style="padding:5px 0;color:#8a8a8a;width:92px;">G${s.no} ${TYPE_LABEL[typeOf(s.no)]}</td><td style="padding:5px 0;color:${mine ? TEAL : '#cfcfcf'};${mine ? 'font-weight:700;' : ''}">${esc(pair)}</td></tr>`;
   }).join('');
   if (!rows) return '';
   return `<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#8a8a8a;margin:0 0 8px;">Full lineup</div>
@@ -111,7 +122,7 @@ function lineupTable(league, m, highlight) {
 function myGamesLine(league, m, email) {
   const g = gamesByPlayer(league, m.slots)[email] || [];
   if (!g.length) return `<p style="font-size:15px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;">You're not in the lineup this week — thanks for being ready if we need a sub.</p>`;
-  const items = g.map(x => `<b style="color:${TEAL}">G${x.no}</b>${x.partner ? ' with ' + esc(x.partner) : ''}`).join('<br>');
+  const items = g.map(x => `<b style="color:${TEAL}">R${x.round} · G${x.no}</b> <span style="color:#8a8a8a">${TYPE_LABEL[x.type]}</span>${x.partner ? ' with ' + esc(x.partner) : ''}`).join('<br>');
   return `<p style="font-size:15px;color:#cfcfcf;line-height:1.6;margin:0 0 6px;">You're in <b>${g.length} game${g.length === 1 ? '' : 's'}</b>:</p>
     <p style="font-size:14px;color:#cfcfcf;line-height:1.8;margin:0 0 18px;">${items}</p>`;
 }
@@ -177,15 +188,17 @@ export async function emailScheduleChange(league, wk, m, lines) {
 export async function emailResult(league, wk, m, r) {
   const side = ourSide(league, m);
   const us = side === 'home' ? r.home : r.away, them = side === 'home' ? r.away : r.home;
+  const pu = side === 'home' ? r.ptsHome : r.ptsAway, pt = side === 'home' ? r.ptsAway : r.ptsHome;
   const opp = teamName(league, opponentOf(league, m));
-  const verdict = us > them ? 'W' : us < them ? 'L' : 'T';
+  const verdict = pu > pt ? 'W' : pu < pt ? 'L' : 'T';
+  const roundsLine = r.rounds.map((x, i) => { const a = side === 'home' ? x.home : x.away, b = side === 'home' ? x.away : x.home; return `Round ${i + 1}: ${a}–${b}`; }).join(' · ');
   const nameOf = (e) => league.roster.find(p => p.email === e)?.name || '';
   const rows = (m.slots || []).filter(s => s.us != null && s.them != null).map(s =>
     `<tr><td style="padding:4px 0;color:#8a8a8a;width:40px;">G${s.no}</td><td style="padding:4px 0;color:#cfcfcf;">${esc(s.players.map(nameOf).filter(Boolean).join(' & '))}</td><td style="padding:4px 0;text-align:right;color:${s.us > s.them ? TEAL : '#ff5c47'};font-weight:700;">${s.us}–${s.them}</td></tr>`).join('');
   return sendAll(league.roster, () => ({
-    subject: `${verdict} ${us}–${them} vs ${opp} · ${wk.label}`,
-    html: shell({ h1: `${verdict === 'W' ? 'Win' : verdict === 'L' ? 'Loss' : 'Tie'} vs ${opp}, ${us}–${them}`,
-      body: `<p style="font-size:14px;color:#8a8a8a;margin:0 0 14px;">${esc(wk.label)} · ${esc(dateLine(matchDate(wk, m)))} · games won</p>` +
+    subject: `${verdict} vs ${opp} · ${pu} of 4 pts (${us}–${them} games) · ${wk.label}`,
+    html: shell({ h1: `${verdict === 'W' ? 'Win' : verdict === 'L' ? 'Loss' : 'Split'} vs ${opp} — ${pu} of 4 points`,
+      body: `<p style="font-size:14px;color:#cfcfcf;margin:0 0 4px;">${esc(roundsLine)} · ${us}–${them} games overall</p><p style="font-size:13px;color:#8a8a8a;margin:0 0 14px;">${esc(wk.label)} · ${esc(dateLine(matchDate(wk, m)))}</p>` +
         (rows ? `<table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="border-collapse:collapse;font-size:13px;">${rows}</table>` : '') }),
   }));
 }

@@ -34,7 +34,8 @@ test('game scores roll up to the match result, stats and standings', () => {
     { no: 2, players: ['a@x.com', 'c@x.com'], us: 9, them: 11 },
     { no: 3, players: ['c@x.com', 'd@x.com'], us: 11, them: 4 },
   ]);
-  assert.deepEqual(matchResult(L, match), { home: 1, away: 2 });
+  const mr = matchResult(L, match);
+  assert.deepEqual([mr.home, mr.away, mr.ptsHome, mr.ptsAway], [1, 2, 0, 2]); // round 1 only: 2-1 to us
   const st = computeStats(L);
   assert.deepEqual([st.team.mw, st.team.gw, st.team.gl], [1, 2, 1]);
   const a = st.players.find(p => p.email === 'a@x.com');
@@ -61,4 +62,60 @@ test('schedule edits describe what changed', () => {
   const lines = describeMatchChange(L, match, after, week, week);
   assert.equal(lines.length, 2);
   assert.match(lines[0], /Oct 13 → .*Nov 10/);
+});
+
+import { roundPoints, typeOf, lineupWarnings, eligibility } from '../netlify/functions/lib/ohana-core.js';
+
+test('PVTC format: WD, MD, then 4 mixed each round; 2/1/0 points per round', () => {
+  assert.deepEqual([1, 2, 3, 6, 7, 8, 12].map(typeOf), ['WD', 'MD', 'MXD', 'MXD', 'WD', 'MD', 'MXD']);
+  assert.deepEqual(roundPoints(4, 2), [2, 0]);
+  assert.deepEqual(roundPoints(3, 3), [1, 1]);
+  const L = seedLeague();
+  findMatch(L, 'w1-m1').match.result = { r1: { home: 4, away: 2 }, r2: { home: 3, away: 3 } }; // Net Flicks 3 pts, Dink Life 1
+  findMatch(L, 'w1-m2').match.result = { r1: { home: 1, away: 5 }, r2: { home: 2, away: 4 } }; // AceHoles 4
+  const t = computeStandings(L);
+  assert.deepEqual(t.slice(0, 3).map(r => [r.name, r.pts]), [['AceHoles', 4], ['Net Flicks', 3], ['Dink Life', 1]]);
+  const nf = t.find(r => r.name === 'Net Flicks');
+  assert.deepEqual([nf.gw, nf.gl, nf.mw, nf.mt], [7, 5, 1, 0]);
+});
+
+test('points tie is broken head-to-head before games won', () => {
+  const L = seedLeague();
+  // Dink Life beats Net Flicks on points but wins fewer games overall elsewhere
+  findMatch(L, 'w1-m1').match.result = { r1: { home: 2, away: 4 }, r2: { home: 2, away: 4 } };  // NF 0, DL 4
+  findMatch(L, 'w4-m1').match.result = { r1: { home: 0, away: 6 }, r2: { home: 0, away: 6 } };  // PJ 0, NF 4
+  findMatch(L, 'w2-m1').match.result = { r1: { home: 3, away: 3 }, r2: { home: 3, away: 3 } };  // DL 2, PJ 2
+  findMatch(L, 'w5-m2').match.result = { r1: { home: 6, away: 0 }, r2: { home: 3, away: 3 } };  // NF 3, AH 1  → NF 7 total
+  findMatch(L, 'w3-m1').match.result = { r1: { home: 2, away: 4 }, r2: { home: 4, away: 2 } };  // AH 2, DL 2 → DL 8
+  // DL 8 pts, NF 7 — make it a tie: give NF one more point
+  findMatch(L, 'w6-m1').match.result = { r1: { home: 3, away: 3 }, r2: { home: 0, away: 0 } }; // NF 1 (RR), DL 1 → DL 9, NF 8
+  const t = computeStandings(L);
+  assert.equal(t[0].name, 'Dink Life');
+});
+
+test('lineup warnings: repeat partner, 4+ games a round, gender fit, player count', () => {
+  const L = seedLeague();
+  L.roster = [
+    { email: 'a@x', name: 'Ann', gender: 'F' }, { email: 'b@x', name: 'Bea', gender: 'F' },
+    { email: 'c@x', name: 'Cal', gender: 'M' }, { email: 'd@x', name: 'Dan', gender: 'M' },
+  ];
+  const w = lineupWarnings(L, [
+    { no: 1, players: ['a@x', 'b@x'] },        // WD ok
+    { no: 2, players: ['c@x', 'a@x'] },        // MD with a woman
+    { no: 3, players: ['a@x', 'c@x'] },        // repeat partner in round 1
+    { no: 4, players: ['a@x', 'd@x'] },        // Ann's 4th game in round 1
+  ]);
+  assert.ok(w.some(x => /men's doubles/.test(x)));
+  assert.ok(w.some(x => /paired twice/.test(x)));
+  assert.ok(w.some(x => /Ann is in 4 games/.test(x)));
+  assert.equal(lineupWarnings(L, [{ no: 1, players: ['a@x', 'b@x'] }]).some(x => /at least 4/.test(x)), true);
+});
+
+test('playoff eligibility is 1/3 of our regular-season matches', () => {
+  const L = seedLeague();
+  const e = eligibility(L, Date.parse('2026-09-01'));
+  assert.equal(e.total, 5); assert.equal(e.needed, 2);
+  findMatch(L, 'w2-m2').match.slots = [{ no: 1, players: ['a@x', 'b@x'] }];
+  assert.equal(eligibility(L, Date.parse('2026-10-08')).played['a@x'], 1);
+  assert.equal(eligibility(L, Date.parse('2026-10-05')).played['a@x'], undefined);
 });

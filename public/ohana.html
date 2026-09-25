@@ -101,6 +101,24 @@
     .oh-photo-tools { position:absolute; right:10px; bottom:10px; display:flex; gap:6px; }
     .oh-photo-tools .oh-btn { background: rgba(14,14,14,.75); backdrop-filter: blur(6px); }
     .oh-photo-add { display:flex; align-items:center; justify-content:center; gap:10px; min-height: 140px; border: 1px dashed var(--color-border-strong); border-radius: var(--radius-lg); margin-bottom:16px; color: var(--color-text-muted); font-size: 13px; }
+    .oh-note-card { background: linear-gradient(135deg, rgba(184,255,44,.10), rgba(23,215,176,.05)), var(--color-surface); border: 1px solid rgba(184,255,44,.28); border-radius: var(--radius-lg); padding: 16px 18px; margin-bottom: 16px; }
+    .oh-note-card h3 { font-size: 18px; font-weight: 800; margin: 0 0 6px; }
+    .oh-note-card p { font-size: 14px; color: var(--color-text-muted); line-height: 1.6; margin: 0; white-space: pre-line; }
+    .oh-note-card .oh-tools { margin-top: 12px; }
+    .oh-round { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-faint); margin: 14px 0 6px; display:flex; justify-content:space-between; }
+    .oh-round b { color: var(--color-text-muted); }
+    .oh-g .t { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-faint); width: 44px; flex-shrink: 0; }
+    .oh-warn { margin-top: 10px; border: 1px solid rgba(255,176,46,.35); background: rgba(255,176,46,.06); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; color: #ffb02e; line-height: 1.6; }
+    .oh-day { font-size: 12px; color: var(--color-text-muted); margin-top: 10px; line-height: 1.55; }
+    .oh-day b { color: var(--color-text); }
+    .oh-rules ol { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; color: var(--color-text); }
+    .oh-rules ol li { margin-bottom: 8px; } .oh-rules ol li::marker { color: var(--color-lime); font-weight: 800; }
+    .oh-rules details { border-top: 1px solid var(--color-divider); padding: 10px 0; }
+    .oh-rules summary { cursor: pointer; font-size: 13px; font-weight: 700; list-style: none; display:flex; justify-content:space-between; }
+    .oh-rules summary::after { content: '+'; color: var(--color-text-faint); } .oh-rules details[open] summary::after { content: '–'; }
+    .oh-rules details ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; color: var(--color-text-muted); line-height: 1.6; }
+    .oh-rules details li { margin-bottom: 5px; }
+    .oh-elig { font-size: 10px; font-weight: 700; margin-left: 6px; } .oh-elig.ok { color: var(--color-teal); } .oh-elig.no { color: var(--color-text-faint); }
     .oh-top { display:flex; flex-direction:column; gap:10px; margin-bottom: 22px; }
     .oh-top .oh-rec { margin-top: 0; }
     /* Clear the fixed site nav (2-line brand on desktop) and keep the hero short. */
@@ -170,9 +188,9 @@
       const nx = nextWeekId();
       const pills = D.weeks.map(w => {
         const r = w.match?.result;
-        const cls = w.id === nx ? 'is-next' : r ? (r.us > r.them ? 'is-w' : r.us < r.them ? 'is-l' : '') : w.bye || w.type === 'rain' ? 'is-bye' : '';
+        const cls = w.id === nx ? 'is-next' : r ? (r.ptsUs > r.ptsThem ? 'is-w' : r.ptsUs < r.ptsThem ? 'is-l' : '') : w.bye || w.type === 'rain' ? 'is-bye' : '';
         const short = w.label.replace('Playoffs · ', '').replace(' · Round Robin', ' RR');
-        return `<button class="oh-pill ${cls}" data-go="${w.id}"><span class="k">${esc(short)}</span>${fmtDate(w.match?.date || w.date, { month: 'numeric', day: 'numeric' })}${r ? ` · ${r.us}-${r.them}` : w.bye ? ' · bye' : ''}</button>`;
+        return `<button class="oh-pill ${cls}" data-go="${w.id}"><span class="k">${esc(short)}</span>${fmtDate(w.match?.date || w.date, { month: 'numeric', day: 'numeric' })}${r ? ` · ${r.ptsUs} pts` : w.bye ? ' · bye' : ''}</button>`;
       }).join('');
 
       $('#oh-sub').textContent = `${D.league.night} · ${D.league.venue}${D.me.name ? ` · Signed in as ${D.me.name}` : ''}`;
@@ -181,14 +199,15 @@
         ? `<figure class="oh-photo"><img src="${API}ohana-photo?v=${encodeURIComponent(ph.updatedAt)}" alt="South Bay Ohana team photo">
             ${D.me.canEdit ? `<div class="oh-photo-tools"><button class="oh-btn sm" data-photo="pick">Change photo</button><button class="oh-btn sm" data-photo="rm">Remove</button></div>` : ''}</figure>`
         : D.me.canEdit ? `<div class="oh-photo-add"><span>No team photo yet</span><button class="oh-btn sm pri" data-photo="pick">Add team photo</button></div>` : '';
-      const top = `${photo}<input type="file" id="photo-in" accept="image/*" hidden><div class="oh-msg" id="photo-out" style="min-height:0"></div><div class="oh-top">
+      const top = `${photo}${announcementCard()}<input type="file" id="photo-in" accept="image/*" hidden><div class="oh-msg" id="photo-out" style="min-height:0"></div><div class="oh-top">
           ${D.me.isManager ? `<div class="oh-mgr">
             <span>${asPlayer ? 'Previewing what players see' : 'Manager view — only you and team managers see these edit tools'}</span>
             <button class="oh-btn sm" id="as-player">${asPlayer ? 'Back to manager view' : 'Preview as player'}</button></div>` : ''}
           <div class="oh-rec">
+            <span class="oh-chip">League pts <b>${t.pts}</b></span>
             <span class="oh-chip">Record <b>${t.mw}-${t.ml}${t.mt ? '-' + t.mt : ''}</b></span>
             <span class="oh-chip">Games <b>${t.gw}-${t.gl}</b></span>
-            ${t.pf + t.pa ? `<span class="oh-chip">Points <b>${sign(t.pf - t.pa)}</b></span>` : ''}
+            <a class="oh-chip" href="#rules" style="text-decoration:none;color:var(--color-text)">Rules ↓</a>
           </div></div>`;
       $('#app').innerHTML = `
         ${top}
@@ -197,6 +216,7 @@
         <section id="weeks">${D.weeks.map(weekCard).join('')}</section>
         ${statsSection()}
         ${rosterSection()}
+        ${rulesSection()}
         ${D.me.canEdit ? messageSection() : ''}
       `;
       bind();
@@ -206,9 +226,9 @@
       if (!w.others.length) return '';
       const one = (o) => {
         const r = o.result;
-        const h = r && r.home > r.away ? `<b style="color:var(--color-text)">${esc(o.home)}</b>` : esc(o.home);
-        const a = r && r.away > r.home ? `<b style="color:var(--color-text)">${esc(o.away)}</b>` : esc(o.away);
-        return `${o.note ? esc(o.note) + ': ' : ''}${h} ${r ? `<span style="font-variant-numeric:tabular-nums">${r.home}-${r.away}</span>` : 'vs'} ${a}`;
+        const h = r && r.ptsHome > r.ptsAway ? `<b style="color:var(--color-text)">${esc(o.home)}</b>` : esc(o.home);
+        const a = r && r.ptsAway > r.ptsHome ? `<b style="color:var(--color-text)">${esc(o.away)}</b>` : esc(o.away);
+        return `${o.note ? esc(o.note) + ': ' : ''}${h} ${r ? `<span style="font-variant-numeric:tabular-nums" title="Games ${r.home}-${r.away}">${r.ptsHome}-${r.ptsAway} pts</span>` : 'vs'} ${a}`;
       };
       return `<div class="oh-others">${w.match ? 'Also tonight: ' : ''}${w.others.map(one).join(' · ')}</div>`;
     }
@@ -230,15 +250,23 @@
       }
       const m = w.match;
       const r = m.result;
-      const cls = r ? (r.us > r.them ? 'w' : r.us < r.them ? 'l' : '') : '';
+      const cls = r ? (r.ptsUs > r.ptsThem ? 'w' : r.ptsUs < r.ptsThem ? 'l' : '') : '';
       const hasLineup = m.slots.some(s => s.players.some(Boolean));
       const isMe = (p) => p && (p.me || (D.me.email && p.email === D.me.email));
       const mine = m.slots.filter(s => s.players.some(isMe));
-      const games = m.slots.filter(s => s.players.some(Boolean) || s.us != null).map(s => {
+      const game = (s) => {
         const names = s.players.filter(Boolean).map(p => p.name).join(' & ') || 'TBD';
         const sc = s.us != null && s.them != null ? `<span class="s ${s.us > s.them ? 'w' : 'l'}">${s.us}-${s.them}</span>` : '';
-        return `<div class="oh-g ${s.players.some(isMe) ? 'mine' : ''}"><span class="n">G${s.no}</span><span class="p" title="${esc(names)}${s.opp.filter(Boolean).length ? ' vs ' + esc(s.opp.filter(Boolean).join(' & ')) : ''}">${esc(names)}</span>${sc}</div>`;
+        return `<div class="oh-g ${s.players.some(isMe) ? 'mine' : ''} ${s.players.some(Boolean) ? '' : 'empty'}"><span class="n">G${s.no}</span><span class="t">${esc(s.typeLabel)}</span><span class="p" title="${esc(names)}${s.opp.filter(Boolean).length ? ' vs ' + esc(s.opp.filter(Boolean).join(' & ')) : ''}">${esc(names)}</span>${sc}</div>`;
+      };
+      const games = [1, 2].map(rn => {
+        const rr = r?.rounds?.[rn - 1];
+        const tag = rr ? `<b>${rr.us}-${rr.them} · ${rr.us > rr.them ? '2 pts' : rr.us < rr.them ? '0 pts' : '1 pt'}</b>` : '';
+        return `<div class="oh-round"><span>Round ${rn}</span>${tag}</div><div class="oh-lineup" style="margin-top:0">${m.slots.filter(s => s.round === rn).map(game).join('')}</div>`;
       }).join('');
+      const day = m.side === 'home'
+        ? `<b>We're home:</b> captain picks up game balls &amp; clipboards at the front desk. We serve first in Round 1, they choose sides; switch in Round 2.`
+        : `<b>We're away:</b> they serve first in Round 1 and we choose sides; switch in Round 2.`;
       return `<article class="oh-week ${nx ? 'is-next' : ''}" id="wk-${w.id}">
         <div class="oh-wk-top">
           <div>
@@ -248,17 +276,21 @@
             ${m.note ? `<div class="oh-note">${esc(m.note)}</div>` : ''}
             ${w.note ? `<div class="oh-meta">${esc(w.note)}</div>` : ''}
           </div>
-          ${r ? `<div class="oh-res ${cls}">${r.us}-${r.them}<span class="v">${r.us > r.them ? 'Win' : r.us < r.them ? 'Loss' : 'Tie'}</span></div>` : ''}
+          ${r ? `<div class="oh-res ${cls}">${r.ptsUs} pts<span class="v">${r.ptsUs > r.ptsThem ? 'Win' : r.ptsUs < r.ptsThem ? 'Loss' : 'Split'} · games ${r.us}-${r.them}</span></div>` : ''}
         </div>
-        ${hasLineup ? `<div class="oh-lineup">${games}</div>` : `<div class="oh-pending">Lineup not posted yet — you'll get an email when it is.</div>`}
+        ${hasLineup || r ? games : `<div class="oh-pending">Lineup not posted yet — you'll get an email when it is.</div>`}
+        ${D.me.canEdit && m.warnings?.length ? `<div class="oh-warn">${m.warnings.map(esc).join('<br>')}</div>` : ''}
+        ${!r ? `<div class="oh-day">${day} Lineups are exchanged at ${esc(lineupTime(m.time))}.</div>` : ''}
         ${r && !m.detailed ? `<div class="oh-pending">Final score only — no game-by-game sheet.</div>` : ''}
         ${othersLine(w)}
-        ${hasLineup && !D.me.canEdit ? `<div class="oh-you">${mine.length ? `You're in <b>${mine.length} game${mine.length === 1 ? '' : 's'}</b>: ${mine.map(s => 'G' + s.no).join(', ')}` : `You're not in the lineup this week.`}</div>` : ''}
+        ${hasLineup && !D.me.canEdit ? `<div class="oh-tools"><a class="oh-btn sm" href="/ohana/print?m=${encodeURIComponent(m.id)}" target="_blank" rel="noopener">Print lineup</a></div>` : ''}
+        ${hasLineup && !D.me.canEdit ? `<div class="oh-you">${mine.length ? `You're in <b>${mine.length} game${mine.length === 1 ? '' : 's'}</b>: ${mine.map(s => `G${s.no} (${s.typeLabel})`).join(', ')}` : `You're not in the lineup this week.`}</div>` : ''}
         ${D.me.canEdit ? `<div class="oh-tools">
             <button class="oh-btn sm ${open[w.id] === 'lineup' ? 'pri' : ''}" data-open="lineup" data-wk="${w.id}">Lineup</button>
             <button class="oh-btn sm ${open[w.id] === 'scores' ? 'pri' : ''}" data-open="scores" data-wk="${w.id}">Scores</button>
             <button class="oh-btn sm ${open[w.id] === 'match' ? 'pri' : ''}" data-open="match" data-wk="${w.id}">Date / courts</button>
             ${finalsBtn(w)}
+            ${hasLineup ? `<a class="oh-btn sm" href="/ohana/print?m=${encodeURIComponent(m.id)}" target="_blank" rel="noopener">Print lineup</a>` : ''}
           </div>${editor(w)}` : ''}
       </article>`;
     }
@@ -272,16 +304,21 @@
       const m = w.match;
       if (kind === 'finals') {
         const rows = [];
-        if (m && !m.detailed) rows.push({ id: m.id, home: m.side === 'home' ? 'South Bay Ohana' : m.opponent, away: m.side === 'home' ? m.opponent : 'South Bay Ohana',
-          result: m.result ? (m.side === 'home' ? { home: m.result.us, away: m.result.them } : { home: m.result.them, away: m.result.us }) : null, ours: true });
-        for (const o of w.others) if (o.homeId && o.awayId) rows.push(o);
+        if (m && !m.detailed) {
+          const flip = (x) => x ? (m.side === 'home' ? { home: x.us, away: x.them } : { home: x.them, away: x.us }) : null;
+          rows.push({ id: m.id, home: m.side === 'home' ? 'South Bay Ohana' : m.opponent, away: m.side === 'home' ? m.opponent : 'South Bay Ohana',
+            rounds: (m.result?.rounds || []).map(flip), pts: null });
+        }
+        for (const o of w.others) if (o.homeId && o.awayId) rows.push({ ...o, rounds: o.result?.rounds || [], pts: o.result && o.result.scoredHome != null ? { home: o.result.scoredHome, away: o.result.scoredAway } : null });
+        const cell = (k, v, lbl) => `<input data-k="${k}" inputmode="numeric" value="${v ?? ''}" aria-label="${esc(lbl)}" placeholder="–">`;
         return `<div class="oh-ed" data-ed="finals" data-wk="${w.id}">
-          <div class="lbl">Games won — from the PVTC final sheet (leave blank if not in yet)</div>
-          ${rows.map(o => `<div class="oh-ed-row sc" data-final="${o.id}" style="grid-template-columns:1fr 52px 52px 1fr">
-            <span class="pairtxt" style="text-align:right">${esc(o.home)}</span>
-            <input data-k="home" inputmode="numeric" value="${o.result ? o.result.home : ''}" aria-label="${esc(o.home)} games">
-            <input data-k="away" inputmode="numeric" value="${o.result ? o.result.away : ''}" aria-label="${esc(o.away)} games">
-            <span class="pairtxt">${esc(o.away)}</span></div>`).join('')}
+          <div class="lbl">From the PVTC scoresheet — games won each round (max 6). Rally points are optional (3rd tiebreaker).</div>
+          <div class="oh-ed-row" style="grid-template-columns:1fr 46px 46px 46px 64px;font-size:10px;color:var(--color-text-faint);font-weight:800;letter-spacing:.06em;text-transform:uppercase">
+            <span></span><span>R1</span><span>R2</span><span></span><span>Points</span></div>
+          ${rows.map(o => `<div data-final="${o.id}" style="margin-bottom:10px">
+            ${[['home', o.home], ['away', o.away]].map(([side, name]) => `<div class="oh-ed-row" style="grid-template-columns:1fr 46px 46px 46px 64px">
+              <span class="pairtxt">${esc(name)}</span>${cell('r1' + side, o.rounds[0]?.[side], name + ' round 1')}${cell('r2' + side, o.rounds[1]?.[side], name + ' round 2')}<span></span>${cell('pts' + side, o.pts?.[side], name + ' points')}</div>`).join('')}
+          </div>`).join('')}
           ${m && !m.detailed ? `<label class="oh-chk"><input type="checkbox" data-notify> Email the team our final score</label>` : ''}
           <button class="oh-btn pri" data-save="finals" data-wk="${w.id}">Save finals</button>
           <div class="oh-msg" data-out></div></div>`;
@@ -290,8 +327,8 @@
         if (!D.roster.length) return `<div class="oh-ed"><div class="oh-empty">Add players to the roster first (bottom of the page).</div></div>`;
         return `<div class="oh-ed" data-ed="lineup" data-wk="${w.id}">
           <datalist id="dl-roster">${rosterOptions()}</datalist>
-          <div class="lbl">Type a name — 12 games</div>
-          ${m.slots.map(s => `<div class="oh-ed-row"><span class="n">G${s.no}</span>
+          <div class="lbl">Type a name · partner only once per round · max 3 games per round · 4–8 players</div>
+          ${m.slots.map(s => `${s.no === 1 || s.no === 7 ? `<div class="oh-round">Round ${s.round}</div>` : ''}<div class="oh-ed-row"><span class="n" title="${esc(s.typeLabel)}">G${s.no}<br><span style="font-size:8px">${s.type}</span></span>
             <input list="dl-roster" data-slot="${s.no}" data-i="0" value="${esc(s.players[0]?.name || '')}" placeholder="Player" autocomplete="off">
             <input list="dl-roster" data-slot="${s.no}" data-i="1" value="${esc(s.players[1]?.name || '')}" placeholder="Partner" autocomplete="off"></div>`).join('')}
           <label class="oh-chk"><input type="checkbox" data-notify checked> ${m.lineupSentAt ? 'Email players whose games changed' : 'Email everyone their games'}</label>
@@ -330,10 +367,10 @@
     function standingsSection() {
       const rows = D.standings || [];
       const any = rows.some(r => r.mp);
-      const body = `<table class="oh-table"><thead><tr><th>#</th><th style="text-align:left">Team</th><th>MP</th><th>W-L</th><th>Games</th><th>+/-</th></tr></thead><tbody>
-        ${rows.map(r => `<tr class="${r.teamId === D.league.ourTeamId ? 'us' : ''}"><td>${any ? r.rank : '–'}</td><td class="tm">${esc(r.name)}</td><td>${r.mp}</td><td>${r.mw}-${r.ml}${r.mt ? '-' + r.mt : ''}</td><td>${r.gw}-${r.gl}</td><td>${any ? sign(r.gd) : '–'}</td></tr>`).join('')}
+      const body = `<table class="oh-table"><thead><tr><th>#</th><th style="text-align:left">Team</th><th>MP</th><th>Pts</th><th>W-L-T</th><th>Games</th></tr></thead><tbody>
+        ${rows.map(r => `<tr class="${r.teamId === D.league.ourTeamId ? 'us' : ''}"><td>${any ? r.rank : '–'}</td><td class="tm">${esc(r.name)}</td><td>${r.mp}</td><td><b>${r.pts}</b></td><td>${r.mw}-${r.ml}-${r.mt}</td><td>${r.gw}-${r.gl}</td></tr>`).join('')}
         </tbody></table>
-        <div style="font-size:11px;color:var(--color-text-faint);margin-top:8px">${any ? 'Ranked by games won, then match wins.' : 'Fills in as final scores are entered.'} All 5 teams make the playoffs — 1st gets a semis bye.</div>`;
+        <div style="font-size:11px;color:var(--color-text-faint);margin-top:8px;line-height:1.6">${any ? '' : 'Fills in as final scores are entered. '}Points per round: win 2, tie 1, loss 0 (max 4 a match). Ties: head-to-head, then games won, then points scored. All 5 teams make the playoffs — 1st gets a semis bye.</div>`;
       return `<h2 class="oh-h2" style="margin-top:0">League standings</h2><div class="oh-card" style="margin-bottom:8px">${body}</div>`;
     }
 
@@ -350,15 +387,80 @@
 
     function rosterSection() {
       const list = D.roster.length ? D.roster.map(p => D.me.canEdit
-        ? `<span class="oh-chip" style="font-weight:600">${esc(p.name)}${p.manager ? '<span class="oh-tag">Mgr</span>' : ''}
+        ? `<span class="oh-chip" style="font-weight:600">${esc(p.name)}${p.manager ? '<span class="oh-tag">Mgr</span>' : ''}${eligTag(p)}
+            <button class="oh-btn sm" style="padding:2px 8px;margin-left:6px" data-gender="${esc(p.email)}" title="Used to check women's / men's / mixed games">${p.gender || '?'}</button>
             <button class="oh-btn sm" style="padding:2px 8px;margin-left:6px" data-mgr="${esc(p.email)}" data-on="${p.manager ? 0 : 1}">${p.manager ? 'Unset mgr' : 'Make mgr'}</button>
             <button class="oh-btn sm" style="padding:2px 8px" data-rm="${esc(p.email)}" aria-label="Remove">✕</button></span>`
-        : `<span class="oh-chip" style="font-weight:600">${esc(p.name)}${p.manager ? '<span class="oh-tag">Captain</span>' : ''}</span>`).join('')
+        : `<span class="oh-chip" style="font-weight:600">${esc(p.name)}${p.manager ? '<span class="oh-tag">Captain</span>' : ''}${eligTag(p)}</span>`).join('')
         : `<div class="oh-empty">No players yet.</div>`;
       const add = D.me.canEdit ? `<div class="oh-sugg" style="margin-top:12px">
           <input class="oh-in" id="add-q" placeholder="Add a player — type a name" autocomplete="off">
           <div class="oh-sugg-list" id="add-list" hidden></div></div><div class="oh-msg" id="roster-out"></div>` : '';
-      return `<h2 class="oh-h2">Roster</h2><div class="oh-card"><div class="oh-roster">${list}</div>${add}</div>`;
+      const e = D.eligibility;
+      return `<h2 class="oh-h2">Roster <span style="font-weight:600;color:var(--color-text-faint);letter-spacing:0;text-transform:none;font-size:12px">${D.roster.length} of 15</span></h2>
+        <div class="oh-card"><div class="oh-roster">${list}</div>
+        <div style="font-size:11px;color:var(--color-text-faint);margin-top:10px">Playoffs: play at least ${e.needed} of our ${e.total} regular-season matches (⅓).</div>${add}</div>`;
+    }
+    function eligTag(p) {
+      const e = D.eligibility; if (!e || !e.total) return '';
+      return p.played >= e.needed ? `<span class="oh-elig ok" title="Playoff eligible">✓ ${p.played}/${e.needed}</span>` : `<span class="oh-elig no" title="Matches played toward playoff eligibility">${p.played}/${e.needed}</span>`;
+    }
+    const lineupTime = (t) => { const m = String(t).match(/(\d+):(\d+)\s*(AM|PM)?/i); if (!m) return '10 min before start'; let h = +m[1], mi = +m[2] - 10; if (mi < 0) { mi += 60; h -= 1; } return `${h}:${String(mi).padStart(2, '0')} ${m[3] || ''}`.trim(); };
+
+    // ── Team note (announcement) ───────────────────────────────────────
+    let editingNote = false;
+    function announcementCard() {
+      const a = D.announcement;
+      if (editingNote && D.me.canEdit) return `<div class="oh-note-card oh-ed" data-ed="note" style="margin-top:0">
+          <div class="lbl">Team note — shows at the top for everyone</div>
+          <input data-f="title" value="${esc(a?.title || '')}" placeholder="Headline" style="margin-bottom:8px">
+          <textarea data-f="body" rows="4" placeholder="Message">${esc(a?.body || '')}</textarea>
+          <label class="oh-chk"><input type="checkbox" data-notify> Also email it to the team</label>
+          <div class="oh-tools"><button class="oh-btn pri sm" data-save="note">Save note</button><button class="oh-btn sm" data-note="cancel">Cancel</button><button class="oh-btn sm" data-note="clear">Remove note</button></div>
+          <div class="oh-msg" data-out></div></div>`;
+      if (!a) return D.me.canEdit ? `<div class="oh-tools" style="margin:0 0 12px"><button class="oh-btn sm" data-note="edit">+ Add a team note</button></div>` : '';
+      return `<div class="oh-note-card">${a.title ? `<h3>${esc(a.title)}</h3>` : ''}${a.body ? `<p>${esc(a.body)}</p>` : ''}
+        <div class="oh-tools"><a class="oh-btn sm" href="#rules">Key rules</a><a class="oh-btn sm" href="${API}ohana-rules-pdf" target="_blank" rel="noopener">Full rules (PDF)</a>${D.me.canEdit ? `<button class="oh-btn sm" data-note="edit">Edit note</button>` : ''}</div></div>`;
+    }
+
+    // ── Rules ──────────────────────────────────────────────────────────
+    const KEY_RULES = [
+      'Games are to 11, win by 1.',
+      'Home team goes to the front desk to pick up game balls and clipboards.',
+      'Home team serves first in Round 1 and Away chooses side. Switch in Round 2.',
+      'Switch sides of the court when the first team gets to 6 points.',
+      'A minimum of 4 people (max of 8) may play each week. You may have up to 15 players on your roster for the season.',
+      'There are 2 rounds of 6 games (12 games total). You may not play with the same partner more than once per round. Mixed teams play 1 game of women’s doubles and men’s doubles, followed by 4 games of mixed doubles each round.',
+      'Use the PVTC scoresheet. Points are given separately for Round 1 and Round 2 — 2 points for a win, 1 for a tie, 0 for a loss. Max points for both rounds = 4.',
+      'Exchange lineups 10 minutes before league start time. You can’t change your lineup once exchanged (except for injury/medical reasons — see full rules).',
+      'PVTC does not guarantee warm-up courts. You may arrive 30 minutes before start to warm up if a court is available. Your captain (or a team rep) must check with the front desk. Please don’t disturb members who have the court reserved.',
+      'Any player on the roster must play at least 1/3 of the regular-season matches to be eligible for the playoffs.',
+    ];
+    const FULL_RULES = [
+      ['Team rosters', ['Players must be 18+. A valid photo ID and signed waiver (if not on file) are required for everyone on the roster.', 'Maximum 15 rostered players per team for the season.', 'Adding or removing players after the first game of Week 1 needs approval from the league coordinator.', 'League fee is due at registration (PVTC front desk, (310) 373-6326).', 'A player may only captain one team, in one skill level per league type in a season.', 'Final, full rosters are due one week before the first game unless the coordinator says otherwise.']],
+      ['Division placement', ['Placement and movement are set by the team’s average DUPR.', 'Players/teams playing in the wrong skill level will be moved up if they continue in PVTC leagues.', 'Season results don’t automatically move a team.', 'Players may only play in one skill level per league type.', 'Ranges: 3.0 = DUPR 2.75–3.25 · 3.5 = 3.25–3.75 · 4.0 = 3.75–4.25.']],
+      ['Captains', ['Share the league rules and make sure players follow them; captains are the main point of contact.', 'Collect waivers and IDs for players new to PVTC (electronic submission encouraged).', 'Arrive with a hardcopy lineup in the emailed format.', 'Check in at the front desk about warm-up courts. They aren’t guaranteed; members with reservations finish their time first. Teams may enter courts 30 minutes early and may share open courts.', 'Home captain checks in at the front desk and picks up balls and clipboards.', 'Captains exchange lineups 10 minutes before start.']],
+      ['Match format', ['2 rounds of 6 games (12 total). Points are given separately for each round: win 2, tie 1, loss 0.', 'Mixed format each round: 1 women’s doubles, 1 men’s doubles, 4 mixed.', 'Games to 11, win by 1. Switch sides when one team reaches 6.', 'Both captains record scores after each game; the home team’s copy is the official record.', 'When done, captains validate results, tally games and points for each round, and sign the home team copy.']],
+      ['Lineups', ['Only rostered players may play — a game with a non-rostered player is a forfeit.', '15-minute grace period for the first game only. Players may arrive late or leave early but must be present when their game starts.', 'Rotate partners every game — same partner only once per round. Max 3 games per person per round.', 'If a player is injured, teams must still rotate partners and not repeat partnerships in a round.', 'Minimum 4 players per match; maximum 8 on any day (space and parking).']],
+      ['Timeouts & injury subs', ['Water breaks when switching sides at 6 (1 minute max).', 'No official timeouts except medical (15 minutes, including urgent restroom).', 'An injured player unable to continue can be replaced by a player not currently in the game; the team chooses who.', 'A subbed-out player who recovers must wait until Round 2 to play again.', 'If the injured player can’t continue, the team may not shuffle its lineup; subs must come from players not in the current game.', 'No subs available → the injured player’s remaining games are forfeited.']],
+      ['Line calls', ['Self-regulated — call your own side fairly.', 'Players on the sideline may not talk, make calls, coach, or gesture during play.', 'On the serve, a ball on any line is in — except the kitchen line, which is out.', 'If in doubt, it’s in. If partners disagree, the call is in.', 'You may appeal to your opponent’s partner and must respectfully accept the decision.']],
+      ['Kitchen & foot faults', ['Toe touching the baseline or kitchen line: don’t call it. Obvious/flagrant foot or kitchen faults: do call.', 'Anyone on the court can call a kitchen fault; if the other team disagrees, replay the point.', 'Keep foot-fault calls to a minimum — repeated issues go to the league coordinator after play.', 'Wrong server/receiver: stop before the return. If the rally is played out, the point stands and players reset.', '2-hour limit per division — avoid unnecessary replays.']],
+      ['Scoring', ['Server calls the score clearly before serving.', 'A wrong score can be corrected before the return is hit (serve is replayed); after the return it’s a fault.']],
+      ['Equipment & clothing', ['Bring your own paddle. Game balls are provided; warm-up balls are not.', 'Avoid clothing that matches the ball color. Eye protection is strongly encouraged.']],
+      ['Cancellations & rescheduling', ['A whole match can be cancelled by mutual consent of captains (rain, wind, heat, air quality, court conditions). Call the PVTC front desk at least 2 hours before start.', 'Weather cancellations aren’t final until the morning of the match; if captains can’t reach each other or it’s clearing, assume you’re playing.', 'Start may be delayed up to 30 minutes (longer if both teams agree and courts are free). Leaving risks a default — no grace period once courts are playable.', 'If a match is stopped mid-way, captains reschedule the remaining games within 1 week, with the original lineup; each game resumes where it left off.', 'A cancelled night extends the season by a week against the same opponent.']],
+      ['Etiquette', ['Fun, friendly, recreational competition. Discipline is at PVTC’s discretion.', 'No swearing, taunting or poor sportsmanship — offenders may forfeit games or be removed.', 'Finish early? You can keep playing until the end of the league slot; leave courts promptly when it ends.', 'Anyone not on the day’s roster sits in the patio area; players not in the current round should too when possible.', 'No cell phones on the court for rostered players. Water only on the courts.']],
+      ['Playoffs', ['A player must play in at least ⅓ of regular-season matches to play in the playoffs (injury appeals go to the coordinator).', 'Playoff seeding is by regular-season points.', 'Standings ties: head-to-head, then games won, then total points scored, then a randomly selected game.', 'Tied playoff match: total points scored in the match, then regular-season head-to-head, then best overall record.']],
+    ];
+    function rulesSection() {
+      return `<h2 class="oh-h2" id="rules" style="scroll-margin-top:130px">Rules</h2>
+        <div class="oh-card oh-rules">
+          <div class="lbl" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:10px">Key rules — PVTC league</div>
+          <ol>${KEY_RULES.map(r => `<li>${esc(r)}</li>`).join('')}</ol>
+          <div class="oh-tools" style="margin:6px 0 14px"><a class="oh-btn sm pri" href="${API}ohana-rules-pdf" target="_blank" rel="noopener">Open full rules (PDF)</a><a class="oh-btn sm" href="${API}ohana-rules-pdf?dl=1">Download</a></div>
+          <div class="lbl" style="font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-faint);margin:6px 0 4px">Full rules</div>
+          ${FULL_RULES.map(([t, items]) => `<details><summary>${esc(t)}</summary><ul>${items.map(i => `<li>${esc(i)}</li>`).join('')}</ul></details>`).join('')}
+          <div style="font-size:11px;color:var(--color-text-faint);margin-top:10px">Summary of the PVTC 2026 league rules — the PDF is the official version.</div>
+        </div>`;
     }
 
     function messageSection() {
@@ -414,8 +516,19 @@
       };
     }
 
+    function alertLine(msg) { const o = $('#photo-out'); if (o) { o.className = 'oh-msg'; o.textContent = msg; } }
     function bind() {
       bindPhoto();
+      document.querySelectorAll('[data-note]').forEach(b => b.onclick = async () => {
+        if (b.dataset.note === 'edit') { editingNote = true; return render(); }
+        if (b.dataset.note === 'cancel') { editingNote = false; return render(); }
+        if (b.dataset.note === 'clear' && confirm('Remove the team note?')) { await post({ action: 'setAnnouncement', title: '', body: '' }); editingNote = false; await load(); }
+      });
+      document.querySelectorAll('[data-gender]').forEach(b => b.onclick = async () => {
+        const p = D.roster.find(x => x.email === b.dataset.gender);
+        const next = p.gender === 'F' ? 'M' : p.gender === 'M' ? '' : 'F';
+        await post({ action: 'setGender', email: p.email, gender: next }); await load();
+      });
       const ap = $('#as-player'); if (ap) ap.onclick = () => { asPlayer = !asPlayer; D.me.canEdit = D.me.isManager && !asPlayer; render(); };
       document.querySelectorAll('[data-go]').forEach(b => b.onclick = () => $('#wk-' + b.dataset.go)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
       document.querySelectorAll('[data-open]').forEach(b => b.onclick = () => {
@@ -468,14 +581,23 @@
           } else if (btn.dataset.save === 'finals') {
             btn.disabled = true; out.className = 'oh-msg'; out.textContent = 'Saving…';
             const notes = [];
+            const val = (row, k) => row.querySelector(`[data-k=${k}]`).value.trim();
             const rows = [...ed.querySelectorAll('[data-final]')].map(row => ({ id: row.dataset.final,
-              home: row.querySelector('[data-k=home]').value.trim(), away: row.querySelector('[data-k=away]').value.trim() }));
-            if (rows.some(x => (x.home === '') !== (x.away === ''))) throw new Error('Enter both scores for each match (or leave both blank).');
+              r1: { home: val(row, 'r1home'), away: val(row, 'r1away') }, r2: { home: val(row, 'r2home'), away: val(row, 'r2away') },
+              pts: { home: val(row, 'ptshome'), away: val(row, 'ptsaway') } }));
+            const half = (x) => (x.home === '') !== (x.away === '');
+            if (rows.some(x => half(x.r1) || half(x.r2) || half(x.pts))) throw new Error('Fill in both teams for each round (or leave both blank).');
             for (const x of rows) {
-              const r = await post({ action: 'saveResult', matchId: x.id, home: x.home, away: x.away, notify });
+              const r = await post({ action: 'saveResult', matchId: x.id, r1: x.r1, r2: x.r2, pts: x.pts, notify });
               if (r.note) notes.push(r.note); if (r.emailed) notes.push(emailedLine(r.emailed));
             }
             open[w.id] = null; await load(); flash(w.id, ['Finals saved.', ...notes].join(' ')); return;
+          } else if (btn.dataset.save === 'note') {
+            payload = { action: 'setAnnouncement', email: notify };
+            ed.querySelectorAll('[data-f]').forEach(i => payload[i.dataset.f] = i.value);
+            btn.disabled = true; out.className = 'oh-msg'; out.textContent = 'Saving…';
+            const r = await post(payload); editingNote = false; await load();
+            if (r.emailed) alertLine(emailedLine(r.emailed)); return;
           } else if (btn.dataset.save === 'match') {
             payload = { action: 'editMatch', matchId: ed.dataset.match, notify };
             ed.querySelectorAll('[data-f]').forEach(i => payload[i.dataset.f] = i.value);
@@ -486,7 +608,7 @@
           btn.disabled = true; out.className = 'oh-msg'; out.textContent = 'Saving…';
           const r = await post(payload);
           if (payload.action === 'message') { out.textContent = emailedLine(r.emailed) || 'Sent.'; ed.querySelectorAll('[data-f]').forEach(i => i.value = ''); btn.disabled = false; return; }
-          const msg = ['Saved.', (r.changes && !r.changes.length) ? 'Nothing changed.' : '', emailedLine(r.emailed)].filter(Boolean).join(' ');
+          const msg = ['Saved.', (r.changes && !r.changes.length) ? 'Nothing changed.' : '', emailedLine(r.emailed), r.warnings?.length ? `Check the rule warnings on the card.` : ''].filter(Boolean).join(' ');
           if (w) open[w.id] = null;
           await load();
           flash(w?.id, msg);
@@ -515,7 +637,7 @@
         list.hidden = false;
         list.querySelectorAll('button').forEach(b => b.onmousedown = (ev) => { ev.preventDefault(); pick(hits[+b.dataset.i]); });
       };
-      const pick = (h) => { list.hidden = true; q.value = ''; act({ action: 'addPlayer', email: h.email, name: h.name }); };
+      const pick = (h) => { list.hidden = true; q.value = ''; act({ action: 'addPlayer', email: h.email, name: h.name, gender: h.gender }); };
       q.oninput = () => {
         clearTimeout(timer);
         const v = q.value.trim(); if (v.length < 2) { hits = []; show(); return; }

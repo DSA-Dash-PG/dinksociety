@@ -8,8 +8,9 @@
 
 import { loadLeague, viewer, json } from './lib/ohana.js';
 import {
-  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, computeStandings, normSlots, slotScored, isOurs, laMs,
+  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, computeStandings, normSlots, slotScored, isOurs, laMs, lineupWarnings, eligibility, TYPE_LABEL,
 } from './lib/ohana-core.js';
+import { DEFAULT_ANNOUNCEMENT } from './lib/ohana.js';
 
 export default async (req) => {
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
@@ -32,11 +33,16 @@ export default async (req) => {
         id: ours.id, date: matchDate(wk, ours), time: ours.time, courts: ours.courts, note: ours.note,
         side, opponent: teamName(league, opponentOf(league, ours)),
         startMs: laMs(matchDate(wk, ours), ours.time),
-        result: r ? { us: side === 'home' ? r.home : r.away, them: side === 'home' ? r.away : r.home } : null,
+        result: r ? {
+          us: side === 'home' ? r.home : r.away, them: side === 'home' ? r.away : r.home,
+          ptsUs: side === 'home' ? r.ptsHome : r.ptsAway, ptsThem: side === 'home' ? r.ptsAway : r.ptsHome,
+          rounds: r.rounds.map(x => ({ us: side === 'home' ? x.home : x.away, them: side === 'home' ? x.away : x.home })),
+        } : null,
+        warnings: v.canEdit ? lineupWarnings(league, ours.slots) : [],
         // true when we have game-by-game scores; false = final score only (no stat sheet)
         detailed: (ours.slots || []).some(slotScored),
         lineupSentAt: ours.lineupSentAt || null,
-        slots: slots.map(s => ({ no: s.no, players: s.players.map(person), opp: s.opp, us: s.us, them: s.them })),
+        slots: slots.map(s => ({ no: s.no, round: s.round, type: s.type, typeLabel: TYPE_LABEL[s.type], players: s.players.map(person), opp: s.opp, us: s.us, them: s.them })),
       };
     }
     return {
@@ -55,6 +61,7 @@ export default async (req) => {
     for (const p of stats.players) { delete p.email; for (const q of p.partners) delete q.email; }
   }
 
+  const elig = eligibility(league);
   return json({
     signedIn: true, allowed: true,
     me: { name: v.entry?.name || '', email: v.email, canEdit: v.canEdit, owner: v.owner, onRoster: !!v.entry },
@@ -62,7 +69,9 @@ export default async (req) => {
     weeks,
     standings: computeStandings(league),
     stats: { team: stats.team, players: stats.players, pairs: stats.pairs.slice(0, 8) },
-    roster: league.roster.map(p => v.canEdit ? { email: p.email, name: p.name, manager: !!p.manager } : { name: p.name, manager: !!p.manager, me: p.email === v.email }),
+    eligibility: { total: elig.total, needed: elig.needed },
+    announcement: league.announcement === undefined ? DEFAULT_ANNOUNCEMENT : league.announcement,
+    roster: league.roster.map(p => ({ ...(v.canEdit ? { email: p.email, gender: p.gender || '' } : { me: p.email === v.email }), name: p.name, manager: !!p.manager, played: elig.played[p.email] || 0 })),
   });
 };
 

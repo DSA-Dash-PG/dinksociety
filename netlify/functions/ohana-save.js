@@ -10,16 +10,20 @@
 //   saveScores    { matchId, slots:[{no, us, them, opp:[a,b]}], notify }
 //   editMatch     { matchId, date, time, courts, note, homeTeamId, awayTeamId, notify }
 //                   notify → everyone on the roster gets the before → after.
-//   saveResult    { matchId, home, away, notify }  final games won only — for
+//   saveResult    { matchId, r1:{home,away}, r2:{home,away}, pts?:{home,away}, notify }
+//                   games won per round from the PVTC sheet (+ optional rally points) — for
 //                   other teams' matches (no stat sheet) or ours when we only
 //                   have the final. Blank both to clear. Our game-by-game
 //                   scores, when entered, always win over this.
+//   setGender     { email, gender:'M'|'F'|'' }  powers the WD/MD/mixed lineup check
+//   setAnnouncement { title, body, email }    team note at the top of the page (email → send it too)
 //   message       { subject, text }           email the whole team
 //
 
 import { loadLeague, saveLeague, viewer, json, emailLineup, emailScheduleChange, emailResult, emailMessage } from './lib/ohana.js';
+import { buildLeagueIndex } from './lib/league-players.js';
 import {
-  findMatch, normSlots, isOurs, lineupChangedFor, describeMatchChange, matchResult, slotScored,
+  findMatch, normSlots, isOurs, lineupChangedFor, describeMatchChange, matchResult, slotScored, lineupWarnings, GAMES_PER_ROUND,
 } from './lib/ohana-core.js';
 import { normalizeEmail } from './lib/identity.js';
 import { isOwnerEmail } from './lib/owner.js';
@@ -47,8 +51,10 @@ export default async (req) => {
       const name = clip(body.name, 80);
       if (!email || !name) return json({ error: 'Name and email required' }, 400);
       if (rosterSet.has(email)) return json({ error: 'Already on the roster' }, 409);
+      if (league.roster.length >= 15) return json({ error: 'PVTC allows a maximum of 15 rostered players.' }, 400);
+      const gender = /^[mf]/i.test(String(body.gender || '')) ? String(body.gender)[0].toUpperCase() : '';
       // The site owner is always a manager, so their own entry gets manager emails (lineup nudges).
-      league.roster.push({ email, name, manager: isOwnerEmail(email), addedAt: new Date().toISOString() });
+      league.roster.push({ email, name, gender, manager: isOwnerEmail(email), addedAt: new Date().toISOString() });
       league.roster.sort((a, b) => a.name.localeCompare(b.name));
       log(`added ${name}`);
       break;
@@ -72,13 +78,19 @@ export default async (req) => {
       const hit = findMatch(league, body.matchId);
       if (!hit || !isOurs(league, hit.match)) return json({ error: 'Match not found' }, 404);
       const { week, match } = hit;
+      // Gender powers the MD/WD/mixed check — fill it in for anyone added before we stored it.
+      if (league.roster.some(p => !p.gender)) {
+        const { byEmail } = await buildLeagueIndex().catch(() => ({ byEmail: new Map() }));
+        for (const p of league.roster) if (!p.gender) { const g = byEmail.get(p.email)?.gender || ''; if (/^[mf]/i.test(g)) p.gender = g[0].toUpperCase(); }
+      }
       const prev = normSlots(match.lineupSnapshot || [], league.gamesPerMatch);
       const incoming = normSlots(body.slots, league.gamesPerMatch);
       // Keep any scores already entered; only the pairings change here.
       const cur = normSlots(match.slots, league.gamesPerMatch);
       const next = incoming.map((s, i) => ({ ...cur[i], players: s.players.map(e => rosterSet.has(e) ? e : '') }));
       for (const s of next) if (s.players[0] && s.players[0] === s.players[1]) s.players[1] = '';
-      match.slots = next;
+      match.slots = next.map(({ no, players, opp, us, them }) => ({ no, players, opp, us, them }));
+      out.warnings = lineupWarnings(league, match.slots);
       log(`lineup saved for ${week.label}`);
       if (body.notify) {
         const first = !match.lineupSentAt;
@@ -109,13 +121,20 @@ export default async (req) => {
       const { week, match } = hit;
       if (!match.home?.teamId || !match.away?.teamId) return json({ error: 'Set both teams first' }, 400);
       const blank = (x) => x === '' || x == null;
-      if (blank(body.home) && blank(body.away)) { match.result = null; log(`cleared final for ${week.label} ${match.id}`); break; }
-      const h = Number(body.home), a = Number(body.away);
-      if (![h, a].every(n => Number.isInteger(n) && n >= 0 && n <= 30)) return json({ error: 'Enter games won for both teams' }, 400);
-      match.result = { home: h, away: a };
-      log(`final ${week.label}: ${h}-${a} (${match.id})`);
+      const pair = (x, max) => {
+        if (!x || (blank(x.home) && blank(x.away))) return null;
+        const h = Number(x.home), a = Number(x.away);
+        if (![h, a].every(n => Number.isInteger(n) && n >= 0) || h + a > max) throw new Error(`bad:${max}`);
+        return { home: h, away: a };
+      };
+      let r1, r2, pts;
+      try { r1 = pair(body.r1, GAMES_PER_ROUND); r2 = pair(body.r2, GAMES_PER_ROUND); pts = pair(body.pts, 1000); }
+      catch { return json({ error: 'Each round is 6 games — enter games won for both teams (e.g. 4 and 2).' }, 400); }
+      if (!r1 && !r2) { match.result = null; log(`cleared final for ${week.label} ${match.id}`); break; }
+      match.result = { r1, r2, pts };
+      log(`final ${week.label} (${match.id}): R1 ${r1 ? r1.home + '-' + r1.away : '—'}, R2 ${r2 ? r2.home + '-' + r2.away : '—'}`);
       if (isOurs(league, match) && match.slots?.some(slotScored)) out.note = 'Game-by-game scores are in for this match, so those count instead of this final.';
-      else if (body.notify && isOurs(league, match)) out.emailed = await emailResult(league, week, match, match.result);
+      else if (body.notify && isOurs(league, match)) out.emailed = await emailResult(league, week, match, matchResult(league, match));
       break;
     }
     case 'editMatch': {
@@ -145,6 +164,19 @@ export default async (req) => {
         out.emailed = await emailScheduleChange(league, week, match, lines);
       }
       out.changes = lines;
+      break;
+    }
+    case 'setGender': {
+      const p = league.roster.find(x => x.email === normalizeEmail(body.email));
+      if (!p) return json({ error: 'Not on the roster' }, 404);
+      p.gender = /^[mf]$/i.test(String(body.gender || '')) ? String(body.gender).toUpperCase() : '';
+      break;
+    }
+    case 'setAnnouncement': {
+      const title = clip(body.title, 120), text = clip(body.body, 4000);
+      league.announcement = (title || text) ? { title, body: text, updatedAt: new Date().toISOString(), by: who } : null;
+      log(title || text ? `updated team note: ${title}` : 'cleared team note');
+      if (body.email && (title || text)) out.emailed = await emailMessage(league, who, title, text);
       break;
     }
     case 'message': {

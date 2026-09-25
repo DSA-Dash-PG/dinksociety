@@ -19,7 +19,7 @@ export default async (req) => {
     if (onRoster.has(rec.email)) continue;
     const n = String(rec.name || '').toLowerCase();
     if (!n.includes(q) && !rec.email.startsWith(q)) continue;
-    hits.push({ rank: n.startsWith(q) ? 0 : 1, name: rec.name || rec.email, email: rec.email, lastTeamName: rec.lastTeamName || '' });
+    hits.push({ rank: n.startsWith(q) ? 0 : 1, name: rec.name || rec.email, email: rec.email, gender: rec.gender || '', lastTeamName: rec.lastTeamName || '' });
   }
   hits.sort((a, b) => a.rank - b.rank || a.name.localeCompare(b.name));
   return json({ results: hits.slice(0, 8).map(({ rank, ...h }) => h) });
