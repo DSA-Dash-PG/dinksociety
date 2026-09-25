@@ -115,7 +115,7 @@ export default async (req) => {
     // shared blob, so every save is etag-guarded: if the other captain wrote
     // mid-flight, re-read and re-apply MY changes on top of theirs (the
     // unguarded version silently wiped scores in week-1 QA).
-    let existing = null, changed = false, saved = false;
+    let existing = null, changed = false, saved = false, changedSlots = [];
     for (let attempt = 0; attempt < 5 && !saved; attempt++) {
       const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
       existing = got?.data || newScoreRecord(match);
@@ -128,6 +128,7 @@ export default async (req) => {
 
       const now = new Date().toISOString();
       changed = false;
+      changedSlots = [];
 
       // Each captain writes ONLY their own team's version of the score.
       for (const slot of SLOT_KEYS) {
@@ -157,7 +158,16 @@ export default async (req) => {
           // right" flag — the new number needs a fresh confirm.
           cur.awayEntry = null;
           delete cur.dispute;
+          // Game-pace clock (lib/pace.js): the FIRST time home saves a complete
+          // score is when the game ended. Later corrections don't move it, and
+          // admin edits never touch `timing`.
+          if (entryComplete(myEntry)) {
+            cur.timing = cur.timing || {};
+            if (!cur.timing.enteredAt) { cur.timing.enteredAt = now; cur.timing.source = 'live'; }
+            else cur.timing.editedAt = now;
+          }
           changed = true;
+          changedSlots.push(slot);
         }
       }
 
@@ -210,7 +220,7 @@ export default async (req) => {
         actor: { email: ctx.user.email, role: ctx.user.role },
         team: ctx.team,
         matchId, week: match.week, circuit: match.circuit,
-        details: `${ctx.team.name} updated their Week ${match.week} scoresheet (${match.teamA.name} vs ${match.teamB.name})`,
+        details: `${ctx.team.name} updated their Week ${match.week} scoresheet (${match.teamA.name} vs ${match.teamB.name}) · ${changedSlots.map(prettySlot).join(', ')}`,
       });
     }
 
@@ -258,10 +268,14 @@ export default async (req) => {
             // all downstream status/finalize logic working unchanged).
             g.awayEntry = { home: g.homeEntry.home, away: g.homeEntry.away, by: ctx.user.email, at: now };
             delete g.dispute;
+            g.timing = g.timing || {};
+            if (!g.timing.confirmedAt) g.timing.confirmedAt = now;
           } else {
             // "Not right" — flag for home to fix; clears any prior confirm.
             g.awayEntry = null;
             g.dispute = { by: ctx.user.email, at: now };
+            g.timing = g.timing || {};
+            g.timing.disputes = (g.timing.disputes || 0) + 1;
           }
         }
 

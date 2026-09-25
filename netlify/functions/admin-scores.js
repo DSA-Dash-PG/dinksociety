@@ -15,7 +15,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { rebuildStandings } from './lib/standings.js';
 import {
-  SLOT_KEYS, newScoreRecord, toScore, decorate, normalizeScore, prettySlot,
+  SLOT_KEYS, newScoreRecord, toScore, decorate, normalizeScore, prettySlot, entriesAgree,
 } from './lib/score-helpers.js';
 
 export default async (req) => {
@@ -66,6 +66,7 @@ export default async (req) => {
 
     const r = await withScore(scoresStore, scoreKey, match, (existing) => {
       const now = new Date().toISOString();
+      let touched = 0;
       for (const slot of SLOT_KEYS) {
         if (!(slot in incoming)) continue;
         const g = incoming[slot] || {};
@@ -80,19 +81,29 @@ export default async (req) => {
         // clear the slot entirely when both values are blank.
         const cur = existing.games[slot];
         if (homeVal === null && awayVal === null) {
+          if (!cur.homeEntry && !cur.awayEntry) continue;
           cur.homeEntry = null;
           cur.awayEntry = null;
         } else {
+          // Unchanged game → leave the captains' entries (and their
+          // timestamps) alone. The admin sheet re-sends all 12 games on every
+          // save; re-stamping them wiped Week 2's game-pace data.
+          if (entriesAgree(cur.homeEntry, cur.awayEntry)
+              && cur.homeEntry.home === homeVal && cur.homeEntry.away === awayVal) continue;
           const entry = { home: homeVal, away: awayVal, by: admin.email, at: now };
           cur.homeEntry = { ...entry };
           cur.awayEntry = { ...entry };
         }
+        // `cur.timing` (game-pace clock) is deliberately never touched here.
+        touched++;
       }
 
       normalizeScore(existing, !!match.championship);
-      existing.updatedAt = now;
-      existing.updatedBy = admin.email;
-      existing.adminEdited = true;
+      if (touched) {
+        existing.updatedAt = now;
+        existing.updatedBy = admin.email;
+        existing.adminEdited = true;
+      }
     });
 
     if (r.abort) return json(r.abort, r.abort.status || 400);

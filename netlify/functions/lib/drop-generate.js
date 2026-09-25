@@ -43,6 +43,7 @@ You will be given a STATS BRIEF for one week. Your job:
 1. Pick the 3–4 BEST storylines from the brief — the ones a reader would actually care about. Lead with the single biggest one.
 2. Write a lead story (2–3 short punchy paragraphs) and 2–3 shorter follow storylines.
 3. Secondary goal: make sure the standout team and players of the week get their due BY NAME, with their numbers, woven into the stories.
+4. When the brief has gamePace, weave in at least one pace angle (the marathon game, the fastest match, tempo by team, who logged the most court minutes). Call pace numbers approximate — they come from score-entry times.
 
 Only use facts present in the brief. Do not invent scores, names, ratings, or streaks. If the brief is thin, write a shorter column rather than padding.
 
@@ -67,6 +68,7 @@ function buildUserPrompt(brief) {
     playersOfTheWeek: brief.performers?.potw,
     teamOfTheWeek: brief.performers?.teamOfWeek,
     dsrRisers: brief.performers?.risers,
+    gamePace: brief.pace || undefined,
   }, null, 2);
 }
 

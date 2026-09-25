@@ -653,6 +653,31 @@
       .tdp-jump button { flex: 0 0 auto; background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text-muted); font-family: inherit; font-size: 12px; font-weight: 700; padding: 7px 13px; border-radius: var(--radius-full); cursor: pointer; white-space: nowrap; }
       .tdp-jump button:active { background: var(--color-lime); color: var(--color-text-inverse); }
     }
+    /* Game Pace tab */
+    .pc-bar { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 0; margin: 0 0 14px; background: var(--color-bg); border-bottom: 1px solid var(--color-border); }
+    .pc-bar__ctl { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .pc-lbl { font-size: 11px; color: var(--color-text-faint); display: inline-flex; gap: 6px; align-items: center; }
+    .pc-lbl select { background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border-strong); border-radius: 8px; padding: 5px 8px; font-size: 12px; }
+    .pc-note { font-size: 11px; color: var(--color-text-faint); }
+    .pc-ins { margin: 0; padding-left: 18px; display: grid; gap: 8px; font-size: 13px; line-height: 1.5; }
+    .pc-t td { padding: 8px 12px; border-bottom: 1px solid var(--color-border); white-space: nowrap; }
+    .pc-t td.num { font-variant-numeric: tabular-nums; text-align: right; }
+    .pc-dim { color: var(--color-text-faint); font-size: 11px; }
+    .pc-m__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; }
+    .pc-m__title { font-weight: 800; text-transform: uppercase; font-size: 14px; letter-spacing: .02em; }
+    .pc-m__kpis { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--color-text-faint); }
+    .pc-m__kpis b { color: var(--color-text); font-size: 15px; }
+    .pc-lane { display: grid; grid-template-columns: 52px 1fr; gap: 8px; align-items: center; margin-bottom: 6px; }
+    .pc-lane__lbl { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-text-faint); }
+    .pc-lane__track { display: flex; gap: 2px; height: 30px; }
+    .pc-seg { position: relative; border-radius: 5px; background: var(--color-surface-2); border: 1px solid var(--color-border-strong); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; overflow: hidden; min-width: 18px; cursor: default; }
+    .pc-seg.is-home { background: var(--color-lime-dim); border-color: var(--color-lime); color: var(--color-lime); }
+    .pc-seg.is-away { background: var(--color-teal-dim); border-color: var(--color-teal); color: var(--color-teal); }
+    .pc-seg.is-r2 { border-style: dashed; }
+    .pc-seg.is-na { opacity: .35; }
+    .pc-axis { display: grid; grid-template-columns: 52px 1fr; gap: 8px; font-size: 10px; color: var(--color-text-faint); margin-top: 2px; }
+    .pc-axis__t { display: flex; justify-content: space-between; }
+    [data-pcp].is-on { border-color: var(--color-lime); color: var(--color-lime); }
   </style>
   <script src="/badges.js?v=3"></script>
   <script src="/js/admin-splits.js"></script>
@@ -805,6 +830,10 @@
           <button class="sb__link" data-tab="analytics">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             Analytics
+          </button>
+          <button class="sb__link" data-tab="pace">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/></svg>
+            Game Pace
           </button>
           <div class="sb__sec">Config</div>
           <button class="sb__link" data-tab="settings">
@@ -1748,6 +1777,37 @@
             <table class="at"><thead><tr><th>Name</th><th>Team</th><th>Role</th><th>Logins</th><th>Visits</th><th>Last login</th><th>Last seen</th><th>Top tab</th></tr></thead>
             <tbody id="an-people"><tr><td colspan="8" class="loading">Loading…</td></tr></tbody></table>
             </div>
+          </div>
+        </section>
+
+        <!-- GAME PACE — minutes per game / match / team / player from score-entry times (admin-pace.js) -->
+        <section class="admin-section" data-section="pace">
+          <div class="pc-bar">
+            <h1 class="am-title" style="margin:0;">Game Pace</h1>
+            <div class="pc-bar__ctl">
+              <label class="pc-lbl">Week <select id="pc-week"></select></label>
+              <label class="pc-lbl" title="Minutes after the scheduled time that the first games actually start">Start + <select id="pc-offset"><option value="0">0</option><option value="5" selected>5</option><option value="10">10</option><option value="15">15</option></select> min</label>
+              <button class="ab ab--outline ab--sm" id="pc-refresh">↻ Refresh</button>
+              <button class="ab ab--lime ab--sm" id="pc-copy">Copy Drop notes</button>
+            </div>
+          </div>
+          <div class="stats-row" id="pc-stats"><div class="loading">Loading…</div></div>
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Storylines</h2><span class="ac__s pc-note">Auto-written from the data · feeds The Drop draft</span></div>
+            <ul class="pc-ins" id="pc-insights"></ul>
+          </div>
+          <div id="pc-matches"></div>
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Teams</h2><span class="ac__s pc-note">This week · season avg in grey</span></div>
+            <div style="overflow-x:auto;"><table class="at pc-t"><thead><tr><th>Team</th><th>Match</th><th>R1 / R2</th><th>Avg game</th><th>vs league</th><th>Pts / min</th><th>Won / lost</th><th>Close / blowout</th><th>W · M · Mx</th><th>Entry</th><th>Confirm lag</th><th>Sign-off lag</th></tr></thead><tbody id="pc-teams"></tbody></table></div>
+          </div>
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Players · court time</h2><span class="ac__s pc-note">Week · tap Season to switch</span><div><button class="ab ab--outline ab--sm is-on" data-pcp="week">Week</button> <button class="ab ab--outline ab--sm" data-pcp="season">Season</button></div></div>
+            <div style="overflow-x:auto;max-height:420px;overflow-y:auto;"><table class="at pc-t"><thead><tr><th>Player</th><th>Team</th><th>Games</th><th>Court min</th><th>Avg game</th><th>Pts / min</th><th>W–L</th><th>Longest game</th></tr></thead><tbody id="pc-players"></tbody></table></div>
+          </div>
+          <div class="ac">
+            <div class="ac__h"><h2 class="ac__t">Every game</h2><span class="ac__s pc-note">Sorted longest first · ~ = estimated · ⏱ = first game incl. warm-up</span></div>
+            <div style="overflow-x:auto;"><table class="at pc-t"><thead><tr><th>Min</th><th>Game</th><th>Match</th><th>Score</th><th>Pairs</th><th>Ended</th><th>Pts / min</th><th>Confirm lag</th></tr></thead><tbody id="pc-games"></tbody></table></div>
           </div>
         </section>
 
@@ -3212,6 +3272,7 @@
     if (t === 'moments') loadAdminGallery();
     if (t === 'activity') initActivityLog();
     if (t === 'analytics') renderAnalytics();
+    if (t === 'pace') renderPace();
     // Keep the bottom nav in sync. Tabs that aren't one of the 5 nav slots just clear all highlights.
     document.querySelectorAll('#am-bottomnav .am-bn').forEach(bn => bn.classList.toggle('is-active', bn.dataset.bn === t));
   }
@@ -3724,6 +3785,139 @@
     }
   }
   $id('an-refresh')?.addEventListener('click', renderAnalytics);
+
+  // ═══════════════════════════════════════════════════════════
+  // GAME PACE — admin-pace.js (lib/pace.js). Run after each game night;
+  // the same numbers feed The Drop's auto-draft brief.
+  // ═══════════════════════════════════════════════════════════
+  let PACE = null, pacePlayers = 'week';
+  const pcMin = v => (v == null ? '—' : (Math.round(v * 10) / 10).toFixed(1));
+  const pcTime = iso => iso ? new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—';
+  const pcShort = n => { const p = String(n || '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[p.length - 1][0] + '.' : (p[0] || ''); };
+  const pcPair = arr => (arr || []).map(pcShort).join(' & ') || '—';
+  const pcFlag = g => (g.flags || []).includes('est') ? '~' : ((g.flags || []).includes('fromStart') ? '⏱' : '');
+
+  async function renderPace(forceWeek) {
+    const wkSel = $id('pc-week');
+    const week = forceWeek != null ? forceWeek : (wkSel && wkSel.value) || '';
+    const off = $id('pc-offset').value;
+    $id('pc-stats').innerHTML = '<div class="loading">Loading…</div>';
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-pace?circuit=' + encodeURIComponent(adminCircuit()) + (week ? '&week=' + encodeURIComponent(week) : '') + '&offset=' + encodeURIComponent(off));
+      PACE = d;
+      wkSel.innerHTML = (d.weeks || []).map(w => '<option value="' + w + '"' + (w === d.week ? ' selected' : '') + '>Week ' + w + '</option>').join('') || '<option value="">—</option>';
+      if (d.empty) {
+        $id('pc-stats').innerHTML = '<div class="empty">No timed games yet for this season. Pace fills in as captains enter scores on game night.</div>';
+        ['pc-insights', 'pc-matches', 'pc-teams', 'pc-players', 'pc-games'].forEach(id => { $id(id).innerHTML = ''; });
+        return;
+      }
+      paceStats(d); paceInsights(d); paceMatches(d); paceTeams(d); pacePlayersTable(); paceGames(d);
+    } catch (e) {
+      $id('pc-stats').innerHTML = '<div class="empty">Failed to load pace: ' + h(e.message) + '</div>';
+    }
+  }
+
+  function paceStats(d) {
+    const n = d.night, bt = n.byType || {};
+    const card = (l, v, sub, cls) => '<div class="sc"><div class="sc__l">' + l + '</div><div class="sc__v ' + (cls || '') + '">' + v + '</div><div class="sc__sub">' + sub + '</div></div>';
+    $id('pc-stats').innerHTML =
+      card('Night ran', pcTime(n.startAt) + '–' + pcTime(n.lastFinishAt), n.timedGames + ' of ' + n.totalGames + ' games timed') +
+      card('Avg game', pcMin(n.avgGameMin) + '<span class="pc-dim"> min</span>', 'median ' + pcMin(n.medianGameMin) + ' · ' + (n.ptsPerMin ?? '—') + ' pts/min', 'sc__v--teal') +
+      card('Avg match', pcMin(n.avgMatchMin) + '<span class="pc-dim"> min</span>', n.fastestMatch ? 'fastest ' + h(n.fastestMatch.teams) + ' ' + pcMin(n.fastestMatch.totalMin) : '—') +
+      card('By type', pcMin(bt.WOMENS?.avgMin) + ' · ' + pcMin(bt.MENS?.avgMin) + ' · ' + pcMin(bt.MIXED?.avgMin), "women's · men's · mixed (min)", 'sc__v--gold') +
+      card('Close vs blowout', pcMin(n.closeAvgMin) + ' / ' + pcMin(n.blowoutAvgMin), 'min · ≤3 pts vs 8+ margin') +
+      card('Confirm lag', pcMin(n.avgConfirmLagMin) + '<span class="pc-dim"> min</span>', 'avg entry → away confirm');
+  }
+
+  function paceInsights(d) {
+    $id('pc-insights').innerHTML = (d.insights || []).map(t => '<li>' + h(t) + '</li>').join('') || '<li class="pc-dim">Not enough timed games yet.</li>';
+  }
+
+  function paceMatches(d) {
+    $id('pc-matches').innerHTML = (d.matches || []).map(m => {
+      const start = m.startAt ? new Date(m.startAt).getTime() : null;
+      const endMs = m.finishAt ? new Date(m.finishAt).getTime() : null;
+      const span = start && endMs ? Math.max(1, (endMs - start) / 60000) : null;
+      const lane = side => {
+        const seq = m.games.filter(g => g.side === side).sort((a, b) => (a.round - b.round) || (a.gameNo - b.gameNo));
+        return '<div class="pc-lane"><div class="pc-lane__lbl">Ct ' + h(seq[0]?.court || side) + '</div><div class="pc-lane__track">' +
+          seq.map(g => {
+            const w = g.min != null && span ? Math.max(3, (g.min / span) * 100) : 100 / 6;
+            const cls = 'pc-seg' + (g.winner === 'home' ? ' is-home' : g.winner === 'away' ? ' is-away' : '') + (g.round === 2 ? ' is-r2' : '') + (g.min == null ? ' is-na' : '');
+            const tip = g.label + ' ' + g.typeLabel + ' · ' + (g.home ?? '–') + '–' + (g.away ?? '–') + ' · ' + (g.min != null ? pcMin(g.min) + ' min' : 'no time') + ' · ended ' + pcTime(g.finishedAt) + '\n' + pcPair(g.homePair) + ' vs ' + pcPair(g.awayPair);
+            return '<div class="' + cls + '" style="flex:0 0 calc(' + w.toFixed(2) + '% - 2px)" title="' + h(tip) + '">' + (g.min != null ? pcFlag(g) + Math.round(g.min) : '?') + '</div>';
+          }).join('') + '</div></div>';
+      };
+      const lag = m.confirm || {}, so = m.signoff || {};
+      return '<div class="ac"><div class="pc-m__head"><div class="pc-m__title"><span style="color:var(--color-lime)">' + h(m.home.name) + '</span> <span class="pc-dim">v</span> <span style="color:var(--color-teal)">' + h(m.away.name) + '</span> <span class="pc-dim">· ' + h(m.courts || '') + '</span></div>' +
+        '<div class="pc-m__kpis"><span>Total <b>' + pcMin(m.totalMin) + '</b></span><span>R1 <b>' + pcMin(m.round1Min) + '</b></span><span>R2 <b>' + pcMin(m.round2Min) + '</b></span><span>Avg game <b>' + pcMin(m.avgGameMin) + '</b></span><span>Pts/min <b>' + (m.ptsPerMin ?? '—') + '</b></span></div></div>' +
+        lane('A') + lane('B') +
+        '<div class="pc-axis"><span></span><div class="pc-axis__t"><span>' + pcTime(m.startAt) + '</span><span>' + pcTime(m.finishAt) + '</span></div></div>' +
+        '<div class="pc-dim" style="margin-top:10px;">Home entry: ' + h(m.entryStyle || '—') + ' · confirm lag avg ' + pcMin(lag.avgLagMin) + ' / max ' + pcMin(lag.maxLagMin) + ' min' + (lag.lateGames ? ' (' + lag.lateGames + ' games 15+ min late)' : '') + (lag.disputes ? ' · ' + lag.disputes + ' flagged' : '') +
+        ' · sign-off ' + (so.adminFinalized ? 'admin-finalized' : (h(m.home.name) + ' +' + pcMin(so.homeLagMin) + ', ' + h(m.away.name) + ' +' + pcMin(so.awayLagMin) + ' min')) + '</div></div>';
+    }).join('');
+  }
+
+  function paceTeams(d) {
+    const season = {};
+    (d.season?.teams || []).forEach(t => { season[t.id] = t; });
+    $id('pc-teams').innerHTML = (d.teams || []).map(t => {
+      const s = season[t.id] || {};
+      const sg = v => '<br><span class="pc-dim">' + pcMin(v) + '</span>';
+      const vs = t.vsLeagueMin == null ? '—' : (t.vsLeagueMin > 0 ? '+' : '') + pcMin(t.vsLeagueMin);
+      return '<tr><td><b>' + h(t.name) + '</b></td>' +
+        '<td class="num">' + pcMin(t.avgMatchMin) + sg(s.avgMatchMin) + '</td>' +
+        '<td class="num">' + pcMin(t.avgRound1Min) + ' / ' + pcMin(t.avgRound2Min) + '</td>' +
+        '<td class="num">' + pcMin(t.avgGameMin) + sg(s.avgGameMin) + '</td>' +
+        '<td class="num">' + vs + '</td>' +
+        '<td class="num">' + (t.ptsPerMin ?? '—') + '<br><span class="pc-dim">' + (s.ptsPerMin ?? '—') + '</span></td>' +
+        '<td class="num">' + pcMin(t.winsAvgMin) + ' / ' + pcMin(t.lossesAvgMin) + '</td>' +
+        '<td class="num">' + pcMin(t.closeAvgMin) + ' / ' + pcMin(t.blowoutAvgMin) + '</td>' +
+        '<td class="num">' + pcMin(t.byType?.WOMENS?.avgMin) + ' · ' + pcMin(t.byType?.MENS?.avgMin) + ' · ' + pcMin(t.byType?.MIXED?.avgMin) + '</td>' +
+        '<td>' + h(t.entryStyle || '—') + '</td>' +
+        '<td class="num">' + pcMin(t.avgConfirmLagMin) + '</td>' +
+        '<td class="num">' + pcMin(t.avgSignoffLagMin) + '</td></tr>';
+    }).join('');
+  }
+
+  function pacePlayersTable() {
+    if (!PACE || PACE.empty) return;
+    const rows = pacePlayers === 'season' ? (PACE.season?.players || []) : (PACE.players || []);
+    document.querySelectorAll('[data-pcp]').forEach(b => b.classList.toggle('is-on', b.dataset.pcp === pacePlayers));
+    $id('pc-players').innerHTML = rows.map(p => '<tr><td><b>' + h(p.name) + '</b></td><td>' + h(p.team || '') + '</td><td class="num">' + p.games + '</td><td class="num">' + pcMin(p.courtMin) + '</td><td class="num">' + pcMin(p.avgGameMin) + '</td><td class="num">' + (p.ptsPerMin ?? '—') + '</td><td class="num">' + (p.record ? p.record.w + '–' + p.record.l : '—') + '</td><td>' + (p.longest ? pcMin(p.longest.min) + ' min · W' + p.longest.week + ' ' + h(p.longest.label) + ' (' + h(p.longest.score) + ')' : '—') + '</td></tr>').join('') || '<tr><td colspan="8" class="empty">No lineups found.</td></tr>';
+  }
+
+  function paceGames(d) {
+    const all = [];
+    (d.matches || []).forEach(m => m.games.forEach(g => all.push({ g, m })));
+    all.sort((a, b) => (b.g.min ?? -1) - (a.g.min ?? -1));
+    $id('pc-games').innerHTML = all.map(({ g, m }) => '<tr><td class="num"><b>' + (g.min != null ? pcFlag(g) + pcMin(g.min) : '—') + '</b></td><td>' + h(g.label) + ' <span class="pc-dim">' + h(g.typeLabel) + ' · Ct ' + h(g.court) + '</span></td><td>' + h(m.home.name) + ' <span class="pc-dim">v</span> ' + h(m.away.name) + '</td><td class="num">' + (g.home ?? '–') + '–' + (g.away ?? '–') + '</td><td>' + h(pcPair(g.homePair)) + ' <span class="pc-dim">vs</span> ' + h(pcPair(g.awayPair)) + '</td><td>' + pcTime(g.finishedAt) + '</td><td class="num">' + (g.ptsPerMin ?? '—') + '</td><td class="num">' + pcMin(g.confirmLagMin) + '</td></tr>').join('');
+  }
+
+  $id('pc-refresh')?.addEventListener('click', () => renderPace());
+  $id('pc-week')?.addEventListener('change', () => renderPace());
+  $id('pc-offset')?.addEventListener('change', () => renderPace());
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('[data-pcp]');
+    if (b) { pacePlayers = b.dataset.pcp; pacePlayersTable(); }
+  });
+  $id('pc-copy')?.addEventListener('click', async () => {
+    if (!PACE || PACE.empty) return;
+    const d = PACE;
+    const lines = ['GAME PACE · Week ' + d.week, ''];
+    (d.insights || []).forEach(t => lines.push('• ' + t));
+    lines.push('', 'MATCHES');
+    d.matches.forEach(m => lines.push('• ' + m.home.name + ' v ' + m.away.name + ': ' + pcMin(m.totalMin) + ' min (R1 ' + pcMin(m.round1Min) + ', R2 ' + pcMin(m.round2Min) + '), avg game ' + pcMin(m.avgGameMin) + ', ' + (m.ptsPerMin ?? '—') + ' pts/min'));
+    lines.push('', 'TEAMS (week avg game · season avg · pts/min)');
+    const season = {}; (d.season?.teams || []).forEach(t => { season[t.id] = t; });
+    d.teams.forEach(t => lines.push('• ' + t.name + ': ' + pcMin(t.avgGameMin) + ' min · season ' + pcMin(season[t.id]?.avgGameMin) + ' · ' + (t.ptsPerMin ?? '—') + ' pts/min · wins ' + pcMin(t.winsAvgMin) + ' / losses ' + pcMin(t.lossesAvgMin)));
+    lines.push('', 'LONGEST GAMES');
+    (d.slowestGames || []).forEach(g => lines.push('• ' + pcMin(g.min) + ' min — ' + g.label + ' ' + g.typeLabel + ', ' + g.score + ' (' + pcPair(g.homePair) + ' vs ' + pcPair(g.awayPair) + ')'));
+    lines.push('', 'MOST COURT TIME');
+    (d.players || []).slice(0, 8).forEach(p => lines.push('• ' + p.name + ' (' + p.team + '): ' + pcMin(p.courtMin) + ' min, ' + p.games + ' games'));
+    try { await navigator.clipboard.writeText(lines.join('\n')); $id('pc-copy').textContent = 'Copied ✓'; setTimeout(() => { $id('pc-copy').textContent = 'Copy Drop notes'; }, 1800); }
+    catch (_) { alert('Copy failed — select the Storylines text instead.'); }
+  });
 
   // ═══════════════════════════════════════════════════════════
   // OVERVIEW — live from admin-overview + admin-gameday endpoints

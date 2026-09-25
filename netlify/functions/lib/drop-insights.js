@@ -9,6 +9,7 @@
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
 import { normPerformers } from './drop.js';
+import { loadPace, paceBrief } from './pace.js';
 import {
   latestPlayedWeek, buildTimelines, computeStreaks, detectUpsets, detectBlowouts,
 } from './drop-stats.js';
@@ -154,6 +155,10 @@ export async function buildWeeklyBrief(circuit, weekOverride = null) {
 
   const performers = await livePerformers(code);
 
+  // Game pace (minutes per game/match, tempo, court time) — never fatal.
+  let pace = null;
+  try { pace = paceBrief(await loadPace(code, week)); } catch (err) { console.error('pace brief failed (non-fatal):', err); }
+
   return {
     circuit: code,
     week,
@@ -163,5 +168,6 @@ export async function buildWeeklyBrief(circuit, weekOverride = null) {
     upsets: detectUpsets(matches, timelines, week).slice(0, 4),
     blowouts: detectBlowouts(matches, week).slice(0, 4),
     performers,
+    pace,
   };
 }
