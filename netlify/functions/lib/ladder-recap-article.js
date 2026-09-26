@@ -147,6 +147,7 @@ export async function buildArticleStats(eventId) {
       entities.set(k, {
         key: k, ids: [], names: [], w: 0, l: 0, pf: 0, pa: 0,
         courts: [], seq: [], pair: !!(fpm && fpm[p.id]),
+        mvp: 0, progress: [],   // progress: per-round {round, diff (cumulative), w, l, court}
       });
     }
     const e = entities.get(k);
@@ -186,13 +187,41 @@ export async function buildArticleStats(eventId) {
       const e = entities.get(k); if (!e) return;
       e.pf += g.sa; e.pa += g.sb; e.courts.push(g.court);
       if (g.sa > g.sb) { e.w++; e.seq.push('W'); } else if (g.sb > g.sa) { e.l++; e.seq.push('L'); }
+      e.progress.push({ round: g.round, diff: e.pf - e.pa, w: e.w, l: e.l, court: g.court, result: g.sa > g.sb ? 'W' : 'L' });
     });
     sideBKeys.forEach(k => {
       const e = entities.get(k); if (!e) return;
       e.pf += g.sb; e.pa += g.sa; e.courts.push(g.court);
       if (g.sb > g.sa) { e.w++; e.seq.push('W'); } else if (g.sa > g.sb) { e.l++; e.seq.push('L'); }
+      e.progress.push({ round: g.round, diff: e.pf - e.pa, w: e.w, l: e.l, court: g.court, result: g.sb > g.sa ? 'W' : 'L' });
     });
     g.entA = ka; g.entB = kb;
+  }
+
+  // MVP shares: per round, whoever won by the largest margin that round gets
+  // the credit (both entities on a winning side, since a team win is shared).
+  // Richard, 2026-09-26: "best margin win that round" — a deliberately simple,
+  // fully-computable stand-in for the MVP calls a human made on the hand-built
+  // Kings Court article. Ties for the round's largest margin all get credit.
+  {
+    const byRound = new Map();
+    for (const g of games) { if (!byRound.has(g.round)) byRound.set(g.round, []); byRound.get(g.round).push(g); }
+    for (const rGames of byRound.values()) {
+      const maxMargin = Math.max(...rGames.map(g => g.margin));
+      if (maxMargin <= 0) continue;
+      for (const g of rGames.filter(g => g.margin === maxMargin)) {
+        const winnerKey = g.sa > g.sb ? g.entA : g.entB;
+        const e = entities.get(winnerKey);
+        if (e) e.mvp++;
+      }
+    }
+  }
+
+  // Comeback wins: the only "comeback" the box score can actually prove is a
+  // win coming immediately after a loss the round before — there's no
+  // point-by-point log to detect an in-game comeback from.
+  for (const e of entities.values()) {
+    e.comebackWins = e.seq.reduce((n, r, i) => n + (r === 'W' && e.seq[i - 1] === 'L' ? 1 : 0), 0);
   }
 
   const rows = [...entities.values()].filter(e => e.w + e.l > 0).map(e => {
@@ -209,6 +238,9 @@ export async function buildArticleStats(eventId) {
       streak: maxStreak(e.seq),
       avgFor: (e.w + e.l) ? Math.round((e.pf / (e.w + e.l)) * 10) / 10 : 0,
       avgAgainst: (e.w + e.l) ? Math.round((e.pa / (e.w + e.l)) * 10) / 10 : 0,
+      mvp: e.mvp,
+      comebackWins: e.comebackWins,
+      progress: e.progress,
     };
   });
 
@@ -289,6 +321,39 @@ export async function buildArticleStats(eventId) {
   if (last && rows.length > 3) push({
     cls: 'loser', tag: `Toughest ${session.noun}`, entity: last.key,
     detail: `${last.w}-${last.l} with a ${signed(last.diff)} differential.`,
+  });
+  // Biggest blowout margin (widest was already computed above and, before
+  // 2026-09-26, never actually used anywhere).
+  if (widest && widest.margin > 0) push({
+    cls: 'kitchen', tag: 'Beat down',
+    entity: widest.sa > widest.sb ? widest.entA : widest.entB,
+    detail: `${Math.max(widest.sa, widest.sb)}-${Math.min(widest.sa, widest.sb)} over ${
+      esc(nameOfKey(widest.sa > widest.sb ? widest.entB : widest.entA))
+    } in round ${widest.round} on ${courtName(widest.court)}${
+      games.filter(g => g.margin === widest.margin).length === 1
+        ? `, the widest margin of the ${session.noun}` : ''
+    }.`,
+  });
+  // Best Dink Rating in the field, when it isn't already the outright winner —
+  // DR and the win-loss ranking answer different questions (Kings Court had a
+  // runner-up post the field's best rating).
+  const bestDR = pick(byDesc(rows.filter(r => r.dr != null), r => r.dr), r => r.dr);
+  if (bestDR && bestDR.key !== rows[0]?.key) push({
+    cls: 'gain', tag: `Best ${session.noun} rating`, entity: bestDR.key,
+    detail: `A ${bestDR.dr} Dink Rating, the highest in the field, on a ${bestDR.w}-${bestDR.l} record.`,
+  });
+  // Comeback wins: only provable as "won the round right after losing one" —
+  // see the comment where comebackWins is computed.
+  const comebacker = pick(byDesc(rows.filter(r => r.comebackWins > 0), r => r.comebackWins), r => r.comebackWins);
+  if (comebacker) push({
+    cls: 'gain', tag: 'Comeback king', entity: comebacker.key,
+    detail: `${plural(comebacker.comebackWins, 'win')} that immediately followed a loss, more than anyone else.`,
+  });
+  // MVP shares (best-margin win per round — see where mvp is tallied above).
+  const mvpLeader = pick(byDesc(rows.filter(r => r.mvp > 0), r => r.mvp), r => r.mvp);
+  if (mvpLeader) push({
+    cls: 'winner', tag: 'Most MVP nods', entity: mvpLeader.key,
+    detail: `${plural(mvpLeader.mvp, 'round MVP share')}, the largest winning margin of the round, more than anyone else.`,
   });
 
   // Standings as they stood BEFORE the last round. Most ladder nights are
@@ -634,6 +699,9 @@ const CSS = `
   .wlbar { height:22px; border-radius:4px; }
   .wlgap { width:2px; }
   .wlrecord { margin-left:10px; font-size:12px; font-weight:700; color:var(--txt); }
+  .progress-wrap { border:1px solid var(--surf3); border-radius:10px; padding:16px; background:var(--surf2); }
+  .pgSel { background:var(--surf3); color:var(--txt); border:1px solid var(--surf3); border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; margin-bottom:14px; max-width:100%; }
+  #pgSvg { width:100%; height:auto; display:block; }
   .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin:0 -4px; }
   table { width:100%; min-width:600px; border-collapse:collapse; font-size:13px; }
   thead th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--txt-faint); font-weight:700; padding:8px 10px; border-bottom:1px solid var(--surf3); }
@@ -672,7 +740,8 @@ const CSS = `
 
 const SORT_SCRIPT = `
 (function(){
-  var table=document.getElementById('statsheet'); if(!table) return;
+  var tables=document.querySelectorAll('table.sortable-table');
+  tables.forEach(function(table){
   var tbody=table.querySelector('tbody'), headers=table.querySelectorAll('th.sortable');
   var state={key:null,dir:1};
   headers.forEach(function(th){
@@ -694,6 +763,63 @@ const SORT_SCRIPT = `
     th.addEventListener('click',doSort);
     th.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){e.preventDefault();doSort();} });
   });
+  });
+})();
+`;
+
+// Player progress chart — cumulative point differential round by round for
+// whichever player/pair is selected. Ladder-specific and single-night, unlike
+// the season-wide DSR trend chart on the player profile page: 2026-09-26,
+// Richard asked for "kind of like [the profile page] but ladder specific."
+const PROGRESS_SCRIPT = `
+(function(){
+  var data = window.__DS_PROGRESS__ || [];
+  var sel = document.getElementById('pgSel');
+  var svg = document.getElementById('pgSvg');
+  if (!sel || !svg || !data.length) return;
+  var NS = 'http://www.w3.org/2000/svg';
+  var W = 720, H = 260, padL = 34, padR = 16, padT = 16, padB = 26;
+  function draw(idx){
+    var series = data[idx]; if (!series) return;
+    var pts = series.points || [];
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    if (!pts.length) return;
+    var maxAbs = 4;
+    pts.forEach(function(p){ maxAbs = Math.max(maxAbs, Math.abs(p.diff)); });
+    var n = pts.length;
+    var xAt = function(i){ return padL + (n <= 1 ? 0 : (i / (n - 1)) * (W - padL - padR)); };
+    var yAt = function(v){ return padT + (H - padT - padB) / 2 - (v / maxAbs) * ((H - padT - padB) / 2); };
+    var zero = document.createElementNS(NS, 'line');
+    zero.setAttribute('x1', padL); zero.setAttribute('x2', W - padR);
+    zero.setAttribute('y1', yAt(0)); zero.setAttribute('y2', yAt(0));
+    zero.setAttribute('stroke', 'rgba(255,255,255,.18)'); zero.setAttribute('stroke-dasharray', '3,3');
+    svg.appendChild(zero);
+    var d = pts.map(function(p, i){ return (i === 0 ? 'M' : 'L') + xAt(i).toFixed(1) + ',' + yAt(p.diff).toFixed(1); }).join(' ');
+    var path = document.createElementNS(NS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', pts[pts.length - 1].diff >= 0 ? '#b8ff2c' : '#ff5c47');
+    path.setAttribute('stroke-width', '2.5');
+    svg.appendChild(path);
+    pts.forEach(function(p, i){
+      var c = document.createElementNS(NS, 'circle');
+      c.setAttribute('cx', xAt(i)); c.setAttribute('cy', yAt(p.diff)); c.setAttribute('r', 4);
+      c.setAttribute('fill', p.result === 'W' ? '#b8ff2c' : '#ff5c47');
+      var title = document.createElementNS(NS, 'title');
+      title.textContent = 'Round ' + p.round + ': ' + (p.result === 'W' ? 'Won' : 'Lost') +
+        ', diff ' + (p.diff >= 0 ? '+' : '') + p.diff + ' (' + p.court + ')';
+      c.appendChild(title);
+      svg.appendChild(c);
+      var lbl = document.createElementNS(NS, 'text');
+      lbl.setAttribute('x', xAt(i)); lbl.setAttribute('y', H - 8);
+      lbl.setAttribute('text-anchor', 'middle'); lbl.setAttribute('font-size', '9.5');
+      lbl.setAttribute('fill', '#8a8f85');
+      lbl.textContent = 'R' + p.round;
+      svg.appendChild(lbl);
+    });
+  }
+  sel.addEventListener('change', function(){ draw(+sel.value); });
+  draw(0);
 })();
 `;
 
@@ -833,10 +959,10 @@ export function renderArticleHtml(stats, narrative) {
     ? 'Partners share every game, so wins, points and differential are the pair&rsquo;s. '
     : ''}Ranked by wins &rarr; point differential &rarr; DR. &ldquo;King Court rds&rdquo; counts rounds played on ${esc(cn(stats.maxCourt))}, the top court.</p>`);
   A('    <div class="table-wrap">');
-  A('    <table>');
+  A('    <table id="standingsheet" class="sortable-table">');
   A('      <thead><tr>');
-  A(`        <th>#</th><th>${stats.fixedPartner ? 'Pair' : 'Player'}</th><th class="num">W-L</th><th class="num">PF-PA</th>`);
-  A('        <th class="num">Diff</th><th class="num">DR</th><th class="num">Court (start&rarr;end)</th><th class="num">Climb</th><th class="num">King Court rds</th>');
+  A(`        <th>#</th><th class="sortable" data-key="name">${stats.fixedPartner ? 'Pair' : 'Player'}</th><th class="num sortable" data-key="w">W-L</th><th class="num sortable" data-key="pf">PF-PA</th>`);
+  A('        <th class="num sortable" data-key="diff">Diff</th><th class="num sortable" data-key="dr">DR</th><th class="num sortable" data-key="streak">Best streak</th><th class="num sortable" data-key="mvp">MVP</th><th class="num">Court (start&rarr;end)</th><th class="num sortable" data-key="climb">Climb</th><th class="num sortable" data-key="king">King Court rds</th>');
   A('      </tr></thead>');
   A('      <tbody>');
   for (const r of rows) {
@@ -844,13 +970,15 @@ export function renderArticleHtml(stats, narrative) {
     const climb = r.climb > 0
       ? `<span style="color:#b8ff2c;">+${r.climb}</span>`
       : r.climb < 0 ? `<span style="color:#ff5c47;">${r.climb}</span>` : '<span style="color:#9a9e97;">0</span>';
-    A('    <tr>');
+    A(`    <tr data-name="${esc(r.name)}" data-w="${r.w}" data-pf="${r.pf}" data-diff="${r.diff}" data-dr="${r.dr ?? 0}" data-streak="${r.streak}" data-mvp="${r.mvp}" data-climb="${r.climb}" data-king="${r.kingRounds}">`);
     A(`      <td class="rank">${r.rank}</td>`);
     A(`      <td class="pname">${entLink(r.key)}</td>`);
     A(`      <td class="num">${r.w}-${r.l}</td>`);
     A(`      <td class="num">${r.pf}-${r.pa}</td>`);
     A(`      <td class="num" style="color:${dc};font-weight:700;">${signed(r.diff)}</td>`);
     A(`      <td class="num">${r.dr ?? '&mdash;'}</td>`);
+    A(`      <td class="num">${r.streak}</td>`);
+    A(`      <td class="num">${r.mvp || '&mdash;'}</td>`);
     A(`      <td class="num">${esc(cn(r.start))} &rarr; ${esc(cn(r.end))}</td>`);
     A(`      <td class="num">${climb}</td>`);
     A(`      <td class="num">${r.kingRounds}/${r.games}</td>`);
@@ -858,6 +986,23 @@ export function renderArticleHtml(stats, narrative) {
   }
   A('      </tbody></table></div>');
   A('  </section>');
+
+  // player progress — cumulative point differential, round by round, for
+  // whichever player/pair is picked from the dropdown.
+  A('  <section>');
+  A(`    <h2>Player progress</h2>`);
+  A(`    <p class="chart-sub">Cumulative point differential, round by round. Pick a ${unit} to trace their ${stats.session.noun}.</p>`);
+  A('    <div class="progress-wrap">');
+  A('      <select id="pgSel" class="pgSel">');
+  rows.forEach((r, i) => A(`        <option value="${i}">${esc(r.name)}</option>`));
+  A('      </select>');
+  A('      <svg id="pgSvg" viewBox="0 0 720 260" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Point differential by round"></svg>');
+  A('    </div>');
+  A('  </section>');
+  A(`<script>window.__DS_PROGRESS__ = ${JSON.stringify(rows.map(r => ({
+    name: r.name,
+    points: r.progress.map(p => ({ round: p.round, diff: p.diff, result: p.result, court: cn(p.court) })),
+  })))};</script>`);
 
   // differential chart
   const mx = Math.max(1, ...rows.map(r => Math.abs(r.diff)));
@@ -932,7 +1077,7 @@ export function renderArticleHtml(stats, narrative) {
     A('    <h2>Individual stats (sortable)</h2>');
     A(`    <p class="chart-sub">In Fixed Partner play a player&rsquo;s record, differential and court path are their pair&rsquo;s &mdash; partners share every game. <strong>Best streak</strong> is the longest run of consecutive wins. <strong>King Court rds</strong> counts rounds played on ${esc(cn(stats.maxCourt))}, the top court. Every game still counts toward their overall Dink Society profile.</p>`);
     A('    <div class="table-wrap">');
-    A('    <table id="statsheet">');
+    A('    <table id="statsheet" class="sortable-table">');
     A('      <thead><tr>');
     A('        <th>#</th><th class="sortable" data-key="name">Player</th><th>Pair</th><th class="num">W-L</th>');
     A('        <th class="num sortable" data-key="diff">Diff</th><th class="num sortable" data-key="dr">DR</th>');
@@ -967,6 +1112,7 @@ export function renderArticleHtml(stats, narrative) {
   A('<script src="/js/partials.js"></script>');
   A(`<script src="/js/recap-photos.js" data-event="${esc(stats.event.id)}" defer></script>`);
   A(`<script>${SORT_SCRIPT}</script>`);
+  A(`<script>${PROGRESS_SCRIPT}</script>`);
   A('</body>');
   A('</html>');
   return L.join('\n') + '\n';
