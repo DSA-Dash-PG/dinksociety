@@ -47,6 +47,7 @@
     .tot td.l { font-weight: 700; border: 0; text-align: right; }
     .sig { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; font-size: 9.5pt; font-weight: 700; }
     .sig div { border-top: 1px solid #000; padding-top: 3px; }
+    .draft { position: absolute; top: 40%; left: 0; right: 0; text-align: center; font-size: 120pt; font-weight: 900; color: rgba(255,0,0,.12); transform: rotate(-24deg); pointer-events: none; }
     .msg { max-width: 560px; margin: 60px auto; text-align: center; font: 500 15px Inter, Arial, sans-serif; color: #333; }
     @media print {
       body { background: #fff; }
@@ -83,7 +84,11 @@
       const d = new Date(m.date + 'T12:00:00');
       const posted = m.lineupSentAt ? new Date(m.lineupSentAt).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : null;
       const filled = m.slots.filter(s => s.players.some(Boolean)).length;
-      document.getElementById('meta').textContent = `${w.label} vs ${m.opponent} · ${filled}/12 games filled` + (posted ? ` · lineup sent ${posted}` : ' · lineup not sent yet') + ' — always shows the latest saved lineup';
+      // Managers get the working draft; players only ever receive the finalized lineup.
+      const isDraft = D.me.canEdit && (!m.finalizedAt || m.draftDirty);
+      document.getElementById('meta').textContent = `${w.label} vs ${m.opponent} · ${filled}/12 games filled · ` + (isDraft
+        ? (m.finalizedAt ? `DRAFT — has changes not finalized (finalized version from ${posted})` : 'DRAFT — not finalized yet')
+        : (posted ? `finalized ${posted}` : 'lineup not posted yet'));
       document.title = `Lineup · ${w.label} vs ${m.opponent}`;
 
       const names = (s) => s.players.map(p => p ? p.name : '');
@@ -113,7 +118,8 @@
       const r1 = rr(1), r2 = rr(2);
       const tot = m.result ? [m.side === 'home' ? m.result.ptsUs : m.result.ptsThem, m.side === 'home' ? m.result.ptsThem : m.result.ptsUs] : ['', ''];
 
-      document.getElementById('out').innerHTML = `<div class="sheet">
+      document.getElementById('out').innerHTML = `<div class="sheet" style="position:relative">
+        ${isDraft ? '<div class="draft">DRAFT</div>' : ''}
         <h1>PVTC Pickleball League Scoresheet</h1>
         <div class="hdr"><div>DATE: <span>${d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric' })}</span></div>
           <div style="text-align:center">DIVISION:&nbsp; MIXED</div><div style="text-align:right">LEVEL: <span>3.5</span></div></div>

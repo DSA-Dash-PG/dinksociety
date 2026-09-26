@@ -8,7 +8,7 @@
 
 import { loadLeague, viewer, json } from './lib/ohana.js';
 import {
-  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, computeStandings, normSlots, slotScored, isOurs, laMs, lineupWarnings, byeTeams, eligibility, TYPE_LABEL,
+  teamName, ourSide, opponentOf, matchResult, matchDate, isByeWeek, computeStats, computeStandings, normSlots, slotScored, isOurs, laMs, lineupWarnings, byeTeams, publishedSlots, draftDirty, eligibility, TYPE_LABEL,
 } from './lib/ohana-core.js';
 import { DEFAULT_ANNOUNCEMENT } from './lib/ohana.js';
 
@@ -28,7 +28,8 @@ export default async (req) => {
     if (ours) {
       const side = ourSide(league, ours);
       const r = matchResult(league, ours);
-      const slots = normSlots(ours.slots, league.gamesPerMatch);
+      // Managers work on the draft; everyone else only ever sees the finalized lineup.
+      const slots = v.canEdit ? normSlots(ours.slots, league.gamesPerMatch) : publishedSlots(ours);
       match = {
         id: ours.id, date: matchDate(wk, ours), time: ours.time, courts: ours.courts, note: ours.note,
         side, opponent: teamName(league, opponentOf(league, ours)),
@@ -42,6 +43,8 @@ export default async (req) => {
         // true when we have game-by-game scores; false = final score only (no stat sheet)
         detailed: (ours.slots || []).some(slotScored),
         lineupSentAt: ours.lineupSentAt || null,
+        finalizedAt: ours.lineupSnapshot ? (ours.lineupSentAt || null) : null,
+        draftDirty: v.canEdit ? draftDirty(ours) : false,
         slots: slots.map(s => ({ no: s.no, round: s.round, type: s.type, typeLabel: TYPE_LABEL[s.type], players: s.players.map(person), opp: s.opp, us: s.us, them: s.them })),
       };
     }

@@ -17,7 +17,7 @@ import { normalizeEmail } from './identity.js';
 import { sendEmail } from './email.js';
 import { siteUrl } from './ladder-notify.js';
 import {
-  SLUG, seedLeague, teamName, matchDate, ourSide, opponentOf, isOurs, dateLine, gamesByPlayer, roundOf, typeOf, TYPE_LABEL,
+  SLUG, seedLeague, teamName, matchDate, ourSide, opponentOf, isOurs, dateLine, gamesByPlayer, roundOf, typeOf, TYPE_LABEL, publishedSlots,
 } from './ohana-core.js';
 
 const KEY = `league/${SLUG}.json`;
@@ -108,7 +108,7 @@ function matchCard(league, wk, m) {
 
 function lineupTable(league, m, highlight) {
   const nameOf = (e) => league.roster.find(p => p.email === e)?.name || '';
-  const rows = (m.slots || []).filter(s => s.players.some(Boolean)).map(s => {
+  const rows = publishedSlots(m).filter(s => s.players.some(Boolean)).map(s => {
     const mine = highlight && s.players.includes(highlight);
     const pair = s.players.map(nameOf).filter(Boolean).join(' & ') || 'TBD';
     const head = (s.no === 1 || s.no === 7) ? `<tr><td colspan="2" style="padding:${s.no === 1 ? 4 : 12}px 0 4px;font-size:10px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#666;">Round ${roundOf(s.no)}</td></tr>` : '';
@@ -120,7 +120,7 @@ function lineupTable(league, m, highlight) {
 }
 
 function myGamesLine(league, m, email) {
-  const g = gamesByPlayer(league, m.slots)[email] || [];
+  const g = gamesByPlayer(league, publishedSlots(m))[email] || [];
   if (!g.length) return `<p style="font-size:15px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;">You're not in the lineup this week — thanks for being ready if we need a sub.</p>`;
   const items = g.map(x => `<b style="color:${TEAL}">R${x.round} · G${x.no}</b> <span style="color:#8a8a8a">${TYPE_LABEL[x.type]}</span>${x.partner ? ' with ' + esc(x.partner) : ''}`).join('<br>');
   return `<p style="font-size:15px;color:#cfcfcf;line-height:1.6;margin:0 0 6px;">You're in <b>${g.length} game${g.length === 1 ? '' : 's'}</b>:</p>
@@ -163,7 +163,7 @@ export async function emailReminder(league, wk, m) {
     }));
   }
   const opp = teamName(league, opponentOf(league, m));
-  const hasLineup = (m.slots || []).some(s => s.players.some(Boolean));
+  const hasLineup = !!m.lineupSnapshot && publishedSlots(m).some(s => s.players.some(Boolean));
   return sendAll(league.roster, (p) => ({
     subject: `Tomorrow: South Bay Ohana vs ${opp} · ${m.time}`,
     html: shell({ h1: `Match tomorrow vs ${opp}`,
@@ -212,14 +212,17 @@ export async function emailMessage(league, fromName, subject, text) {
   }));
 }
 
-/** Nudge managers two days out when the lineup is empty. */
+/** Nudge managers two days out when the lineup isn't finalized (empty or still a draft). */
 export async function emailLineupNudge(league, wk, m) {
   const opp = teamName(league, opponentOf(league, m));
   const managers = league.roster.filter(p => p.manager);
+  const hasDraft = (m.slots || []).some(s => (s.players || []).some(Boolean));
   return sendAll(managers, (p) => ({
-    subject: `Set the lineup · ${wk.label} vs ${opp}`,
-    html: shell({ h1: 'Lineup not set yet', accent: '#ffb02e',
-      body: `<p style="font-size:15px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;">Hi ${esc(firstName(p.name))} — we play ${esc(opp)} ${esc(dateLine(matchDate(wk, m), m.time))} and the lineup is empty. Post it on the team page and everyone gets their games by email.</p>` + matchCard(league, wk, m) }),
+    subject: `${hasDraft ? 'Finalize' : 'Set'} the lineup · ${wk.label} vs ${opp}`,
+    html: shell({ h1: hasDraft ? 'Lineup is still a draft' : 'Lineup not set yet', accent: '#ffb02e',
+      body: `<p style="font-size:15px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;">Hi ${esc(firstName(p.name))} — we play ${esc(opp)} ${esc(dateLine(matchDate(wk, m), m.time))}. ${hasDraft
+        ? 'There\'s a saved draft, but players can\'t see it yet. Hit <b>Finalize</b> on the team page and everyone gets their games by email.'
+        : 'The lineup is empty. Post it on the team page and finalize it — everyone gets their games by email.'}</p>` + matchCard(league, wk, m) }),
   }));
 }
 

@@ -108,6 +108,10 @@
     .oh-round { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-faint); margin: 14px 0 6px; display:flex; justify-content:space-between; }
     .oh-round b { color: var(--color-text-muted); }
     .oh-g .t { font-size: 9px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-faint); width: 44px; flex-shrink: 0; }
+    .oh-status { margin-top: 10px; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: var(--radius-full); display: inline-block; }
+    .oh-status.draft { color: #ffb02e; background: rgba(255,176,46,.08); border: 1px dashed rgba(255,176,46,.45); }
+    .oh-status.dirty { color: #ffb02e; background: rgba(255,176,46,.08); border: 1px solid rgba(255,176,46,.35); }
+    .oh-status.ok { color: var(--color-teal); background: var(--color-teal-dim); border: 1px solid rgba(23,215,176,.3); }
     .oh-warn { margin-top: 10px; border: 1px solid rgba(255,176,46,.35); background: rgba(255,176,46,.06); border-radius: var(--radius-sm); padding: 8px 12px; font-size: 12px; color: #ffb02e; line-height: 1.6; }
     .oh-day { font-size: 12px; color: var(--color-text-muted); margin-top: 10px; line-height: 1.55; }
     .oh-day b { color: var(--color-text); }
@@ -159,6 +163,7 @@
     let asPlayer = false; // manager's "preview as player" (client-side only — the server still decides who can save)
 
     const fmtDate = (d, opts) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', opts || { weekday: 'short', month: 'short', day: 'numeric' });
+    const fmtStamp = (iso) => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const pct = (x) => (x * 100).toFixed(0) + '%';
     const sign = (n) => (n > 0 ? '+' : '') + n;
 
@@ -280,6 +285,10 @@
           ${r ? `<div class="oh-res ${cls}">${r.ptsUs} pts<span class="v">${r.ptsUs > r.ptsThem ? 'Win' : r.ptsUs < r.ptsThem ? 'Loss' : 'Split'} · games ${r.us}-${r.them}</span></div>` : ''}
         </div>
         ${hasLineup || r ? games : `<div class="oh-pending">Lineup not posted yet — you'll get an email when it is.</div>`}
+        ${D.me.canEdit && (hasLineup || m.finalizedAt) ? `<div class="oh-status ${!m.finalizedAt ? 'draft' : m.draftDirty ? 'dirty' : 'ok'}">${!m.finalizedAt
+            ? '● Draft — players can’t see this lineup yet'
+            : m.draftDirty ? `● Finalized ${fmtStamp(m.finalizedAt)} — draft has changes players haven’t seen`
+            : `✓ Finalized ${fmtStamp(m.finalizedAt)} — players emailed their games`}</div>` : ''}
         ${D.me.canEdit && m.warnings?.length ? `<div class="oh-warn">${m.warnings.map(esc).join('<br>')}</div>` : ''}
         ${!r ? `<div class="oh-day">${day} Lineups are exchanged at ${esc(lineupTime(m.time))}.</div>` : ''}
         ${r && !m.detailed ? `<div class="oh-pending">Final score only — no game-by-game sheet.</div>` : ''}
@@ -332,8 +341,13 @@
           ${m.slots.map(s => `${s.no === 1 || s.no === 7 ? `<div class="oh-round">Round ${s.round}</div>` : ''}<div class="oh-ed-row"><span class="n" title="${esc(s.typeLabel)}">G${s.no}<br><span style="font-size:8px">${s.type}</span></span>
             <input list="dl-roster" data-slot="${s.no}" data-i="0" value="${esc(s.players[0]?.name || '')}" placeholder="Player" autocomplete="off">
             <input list="dl-roster" data-slot="${s.no}" data-i="1" value="${esc(s.players[1]?.name || '')}" placeholder="Partner" autocomplete="off"></div>`).join('')}
-          <label class="oh-chk"><input type="checkbox" data-notify checked> ${m.lineupSentAt ? 'Email players whose games changed' : 'Email everyone their games'}</label>
-          <button class="oh-btn pri" data-save="lineup" data-wk="${w.id}">Save lineup</button>
+          <div style="font-size:12px;color:var(--color-text-muted);margin:10px 0">${m.finalizedAt
+            ? '<b>Save draft</b> keeps changes private. <b>Finalize</b> shows them to players and emails only the players whose games changed.'
+            : '<b>Save draft</b> keeps it private to managers. <b>Finalize</b> shows it to the team and emails each player their games.'}</div>
+          <div class="oh-tools" style="margin-top:0">
+            <button class="oh-btn" data-save="lineup" data-final="0" data-wk="${w.id}">Save draft</button>
+            <button class="oh-btn pri" data-save="lineup" data-final="1" data-wk="${w.id}">${m.finalizedAt ? 'Finalize changes' : 'Finalize & email team'}</button>
+          </div>
           <div class="oh-msg" data-out></div></div>`;
       }
       if (kind === 'scores') {
@@ -570,7 +584,9 @@
               if (!e) throw new Error(`"${v}" isn't on the roster — pick a name from the list.`);
               slots[+inp.dataset.slot - 1].players[+inp.dataset.i] = e;
             }
-            payload = { action: 'saveLineup', matchId: w.match.id, slots, notify };
+            const finalize = btn.dataset.final === '1';
+            if (finalize && !confirm(w.match.finalizedAt ? 'Finalize these changes? Players whose games changed get an email.' : 'Finalize the lineup? Everyone on the roster gets an email with their games.')) return;
+            payload = { action: 'saveLineup', matchId: w.match.id, slots, finalize };
           } else if (btn.dataset.save === 'scores') {
             const slots = w.match.slots.map(s => ({ no: s.no, us: null, them: null, opp: ['', ''] }));
             for (const inp of ed.querySelectorAll('input[data-slot]')) {
@@ -609,7 +625,7 @@
           btn.disabled = true; out.className = 'oh-msg'; out.textContent = 'Saving…';
           const r = await post(payload);
           if (payload.action === 'message') { out.textContent = emailedLine(r.emailed) || 'Sent.'; ed.querySelectorAll('[data-f]').forEach(i => i.value = ''); btn.disabled = false; return; }
-          const msg = ['Saved.', (r.changes && !r.changes.length) ? 'Nothing changed.' : '', emailedLine(r.emailed), r.warnings?.length ? `Check the rule warnings on the card.` : ''].filter(Boolean).join(' ');
+          const msg = [payload.action === 'saveLineup' ? (r.finalized ? 'Lineup finalized.' : 'Draft saved — only managers can see it.') : 'Saved.', (r.changes && !r.changes.length) ? 'Nothing changed.' : '', emailedLine(r.emailed), r.warnings?.length ? `Check the rule warnings on the card.` : ''].filter(Boolean).join(' ');
           if (w) open[w.id] = null;
           await load();
           flash(w?.id, msg);

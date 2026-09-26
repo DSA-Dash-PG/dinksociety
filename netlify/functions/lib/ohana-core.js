@@ -15,6 +15,8 @@
 //             counts, note, result:{home,away}|null,
 //             slots:[{no, players:[email,email], opp:[name,name], us, them}],
 //             avail:{email:'in'|'out'}, lineupSentAt, lineupSnapshot }
+//   slots = the managers' WORKING lineup (draft) + scores. lineupSnapshot = the
+//   FINALIZED lineup players see and get emailed; lineupSentAt = when finalized.
 // Per-game detail (slots) only exists for OUR matches. For everyone else we
 // only record final games won — `result` — which is enough for standings.
 
@@ -202,6 +204,17 @@ export function normSlots(slots, n = GAMES_PER_MATCH) {
   }
   return out;
 }
+/** The finalized lineup (what players see / get emailed), with scores from the working slots. */
+export function publishedSlots(m) {
+  const snap = normSlots(m?.lineupSnapshot || []);
+  return normSlots(m?.slots).map((s, i) => ({ ...s, players: m?.lineupSnapshot ? snap[i].players : ['', ''] }));
+}
+/** True when the working lineup differs from what was finalized (or nothing is finalized yet). */
+export function draftDirty(m) {
+  const a = normSlots(m?.slots).map(s => s.players.join('|')).join(',');
+  const b = normSlots(m?.lineupSnapshot || []).map(s => s.players.join('|')).join(',');
+  return a !== b;
+}
 export function slotScored(s) { return s && s.us != null && s.them != null && s.us !== s.them; }
 
 /**
@@ -319,7 +332,8 @@ export function eligibility(league, now = Date.now()) {
   for (const { week, match } of regular) {
     const happened = (match.slots || []).some(slotScored) || matchResult(league, match) || laMs(matchDate(week, match), match.time) < now;
     if (!happened) continue;
-    for (const e of new Set((match.slots || []).flatMap(s => s.players || []).filter(Boolean))) played[e] = (played[e] || 0) + 1;
+    const lineup = match.lineupSnapshot ? publishedSlots(match) : normSlots(match.slots);
+    for (const e of new Set(lineup.flatMap(s => s.players || []).filter(Boolean))) played[e] = (played[e] || 0) + 1;
   }
   return { total: regular.length, needed, played };
 }

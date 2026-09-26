@@ -9,7 +9,7 @@
 // sends after the match has started (no catch-up blasts after an outage).
 
 import { loadLeague, saveLeague, emailReminder, emailLineupNudge } from './lib/ohana.js';
-import { isOurs, isByeWeek, laMs, matchDate } from './lib/ohana-core.js';
+import { isOurs, isByeWeek, laMs, matchDate, publishedSlots } from './lib/ohana-core.js';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -29,7 +29,8 @@ export async function runOhanaReminders(now = Date.now()) {
       const date = matchDate(wk, m);
       const start = laMs(date, m.time);
       if (now >= start) continue;
-      const hasLineup = (m.slots || []).some(s => (s.players || []).some(Boolean));
+      // Only a FINALIZED lineup counts — a saved draft still gets the managers' nudge.
+      const hasLineup = !!m.lineupSnapshot && publishedSlots(m).some(s => s.players.some(Boolean));
       const nudgeKey = `nudge:${m.id}:${date}`;
       if (!hasLineup && !league.sent[nudgeKey] && now >= nineAmBefore(date, 2)) {
         league.sent[nudgeKey] = new Date(now).toISOString();

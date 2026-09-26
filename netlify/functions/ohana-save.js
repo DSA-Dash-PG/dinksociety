@@ -4,9 +4,10 @@
 //   addPlayer     { email, name }            add to the Ohana roster
 //   removePlayer  { email }
 //   setManager    { email, manager }
-//   saveLineup    { matchId, slots:[{no, players:[email,email]}], notify }
-//                   notify → first post emails everyone their games; later
-//                   saves email only players whose games changed.
+//   saveLineup    { matchId, slots:[{no, players:[email,email]}], finalize }
+//                   Always saves the DRAFT (managers only see it). finalize →
+//                   publishes it to players: the first time everyone gets their
+//                   games by email; after that only players whose games changed.
 //   saveScores    { matchId, slots:[{no, us, them, opp:[a,b]}], notify }
 //   editMatch     { matchId, date, time, courts, note, homeTeamId, awayTeamId, notify }
 //                   notify → everyone on the roster gets the before → after.
@@ -92,14 +93,17 @@ export default async (req) => {
       match.slots = next.map(({ no, players, opp, us, them }) => ({ no, players, opp, us, them }));
       out.warnings = lineupWarnings(league, match.slots);
       log(`lineup saved for ${week.label}`);
-      if (body.notify) {
+      out.finalized = false;
+      if (body.finalize ?? body.notify) {
+        out.finalized = true;
         const first = !match.lineupSentAt;
         const only = first ? null : lineupChangedFor(league, prev, next);
-        if (first || only.length) {
-          out.emailed = await emailLineup(league, week, match, { changed: !first, only });
-        } else out.emailed = { sent: 0, note: 'No one’s games changed — no emails sent.' };
+        // Publish first — the emails render from the finalized lineup.
         match.lineupSentAt = new Date().toISOString();
         match.lineupSnapshot = next.map(s => ({ no: s.no, players: s.players }));
+        if (first || only.length) {
+          out.emailed = await emailLineup(league, week, match, { changed: !first, only });
+        } else out.emailed = { sent: 0, note: 'Nobody’s games changed, so no emails went out.' };
       }
       break;
     }
