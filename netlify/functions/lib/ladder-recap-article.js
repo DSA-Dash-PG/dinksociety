@@ -155,10 +155,27 @@ export async function buildArticleStats(eventId) {
     const kb = entityOf.get(g.b[0]);
     const ea = entities.get(ka), eb = entities.get(kb);
     if (!ea || !eb) continue;
-    ea.pf += g.sa; ea.pa += g.sb; eb.pf += g.sb; eb.pa += g.sa;
-    ea.courts.push(g.court); eb.courts.push(g.court);
-    if (g.sa > g.sb) { ea.w++; eb.l++; ea.seq.push('W'); eb.seq.push('L'); }
-    else if (g.sb > g.sa) { eb.w++; ea.l++; eb.seq.push('W'); ea.seq.push('L'); }
+    // On a FIXED-PARTNER night both of a team's ids resolve to the SAME entity
+    // (keyFor pairs them), so crediting just g.a[0]/g.b[0] was already correct
+    // there. On an INDIVIDUAL night each teammate is their OWN entity, and
+    // crediting only index 0 silently dropped every second teammate's stats
+    // from the whole night (2026-09-26: this is why Quan V had 0 recorded
+    // games and vanished from the table, and why everyone else's record only
+    // reflected the games where they happened to be listed first). Crediting
+    // every distinct entity on each side fixes both formats: the Set collapses
+    // back to one credit per team on a fixed-partner night.
+    const sideAKeys = [...new Set(g.a.map(id => entityOf.get(id)).filter(Boolean))];
+    const sideBKeys = [...new Set(g.b.map(id => entityOf.get(id)).filter(Boolean))];
+    sideAKeys.forEach(k => {
+      const e = entities.get(k); if (!e) return;
+      e.pf += g.sa; e.pa += g.sb; e.courts.push(g.court);
+      if (g.sa > g.sb) { e.w++; e.seq.push('W'); } else if (g.sb > g.sa) { e.l++; e.seq.push('L'); }
+    });
+    sideBKeys.forEach(k => {
+      const e = entities.get(k); if (!e) return;
+      e.pf += g.sb; e.pa += g.sa; e.courts.push(g.court);
+      if (g.sb > g.sa) { e.w++; e.seq.push('W'); } else if (g.sa > g.sb) { e.l++; e.seq.push('L'); }
+    });
     g.entA = ka; g.entB = kb;
   }
 
