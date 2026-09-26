@@ -8,7 +8,7 @@
 // so a date key cannot address them. The id is the same value the article's own
 // <script src="/js/recap-photos.js" data-event="..."> carries, so grep the file
 // if you need to confirm one.
-window.DS_RECAP_URLS = {
+const HAND_BUILT_RECAPS = {
   '01adcfc2aa5a': '/ladders/recaps/2026-09-14-kings-court-ladder.html',
   '888e94ce398c': '/ladders/recaps/2026-09-14-september-reigns.html',
   '35682ec4cfff': '/ladders/recaps/2026-09-10-fix-partner-ladder.html',
@@ -20,3 +20,21 @@ window.DS_RECAP_URLS = {
   'f42f0a03811d': '/ladders/recaps/2026-07-16-thursday-night-ladder.html',
   '25f36641f571': '/ladders/recaps/2026-07-14-aloha-night-ladder.html',
 };
+
+// 2026-09-26: everything above is a HAND-BUILT article from before the article
+// generator existed — those still need a manual line here. Every night since
+// publishes automatically at /ladders/recaps/<eventId> (recap-article-cron.js,
+// ~10-15 min after the night finishes; ladder-recap-page.js answers a friendly
+// "recap on the way" placeholder if it's ever asked for before that), so this
+// object falls back to that URL for any event id not in the hand-built map
+// instead of silently showing "Recap coming soon" forever (Men's Ladder #2,
+// 2026-09-26, sat with a live article nobody could find from this list).
+// Server side has the same fallback already — see recapArticleUrl() in
+// netlify/functions/lib/recap-articles.js.
+window.DS_RECAP_URLS = new Proxy(HAND_BUILT_RECAPS, {
+  get(target, prop) {
+    if (prop in target) return target[prop];
+    if (typeof prop === 'string' && prop) return `/ladders/recaps/${encodeURIComponent(prop)}`;
+    return undefined;
+  },
+});

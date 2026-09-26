@@ -22,7 +22,7 @@
 // the last round). A tie or a lead change there is the story, and it is
 // invisible in the final table.
 
-import { getEvent } from './ladder.js';
+import { getEvent, parseTime } from './ladder.js';
 import { getPlay, toSession, playersFromPlay } from './ladder-play.js';
 import { calcStats, calcDinkRating, fixedPartnerMap, orderPairWomenFirst } from './ladder-scoring.js';
 import { getMergeMap, applyMerges } from './player-merge.js';
@@ -66,6 +66,21 @@ function courtNamer(event, play) {
   };
 }
 
+/**
+ * Not every ladder runs at night -- Men's Ladder #2 (2026-09-26) ran 9-11am, and
+ * the article copy calling a morning ladder "Night DR" and "the night" read
+ * wrong to players who were there. One word, derived from the event's own start
+ * time, threading through the awards and narrative below instead of a
+ * hardcoded "night".
+ */
+function sessionWords(event) {
+  const t = parseTime(event?.startTime);
+  const h = t ? t.h : 19; // unknown start time: keep the old evening-ladder default
+  if (h < 12) return { noun: 'morning', cap: 'Morning' };
+  if (h < 17) return { noun: 'afternoon', cap: 'Afternoon' };
+  return { noun: 'night', cap: 'Night' };
+}
+
 // ─────────────────────────── stats builder ───────────────────────────
 
 /**
@@ -91,6 +106,7 @@ export async function buildArticleStats(eventId) {
   const drMap = calcDinkRating(rawStats, sessions, players);
   const fpm = fixedPartnerMap(sessions[0]);
   const courtName = courtNamer(event, play);
+  const session = sessionWords(event);
 
   const byId = {};
   players.forEach(p => { byId[p.id] = p; });
@@ -227,7 +243,7 @@ export async function buildArticleStats(eventId) {
   };
   const push = a => { awards.push(a); awarded.add(a.entity); };
   if (rows[0]) push({
-    cls: 'winner', tag: rows.length && rows[0].pair ? 'Night winners' : 'Night winner',
+    cls: 'winner', tag: rows.length && rows[0].pair ? `${session.cap} winners` : `${session.cap} winner`,
     entity: rows[0].key,
     detail: `${rows[0].w}-${rows[0].l} and ${signed(rows[0].diff)}${rows[0].climb > 0
       ? `, climbing from ${courtName(rows[0].start)} to ${courtName(rows[0].end)}`
@@ -236,12 +252,12 @@ export async function buildArticleStats(eventId) {
   const topScorer = pick(scorers, r => r.pf);
   if (topScorer && topScorer.key !== rows[0]?.key) push({
     cls: 'gain', tag: 'Most points scored', entity: topScorer.key,
-    detail: `${topScorer.pf} points at ${topScorer.avgFor} a game, more than anyone else on the night.`,
+    detail: `${topScorer.pf} points at ${topScorer.avgFor} a game, more than anyone else on the ${session.noun}.`,
   });
   const climber = pick(climbers, r => r.climb);
   if (climber && climber.key !== rows[0]?.key) push({
     cls: 'climb', tag: 'Biggest climb', entity: climber.key,
-    detail: `${courtName(climber.start)} up to ${courtName(climber.end)}, ${signed(climber.climb)} courts across the night.`,
+    detail: `${courtName(climber.start)} up to ${courtName(climber.end)}, ${signed(climber.climb)} courts across the ${session.noun}.`,
   });
   const king = pick(kingCourt, r => r.kingRounds);
   if (king && king.kingRounds > 0) push({
@@ -261,17 +277,17 @@ export async function buildArticleStats(eventId) {
       esc(nameOfKey(closest.sa > closest.sb ? closest.entB : closest.entA))
     } in round ${closest.round} on ${courtName(closest.court)}${
       games.filter(g => g.margin === closest.margin).length === 1
-        ? ` — the only ${closest.margin}-point game of the night` : ''
+        ? ` — the only ${closest.margin}-point game of the ${session.noun}` : ''
     }.`,
   });
   const slider = pick(sliders, r => r.climb);
   if (slider) push({
     cls: 'drop', tag: 'Free fall', entity: slider.key,
-    detail: `From ${courtName(slider.start)} down to ${courtName(slider.end)}, ${slider.climb} courts — the steepest slide of the night.`,
+    detail: `From ${courtName(slider.start)} down to ${courtName(slider.end)}, ${slider.climb} courts — the steepest slide of the ${session.noun}.`,
   });
   const last = rows[rows.length - 1];
   if (last && rows.length > 3) push({
-    cls: 'loser', tag: 'Toughest night', entity: last.key,
+    cls: 'loser', tag: `Toughest ${session.noun}`, entity: last.key,
     detail: `${last.w}-${last.l} with a ${signed(last.diff)} differential.`,
   });
 
@@ -312,6 +328,7 @@ export async function buildArticleStats(eventId) {
       dupr: !!event.dupr,
     },
     fixedPartner: !!fpm,
+    session,
     maxCourt,
     courtLabel: idx => courtName(idx),
     kpis: {
@@ -399,7 +416,7 @@ export function buildNarrative(stats, { notes = '' } = {}) {
     paragraphs.push(
       `Two ${unit}s walked onto ${cn(decider.court)} for the final round with nothing between them. ` +
       `${nm(winnerKey)} and ${nm(loserKey)} were both ${bLead.w}-${bLead.l}. Both were ${signed(bLead.diff)} on point differential. ` +
-      `Not close, identical. ${Spell(stats.lastRound - 1)} rounds had failed to separate them, so the night did the ` +
+      `Not close, identical. ${Spell(stats.lastRound - 1)} rounds had failed to separate them, so the ${stats.session.noun} did the ` +
       `sensible thing and settled it head to head. ${nm(winnerKey)} won it ${score}.`
     );
   } else if (deadHeat) {
@@ -413,13 +430,13 @@ export function buildNarrative(stats, { notes = '' } = {}) {
     headline = `${(w.name || '').split(' & ')[0]} Steals It in the Final Round`;
     paragraphs.push(
       `${nm(bLead.key)} led going into the last round at ${bLead.w}-${bLead.l}. They did not lead coming out of it. ` +
-      `${nm(w.key)} closed at ${w.w}-${w.l} with a ${signed(w.diff)} differential and took the night off them ` +
+      `${nm(w.key)} closed at ${w.w}-${w.l} with a ${signed(w.diff)} differential and took the ${stats.session.noun} off them ` +
       `in the time it takes to play one game.`
     );
   } else if (w) {
     headline = pickOne(seed, [
       `${(w.name || '').split(' & ')[0]} Runs the Ladder at the ${stats.event.name}`,
-      `${w.w}-${w.l} and No Argument: ${(w.name || '').split(' & ')[0]} Takes the Night`,
+      `${w.w}-${w.l} and No Argument: ${(w.name || '').split(' & ')[0]} Takes the ${stats.session.cap}`,
     ]);
     paragraphs.push(
       `${nm(w.key)} won the ${stats.event.name} at ${w.w}-${w.l} with a ${signed(w.diff)} point differential, ` +
@@ -428,13 +445,13 @@ export function buildNarrative(stats, { notes = '' } = {}) {
     );
   }
 
-  // ── the winner's night in detail ──
+  // ── the winner's session (morning/afternoon/night) in detail ──
   if (w) {
     const bits = [];
     if (w.climb > 0) {
       bits.push(`They opened on ${cn(w.start)} and finished on ${cn(w.end)}, ${
         w.start === 1 && w.end === stats.maxCourt
-          ? 'the full bottom-to-top climb and the only one of the night'
+          ? `the full bottom-to-top climb and the only one of the ${stats.session.noun}`
           : `a climb of ${plural(w.climb, 'court')}`}`);
     } else if (w.kingRounds === w.games) {
       bits.push(`They never left ${cn(stats.maxCourt)}, all ${plural(w.games, 'round')} of it`);
@@ -443,7 +460,7 @@ export function buildNarrative(stats, { notes = '' } = {}) {
     }
     if (w.avgAgainst != null) bits.push(`and gave up ${w.avgAgainst} points a game, the stingiest defense in the field`);
     if (w.streak >= 3) bits.push(`with ${plural(w.streak, 'straight win')} in the middle of it`);
-    paragraphs.push(`${bits.join(', ')}. Night DR of ${w.dr ?? '—'}.`);
+    paragraphs.push(`${bits.join(', ')}. ${stats.session.cap} DR of ${w.dr ?? '—'}.`);
   }
 
   // ── the podium, and any tiebreak that decided it ──
@@ -455,7 +472,7 @@ export function buildNarrative(stats, { notes = '' } = {}) {
       paragraphs.push(
         `Third came down to arithmetic. ${nm(p3.key)} and ${nm(p4.key)} both finished ${p3.w}-${p3.l}, so it went to ` +
         `point differential: ${signed(p3.diff)} against ${signed(p4.diff)}. ` +
-        `${p3.diff - p4.diff === 1 ? 'One point, across a full night of games, decided the last podium step.' :
+        `${p3.diff - p4.diff === 1 ? `One point, across a full ${stats.session.noun} of games, decided the last podium step.` :
           `${plural(p3.diff - p4.diff, 'point')} decided the last podium step.`}`
       );
     } else if (tied23) {
@@ -507,7 +524,7 @@ export function buildNarrative(stats, { notes = '' } = {}) {
     const cl = nm(closest.sa > closest.sb ? closest.entB : closest.entA);
     const only = stats.games.filter(g => g.margin === closest.margin).length === 1;
     field.push(
-      `the tightest game of the night was ${cw} over ${cl}, ` +
+      `the tightest game of the ${stats.session.noun} was ${cw} over ${cl}, ` +
       `${Math.max(closest.sa, closest.sb)}-${Math.min(closest.sa, closest.sb)} in round ${closest.round}` +
       (only ? `, the only ${closest.margin}-point game out of ${stats.games.length}` : '')
     );
@@ -518,7 +535,7 @@ export function buildNarrative(stats, { notes = '' } = {}) {
   const last = rows[rows.length - 1];
   if (last && rows.length > 3 && last.key !== w?.key) {
     paragraphs.push(
-      `${nm(last.key)} had the hardest night of it at ${last.w}-${last.l} (${signed(last.diff)})` +
+      `${nm(last.key)} had the hardest ${stats.session.noun} of it at ${last.w}-${last.l} (${signed(last.diff)})` +
       (last.streak >= 2
         ? `, though they did win ${plural(last.streak, 'game')} back to back in there, which the differential does its best to hide.`
         : `, and answered the bell for all ${plural(last.games, 'round')} anyway.`)
@@ -778,7 +795,7 @@ export function renderArticleHtml(stats, narrative) {
   // banner
   const bannerBits = [];
   if (stats.fixedPartner) bannerBits.push(
-    '<strong>Fixed Partner format:</strong> teams were locked at signup and stayed together all night, ' +
+    `<strong>Fixed Partner format:</strong> teams were locked at signup and stayed together all ${stats.session.noun}, ` +
     'no re-pairing between rounds, so the standings here are by pair. Every game still counts on each player&rsquo;s individual profile.'
   );
   bannerBits.push(
@@ -892,7 +909,7 @@ export function renderArticleHtml(stats, narrative) {
   for (const g of stats.games) (byRound[g.round] = byRound[g.round] || []).push(g);
   A('  <section>');
   A('    <h2>Round by round</h2>');
-  A(`    <p class="chart-sub">Every game of the night. Courts are listed top to bottom: <strong>${esc(cn(stats.maxCourt))} is King Court</strong>, ${esc(cn(1))} the bottom. Win and you move up a court for the next round, lose and you move down.</p>`);
+  A(`    <p class="chart-sub">Every game of the ${stats.session.noun}. Courts are listed top to bottom: <strong>${esc(cn(stats.maxCourt))} is King Court</strong>, ${esc(cn(1))} the bottom. Win and you move up a court for the next round, lose and you move down.</p>`);
   A('    <div class="rounds">');
   for (const rn of Object.keys(byRound).sort((a, b) => a - b)) {
     A('      <div class="rnd">');
