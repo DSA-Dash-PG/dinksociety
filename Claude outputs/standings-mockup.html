@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Standings mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#0b0d0a; --surf:#161914; --surf2:#1c1f18; --bd:rgba(255,255,255,.08); --bds:rgba(255,255,255,.16);
+    --tx:#f0f2ec; --mut:#9aa094; --fnt:#5e655a;
+    --lime:#b8ff2c; --teal:#17d7b0; --blue:#4aa3e0; --pink:#ff7bb0; --gold:#f0c040; --red:#ff5c47; --purp:#a78bfa; }
+  *{box-sizing:border-box;}
+  body{ margin:0; background:var(--bg); color:var(--tx); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; padding:24px 14px 60px; }
+  .wrap{ max-width:420px; margin:0 auto; }
+  .lbl{ font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--fnt); margin:0 0 8px 2px; }
+  .note{ font-size:11.5px; color:var(--mut); margin:0 0 22px 2px; line-height:1.5; }
+  h2{ font-size:13px; font-weight:900; margin:0 0 4px 2px; }
+
+  /* ---- BEFORE: current ladder-score.html kit-card ---- */
+  .kit-grid{ display:flex;flex-direction:column;gap:10px; }
+  .kit-card{ background:var(--surf2);border:1px solid var(--bd);border-radius:12px;padding:11px 12px; }
+  .kit-row{ display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid rgba(255,255,255,.06); } .kit-row:first-of-type{ border-top:0; }
+  .kit-rk{ width:15px;font-size:.64rem;font-weight:900;color:var(--fnt);flex-shrink:0; } .kit-rk.top{ color:var(--gold); }
+  .kit-nm{ flex:1;font-size:.74rem;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+  .kit-xt{ font-size:.58rem;color:var(--fnt);font-weight:700; }
+  .kit-vl{ font-size:.76rem;font-weight:900;color:var(--lime);font-variant-numeric:tabular-nums; }
+
+  /* ---- AFTER: with total points added ---- */
+  .kit-vl2{ font-size:.7rem;font-weight:800;color:var(--mut);font-variant-numeric:tabular-nums;width:30px;text-align:right; }
+  .kit-hd{ display:flex;align-items:center;gap:8px;padding:0 0 6px; }
+  .kit-hd span{ font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--fnt); }
+  .kit-hd .hnm{ flex:1; } .kit-hd .hxt{ width:34px;text-align:right; } .kit-hd .hdf{ width:34px;text-align:right; } .kit-hd .hpf{ width:30px;text-align:right; }
+  .kit-rk2{ width:15px;font-size:.64rem;font-weight:900;color:var(--fnt);flex-shrink:0; } .kit-rk2.top{ color:var(--gold); }
+  .kit-xt2{ font-size:.58rem;color:var(--fnt);font-weight:700;width:34px;text-align:right; }
+  .kit-vldiff{ font-size:.76rem;font-weight:900;color:var(--lime);font-variant-numeric:tabular-nums;width:34px;text-align:right; }
+  .me{ background:rgba(184,255,44,.07); margin:0 -12px; padding-left:12px; padding-right:12px; border-radius:8px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="lbl">Before — today, live</div>
+  <h2>Tonight's standings</h2>
+  <div class="note">Rank · name · record · diff. No total-points column — this is what made 5th vs. the three 4-4 players below it hard to read at a glance.</div>
+  <div class="kit-grid"><div class="kit-card" id="before"></div></div>
+
+  <div class="lbl" style="margin-top:32px">After — proposed</div>
+  <h2>Tonight's standings</h2>
+  <div class="note">Same rank order (wins → diff → total points, unchanged) — just makes diff <i>and</i> total points scored (PF) visible together, so a 4–4 tie is easy to read.</div>
+  <div class="kit-grid"><div class="kit-card">
+    <div class="kit-hd"><span class="hnm">&nbsp;</span><span class="hxt">W-L</span><span class="hdf">Diff</span><span class="hpf">PF</span></div>
+    <div id="after"></div>
+  </div></div>
+
+</div>
+<script>
+const rows = [{"name":"Ryan Hom","w":7,"l":1,"diff":48,"pf":84},{"name":"Kai Pylkkanen","w":6,"l":2,"diff":26,"pf":75},{"name":"Kevin Phan","w":5,"l":3,"diff":15,"pf":75},{"name":"Eli Henry","w":5,"l":3,"diff":9,"pf":71},{"name":"Richard Hak","w":4,"l":4,"diff":3,"pf":58},{"name":"Jp","w":4,"l":4,"diff":-5,"pf":65},{"name":"Matthew Pasqualetto","w":4,"l":4,"diff":-11,"pf":58},{"name":"Ryan Kim","w":4,"l":4,"diff":-12,"pf":61},{"name":"Peter","w":3,"l":5,"diff":2,"pf":70},{"name":"Quan vu","w":3,"l":5,"diff":-19,"pf":56},{"name":"Tony Phan","w":2,"l":6,"diff":-33,"pf":49},{"name":"Kevin Vu","w":1,"l":7,"diff":-23,"pf":56}];
+const first = n => (n||'').split(' ')[0];
+document.getElementById('before').innerHTML = rows.map((r,i)=>{
+  const me = r.name==='Richard Hak' ? ' me' : '';
+  return `<div class="kit-row${me}"><span class="kit-rk${i<3?' top':''}">${i+1}</span><div class="kit-nm">${first(r.name)}</div><div class="kit-xt">${r.w}-${r.l}</div><div class="kit-vl">${r.diff>=0?'+':''}${r.diff}</div></div>`;
+}).join('');
+document.getElementById('after').innerHTML = rows.map((r,i)=>{
+  const me = r.name==='Richard Hak' ? ' me' : '';
+  return `<div class="kit-row${me}"><span class="kit-rk2${i<3?' top':''}">${i+1}</span><div class="kit-nm">${first(r.name)}</div><div class="kit-xt2">${r.w}-${r.l}</div><div class="kit-vldiff">${r.diff>=0?'+':''}${r.diff}</div><div class="kit-vl2">${r.pf}</div></div>`;
+}).join('');
+</script>
+</body>
+</html>
