@@ -1466,17 +1466,20 @@
       // Cross-season history + division standings — public endpoints, fetched in parallel.
       const pid = DATA.profile?.playerId, circ = DATA.profile?.circuit || 'I';
       const season = 'circuit-' + circ.toLowerCase();
-      const [hRes, sRes, pRes, lRes, bRes] = await Promise.allSettled([
+      const [hRes, sRes, pRes, lRes, bRes, oRes] = await Promise.allSettled([
         pid ? fetch(API + '/public-player?id=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' }) : Promise.resolve(null),
         fetch(API + '/public-standings?season=' + encodeURIComponent(season), { credentials: 'include' }),
         pid ? fetch(API + '/public-profile?leagueId=' + encodeURIComponent(pid) + '&circuit=' + encodeURIComponent(circ), { credentials: 'include' }) : Promise.resolve(null),
         fetch(API + '/player-ladder-events', { credentials: 'include' }),
         fetch(API + '/public-badges?circuit=' + encodeURIComponent(circ) + (pid ? '&playerId=' + encodeURIComponent(pid) : ''), { credentials: 'include' }),
+        // South Bay Ohana (private PVTC team) — 200 only for people on that roster.
+        fetch(API + '/ohana-data', { credentials: 'include' }),
       ]);
       try { if (hRes.value?.ok) DATA.history = (await hRes.value.json()).history || []; } catch {}
       try { if (sRes.value?.ok) DATA.standings = await sRes.value.json(); } catch {}
       try { if (pRes.value?.ok) { const u = await pRes.value.json(); if (u && u.found && u.ladder) DATA.ladder = u.ladder; } } catch {}
       try { if (lRes.value?.ok) DATA.ladderEvents = await lRes.value.json(); } catch {}
+      try { if (oRes.value?.ok) DATA.ohana = await oRes.value.json(); } catch {}
       try { if (bRes.value?.ok) { DATA.badges = await bRes.value.json(); if (window.dsBadges && DATA.badges.config) dsBadges.setConfig(DATA.badges.config); } } catch {}
       showApp();
     } catch (e) {
@@ -1999,9 +2002,58 @@
     const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
     return (h ? h + 'h ' : '') + m + 'm';
   }
+  // ── South Bay Ohana (private PVTC team) — shown only to its roster ─────
+  // Players see the finalized lineup only (ohana-data enforces that).
+  function ohanaIsMe(p) { const O = DATA.ohana; return !!p && (p.me || (O?.me?.email && p.email === O.me.email)); }
+  function ohanaWeekHtml(w, compact) {
+    const O = DATA.ohana, m = w.match;
+    const fd = (d, o) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', o || { weekday: 'short', month: 'short', day: 'numeric' });
+    if (!m) {
+      const t = w.type === 'rain' ? 'Rain makeup date' : w.bye ? 'Bye — no match for us' : 'Playoffs — matchup TBD';
+      return `<div style="padding:9px 0;border-top:1px solid var(--color-divider);font-size:12px;color:var(--color-text-faint)"><b style="color:var(--color-text-muted)">${esc(w.label)}</b> · ${fd(w.date)} · ${t}</div>`;
+    }
+    const mine = m.slots.filter(s => s.players.some(ohanaIsMe));
+    const posted = m.slots.some(s => s.players.some(Boolean));
+    const r = m.result;
+    const res = r ? `<span style="font-weight:800;color:${r.ptsUs > r.ptsThem ? 'var(--color-teal)' : r.ptsUs < r.ptsThem ? 'var(--color-red)' : 'var(--color-text-muted)'}">${r.ptsUs} pts · ${r.us}-${r.them}</span>` : '';
+    const partner = (s) => { const o = s.players.find(p => p && !ohanaIsMe(p)); return o ? ' w/ ' + esc(o.name) : ''; };
+    const games = !posted ? '<span style="color:var(--color-text-faint)">Lineup not posted yet</span>'
+      : mine.length ? mine.map(s => `<b style="color:var(--color-teal)">G${s.no}</b> ${esc(s.typeLabel)}${partner(s)}`).join(' · ')
+      : '<span style="color:var(--color-text-faint)">Not in the lineup</span>';
+    return `<div style="padding:10px 0;border-top:1px solid var(--color-divider)">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+        <div style="font-size:13px;font-weight:700">${esc(w.label)} · vs ${esc(m.opponent)} <span style="font-size:10px;color:var(--color-text-faint);font-weight:700">${m.side === 'home' ? 'HOME' : 'AWAY'}</span></div>${res}</div>
+      <div style="font-size:11px;color:var(--color-text-faint);margin-top:2px">${fd(m.date)} · ${esc(m.time)} · Courts ${esc(m.courts)}</div>
+      ${compact && r ? '' : `<div style="font-size:12px;margin-top:5px;line-height:1.5">${games}</div>`}
+    </div>`;
+  }
+  function ohanaNextWeek() {
+    const O = DATA.ohana; if (!O?.weeks) return null;
+    const now = Date.now();
+    return O.weeks.find(w => (w.match ? w.match.startMs + 3 * 3600e3 : Date.parse(w.date + 'T23:59:00')) > now) || null;
+  }
+  function ohanaHomeCard() {
+    const O = DATA.ohana; if (!O?.weeks) return '';
+    const nx = ohanaNextWeek(); if (!nx) return '';
+    return `<div class="m" style="display:block;padding:12px 14px;border-color:rgba(23,215,176,.35)">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px">
+        <div style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--color-teal)">South Bay Ohana · PVTC</div>
+        <a href="/ohana" style="font-size:11px;font-weight:800;color:var(--color-text-inverse);background:var(--color-lime);padding:6px 12px;border-radius:999px;text-decoration:none;white-space:nowrap">Team page</a>
+      </div>${ohanaWeekHtml(nx, false).replace('border-top:1px solid var(--color-divider)', 'border-top:0')}</div>`;
+  }
+  function ohanaScheduleHtml() {
+    const O = DATA.ohana; if (!O?.weeks) return '';
+    return `<div class="label" style="display:flex;justify-content:space-between;align-items:center">South Bay Ohana · PVTC 3.5 Mixed <a href="/ohana" style="font-size:11px;font-weight:800;color:var(--color-lime);text-decoration:none;letter-spacing:0;text-transform:none">Team page →</a></div>
+      <div class="m" style="display:block;padding:4px 14px 6px">${O.weeks.map(w => ohanaWeekHtml(w, true)).join('').replace('border-top:1px solid var(--color-divider)', 'border-top:0')}</div>`;
+  }
+
   function renderHome() {
     try {
       renderHomeInner();
+      try {
+        const card = ohanaHomeCard(), wk = $('h-week');
+        if (card && wk) { const first = wk.firstElementChild; if (first && !first.classList.contains('muted')) first.insertAdjacentHTML('afterend', card); else wk.innerHTML = card; }
+      } catch (e) { console.warn('ohana card skipped', e); }
     } catch (err) {
       console.error('home render failed:', err);
       $('v-home').innerHTML = '<div class="muted">Couldn’t display your home feed. Pull down to refresh, or try again shortly.</div>';
@@ -2452,6 +2504,7 @@
   function renderSchedule() {
     try {
       renderScheduleInner();
+      try { const h = ohanaScheduleHtml(); if (h) $('v-schedule').insertAdjacentHTML('beforeend', h); } catch (e) { console.warn('ohana schedule skipped', e); }
     } catch (err) {
       console.error('schedule render failed:', err);
       $('v-schedule').innerHTML = '<div class="muted">Couldn’t display your schedule. Pull down to refresh, or try again shortly.</div>';
