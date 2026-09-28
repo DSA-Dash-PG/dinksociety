@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Traffic · Admin · The Dink Society</title>
+<meta name="robots" content="noindex,nofollow">
+<script>(function(){var t=localStorage.getItem("ds-theme");document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark")})()</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0e0e0e;--surface:#161616;--s2:#1e1e1e;--s3:#262626;
+  --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+  --text:#f0f0ec;--muted:#9a9e97;--faint:#5e625c;--inv:#0e0e0e;
+  --lime:#b8ff2c;--lime-dim:rgba(184,255,44,.12);--teal:#17d7b0;--teal-dim:rgba(23,215,176,.14);
+  --gold:#f0c040;--gold-dim:rgba(240,192,64,.14);--red:#ff5c47;
+  --rf:9999px;--r:12px;--font:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+}
+:root[data-theme="light"]{
+  --bg:#f4f5f1;--surface:#ffffff;--s2:#f0f1ec;--s3:#e6e8e1;
+  --border:rgba(0,0,0,.08);--border2:rgba(0,0,0,.16);
+  --text:#141612;--muted:#5d6259;--faint:#8b9086;--inv:#141612;
+  --lime:#5a8f00;--lime-dim:rgba(90,143,0,.12);--teal:#0a9e80;--teal-dim:rgba(10,158,128,.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--font);background:var(--bg);color:var(--text);-webkit-font-smoothing:antialiased;font-size:14px}
+button{font:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input{font:inherit;color:inherit}
+.wrap{max-width:1280px;margin:0 auto;padding:0 16px 80px}
+
+/* Sticky control bar — filters never scroll away */
+.bar{position:sticky;top:0;z-index:50;background:var(--bg);border-bottom:1px solid var(--border);margin:0 -16px 18px;padding:12px 16px}
+.bar__row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.bar h1{font-size:15px;font-weight:900;text-transform:uppercase;letter-spacing:.04em;margin-right:6px}
+.pills{display:flex;gap:3px;background:var(--s2);border:1px solid var(--border);border-radius:var(--rf);padding:3px;flex-wrap:wrap}
+.pills button{padding:6px 12px;border-radius:var(--rf);font-size:11px;font-weight:700;color:var(--muted)}
+.pills button.on{background:var(--lime);color:#0e0e0e}
+.dates{display:none;gap:6px;align-items:center}
+.dates.on{display:flex}
+.dates input{background:var(--s2);border:1px solid var(--border2);border-radius:8px;padding:5px 8px;font-size:12px}
+.chk{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);font-weight:600;cursor:pointer;user-select:none}
+.chk input{accent-color:var(--lime)}
+.search{flex:1;min-width:180px;max-width:320px;margin-left:auto;position:relative}
+.search input{width:100%;background:var(--s2);border:1px solid var(--border2);border-radius:var(--rf);padding:8px 14px;font-size:12.5px}
+.search input:focus{outline:none;border-color:var(--lime)}
+.sugg{position:absolute;top:calc(100% + 6px);left:0;right:0;min-width:280px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);box-shadow:0 12px 40px rgba(0,0,0,.4);display:none;max-height:360px;overflow-y:auto}
+.sugg.on{display:block}
+.sugg>button{display:flex;width:100%;text-align:left;padding:9px 12px;gap:10px;align-items:center;border-bottom:1px solid var(--border)}
+.sugg>button:hover,.sugg>button.hl{background:var(--s2)}
+.iconbtn{padding:7px 12px;border-radius:var(--rf);border:1px solid var(--border2);font-size:11.5px;font-weight:700;color:var(--muted)}
+.iconbtn:hover{color:var(--text)}
+.upd{font-size:10.5px;color:var(--faint)}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:18px;min-width:0}
+.card__h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.card__t{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--lime)}
+.card__s{font-size:11px;color:var(--faint)}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-top:14px}
+@media(max-width:980px){.grid4{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+
+/* Live */
+.live{border-color:rgba(23,215,176,.3);background:linear-gradient(180deg,var(--teal-dim),transparent 120px),var(--surface)}
+.live__head{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.live__n{font-size:44px;font-weight:900;line-height:1;color:var(--teal);font-variant-numeric:tabular-nums}
+.live__lbl{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.pulse{width:10px;height:10px;border-radius:50%;background:var(--teal);box-shadow:0 0 0 0 rgba(23,215,176,.6);animation:pulse 1.8s infinite;flex:none}
+@keyframes pulse{70%{box-shadow:0 0 0 10px rgba(23,215,176,0)}100%{box-shadow:0 0 0 0 rgba(23,215,176,0)}}
+.live__list{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:10px}
+.lv{display:flex;gap:11px;padding:12px;border-radius:var(--r);background:var(--s2);border:1px solid var(--border);text-align:left;width:100%}
+.lv:hover{border-color:var(--border2)}
+.lv.gone{opacity:.55}
+.av{width:34px;height:34px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;background:var(--s3);color:var(--muted)}
+.av.p{background:var(--lime-dim);color:var(--lime)}
+.av.c{background:var(--gold-dim);color:var(--gold)}
+.av.a{background:rgba(255,92,71,.14);color:var(--red)}
+.lv__b{min-width:0;flex:1}
+.lv__n{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lv__pg{font-size:12px;color:var(--text);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lv__pg code{font-family:inherit;color:var(--faint);font-size:11px}
+.lv__m{font-size:11px;color:var(--muted);margin-top:4px;display:flex;gap:4px 10px;flex-wrap:wrap}
+.lv__m b{color:var(--teal);font-weight:700;font-variant-numeric:tabular-nums}
+.chip{display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:var(--rf);background:var(--s3);color:var(--muted);vertical-align:1px;margin-left:5px}
+.chip.t{background:var(--lime-dim);color:var(--lime)}
+.chip.i{background:transparent;border:1px dashed var(--border2);color:var(--faint)}
+.recent-t{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);margin:16px 0 8px}
+.empty{padding:22px 8px;text-align:center;color:var(--faint);font-size:12.5px}
+
+/* KPIs */
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px;min-width:0}
+.kpi__l{font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+.kpi__v{font-size:28px;font-weight:900;margin-top:6px;font-variant-numeric:tabular-nums}
+.kpi__s{font-size:11.5px;color:var(--muted);margin-top:3px}
+
+/* Charts */
+.bars{display:flex;align-items:flex-end;gap:3px;height:150px;padding-top:6px}
+.bars__c{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;height:100%;justify-content:flex-end}
+.bars__b{width:100%;border-radius:4px 4px 0 0;background:var(--lime);min-height:2px;opacity:.9}
+.bars__b.z{background:var(--s3)}
+.bars__c:hover .bars__b{opacity:1;filter:brightness(1.15)}
+.bars__x{font-size:9.5px;color:var(--faint);white-space:nowrap;height:12px}
+.tip{position:fixed;pointer-events:none;background:var(--s3);color:var(--text);border:1px solid var(--border2);padding:6px 9px;border-radius:8px;font-size:11.5px;z-index:200;display:none;white-space:nowrap}
+
+/* Tables */
+.tw{overflow-x:auto;margin:0 -4px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{text-align:left;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);padding:8px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
+th.n,td.n{text-align:right;font-variant-numeric:tabular-nums}
+th.on{color:var(--lime)}
+td{padding:9px 8px;border-bottom:1px solid var(--border);vertical-align:middle;white-space:nowrap}
+tbody tr{cursor:pointer}
+tbody tr:hover td{background:var(--s2)}
+.pth{font-weight:600;max-width:320px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pth small{display:block;font-weight:400;color:var(--faint);font-size:11px}
+.mini{height:5px;border-radius:3px;background:var(--s3);overflow:hidden;min-width:50px}
+.mini i{display:block;height:100%;background:var(--teal)}
+.more{margin-top:10px;font-size:11.5px;font-weight:700;color:var(--lime)}
+
+/* Lists */
+.lst{display:flex;flex-direction:column;gap:9px}
+.lst__r{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:12.5px}
+.lst__r .mini{grid-column:1/-1}
+
+/* Sessions */
+.sess{padding:12px 0;border-bottom:1px solid var(--border)}
+.sess:last-child{border-bottom:0}
+.sess__h{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap}
+.sess__who{font-weight:700;cursor:pointer}
+.sess__who:hover{color:var(--lime)}
+.sess__m{font-size:11.5px;color:var(--muted)}
+.trail{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;align-items:center}
+.stp{font-size:11.5px;padding:4px 9px;border-radius:var(--rf);background:var(--s2);border:1px solid var(--border);white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.stp b{color:var(--teal);font-weight:700;margin-left:4px;font-variant-numeric:tabular-nums}
+.arr{color:var(--faint);font-size:11px}
+
+/* Drawer */
+.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:90;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.on{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:var(--bg);border-left:1px solid var(--border2);z-index:100;transform:translateX(100%);transition:transform .25s cubic-bezier(.16,1,.3,1);display:flex;flex-direction:column}
+.drawer.on{transform:none}
+.drawer__h{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center}
+.drawer__b{padding:16px 18px 40px;overflow-y:auto;flex:1}
+.drawer__x{margin-left:auto;font-size:22px;color:var(--muted);padding:4px 8px}
+.tl{position:relative;margin:10px 0 4px 6px;padding-left:16px;border-left:2px solid var(--border2)}
+.tl__i{position:relative;padding:6px 0}
+.tl__i::before{content:'';position:absolute;left:-22px;top:11px;width:10px;height:10px;border-radius:50%;background:var(--teal);border:2px solid var(--surface)}
+.tl__t{font-size:10.5px;color:var(--faint);font-variant-numeric:tabular-nums}
+.tl__p{font-size:13px;font-weight:600}
+.tl__p small{font-weight:400;color:var(--faint);margin-left:6px}
+.tl__d{font-size:11.5px;color:var(--teal);font-weight:700}
+.dayh{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:22px 0 4px}
+.gate{max-width:420px;margin:120px auto;text-align:center}
+.gate a{display:inline-block;margin-top:16px;padding:11px 22px;border-radius:var(--rf);background:var(--lime);color:#0e0e0e;font-weight:800;text-decoration:none}
+.note{font-size:11px;color:var(--faint);margin-top:18px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="bar">
+    <div class="bar__row">
+      <h1>Traffic</h1>
+      <div class="pills" id="range">
+        <button data-r="today" class="on">Today</button>
+        <button data-r="yesterday">Yesterday</button>
+        <button data-r="7">7 days</button>
+        <button data-r="30">30 days</button>
+        <button data-r="custom">Custom</button>
+      </div>
+      <div class="dates" id="dates"><input type="date" id="d-from"><span class="upd">→</span><input type="date" id="d-to"></div>
+      <label class="chk"><input type="checkbox" id="admins"> Include admins</label>
+      <div class="search">
+        <input id="q" placeholder="Find a person or page…" autocomplete="off">
+        <div class="sugg" id="sugg"></div>
+      </div>
+      <button class="iconbtn" id="refresh" title="Refresh">↻</button>
+      <span class="upd" id="upd"></span>
+    </div>
+  </div>
+
+  <section class="card live" id="live-card">
+    <div class="live__head">
+      <span class="pulse"></span>
+      <div class="live__n" id="live-n">–</div>
+      <div><div class="live__lbl">On the site now</div><div class="card__s" id="live-sub">Updates every 10 seconds</div></div>
+    </div>
+    <div class="live__list" id="live-list"><div class="empty">Loading…</div></div>
+    <div id="live-recent"></div>
+  </section>
+
+  <div class="grid4" id="kpis"></div>
+
+  <div class="grid2">
+    <section class="card"><div class="card__h"><h2 class="card__t">When people visit</h2><span class="card__s">Pacific time · page views by hour</span></div><div id="hours"></div></section>
+    <section class="card"><div class="card__h"><h2 class="card__t" id="days-t">By day</h2><span class="card__s" id="days-s">people per day</span></div><div id="days"></div></section>
+  </div>
+
+  <section class="card" style="margin-top:14px">
+    <div class="card__h"><h2 class="card__t">Pages</h2><span class="card__s">Avg time = active time on the page (tab open and in use)</span></div>
+    <div class="tw"><table id="pages-t"><thead><tr>
+      <th data-k="s">Page</th><th class="n" data-k="views">Views</th><th class="n" data-k="visitors">People</th>
+      <th class="n" data-k="avgMs">Avg time</th><th class="n" data-k="totalMs">Total time</th>
+      <th class="n" data-k="avgScroll">Scrolled</th><th class="n" data-k="entries">Landings</th><th class="n" data-k="exitRate">Exit %</th>
+    </tr></thead><tbody></tbody></table></div>
+    <button class="more" id="pages-more" hidden>Show all pages</button>
+  </section>
+
+  <section class="card" style="margin-top:14px">
+    <div class="card__h"><h2 class="card__t">People</h2><span class="card__s" id="people-s"></span></div>
+    <div class="tw"><table id="people-t"><thead><tr>
+      <th data-k="name">Who</th><th data-k="team">Team</th><th class="n" data-k="sessions">Visits</th>
+      <th class="n" data-k="pv">Pages</th><th class="n" data-k="ms">Time on site</th><th class="n" data-k="avgSessionMs">Avg visit</th>
+      <th data-k="top">Most time on</th><th data-k="dev">Device</th><th class="n" data-k="last">Last seen</th>
+    </tr></thead><tbody></tbody></table></div>
+    <button class="more" id="people-more" hidden>Show everyone</button>
+  </section>
+
+  <div class="grid2">
+    <section class="card"><div class="card__h"><h2 class="card__t">Recent visits</h2><span class="card__s" id="sess-s"></span></div><div id="sessions"></div><button class="more" id="sess-more" hidden>Show more</button></section>
+    <div style="display:flex;flex-direction:column;gap:14px;min-width:0">
+      <section class="card"><div class="card__h"><h2 class="card__t">Where they came from</h2><span class="card__s">visits</span></div><div class="lst" id="refs"></div></section>
+      <section class="card"><div class="card__h"><h2 class="card__t">Devices</h2></div><div class="lst" id="devs"></div></section>
+      <section class="card"><div class="card__h"><h2 class="card__t">Browsers</h2></div><div class="lst" id="brs"></div></section>
+      <section class="card"><div class="card__h"><h2 class="card__t">Cities</h2><span class="card__s">approximate, from IP</span></div><div class="lst" id="cities"></div></section>
+    </div>
+  </div>
+  <p class="note">Signed-in players and captains are named. An anonymous visitor gets a name once they sign in on that browser (marked with a dashed "same device" chip). Time only counts while the tab is visible and in use — the clock stops after 3 minutes without a tap, scroll or keypress. Admin browsing is hidden unless "Include admins" is on. Tracking started when this page shipped; earlier days are empty.</p>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer__h"><div class="av" id="dr-av"></div><div style="min-width:0"><div style="font-weight:800" id="dr-name"></div><div class="card__s" id="dr-sub"></div></div><button class="drawer__x" id="dr-x" aria-label="Close">×</button></div>
+  <div class="drawer__b" id="dr-body"></div>
+</aside>
+<div class="tip" id="tip"></div>
+
+<script>
+(function(){
+  const API='/.netlify/functions/admin-traffic';
+  const $=id=>document.getElementById(id);
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const TZ='America/Los_Angeles';
+  const DAYF=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'});
+  const dayOf=ms=>DAYF.format(new Date(ms));
+  const addDays=(d,n)=>new Date(Date.parse(d+'T12:00:00Z')+n*864e5).toISOString().slice(0,10);
+  const tfmt=ms=>new Date(ms).toLocaleTimeString('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'});
+  const dfmt=d=>new Date(d+'T12:00:00Z').toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'});
+  const dshort=d=>new Date(d+'T12:00:00Z').toLocaleDateString('en-US',{timeZone:'UTC',month:'numeric',day:'numeric'});
+  function dur(ms){
+    const s=Math.max(0,Math.round((ms||0)/1000));
+    if(s<60) return s+'s';
+    const m=Math.floor(s/60); if(m<60) return m+'m '+String(s%60).padStart(2,'0')+'s';
+    const h=Math.floor(m/60); return h+'h '+String(m%60).padStart(2,'0')+'m';
+  }
+  function ago(ms){
+    const s=Math.round((Date.now()-ms)/1000);
+    if(s<60) return 'just now'; const m=Math.round(s/60); if(m<60) return m+'m ago';
+    const h=Math.round(m/60); if(h<24) return h+'h ago';
+    return new Date(ms).toLocaleDateString('en-US',{timeZone:TZ,month:'short',day:'numeric'});
+  }
+  const pageLabel=s=>{ if(!s) return ''; const i=s.indexOf('#'); const p=i<0?s:s.slice(0,i), tab=i<0?'':s.slice(i+1); const base=p==='/'?'Home':p.replace(/^\//,''); return tab?base+' · '+tab:base; };
+  const initials=n=>String(n||'?').replace(/@.*/,'').split(/[\s._-]+/).filter(Boolean).map(w=>w[0]).join('').slice(0,2).toUpperCase()||'?';
+  const avClass=w=>!w||w.k==='anon'?'':w.k==='admin'?'a':w.k==='captain'?'c':'p';
+  const kindLabel=w=>!w||w.k==='anon'?'Visitor':w.k==='captain'?'Captain':w.k==='admin'?'Admin':'Player';
+  const avTxt=(w,name)=>!w||w.k==='anon'?'·':initials(name);
+
+  // ── State ──
+  const S={range:'today',admins:false,report:null,live:null,
+    pageSort:{k:'views',d:-1},peopleSort:{k:'last',d:-1},pagesAll:false,peopleAll:false,sessN:25};
+  try{ S.admins=localStorage.getItem('ds-traffic-admins')==='1'; const r=localStorage.getItem('ds-traffic-range'); if(r&&r!=='custom') S.range=r; }catch(e){}
+  $('admins').checked=S.admins;
+
+  function rangeDates(){
+    const today=dayOf(Date.now());
+    if(S.range==='today') return [today,today];
+    if(S.range==='yesterday'){ const y=addDays(today,-1); return [y,y]; }
+    if(S.range==='7') return [addDays(today,-6),today];
+    if(S.range==='30') return [addDays(today,-29),today];
+    return [$('d-from').value||today,$('d-to').value||today];
+  }
+  const includesToday=()=>rangeDates()[1]>=dayOf(Date.now());
+  const adm=()=>S.admins?'&admins=1':'';
+
+  let stopped=false;
+  async function get(qs){
+    const r=await fetch(API+'?'+qs,{credentials:'include',cache:'no-store'});
+    if(r.status===401){ gate(); throw new Error('unauth'); }
+    const j=await r.json().catch(()=>({})); if(!r.ok) throw new Error(j.error||('HTTP '+r.status)); return j;
+  }
+  function gate(){
+    if(stopped) return; stopped=true;
+    $('app').innerHTML='<div class="gate"><h2 style="font-weight:900">Admins only</h2><p class="card__s" style="margin-top:8px">Sign in to the admin portal first, then come back.</p><a href="/admin.html" target="_top">Sign in</a></div>';
+  }
+
+  // ── Live ──
+  async function loadLive(){
+    if(stopped) return;
+    try{ S.live=await get('view=live'+adm()); renderLive(); }
+    catch(e){ if(e.message!=='unauth') $('live-sub').textContent='Live feed unavailable — '+e.message; }
+  }
+  function lvRow(r,gone){
+    const w=r.who||{};
+    const onPage=(r.ms||0)+Math.max(0,Date.now()-(r.last||Date.now()));
+    const sessLen=(gone?r.last:Date.now())-(r.sessAt||r.last);
+    const place=[r.city,r.region].filter(Boolean).join(', ');
+    return `<button class="lv ${gone?'gone':''}" data-key="${esc(r.key)}" data-name="${esc(r.name)}">
+      <div class="av ${avClass(w)}">${esc(avTxt(w,r.name))}</div>
+      <div class="lv__b">
+        <div class="lv__n">${esc(r.name)}${w.t?`<span class="chip t">${esc(w.t)}</span>`:''}${w.inferred?'<span class="chip i">same device</span>':''}</div>
+        <div class="lv__pg">${gone?'Last on ':''}${esc(r.title||pageLabel(r.path))} <code>${esc(r.path)}</code></div>
+        <div class="lv__m">${gone?`<span>left ${ago(r.last)}</span>`:`<span>on page <b data-live-page="${r.last}" data-base="${r.ms||0}">${dur(onPage)}</b></span>`}
+          <span>visit <b ${gone?'':`data-live-sess="${r.sessAt}"`}>${dur(sessLen)}</b></span><span>${r.pages} page${r.pages===1?'':'s'}</span>
+          <span>${esc(r.dev||'')}${r.br?' · '+esc(r.br):''}</span>${place?`<span>${esc(place)}</span>`:''}${r.ref?`<span>via ${esc(r.ref)}</span>`:''}</div>
+      </div></button>`;
+  }
+  function renderLive(){
+    const L=S.live; if(!L) return;
+    $('live-n').textContent=L.active.length;
+    const signed=L.active.filter(r=>r.who&&r.who.k!=='anon').length;
+    $('live-sub').textContent=L.active.length?`${signed} signed in · ${L.active.length-signed} anonymous · updates every 10s`:'Nobody right now · updates every 10s';
+    $('live-list').innerHTML=L.active.length?L.active.map(r=>lvRow(r,false)).join(''):'<div class="empty">No one is on the site right now.</div>';
+    $('live-recent').innerHTML=L.recent.length?`<div class="recent-t">Left in the last 15 minutes</div><div class="live__list">${L.recent.map(r=>lvRow(r,true)).join('')}</div>`:'';
+  }
+  function tick(){
+    const now=Date.now();
+    document.querySelectorAll('[data-live-page]').forEach(el=>{ el.textContent=dur(+el.dataset.base+Math.max(0,now-(+el.dataset.livePage))); });
+    document.querySelectorAll('[data-live-sess]').forEach(el=>{ el.textContent=dur(now-(+el.dataset.liveSess)); });
+  }
+
+  // ── Report ──
+  let repSeq=0;
+  async function loadReport(){
+    if(stopped) return;
+    const [from,to]=rangeDates(); const seq=++repSeq;
+    $('upd').textContent='Loading…';
+    try{
+      const rep=await get(`view=report&from=${from}&to=${to}${adm()}`);
+      if(seq!==repSeq) return;
+      S.report=rep; $('upd').textContent='Updated '+tfmt(Date.now());
+      renderReport();
+    }catch(e){ if(e.message!=='unauth'&&seq===repSeq) $('upd').textContent='Failed: '+e.message; }
+  }
+  const kpi=(l,v,s)=>`<div class="kpi"><div class="kpi__l">${l}</div><div class="kpi__v">${v}</div><div class="kpi__s">${s||''}</div></div>`;
+  function bars(items,color){
+    const mx=Math.max(1,...items.map(x=>x.v));
+    return '<div class="bars">'+items.map(x=>`<div class="bars__c" data-tip="${esc(x.tip)}"><div class="bars__b ${x.v?'':'z'}" style="height:${Math.round(100*x.v/mx)}%${color?';background:'+color:''}"></div><div class="bars__x">${esc(x.x)}</div></div>`).join('')+'</div>';
+  }
+  function renderReport(){
+    const R=S.report, K=R.kpis;
+    $('kpis').innerHTML=[
+      kpi('People',K.visitors.toLocaleString(),`${K.signedIn} signed in · ${K.anonymous} anonymous`),
+      kpi('Visits',K.sessions.toLocaleString(),`${K.pagesPerSession} pages per visit · ${K.bounceRate}% saw one page`),
+      kpi('Time on site',dur(K.avgSessionMs),`avg per visit · median ${dur(K.medianSessionMs)}`),
+      kpi('Page views',K.pageviews.toLocaleString(),`avg ${dur(K.avgPageMs)} per page · ${dur(K.totalMs)} total`),
+    ].join('');
+    const hl=h=>h===0?'12a':h<12?h+'a':h===12?'12p':(h-12)+'p';
+    $('hours').innerHTML=bars(R.byHour.map(h=>({v:h.pv,x:h.h%3===0?hl(h.h):'',tip:`${hl(h.h)}: ${h.pv} views · ${h.visitors} people`})));
+    const [from,to]=rangeDates();
+    const days=[]; for(let d=from; d<=to && days.length<92; d=addDays(d,1)) days.push(d);
+    if(days.length>1){
+      const byD=Object.fromEntries(R.byDay.map(d=>[d.date,d]));
+      const every=Math.ceil(days.length/8);
+      $('days-t').textContent='By day'; $('days-s').textContent='people per day';
+      $('days').innerHTML=bars(days.map((d,i)=>{ const x=byD[d]||{pv:0,visitors:0,sessions:0,ms:0};
+        return {v:x.visitors,x:(days.length<=10||i%every===0)?dshort(d):'',tip:`${dfmt(d)}: ${x.visitors} people · ${x.sessions} visits · ${x.pv} views · ${dur(x.ms)}`}; }),'var(--teal)');
+    } else {
+      const B=[['< 30s',0,30e3],['30s–2m',30e3,120e3],['2–5m',120e3,300e3],['5–15m',300e3,900e3],['15m+',900e3,Infinity]];
+      $('days-t').textContent='How long visits last'; $('days-s').textContent='active time per visit';
+      $('days').innerHTML=bars(B.map(([l,a,b])=>{ const n=R.sessions.filter(s=>s.ms>=a&&s.ms<b).length; return {v:n,x:l,tip:`${l}: ${n} visit${n===1?'':'s'}`}; }),'var(--teal)');
+    }
+    renderPages(); renderPeople(); renderSessions();
+    const list=(el,arr)=>{ const t=arr.reduce((a,b)=>a+b.n,0)||1; $(el).innerHTML=arr.length?arr.map(x=>`<div class="lst__r"><span>${esc(x.label)}</span><span class="card__s">${x.n} · ${Math.round(100*x.n/t)}%</span><div class="mini"><i style="width:${Math.round(100*x.n/t)}%"></i></div></div>`).join(''):'<div class="empty">No data yet</div>'; };
+    list('refs',R.referrers); list('devs',R.devices); list('brs',R.browsers); list('cities',R.cities);
+    if(document.activeElement===$('q')) showSugg();
+  }
+  function sortBy(arr,{k,d}){ return [...arr].sort((a,b)=>{ const x=a[k],y=b[k]; if(typeof x==='string'||typeof y==='string') return d*String(x||'').localeCompare(String(y||'')); return d*((x||0)-(y||0)); }); }
+  function renderPages(){
+    const R=S.report; const rows=sortBy(R.pages,S.pageSort); const shown=S.pagesAll?rows:rows.slice(0,15);
+    const maxT=Math.max(1,...R.pages.map(p=>p.totalMs));
+    $('pages-t').querySelector('tbody').innerHTML=shown.length?shown.map(p=>`<tr data-page="${esc(p.s)}">
+      <td class="pth">${esc(p.title||pageLabel(p.s))}<small>${esc(p.s)}</small></td><td class="n">${p.views}</td><td class="n">${p.visitors}</td>
+      <td class="n">${dur(p.avgMs)}</td><td class="n"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><span>${dur(p.totalMs)}</span><div class="mini" style="width:60px"><i style="width:${Math.round(100*p.totalMs/maxT)}%"></i></div></div></td>
+      <td class="n">${p.avgScroll}%</td><td class="n">${p.entries}</td><td class="n">${p.exitRate}%</td></tr>`).join(''):'<tr><td colspan="8" class="empty">No page views in this range yet.</td></tr>';
+    $('pages-more').hidden=S.pagesAll||rows.length<=15;
+    markSort('pages-t',S.pageSort);
+  }
+  function renderPeople(){
+    const R=S.report; const rows=sortBy(R.people,S.peopleSort); const shown=S.peopleAll?rows:rows.slice(0,25);
+    $('people-s').textContent=`${R.people.length} people · tap a row for their full trail`;
+    $('people-t').querySelector('tbody').innerHTML=shown.length?shown.map(p=>`<tr data-key="${esc(p.key)}" data-name="${esc(p.name)}">
+      <td><div style="display:flex;align-items:center;gap:9px"><div class="av ${avClass(p.who)}" style="width:28px;height:28px;font-size:10.5px">${esc(avTxt(p.who,p.name))}</div><div><div style="font-weight:600">${esc(p.name)}${p.inferred?'<span class="chip i">same device</span>':''}</div><div class="card__s">${kindLabel(p.who)}${p.adm?' · admin':''}</div></div></div></td>
+      <td>${p.team?`<span class="chip t" style="margin:0">${esc(p.team)}</span>`:''}</td>
+      <td class="n">${p.sessions}</td><td class="n">${p.pv}</td><td class="n"><b>${dur(p.ms)}</b></td><td class="n">${dur(p.avgSessionMs)}</td>
+      <td class="pth" style="max-width:200px">${esc(pageLabel(p.top))}</td><td>${esc(p.dev||'')}${p.br?' · '+esc(p.br):''}</td><td class="n">${ago(p.last)}</td></tr>`).join(''):'<tr><td colspan="9" class="empty">Nobody yet.</td></tr>';
+    $('people-more').hidden=S.peopleAll||rows.length<=25;
+    markSort('people-t',S.peopleSort);
+  }
+  const trail=pages=>'<div class="trail">'+pages.map((p,i)=>`${i?'<span class="arr">→</span>':''}<span class="stp" title="${esc(p.s)} · ${tfmt(p.at)}">${esc(p.title||pageLabel(p.s))}<b>${dur(p.ms)}</b></span>`).join('')+'</div>';
+  function renderSessions(){
+    const R=S.report; const list=R.sessions.slice(0,S.sessN);
+    $('sess-s').textContent=R.sessionsTotal>R.sessions.length?`latest ${R.sessions.length} of ${R.sessionsTotal}`:`${R.sessionsTotal} visit${R.sessionsTotal===1?'':'s'}`;
+    $('sessions').innerHTML=list.length?list.map(s=>`<div class="sess"><div class="sess__h">
+      <span class="sess__who" data-key="${esc(s.key)}" data-name="${esc(s.name)}">${esc(s.name)}</span>${s.who&&s.who.t?`<span class="chip t" style="margin:0">${esc(s.who.t)}</span>`:''}
+      <span class="sess__m">${dshort(dayOf(s.start))} ${tfmt(s.start)} · ${dur(s.ms)} · ${s.pages.length} page${s.pages.length===1?'':'s'}${s.ref?' · via '+esc(s.ref):''} · ${esc(s.dev||'')}</span></div>${trail(s.pages)}</div>`).join(''):'<div class="empty">No visits yet.</div>';
+    $('sess-more').hidden=S.sessN>=R.sessions.length;
+  }
+  function markSort(id,st){ document.querySelectorAll('#'+id+' th').forEach(th=>th.classList.toggle('on',th.dataset.k===st.k)); }
+  function bindSort(id,key,render){
+    document.querySelectorAll('#'+id+' th').forEach(th=>th.addEventListener('click',()=>{
+      const k=th.dataset.k, st=S[key];
+      S[key]=st.k===k?{k,d:-st.d}:{k,d:['name','s','team','top','dev'].includes(k)?1:-1};
+      if(S.report) render();
+    }));
+  }
+  bindSort('pages-t','pageSort',renderPages); bindSort('people-t','peopleSort',renderPeople);
+  $('pages-more').onclick=()=>{S.pagesAll=true;renderPages();};
+  $('people-more').onclick=()=>{S.peopleAll=true;renderPeople();};
+  $('sess-more').onclick=()=>{S.sessN+=50;renderSessions();};
+
+  // ── Person drawer: their full trail ──
+  async function openPerson(key,name){
+    $('dr-name').textContent=name||''; $('dr-av').textContent=initials(name); $('dr-av').className='av';
+    $('dr-sub').textContent=''; $('dr-body').innerHTML='<div class="empty">Loading…</div>';
+    $('drawer').classList.add('on'); $('scrim').classList.add('on'); $('drawer').setAttribute('aria-hidden','false');
+    const [from,to]=rangeDates();
+    try{
+      const d=await get(`view=person&key=${encodeURIComponent(key)}&from=${from}&to=${to}${adm()}`);
+      const p=d.person;
+      if(!p){ $('dr-body').innerHTML='<div class="empty">No activity in this date range.</div>'; return; }
+      $('dr-av').className='av '+avClass(p.who); $('dr-av').textContent=avTxt(p.who,p.name);
+      $('dr-name').textContent=p.name;
+      $('dr-sub').textContent=[kindLabel(p.who),p.team,p.who&&p.who.e&&p.who.e!==p.name?p.who.e:'',p.city].filter(Boolean).join(' · ');
+      const K=d.kpis;
+      let html=`<div class="grid2" style="margin-top:0;grid-template-columns:1fr 1fr">${kpi('Visits',K.sessions,`${K.pagesPerSession} pages per visit`)}${kpi('Time on site',dur(K.totalMs),`avg ${dur(K.avgSessionMs)} per visit`)}</div>`;
+      const mx=Math.max(1,...d.pages.map(x=>x.totalMs));
+      html+='<div class="dayh">Where they spend their time</div><div class="lst" style="margin-top:8px">'+
+        d.pages.slice().sort((a,b)=>b.totalMs-a.totalMs).slice(0,8).map(pg=>`<div class="lst__r"><span>${esc(pg.title||pageLabel(pg.s))}</span><span class="card__s">${pg.views}× · ${dur(pg.totalMs)}</span><div class="mini"><i style="width:${Math.round(100*pg.totalMs/mx)}%"></i></div></div>`).join('')+'</div>';
+      let lastDay='';
+      for(const s of d.sessions){
+        const dd=dayOf(s.start);
+        if(dd!==lastDay){ html+=`<div class="dayh">${dfmt(dd)}</div>`; lastDay=dd; }
+        html+=`<div class="card" style="padding:12px 14px;margin-top:8px"><div class="sess__m"><b style="color:var(--text)">${tfmt(s.start)}–${tfmt(s.end)}</b> · ${dur(s.ms)} active · ${s.pages.length} page${s.pages.length===1?'':'s'}${s.ref?' · via '+esc(s.ref):''} · ${esc(s.dev||'')} ${esc(s.br||'')}</div>
+          <div class="tl">${s.pages.map(pg=>`<div class="tl__i"><div class="tl__t">${tfmt(pg.at)}</div><div class="tl__p">${esc(pg.title||pageLabel(pg.s))}<small>${esc(pg.s)}</small></div><div class="tl__d">${dur(pg.ms)}${pg.sc?` <span class="card__s" style="font-weight:400">· scrolled ${pg.sc}%</span>`:''}</div></div>`).join('')}</div></div>`;
+      }
+      $('dr-body').innerHTML=html;
+    }catch(e){ if(e.message!=='unauth') $('dr-body').innerHTML='<div class="empty">Failed: '+esc(e.message)+'</div>'; }
+  }
+  function closeDrawer(){ $('drawer').classList.remove('on'); $('scrim').classList.remove('on'); $('drawer').setAttribute('aria-hidden','true'); }
+  $('dr-x').onclick=closeDrawer; $('scrim').onclick=closeDrawer;
+  document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ closeDrawer(); $('sugg').classList.remove('on'); } });
+
+  // ── Type-to-find (people + pages) ──
+  let hl=-1;
+  function showSugg(){
+    const q=$('q').value.trim().toLowerCase(), box=$('sugg');
+    if(!q||!S.report){ box.classList.remove('on'); return; }
+    const people=S.report.people.filter(p=>[p.name,p.team,p.who&&p.who.e].filter(Boolean).join(' ').toLowerCase().includes(q)).slice(0,8);
+    const pages=S.report.pages.filter(p=>(p.s+' '+p.title).toLowerCase().includes(q)).slice(0,4);
+    if(!people.length&&!pages.length){ box.innerHTML='<div class="empty">No match in this date range</div>'; box.classList.add('on'); return; }
+    box.innerHTML=people.map(p=>`<button data-pk="${esc(p.key)}" data-pn="${esc(p.name)}"><div class="av ${avClass(p.who)}" style="width:26px;height:26px;font-size:10px">${esc(avTxt(p.who,p.name))}</div><div><div style="font-weight:600;font-size:12.5px">${esc(p.name)}</div><div class="card__s">${esc(p.team||kindLabel(p.who))} · ${p.sessions} visit${p.sessions===1?'':'s'} · ${dur(p.ms)}</div></div></button>`).join('')+
+      pages.map(p=>{
+        const seen=new Map(); S.report.sessions.forEach(s=>{ if(s.pages.some(x=>x.s===p.s)&&!seen.has(s.key)) seen.set(s.key,s); });
+        const names=[...seen.values()].slice(0,8);
+        return `<div style="padding:9px 12px;border-bottom:1px solid var(--border)"><div style="font-weight:600;font-size:12.5px">${esc(p.title||pageLabel(p.s))} <span class="card__s">${esc(p.s)}</span></div><div class="card__s">${p.views} views · ${p.visitors} people · avg ${dur(p.avgMs)}</div>${names.length?`<div class="trail">${names.map(s=>`<span class="stp" data-pk="${esc(s.key)}" data-pn="${esc(s.name)}" style="cursor:pointer">${esc(s.name)}</span>`).join('')}</div>`:''}</div>`;
+      }).join('');
+    box.classList.add('on'); hl=-1;
+  }
+  $('q').addEventListener('input',showSugg);
+  $('q').addEventListener('focus',showSugg);
+  $('q').addEventListener('keydown',e=>{
+    const items=[...$('sugg').querySelectorAll('button[data-pk]')];
+    if((e.key==='ArrowDown'||e.key==='ArrowUp')&&items.length){ e.preventDefault(); hl=(hl+(e.key==='ArrowDown'?1:-1)+items.length)%items.length; items.forEach((b,i)=>b.classList.toggle('hl',i===hl)); }
+    else if(e.key==='Enter'&&items.length){ const b=items[Math.max(0,hl)]; openPerson(b.dataset.pk,b.dataset.pn); $('sugg').classList.remove('on'); }
+  });
+  document.addEventListener('click',e=>{
+    const sg=e.target.closest('#sugg [data-pk]');
+    if(sg){ openPerson(sg.dataset.pk,sg.dataset.pn); $('sugg').classList.remove('on'); return; }
+    if(!e.target.closest('.search')) $('sugg').classList.remove('on');
+    const el=e.target.closest('[data-key]'); if(el){ openPerson(el.dataset.key,el.dataset.name); return; }
+    const pg=e.target.closest('tr[data-page]'); if(pg){ $('q').value=pg.dataset.page; $('q').focus(); showSugg(); window.scrollTo({top:0,behavior:'smooth'}); }
+  });
+
+  // ── Chart tooltips ──
+  document.addEventListener('mousemove',e=>{ const c=e.target.closest('[data-tip]'), t=$('tip');
+    if(!c){ t.style.display='none'; return; } t.textContent=c.dataset.tip; t.style.display='block';
+    t.style.left=Math.max(8,Math.min(window.innerWidth-t.offsetWidth-8,e.clientX+12))+'px'; t.style.top=(e.clientY-36)+'px'; });
+
+  // ── Controls ──
+  function setRange(r){
+    S.range=r; try{ localStorage.setItem('ds-traffic-range',r); }catch(e){}
+    document.querySelectorAll('#range button').forEach(b=>b.classList.toggle('on',b.dataset.r===r));
+    $('dates').classList.toggle('on',r==='custom');
+    if(r==='custom'){ const t=dayOf(Date.now()); if(!$('d-from').value) $('d-from').value=addDays(t,-6); if(!$('d-to').value) $('d-to').value=t; $('d-to').max=t; $('d-from').max=t; }
+    S.pagesAll=false; S.peopleAll=false; S.sessN=25;
+    loadReport();
+  }
+  document.querySelectorAll('#range button').forEach(b=>b.addEventListener('click',()=>setRange(b.dataset.r)));
+  $('d-from').addEventListener('change',loadReport); $('d-to').addEventListener('change',loadReport);
+  $('admins').addEventListener('change',()=>{ S.admins=$('admins').checked; try{ localStorage.setItem('ds-traffic-admins',S.admins?'1':'0'); }catch(e){} loadLive(); loadReport(); });
+  $('refresh').addEventListener('click',()=>{ loadLive(); loadReport(); });
+
+  setInterval(()=>{ if(document.visibilityState==='visible') loadLive(); },10000);
+  setInterval(()=>{ if(document.visibilityState==='visible'&&includesToday()) loadReport(); },60000);
+  setInterval(tick,1000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') loadLive(); });
+
+  setRange(S.range);
+  loadLive();
+})();
+</script>
+</body>
+</html>

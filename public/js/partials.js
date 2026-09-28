@@ -97,26 +97,20 @@ function highlightNav() {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// Anonymous pageview beacon — counts public-page traffic for the admin
-// Analytics tab. No PII: ds_vid is a random per-browser id used only to
-// estimate daily uniques. partials.js loads on public pages ONLY (not the
-// me/captain/admin portals), so this never double-counts authed sessions.
-// Fire-and-forget; one hit per page load.
+// Page analytics — loads /js/ds-track.js (who's on the site, which pages,
+// how long). It also feeds the older anonymous daily counter server-side, so
+// the admin Analytics tab keeps working. Portal pages that don't load
+// partials.js include ds-track.js with their own <script> tag; the script
+// guards against running twice.
 // ═══════════════════════════════════════════════════════════════
-(function trackPublicPageview() {
+(function loadTracker() {
   try {
-    let vid = localStorage.getItem('ds_vid');
-    if (!vid) {
-      vid = (window.crypto && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : (Date.now().toString(36) + Math.random().toString(16).slice(2));
-      localStorage.setItem('ds_vid', vid);
-    }
-    const body = JSON.stringify({ path: location.pathname, vid });
-    const url = '/.netlify/functions/activity-public';
-    if (navigator.sendBeacon) navigator.sendBeacon(url, new Blob([body], { type: 'application/json' }));
-    else fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
-  } catch {}
+    if (window.__dsTrack) return;
+    var s = document.createElement('script');
+    s.src = '/js/ds-track.js';
+    s.defer = true;
+    document.head.appendChild(s);
+  } catch (e) {}
 })();
 
 // ═══════════════════════════════════════════════════════════════
