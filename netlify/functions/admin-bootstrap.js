@@ -44,7 +44,7 @@ export default async (req) => {
 
   // Mint an admin session — same store, shape, and TTL as admin-link.js.
   const sessionToken = crypto.randomBytes(32).toString('hex');
-  const sessionExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  const sessionExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
   const sessionStore = getStore('admin-sessions');
   await sessionStore.set(sessionToken, JSON.stringify({
     email: normalized,
@@ -60,7 +60,7 @@ export default async (req) => {
     `admin_session=${sessionToken}`,
     'Path=/',
     'HttpOnly',
-    `Max-Age=${24 * 60 * 60}`,
+    `Max-Age=${30 * 24 * 60 * 60}`,
     'SameSite=Lax',
     ...(isLocal ? [] : ['Secure']),
   ].join('; ');

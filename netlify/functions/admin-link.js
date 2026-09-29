@@ -79,7 +79,7 @@ export default async (req) => {
     await store.set(token, JSON.stringify({ ...record, used: true }));
 
     const sessionToken = crypto.randomBytes(32).toString('hex');
-    const sessionExpiry = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+    const sessionExpiry = Date.now() + 30 * 24 * 60 * 60 * 1000; // 30 days
     await getStore('admin-sessions').set(sessionToken, JSON.stringify({ email: record.email, expiresAt: sessionExpiry }));
 
     await recordLogin({ email: record.email, role: 'admin' });
@@ -87,7 +87,7 @@ export default async (req) => {
     const isLocal = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
     const cookie = [
       `admin_session=${sessionToken}`, 'Path=/', 'HttpOnly',
-      `Max-Age=${24 * 60 * 60}`, 'SameSite=Lax', ...(isLocal ? [] : ['Secure']),
+      `Max-Age=${30 * 24 * 60 * 60}`, 'SameSite=Lax', ...(isLocal ? [] : ['Secure']),
     ].join('; ');
 
     // Land on the unified admin console (league + ladders in one shell). The
