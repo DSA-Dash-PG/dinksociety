@@ -312,6 +312,8 @@
     body.nvz-embed .nvz-shell { max-width:none; padding:4px 0 20px; }
     body.nvz-embed .tabs { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; margin-top:4px; scrollbar-width:none; }
     body.nvz-embed .tabs::-webkit-scrollbar { display:none; }
+    /* Compare tab on the leaderboard: its Players/Teams toggle lives on the host page. */
+    body.nvz-embed.nvz-versus .tabs { display:none; }
   </style>
 </head>
 <body data-page="nvz">
@@ -358,10 +360,15 @@
 
     // When embedded in the Leaderboard tab (?embed=1): strip chrome and report our
     // height to the parent so the iframe auto-sizes (no nested scrollbar).
-    var EMBED = new URLSearchParams(location.search).get('embed') === '1';
+    var QS = new URLSearchParams(location.search);
+    var EMBED = QS.get('embed') === '1';
+    // Two sets of views share this page: 'versus' (Player vs Player + Team vs Team, the
+    // leaderboard's Compare tab) and the NVZ proper (everything else).
+    var SET = QS.get('set') === 'versus' ? 'versus' : 'nvz', START = QS.get('tab') || '', CURTAB = '';
+    if (SET === 'versus') document.body.classList.add('nvz-versus');
     if (EMBED) {
       document.body.classList.add('nvz-embed');
-      var postH = function () { try { parent.postMessage({ nvzHeight: Math.ceil(document.body.getBoundingClientRect().height) }, '*'); } catch (e) {} };
+      var postH = function () { try { parent.postMessage({ nvzHeight: Math.ceil(document.body.getBoundingClientRect().height), nvzTab: CURTAB }, '*'); } catch (e) {} };
       window.addEventListener('load', postH);
       window.addEventListener('resize', postH);
       if (window.ResizeObserver) { try { new ResizeObserver(postH).observe(document.body); } catch (e) {} }
@@ -455,23 +462,39 @@
       ['scoring','📈 Scoring Trends', soon('Weekly scored/allowed needs a per-week player series, which isn\'t exposed yet.')],
       ['weekly','🔥 Weekly Trends', soon('Weekly composite movement needs a per-week player series, which isn\'t exposed yet.')],
     ];
+    VIEWS = VIEWS.filter(function(v){ return (SET==='versus') === (v[0]==='pvp'||v[0]==='tvt'); });
+    function hasView(k){ return VIEWS.some(function(v){ return v[0]===k; }); }
+    // The host page's sub-toggle tells the embedded Compare frame which view to show.
+    if (EMBED) window.addEventListener('message', function(e){
+      if (e.origin !== location.origin) return;
+      var k = e.data && e.data.nvzShow;
+      if (typeof k === 'string' && hasView(k) && document.getElementById('np-'+k)) show(k);
+    });
+    if (SET === 'versus' && !EMBED) {
+      document.title = 'Compare \u00b7 The Dink Society';
+      var hh = document.querySelector('.nvz-hero h1'), hp = document.querySelector('.nvz-hero p');
+      if (hh) hh.innerHTML = 'Com<span class="lime">pare</span>';
+      if (hp) hp.textContent = 'Any two players, any two teams';
+    }
     var rendered={};
     function initTabs(){
       var tabsEl=document.getElementById('tabs'), panelsEl=document.getElementById('panels');
       panelsEl.innerHTML='';
       VIEWS.forEach(function(v,i){
-        var b=document.createElement('button'); b.className='tab'+(i===0?' on':'')+(v[0]==='rounds'||v[0]==='scoring'||v[0]==='weekly'?' soon':''); b.textContent=v[1]; b.dataset.k=v[0]; tabsEl.appendChild(b);
-        var p=document.createElement('div'); p.className='panel'+(i===0?' on':''); p.id='np-'+v[0]; panelsEl.appendChild(p);
+        var b=document.createElement('button'); b.className='tab'+(v[0]==='rounds'||v[0]==='scoring'||v[0]==='weekly'?' soon':''); b.textContent=v[1]; b.dataset.k=v[0]; tabsEl.appendChild(b);
+        var p=document.createElement('div'); p.className='panel'; p.id='np-'+v[0]; panelsEl.appendChild(p);
       });
       tabsEl.addEventListener('click', function(e){ var b=e.target.closest('.tab'); if(b) show(b.dataset.k); });
-      show('pvp');
+      show(hasView(START)? START : VIEWS[0][0]);
     }
     function show(k){
+      CURTAB=k;
       VIEWS.forEach(function(v){ var on=v[0]===k;
         document.querySelector('.tab[data-k="'+v[0]+'"]').classList.toggle('on',on);
         var panel=document.getElementById('np-'+v[0]); panel.classList.toggle('on',on);
         if(on && !rendered[k]){ v[2](panel); rendered[k]=true; }
       });
+      repinSoon();   // the newly shown view has its own matchup bar to place
     }
     function soon(msg){ return function(root){ root.innerHTML='<div class="card"><div class="empty"><b>Coming soon.</b><br>'+esc(msg)+'</div></div>'; }; }
 

@@ -100,7 +100,8 @@
     .lb-sub { padding:6px 13px; border-radius:var(--radius-full); font-size:11px; font-weight:700; border:1px solid var(--color-border); background:var(--color-surface-2); color:var(--color-text-muted); cursor:pointer; font-family:inherit; }
     .lb-sub:hover { color:var(--color-text); }
     .lb-sub.is-active { border-color:var(--color-lime); color:var(--color-lime); background:var(--color-lime-dim); }
-    #nvz-frame { width:100%; border:0; display:block; min-height:70vh; }
+    #nvz-frame, #cmp-frame { width:100%; border:0; display:block; min-height:70vh; }
+    .lb-filter-note { font-size:11px; color:var(--color-text-muted); margin:-8px 0 var(--space-4); }
 
     /* Generic card */
     .lb-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:var(--space-5); margin-bottom:var(--space-4); }
@@ -296,6 +297,7 @@
     <div class="lb-bar">
     <nav class="lb-tabs">
       <button class="lb-tab is-active" data-top="rankings">🏆 Rankings</button>
+      <button class="lb-tab" data-top="compare">⚔️ Compare</button>
       <button class="lb-tab" data-top="awards">🏅 Awards</button>
       <button class="lb-tab" data-top="nvz">📈 The NVZ</button>
       <button class="lb-tab" data-top="ladder">🪜 Ladder</button>
@@ -305,6 +307,11 @@
     <div class="lb-subseg is-active" data-subfor="rankings">
       <button class="lb-sub is-active" data-section="rankings">Players</button>
       <button class="lb-sub" data-section="leaders">🎯 Team Leaders</button>
+    </div>
+    <!-- Compare sub-toggle: players or teams (both live in one embedded frame) -->
+    <div class="lb-subseg" data-subfor="compare">
+      <button class="lb-sub is-active" data-section="pvp">Player vs Player</button>
+      <button class="lb-sub" data-section="tvt">Team vs Team</button>
     </div>
     <!-- Awards sub-toggle: Player of the Week vs Hot Streaks -->
     <div class="lb-subseg" data-subfor="awards">
@@ -342,6 +349,11 @@
       <div id="streaks-content"><div class="empty-state">Loading…</div></div>
     </section>
 
+    <!-- COMPARE (Player vs Player / Team vs Team — embedded, same page as the NVZ) -->
+    <section class="lb-section" data-section="compare">
+      <iframe id="cmp-frame" title="Compare players and teams" loading="lazy" scrolling="no"></iframe>
+    </section>
+
     <!-- THE NVZ (embedded analytics) -->
     <section class="lb-section" data-section="nvz">
       <iframe id="nvz-frame" title="The NVZ — deep stats" loading="lazy" scrolling="no"></iframe>
@@ -365,14 +377,14 @@
 
   const state = {
     circuit:'I', division:'', section:'rankings',
-    lastSub:{ rankings:'rankings', awards:'topchefs' },
+    lastSub:{ rankings:'rankings', compare:'pvp', awards:'topchefs' },
     filter:'all', genderFilter:'all', search:'', sort:'dsr', sortDir:'desc',
     playerStats:null, standings:null, potw:null
   };
   // Which top tab owns each content section.
-  const SECTION_TOP = { rankings:'rankings', leaders:'rankings', topchefs:'awards', streaks:'awards', nvz:'nvz', ladder:'ladder' };
-  const TOP_DEFAULT = { rankings:'rankings', awards:'topchefs', nvz:'nvz', ladder:'ladder' };
-  const KNOWN_SECTIONS = ['rankings','leaders','topchefs','streaks','nvz','ladder'];
+  const SECTION_TOP = { rankings:'rankings', leaders:'rankings', pvp:'compare', tvt:'compare', topchefs:'awards', streaks:'awards', nvz:'nvz', ladder:'ladder' };
+  const TOP_DEFAULT = { rankings:'rankings', compare:'pvp', awards:'topchefs', nvz:'nvz', ladder:'ladder' };
+  const KNOWN_SECTIONS = ['rankings','leaders','pvp','tvt','topchefs','streaks','nvz','ladder'];
   const LB_GENDER_COLOR = { M:'#6aa8ff', F:'#ff8fb3' };
   const lbGenderOf = p => /^f/i.test(p.gender||'') ? 'F' : /^m/i.test(p.gender||'') ? 'M' : null;
 
@@ -401,7 +413,7 @@
     const v = p.get('view');
     // Legacy redirects: society/standings → rankings, analytics → the NVZ.
     if (v) {
-      const legacy = { society:'rankings', standings:'rankings', analytics:'nvz' };
+      const legacy = { society:'rankings', standings:'rankings', analytics:'nvz', compare:'pvp' };
       state.section = legacy[v] || (KNOWN_SECTIONS.includes(v) ? v : 'rankings');
     }
     $('circuit-select').value  = state.circuit;
@@ -533,8 +545,29 @@
     });
     return m;
   }
+  // Which rating a game-type filter ranks by. "All games" → overall DSR. Women's /
+  // Men's → the gender-line DSR, Mixed → the Mixed DSR, each with its own rank and
+  // its own week-over-week movement. Returns null for "All games", and for seasons
+  // whose stats were built before the split ratings existed (those keep the overall
+  // ranking under every filter, as before).
+  function splitMode(filter) {
+    filter = filter || state.filter;
+    if (filter === 'all') return null;
+    if (!playerList().some(p => p.dsrGender != null || p.dsrMixed != null)) return null;
+    return filter === 'mixed'
+      ? { dsr:'dsrMixed', rank:'dsrMixedRank', hist:'xRank' }
+      : { dsr:'dsrGender', rank:'dsrGenderRank', hist:'gRank' };
+  }
+  // Movement within one split: last week's rank in that split minus today's.
+  function splitDelta(p, sm) {
+    const h = Array.isArray(p.dsrHistory) ? p.dsrHistory : [];
+    if (h.length < 2 || p[sm.rank] == null) return null;
+    const prev = h[h.length - 2][sm.hist];
+    return prev == null ? null : prev - p[sm.rank];
+  }
   function filteredPlayers(filter, searchQ) {
     filter = filter || state.filter;
+    const sm = splitMode(filter);
     searchQ = (searchQ !== undefined ? searchQ : state.search).toLowerCase();
     const gf = state.genderFilter || 'all';
     // Gendered game-type tabs (Women's / Men's) also restrict the player list:
@@ -549,13 +582,20 @@
         const s = filter === 'all'
           ? { played: p.gamesPlayed||0, won: p.gamesWon||0 }
           : (p.byType?.[filter] || { played:0, won:0 });
-        // PS / PA / DIFF and per-game averages are always season totals
-        const gp = p.gamesPlayed || 0;
-        const ps = p.ps || 0, pa = p.pa || 0, diff = (p.diff != null ? p.diff : ps - pa);
+        // PS / PA / DIFF and per-game averages: season totals on "All games"; on a
+        // game-type filter they cover that game type only (when the blob carries
+        // per-type points — older ones only have played/won, so fall back to totals).
+        const bt = sm ? (p.byType?.[filter] || { played:0, won:0, ps:0, pa:0, diff:0 }) : null;
+        const own = !!(bt && bt.ps != null && bt.pa != null);
+        const gp = own ? (bt.played || 0) : (p.gamesPlayed || 0);
+        const ps = own ? bt.ps : (p.ps || 0), pa = own ? bt.pa : (p.pa || 0);
+        const diff = own ? (bt.diff != null ? bt.diff : ps - pa) : (p.diff != null ? p.diff : ps - pa);
         return { ...p,
           _played: s.played, _won: s.won, _lost: s.played - s.won,
           _rate: s.played ? s.won/s.played : 0,
-          _dsr: p.composite,
+          _dsr: sm ? (p[sm.dsr] != null ? p[sm.dsr] : null) : p.composite,
+          _rank: sm ? (p[sm.rank] != null ? p[sm.rank] : null) : null,
+          _delta: sm ? splitDelta(p, sm) : p.rankDelta,
           _ps: ps, _pa: pa, _diff: diff,
           _aps: gp ? ps/gp : 0, _apa: gp ? pa/gp : 0, _avgDiff: gp ? diff/gp : 0,
         };
@@ -664,7 +704,8 @@
     const rankById = dsrRankMap();
     const gRankById = genderRankMap();
     const gf = state.genderFilter || 'all';
-    const isRanked = (p) => p._dsr != null && p.dsrQualified !== false;
+    const sm = splitMode();
+    const isRanked = (p) => sm ? p._rank != null : (p._dsr != null && p.dsrQualified !== false);
     const unqTag = ' <span style="display:inline-block;padding:1px 6px;border-radius:9999px;font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border:1px solid rgba(232,179,58,.45);color:#e8b33a;background:rgba(232,179,58,.10);vertical-align:middle;">Unqualified</span>';
     const rowHtml = (p) => {
       // Overall DSR rank + within-gender DSR rank, both stable across filters.
@@ -672,7 +713,10 @@
       const gOf = lbGenderOf(p);
       const gR = gRankById.get(p.playerId) ?? '—';
       let rankCell;
-      if (gf === 'all') {
+      if (sm) {
+        // This filter's own rank up top, overall rank underneath for reference.
+        rankCell = `<span class="rank-num">${p._rank != null ? p._rank : '—'}</span><br><span style="font-size:9px;font-weight:700;color:var(--color-text-faint)">#${oR} ov</span>`;
+      } else if (gf === 'all') {
         const sec = gOf ? `<span style="font-size:9px;font-weight:800;color:${LB_GENDER_COLOR[gOf]}">${gOf==='M'?'M':'W'}#${gR}</span>` : '';
         rankCell = `<span class="rank-num">${oR}</span>${sec?'<br>'+sec:''}`;
       } else {
@@ -683,7 +727,7 @@
       const tag = (!isRanked(p) && p._dsr != null) ? unqTag : '';
       return `<tr>
         <td>${rankCell}</td>
-        <td class="col-opt">${mvCell(p.rankDelta)}</td>
+        <td class="col-opt">${mvCell(p._delta)}</td>
         <td class="r"><span class="${p._dsr != null ? 'val-dsr' : 'val-zero'}">${dsr}</span></td>
         <td>
           <div class="player-cell">
@@ -706,7 +750,13 @@
     const rankedPlayers = players.filter(isRanked);
     const unqPlayers = players.filter(p => !isRanked(p));
     const need = state.playerStats && state.playerStats.needGames;
-    const dividerSub = need ? `Fewer than ${need} games played — rated, not yet ranked` : 'Rated, not yet ranked';
+    const flabel = state.filter === 'all' ? '' : SLOT_LABELS[state.filter];
+    const dividerSub = sm
+      ? `No ${flabel} doubles games yet${need ? `, or fewer than ${need} games overall` : ''}`
+      : (need ? `Fewer than ${need} games played — rated, not yet ranked` : 'Rated, not yet ranked');
+    const filterNote = sm
+      ? `<div class="lb-filter-note">Ranked by <b>${flabel} doubles DSR</b>. Rank, +/− and stats here are for ${flabel.toLowerCase()} doubles games only.</div>`
+      : '';
     let rows = rankedPlayers.map(rowHtml).join('');
     if (unqPlayers.length) {
       rows += `<tr class="rank-divider"><td colspan="14" style="padding:9px 8px;background:var(--color-surface-2);border-top:1px solid var(--color-border-strong);border-bottom:1px solid var(--color-border-strong);"><span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#e8b33a;">Not yet qualified</span> <span style="font-size:11px;color:var(--color-text-faint);margin-left:8px;">${dividerSub}</span></td></tr>`;
@@ -727,6 +777,7 @@
         </div>
       </div>
       <div class="lb-filter-row">${fbtns}</div>
+      ${filterNote}
       <div style="overflow-x:auto">
         <table class="rank-table">
           <thead><tr>
@@ -1162,9 +1213,27 @@
     f.dataset.season = season;
     f.src = '/the-nvz.html?embed=1&season=' + encodeURIComponent(season);
   }
+  // Compare tab: the same page, limited to Player vs Player + Team vs Team.
+  // The Players/Teams sub-toggle lives out here, so tell the frame which one to show.
+  function loadCmpFrame(tab) {
+    const f = $('cmp-frame'); if (!f) return;
+    const season = 'circuit-' + String(state.circuit || 'I').toLowerCase();
+    f.dataset.tab = tab;
+    if (f.dataset.season === season) { try { f.contentWindow.postMessage({ nvzShow: tab }, location.origin); } catch {} return; }
+    f.dataset.season = season;
+    f.src = '/the-nvz.html?embed=1&set=versus&tab=' + encodeURIComponent(tab) + '&season=' + encodeURIComponent(season);
+  }
   window.addEventListener('message', e => {
     const h = e.data && e.data.nvzHeight;
-    if (typeof h === 'number' && h > 0) { const f = $('nvz-frame'); if (f) f.style.height = (h + 8) + 'px'; }
+    if (typeof h !== 'number' || h <= 0) return;
+    // Two frames report their height; size whichever one sent this.
+    const f = [$('nvz-frame'), $('cmp-frame')].find(x => x && x.contentWindow === e.source) || $('nvz-frame');
+    if (!f) return;
+    f.style.height = (h + 8) + 'px';
+    // If a sub-toggle click landed before the frame was ready, it missed the message: resend.
+    if (f.id === 'cmp-frame' && e.data.nvzTab && f.dataset.tab && e.data.nvzTab !== f.dataset.tab) {
+      try { f.contentWindow.postMessage({ nvzShow: f.dataset.tab }, location.origin); } catch {}
+    }
   });
 
   // ── Section activation ───────────────────────────────────────────
@@ -1190,8 +1259,9 @@
     document.querySelectorAll('.lb-tab').forEach(b => b.classList.toggle('is-active', b.dataset.top === top));
     document.querySelectorAll('.lb-subseg').forEach(s => s.classList.toggle('is-active', s.dataset.subfor === top));
     document.querySelectorAll('.lb-sub').forEach(b => b.classList.toggle('is-active', b.dataset.section === section));
-    document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === section));
+    document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === section || (top === 'compare' && s.dataset.section === 'compare')));
     if (!skipWrite) writeUrl();
+    if (top === 'compare') { loadCmpFrame(section); return; }
     if (section === 'nvz') { loadNvzFrame(); return; }
     if (section === 'ladder') { loadLadderTab(); return; }
     ensureDataThenRender();
