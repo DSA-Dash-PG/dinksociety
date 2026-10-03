@@ -186,6 +186,9 @@
     var SEASON_ID = qs.get('season') || null;
     var WEEK = Number(qs.get('week')) || null;      // null → the API picks (tonight / next unfinished / last)
     var DATA = null, POLL = null, OPEN = {};        // OPEN: matchId → box score expanded
+    // ?match=<id> (the ticker and the home page link here): open that match and bring it into view once.
+    var FOCUS = qs.get('match') || null;
+    if (FOCUS) OPEN[FOCUS] = true;
 
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
     function shortName(n) { var p = String(n || '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[p.length - 1][0] : (p[0] || ''); }
@@ -407,6 +410,11 @@
       html += onCourt(d);
       if (allFinal && d.week) html += '<div class="sec"><h2 class="disp">The recap<small>how the night went</small></h2><a class="cta" href="/drop.html?edition=week-' + d.week + '">Read The Drop · Week ' + d.week + ' →</a></div>';
       $('lv-body').innerHTML = html;
+      if (FOCUS) {
+        var want = FOCUS; FOCUS = null;
+        var el = null; $('lv-body').querySelectorAll('.match').forEach(function (x) { if (x.dataset.id === want) el = x; });
+        if (el) setTimeout(function () { var y = el.getBoundingClientRect().top + window.pageYOffset - 90; window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); }, 60);
+      }
     }
 
     // ── interactions ──

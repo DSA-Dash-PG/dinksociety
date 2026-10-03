@@ -176,6 +176,13 @@
            d.matches.some(function (m) { return m.status === 'live'; });
   }
 
+  // Label for the link to the live board: it is only "live" while games are on.
+  function boardLabel(d) {
+    var ms = (d && d.matches) || [];
+    if (ms.length && ms.every(function (m) { return m.status === 'final'; })) return 'Full scores';
+    return ms.some(function (m) { return m.status === 'live'; }) ? 'Watch live' : 'Live board';
+  }
+
   // ---------- bottomline items ----------
   function matchItem(m) {
     var live = m.status === 'live';
@@ -185,7 +192,7 @@
     var hWin = s.h > s.a, aWin = s.a > s.h;
 
     if (deck) {
-      return '<a class="ds-tick-item" href="/team.html?match=' + esc(m.id) + '">' +
+      return '<a class="ds-tick-item" href="/live.html?match=' + esc(m.id) + '">' +
         '<span class="ct">' + esc(shortCourt(m)) + '</span>' +
         '<span class="emoji">' + esc(m.home.emoji || '') + '</span>' +
         '<span class="ds-tick-name">' + esc(m.home.name) + '</span>' +
@@ -195,7 +202,7 @@
         '<span class="fin">On deck</span>' +
       '</a>';
     }
-    return '<a class="ds-tick-item' + (live ? ' is-live' : '') + '" href="/team.html?match=' + esc(m.id) + '">' +
+    return '<a class="ds-tick-item' + (live ? ' is-live' : '') + '" href="/live.html?match=' + esc(m.id) + '">' +
       (live ? '<span class="ds-livedot"></span>' : '') +
       '<span class="ct">' + esc(shortCourt(m)) + '</span>' +
       '<span class="emoji">' + esc(m.home.emoji || '') + '</span>' +
@@ -255,6 +262,7 @@
       '<div class="ds-tick-brand"><span class="ds-livedot"></span>Dink Society<span class="lbl">LIVE</span></div>' +
       '<div class="ds-tick-meta">' + meta + '</div>' +
       '<div class="ds-tick-viewport"><div class="ds-tick-track">' + run + run + '</div></div>' +
+      '<a class="ds-tick-live" href="/live.html">' + esc(boardLabel(d)) + '</a>' +
       '<button class="ds-tick-close" type="button" aria-label="Hide live ticker">×</button>';
 
     // duration scales with content so speed stays constant regardless of slate size
@@ -314,7 +322,7 @@
         return deck ? '<span class="ds-lc-score" style="color:var(--color-text-faint);font-size:14px">–</span>'
                     : '<span class="ds-lc-score">' + v + '</span>';
       };
-      return '<a class="ds-lc-row" style="--accent:' + accents[i % accents.length] + '" href="/team.html?match=' + esc(m.id) + '">' +
+      return '<a class="ds-lc-row" style="--accent:' + accents[i % accents.length] + '" href="/live.html?match=' + esc(m.id) + '">' +
         '<span class="ds-lc-side' + (hWin ? ' win' : '') + '">' +
           '<span class="ds-lc-emoji">' + esc(m.home.emoji || '') + '</span>' +
           '<span class="ds-lc-name">' + esc(m.home.name) + '</span>' +
@@ -341,6 +349,7 @@
       '</div>' +
       '<div class="ds-lc-rows">' + rows + '</div>' +
       '<div class="ds-lc-foot">' +
+        '<a class="ds-lc-watch" href="/live.html">' + esc(boardLabel(d)) + '</a>' +
         '<a href="/schedule.html">Full schedule →</a>' +
         '<span class="ts">Updated ' + esc(timeAgo(d.updatedAt)) + '</span>' +
       '</div>';
@@ -353,6 +362,8 @@
     state.data = data;
     renderStrip(state.strip, data);
     renderCard(state.card, data);
+    // Tell the rest of the page (the nav's game-day pill) what tonight looks like.
+    try { document.dispatchEvent(new CustomEvent('ds:gameday', { detail: data })); } catch (e) {}
     // Host pages (e.g. /live) add their own surfaces. This must be a real
     // hook — reassigning DSTicker.render after mount() does NOT work, because
     // the poller closes over this function directly.

@@ -8,7 +8,7 @@
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <link rel="stylesheet" href="/css/shared-nav.css" />
   <!-- Resolves which season this page shows (?season= / ?circuit=, else the
@@ -31,376 +31,423 @@
 
   <style>
   /* ═══════════════════════════════════════════════════════════════
-     HOME — Weekly Recap  ("The Drop" template)
-     Scoped under #recap. Uses shared.css tokens.
+     HOME — the front page. Scoped under #recap, shared.css tokens.
+     Order: headline + cover photo → week bar → live card →
+     standings + players of the week → the night in numbers →
+     results → The Drop + week in pictures → title race → up next.
      ═══════════════════════════════════════════════════════════════ */
-  #recap{ --kchn-gold:#f0d020; --serif:'Newsreader',Georgia,serif; }
-  #recap a{ color:inherit; text-decoration:none; }
-  #recap .eyebrow{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--color-lime);}
-  #recap .eyebrow::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--color-lime);box-shadow:0 0 10px var(--color-lime);}
-  #recap .rc-h2{font-size:clamp(1.15rem,1rem+.7vw,1.5rem);font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;line-height:1;}
-  #recap .rc-h2 .lime{color:var(--color-lime);}
-  #recap .rc-more{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--color-lime);white-space:nowrap;}
+  /* :where keeps this at element-level weight, so the live card's own link colours (ticker.css) still win. */
+  :where(#recap) a{ color:inherit; text-decoration:none; }
+  #recap .lime{ color:var(--color-lime); }
+  #recap .hp-wrap{ max-width:var(--max-w); margin:0 auto; padding:0 var(--gutter); }
+  #recap .hp-stack{ display:flex; flex-direction:column; gap:36px; padding-top:28px; padding-bottom:64px; }
+  #recap [hidden]{ display:none !important; }
+  #recap .hp-h2{ margin:0; font-size:22px; font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:-.01em; line-height:1.05; color:var(--color-text); }
+  #recap .hp-h2--lg{ font-size:26px; }
+  #recap .hp-head{ display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:6px 16px; margin-bottom:14px; }
+  #recap .hp-head > span, #recap .hp-sub{ font-size:13px; color:var(--color-text-muted); }
+  #recap .hp-more{ font-size:13px; font-weight:700; color:var(--color-lime); white-space:nowrap; }
+  #recap .hp-more:hover{ text-decoration:underline; }
+  #recap .hp-card{ background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); }
+  #recap .hp-pill{ display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; padding:4px 10px; border-radius:var(--radius-full); background:var(--color-text); color:var(--color-bg); white-space:nowrap; }
+  #recap .hp-pill--lime{ background:var(--color-lime); color:var(--color-text-inverse); }
+  #recap .hp-pill--live{ background:var(--color-red); color:#0e0e0e; }
+  #recap .hp-pill--live i{ width:7px; height:7px; border-radius:50%; background:#0e0e0e; animation:hppulse 1.3s infinite; }
+  @keyframes hppulse{ 50%{ opacity:.3; } }
 
-  /* recap header strip */
-  #recap .recap-head{background:radial-gradient(900px 320px at 80% -20%,rgba(240,208,32,.08),transparent 60%);}
-  #recap .recap-head__in{max-width:var(--max-w);margin:0 auto;padding:96px var(--gutter) 4px;display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;}
-  #recap .recap-head h1{font-size:clamp(1.8rem,1rem+3vw,3rem);font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.02em;line-height:1;margin-top:12px;color:var(--color-text);}
-  #recap .recap-head h1 .lime{color:var(--color-lime);}
-  /* Preseason countdown (replaces "SEASON N STARTS <DATE>.") */
+  /* ── Hero ── */
+  #recap .hp-hero{ background:radial-gradient(900px 320px at 80% -20%,rgba(184,255,44,.07),transparent 60%); }
+  #recap .hp-hero__in{ padding-top:96px; padding-bottom:8px; display:flex; flex-wrap:wrap; gap:24px 36px; align-items:stretch; }
+  #recap .hp-hero__txt{ flex:999 1 480px; min-width:0; display:flex; flex-direction:column; justify-content:center; gap:14px; }
+  #recap .hp-eyebrow{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; }
+  #recap .hp-eyebrow .a{ color:var(--color-lime); } #recap .hp-eyebrow .b{ color:var(--color-text-muted); }
+  #recap .hp-hero h1{ margin:0; font-size:clamp(2.1rem,1rem + 4.2vw,3.75rem); line-height:.98; font-weight:900; font-style:italic; text-transform:uppercase; letter-spacing:-.02em; color:var(--color-text); overflow-wrap:anywhere; }
+  #recap .hp-lede{ margin:0; max-width:620px; font-size:17px; line-height:1.5; color:var(--color-text-muted); }
+  #recap .hp-lede b{ color:var(--color-text); font-weight:700; }
+  #recap .hp-hero__cta{ align-self:flex-start; display:inline-flex; align-items:center; height:46px; padding:0 22px; border-radius:var(--radius-full); background:var(--color-lime); color:var(--color-text-inverse); font-size:13px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+  #recap .hp-hero__pic{ flex:1 1 380px; min-width:0; aspect-ratio:4 / 3; min-height:220px; border-radius:var(--radius-lg); border:1px solid var(--color-border); background:var(--color-surface) center / cover no-repeat; display:block; position:relative; overflow:hidden; }
+  #recap .hp-hero__pic span{ position:absolute; left:12px; bottom:12px; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:#f0f0ec; background:rgba(0,0,0,.55); padding:5px 10px; border-radius:var(--radius-full); }
+  #recap .hp-heroact{ display:flex; flex-wrap:wrap; align-items:center; gap:14px 20px; }
+  #recap .hp-cdrow{ display:flex; gap:8px; flex:0 1 340px; min-width:240px; }
+  #recap .hp-cdrow div{ flex:1; background:var(--color-surface); border:1px solid var(--color-border-strong); border-radius:var(--radius-md); padding:12px 6px 10px; text-align:center; }
+  #recap .hp-cdrow b{ display:block; font-size:32px; line-height:1; font-weight:900; font-style:italic; font-variant-numeric:tabular-nums; color:var(--color-text); }
+  #recap .hp-cdrow small{ display:block; margin-top:6px; font-size:10px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--color-text-muted); }
+
+  /* Preseason countdown (before any week is final) */
   #recap .cd{display:flex;align-items:flex-end;justify-content:space-between;gap:22px 32px;flex-wrap:wrap;width:100%;}
-  #recap .cd__kick{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--color-teal);}
+  #recap .cd__kick{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--color-teal);margin-bottom:12px;}
   #recap .cd__dot{width:7px;height:7px;border-radius:50%;background:var(--color-teal);}
   #recap .cd__sub{margin-top:12px;font-size:13px;color:var(--color-text-muted);font-weight:600;}
   #recap .cd__clock{display:flex;align-items:flex-start;gap:8px;}
-  #recap .cd__unit{min-width:86px;background:var(--color-surface);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 10px 10px;text-align:center;}
+  #recap .cd__unit{min-width:86px;background:var(--color-surface);border:1px solid var(--color-border-strong);border-radius:14px;padding:12px 10px 10px;text-align:center;}
   #recap .cd__num{font-size:44px;font-weight:900;font-style:italic;letter-spacing:-.03em;line-height:1;font-variant-numeric:tabular-nums;color:var(--color-text);}
   #recap .cd__unit--sec .cd__num{color:var(--color-lime);}
-  #recap .cd__cap{margin-top:6px;font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--color-text-faint);}
+  #recap .cd__cap{margin-top:6px;font-size:9px;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:var(--color-text-muted);}
   #recap .cd__sep{font-size:34px;font-weight:900;color:var(--color-text-faint);padding-top:12px;}
   #recap .cd__clock.tick .cd__unit--sec{animation:cdtick .35s ease-out;}
   @keyframes cdtick{0%{border-color:var(--color-lime);box-shadow:0 0 0 3px rgba(184,255,44,.12);}100%{border-color:rgba(255,255,255,.14);box-shadow:none;}}
   #recap .cd.is-soon .cd__unit{border-color:rgba(184,255,44,.35);}
   #recap .cd.is-soon .cd__kick{color:var(--color-lime);}
-  #recap .cd.is-soon .cd__dot{background:var(--color-lime);animation:cdpulse 1.4s infinite;}
+  #recap .cd.is-soon .cd__dot{background:var(--color-lime);animation:hppulse 1.4s infinite;}
   #recap .cd__live{display:none;align-items:center;gap:10px;background:var(--color-lime);color:#0e0e0e;border-radius:9999px;padding:12px 22px;font-weight:900;font-style:italic;text-transform:uppercase;font-size:18px;letter-spacing:.02em;}
-  #recap .cd__live i{width:10px;height:10px;border-radius:50%;background:#0e0e0e;animation:cdpulse 1.2s infinite;}
+  #recap .cd__live i{width:10px;height:10px;border-radius:50%;background:#0e0e0e;animation:hppulse 1.2s infinite;}
   #recap .cd.is-live .cd__clock{display:none;}
   #recap .cd.is-live .cd__live{display:flex;}
-  @keyframes cdpulse{50%{opacity:.35;}}
-  @media(prefers-reduced-motion:reduce){#recap .cd *{animation:none!important;}}
+  @media(prefers-reduced-motion:reduce){#recap .cd *, #recap .hp-pill--live i{animation:none!important;}}
   @media(max-width:700px){#recap .cd__clock{width:100%;gap:6px;}#recap .cd__unit{flex:1;min-width:0;padding:10px 4px 8px;border-radius:12px;}#recap .cd__num{font-size:30px;}#recap .cd__sep{display:none;}#recap .cd__live{width:100%;justify-content:center;}}
-  #recap .weeknav{display:flex;gap:6px;flex-wrap:wrap;}
-  #recap .weeknav span{font-size:12px;font-weight:800;width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:9px;border:1px solid var(--color-border);color:var(--color-text-faint);cursor:pointer;transition:background .12s,color .12s,border-color .12s;}
-  #recap .weeknav span:not(.on):hover{border-color:var(--color-lime);color:var(--color-text);}
-  #recap .weeknav span.on{background:var(--color-lime);color:var(--color-text-inverse);border-color:var(--color-lime);}
 
-  /* TOP ROW: [POTW + DSR] | STANDINGS */
-  #recap .recap-top{max-width:var(--max-w);margin:0 auto;padding:24px var(--gutter) 8px;display:grid;grid-template-columns:minmax(0,.82fr) minmax(0,1.18fr);gap:18px;align-items:stretch;}
-  @media(max-width:1024px){#recap .recap-top{grid-template-columns:1fr;}}
-  #recap .recap-left{display:flex;flex-direction:column;gap:16px;min-width:0;}
-  #recap .potw{display:flex;flex-direction:column;}
-  #recap .dsr{display:flex;flex-direction:column;flex:1;}
-  #recap .standings-panel{display:flex;flex-direction:column;min-width:0;}
-  #recap .panel-head{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px;min-height:30px;}
-  #recap .presented{display:flex;align-items:center;gap:7px;}
-  #recap .presented small{font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--color-text-faint);}
+  /* ── Week bar: stays under the nav so the week can be changed from anywhere ── */
+  #recap .hp-weekbar{ position:sticky; top:var(--hp-top,65px); z-index:30; background:var(--color-bg); border-bottom:1px solid var(--color-border); margin-top:18px; }
+  #recap .hp-weekbar__in{ display:flex; align-items:center; gap:12px; padding-top:10px; padding-bottom:10px; }
+  #recap .hp-weekbar__lbl{ flex:0 0 auto; font-size:11px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--color-text-muted); }
+  #recap .weeknav{ display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; -webkit-overflow-scrolling:touch; padding:2px 0; }
+  #recap .weeknav::-webkit-scrollbar{ display:none; }
+  #recap .weeknav button{ flex:0 0 auto; height:40px; min-width:48px; padding:0 14px; border-radius:var(--radius-full); border:1px solid var(--color-border-strong); background:transparent; color:var(--color-text); font:inherit; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+  #recap .weeknav button:hover{ border-color:var(--color-lime); }
+  #recap .weeknav button.on{ background:var(--color-lime); border-color:var(--color-lime); color:var(--color-text-inverse); font-weight:800; }
+  #recap .weeknav button.nx{ border-style:dashed; color:var(--color-text-muted); }
+  #recap .weeknav button.nx.on{ border-style:solid; color:var(--color-text-inverse); }
+  #recap .hp-live{ padding-top:20px; }
 
-  /* POTW cards */
-  #recap .potw__cards{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;}
-  @media(max-width:560px){#recap .potw__cards{grid-template-columns:1fr;}}
-  #recap .pcard{position:relative;display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:linear-gradient(160deg,var(--color-surface),var(--color-bg));padding:15px 15px 14px;overflow:hidden;}
-  #recap .pcard::before{content:'';position:absolute;inset:0 0 auto 0;height:3px;}
-  #recap .pcard.m::before{background:var(--color-lime);}
-  #recap .pcard.f::before{background:var(--color-teal);}
-  #recap .pcard__cat{font-size:8.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);}
-  #recap .pcard__row{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:9px;flex:1;margin:8px 0 14px;}
-  #recap .pav{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900;flex-shrink:0;background:var(--color-surface-2);}
-  #recap .pcard.m .pav{border:2.5px solid var(--color-lime);color:var(--color-lime);box-shadow:0 0 0 4px var(--color-lime-dim);}
-  #recap .pcard.f .pav{border:2.5px solid var(--color-teal);color:var(--color-teal);box-shadow:0 0 0 4px rgba(23,215,176,.13);}
-  #recap .pcard__name{font-size:22px;font-weight:900;font-style:italic;text-transform:uppercase;letter-spacing:-.015em;line-height:1.0;color:var(--color-text);}
-  #recap .pcard__team{font-size:12px;color:var(--color-text-muted);}
-  #recap a.pname{color:inherit;text-decoration:none;transition:color var(--transition);}
-  #recap a.pname:hover{color:var(--color-teal);}
-  #recap a.ptm{color:inherit;text-decoration:none;}
-  #recap a.ptm:hover{color:var(--color-text);text-decoration:underline;}
-  #recap .pcard__stats{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px;}
-  #recap .pcard__stats > div{background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:11px;padding:12px 8px;text-align:center;}
-  #recap .pcard__stats .l{font-size:8.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:6px;}
-  #recap .pcard__stats .v{font-size:24px;font-weight:900;line-height:1;color:var(--color-text);}
-
-  /* MVP cards — Week 8 swaps the POTW pair for the Season MVPs */
-  #recap .pcard.mvp{border-color:rgba(240,192,64,.4);}
-  #recap .pcard.mvp::before{background:#f0c040;}
-  #recap .pcard.mvp.f2{border-color:rgba(230,225,213,.35);}
-  #recap .pcard.mvp.f2::before{background:#E6E1D5;}
-  #recap .pcard.mvp .pav{border:2.5px solid #f0c040;color:#f0c040;box-shadow:0 0 0 4px rgba(240,192,64,.14),0 0 22px rgba(240,192,64,.35);}
-  #recap .pcard.mvp.f2 .pav{border-color:#E6E1D5;color:#E6E1D5;box-shadow:0 0 0 4px rgba(230,225,213,.12),0 0 22px rgba(230,225,213,.3);}
-  #recap .pcard.mvp .pcard__cat{color:#f0c040;}
-  #recap .pcard.mvp.f2 .pcard__cat{color:#E6E1D5;}
-  #recap .pcard.mvp .mvp-crown{position:absolute;top:10px;left:12px;font-size:20px;filter:drop-shadow(0 0 8px rgba(240,192,64,.8));}
-  #recap .pcard__badge{position:absolute;top:12px;right:12px;font-size:9px;font-weight:900;font-style:italic;color:#f0c040;background:#000;border:1px solid rgba(240,192,64,.4);border-radius:6px;padding:3px 7px;}
-
-  /* Final-finish treatment on the home standings (mirrors the Playoffs tab) */
-  #recap .stand .fin-chip{display:inline-flex;align-items:center;gap:4px;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;border-radius:9999px;padding:2px 7px;margin-left:7px;vertical-align:middle;white-space:nowrap;background:var(--color-surface-2);color:var(--color-text-faint);border:1px solid var(--color-border);}
-  #recap .stand .fin-1{background:rgba(240,192,64,.16);color:#f0c040;border-color:rgba(240,192,64,.45);box-shadow:0 0 14px rgba(240,192,64,.35);}
-  #recap .stand .fin-2{background:rgba(207,211,200,.13);color:#cfd3c8;border-color:rgba(207,211,200,.4);box-shadow:0 0 10px rgba(207,211,200,.25);}
-  #recap .stand .fin-3{background:rgba(216,138,58,.14);color:#d88a3a;border-color:rgba(216,138,58,.42);box-shadow:0 0 10px rgba(216,138,58,.28);}
-  /* The finish tint is painted once across the whole ROW — putting it on the
-     cells restarts the gradient in every column and reads as banding. */
-  #recap .stand tr.fm1{background:linear-gradient(90deg,rgba(240,192,64,.13),rgba(240,192,64,.02) 60%,transparent);}
-  #recap .stand tr.fm2{background:linear-gradient(90deg,rgba(207,211,200,.11),rgba(207,211,200,.02) 60%,transparent);}
-  #recap .stand tr.fm3{background:linear-gradient(90deg,rgba(216,138,58,.12),rgba(216,138,58,.02) 60%,transparent);}
-  #recap .stand tr.fm1 td,#recap .stand tr.fm2 td,#recap .stand tr.fm3 td{background:transparent;}
-  #recap .stand tr.fm1 td:first-child{box-shadow:inset 3px 0 0 #f0c040;}
-  #recap .stand tr.fm2 td:first-child{box-shadow:inset 3px 0 0 #cfd3c8;}
-  #recap .stand tr.fm3 td:first-child{box-shadow:inset 3px 0 0 #d88a3a;}
-  @media(prefers-reduced-motion:no-preference){
-    #recap .stand .fin-1{animation:homeChamp 2.6s ease-in-out infinite;}
-    @keyframes homeChamp{0%,100%{box-shadow:0 0 8px rgba(240,192,64,.25);}50%{box-shadow:0 0 18px rgba(240,192,64,.6);}}
+  /* ── Standings + Players of the Week ── */
+  #recap .hp-top{ display:flex; flex-wrap:wrap; gap:24px; align-items:stretch; }
+  #recap .hp-stand{ flex:999 1 520px; min-width:0; display:flex; flex-direction:column; }
+  #recap .hp-perf{ flex:1 1 380px; min-width:0; display:flex; flex-direction:column; }
+  #recap .hp-st{ flex:1; padding:6px 18px 14px; }
+  #recap .hp-st__row{ display:flex; align-items:center; gap:10px; padding:11px 0; border-bottom:1px solid var(--color-divider); font-size:14px; font-variant-numeric:tabular-nums; color:var(--color-text); }
+  #recap .hp-st__row.hd{ padding:10px 0; border-bottom-color:var(--color-border-strong); font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--color-text-muted); }
+  #recap .hp-st .c-rk{ flex:0 0 18px; font-weight:900; font-size:16px; }
+  #recap .hp-st .hd .c-rk{ font-size:10px; }
+  #recap .hp-st .c-mv{ flex:0 0 30px; font-size:12px; font-weight:800; color:var(--color-text-muted); }
+  #recap .hp-st .c-mv.up{ color:var(--color-lime); } #recap .hp-st .c-mv.dn{ color:var(--color-red); }
+  #recap .hp-st .c-team{ flex:1; min-width:0; display:flex; align-items:center; gap:10px; }
+  #recap .hp-st .c-team a.tname{ font-weight:800; overflow-wrap:break-word; }
+  #recap .hp-st .c-team a.tname:hover{ color:var(--color-lime); }
+  #recap .hp-st .c-rec{ flex:0 0 52px; text-align:right; color:var(--color-text-muted); }
+  #recap .hp-st .c-pts{ flex:0 0 34px; text-align:right; font-weight:900; font-size:18px; }
+  #recap .hp-st .hd .c-pts{ font-size:10px; }
+  #recap .hp-st .c-gm{ flex:0 0 50px; text-align:right; color:var(--color-text-muted); }
+  #recap .hp-st .c-df{ flex:0 0 46px; text-align:right; font-weight:800; }
+  #recap .hp-st .c-df.pos{ color:var(--color-lime); } #recap .hp-st .c-df.neg{ color:var(--color-red); }
+  #recap .hp-st .hd .c-df{ font-weight:800; }
+  #recap .hp-st .c-form{ flex:0 0 82px; display:flex; justify-content:flex-end; gap:4px; }
+  #recap .hp-st .hd .c-form{ display:block; text-align:right; }
+  #recap .hp-form{ width:22px; height:22px; border-radius:6px; box-sizing:border-box; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; font-style:normal; border:1px solid var(--color-border-strong); background:var(--color-surface-2,rgba(128,128,128,.14)); color:var(--color-text-muted); }
+  #recap .hp-form.w{ background:var(--color-lime); border-color:var(--color-lime); color:var(--color-text-inverse); }
+  #recap .hp-form.t{ background:transparent; border-color:var(--color-text-muted); color:var(--color-text); }
+  #recap .hp-st__note{ padding-top:12px; font-size:12px; line-height:1.5; color:var(--color-text-muted); }
+  #recap .hp-st__row.fm1{ box-shadow:inset 3px 0 0 #f0c040; padding-left:10px; }
+  #recap .hp-st__row.fm2{ box-shadow:inset 3px 0 0 #cfd3c8; padding-left:10px; }
+  #recap .hp-st__row.fm3{ box-shadow:inset 3px 0 0 #d88a3a; padding-left:10px; }
+  #recap .fin-chip{ display:inline-flex; align-items:center; font-size:9px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; border-radius:9999px; padding:2px 8px; white-space:nowrap; background:var(--color-surface-2,rgba(128,128,128,.14)); color:var(--color-text-muted); border:1px solid var(--color-border); }
+  #recap .fin-1{ background:rgba(240,192,64,.16); color:#f0c040; border-color:rgba(240,192,64,.45); }
+  #recap .fin-2{ background:rgba(207,211,200,.13); color:#cfd3c8; border-color:rgba(207,211,200,.4); }
+  #recap .fin-3{ background:rgba(216,138,58,.14); color:#d88a3a; border-color:rgba(216,138,58,.42); }
+  #recap .wpill{ display:inline-block; font-size:9px; font-weight:900; letter-spacing:.06em; text-transform:uppercase; color:var(--color-text-inverse); background:var(--color-lime); border-radius:var(--radius-full); padding:2px 7px; white-space:nowrap; }
+  /* Phones: W–L–T and Games drop out and the rest tightens, so the team name keeps whole words. */
+  @media(max-width:600px){
+    #recap .hp-st{ padding:6px 14px 12px; } #recap .hp-st .c-rec, #recap .hp-st .c-gm, #recap .wpill{ display:none; }
+    #recap .hp-st__row{ gap:6px; font-size:13px; } #recap .hp-st .c-rk{ flex-basis:14px; } #recap .hp-st .c-mv{ flex-basis:24px; font-size:11px; }
+    #recap .hp-st .c-team{ gap:8px; } #recap .hp-st .c-team .hp-tb{ width:28px !important; height:28px !important; font-size:15px !important; }
+    #recap .hp-st .c-pts{ flex-basis:26px; } #recap .hp-st .c-df{ flex-basis:40px; } #recap .hp-st .c-form{ flex-basis:60px; gap:3px; } #recap .hp-form{ width:18px; height:18px; font-size:10px; border-radius:5px; }
+    #recap .hp-weekbar__lbl{ display:none; }
   }
 
-  /* Tabbed performers (POTW / DSR / Best Diff / Most Pts) */
-  #recap .perftabs{display:flex;gap:4px;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:11px;padding:3px;margin-bottom:12px;}
-  #recap .perftabs button{flex:1 1 0;min-width:0;font-family:inherit;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.01em;color:var(--color-text-muted);background:none;border:0;padding:8px 2px;border-radius:8px;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  /* Team badge: photo, else emoji, else initial */
+  #recap .hp-tb{ flex:0 0 auto; border-radius:50%; overflow:hidden; display:inline-flex; align-items:center; justify-content:center; font-weight:900; font-style:normal; line-height:1; color:#0e0e0e; background:var(--color-surface-2,rgba(128,128,128,.14)); border:1px solid var(--color-border-strong); box-sizing:border-box; }
+  #recap .hp-tb img{ width:100%; height:100%; object-fit:cover; display:block; }
+  #recap .hp-tb.emo{ color:var(--color-text); }
+
+  /* Performers: tabs + photo-led Players of the Week */
+  #recap .perftabs{display:flex;gap:4px;background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-full);padding:4px;margin-bottom:12px;}
+  #recap .perftabs button{flex:1 1 0;min-width:0;font-family:inherit;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.02em;color:var(--color-text-muted);background:none;border:0;padding:10px 2px;border-radius:var(--radius-full);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   #recap .perftabs button:hover{color:var(--color-text);}
   #recap .perftabs button.on{background:var(--color-lime);color:var(--color-text-inverse);}
+  #recap .perfwrap{ flex:1; display:flex; flex-direction:column; }
   #recap .perfpanel{display:none;}
-  /* active panel sets the shared height; columns + rows stretch to fill (no dead space) */
-  #recap .perfpanel.on{display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;min-height:392px;}
-  @media(max-width:560px){#recap .perfpanel.on{grid-template-columns:1fr;}}
-  #recap .perf-col{display:flex;flex-direction:column;min-width:0;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface-2);padding:12px 12px 10px;}
-  #recap .perf-col h4{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);margin:0 0 2px;}
+  #recap .perfpanel.on{flex:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch;min-height:360px;}
+  #recap .hp-pw{ display:flex; flex-direction:column; overflow:hidden; background:var(--color-surface); border:1px solid rgba(184,255,44,.45); border-radius:var(--radius-lg); min-width:0; }
+  #recap .hp-pw.f{ border-color:rgba(23,215,176,.5); }
+  #recap .hp-pw.mvp{ border-color:rgba(240,192,64,.5); }
+  #recap .hp-pw__pic{ position:relative; flex:1; min-height:190px; display:flex; align-items:center; justify-content:center; background:var(--color-surface-2,rgba(128,128,128,.14)); overflow:hidden; }
+  #recap .hp-pw__pic img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 20%; }
+  #recap .hp-pw__ini{ font-size:54px; font-weight:900; font-style:italic; color:var(--color-lime); opacity:.8; }
+  #recap .hp-pw.f .hp-pw__ini{ color:var(--color-teal); } #recap .hp-pw.mvp .hp-pw__ini{ color:#f0c040; }
+  #recap .hp-pw__cat{ position:absolute; left:10px; top:10px; z-index:1; font-size:10px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#0e0e0e; background:var(--color-lime); padding:4px 9px; border-radius:var(--radius-full); }
+  #recap .hp-pw.f .hp-pw__cat{ background:var(--color-teal); } #recap .hp-pw.mvp .hp-pw__cat{ background:#f0c040; }
+  #recap .hp-pw__body{ display:flex; flex-direction:column; gap:4px; padding:14px; }
+  #recap .hp-pw__name{ font-size:17px; line-height:1.15; font-weight:900; font-style:italic; text-transform:uppercase; color:var(--color-text); overflow-wrap:anywhere; }
+  #recap .hp-pw__team{ font-size:13px; color:var(--color-text-muted); }
+  #recap .hp-pw__stats{ margin-top:6px; display:flex; flex-wrap:wrap; gap:4px 12px; font-size:13px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--color-text); }
+  #recap .hp-pw__stats .hot{ color:var(--color-lime); }
+  #recap a.pname:hover{ color:var(--color-lime); } #recap a.ptm:hover{ text-decoration:underline; }
+  #recap .perf-col{display:flex;flex-direction:column;min-width:0;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:14px 12px 10px;}
+  #recap .perf-col h4{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-muted);margin:0 0 2px;}
   #recap .prow{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid var(--color-divider);flex:1 1 0;min-height:0;}
   #recap .prow:first-of-type{border-top:none;}
-  #recap .prk{font-size:12px;font-weight:900;color:var(--color-text-faint);width:14px;flex-shrink:0;}
+  #recap .prk{font-size:12px;font-weight:900;color:var(--color-text-muted);width:14px;flex-shrink:0;}
   #recap .prow.lead .prk{color:var(--color-gold);}
-  #recap .prow-av{width:30px;height:30px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:var(--color-surface-3);color:var(--color-text-muted);overflow:hidden;border:1.5px solid var(--color-border);}
+  #recap .prow-av{width:32px;height:32px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;background:var(--color-surface-2,rgba(128,128,128,.14));color:var(--color-text-muted);overflow:hidden;border:1.5px solid var(--color-border);}
   #recap .perf-col.m .prow-av{border-color:rgba(184,255,44,.45);}
   #recap .perf-col.f .prow-av{border-color:rgba(23,215,176,.45);}
   #recap .pinfo{min-width:0;flex:1;}
   #recap .pnm{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--color-text);}
-  #recap .ptm{font-size:10px;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #recap .ptm{font-size:11px;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   #recap .pval{margin-left:auto;font-size:15px;font-weight:900;flex-shrink:0;}
   #recap .perf-col.m .pval{color:var(--color-lime);}
   #recap .perf-col.f .pval{color:var(--color-teal);}
-  #recap .pcard.m .v.hot{color:var(--color-lime);}
-  #recap .pcard.f .v.hot{color:var(--color-teal);}
+  @media(max-width:420px){ #recap .perfpanel.on{ gap:8px; } #recap .hp-pw__body{ padding:12px 10px; } #recap .hp-pw__name{ font-size:15px; } }
 
-  /* DSR top-3 */
-  #recap .dsr__cols{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:12px;align-items:stretch;}
-  @media(max-width:560px){#recap .dsr__cols{grid-template-columns:1fr;}}
-  #recap .dsr-col{display:flex;flex-direction:column;border:1px solid var(--color-border);border-radius:var(--radius-lg);background:var(--color-surface);padding:13px 13px 6px;}
-  #recap .dsr-col h4{font-size:9.5px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--color-text-faint);margin-bottom:4px;}
-  #recap .drow{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid var(--color-divider);flex:1;min-height:0;}
-  #recap .drow:first-of-type{border-top:none;}
-  #recap .drk{font-size:12px;font-weight:900;color:var(--color-text-faint);width:14px;flex-shrink:0;}
-  #recap .drow.lead .drk{color:var(--color-gold);}
-  #recap .dinfo{min-width:0;}
-  #recap .dnm{font-weight:800;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--color-text);}
-  #recap .dtm{font-size:10px;color:var(--color-text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  #recap .dval{margin-left:auto;font-size:15px;font-weight:900;flex-shrink:0;}
-  #recap .dsr-col.m .dval{color:var(--color-lime);}
-  #recap .dsr-col.f .dval{color:var(--color-teal);}
+  /* ── Season leaders (top 10 × DSR, Diff, Points) ── */
+  #recap .hp-seg{ display:flex; gap:6px; margin-bottom:14px; }
+  #recap .hp-seg button{ height:40px; padding:0 16px; border-radius:var(--radius-full); border:1px solid var(--color-border-strong); background:transparent; color:var(--color-text-muted); font:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  #recap .hp-seg button.on{ background:var(--color-lime); border-color:var(--color-lime); color:var(--color-text-inverse); font-weight:800; }
+  #recap .hp-leads{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+  #recap .hp-lead{ padding:16px 16px 8px; min-width:0; }
+  #recap .hp-lead h3{ margin:0; font-size:15px; font-weight:900; font-style:italic; text-transform:uppercase; color:var(--color-text); }
+  #recap .hp-lead > p{ margin:3px 0 8px; font-size:12px; line-height:1.4; color:var(--color-text-muted); }
+  #recap .hp-lead .prow{ flex:0 0 auto; padding:9px 0; }
+  #recap .hp-lead .prow:first-of-type{ border-top:1px solid var(--color-divider); }
+  #recap .hp-lead .prk{ width:18px; text-align:right; }
+  #recap .hp-lead .pval{ color:var(--color-text); font-variant-numeric:tabular-nums; }
+  #recap .hp-lead .prow.lead .pval{ color:var(--color-lime); }
+  #recap .hp-lead .pval small{ display:block; font-size:10px; font-weight:800; text-align:right; color:var(--color-text-muted); }
+  #recap .hp-lead .pval small.up{ color:var(--color-lime); } #recap .hp-lead .pval small.dn{ color:var(--color-red); }
+  /* Phones: the three lists become one swipeable row so the page does not grow by thirty rows. */
+  @media(max-width:860px){ #recap .hp-leads{ display:flex; overflow-x:auto; scroll-snap-type:x mandatory; -webkit-overflow-scrolling:touch; scrollbar-width:none; } #recap .hp-leads::-webkit-scrollbar{ display:none; } #recap .hp-lead{ flex:0 0 84%; scroll-snap-align:start; } }
 
-  /* STANDINGS (top-right) */
-  #recap .stand-wrap{border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;}
-  #recap table.stand{width:100%;border-collapse:collapse;font-size:13.5px;}
-  #recap table.stand th{font-size:9.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-text-faint);text-align:center;padding:11px 8px;background:var(--color-surface);white-space:nowrap;}
-  #recap table.stand th.l,#recap table.stand td.l{text-align:left;}
-  #recap table.stand td{padding:13px 8px;border-top:1px solid var(--color-divider);text-align:center;white-space:nowrap;color:var(--color-text);}
-  #recap table.stand tr.leader td{background:rgba(240,192,64,.05);}
-  #recap .c-rank{font-weight:900;color:var(--color-text-faint);width:28px;}
-  #recap tr.medal .c-rank{color:var(--color-gold);}
-  #recap .c-delta{color:var(--color-text-faint);font-weight:700;}
-  #recap .c-team{font-weight:800;font-style:italic;}
-  #recap .c-team .e{margin-right:7px;font-size:17px;font-style:normal;}
-  #recap .c-team a{color:inherit;text-decoration:none;transition:color var(--transition);}
-  #recap .c-team a:hover{color:var(--color-teal);}
-  #recap .c-pts{font-weight:900;color:var(--color-lime);}
-  #recap .c-pts.zero{color:var(--color-text-faint);}
-  #recap .c-muted{color:var(--color-text-muted);}
-  #recap .c-diff-pos{color:var(--color-lime);font-weight:800;}
-  #recap .c-diff-neg{color:var(--color-red);font-weight:800;}
-  #recap .wpill{display:inline-block;font-size:8px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:#06140a;background:var(--color-lime);border-radius:var(--radius-full);padding:2px 6px;margin-left:7px;vertical-align:middle;}
-  #recap .stand-note{font-size:11px;color:var(--color-text-faint);margin-top:10px;line-height:1.6;}
-  #recap .stand-note b{color:var(--color-text-muted);}
-  @media(max-width:760px){#recap .col-opt{display:none;}#recap table.stand th,#recap table.stand td{padding:12px 7px;}#recap .c-team .e{font-size:15px;margin-right:5px;}#recap .wpill{display:none;}}
-  /* phones: every column (incl. +/−) must fit without sideways scrolling */
-  @media(max-width:480px){#recap table.stand th,#recap table.stand td{padding:12px 4px;}#recap table.stand td.c-team{white-space:normal;}#recap .c-team .e{margin-right:4px;}}
+  /* ── The night in numbers ── */
+  #recap .hp-nums{ display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:10px; }
+  #recap .hp-num{ padding:16px; border-radius:var(--radius-md); }
+  #recap .hp-num b{ display:block; font-size:34px; line-height:1; font-weight:900; font-variant-numeric:tabular-nums; color:var(--color-text); }
+  #recap .hp-num b small{ font-size:15px; font-weight:700; color:var(--color-text-muted); }
+  #recap .hp-num.hot b{ color:var(--color-lime); }
+  #recap .hp-num span{ display:block; margin-top:8px; font-size:13px; line-height:1.4; color:var(--color-text-muted); }
 
-  /* THE DROP editorial */
-  #recap .drop{border-top:1px solid var(--color-border);border-bottom:1px solid var(--color-border);background:linear-gradient(180deg,var(--color-surface),var(--color-bg));margin-top:26px;}
-  #recap .drop__in{max-width:var(--max-w);margin:0 auto;padding:46px var(--gutter);display:grid;grid-template-columns:1.4fr .9fr;gap:40px;align-items:center;}
-  @media(max-width:820px){#recap .drop__in{grid-template-columns:1fr;gap:26px;}}
-  #recap .drop__kicker{display:inline-flex;align-items:center;gap:9px;font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--color-lime);}
-  #recap .drop__kicker::before{content:'';width:8px;height:8px;border-radius:50%;background:var(--color-lime);box-shadow:0 0 10px var(--color-lime);}
-  #recap .drop h2{font-family:var(--serif);font-weight:500;font-size:clamp(1.8rem,1rem+3vw,3rem);line-height:1.05;letter-spacing:-.01em;margin:14px 0 16px;color:var(--color-text);}
-  #recap .drop h2 em{font-style:italic;color:var(--color-lime);}
-  #recap .drop__byline{font-size:12px;color:var(--color-text-faint);margin-bottom:18px;}
-  #recap .drop__byline b{color:var(--color-text-muted);font-weight:700;}
-  #recap .drop__excerpt{font-family:var(--serif);font-size:17px;line-height:1.6;color:var(--color-text-muted);}
-  #recap .drop__excerpt p{margin-bottom:13px;}
-  #recap .drop__excerpt .dropcap::first-letter{float:left;font-weight:700;font-size:54px;line-height:.74;padding:6px 10px 0 0;color:var(--color-lime);}
-  #recap .drop__read{display:inline-flex;align-items:center;gap:8px;margin-top:6px;font-family:'Inter',sans-serif;font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--color-text-inverse);background:var(--color-lime);padding:12px 22px;border-radius:var(--radius-full);}
-  #recap .drop__aside{border:1px solid var(--color-border);border-radius:var(--radius-lg);overflow:hidden;background:var(--color-surface);}
-  #recap .drop__cover{height:140px;background:radial-gradient(400px 200px at 30% 20%,rgba(184,255,44,.22),transparent 60%),radial-gradient(300px 180px at 90% 90%,rgba(23,215,176,.18),transparent 60%),linear-gradient(135deg,#13361f,var(--color-bg));display:flex;align-items:flex-end;padding:14px;}
-  #recap .drop__cover span{font-size:10px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--color-text);background:rgba(0,0,0,.4);padding:5px 10px;border-radius:var(--radius-full);}
-  #recap .drop__aside h4{font-size:13px;font-weight:800;padding:15px 16px 6px;color:var(--color-text);}
-  #recap .drop__aside ul{list-style:none;padding:0 16px 15px;margin:0;}
-  #recap .drop__aside li{font-size:13px;color:var(--color-text-muted);padding:8px 0;border-top:1px solid var(--color-divider);display:flex;gap:8px;}
-  #recap .drop__aside li::before{content:'—';color:var(--color-lime);}
-
-  #recap .rc-empty{max-width:var(--max-w);margin:0 auto;padding:60px var(--gutter);text-align:center;color:var(--color-text-faint);font-size:14px;}
-
-  /* THIS WEEK — schedule strip */
-  #recap .dweek{max-width:var(--max-w);margin:0 auto;padding:24px var(--gutter) 8px;}
-  #recap .dweek__head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;}
-  #recap .dweek__date{font-size:12px;color:var(--color-text-faint);margin-top:4px;}
-  #recap .dweek-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
-  @media(max-width:900px){#recap .dweek-grid{grid-template-columns:1fr;}}
-  #recap .dwc{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius-lg,14px);padding:14px 14px 12px;display:flex;flex-direction:column;}
-  #recap .dwc.is-final{border-color:var(--color-border-strong);}
-  #recap .dwc__top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
-  #recap .dwc__court{display:inline-flex;align-items:center;gap:7px;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--color-text-muted);}
-  #recap .dwc__cdot{width:7px;height:7px;border-radius:50%;background:var(--color-text-faint);}
-  #recap .dwc__badge{font-size:10px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:var(--radius-full);}
-  #recap .dwc__badge.b-final{background:var(--color-lime-dim);color:var(--color-lime);}
-  #recap .dwc__badge.b-up{background:var(--color-surface-3);color:var(--color-text-muted);}
-  #recap .dwc__badge.b-live{background:var(--color-red-dim);color:var(--color-red);display:inline-flex;align-items:center;gap:5px;}
-  #recap .dwc__badge.b-live .ld{width:6px;height:6px;border-radius:50%;background:var(--color-red);animation:dwpulse 1.4s infinite;}
-  @keyframes dwpulse{0%,100%{opacity:1}50%{opacity:.3}}
-  #recap .dwc__row{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;}
-  #recap .dwc__side{display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;min-width:0;}
-  #recap .dwc__seed{font-size:9px;font-weight:800;letter-spacing:.1em;color:var(--color-text-faint);}
-  #recap .dwc__logo{font-size:26px;line-height:1;}
-  #recap .dwc__logo--mono{width:34px;height:34px;border-radius:50%;background:var(--color-surface-3);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:var(--color-text-muted);}
-  #recap .dwc__team{font-size:12px;font-weight:700;color:var(--color-text);line-height:1.2;}
-  #recap .dwc__team.is-win{color:var(--color-lime);}
-  #recap a.dwc__team:hover{text-decoration:underline;}
-  #recap .dwc__center{display:flex;flex-direction:column;align-items:center;gap:2px;padding:0 4px;}
-  #recap .dwc__tally{font-size:20px;font-weight:900;color:var(--color-text);letter-spacing:.02em;white-space:nowrap;}
-  #recap .dwc__tally .w{color:var(--color-lime);}
-  #recap .dwc__tally .d{color:var(--color-text-faint);margin:0 3px;}
-  #recap .dwc__sub{font-size:10px;color:var(--color-text-faint);}
-  #recap .dwc__result{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--color-text-muted);}
-  #recap .dwc__result.tie{color:var(--color-gold);}
-  #recap .dwc__vs{font-size:13px;font-weight:900;color:var(--color-text-faint);letter-spacing:.08em;}
-  #recap .dwc__start{font-size:10px;color:var(--color-text-faint);}
-  #recap .dwc__toggle{margin-top:12px;background:none;border:0;border-top:1px solid var(--color-border);padding:9px 0 2px;width:100%;cursor:pointer;font-size:11px;font-weight:700;color:var(--color-lime);display:flex;align-items:center;justify-content:center;gap:6px;}
-  #recap .dwc__toggle .chev{transition:transform .2s;}
-  #recap .dwc.is-open .dwc__toggle .chev{transform:rotate(180deg);}
-  #recap .dwc__scores{display:none;margin-top:8px;}
-  #recap .dwc.is-open .dwc__scores{display:block;}
-  #recap .dwg{padding:12px;text-align:center;font-size:12px;color:var(--color-text-faint);}
-  /* Game-by-game box score — same component as the Schedule page (rounds, pairs, winner in lime) */
+  /* ── Results ── */
+  #recap .hp-grid3{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; }
+  #recap .hp-res{ overflow:hidden; display:flex; flex-direction:column; min-width:0; }
+  #recap .hp-res__pic{ display:block; aspect-ratio:16 / 9; background:var(--color-surface-2,rgba(128,128,128,.14)) center / cover no-repeat; }
+  #recap .hp-res__pic--art{ display:flex; align-items:center; justify-content:center; gap:28px; }
+  #recap .hp-res__body{ padding:18px 20px 16px; display:flex; flex-direction:column; gap:14px; flex:1; }
+  #recap .hp-res__top{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--color-text-muted); }
+  #recap .hp-res__teams{ display:flex; flex-direction:column; gap:10px; }
+  #recap .hp-res__t{ display:flex; align-items:center; gap:10px; }
+  #recap .hp-res__t a, #recap .hp-res__t .tn{ flex:1; min-width:0; font-size:17px; font-weight:600; color:var(--color-text-muted); overflow-wrap:anywhere; }
+  #recap .hp-res__t b{ font-size:34px; line-height:1; font-weight:900; font-variant-numeric:tabular-nums; color:var(--color-text-muted); }
+  #recap .hp-res__t.win a, #recap .hp-res__t.win .tn{ font-weight:800; color:var(--color-text); }
+  #recap .hp-res__t.win b{ color:var(--color-lime); }
+  #recap .hp-res__t.tie a, #recap .hp-res__t.tie .tn{ font-weight:700; color:var(--color-text); } #recap .hp-res__t.tie b{ color:var(--color-text); }
+  #recap .hp-res__t a:hover{ text-decoration:underline; }
+  #recap .hp-res__stats{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding-top:14px; border-top:1px solid var(--color-border); }
+  #recap .hp-res__stats small{ display:block; font-size:11px; color:var(--color-text-muted); }
+  #recap .hp-res__stats b{ display:block; font-size:15px; font-weight:800; font-variant-numeric:tabular-nums; color:var(--color-text); }
+  #recap .hp-res__note{ margin:0; font-size:14px; line-height:1.45; color:var(--color-text-muted); }
+  #recap .hp-res__tog{ margin-top:auto; background:none; border:0; border-top:1px solid var(--color-border); padding:12px 0 2px; width:100%; min-height:44px; cursor:pointer; font:inherit; font-size:13px; font-weight:700; color:var(--color-lime); display:flex; align-items:center; justify-content:space-between; gap:6px; }
+  #recap .hp-res__tog svg{ transition:transform .2s; }
+  #recap .hp-res.is-open .hp-res__tog svg{ transform:rotate(180deg); }
+  #recap .hp-res__scores{ display:none; }
+  #recap .hp-res.is-open .hp-res__scores{ display:block; }
+  #recap .dwg{padding:12px;text-align:center;font-size:12px;color:var(--color-text-muted);}
+  /* Game-by-game box score — same component as the Schedule page */
   #recap .m-round{margin-top:12px;}
   #recap .m-round-head{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
   #recap .m-round-label{font-size:9.5px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--color-bg);background:var(--color-lime);padding:3px 9px;border-radius:9999px;}
   #recap .m-round-label.r2{background:var(--color-surface);color:var(--color-text-muted);border:1px solid var(--color-border);}
   #recap .m-games{border:1px solid var(--color-divider, var(--color-border));border-radius:8px;overflow:hidden;}
   #recap .m-game{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:8px;padding:7px 9px;font-size:11.5px;}
-  #recap .m-game:nth-child(odd){background:var(--color-surface);}
+  #recap .m-game:nth-child(odd){background:var(--color-bg);}
   #recap .m-game .pl{display:flex;flex-direction:column;gap:3px;min-width:0;color:var(--color-text-muted);line-height:1.25;}
   #recap .m-game .pl.right{align-items:flex-end;text-align:right;}
   #recap .m-game .pl a{color:var(--color-text-muted);font-weight:600;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-decoration:underline;text-decoration-color:rgba(128,128,128,0.4);text-underline-offset:3px;}
   #recap .m-game .pl a:hover{color:var(--color-text);}
   #recap .m-game .pl.is-winner a{color:var(--color-lime);font-weight:700;text-decoration-color:rgba(184,255,44,0.45);}
   #recap .m-game .mid{display:flex;flex-direction:column;align-items:center;min-width:56px;}
-  #recap .m-game .gtype{font-size:8px;font-weight:800;letter-spacing:0.06em;color:var(--color-text-faint);}
+  #recap .m-game .gtype{font-size:8px;font-weight:800;letter-spacing:0.06em;color:var(--color-text-muted);}
   #recap .m-game .gnum{font-weight:800;font-variant-numeric:tabular-nums;font-size:13px;white-space:nowrap;}
   #recap .m-game .gnum .w{color:var(--color-lime);}
-  #recap .m-game .gnum .l{color:var(--color-text-faint);}
+  #recap .m-game .gnum .l{color:var(--color-text-muted);}
   #recap .m-game .gnum .dash{color:var(--color-text-faint);margin:0 2px;}
-  #recap .m-round-sum{display:flex;justify-content:space-between;align-items:center;margin-top:7px;padding:7px 11px;border-radius:7px;background:var(--color-surface);font-size:10.5px;color:var(--color-text-muted);}
+  #recap .m-round-sum{display:flex;justify-content:space-between;align-items:center;margin-top:7px;padding:7px 11px;border-radius:7px;background:var(--color-bg);font-size:10.5px;color:var(--color-text-muted);}
   #recap .m-round-sum .b{font-weight:800;color:var(--color-text);font-variant-numeric:tabular-nums;}
-  #recap .dweek__more{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em;color:var(--color-lime);}
-  #recap .dweek__cta{text-align:center;padding:28px var(--gutter) 8px;}
-  #recap .dweek__cta .btn{display:inline-block;background:var(--color-lime);color:var(--color-text-inverse);font-weight:800;font-size:14px;padding:13px 28px;border-radius:var(--radius-full);text-transform:uppercase;letter-spacing:.04em;}
+
+  /* ── The Drop + week in pictures ── */
+  #recap .hp-drop{ overflow:hidden; display:flex; flex-wrap:wrap; }
+  #recap .hp-drop__pic{ flex:1 1 340px; min-height:240px; background:var(--color-surface-2,rgba(128,128,128,.14)) center / cover no-repeat; display:block; }
+  #recap .hp-drop__txt{ flex:999 1 440px; min-width:0; padding:26px; display:flex; flex-direction:column; gap:12px; }
+  #recap .hp-kicker{ font-size:12px; font-weight:800; letter-spacing:.1em; text-transform:uppercase; color:var(--color-lime); }
+  #recap .hp-drop h2{ margin:0; font-size:clamp(20px,2.8vw,28px); line-height:1.2; font-weight:800; color:var(--color-text); }
+  #recap .hp-drop p{ margin:0; font-size:15px; line-height:1.5; color:var(--color-text-muted); }
+  #recap .hp-drop h2 a, #recap .hp-drop p a, #recap .hp-res__note a{ text-decoration:underline; text-decoration-color:rgba(128,128,128,.5); text-underline-offset:3px; }
+  #recap .hp-drop__foot{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 20px; margin-top:4px; }
+  #recap .hp-btn{ display:inline-flex; align-items:center; height:48px; padding:0 26px; border-radius:var(--radius-full); background:var(--color-lime); color:var(--color-text-inverse); font-size:14px; font-weight:800; text-transform:uppercase; letter-spacing:.04em; }
+  #recap .hp-pics{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  #recap .hp-pics a{ display:block; aspect-ratio:1 / 1; border-radius:var(--radius-md); background:var(--color-surface-2,rgba(128,128,128,.14)) center / cover no-repeat; border:1px solid var(--color-border); }
+  #recap .hp-pics a:hover{ border-color:var(--color-lime); }
+  #recap .hp-h3{ margin:0; font-size:13px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--color-text-muted); }
+
+  /* ── Title race ── */
+  #recap .hp-race{ padding:22px; }
+  #recap .hp-race__in{ display:flex; flex-wrap:wrap; gap:20px 28px; align-items:center; }
+  #recap .hp-race__chart{ flex:999 1 520px; min-width:0; overflow-x:auto; }
+  #recap .hp-race svg{ display:block; width:100%; min-width:560px; height:auto; font-family:inherit; }
+  #recap .hp-race svg text{ fill:var(--color-text-muted); font-size:12px; }
+  #recap .hp-race svg text.nm{ fill:var(--color-text); font-size:13px; font-weight:800; }
+  #recap .hp-race svg text.now{ fill:var(--color-text); font-weight:800; }
+  #recap .hp-race svg .grid{ stroke:var(--color-border); stroke-width:1; }
+  #recap .hp-race svg .base{ stroke:var(--color-border-strong); stroke-width:1; }
+  #recap .hp-race svg .todo{ fill:var(--color-text); opacity:.03; }
+  #recap .hp-race ul{ flex:1 1 260px; min-width:0; margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:12px; }
+  #recap .hp-race li{ display:flex; gap:12px; }
+  #recap .hp-race li i{ flex:0 0 10px; width:10px; height:10px; margin-top:6px; border-radius:50%; background:var(--color-lime); }
+  #recap .hp-race li b{ display:block; font-size:15px; font-weight:800; color:var(--color-text); }
+  #recap .hp-race li span{ display:block; font-size:13px; line-height:1.45; color:var(--color-text-muted); }
+
+  /* ── Up next ── */
+  #recap .hp-nx{ padding:20px; display:flex; flex-direction:column; gap:14px; min-width:0; }
+  #recap .hp-nx__top{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:12px; color:var(--color-text-muted); }
+  #recap .hp-nx__vs{ display:flex; align-items:flex-start; gap:10px; }
+  #recap .hp-nx__side{ flex:1; min-width:0; display:flex; flex-direction:column; align-items:center; gap:8px; text-align:center; font-size:15px; font-weight:800; color:var(--color-text); overflow-wrap:anywhere; }
+  #recap .hp-nx__side a:hover{ text-decoration:underline; }
+  #recap .hp-nx__v{ margin-top:22px; font-size:13px; font-weight:800; font-style:italic; color:var(--color-text-muted); }
+  #recap .hp-tape div{ display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--color-divider); font-size:14px; font-variant-numeric:tabular-nums; color:var(--color-text); }
+  #recap .hp-tape b{ flex:1; font-weight:800; } #recap .hp-tape b:last-child{ text-align:right; }
+  #recap .hp-tape span{ font-size:11px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--color-text-muted); }
+  #recap .hp-nx p{ margin:0; font-size:14px; line-height:1.45; color:var(--color-text-muted); }
+  #recap .hp-rail{ display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:8px; margin-top:20px; }
+  #recap .hp-rail div i{ display:block; height:6px; border-radius:9999px; background:var(--color-border-strong); margin-bottom:6px; }
+  #recap .hp-rail div.done i{ background:var(--color-lime); } #recap .hp-rail div.next i{ background:var(--color-text); }
+  #recap .hp-rail b{ display:block; font-size:12px; font-weight:800; color:var(--color-text-muted); }
+  #recap .hp-rail div.done b, #recap .hp-rail div.next b{ color:var(--color-text); }
+  #recap .hp-rail span{ display:block; font-size:12px; color:var(--color-text-muted); }
+  #recap .hp-cta{ text-align:center; padding-top:24px; }
+  @media(max-width:560px){ #recap .hp-stack{ gap:30px; } #recap .hp-lede{ font-size:16px; } #recap .hp-drop__txt{ padding:20px; } #recap .hp-race{ padding:18px 16px; } #recap .hp-res__body{ padding:16px; } }
   </style>
 </head>
 <body data-page="home">
   <div data-partial="nav"></div>
 
   <main id="recap">
-    <!-- RECAP HEADER -->
-    <header class="recap-head"><div class="recap-head__in">
-      <div>
-        <h1 id="rc-title">WEEK ONE IS IN THE <span class="lime">BOOKS.</span></h1>
+    <!-- HERO: headline written from the results (or the next match night), with the week's cover photo -->
+    <header class="hp-hero"><div class="hp-wrap hp-hero__in">
+      <div class="hp-hero__txt" id="hp-herotxt">
+        <div class="hp-eyebrow" id="hp-eyebrow"></div>
+        <h1 id="rc-title">The Dink <span class="lime">Society.</span></h1>
+        <p class="hp-lede" id="hp-lede"></p>
+        <div id="hp-heroextra"></div>
       </div>
-      <div class="weeknav" id="rc-weeknav"></div>
+      <a class="hp-hero__pic" id="hp-heropic" href="/drop.html" hidden><span id="hp-heropic-cap"></span></a>
     </div></header>
 
-    <!-- TOP ROW: LEFT (POTW + DSR) | RIGHT (Standings) -->
-    <section class="recap-top">
-      <!-- LEFT COLUMN -->
-      <div class="recap-left">
-        <!-- SuprDupr Performers — tabbed: POTW / DSR / Best Diff / Most Pts -->
-        <div class="perf" id="rc-perf" style="display:none;">
-          <div class="panel-head">
-            <div style="display:flex;align-items:center;gap:11px;">
-              <img class="sd-logo" src="/img/suprdupr.png" alt="SuprDupr" style="height:24px;width:auto;border-radius:4px;display:block">
-              <div class="rc-h2"><span class="lime">PERFORMERS</span></div>
+    <!-- WEEK BAR: sticky, so the week can be changed from anywhere on the page -->
+    <div class="hp-weekbar" id="hp-weekbar" hidden><div class="hp-wrap hp-weekbar__in">
+      <span class="hp-weekbar__lbl">Week</span>
+      <nav class="weeknav" id="rc-weeknav" aria-label="Week"></nav>
+    </div></div>
+
+    <!-- LIVE CARD: match-night scores (ds-ticker.js fills this while games are being played) -->
+    <div class="hp-wrap hp-live"><div class="ds-livecard" id="ds-livecard" hidden></div></div>
+
+    <div class="hp-wrap hp-stack">
+
+      <!-- STANDINGS + PLAYERS OF THE WEEK -->
+      <div class="hp-top">
+        <section class="hp-stand" id="rc-standings" hidden>
+          <div class="hp-head">
+            <h2 class="hp-h2 hp-h2--lg" id="hp-stand-h">Standings</h2>
+            <a class="hp-more" href="/standings.html" data-season-link>Full standings</a>
+          </div>
+          <div class="hp-card hp-st">
+            <div class="hp-st__row hd">
+              <span class="c-rk">#</span><span class="c-mv" title="Places moved since the week before">+/−</span><span class="c-team">Team</span>
+              <span class="c-rec" title="Rounds won, lost and tied">W–L–T</span><span class="c-pts" title="Match points (round win 2, tie 1)">Pts</span>
+              <span class="c-gm" title="Games won and lost">Games</span><span class="c-df" title="Points scored minus points allowed">Diff</span><span class="c-form">Last 3</span>
             </div>
-            <a class="rc-more" href="/leaderboard.html">Leaderboard →</a>
+            <div id="rc-stand-body"></div>
+            <div class="hp-st__note" id="rc-stand-note"></div>
+          </div>
+        </section>
+
+        <section class="hp-perf" id="rc-perf" hidden>
+          <div class="hp-head">
+            <h2 class="hp-h2 hp-h2--lg" id="hp-perf-h">Players of the week</h2>
+            <span style="display:inline-flex;align-items:center;gap:8px">Presented by <img src="/img/suprdupr.png" alt="SuprDupr" style="height:20px;width:auto;border-radius:4px;display:block"></span>
           </div>
           <div class="perftabs" id="rc-perftabs">
-            <button class="on" data-k="potw">POTW</button>
-            <button data-k="dsr">DSR</button>
-            <button data-k="diff">Diff</button>
-            <button data-k="pts">Pts</button>
-            <button data-k="climbers">Movers</button>
+            <button type="button" class="on" data-k="potw">POTW</button>
+            <button type="button" data-k="dsr">DSR</button>
+            <button type="button" data-k="diff">Diff</button>
+            <button type="button" data-k="pts">Pts</button>
+            <button type="button" data-k="climbers">Movers</button>
           </div>
           <div class="perfwrap" id="rc-perfpanels"></div>
-        </div>
+        </section>
       </div>
 
-      <!-- RIGHT COLUMN: Standings -->
-      <div class="standings-panel" id="rc-standings" style="display:none;">
-        <div class="panel-head">
-          <div class="rc-h2">LATEST <span class="lime">STANDINGS</span></div>
-          <a class="rc-more" href="/standings.html">Full standings →</a>
+      <!-- SEASON LEADERS: top 10 by DSR, point differential and points scored -->
+      <section id="hp-leaders" hidden>
+        <div class="hp-head"><h2 class="hp-h2">Season leaders <span class="lime">· Top 10</span></h2><a class="hp-more" href="/leaderboard.html" data-season-link>Full leaderboard</a></div>
+        <div class="hp-seg" role="group" aria-label="Show" id="hp-leaders-seg">
+          <button type="button" class="on" data-g="all" aria-pressed="true">All</button>
+          <button type="button" data-g="M" aria-pressed="false">Men</button>
+          <button type="button" data-g="F" aria-pressed="false">Women</button>
         </div>
-        <div class="stand-wrap">
-          <table class="stand">
-            <thead><tr>
-              <th class="c-rank" title="Rank">#</th>
-              <th class="l c-team">Team</th>
-              <th title="Match wins">W</th>
-              <th title="Match ties">T</th>
-              <th title="Match losses">L</th>
-              <th title="Match points (Win×2 + Tie×1)">PTS</th>
-              <th class="col-opt" title="Games won">GW</th>
-              <th class="col-opt" title="Points scored (all games)">PS</th>
-              <th title="Match-point differential">DIFF</th>
-              <th title="Places moved in the standings since last week">+/−</th>
-            </tr></thead>
-            <tbody id="rc-stand-body"></tbody>
-          </table>
-        </div>
-        <div class="stand-note" id="rc-stand-note"></div>
-      </div>
-    </section>
+        <div class="hp-leads" id="hp-leads"></div>
+      </section>
 
-    <!-- THE DROP — weekly editorial (populated from public-drop; hidden until a week is published) -->
-    <section class="drop" id="rc-drop" style="display:none;"><div class="drop__in">
-      <div>
-        <span class="drop__kicker" id="rc-drop-kicker">The Drop · Week 1</span>
-        <h2 id="rc-drop-title">Smash Society didn't come to play. They came to <em>take attendance.</em></h2>
-        <div class="drop__byline" id="rc-drop-byline">By <b>The Society Desk</b> · 4 min read</div>
-        <div class="drop__excerpt" id="rc-drop-excerpt">
-          <p class="dropcap">Eight weeks is a long time to keep a promise, but Smash Society spent opening night acting like the trophy already had their name engraved. Eleven games to one against Timog Cal isn't a win — it's a statement, hand-delivered. And right behind them, K'CHN served notice of their own, sweeping What the Dink?! without breaking a sweat…</p>
-          <p>The night's real headline wore Smash Society green twice over: Devin Carroll and Annie Kang both ran the table 4–0, the only two players to top a 93 DSR on a debut Monday…</p>
-        </div>
-        <a class="drop__read" id="rc-drop-read" href="#">Read the full Drop →</a>
-      </div>
-      <aside class="drop__aside">
-        <div class="drop__cover"><span id="rc-drop-cover">This week · The Drop</span></div>
-        <h4>Also in this issue</h4>
-        <ul id="rc-drop-aside">
-          <li>The two-team logjam at the top, explained</li>
-          <li>Who almost stole Player of the Week</li>
-          <li>Three takeaways before next week</li>
-        </ul>
-      </aside>
-    </div></section>
+      <!-- THE NIGHT IN NUMBERS -->
+      <section id="hp-numbers" hidden>
+        <div class="hp-head"><h2 class="hp-h2">The night in numbers</h2><span id="hp-numbers-sub"></span></div>
+        <div class="hp-nums" id="hp-nums"></div>
+      </section>
 
-    <!-- THIS WEEK — current/next week's matches (populated from public-schedule) -->
-    <section class="dweek" id="rc-week" style="display:none;">
-      <div class="dweek__head">
-        <div>
-          <span class="eyebrow" id="rc-week-eyebrow">This Week</span>
-          <div class="dweek__date" id="rc-week-date"></div>
+      <!-- WEEK RESULTS -->
+      <section id="hp-results" hidden>
+        <div class="hp-head"><h2 class="hp-h2" id="hp-results-h">Results</h2><a class="hp-more" href="/schedule.html" data-season-link>Full schedule</a></div>
+        <div class="hp-grid3" id="hp-results-grid"></div>
+      </section>
+
+      <!-- THE DROP + WEEK IN PICTURES (hidden until an edition is published) -->
+      <section id="rc-drop" hidden>
+        <div class="hp-card hp-drop">
+          <a class="hp-drop__pic" id="rc-drop-pic" href="/drop.html" hidden aria-label="Read The Drop"></a>
+          <div class="hp-drop__txt">
+            <div class="hp-kicker" id="rc-drop-kicker">The Drop</div>
+            <h2 id="rc-drop-title"></h2>
+            <p id="rc-drop-excerpt"></p>
+            <div class="hp-drop__foot">
+              <a class="hp-btn" id="rc-drop-read" href="/drop.html">Read the full Drop</a>
+              <span class="hp-sub" id="rc-drop-byline"></span>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="dweek-grid" id="rc-week-grid"></div>
-      <div class="dweek__cta"><a class="btn" href="/schedule.html">Full schedule →</a></div>
-    </section>
+        <div id="hp-pics-wrap" hidden>
+          <div class="hp-head" style="margin-top:20px"><h3 class="hp-h3" id="hp-pics-h">In pictures</h3><a class="hp-more" id="hp-pics-more" href="/drop.html">See every photo</a></div>
+          <div class="hp-pics" id="hp-pics"></div>
+        </div>
+      </section>
+
+      <!-- THE TITLE RACE -->
+      <section id="hp-race" hidden>
+        <div class="hp-card hp-race">
+          <div class="hp-head"><h2 class="hp-h2">The title race</h2><span>Match points, week by week</span></div>
+          <div class="hp-race__in">
+            <div class="hp-race__chart" id="hp-race-chart"></div>
+            <ul id="hp-race-notes"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- UP NEXT + SEASON TIMELINE -->
+      <section id="hp-next" hidden>
+        <div class="hp-head"><h2 class="hp-h2" id="hp-next-h">Up next</h2><span id="hp-next-sub"></span></div>
+        <div class="hp-grid3" id="hp-next-grid"></div>
+        <div class="hp-rail" id="hp-rail" aria-label="Season timeline"></div>
+        <div class="hp-cta"><a class="hp-btn" href="/schedule.html" data-season-link>Full schedule</a></div>
+      </section>
+
+    </div>
   </main>
-
-  <section class="wrap" style="max-width:var(--max-w,1200px);margin:0 auto;padding:0 20px 60px">
-    <div class="ds-livecard" id="ds-livecard" hidden></div>
-  </section>
 
   <div data-partial="footer"></div>
 
@@ -411,109 +458,328 @@
 
   <script>
   /* ═══════════════════════════════════════════════════════════════
-     Weekly recap data — POTW + DSR (public-leaderboard) and the
-     standings table (public-standings). All public, no auth.
+     The front page. Everything is built from public endpoints:
+       public-leaderboard (weekly top performers + players), public-standings,
+       public-schedule, public-drop, public-teams, public-pace, public-match.
+     One selected week (the week bar) drives the headline, standings as they
+     stood that week, players of the week, the numbers, the results, The Drop
+     and the title race. "Up next" always shows the real next match night.
      ═══════════════════════════════════════════════════════════════ */
   (function () {
     var SN = (typeof shortName === 'function') ? shortName : function (s) { return s || ''; };
-    // Editorial-only entity links + hover cards (The Drop teaser), built from the
-    // players + standings data already fetched below.
-    var DROP_IDX = null;
-    function LZ(text){ return (window.DSEntity && DROP_IDX) ? window.DSEntity.linkify(esc(text), DROP_IDX) : esc(text); }
-    function LZhtml(html){ return (window.DSEntity && DROP_IDX) ? window.DSEntity.linkify(html||'', DROP_IDX) : (html||''); }
+    var FN = '/.netlify/functions/';
     function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
     function initials(name){if(!name)return '?';var p=String(name).trim().split(/\s+/);return ((p[0][0]||'')+(p.length>1?p[p.length-1][0]:'')).toUpperCase();}
     function rec(w,l){return (w==null?0:w)+'–'+(l==null?0:l);}
-    function signed(n){if(n==null)return '—';return n>0?'+'+n:String(n);}
+    function signed(n){if(n==null)return '—';return n>0?'+'+n:n<0?'−'+Math.abs(n):'0';}
+    function $(id){return document.getElementById(id);}
+    function show(el,on){ if(el) el.hidden=!on; }
+    function getJSON(u){ return fetch(u).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}); }
+    function ord(n){ var s=['th','st','nd','rd'], v=n%100; return n+(s[(v-20)%10]||s[v]||s[0]); }
+    function ordWord(n){ return ['','first','second','third','fourth','fifth','sixth','seventh','eighth','ninth','tenth'][n]||ord(n); }
+    function numWord(n){ return ['zero','one','two','three','four','five','six','seven','eight','nine','ten'][n]||String(n); }
+    function plural(n,w){ return n===1?w:w+'s'; }
+    function joinAnd(a){ return a.length<2?(a[0]||''):a.slice(0,-1).join(', ')+' and '+a[a.length-1]; }
+    var WW=['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'];
 
-    // Link helpers — the schedule IIFE below defines its own copies, but the
-    // recap renderers in THIS block (POTW/DSR/standings) call them too. Without
-    // them in scope, the first name rendered throws ReferenceError and POTW,
-    // DSR, standings AND the Drop teaser all silently stay hidden.
+    // Editorial entity links + hover cards (Drop copy), built from data fetched below.
+    var DROP_IDX = null;
+    function LZ(text){ return (window.DSEntity && DROP_IDX) ? window.DSEntity.linkify(esc(text), DROP_IDX) : esc(text); }
+
     var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
-    var SEASON_CODE = 'I';   // both refined below, before anything is fetched
-    var SEASON_NAME = null, SEASON_START = null, SEASON_TAG = '';
+    var SEASON_CODE = 'I', SEASON_NAME = null, SEASON_START = null, SEASON_TAG = '', SEASON = null;
     var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
+    var TOTAL_WEEKS = 8;
     function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
+    function teamHref(name,id){ return '/team?id='+encodeURIComponent(id||slug(name))+LINK_SUFFIX; }
     function teamLink(name, id, cls){
       if (!name || name === 'TBD') return '<span class="'+cls+'">'+esc(name||'TBD')+'</span>';
-      var ref = id || slug(name);
-      return '<a class="'+cls+'" href="/team?id='+encodeURIComponent(ref)+LINK_SUFFIX+'">'+esc(name)+'</a>';
+      return '<a class="'+cls+'" href="'+teamHref(name,id)+'">'+esc(name)+'</a>';
     }
+    function playerHref(name, teamName){ return '/player?team='+encodeURIComponent(slug(teamName||''))+'&name='+encodeURIComponent(name)+LINK_SUFFIX; }
     function playerLink(name, teamName, cls, label){
       if (!name) return '<span class="'+cls+'">'+esc(label||'—')+'</span>';
-      return '<a class="'+cls+'" href="/player?team='+encodeURIComponent(slug(teamName||''))+'&name='+encodeURIComponent(name)+LINK_SUFFIX+'">'+esc(label!=null?label:name)+'</a>';
+      return '<a class="'+cls+'" href="'+playerHref(name,teamName)+'">'+esc(label!=null?label:name)+'</a>';
+    }
+    function dropHref(drop){ return '/drop.html?edition='+encodeURIComponent(drop.edition||('week-'+drop.week))+(SEASON&&!SEASON.isCurrent?'&circuit='+encodeURIComponent(SEASON_CODE):''); }
+    function photoUrl(id){ return FN+'drop-photo-serve?id='+encodeURIComponent(id); }
+    function bgPhoto(el, art){
+      var f=(art&&art.focal)||{}, ax=isFinite(f.x)?f.x:50, ay=isFinite(f.y)?f.y:50;
+      el.style.backgroundImage='url("'+photoUrl(art.id)+'")'; el.style.backgroundPosition=ax+'% '+ay+'%';
+    }
+    function bgAttr(art){ var f=(art&&art.focal)||{}, ax=isFinite(f.x)?f.x:50, ay=isFinite(f.y)?f.y:50; return 'style="background-image:url(&quot;'+photoUrl(art.id)+'&quot;);background-position:'+ax+'% '+ay+'%"'; }
+
+    /* ── Data ── */
+    var WEEKS = [];            // schedule weeks
+    var TEAMS = [];            // standings blob teams (first division), blob order
+    var TEAMINFO = {};         // public-teams by id and by lowercased name: { photoUrl, color, emoji }
+    var PERF = [], PLAYERS = null, PACE = null, STAND_DIV = null;
+    var DROP_LATEST = null, DROP_INDEX = null, DROPS = {};
+    var MAXWEEK = 0;           // latest week with a finalized match
+    var HOME_FINISH = null;    // bracket finish once a champion exists
+    var VIEW = { week: 0, mode: 'recap' };   // mode: recap | build | live | pre
+    var AUTO_MODE = 'recap';
+
+    function weekObj(n){ for(var i=0;i<WEEKS.length;i++) if(WEEKS[i].week===n) return WEEKS[i]; return null; }
+    function isFinal(m){ return !!m.finalizedAt && m.scoreA!=null && m.scoreB!=null; }
+    function finals(n){ var w=weekObj(n); return ((w&&w.matches)||[]).filter(isFinal); }
+    // Post-season never moves the table (same rule as the standings page).
+    function countsForTable(m){ return m.phase!=='playoff' && m.phase!=='championship'; }
+    function weekStartMs(n){
+      var w=weekObj(n), best=NaN;
+      ((w&&w.matches)||[]).forEach(function(m){ var t=Date.parse(m.scheduledAt||m.date||''); if(!isNaN(t)&&(isNaN(best)||t<best)) best=t; });
+      if(!isNaN(best)) return best;
+      var s=SEASON_START?Date.parse(SEASON_START+'T19:00:00'):NaN;
+      return isNaN(s)?NaN:s+(n-1)*7*86400000;
+    }
+    function fmtDay(ms,long){ return isNaN(ms)?'':new Date(ms).toLocaleDateString('en-US',long?{weekday:'long',month:'long',day:'numeric'}:{month:'short',day:'numeric'}); }
+    function fmtTime(ms){ return isNaN(ms)?'':new Date(ms).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
+    function weekLabel(n){ var w=weekObj(n); return (w&&w.phaseLabel)?w.phaseLabel:'Week '+n; }
+    // The next match night: the first week that still has a match to play.
+    function nextWeek(){
+      for(var i=0;i<WEEKS.length;i++){ var w=WEEKS[i]; if((w.matches||[]).length && (w.matches||[]).some(function(m){return !isFinal(m);}) && w.week>=MAXWEEK) return w; }
+      return null;
     }
 
-    var TOTAL_WEEKS = 8;
+    /* ── The table as it stood after week w, rebuilt from the finalized schedule
+       with the live table's tiebreakers (PTS → GW → H2H → DIFF). Also carries
+       round W–L–T and each night's match points (the "Last 3" squares). ── */
+    var TABLES = {};
+    function tableThrough(w){
+      if(TABLES[w]) return TABLES[w];
+      var rows={}, byName={};
+      TEAMS.forEach(function(t){ var r={id:t.teamId,name:t.teamName,emoji:t.teamEmoji||'',pts:0,rw:0,rl:0,rt:0,gw:0,gl:0,ps:0,pa:0,mp:0,h2h:{},nights:[],rounds:true}; rows[t.teamId]=r; byName[t.teamName]=r; });
+      WEEKS.forEach(function(wk){
+        if(wk.week>w) return;
+        (wk.matches||[]).forEach(function(m){
+          if(!isFinal(m)||!countsForTable(m)) return;
+          var A=rows[m.teamAId]||byName[m.teamA], B=rows[m.teamBId]||byName[m.teamB]; if(!A||!B) return;
+          A.pts+=m.scoreA; B.pts+=m.scoreB; A.mp++; B.mp++;
+          A.gw+=m.gamesA||0; A.gl+=m.gamesB||0; B.gw+=m.gamesB||0; B.gl+=m.gamesA||0;
+          A.ps+=m.pointsA||0; A.pa+=m.pointsB||0; B.ps+=m.pointsB||0; B.pa+=m.pointsA||0;
+          A.h2h[B.id]=(A.h2h[B.id]||0)+m.scoreA; B.h2h[A.id]=(B.h2h[A.id]||0)+m.scoreB;
+          A.nights.push({w:wk.week,f:m.scoreA,a:m.scoreB,opp:B.name,gf:m.gamesA,ga:m.gamesB});
+          B.nights.push({w:wk.week,f:m.scoreB,a:m.scoreA,opp:A.name,gf:m.gamesB,ga:m.gamesA});
+          var rf=0, ra=0, ok=true;
+          [m.round1,m.round2].forEach(function(r){
+            if(!r||r.homeGames==null||r.awayGames==null){ ok=false; return; }
+            if(r.homeGames>r.awayGames){ A.rw++; B.rl++; rf+=2; } else if(r.homeGames<r.awayGames){ B.rw++; A.rl++; ra+=2; } else { A.rt++; B.rt++; rf++; ra++; }
+          });
+          if(!ok||rf!==m.scoreA||ra!==m.scoreB){ A.rounds=false; B.rounds=false; }
+        });
+      });
+      var list=Object.keys(rows).map(function(k){ var r=rows[k]; r.diff=r.ps-r.pa; return r; });
+      list.sort(function(a,b){
+        if(b.pts!==a.pts) return b.pts-a.pts;
+        if(b.gw!==a.gw) return b.gw-a.gw;
+        var ab=a.h2h[b.id], ba=b.h2h[a.id];
+        if(ab!=null&&ba!=null&&ab!==ba) return ba-ab;
+        if(b.diff!==a.diff) return b.diff-a.diff;
+        return String(a.name).localeCompare(String(b.name));
+      });
+      list.forEach(function(r,i){ r.rank=i+1; });
+      TABLES[w]=list; return list;
+    }
+    // Weeks that have at least one result counting toward the table, in order.
+    function playedWeeks(){ var out=[]; WEEKS.forEach(function(w){ if((w.matches||[]).some(function(m){return isFinal(m)&&countsForTable(m);})) out.push(w.week); }); return out.sort(function(a,b){return a-b;}); }
+    function prevPlayed(w){ var p=playedWeeks().filter(function(x){return x<w;}); return p.length?p[p.length-1]:0; }
+    function lastTableWeek(w){ var p=playedWeeks().filter(function(x){return x<=w;}); return p.length?p[p.length-1]:0; }
 
-    // Shared title builder so the finale week's headline also announces the
-    // champion — used by both the initial-load render and the week-pager.
-    // Before a ball is hit there is no week to recap. The static headline said
-    // "WEEK ONE IS IN THE BOOKS", which is a lie on opening week of a new season.
+    // Rows for the standings card. The latest week uses the standings blob
+    // (authoritative order and totals) when it agrees with the schedule;
+    // an earlier week, or a stale blob, uses the rebuilt table.
+    function standRows(w){
+      var tw=lastTableWeek(w), calc=tableThrough(tw||w), byId={}; calc.forEach(function(r){ byId[r.id]=r; });
+      var pw=prevPlayed(tw), prev={}; if(pw) tableThrough(pw).forEach(function(r){ prev[r.id]=r.rank; });
+      var latest=(w>=MAXWEEK);
+      var blobPts=TEAMS.reduce(function(s,t){return s+(t.matchPointsFor||0);},0), calcPts=calc.reduce(function(s,r){return s+r.pts;},0);
+      var useBlob=latest && TEAMS.length && (blobPts===calcPts || !calcPts);
+      var rows;
+      if(useBlob){
+        rows=TEAMS.map(function(t,i){ var c=byId[t.teamId]||{nights:[]};
+          return {id:t.teamId,name:t.teamName,emoji:t.teamEmoji||'',rank:i+1,pts:t.matchPointsFor||0,rec:(t.wins||0)+'–'+(t.losses||0)+'–'+(t.ties||0),
+            gw:t.totalGamesWon||0,gl:t.totalGamesLost||0,diff:t.pointDiff,nights:c.nights,rw:t.wins||0,rl:t.losses||0,rt:t.ties||0,rounds:true}; });
+      } else {
+        rows=calc.map(function(r){ return {id:r.id,name:r.name,emoji:r.emoji,rank:r.rank,pts:r.pts,rec:r.rounds?(r.rw+'–'+r.rl+'–'+r.rt):'—',gw:r.gw,gl:r.gl,diff:r.mp?r.diff:null,nights:r.nights,rw:r.rw,rl:r.rl,rt:r.rt,rounds:r.rounds}; });
+      }
+      // Season over: rank by bracket finish, same as the Playoffs tab, and drop the movement arrows.
+      if(latest&&HOME_FINISH){ rows.sort(function(a,b){ var an=(HOME_FINISH[a.name]||{}).n||99, bn=(HOME_FINISH[b.name]||{}).n||99; return an-bn||(b.pts-a.pts); }); rows.forEach(function(r,i){ r.rank=i+1; }); }
+      rows.forEach(function(r){ r.move=(!HOME_FINISH||!latest)&&prev[r.id]!=null ? prev[r.id]-r.rank : null; r.prevRank=prev[r.id]||null; });
+      return rows;
+    }
+
+    /* ── Team badge: photo, else emoji, else initial on the team's colour ── */
+    var PALETTE=['#b8ff2c','#5aa9ff','#ffc247','#17d7b0','#b08cff','#ff8a5c','#f06bb0','#8a8f87'];
+    function teamInfo(id,name){ return TEAMINFO[id]||TEAMINFO[String(name||'').toLowerCase()]||{}; }
+    function ownColor(id,name){ var c=teamInfo(id,name).color; return (c&&/^#[0-9a-f]{3,8}$/i.test(c))?c:null; }
+    function teamColor(id,name){
+      var own=ownColor(id,name); if(own) return own;
+      // No colour on the team record: take the first palette colour no team has claimed.
+      var used={}, free; TEAMS.forEach(function(t){ var c=ownColor(t.teamId,t.teamName); if(c) used[c.toLowerCase()]=1; });
+      free=PALETTE.filter(function(c){ return !used[c]; }); if(!free.length) free=PALETTE;
+      var names=TEAMS.filter(function(t){ return !ownColor(t.teamId,t.teamName); }).map(function(t){return t.teamName;}).sort(), i=names.indexOf(name);
+      return free[(i<0?0:i)%free.length];
+    }
+    function teamBadge(name,id,size,emoji){
+      var inf=teamInfo(id,name), e=inf.emoji||emoji||'', st='width:'+size+'px;height:'+size+'px;font-size:'+Math.round(size*(e?0.52:0.34))+'px;';
+      if(inf.photoUrl) return '<span class="hp-tb" aria-hidden="true" style="'+st+'"><img src="'+esc(inf.photoUrl)+'" alt="" loading="lazy" onerror="this.remove()"></span>';
+      if(e) return '<span class="hp-tb emo" aria-hidden="true" style="'+st+'">'+esc(e)+'</span>';
+      return '<span class="hp-tb" aria-hidden="true" style="'+st+'background:'+teamColor(id,name)+'">'+esc(initials(name))+'</span>';
+    }
+
+    /* ═══ HERO ═══ */
+    var HERO_TIMER=null;
+    function champion(){ if(!HOME_FINISH) return null; var k=Object.keys(HOME_FINISH); for(var i=0;i<k.length;i++) if(HOME_FINISH[k[i]].n===1) return k[i]; return null; }
+    function nightOf(row,w){ var n=null; (row.nights||[]).forEach(function(x){ if(x.w===w) n=x; }); return n; }
+    // Headline + lede for a finished week, written from the table and that night's results.
+    function recapStory(w){
+      var rows=standRows(w), lead=rows[0], second=rows[1], U=function(s){return esc(String(s).toUpperCase());};
+      var plain='WEEK '+(WW[w]||w)+' IS IN THE <span class="lime">BOOKS.</span>';
+      var champ=(w>=MAXWEEK)?champion():null, wk=weekObj(w)||{}, post=wk.phase==='playoff'||wk.phase==='championship';
+      var scores=finals(w).map(function(m){ if(m.scoreA===m.scoreB) return esc(m.teamA)+' and '+esc(m.teamB)+' tied '+m.scoreA+'–'+m.scoreB+'.'; var aw=m.scoreA>m.scoreB; return esc(aw?m.teamA:m.teamB)+' beat '+esc(aw?m.teamB:m.teamA)+' '+Math.max(m.scoreA,m.scoreB)+'–'+Math.min(m.scoreA,m.scoreB)+'.'; }).join(' ');
+      if(champ) return { h: U(champ)+' ARE <span class="lime">CHAMPIONS.</span>', p: scores };
+      if(post) return { h: (wk.phase==='playoff'?'THE PLAYOFFS ARE':'CHAMPIONSHIP NIGHT IS')+' IN THE <span class="lime">BOOKS.</span>', p: scores };
+      if(!lead||!lead.pts||!lastTableWeek(w)) return { h: plain, p: '' };
+      var tw=lastTableWeek(w), pw=prevPlayed(tw), prev=pw?tableThrough(pw):null;
+      var tied=rows.filter(function(r){return r.pts===lead.pts;});
+      var h, gap=second?lead.pts-second.pts:lead.pts;
+      if(tied.length===2) h=U(tied[0].name)+' AND '+U(tied[1].name)+' ARE <span class="lime">LEVEL ON TOP.</span>';
+      else if(tied.length>2) h=numWord(tied.length).toUpperCase()+' TEAMS SHARE <span class="lime">FIRST PLACE.</span>';
+      else if(!prev) h=U(lead.name)+' ARE THE <span class="lime">EARLY LEADERS.</span>';
+      else if(prev[0].id!==lead.id) h=U(lead.name)+' TAKE <span class="lime">OVER FIRST.</span>';
+      else if(prev[1]&&prev[1].pts===prev[0].pts) h=U(lead.name)+' ARE <span class="lime">ALONE IN FIRST.</span>';
+      else h=U(lead.name)+' STAY <span class="lime">ON TOP.</span>';
+      // Sentence one: what the leader did that night.
+      var s=[], n=nightOf(lead,tw), clear=tied.length>1?'':' and '+(gap===1?'one point':numWord(gap)+' points')+' clear';
+      if(n){
+        var sc=n.f+'–'+n.a;
+        if(tied.length>1) s.push(esc(lead.name)+' '+(n.f>n.a?'beat':n.f<n.a?'lost to':'tied')+' '+esc(n.opp)+' '+sc+' and share first on '+lead.pts+' '+plural(lead.pts,'point')+'.');
+        else if(n.f===4) s.push('A 4–0 sweep of '+esc(n.opp)+' puts '+esc(lead.name)+' '+(gap===1?'one point':numWord(gap)+' points')+' clear.');
+        else if(n.f>n.a) s.push('A '+sc+' win over '+esc(n.opp)+' puts '+esc(lead.name)+' '+(gap===1?'one point':numWord(gap)+' points')+' clear.');
+        else if(n.f===n.a) s.push(esc(lead.name)+' tied '+esc(n.opp)+' '+sc+' and lead by '+numWord(gap)+'.');
+        else s.push(esc(lead.name)+' lost '+sc+' to '+esc(n.opp)+' but still lead by '+numWord(gap)+'.');
+      } else s.push(esc(lead.name)+' lead on '+lead.pts+' '+plural(lead.pts,'point')+clear+'.');
+      // Sentence two: the night's biggest climb, or its biggest win.
+      var riser=null; rows.forEach(function(r){ if(r.id!==lead.id&&r.move>=2&&(!riser||r.move>riser.move)) riser=r; });
+      if(riser){
+        var rn=nightOf(riser,tw), sheet=rn&&rn.gf!=null&&rn.ga===0&&rn.gf>0, first=sheet&&!anyCleanSheetBefore(tw);
+        s.push(esc(riser.name)+(sheet?' posted '+(first?'the season\'s first ':'a ')+rn.gf+'–0 and':'')+' jumped from '+ordWord(riser.prevRank)+' to '+ordWord(riser.rank)+'.');
+      } else {
+        var big=null; finals(w).forEach(function(m){ if(m.gamesA==null||m.gamesB==null) return; var d=Math.abs(m.gamesA-m.gamesB); if(d>=6&&(!big||d>big.d)) big={d:d,m:m}; });
+        if(big&&!(n&&(big.m.teamA===lead.name||big.m.teamB===lead.name))){ var hw=big.m.gamesA>big.m.gamesB; s.push(esc(hw?big.m.teamA:big.m.teamB)+' beat '+esc(hw?big.m.teamB:big.m.teamA)+' '+Math.max(big.m.gamesA,big.m.gamesB)+'–'+Math.min(big.m.gamesA,big.m.gamesB)+' in games.'); }
+      }
+      return { h: h, p: s.join(' ') };
+    }
+    function anyCleanSheetBefore(w){ return WEEKS.some(function(wk){ return wk.week<w && (wk.matches||[]).some(function(m){ return isFinal(m)&&m.gamesA!=null&&m.gamesB!=null&&(m.gamesA===0||m.gamesB===0)&&(m.gamesA+m.gamesB)>0; }); }); }
+    function courtsOf(m){ return (m.courtA&&m.courtB)?('Courts '+m.courtA+' & '+m.courtB):(m.court||''); }
+    // Headline + lede for the next match night.
+    function buildStory(nw){
+      var rows=standRows(MAXWEEK), by={}; rows.forEach(function(r){ by[r.name]=r; });
+      var label=weekLabel(nw.week), U=String(label).toUpperCase();
+      var h=(nw.phase==='playoff'?'THE PLAYOFFS ARE':nw.phase==='championship'?'CHAMPIONSHIP NIGHT IS':U+' IS')+' <span class="lime">UP NEXT.</span>';
+      var best=null, lede=[];
+      (nw.matches||[]).forEach(function(m){ var a=by[m.teamA], b=by[m.teamB]; if(!a||!b) return;
+        if(Math.abs(a.pts-b.pts)<=1){ var top=Math.min(a.rank,b.rank); if(!best||top<best.top) best={top:top,m:m,a:a,b:b}; } });
+      if(best&&!nw.phase){
+        h=ordWord(best.top).toUpperCase()+' PLACE IS <span class="lime">ON THE LINE.</span>';
+        var c=courtsOf(best.m);
+        lede.push(esc(best.a.name)+' and '+esc(best.b.name)+(best.a.pts===best.b.pts?' are level on '+best.a.pts+' '+plural(best.a.pts,'point'):' are a point apart')+' and meet'+(c?' on '+esc(c):'')+'.');
+        var L=rows[0]; if(L&&L.id!==best.a.id&&L.id!==best.b.id){ var lm=null; (nw.matches||[]).forEach(function(m){ if(m.teamA===L.name||m.teamB===L.name) lm=m; }); if(lm) lede.push('Leaders '+esc(L.name)+' play '+esc(lm.teamA===L.name?lm.teamB:lm.teamA)+'.'); }
+      } else {
+        var named=(nw.matches||[]).filter(function(m){return m.teamA&&m.teamB&&m.teamA!=='TBD'&&m.teamB!=='TBD';});
+        if(named.length) lede.push(joinAnd(named.slice(0,3).map(function(m){return esc(m.teamA)+' v '+esc(m.teamB);}))+'.');
+        else if(nw.phase) lede.push('Matchups lock once the standings are final.');
+      }
+      return { h:h, p:lede.join(' ') };
+    }
+    function renderHero(){
+      var eb=$('hp-eyebrow'), t=$('rc-title'), p=$('hp-lede'), x=$('hp-heroextra');
+      if(HERO_TIMER){ clearInterval(HERO_TIMER); HERO_TIMER=null; }
+      x.innerHTML='';
+      var sn=esc(SEASON_NAME||'Season');
+      if(VIEW.mode==='build'||VIEW.mode==='live'){
+        var nw=nextWeek(); if(!nw){ VIEW.mode='recap'; return renderHero(); }
+        var ms=weekStartMs(nw.week), st=buildStory(nw), venue=''; (nw.matches||[]).forEach(function(m){ if(!venue&&m.venue) venue=m.venue; });
+        if(VIEW.mode==='live'){
+          eb.innerHTML='<span class="hp-pill hp-pill--live"><i></i>Live</span><span class="a">'+sn+' · '+esc(weekLabel(nw.week))+'</span><span class="b">'+esc(fmtDay(ms,true))+'</span>';
+          t.innerHTML='MATCH NIGHT. <span class="lime">SCORES ARE LIVE.</span>';
+          p.innerHTML='Scores land here game by game as captains confirm them, and the standings move when each match is final.';
+          x.innerHTML='<a class="hp-hero__cta" href="/live.html">Open the live board</a>';
+        } else {
+          var gameDay=!isNaN(ms)&&new Date(ms).toDateString()===new Date().toDateString();
+          eb.innerHTML='<span class="hp-pill'+(gameDay?' hp-pill--lime':'')+'">'+(gameDay?'Game day':'Up next')+'</span><span class="a">'+sn+' · '+esc(weekLabel(nw.week))+'</span><span class="b">'+esc(gameDay?'Tonight':fmtDay(ms,true))+(isNaN(ms)?'':' · '+esc(fmtTime(ms)))+(venue?' · '+esc(venue):'')+'</span>';
+          t.innerHTML=st.h; p.innerHTML=st.p;
+          if(!isNaN(ms)){
+            x.innerHTML='<div class="hp-heroact"><div class="hp-cdrow" role="timer" aria-live="off"><div><b data-u="d">0</b><small>Days</small></div><div><b data-u="h">00</b><small>Hours</small></div><div><b data-u="m">00</b><small>Minutes</small></div></div>'
+              +(gameDay?'<a class="hp-hero__cta" href="/live.html">Watch live tonight</a>':'')+'</div>';
+            var tick=function(){ var s=Math.max(0,Math.floor((ms-Date.now())/1000)), v={d:Math.floor(s/86400),h:Math.floor(s%86400/3600),m:Math.floor(s%3600/60)};
+              x.querySelectorAll('b').forEach(function(b){ var u=b.getAttribute('data-u'); b.textContent=(u==='d'?'':(v[u]<10?'0':''))+v[u]; });
+              if(s<=0&&AUTO_MODE!=='live'){ AUTO_MODE='live'; VIEW.mode='live'; renderHero(); renderWeeknav(); } };
+            tick(); HERO_TIMER=setInterval(tick,30000);
+          }
+        }
+        p.hidden=!p.innerHTML;
+        return;
+      }
+      var w=VIEW.week, s2=recapStory(w), ms2=weekStartMs(w);
+      eb.innerHTML='<span class="hp-pill hp-pill--lime">Final</span><span class="a">'+sn+' · '+esc(weekLabel(w))+'</span><span class="b">'+esc(fmtDay(ms2,true))+'</span>';
+      t.innerHTML=s2.h; p.innerHTML=s2.p; p.hidden=!s2.p;
+    }
+    function heroPhoto(drop){
+      var a=$('hp-heropic'); if(!a) return;
+      var art=drop&&(drop.cover||((drop.gallery||[])[0])||firstStoryPhoto(drop));
+      // On match night the scores come first: no photo between the headline and the live card.
+      if(!art||!art.id||VIEW.mode==='live'){ a.hidden=true; return; }
+      bgPhoto(a,art); a.href=dropHref(drop); $('hp-heropic-cap').textContent=(drop.label||('Week '+drop.week))+' · The Drop';
+      a.setAttribute('aria-label','Read The Drop, '+(drop.label||('Week '+drop.week)));
+      a.hidden=false;
+    }
+    function firstStoryPhoto(drop){ var out=null; (drop.storylines||[]).forEach(function(s){ if(!out&&s.images&&s.images[0]) out=s.images[0]; }); return out; }
+
+    /* ── Preseason: no week is final yet ── */
     function preseasonTitleHtml(){
-      var nm = String(SEASON_NAME || 'The season').toUpperCase();
-      // A season that has already finished never says "starts" or "underway".
+      var nm = esc(String(SEASON_NAME || 'The season').toUpperCase());
       if (SEASON_TAG === 'Final') return nm + ' IS IN THE <span class="lime">BOOKS.</span>';
       if (!SEASON_START) return nm + ' IS <span class="lime">LOADING UP.</span>';
       var d = new Date(SEASON_START + 'T12:00:00');
       if (isNaN(d)) return nm + ' IS <span class="lime">LOADING UP.</span>';
-      // Started, but nothing final yet — week one is being played right now.
       if (d <= new Date()) return nm + ' IS <span class="lime">UNDERWAY.</span>';
       var when = d.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }).toUpperCase();
       return nm + ' STARTS <span class="lime">' + when + '.</span>';
     }
-
-    // ── Preseason countdown ──
-    // Counts down to the season's first serve: the earliest scheduled match, or
-    // 7:00 PM on the season start date if nothing has a time yet. Only runs
-    // before any week is final and never for a finished season.
+    // Counts down to the first serve: the earliest scheduled match, or 7:00 PM on
+    // the season start date. Never runs for a finished season.
     var CD_TIMER = null;
-    function mountCountdown(titleEl, sched){
+    function mountCountdown(){
       if (SEASON_TAG === 'Final' || !SEASON_START) return;
       var first = null;
-      ((sched && sched.weeks) || []).forEach(function(w){
-        (w.matches || []).forEach(function(m){
-          var ts = m.scheduledAt ? Date.parse(m.scheduledAt) : NaN;
-          if (!isNaN(ts) && (!first || ts < first.ts)) first = { ts: ts, venue: m.venue || null };
-        });
-      });
+      WEEKS.forEach(function(w){ (w.matches || []).forEach(function(m){
+        var ts = m.scheduledAt ? Date.parse(m.scheduledAt) : NaN;
+        if (!isNaN(ts) && (!first || ts < first.ts)) first = { ts: ts, venue: m.venue || null };
+      }); });
       var target = first ? first.ts : Date.parse(SEASON_START + 'T19:00:00');
       if (isNaN(target)) return;
-      // Once the first night is well past with nothing final, keep the plain "UNDERWAY" title.
-      if (Date.now() - target > 12 * 3600 * 1000) return;
-
-      var nm = String(SEASON_NAME || 'The season').toUpperCase();
+      if (Date.now() - target > 12 * 3600 * 1000) return;   // long past with nothing final: keep the plain title
+      var nm = esc(String(SEASON_NAME || 'The season').toUpperCase());
       var d = new Date(target);
-      var sub = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) +
-        ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) +
-        (first && first.venue ? ' · ' + esc(first.venue) : '');
-      var box = titleEl.parentNode;
-      box.style.flex = '1 1 100%';
-      box.innerHTML =
-        '<div class="cd" id="rc-cd">' +
-          '<div>' +
+      var sub = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) + ' · ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) + (first && first.venue ? ' · ' + esc(first.venue) : '');
+      $('hp-herotxt').innerHTML =
+        '<div class="cd" id="rc-cd"><div>' +
             '<div class="cd__kick"><span class="cd__dot"></span><span id="cd-kick">Countdown to first serve</span></div>' +
-            '<h1 id="rc-title"></h1>' +
-            '<div class="cd__sub">' + sub + '</div>' +
-          '</div>' +
+            '<h1 id="rc-title"></h1><div class="cd__sub">' + sub + '</div></div>' +
           '<div class="cd__clock" id="cd-clock" role="timer" aria-live="off">' +
             '<div class="cd__unit"><div class="cd__num" data-u="d">00</div><div class="cd__cap">Days</div></div><div class="cd__sep">:</div>' +
             '<div class="cd__unit"><div class="cd__num" data-u="h">00</div><div class="cd__cap">Hours</div></div><div class="cd__sep">:</div>' +
             '<div class="cd__unit"><div class="cd__num" data-u="m">00</div><div class="cd__cap">Minutes</div></div><div class="cd__sep">:</div>' +
             '<div class="cd__unit cd__unit--sec"><div class="cd__num" data-u="s">00</div><div class="cd__cap">Seconds</div></div>' +
           '</div>' +
-          '<div class="cd__live"><i></i>' + esc(SEASON_NAME || 'The season') + ' is live</div>' +
-        '</div>';
-      var cd = document.getElementById('rc-cd'), h1 = document.getElementById('rc-title'),
-          kick = document.getElementById('cd-kick'), clock = document.getElementById('cd-clock'),
-          nums = clock.querySelectorAll('.cd__num');
+          '<div class="cd__live"><i></i>' + esc(SEASON_NAME || 'The season') + ' is live</div></div>';
+      var cd = $('rc-cd'), h1 = $('rc-title'), kick = $('cd-kick'), clock = $('cd-clock'), nums = clock.querySelectorAll('.cd__num');
       function pad(n){ return (n < 10 ? '0' : '') + n; }
       function tick(){
         var ms = Math.max(0, target - Date.now());
         var live = ms <= 0, soon = !live && ms < 86400000;
-        cd.classList.toggle('is-live', live);
-        cd.classList.toggle('is-soon', soon);
+        cd.classList.toggle('is-live', live); cd.classList.toggle('is-soon', soon);
         kick.textContent = live ? 'First serve' : soon ? 'Game night' : 'Countdown to first serve';
         h1.innerHTML = live ? nm + ' IS <span class="lime">UNDERWAY.</span>' : nm + ' <span class="lime">STARTS</span>';
         var s = Math.floor(ms / 1000), v = { d: Math.floor(s / 86400), h: Math.floor(s % 86400 / 3600), m: Math.floor(s % 3600 / 60), s: s % 60 };
@@ -522,603 +788,292 @@
         if (live && CD_TIMER) { clearInterval(CD_TIMER); CD_TIMER = null; }
       }
       if (CD_TIMER) clearInterval(CD_TIMER);
-      tick();
-      CD_TIMER = setInterval(tick, 1000);
+      tick(); CD_TIMER = setInterval(tick, 1000);
     }
 
-    function recapTitleHtml(w){
-      var WW=['','ONE','TWO','THREE','FOUR','FIVE','SIX','SEVEN','EIGHT','NINE','TEN'];
-      var html='WEEK '+(WW[w]||w)+' IS IN THE <span class="lime">BOOKS.</span>';
-      if(w===TOTAL_WEEKS) html+=' <span class="lime">A CHAMPION IS CROWNED.</span>';
-      return html;
+    /* ═══ WEEK BAR ═══ */
+    function renderWeeknav(){
+      var el=$('rc-weeknav'), bar=$('hp-weekbar'); if(!el) return;
+      if(!MAXWEEK){ show(bar,false); return; }
+      var html='', nw=nextWeek(), recap=VIEW.mode==='recap';
+      for(var w=1;w<=MAXWEEK;w++){ if(!finals(w).length) continue; var on=recap&&w===VIEW.week; html+='<button type="button" data-week="'+w+'"'+(on?' class="on" aria-current="true"':'')+'>Wk '+w+'</button>'; }
+      if(nw){ var on2=!recap; var tn=weekStartMs(nw.week), tonight=AUTO_MODE==='live'||(!isNaN(tn)&&new Date(tn).toDateString()===new Date().toDateString());
+        html+='<button type="button" class="nx'+(on2?' on':'')+'" data-next="1"'+(on2?' aria-current="true"':'')+'>'+(tonight?'Tonight':'Wk '+nw.week+' preview')+'</button>'; }
+      el.innerHTML=html; show(bar,true);
+      var cur=el.querySelector('.on'); if(cur&&el.scrollWidth>el.clientWidth) el.scrollLeft=Math.max(0,cur.offsetLeft-el.clientWidth/2);
+    }
+    document.addEventListener('click',function(e){
+      var b=e.target.closest('#rc-weeknav button'); if(!b) return;
+      if(b.getAttribute('data-next')){ VIEW.mode=(AUTO_MODE==='live')?'live':'build'; VIEW.week=MAXWEEK; }
+      else { VIEW.mode='recap'; VIEW.week=parseInt(b.getAttribute('data-week'),10); }
+      renderAll();
+      var top=$('recap').getBoundingClientRect().top+window.pageYOffset; if(window.pageYOffset>top+200) window.scrollTo({top:top,behavior:'smooth'});
+    });
+    // The week bar sits under the fixed nav, whatever its height is today.
+    function setTop(){ var h=0; ['.ds-nav','.ds-pastbar'].forEach(function(s){ var n=document.querySelector(s); if(!n) return; var r=n.getBoundingClientRect(); if(r.height>0&&r.bottom>h&&r.top<=0) h=r.bottom; }); document.documentElement.style.setProperty('--hp-top',Math.max(0,Math.round(h))+'px'); }
+    window.addEventListener('resize',setTop); setTimeout(setTop,300); setTimeout(setTop,1500);
+
+    /* ═══ STANDINGS ═══ */
+    function renderStandings(w){
+      var sec=$('rc-standings'); if(!TEAMS.length){ show(sec,false); return; }
+      var rows=standRows(w), latest=w>=MAXWEEK, tw=lastTableWeek(w);
+      var topIds=[];
+      if(latest&&STAND_DIV&&STAND_DIV.weeklyTopTeams){ var wks=Object.keys(STAND_DIV.weeklyTopTeams).map(Number).sort(function(a,b){return b-a;}); for(var i=0;i<wks.length;i++){ var arr=STAND_DIV.weeklyTopTeams[wks[i]]; if(arr&&arr.length){ topIds=arr; break; } } }
+      $('hp-stand-h').innerHTML=(latest||!tw)?'Standings':'Standings <span class="lime">after Week '+tw+'</span>';
+      $('rc-stand-body').innerHTML=rows.map(function(r){
+        var fin=(latest&&HOME_FINISH)?(HOME_FINISH[r.name]||null):null;
+        var chip=fin&&fin.n<=3?'<span class="fin-chip fin-'+fin.n+'">'+esc(fin.chip)+'</span>':'';
+        var top=topIds.indexOf(r.id)>=0?'<span class="wpill">Top Wk</span>':'';
+        var mv=r.move==null||!r.move?'<span class="c-mv">—</span>':r.move>0?'<span class="c-mv up">▲'+r.move+'</span>':'<span class="c-mv dn">▼'+(-r.move)+'</span>';
+        var df=r.diff==null?'<span class="c-df">—</span>':'<span class="c-df '+(r.diff>0?'pos':r.diff<0?'neg':'')+'">'+signed(r.diff)+'</span>';
+        var form=(r.nights||[]).slice(-3).map(function(n){ return '<i class="hp-form '+(n.f>=3?'w':n.f===2?'t':'l')+'" title="Week '+n.w+': '+n.f+'–'+n.a+' v '+esc(n.opp)+'">'+n.f+'</i>'; }).join('');
+        return '<div class="hp-st__row'+(fin&&fin.cls?' '+fin.cls:'')+'">'
+          +'<span class="c-rk">'+r.rank+'</span>'+mv
+          +'<span class="c-team">'+teamBadge(r.name,r.id,34,r.emoji)+'<span style="min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px">'+teamLink(r.name,r.id,'tname')+chip+top+'</span></span>'
+          +'<span class="c-rec">'+esc(r.rec)+'</span><span class="c-pts">'+r.pts+'</span><span class="c-gm">'+r.gw+'–'+r.gl+'</span>'+df
+          +'<span class="c-form">'+form+'</span></div>';
+      }).join('');
+      $('rc-stand-note').textContent='Pts: a round win is 2, a tie is 1, so 4 a night. Last 3 = match points taken each night. +/− = places moved since the week before.';
+      show(sec,true);
     }
 
-    var RECAP_PERF = [], RECAP_MAXWEEK = 0, RECAP_PLAYERS = null;
-    function renderWeeknav(selectedWeek, maxWeek){
-      var el=document.getElementById('rc-weeknav');if(!el)return;
-      var html='';
-      var mx=Math.min(maxWeek||selectedWeek||0,TOTAL_WEEKS);
-      for(var w=1;w<=mx;w++){html+='<span data-week="'+w+'"'+(w===selectedWeek?' class="on"':'')+'>'+w+'</span>';}
-      el.innerHTML=html;
-    }
-
-    // Week pager: re-render the performers panel for a selected (past) week using
-    // the already-loaded weeklyTopPerformers data. Standings stay 'latest'.
-    function showWeek(w){
-      var entry=null;
-      for(var i=0;i<RECAP_PERF.length;i++){if(RECAP_PERF[i].week===w){entry=RECAP_PERF[i];break;}}
-      if(!entry)return;
-      var men=entry.men||[],women=entry.women||[];
-      var panels=document.getElementById('rc-perfpanels');
-      setPerfTabLabel(w);
-      if(panels){
-        panels.innerHTML=potwPanel(men,women,true,w)
-          +perfListPanel(entry,'dsr',false)
-          +perfListPanel(entry,'diff',false)
-          +perfListPanel(entry,'pts',false)
-          +climbersPanel(false);
-      }
-      document.querySelectorAll('#rc-perftabs button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-k')==='potw');});
-      var t=document.getElementById('rc-title');
-      if(t){t.innerHTML=recapTitleHtml(w);}
-      renderWeeknav(w, RECAP_MAXWEEK);
-    }
-
-    /* ---- POTW + DSR from weeklyTopPerformers (latest week) ---- */
-    // Avatar: show the player's photo when they have one, else initials.
-    // player-photo-serve returns 404 for players with no photo, so the onerror
-    // handler swaps back to initials cleanly.
+    /* ═══ PLAYERS OF THE WEEK + leaders ═══ */
+    function photoSrc(p){ return p.photoUrl ? p.photoUrl : ((!('photoUrl' in p) && p.playerId) ? FN+'player-photo-serve?id='+encodeURIComponent(p.playerId) : null); }
     function avatarHtml(p, cls){
-      var ini = esc(initials(p.name));
-      // Prefer server-stamped photoUrl (cache-busted, only set when a photo
-      // exists). Only fall back to a blind id-based request for legacy data
-      // that predates photoUrl. null photoUrl = known no-photo → initials.
-      var src = p.photoUrl ? p.photoUrl
-        : ((!('photoUrl' in p) && p.playerId) ? '/.netlify/functions/player-photo-serve?id='+encodeURIComponent(p.playerId) : null);
+      var ini = esc(initials(p.name)), src=photoSrc(p);
       if (!src) return '<div class="'+cls+'">'+ini+'</div>';
-      return '<div class="'+cls+'" data-ini="'+ini+'"><img src="'+src+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="this.remove();this.parentNode.textContent=this.parentNode.dataset.ini;"></div>';
+      return '<div class="'+cls+'" data-ini="'+ini+'"><img src="'+esc(src)+'" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;" onerror="var b=this.parentNode;this.remove();if(b)b.textContent=b.dataset.ini;"></div>';
+    }
+    function bigCard(p, cls, cat, stats){
+      var src=photoSrc(p);
+      return '<div class="hp-pw '+cls+'">'
+        +'<a class="hp-pw__pic" href="'+playerHref(p.name,p.teamName)+'" aria-label="'+esc(p.name)+'"><span class="hp-pw__cat">'+esc(cat)+'</span><span class="hp-pw__ini" aria-hidden="true">'+esc(initials(p.name))+'</span>'
+        +(src?'<img src="'+esc(src)+'" alt="" loading="lazy" onerror="this.remove()">':'')+'</a>'
+        +'<div class="hp-pw__body"><div class="hp-pw__name">'+playerLink(p.name,p.teamName,'pname')+'</div>'
+        +(p.teamName?'<div class="hp-pw__team">'+teamLink(p.teamName,p.teamId,'ptm')+'</div>':'')
+        +'<div class="hp-pw__stats">'+stats+'</div></div></div>';
     }
     function potwCard(p,gender){
-      var isM=gender==='m';
-      var cls=isM?'m':'f';
-      var ps=(p.ps!=null)?p.ps:'—';
-      return '<div class="pcard '+cls+'">'
-        +'<div class="pcard__cat">'+(isM?'Men\'s':'Women\'s')+'</div>'
-        +'<div class="pcard__row">'
-          +avatarHtml(p,'pav')
-          +'<div class="pcard__name">'+playerLink(p.name,p.teamName,'pname',SN(p.name))+'</div>'
-          +(p.teamName?'<div class="pcard__team">'+teamLink(p.teamName,p.teamId,'ptm')+'</div>':'')
-        +'</div>'
-        +'<div class="pcard__stats">'
-          +'<div><div class="l">Record</div><div class="v hot">'+esc(rec(p.w,p.l))+'</div></div>'
-          +'<div><div class="l">DSR</div><div class="v">'+esc(p.dsr!=null?p.dsr:'—')+'</div></div>'
-          +'<div><div class="l">Pts Scored</div><div class="v">'+esc(ps)+'</div></div>'
-          +'<div><div class="l">Diff</div><div class="v">'+esc(signed(p.diff))+'</div></div>'
-        +'</div></div>';
+      var st='<span>'+esc(rec(p.w,p.l))+'</span><span class="hot">'+esc(signed(p.diff))+'</span>'+(p.dsr!=null?'<span>'+esc(p.dsr)+' DSR</span>':'')+(p.ps!=null?'<span>'+esc(p.ps)+' pts</span>':'');
+      return bigCard(p, gender==='m'?'m':'f', gender==='m'?'Men\'s':'Women\'s', st);
     }
-    // Top Performers — tabbed (POTW / DSR / Best Diff / Most Pts), Top 6 M & F.
     function perfVal(p,metric){ if(metric==='diff')return signed(p.diff); if(metric==='pts')return p.ps!=null?p.ps:'—'; return p.dsr!=null?p.dsr:'—'; }
     function perfRow(p,i,metric){
-      return '<div class="prow'+(i===0?' lead':'')+'"><span class="prk">'+(i+1)+'</span>'
-        +avatarHtml(p,'prow-av')
+      return '<div class="prow'+(i===0?' lead':'')+'"><span class="prk">'+(i+1)+'</span>'+avatarHtml(p,'prow-av')
         +'<div class="pinfo"><div class="pnm">'+playerLink(p.name,p.teamName,'pname',SN(p.name))+'</div>'
         +'<div class="ptm">'+teamLink(p.teamName,p.teamId,'ptm')+' · '+esc(rec(p.w,p.l))+'</div></div>'
         +'<span class="pval">'+esc(perfVal(p,metric))+'</span></div>';
     }
-    function perfSort(arr,metric){
-      var key=metric==='diff'?'diff':metric==='pts'?'ps':'dsr';
-      return arr.slice().sort(function(a,b){var av=a[key],bv=b[key];if(av==null)av=-Infinity;if(bv==null)bv=-Infinity;return bv-av;});
+    function perfSort(arr,metric){ var key=metric==='diff'?'diff':metric==='pts'?'ps':'dsr'; return arr.slice().sort(function(a,b){var av=a[key],bv=b[key];if(av==null)av=-Infinity;if(bv==null)bv=-Infinity;return bv-av;}); }
+    // Precomputed top-per-metric leaders when present, else sort the top-N arrays.
+    function perfMetricList(entry, g, metric){ var L = entry.leaders && entry.leaders[g]; if (L && Array.isArray(L[metric])) return L[metric].slice(0, 5); return perfSort(entry[g] || [], metric).slice(0, 5); }
+    function perfListPanel(entry,metric){
+      return '<div class="perfpanel" data-tab="'+metric+'">'
+        +'<div class="perf-col m"><h4>Men · Top 5</h4>'+perfMetricList(entry,'men',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div>'
+        +'<div class="perf-col f"><h4>Women · Top 5</h4>'+perfMetricList(entry,'women',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div></div>';
     }
-    // Use the precomputed top-per-metric leaders (top 6 each) when present, so
-    // Best Diff / Most Pts aren't constrained to the DSR top 3; fall back to
-    // sorting the topN arrays for older data without `leaders`.
-    function perfMetricList(latest, g, metric){
-      var L = latest.leaders && latest.leaders[g];
-      if (L && Array.isArray(L[metric])) return L[metric].slice(0, 5);
-      return perfSort(latest[g] || [], metric).slice(0, 5);
-    }
-    function perfListPanel(latest,metric,on){
-      return '<div class="perfpanel'+(on?' on':'')+'" data-tab="'+metric+'">'
-        +'<div class="perf-col m"><h4>Men · Top 5</h4>'+perfMetricList(latest,'men',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div>'
-        +'<div class="perf-col f"><h4>Women · Top 5</h4>'+perfMetricList(latest,'women',metric).map(function(p,i){return perfRow(p,i,metric);}).join('')+'</div></div>';
-    }
-    /* ---- Season MVPs — Week 8 replaces POTW with the season crowns ----
-       One male, one female, picked by the league at season's end (stats made
-       the shortlist). Shown only on the final week's panel; every earlier
-       week keeps its POTW pair. Edit names/stats here. */
-    // Hand-written, and specific to the season named here — see MVP_CIRCUIT.
+    /* Season MVPs: the final week swaps the POTW pair for the season crowns.
+       Hand-written and specific to the season named in MVP_CIRCUIT. */
     var MVP_CIRCUIT = 'I';
     var SEASON_MVPS = {
       male:   { name:'Ryan Hom', teamName:'Smash Society', stats:[['Record','24-6'],['DSR','72.0'],['Diff','+117'],['Clutch','7/9']] },
       female: { name:'Shay C',   teamName:'ZERO ZERO TWO', stats:[['Record','29-3'],['DSR','82.0'],['Diff','+200'],['Win rate','91%']] },
     };
-    function playerByName(name){
-      if(!RECAP_PLAYERS) return null;
-      var ks=Object.keys(RECAP_PLAYERS);
-      for(var i=0;i<ks.length;i++){ if(RECAP_PLAYERS[ks[i]].name===name) return RECAP_PLAYERS[ks[i]]; }
-      return null;
+    function playerByName(name){ if(!PLAYERS) return null; var ks=Object.keys(PLAYERS); for(var i=0;i<ks.length;i++){ if(PLAYERS[ks[i]].name===name) return PLAYERS[ks[i]]; } return null; }
+    function mvpCard(m, female){
+      var p = playerByName(m.name) || {}; var q={name:m.name,teamName:m.teamName,teamId:p.teamId,playerId:p.playerId}; if('photoUrl' in p) q.photoUrl=p.photoUrl;
+      return bigCard(q,'mvp','Season MVP · '+(female?'Female':'Male'), m.stats.map(function(s){return '<span>'+esc(s[1])+' '+esc(s[0])+'</span>';}).join(''));
     }
-    function mvpCardHome(m, female){
-      var p = playerByName(m.name) || { name:m.name };
-      return '<div class="pcard mvp'+(female?' f2':'')+'">'
-        +'<div class="pcard__badge">MVP</div>'
-        +'<div class="pcard__cat">Season MVP · '+(female?'Female':'Male')+'</div>'
-        +'<div class="pcard__row">'
-          +avatarHtml(p,'pav')
-          +'<div class="pcard__name">'+playerLink(m.name,m.teamName,'pname',SN(m.name))+'</div>'
-          +'<div class="pcard__team">'+teamLink(m.teamName,p.teamId,'ptm')+'</div>'
-        +'</div>'
-        +'<div class="pcard__stats">'
-          +m.stats.map(function(s){return '<div><div class="l">'+s[0]+'</div><div class="v'+(s[0]==='Record'?' hot':'')+'">'+s[1]+'</div></div>';}).join('')
-        +'</div></div>';
-    }
-    function mvpPanelHome(on){
-      if (SEASON_CODE !== MVP_CIRCUIT) return '';  // these MVPs belong to one season
-      return '<div class="perfpanel'+(on?' on':'')+'" data-tab="potw">'
-        + mvpCardHome(SEASON_MVPS.male,false)
-        + mvpCardHome(SEASON_MVPS.female,true)
-        + '</div>';
-    }
-    function setPerfTabLabel(week){
-      var b=document.querySelector('#rc-perftabs button[data-k="potw"]');
-      if(b) b.textContent = (week===TOTAL_WEEKS && HOME_FINISH) ? 'MVP' : 'POTW';
-    }
-    function potwPanel(men,women,on,week){
-      // The final week crowns the season: MVPs take the POTW slot.
-      if(week===TOTAL_WEEKS && HOME_FINISH) return mvpPanelHome(on);
-      var html='<div class="perfpanel'+(on?' on':'')+'" data-tab="potw">';
-      if(men[0])html+=potwCard(men[0],'m');
-      if(women[0])html+=potwCard(women[0],'f');
+    function isMvpWeek(week){ return week===TOTAL_WEEKS && HOME_FINISH && SEASON_CODE===MVP_CIRCUIT; }
+    function potwPanel(entry,week){
+      var html='<div class="perfpanel on" data-tab="potw">';
+      if(isMvpWeek(week)) html+=mvpCard(SEASON_MVPS.male,false)+mvpCard(SEASON_MVPS.female,true);
+      else { var men=entry.men||[], women=entry.women||[]; if(men[0])html+=potwCard(men[0],'m'); if(women[0])html+=potwCard(women[0],'f'); }
       return html+'</div>';
     }
-    // Top Climbers — biggest DSR rank jumps this week, computed fresh from the
-    // players aggregate (composite rating + rankDelta). Rank = position by
-    // composite; fromRank = current rank + spots gained.
+    // Movers: biggest season-ranking jumps this week, from the players aggregate.
     function computeClimbers(){
-      if(!RECAP_PLAYERS) return [];
-      var all=Object.keys(RECAP_PLAYERS).map(function(k){return RECAP_PLAYERS[k];});
-      var ranked=all.filter(function(p){return p.composite!=null&&isFinite(p.composite);}).slice()
-        .sort(function(a,b){return b.composite-a.composite;});
-      var rankOf={};
-      ranked.forEach(function(p,i){rankOf[p.playerId!=null?p.playerId:p.name]=i+1;});
+      if(!PLAYERS) return [];
+      var all=Object.keys(PLAYERS).map(function(k){return PLAYERS[k];});
+      var ranked=all.filter(function(p){return p.composite!=null&&isFinite(p.composite);}).slice().sort(function(a,b){return b.composite-a.composite;});
+      var rankOf={}; ranked.forEach(function(p,i){rankOf[p.playerId!=null?p.playerId:p.name]=i+1;});
       var rkFor=function(p){return rankOf[p.playerId!=null?p.playerId:p.name]||Infinity;};
       return all.filter(function(p){return p.rankDelta!=null&&isFinite(p.rankDelta)&&p.rankDelta>0;})
-        .sort(function(a,b){
-          if(b.rankDelta!==a.rankDelta) return b.rankDelta-a.rankDelta; // biggest jump first
-          return rkFor(a)-rkFor(b); // tie → higher current ranking (lower rank #) on top
-        })
+        .sort(function(a,b){ if(b.rankDelta!==a.rankDelta) return b.rankDelta-a.rankDelta; return rkFor(a)-rkFor(b); })
         .map(function(p){var rk=rankOf[p.playerId!=null?p.playerId:p.name]||null;
-          return {name:p.name,teamName:p.teamName,teamId:p.teamId,playerId:p.playerId,photoUrl:p.photoUrl,gender:p.gender,
-                  delta:p.rankDelta,rank:rk,fromRank:rk!=null?rk+p.rankDelta:null};});
+          var o={name:p.name,teamName:p.teamName,teamId:p.teamId,playerId:p.playerId,gender:p.gender,delta:p.rankDelta,rank:rk,fromRank:rk!=null?rk+p.rankDelta:null}; if('photoUrl' in p) o.photoUrl=p.photoUrl; return o;});
     }
     function climberRow(c,i){
       var jump=(c.rank!=null&&c.fromRank!=null)?' · #'+c.fromRank+' → #'+c.rank:'';
-      return '<div class="prow'+(i===0?' lead':'')+'"><span class="prk">'+(i+1)+'</span>'
-        +avatarHtml(c,'prow-av')
-        +'<div class="pinfo"><div class="pnm">'+playerLink(c.name,c.teamName,'pname',SN(c.name))+'</div>'
-        +'<div class="ptm">'+teamLink(c.teamName,c.teamId,'ptm')+jump+'</div></div>'
+      return '<div class="prow'+(i===0?' lead':'')+'"><span class="prk">'+(i+1)+'</span>'+avatarHtml(c,'prow-av')
+        +'<div class="pinfo"><div class="pnm">'+playerLink(c.name,c.teamName,'pname',SN(c.name))+'</div><div class="ptm">'+teamLink(c.teamName,c.teamId,'ptm')+jump+'</div></div>'
         +'<span class="pval" style="color:var(--color-lime)">▲'+esc(c.delta)+'</span></div>';
     }
     function climbersCol(cl, g, label){
-      var rows=cl.filter(function(c){return (c.gender||'').toUpperCase()===g;}).slice(0,5);
-      var inner=rows.length?rows.map(function(c,i){return climberRow(c,i);}).join('')
-        :'<div style="color:var(--color-text-faint);font-size:12px;padding:12px 4px;">No rank jumps yet.</div>';
-      return '<div class="perf-col '+(g==='M'?'m':'f')+'"><h4>'+label+'</h4>'+inner+'</div>';
+      var rows=cl.filter(function(c){return (c.gender||'').toUpperCase().charAt(0)===g;}).slice(0,5);
+      return '<div class="perf-col '+(g==='M'?'m':'f')+'"><h4>'+label+'</h4>'+(rows.length?rows.map(climberRow).join(''):'<div class="dwg">No rank jumps yet.</div>')+'</div>';
     }
-    function climbersPanel(on){
-      var cl=computeClimbers();
-      return '<div class="perfpanel'+(on?' on':'')+'" data-tab="climbers">'
-        +climbersCol(cl,'M','Men · Top Movers')+climbersCol(cl,'F','Women · Top Movers')+'</div>';
+    function renderPerformers(w){
+      var sec=$('rc-perf'), entry=null; PERF.forEach(function(e){ if(e.week===w) entry=e; });
+      if(!entry||(!(entry.men||[]).length&&!(entry.women||[]).length)){ show(sec,false); return; }
+      var latest=w>=MAXWEEK, mvp=isMvpWeek(w);
+      $('hp-perf-h').textContent=mvp?'Season MVPs':'Players of the week';
+      var tabs=$('rc-perftabs'); tabs.querySelector('[data-k="potw"]').textContent=mvp?'MVP':'POTW';
+      tabs.querySelector('[data-k="climbers"]').hidden=!latest;   // rank movement is only known for the latest week
+      var cl=latest?computeClimbers():[];
+      $('rc-perfpanels').innerHTML=potwPanel(entry,w)+perfListPanel(entry,'dsr')+perfListPanel(entry,'diff')+perfListPanel(entry,'pts')
+        +(latest?'<div class="perfpanel" data-tab="climbers">'+climbersCol(cl,'M','Men · Top movers')+climbersCol(cl,'F','Women · Top movers')+'</div>':'');
+      tabs.querySelectorAll('button').forEach(function(x){x.classList.toggle('on',x.getAttribute('data-k')==='potw');});
+      show(sec,true);
     }
-    function renderPerformers(latest){
-      if(!latest){return;}
-      var men=latest.men||[],women=latest.women||[];
-      setPerfTabLabel(latest.week);
-      if(men.length||women.length){
-        document.getElementById('rc-perfpanels').innerHTML =
-          potwPanel(men,women,true,latest.week)
-          +perfListPanel(latest,'dsr',false)
-          +perfListPanel(latest,'diff',false)
-          +perfListPanel(latest,'pts',false)
-          +climbersPanel(false);
-        document.getElementById('rc-perf').style.display='';
-      }
-      // header week
-      if(latest.week){
-        renderWeeknav(latest.week, RECAP_MAXWEEK);
-        var t=document.getElementById('rc-title');
-        if(t){t.innerHTML=recapTitleHtml(latest.week);}
-        var k=document.getElementById('rc-drop-kicker');if(k)k.textContent='The Drop · Week '+latest.week;
-        var cv=document.getElementById('rc-drop-cover');if(cv)cv.textContent='Week '+latest.week+' · The Drop';
-      }
-    }
-    // Top Performers tab switcher (delegated — survives re-render).
     document.addEventListener('click',function(e){
       var b=e.target.closest('#rc-perftabs button'); if(!b)return;
       var k=b.getAttribute('data-k');
       document.querySelectorAll('#rc-perftabs button').forEach(function(x){x.classList.toggle('on',x===b);});
       document.querySelectorAll('#rc-perfpanels .perfpanel').forEach(function(p){p.classList.toggle('on',p.getAttribute('data-tab')===k);});
     });
-    // Week pager — click a week number to view that week's recap performers.
+
+    /* ═══ SEASON LEADERS: top 10 by DSR, point differential and points scored ═══
+       Season to date, from the players aggregate. DSR counts qualified players only
+       (the same games bar the leaderboard uses) once anyone has qualified. */
+    var LEAD_G='all';
+    function renderLeaders(){
+      var sec=$('hp-leaders'); if(!PLAYERS){ show(sec,false); return; }
+      var all=Object.keys(PLAYERS).map(function(k){return PLAYERS[k];}).filter(function(p){ return (p.gamesPlayed||0)>0; });
+      if(!all.length){ show(sec,false); return; }
+      var pool=all.filter(function(p){ return LEAD_G==='all' || String(p.gender||'').toUpperCase().charAt(0)===LEAD_G; });
+      var qual=pool.filter(function(p){ return p.dsrQualified&&p.composite!=null; }), anyQual=all.some(function(p){ return p.dsrQualified; });
+      function top(list,key){ return list.filter(function(p){ return p[key]!=null&&isFinite(p[key]); }).sort(function(a,b){ return (b[key]-a[key])||((b.gamesWon||0)-(a.gamesWon||0))||String(a.name).localeCompare(String(b.name)); }).slice(0,10); }
+      function row(p,i,val,extra){
+        return '<div class="prow'+(i===0?' lead':'')+'"><span class="prk">'+(i+1)+'</span>'+avatarHtml(p,'prow-av')
+          +'<div class="pinfo"><div class="pnm">'+playerLink(p.name,p.teamName,'pname')+'</div><div class="ptm">'+teamLink(p.teamName,p.teamId,'ptm')+' · '+esc(rec(p.gamesWon,p.gamesLost))+'</div></div>'
+          +'<span class="pval">'+val+(extra||'')+'</span></div>';
+      }
+      function card(title,sub,list,fmt,extra){ return '<div class="hp-card hp-lead"><h3>'+title+'</h3><p>'+sub+'</p>'+(list.length?list.map(function(p,i){ return row(p,i,fmt(p),extra?extra(p):''); }).join(''):'<div class="dwg">No one yet.</div>')+'</div>'; }
+      var need=D_NEED?(' ('+D_NEED+'+ games)'):'';
+      $('hp-leads').innerHTML=
+        card('DSR','Dink Society Rating'+(anyQual?', qualified players'+need:''), top(anyQual?qual:pool,'composite'), function(p){ return esc((Math.round(p.composite*10)/10).toFixed(1)); },
+          function(p){ var d=p.rankDelta; return d>0?'<small class="up">▲'+d+'</small>':d<0?'<small class="dn">▼'+(-d)+'</small>':''; })
+        +card('Point differential','Points scored minus points allowed', top(pool,'diff'), function(p){ return esc(signed(p.diff)); })
+        +card('Points scored','Every point across the season', top(pool,'ps'), function(p){ return esc(Number(p.ps).toLocaleString('en-US')); });
+      show(sec,true);
+    }
+    var D_NEED=0;
     document.addEventListener('click',function(e){
-      var s=e.target.closest('#rc-weeknav span[data-week]'); if(!s)return;
-      showWeek(parseInt(s.getAttribute('data-week'),10));
+      var b=e.target.closest('#hp-leaders-seg button'); if(!b) return;
+      LEAD_G=b.getAttribute('data-g');
+      document.querySelectorAll('#hp-leaders-seg button').forEach(function(x){ var on=x===b; x.classList.toggle('on',on); x.setAttribute('aria-pressed',on?'true':'false'); });
+      renderLeaders();
     });
 
-    /* ---- Bracket finish (mirrors the Playoffs tab on /standings.html) ----
-       Once the medal round is finalized, the home standings rank by finish —
-       Champion → Runner-up → Bronze winner → Bronze loser → consolation —
-       with the same medal chips + glowing rows. Null until a champion exists,
-       so mid-season the table keeps its normal points order. */
-    var HOME_FINISH = null;
-    function computeBracketFinish(sched){
-      var weeks=(sched&&sched.weeks)||[], map={}, sawGold=false;
-      weeks.forEach(function(w){
-        if(w.phase!=='playoff'&&w.phase!=='championship')return;
-        (w.matches||[]).forEach(function(m){
-          if(!m.finalizedAt||m.homeRoundPts==null||m.homeRoundPts===m.awayRoundPts)return;
-          var win=m.homeRoundPts>m.awayRoundPts?m.teamA:m.teamB;
-          var lose=m.homeRoundPts>m.awayRoundPts?m.teamB:m.teamA;
-          var medal=String(m.medal||'')+' '+String(m.bracketGroup||m.gameLabel||'');
-          var place=String(m.placeLabel||'');
-          if(/🥇|gold/i.test(medal)){ map[win]={n:1,cls:'fm1',chip:'🥇 Champion'}; map[lose]={n:2,cls:'fm2',chip:'🥈 Runner-up'}; sawGold=true; }
-          else if(/🥉|bronze/i.test(medal)){ map[win]={n:3,cls:'fm3',chip:'🥉 Bronze'}; map[lose]={n:4,cls:'',chip:'4th'}; }
-          else if(/5th/i.test(place)||/consolation/i.test(medal)){ map[win]={n:5,cls:'',chip:'5th'}; map[lose]={n:6,cls:'',chip:'6th'}; }
-        });
-      });
-      return sawGold?map:null;
+    /* ═══ THE NIGHT IN NUMBERS ═══ */
+    // Game-by-game logs for one week (one public-match call per final match, cached).
+    var LOGS={}, LOGP={};
+    function loadWeekLogs(w){
+      if(LOGP[w]) return LOGP[w];
+      var ms=finals(w);
+      LOGP[w]=Promise.all(ms.map(function(m){ return getJSON(FN+'public-match?'+new URLSearchParams({season:SEASON_ID,match:m.id})).then(function(d){ var x=d&&d.match; if(x) detailCache[m.id]=x; return x||null; }); }))
+        .then(function(list){ LOGS[w]=(list.length&&list.every(function(x){return x&&x.games&&x.games.length;}))?list:null; return LOGS[w]; });
+      return LOGP[w];
+    }
+    function paceFor(w,m){ var out=null; ((PACE&&PACE.matches)||[]).forEach(function(p){ if(p.week===w&&((p.homeId&&p.homeId===m.teamAId)||p.home===m.teamA)&&p.totalMin!=null) out=p; }); return out; }
+    function renderNumbers(w){
+      var sec=$('hp-numbers'), ms=finals(w); if(!ms.length){ show(sec,false); return; }
+      var games=0, pts=0, tiles=[];
+      ms.forEach(function(m){ games+=(m.gamesA||0)+(m.gamesB||0); pts+=(m.pointsA||0)+(m.pointsB||0); });
+      if(games) tiles.push({v:games,t:plural(games,'game')+' played across '+numWord(ms.length)+' '+(ms.length===1?'match':'matches')});
+      if(pts&&games) tiles.push({v:pts.toLocaleString('en-US'),t:'points scored, '+(pts/games).toFixed(1)+' a game'});
+      var logs=LOGS[w];
+      if(logs){
+        var close=0, rec2={};
+        logs.forEach(function(x){ var hn=(x.home&&x.home.name)||'', an=(x.away&&x.away.name)||'';
+          x.games.forEach(function(g){ if(g.home==null||g.away==null) return; if(Math.abs(g.home-g.away)<=2) close++;
+            [[g.homePlayers,hn,g.home>g.away],[g.awayPlayers,an,g.away>g.home]].forEach(function(S){ (S[0]||[]).forEach(function(nm){ if(!nm) return; var k=S[1]+'|'+nm, r=rec2[k]||(rec2[k]={w:0,l:0}); r[S[2]?'w':'l']++; }); }); }); });
+        tiles.push({v:close,t:(close===1?'game':'games')+' decided by one or two points',hot:true});
+        var unb=Object.keys(rec2).filter(function(k){ return rec2[k].l===0&&rec2[k].w>=3; }).length;
+        if(unb) tiles.push({v:unb,t:plural(unb,'player')+' went unbeaten in three or more games',last:true});
+      }
+      var big=null; ms.forEach(function(m){ if(m.gamesA==null||m.gamesB==null) return; var d=Math.abs(m.gamesA-m.gamesB), pd=Math.abs((m.pointsA||0)-(m.pointsB||0)); if(d>0&&(!big||d>big.d||(d===big.d&&pd>big.pd))) big={d:d,pd:pd,m:m}; });
+      if(big){ var hw=big.m.gamesA>big.m.gamesB, W=hw?big.m.teamA:big.m.teamB, L=hw?big.m.teamB:big.m.teamA, hi=Math.max(big.m.gamesA,big.m.gamesB), lo=Math.min(big.m.gamesA,big.m.gamesB);
+        tiles.push({v:hi+'–'+lo,t:lo===0?(W+', '+(anyCleanSheetBefore(w)?'a clean sheet':'the season\'s first clean sheet')):(W+' over '+L+', the widest margin in games')}); }
+      var mins=ms.map(function(m){ var p=paceFor(w,m); return p?p.totalMin:null; }).filter(function(x){return x!=null;});
+      if(mins.length){ var lo2=Math.min.apply(null,mins), hi2=Math.max.apply(null,mins); tiles.push({v:lo2+'<small> min</small>',raw:true,t:mins.length>1&&hi2>lo2?'fastest match. The longest ran '+hi2+'.':'match time'}); }
+      tiles.sort(function(a,b){ return (a.last?1:0)-(b.last?1:0); });
+      $('hp-numbers-sub').textContent=weekLabel(w)+' · '+fmtDay(weekStartMs(w),true);
+      $('hp-nums').innerHTML=tiles.map(function(t){ return '<div class="hp-card hp-num'+(t.hot?' hot':'')+'"><b>'+(t.raw?t.v:esc(t.v))+'</b><span>'+esc(t.t)+'</span></div>'; }).join('');
+      show(sec,tiles.length>0);
     }
 
-    /* ---- Places moved since last week ----
-       The standings blob only holds today's order, so rebuild the table as it stood
-       after the previous played week from the finalized schedule, using the same
-       tiebreakers as the live table (PTS → GW → H2H → DIFF), and compare positions.
-       Returns { teamId: rank } or null when there is no earlier week to compare to. */
-    var HOME_SCHED = null;
-    function computePrevRanks(sched, teams){
-      var ids={}; teams.forEach(function(t){ ids[t.teamId]=1; });
-      var ms=[], weeks={};
-      ((sched&&sched.weeks)||[]).forEach(function(w){
-        (w.matches||[]).forEach(function(m){
-          if(!m.finalizedAt||m.scoreA==null||m.scoreB==null)return;
-          if(m.phase==='playoff'||m.phase==='championship')return;   // post-season never moves the table
-          if(!ids[m.teamAId]||!ids[m.teamBId])return;
-          ms.push({w:w.week,m:m}); weeks[w.week]=1;
-        });
-      });
-      var played=Object.keys(weeks).map(Number).sort(function(a,b){return a-b;});
-      if(played.length<2)return null;
-      var through=played[played.length-2];
-      var rows={}; teams.forEach(function(t){ rows[t.teamId]={id:t.teamId,name:t.teamName,pts:0,gw:0,ps:0,pa:0,h2h:{}}; });
-      ms.forEach(function(x){
-        if(x.w>through)return;
-        var m=x.m, A=rows[m.teamAId], B=rows[m.teamBId];
-        A.pts+=m.scoreA; B.pts+=m.scoreB;
-        A.gw+=m.gamesA||0; B.gw+=m.gamesB||0;
-        A.ps+=m.pointsA||0; A.pa+=m.pointsB||0; B.ps+=m.pointsB||0; B.pa+=m.pointsA||0;
-        A.h2h[B.id]=(A.h2h[B.id]||0)+m.scoreA; B.h2h[A.id]=(B.h2h[A.id]||0)+m.scoreB;
-      });
-      var list=Object.keys(rows).map(function(k){return rows[k];});
-      list.sort(function(a,b){
-        if(b.pts!==a.pts)return b.pts-a.pts;
-        if(b.gw!==a.gw)return b.gw-a.gw;
-        var ab=a.h2h[b.id], ba=b.h2h[a.id];
-        if(ab!=null&&ba!=null&&ab!==ba)return ba-ab;
-        var d=(b.ps-b.pa)-(a.ps-a.pa); if(d)return d;
-        return String(a.name).localeCompare(String(b.name));
-      });
-      var map={}; list.forEach(function(r,i){ map[r.id]=i+1; });
-      return map;
-    }
-    function moveCell(d){
-      if(d==null||!d)return '<td class="c-muted">—</td>';
-      return d>0?'<td style="color:var(--color-lime);font-weight:800">▲'+d+'</td>':'<td style="color:var(--color-red);font-weight:800">▼'+(-d)+'</td>';
-    }
-
-    /* ---- Standings table ---- */
-    function diffCell(d){
-      if(d==null)return '<td class="c-muted">—</td>';
-      if(d>0)return '<td class="c-diff-pos">+'+d+'</td>';
-      if(d<0)return '<td class="c-diff-neg">−'+Math.abs(d)+'</td>';
-      return '<td class="c-muted">0</td>';
-    }
-    function renderStandings(div, weeklyTopTeamIds){
-      var teams=(div&&div.teams)||[];
-      if(!teams.length)return;
-      // Season over → rank by bracket finish, same as the Playoffs tab.
-      if(HOME_FINISH){
-        teams=teams.slice().sort(function(a,b){
-          var an=(HOME_FINISH[a.teamName]||{}).n||99, bn=(HOME_FINISH[b.teamName]||{}).n||99;
-          return an-bn||((b.matchPointsFor||0)-(a.matchPointsFor||0));
-        });
-      }
-      var leadPts=teams[0]?teams[0].matchPointsFor:0;
-      // No movement once the season is ranked by bracket finish.
-      var prevRank=HOME_FINISH?null:computePrevRanks(HOME_SCHED,teams);
-      var RC=['#f0c040','#c0c8d0','#cd7f32'];
-      var rows=teams.map(function(t,i){
-        var pts=t.matchPointsFor||0;
-        var win=weeklyTopTeamIds.indexOf(t.teamId)>=0?'<span class="wpill">Top Wk</span>':'';
-        var fin=HOME_FINISH?(HOME_FINISH[t.teamName]||null):null;
-        var finChip=fin&&fin.n<=3?'<span class="fin-chip fin-'+fin.n+'">'+fin.chip+'</span>':'';
-        var rankSym=i<3?('<span style="color:'+RC[i]+';font-weight:900">'+(i+1)+'</span>'):(i+1);
-        return '<tr class="'+(i===0?'leader medal':(i<3?'medal':''))+(fin&&fin.cls?' '+fin.cls:'')+'">'
-          +'<td class="c-rank"><div style="display:flex;align-items:center;gap:5px;justify-content:center">'+rankSym+'</div></td>'
-          +'<td class="l c-team">'+(t.teamEmoji?'<span class="e">'+t.teamEmoji+'</span>':'')+teamLink(t.teamName,t.teamId,'tname')+finChip+win+'</td>'
-          +'<td>'+(t.wins||0)+'</td>'
-          +'<td class="c-muted">'+(t.ties||0)+'</td>'
-          +'<td class="c-muted">'+(t.losses||0)+'</td>'
-          +'<td class="c-pts'+(pts===0?' zero':'')+'">'+pts+'</td>'
-          +'<td class="col-opt">'+(t.totalGamesWon||0)+'</td>'
-          +'<td class="col-opt c-muted">'+(t.pointsScored||0)+'</td>'
-          +diffCell(t.pointDiff)
-          +moveCell(prevRank&&prevRank[t.teamId]!=null?prevRank[t.teamId]-(i+1):null)
-          +'</tr>';
-      }).join('');
-      document.getElementById('rc-stand-body').innerHTML=rows;
-      document.getElementById('rc-stand-note').innerHTML='<b>Pts:</b> Win 2 · Tie 1 · Loss 0 (max 4/match). &nbsp; <b>PS</b> = points scored · <b>DIFF</b> = match-point differential · <b>+/−</b> = places moved since last week. &nbsp;<span class="col-opt"><b>GW, PS</b> collapse on phones.</span>';
-      document.getElementById('rc-standings').style.display='';
-    }
-
-    /* ---- The Drop teaser (published editorial only) ---- */
-    function renderDropTeaser(payload){
-      var sec=document.getElementById('rc-drop');
-      if(!sec)return;
-      var drop = payload && payload.drop;
-      if(!drop){ sec.style.display='none'; return; }
-      var k=document.getElementById('rc-drop-kicker'); if(k)k.textContent=drop.kicker||('The Drop · Week '+drop.week);
-      var t=document.getElementById('rc-drop-title'); if(t)t.innerHTML=LZ(drop.title||'');
-      var bl=String(drop.byline||'By The Society Desk').replace(/^By\s+/i,'');
-      var by=document.getElementById('rc-drop-byline'); if(by)by.innerHTML='By <b>'+esc(bl)+'</b> · '+(drop.readMins||4)+' min read';
-      var ex=document.getElementById('rc-drop-excerpt');
-      if(ex){
-        var paras=String(drop.leadHtml||'').match(/<p[\s\S]*?<\/p>/gi)||[];
-        if(paras.length){
-          ex.innerHTML = LZhtml(paras.slice(0,2).map(function(p,i){ return i===0 ? p.replace(/^<p/i,'<p class="dropcap"') : p; }).join(''));
-        } else if(drop.dek){ ex.innerHTML='<p class="dropcap">'+LZ(drop.dek)+'</p>'; }
-      }
-      var read=document.getElementById('rc-drop-read'); if(read)read.setAttribute('href','/drop.html?edition='+encodeURIComponent(drop.edition||('week-'+drop.week)));
-      var cv=document.getElementById('rc-drop-cover'); if(cv)cv.textContent=(drop.label||('Week '+drop.week))+' · The Drop';
-      // Cover art: the issue's cover photo (or its first gallery shot) fills the
-      // teaser's cover box, honoring the photo's focal point from the Drop
-      // editor. No photo on the issue → the gradient stays.
-      var cvBox = cv ? cv.parentElement : null;
-      var art = drop.cover || ((drop.gallery||[])[0]) || null;
-      if(cvBox && art && art.id){
-        var f = art.focal || {};
-        var ax = (f && isFinite(f.x)) ? f.x : 50, ay = (f && isFinite(f.y)) ? f.y : 50;
-        cvBox.style.backgroundImage = 'linear-gradient(180deg, rgba(6,8,6,.08), rgba(6,8,6,.55)), url("/.netlify/functions/drop-photo-serve?id='+encodeURIComponent(art.id)+'")';
-        cvBox.style.backgroundSize = 'cover';
-        cvBox.style.backgroundPosition = ax+'% '+ay+'%';
-        cvBox.style.height = '190px';
-      }
-      var aside=document.getElementById('rc-drop-aside');
-      if(aside && drop.storylines && drop.storylines.length>1){
-        aside.innerHTML=drop.storylines.slice(1,5).map(function(s){ return '<li>'+LZ(s.title||s.tag||'')+'</li>'; }).join('');
-      }
-      sec.style.display='';
-      if(window.DSEntity && DROP_IDX) window.DSEntity.mount(sec, DROP_IDX);
-    }
-
-    /* ---- Fetch + wire ----
-       Every call is season-scoped. They used to be bare, so the home page could
-       show one season's schedule beside another's standings and leaderboard. */
-    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
-      if (S) { SEASON_ID = S.id; SEASON_CODE = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; SEASON_START = S.startDate; SEASON_TAG = S.tag || ''; }
-    }).catch(function(){}).then(function(){
-    return Promise.all([
-      fetch('/.netlify/functions/public-leaderboard?circuit='+encodeURIComponent(SEASON_CODE)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-standings?season='+encodeURIComponent(SEASON_ID)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-leaderboard?circuit='+encodeURIComponent(SEASON_CODE)+'&view=players').then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-drop?circuit='+encodeURIComponent(SEASON_CODE)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-      fetch('/.netlify/functions/public-schedule?season='+encodeURIComponent(SEASON_ID)).then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})
-    ]).then(function(res){
-      var lb=res[0],st=res[1],pl=res[2],dropPayload=res[3],sched=res[4];
-      HOME_FINISH=computeBracketFinish(sched);
-      HOME_SCHED=sched;
-
-      // Build the editorial entity index (player/team names → links + hover cards)
-      // from data already fetched — used ONLY by the Drop teaser below.
-      try {
-        if(window.DSEntity){
-          DROP_IDX = window.DSEntity.buildIndex({
-            teams: [],
-            players: (pl && pl.players) ? Object.values(pl.players) : [],
-            standings: st || null
-          });
-        }
-      } catch(e){ DROP_IDX = null; }
-
-      // PS fallback: enrich weeklyTopPerformers entries from the players aggregate (season PS) when weekly ps is absent
-      var perf=(lb&&lb.weeklyTopPerformers)||[];
-      var latest=perf.length?perf[0]:null;
-      if(pl&&pl.players){
-        perf.forEach(function(entry){['men','women'].forEach(function(g){(entry[g]||[]).forEach(function(p){
-          if(p.ps==null&&pl.players[p.playerId]&&pl.players[p.playerId].ps!=null)p.ps=pl.players[p.playerId].ps;
-        });});});
-      }
-      RECAP_PERF=perf; RECAP_MAXWEEK=latest?latest.week:0;
-      RECAP_PLAYERS=(pl&&pl.players)?pl.players:null;
-      renderPerformers(latest);
-      // Nothing finalized yet → say where the season actually is.
-      if(!RECAP_MAXWEEK){
-        var t0=document.getElementById('rc-title');
-        if(t0) t0.innerHTML=preseasonTitleHtml();
-        var wn=document.getElementById('rc-weeknav'); if(wn) wn.innerHTML='';
-        if(t0) mountCountdown(t0, sched);
-      }
-
-      // Standings — first division in the blob
-      if(st&&st.divisions){
-        var divKey=Object.keys(st.divisions)[0];
-        var div=st.divisions[divKey];
-        var topIds=[];
-        if(div&&div.weeklyTopTeams){
-          var wks=Object.keys(div.weeklyTopTeams).map(Number).sort(function(a,b){return b-a;});
-          for(var i=0;i<wks.length;i++){var arr=div.weeklyTopTeams[wks[i]];if(arr&&arr.length){topIds=arr;break;}}
-        }
-        if(div&&div.teams&&div.teams.length){renderStandings(div,topIds);}
-      }
-
-      // The Drop teaser (hidden until a week is published)
-      renderDropTeaser(dropPayload);
-    });
-    });
-  })();
-  </script>
-
-  <script>
-  /* ═══════════════════════════════════════════════════════════════
-     THIS WEEK — current / next week's matches (public-schedule).
-     Mirrors the schedule page's match cards in a compact 3-up strip.
-     ═══════════════════════════════════════════════════════════════ */
-  (function () {
-    var SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
-    var LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON_ID);
-    // Fallback until the season resolves — then it's the real start date.
-    var SEASON_START = new Date('2026-06-08T00:00:00');
-    var TOTAL_WEEKS = 8;
-    var MATCH_START_TIME = '7:00 PM';
-    var COURT_SET_META = {
-      A: { label: 'Courts 1 & 2', color: '#4a7c9e' },
-      B: { label: 'Courts 3 & 6', color: '#7c4a9e' },
-      C: { label: 'Courts 5 & 7', color: '#9e7c4a' },
-    };
+    /* ═══ RESULTS ═══ */
+    var COURT_SET_META = { A:{label:'Courts 1 & 2'}, B:{label:'Courts 3 & 6'}, C:{label:'Courts 5 & 7'} };
     var COURT_SET_ORDER = { A: 0, B: 1, C: 2 };
     var detailCache = {};
-
-    function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-    function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
-
-    function weekDate(n){ var d = new Date(SEASON_START); d.setDate(d.getDate()+(n-1)*7); return d; }
-    function weekNightDate(n, weeksData){
-      var w = weeksData && weeksData.find(function(x){return x.week===n;});
-      var fm = w && w.matches && w.matches[0];
-      var dt = fm && (fm.date || fm.scheduledAt);
-      return dt ? new Date(dt) : weekDate(n);
-    }
-    function isWeekPast(n, weeksData){
-      var d = weekNightDate(n, weeksData); d.setHours(23,59,59,999);
-      return d < new Date();
-    }
-    function isWeekToday(n, weeksData){
-      var d = weekNightDate(n, weeksData), now = new Date();
-      return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth() && d.getDate()===now.getDate();
-    }
-    function activeWeek(weeksData){
-      for (var n=1; n<=TOTAL_WEEKS; n++){ if (!isWeekPast(n, weeksData)) return n; }
-      // Season over — show the last week that actually has matches.
-      for (var m=TOTAL_WEEKS; m>=1; m--){ var w = weeksData && weeksData.find(function(x){return x.week===m;}); if (w && w.matches && w.matches.length) return m; }
-      return TOTAL_WEEKS;
-    }
-
-    function teamLink(name, id, cls){
-      if (!name || name === 'TBD') return '<span class="'+cls+'">'+esc(name||'TBD')+'</span>';
-      var ref = id || slug(name);
-      return '<a class="'+cls+'" href="/team?id='+encodeURIComponent(ref)+LINK_SUFFIX+'">'+esc(name)+'</a>';
-    }
-    function playerLink(name, teamName, cls, label){
-      if (!name) return '<span class="'+cls+'">'+esc(label||'—')+'</span>';
-      return '<a class="'+cls+'" href="/player?team='+encodeURIComponent(slug(teamName||''))+'&name='+encodeURIComponent(name)+LINK_SUFFIX+'">'+esc(label!=null?label:name)+'</a>';
-    }
-    function logo(emoji, name){
-      if (emoji) return '<span class="dwc__logo">'+esc(emoji)+'</span>';
-      var ini = (String(name||'?').trim()[0]||'?').toUpperCase();
-      return '<span class="dwc__logo dwc__logo--mono">'+esc(ini)+'</span>';
-    }
-    function courtMeta(m, idx){
-      // Actual courts on the match always win; courtSet only supplies the
-      // color (and a fallback label for legacy matches without courts).
-      var setMeta = (m.courtSet && COURT_SET_META[m.courtSet]) || null;
-      var label = (m.courtA && m.courtB) ? ('Courts '+m.courtA+' & '+m.courtB)
-        : (m.court || (setMeta && setMeta.label) || ('Court '+(idx+1)));
-      return { label: label, color: setMeta ? setMeta.color : '#4a7c9e' };
-    }
-    function startLabel(m){
-      if (m && m.scheduledAt){ var d = new Date(m.scheduledAt); if (!isNaN(d)) return d.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'}); }
-      return (m && m.startTime) || MATCH_START_TIME;
-    }
+    // Actual courts on the match always win; courtSet is only a legacy fallback label.
+    function courtLabel(m, idx){ var setMeta=(m.courtSet&&COURT_SET_META[m.courtSet])||null; return (m.courtA&&m.courtB)?('Courts '+m.courtA+' & '+m.courtB):(m.court||(setMeta&&setMeta.label)||''); }
     function orderMatches(matches){
       return matches.map(function(m,idx){return {m:m,idx:idx};}).sort(function(a,b){
-        var ra = COURT_SET_ORDER[a.m.courtSet]; if (ra==null) ra = 90+a.idx;
-        var rb = COURT_SET_ORDER[b.m.courtSet]; if (rb==null) rb = 90+b.idx;
-        return ra - rb;
+        var ra = COURT_SET_ORDER[a.m.courtSet]; if (ra==null) ra = isFinite(parseFloat(a.m.courtA)) ? 10+parseFloat(a.m.courtA) : 900+a.idx;
+        var rb = COURT_SET_ORDER[b.m.courtSet]; if (rb==null) rb = isFinite(parseFloat(b.m.courtA)) ? 10+parseFloat(b.m.courtA) : 900+b.idx;
+        return (ra - rb) || (a.idx - b.idx);
       }).map(function(x){return x.m;});
     }
-
-    function matchCard(m, idx, isToday){
-      var isFinal = m.status === 'final';
-      var teamA = m.teamA || 'TBD', teamB = m.teamB || 'TBD';
-      var isTbd = teamA === 'TBD' && teamB === 'TBD';
-      var meta = courtMeta(m, idx);
-
-      // "Live" means the match is actually underway — status says so, or its
-      // start time has passed. Before that on game day it's "Tonight · 6:00 PM".
-      var startMs = m.scheduledAt ? new Date(m.scheduledAt).getTime() : NaN;
-      var underway = m.status === 'live' || (!isNaN(startMs) && Date.now() >= startMs);
-      var badge = '';
-      if (isFinal)                        badge = '<span class="dwc__badge b-final">Final</span>';
-      else if (isToday && !isTbd && underway) badge = '<span class="dwc__badge b-live"><span class="ld"></span>Live</span>';
-      else if (isToday && !isTbd)         badge = '<span class="dwc__badge b-up">Tonight · ' + startLabel(m) + '</span>';
-      else                                badge = '<span class="dwc__badge b-up">Upcoming</span>';
-
-      var center, aWin = false, bWin = false;
-      if (isFinal && m.homeRoundPts != null){
-        aWin = m.homeRoundPts > m.awayRoundPts;
-        bWin = m.awayRoundPts > m.homeRoundPts;
-        var tie = m.homeRoundPts === m.awayRoundPts;
-        var result = tie ? 'Tie' : esc(aWin ? teamA : teamB);
-        var sub = (m.gamesA != null && m.gamesB != null) ? '<div class="dwc__sub">'+m.gamesA+'–'+m.gamesB+' games</div>' : '';
-        center = '<div class="dwc__center">'
-          + '<div class="dwc__tally"><span class="'+(aWin?'w':'')+'">'+m.homeRoundPts+'</span><span class="d">–</span><span class="'+(bWin?'w':'')+'">'+m.awayRoundPts+'</span></div>'
-          + sub
-          + '<div class="dwc__result'+(tie?' tie':'')+'">'+result+'</div>'
-          + '</div>';
-      } else {
-        center = '<div class="dwc__center"><div class="dwc__vs">VS</div><div class="dwc__start">'+esc(startLabel(m))+'</div></div>';
-      }
-
-      var toggle = isFinal
-        ? '<button class="dwc__toggle" onclick="dwToggle(this,\''+esc(m.id)+'\')"><span class="lbl">Show game scores</span><span class="chev">▾</span></button>'
-          + '<div class="dwc__scores" data-match="'+esc(m.id)+'"></div>'
-        : '';
-
-      return '<div class="dwc'+(isFinal?' is-final':'')+'">'
-        + '<div class="dwc__top">'
-          + '<span class="dwc__court"><span class="dwc__cdot" style="background:'+meta.color+'"></span>'+esc(meta.label)+(m.venue?' · '+esc(m.venue):'')+'</span>'
-          + badge
-        + '</div>'
-        + '<div class="dwc__row">'
-          + '<div class="dwc__side"><span class="dwc__seed">HOME</span>'+logo(m.emojiA, teamA)+teamLink(teamA, m.teamAId, 'dwc__team'+(aWin?' is-win':''))+'</div>'
-          + center
-          + '<div class="dwc__side"><span class="dwc__seed">AWAY</span>'+logo(m.emojiB, teamB)+teamLink(teamB, m.teamBId, 'dwc__team'+(bWin?' is-win':''))+'</div>'
-        + '</div>'
-        + toggle
-      + '</div>';
+    function storyPhotoFor(drop, team){ var out=null; ((drop&&drop.storylines)||[]).forEach(function(s){ if(!out&&s.team&&String(s.team).toLowerCase()===String(team||'').toLowerCase()&&s.images&&s.images[0]) out=s.images[0]; }); return out; }
+    function blurbFor(drop, team){ var out=''; ((drop&&drop.teamReports)||[]).forEach(function(r){ if(!out&&String(r.team).toLowerCase()===String(team||'').toLowerCase()) out=r.blurb; });
+      if(!out) return ''; var m=String(out).match(/^[\s\S]*?[.!?](?=\s|$)/); var s=(m?m[0]:out).trim(); return s.length>220?s.slice(0,217).replace(/\s+\S*$/,'')+'…':s; }
+    var CHEV='<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>';
+    function resultArt(m, drop){ var tie=m.scoreA===m.scoreB, wn=m.scoreA>=m.scoreB?m.teamA:m.teamB, ln=m.scoreA>=m.scoreB?m.teamB:m.teamA; return drop?(storyPhotoFor(drop,wn)||(tie?storyPhotoFor(drop,ln):null)):null; }
+    function resultCard(m, idx, w, drop, banners){
+      var tie=m.scoreA===m.scoreB, aWin=m.scoreA>m.scoreB;
+      var W={n:aWin||tie?m.teamA:m.teamB,id:aWin||tie?m.teamAId:m.teamBId,e:aWin||tie?m.emojiA:m.emojiB,s:aWin||tie?m.scoreA:m.scoreB,g:aWin||tie?m.gamesA:m.gamesB,p:aWin||tie?m.pointsA:m.pointsB};
+      var L={n:aWin||tie?m.teamB:m.teamA,id:aWin||tie?m.teamBId:m.teamAId,e:aWin||tie?m.emojiB:m.emojiA,s:aWin||tie?m.scoreB:m.scoreA,g:aWin||tie?m.gamesB:m.gamesA,p:aWin||tie?m.pointsB:m.pointsA};
+      var art=resultArt(m,drop);
+      var court=courtLabel(m,idx), pace=paceFor(w,m);
+      var r1=m.round1, r2=m.round2, flip=!(aWin||tie);
+      var rounds=(r1&&r2&&r1.homeGames!=null&&r2.homeGames!=null)?((flip?r1.awayGames+'–'+r1.homeGames:r1.homeGames+'–'+r1.awayGames)+', '+(flip?r2.awayGames+'–'+r2.homeGames:r2.homeGames+'–'+r2.awayGames)):null;
+      var third=pace?'<div><small>Match time</small><b>'+pace.totalMin+' min</b></div>':(rounds?'<div><small>By round</small><b>'+rounds+'</b></div>':'<div></div>');
+      var note=drop?blurbFor(drop,W.n):'';
+      if(!note&&rounds&&pace) note='Round 1 went '+rounds.split(', ')[0]+', Round 2 '+rounds.split(', ')[1]+'.';
+      var side=function(T,cls){ return '<div class="hp-res__t '+cls+'">'+teamBadge(T.n,T.id,30,T.e)+teamLink(T.n,T.id,'tn')+'<b>'+T.s+'</b></div>'; };
+      return '<article class="hp-card hp-res" data-match="'+esc(m.id)+'">'
+        +(art?'<a class="hp-res__pic" href="'+dropHref(drop)+'" aria-label="Photos from '+esc(W.n)+'" '+bgAttr(art)+'></a>'
+          :banners?'<div class="hp-res__pic hp-res__pic--art" style="background-image:linear-gradient(120deg,'+teamColor(W.id,W.n)+'33,transparent 55%),linear-gradient(300deg,'+teamColor(L.id,L.n)+'33,transparent 55%)">'+teamBadge(W.n,W.id,72,W.e)+teamBadge(L.n,L.id,72,L.e)+'</div>':'')
+        +'<div class="hp-res__body">'
+        +'<div class="hp-res__top"><span>'+(court?esc(court):'Final')+'</span><span class="hp-pill hp-pill--lime">'+(tie?'Tied':'Final')+'</span></div>'
+        +'<div class="hp-res__teams">'+side(W,tie?'tie':'win')+side(L,tie?'tie':'')+'</div>'
+        +'<div class="hp-res__stats">'+(W.g!=null&&L.g!=null?'<div><small>Games</small><b>'+W.g+'–'+L.g+'</b></div>':'<div></div>')+(W.p!=null&&L.p!=null?'<div><small>Points</small><b>'+W.p+'–'+L.p+'</b></div>':'<div></div>')+third+'</div>'
+        +(note?'<p class="hp-res__note">'+LZ(note)+'</p>':'')
+        +'<button type="button" class="hp-res__tog" aria-expanded="false"><span class="lbl">Game by game</span>'+CHEV+'</button>'
+        +'<div class="hp-res__scores"></div>'
+        +'</div></article>';
     }
-
-    window.dwToggle = function(btn, matchId){
-      var card = btn.closest('.dwc');
-      var body = card.querySelector('.dwc__scores');
-      var open = card.classList.toggle('is-open');
-      btn.querySelector('.lbl').textContent = open ? 'Hide game scores' : 'Show game scores';
-      if (!open) return;
-      if (detailCache[matchId] && detailCache[matchId] !== 'error'){ body.innerHTML = gameDetail(detailCache[matchId]); return; }
-      if (body.dataset.loaded) return;
-      body.innerHTML = '<div class="dwg">Loading scores…</div>';
-      var p = new URLSearchParams({ season: SEASON_ID, match: matchId });
-      fetch('/.netlify/functions/public-match?'+p).then(function(r){ if(!r.ok) throw 0; return r.json(); })
-        .then(function(data){ detailCache[matchId] = data.match; body.innerHTML = gameDetail(data.match); body.dataset.loaded = '1'; })
-        .catch(function(){ detailCache[matchId] = 'error'; body.innerHTML = '<div class="dwg">Scores unavailable right now.</div>'; });
-    };
-
-    // Same box score the Schedule page shows: two rounds, each game with the
-    // pair on each side (linked to player pages), the score in the middle, the
-    // winning pair in lime, and a games/points line per round.
+    function renderResults(w, drop){
+      var sec=$('hp-results'), ms=orderMatches(finals(w)); if(!ms.length){ show(sec,false); return; }
+      var open={}; sec.querySelectorAll('.hp-res.is-open').forEach(function(c){ open[c.getAttribute('data-match')]=1; });
+      $('hp-results-h').textContent=weekLabel(w)+' results';
+      var banners=ms.some(function(m){ return !!resultArt(m,drop); });   // keep the cards level when only some have a photo
+      var grid=$('hp-results-grid'); grid.innerHTML=ms.map(function(m,i){ return resultCard(m,i,w,drop,banners); }).join('');
+      Object.keys(open).forEach(function(id){ var c=grid.querySelector('.hp-res[data-match="'+(window.CSS&&CSS.escape?CSS.escape(id):id)+'"]'); if(c) toggleScores(c,true); });
+      if(window.DSEntity && DROP_IDX) window.DSEntity.mount(grid, DROP_IDX);
+      show(sec,true);
+    }
+    function toggleScores(card, force){
+      var id=card.getAttribute('data-match'), body=card.querySelector('.hp-res__scores'), btn=card.querySelector('.hp-res__tog');
+      var open=force===true?true:!card.classList.contains('is-open');
+      card.classList.toggle('is-open',open); btn.setAttribute('aria-expanded',open?'true':'false');
+      btn.querySelector('.lbl').textContent=open?'Hide game scores':'Game by game';
+      if(!open) return;
+      if(detailCache[id]&&detailCache[id]!=='error'){ body.innerHTML=gameDetail(detailCache[id]); return; }
+      body.innerHTML='<div class="dwg">Loading scores…</div>';
+      getJSON(FN+'public-match?'+new URLSearchParams({season:SEASON_ID,match:id})).then(function(d){
+        if(d&&d.match){ detailCache[id]=d.match; body.innerHTML=gameDetail(d.match); } else body.innerHTML='<div class="dwg">Scores unavailable right now.</div>';
+      });
+    }
+    document.addEventListener('click',function(e){ var b=e.target.closest('.hp-res__tog'); if(b) toggleScores(b.closest('.hp-res')); });
+    // The same box score the Schedule page shows: two rounds, each game with the
+    // pair on each side, the score in the middle and the winning pair in lime.
     function gameDetail(match){
       if (!match || !match.games || !match.games.length) return '<div class="dwg">Game-by-game scores not posted.</div>';
-      var sn = (typeof shortName === 'function') ? shortName : function (n) { return n; };
-      var plink = function(n, teamName){ return '<a href="/player?team='+slug(teamName)+'&name='+encodeURIComponent(n)+LINK_SUFFIX+'">'+esc(sn(n))+'</a>'; };
+      var plink = function(n, teamName){ return '<a href="'+playerHref(n,teamName)+'">'+esc(SN(n))+'</a>'; };
       var homeName = match.home && match.home.name, awayName = match.away && match.away.name;
       var rounds = [1, 2].map(function(rn){
         var games = match.games.filter(function(g){ return g.round === rn; });
@@ -1130,58 +1085,251 @@
           var ap = (g.awayPlayers && g.awayPlayers.length) ? g.awayPlayers.map(function(n){ return plink(n, awayName); }).join('') : '—';
           var scored = g.home != null && g.away != null;
           var num = '<span class="gnum">—</span>';
-          if (scored) {
-            ptsH += g.home; ptsA += g.away;
-            num = '<span class="gnum"><span class="'+(g.homeWin ? 'w' : 'l')+'">'+g.home+'</span><span class="dash">–</span><span class="'+(g.homeWin ? 'l' : 'w')+'">'+g.away+'</span></span>';
-          }
-          return '<div class="m-game">'
-            + '<div class="pl'+(scored && g.homeWin ? ' is-winner' : '')+'">'+hp+'</div>'
-            + '<div class="mid"><span class="gtype">'+esc(g.type || '')+'</span>'+num+'</div>'
-            + '<div class="pl right'+(scored && !g.homeWin ? ' is-winner' : '')+'">'+ap+'</div>'
-            + '</div>';
+          if (scored) { ptsH += g.home; ptsA += g.away; num = '<span class="gnum"><span class="'+(g.homeWin ? 'w' : 'l')+'">'+g.home+'</span><span class="dash">–</span><span class="'+(g.homeWin ? 'l' : 'w')+'">'+g.away+'</span></span>'; }
+          return '<div class="m-game"><div class="pl'+(scored && g.homeWin ? ' is-winner' : '')+'">'+hp+'</div><div class="mid"><span class="gtype">'+esc(g.type || '')+'</span>'+num+'</div><div class="pl right'+(scored && !g.homeWin ? ' is-winner' : '')+'">'+ap+'</div></div>';
         }).join('');
         var gamesH = rd && rd.homeGames != null ? rd.homeGames : '', gamesA = rd && rd.awayGames != null ? rd.awayGames : '';
-        var sum = (rd || ptsH || ptsA)
-          ? '<div class="m-round-sum"><span><span class="b">'+gamesH+'</span> games · <span class="b">'+ptsH+'</span> pts</span><span><span class="b">'+ptsA+'</span> pts · <span class="b">'+gamesA+'</span> games</span></div>'
-          : '';
+        var sum = (rd || ptsH || ptsA) ? '<div class="m-round-sum"><span><span class="b">'+gamesH+'</span> games · <span class="b">'+ptsH+'</span> pts</span><span><span class="b">'+ptsA+'</span> pts · <span class="b">'+gamesA+'</span> games</span></div>' : '';
         return '<div class="m-round"><div class="m-round-head"><span class="m-round-label'+(rn === 2 ? ' r2' : '')+'">Round '+rn+'</span></div><div class="m-games">'+rows+'</div>'+sum+'</div>';
       }).join('');
       return rounds || '<div class="dwg">Game-by-game scores not posted.</div>';
     }
 
-    function render(weeksData){
-      var sec = document.getElementById('rc-week');
-      var grid = document.getElementById('rc-week-grid');
-      if (!sec || !grid) return;
-      var n = activeWeek(weeksData);
-      var w = weeksData && weeksData.find(function(x){return x.week===n;});
-      var matches = (w && w.matches) ? w.matches : [];
-      if (!matches.length) return; // nothing to show — leave hidden
-      var today = isWeekToday(n, weeksData);
-
-      var anyUnderway = today && matches.some(function(m){ var t = m.scheduledAt ? new Date(m.scheduledAt).getTime() : NaN; return m.status === 'live' || (!isNaN(t) && Date.now() >= t && m.status !== 'final'); });
-      document.getElementById('rc-week-eyebrow').textContent = today ? (anyUnderway ? 'This Week · Live' : 'This Week · Tonight') : 'Up Next · Week ' + n;
-      // First serve = the earliest scheduled match that night, not the season
-      // default — Season 2 plays 6:00 at South End while the default says 7:00.
-      var firstMatch = matches.filter(function(m){ return m.scheduledAt && !isNaN(new Date(m.scheduledAt)); })
-        .sort(function(a,b){ return new Date(a.scheduledAt) - new Date(b.scheduledAt); })[0] || null;
-      document.getElementById('rc-week-date').textContent =
-        weekNightDate(n, weeksData).toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'}) + ' · matches start ' + (firstMatch ? startLabel(firstMatch) : MATCH_START_TIME);
-      grid.innerHTML = orderMatches(matches).map(function(m, idx){ return matchCard(m, idx, today); }).join('');
-      sec.style.display = '';
+    /* ═══ THE DROP + WEEK IN PICTURES ═══ */
+    // The Drop for week w, or null. Uses the latest-published payload when it is
+    // that week's, else asks for the edition (only if the index lists it).
+    function dropFor(w){
+      var key='week-'+w;
+      if(DROPS[key]!==undefined) return Promise.resolve(DROPS[key]);
+      if(DROP_LATEST&&DROP_LATEST.week===w){ DROPS[key]=DROP_LATEST; return Promise.resolve(DROP_LATEST); }
+      var listed=!DROP_INDEX||((DROP_INDEX.editions||[]).some(function(e){return e.week===w;}));
+      if(!listed){ DROPS[key]=null; return Promise.resolve(null); }
+      return getJSON(FN+'public-drop?circuit='+encodeURIComponent(SEASON_CODE)+'&edition='+encodeURIComponent(key)).then(function(d){ DROPS[key]=(d&&d.drop)||null; return DROPS[key]; });
+    }
+    function allPhotos(drop){ var seen={}, out=[]; function add(x){ if(x&&x.id&&!seen[x.id]){ seen[x.id]=1; out.push(x); } }
+      (drop.gallery||[]).forEach(add); (drop.storylines||[]).forEach(function(s){ (s.images||[]).forEach(add); }); add(drop.cover); return out; }
+    function plainText(html){ var d=document.createElement('div'); d.innerHTML=String(html||''); return (d.textContent||'').replace(/\s+/g,' ').trim(); }
+    function renderDrop(drop){
+      var sec=$('rc-drop'); if(!drop){ show(sec,false); return; }
+      var href=dropHref(drop);
+      $('rc-drop-kicker').textContent=drop.kicker||('The Drop · '+(drop.label||('Week '+drop.week)));
+      $('rc-drop-title').innerHTML=LZ(drop.title||'');
+      var text=drop.dek||'';
+      if(!text){ var paras=String(drop.leadHtml||'').match(/<p[\s\S]*?<\/p>/gi)||[]; text=plainText(paras[0]||''); if(text.length>320) text=text.slice(0,317).replace(/\s+\S*$/,'')+'…'; }
+      var ex=$('rc-drop-excerpt'); ex.innerHTML=LZ(text); ex.hidden=!text;
+      var bl=String(drop.byline||'By The Society Desk').replace(/^By\s+/i,'');
+      $('rc-drop-byline').textContent='By '+bl+' · '+(drop.readMins||4)+' min read';
+      $('rc-drop-read').setAttribute('href',href);
+      var pic=$('rc-drop-pic'), art=drop.cover||((drop.gallery||[])[0])||firstStoryPhoto(drop);
+      if(art&&art.id){ bgPhoto(pic,art); pic.href=href; pic.hidden=false; } else pic.hidden=true;
+      var photos=allPhotos(drop).filter(function(x){ return !art||x.id!==art.id; }), wrap=$('hp-pics-wrap');
+      if(photos.length>=3){
+        $('hp-pics-h').textContent=(drop.label||('Week '+drop.week))+' in pictures';
+        $('hp-pics-more').setAttribute('href',href);
+        $('hp-pics').innerHTML=photos.slice(0,6).map(function(x,i){ return '<a href="'+href+'" aria-label="'+esc(x.caption||('Photo '+(i+1)))+'" '+bgAttr(x)+'></a>'; }).join('');
+        wrap.hidden=false;
+      } else wrap.hidden=true;
+      show(sec,true);
+      if(window.DSEntity && DROP_IDX) window.DSEntity.mount(sec, DROP_IDX);
     }
 
-    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
-      if (S) {
-        SEASON_ID = S.id;
-        LINK_SUFFIX = S.suffix;
-        if (S.startDate) { var d = new Date(S.startDate + 'T00:00:00'); if (!isNaN(d)) SEASON_START = d; }
+    /* ═══ THE TITLE RACE ═══ */
+    function renderRace(w){
+      var sec=$('hp-race'), tw=lastTableWeek(w); if(!tw||TEAMS.length<2){ show(sec,false); return; }
+      // x axis: every week that counts toward the table; y: cumulative match points.
+      var axis=WEEKS.filter(function(k){ return k.phase!=='playoff'&&k.phase!=='championship'&&(k.matches||[]).length; }).map(function(k){return k.week;}).sort(function(a,b){return a-b;});
+      if(axis.indexOf(tw)<0) axis.push(tw);
+      var played=playedWeeks().filter(function(x){return x<=tw;}), rows=standRows(w);
+      var series=rows.map(function(r){ var pts=[0], run=0; played.forEach(function(pwk){ var n=nightOf(r,pwk); run+=n?n.f:0; pts.push(run); }); return {r:r,pts:pts,col:teamColor(r.id,r.name)}; });
+      var maxP=Math.max(4,Math.ceil(Math.max.apply(null,series.map(function(s){return s.pts[s.pts.length-1];}))/4)*4);
+      var VW=720, VH=300, L=40, R=VW-170, T=20, B=260, n=axis.length;
+      function X(i){ return n<1?L:L+i*(R-L)/n; }            // i = 0 (start) … n (last week)
+      function Y(p){ return B-(p/maxP)*(B-T); }
+      var svg='', lastI=played.length, i;
+      if(lastI<n) svg+='<rect class="todo" x="'+X(lastI).toFixed(1)+'" y="'+T+'" width="'+(X(n)-X(lastI)).toFixed(1)+'" height="'+(B-T)+'"></rect><text x="'+((X(lastI)+X(n))/2).toFixed(1)+'" y="'+(T+20)+'" text-anchor="middle" style="font-weight:700">Still to play</text>';
+      for(i=0;i<=maxP;i+=maxP/Math.min(4,maxP)){ svg+='<line class="'+(i===0?'base':'grid')+'" x1="'+L+'" y1="'+Y(i).toFixed(1)+'" x2="'+X(n).toFixed(1)+'" y2="'+Y(i).toFixed(1)+'"></line><text x="'+(L-10)+'" y="'+(Y(i)+4).toFixed(1)+'" text-anchor="end">'+Math.round(i)+'</text>'; }
+      svg+='<text x="'+L+'" y="'+(B+24)+'" text-anchor="middle">Start</text>';
+      axis.forEach(function(wk,k){ var ph=(weekObj(wk)||{}).phase; svg+='<text'+(wk===tw?' class="now"':'')+' x="'+X(k+1).toFixed(1)+'" y="'+(B+24)+'" text-anchor="middle">'+(ph==='rivalry'?'Rivalry':'Wk '+wk)+'</text>'; });
+      series.slice().reverse().forEach(function(s){ var lead=s.r.rank===1;
+        svg+='<polyline fill="none" stroke="'+s.col+'" stroke-width="'+(lead?4:3)+'" stroke-linejoin="round" stroke-linecap="round" points="'+s.pts.map(function(p,k){ return X(k).toFixed(1)+','+Y(p).toFixed(1); }).join(' ')+'"></polyline>'; });
+      // End labels, nudged apart so tied teams stay readable.
+      var labs=series.map(function(s){ return {s:s,y:Y(s.pts[s.pts.length-1])}; }).sort(function(a,b){ return a.y-b.y||a.s.r.rank-b.s.r.rank; });
+      for(i=1;i<labs.length;i++) if(labs[i].y-labs[i-1].y<17) labs[i].y=labs[i-1].y+17;
+      var over=labs.length?labs[labs.length-1].y-(B+2):0; if(over>0) for(i=labs.length-1;i>=0;i--){ labs[i].y-=over; if(i>0&&labs[i].y-labs[i-1].y>=17) break; }
+      for(i=labs.length-2;i>=0;i--) if(labs[i+1].y-labs[i].y<17) labs[i].y=labs[i+1].y-17;
+      labs.forEach(function(l){ var s=l.s, ex=X(lastI), ey=Y(s.pts[s.pts.length-1]);
+        svg+='<circle cx="'+ex.toFixed(1)+'" cy="'+ey.toFixed(1)+'" r="'+(s.r.rank===1?6:5)+'" fill="'+s.col+'"></circle>'
+          +'<circle cx="'+(ex+18).toFixed(1)+'" cy="'+(l.y-4).toFixed(1)+'" r="4" fill="'+s.col+'"></circle>'
+          +'<text class="nm" x="'+(ex+28).toFixed(1)+'" y="'+l.y.toFixed(1)+'">'+esc(s.r.name)+' · '+s.r.pts+'</text>'; });
+      var aria='Match points by week. '+rows.map(function(r){ return r.name+' '+r.pts; }).join(', ')+'.';
+      $('hp-race-chart').innerHTML='<svg viewBox="0 0 '+VW+' '+VH+'" role="img" aria-label="'+esc(aria)+'">'+svg+'</svg>';
+      // Three plain-language takeaways.
+      var notes=[], lead=rows[0], second=rows[1], col=function(r){ return teamColor(r.id,r.name); };
+      if(lead&&second){
+        var gap=lead.pts-second.pts;
+        var who=gap>0?'':esc(lead.name)+': ', nr=lead.rw+lead.rt;
+        var sub=!lead.rounds?'':(lead.rl===0&&nr>0)?(lead.rt===0?who+(nr===2?'won both rounds.':'won all '+numWord(nr)+' rounds.'):who+'unbeaten in '+numWord(nr)+' rounds: '+numWord(lead.rw)+' won, '+numWord(lead.rt)+' tied.'):who+lead.rw+'–'+lead.rl+'–'+lead.rt+' in rounds (won, lost, tied).';
+        sub=sub.replace(/^./,function(ch){return ch.toUpperCase();});
+        notes.push({c:col(lead),b:gap>0?esc(lead.name)+' lead by '+gap+'.':esc(lead.name)+' and '+esc(second.name)+' are level on '+lead.pts+'.',s:sub});
+        var k=1; while(k+1<rows.length&&second.pts-rows[k+1].pts<=1) k++;
+        if(gap>0&&k>=2){
+          var groups={}, order=[]; rows.slice(1,k+1).forEach(function(r){ if(!groups[r.pts]){ groups[r.pts]=[]; order.push(r.pts); } groups[r.pts].push(esc(r.name)); });
+          var spread=second.pts-rows[k].pts;
+          notes.push({c:col(second),b:(spread===0?esc(ordWord(2))+' to '+ordWord(k+1)+' are level.':'One point covers '+ordWord(2)+' to '+ordWord(k+1)+'.').replace(/^./,function(ch){return ch.toUpperCase();}),s:order.map(function(p){ return joinAnd(groups[p])+' '+(groups[p].length>1?'have':'has')+' '+p+'.'; }).join(' ')});
+        } else if(gap>0) notes.push({c:col(second),b:esc(second.name)+' are second, '+gap+' back.',s:rows[2]?esc(rows[2].name)+' are third on '+rows[2].pts+'.':''});
       }
+      var mover=null; rows.forEach(function(r){ if(r.move&&(!mover||Math.abs(r.move)>Math.abs(mover.move)||(Math.abs(r.move)===Math.abs(mover.move)&&r.move>mover.move))) mover=r; });
+      if(mover){ var mn=nightOf(mover,tw), res=mn?(mn.f>mn.a?'Beat ':mn.f<mn.a?'Lost to ':'Tied ')+esc(mn.opp)+' '+mn.f+'–'+mn.a+'.':'';
+        notes.push({c:col(mover),b:esc(mover.name)+(mover.move>0?' climbed ':' dropped ')+numWord(Math.abs(mover.move))+' '+plural(Math.abs(mover.move),'place')+' to '+ordWord(mover.rank)+'.',s:res}); }
+      $('hp-race-notes').innerHTML=notes.map(function(x){ return '<li><i style="background:'+x.c+'"></i><div><b>'+x.b+'</b>'+(x.s?'<span>'+x.s+'</span>':'')+'</div></li>'; }).join('');
+      show(sec,true);
+    }
+
+    /* ═══ UP NEXT + SEASON TIMELINE ═══ */
+    function whenText(ms){ if(isNaN(ms)) return ''; var a=new Date(ms), b=new Date(); a.setHours(0,0,0,0); b.setHours(0,0,0,0); var d=Math.round((a-b)/86400000); return d<0?'':d===0?'tonight':d===1?'tomorrow':'in '+d+' days'; }
+    function nextCard(m, idx, rows, today){
+      var by={}; rows.forEach(function(r){ by[r.name]=r; });
+      var nA=m.teamA||m.seedLabelA||'TBD', nB=m.teamB||m.seedLabelB||'TBD', a=by[m.teamA], b=by[m.teamB];
+      if(nA==='TBD'&&m.seedLabelA) nA=m.seedLabelA; if(nB==='TBD'&&m.seedLabelB) nB=m.seedLabelB;
+      var startMs=m.scheduledAt?Date.parse(m.scheduledAt):NaN, underway=!isNaN(startMs)&&Date.now()>=startMs;
+      var played=a&&b&&(a.gw+a.gl+b.gw+b.gl)>0;   // nothing to compare before the first night
+      var tag=played?(ord(Math.min(a.rank,b.rank))+' v '+ord(Math.max(a.rank,b.rank))):(m.gameLabel||m.placeLabel||m.bracketGroup||(a&&b?'Opening night':'Matchup'));
+      var badge=today&&underway?'<span class="hp-pill hp-pill--live"><i></i>Live</span>':'<span class="hp-pill">'+esc(tag)+'</span>';
+      var court=courtLabel(m,idx), right=[court, today&&!underway&&!isNaN(startMs)?'Tonight · '+fmtTime(startMs):''].filter(Boolean).join(' · ');
+      var side=function(name,id,emoji,known){ return '<div class="hp-nx__side">'+teamBadge(name,id,64,emoji)+(known?teamLink(name,id,'tn'):'<span>'+esc(name)+'</span>')+'</div>'; };
+      var tape='', stake='';
+      if(played){
+        var last=function(r){ var n=(r.nights||[])[r.nights.length-1]; return n?(n.f>n.a?'Won ':n.f<n.a?'Lost ':'Tied ')+n.f+'–'+n.a:'—'; };
+        tape='<div class="hp-tape">'+[['Match pts',a.pts,b.pts],['Games',a.gw+'–'+a.gl,b.gw+'–'+b.gl],['Point diff',a.diff==null?'—':signed(a.diff),b.diff==null?'—':signed(b.diff)],['Last night',last(a),last(b)]]
+          .map(function(r){ return '<div><b>'+esc(r[1])+'</b><span>'+r[0]+'</span><b>'+esc(r[2])+'</b></div>'; }).join('')+'</div>';
+        var hi=a.rank<b.rank?a:b, lo=hi===a?b:a;
+        if(!a.pts&&!b.pts) stake='';
+        else if(a.pts===b.pts) stake='Level on '+a.pts+' '+plural(a.pts,'point')+'. The winner '+(hi.rank===1?'goes top.':'holds '+ordWord(hi.rank)+' place.');
+        else if(!lo.pts) stake=esc(lo.name)+' are still chasing a first match point. A tied round is worth one.';
+        else if(hi.pts-lo.pts<=4) stake=esc(lo.name)+' are '+numWord(hi.pts-lo.pts)+' '+plural(hi.pts-lo.pts,'point')+' behind '+esc(hi.name)+'. A night is worth four.';
+        else stake=esc(hi.name)+' are '+numWord(hi.pts-lo.pts)+' points ahead of '+esc(lo.name)+'.';
+      }
+      return '<article class="hp-card hp-nx"><div class="hp-nx__top">'+badge+'<span>'+esc(right)+'</span></div>'
+        +'<div class="hp-nx__vs">'+side(nA,m.teamAId,m.emojiA,!!a||(!!m.teamA&&m.teamA!=='TBD'))+'<span class="hp-nx__v">v</span>'+side(nB,m.teamBId,m.emojiB,!!b||(!!m.teamB&&m.teamB!=='TBD'))+'</div>'
+        +tape+(stake?'<p>'+stake+'</p>':'')+'</article>';
+    }
+    function renderNext(){
+      var sec=$('hp-next'), nw=nextWeek(), rows=TEAMS.length?standRows(MAXWEEK||0):[];
+      var grid=$('hp-next-grid');
+      if(nw){
+        var ms=weekStartMs(nw.week), a=new Date(ms), b=new Date(), today=!isNaN(ms)&&a.toDateString()===b.toDateString();
+        var venue=''; (nw.matches||[]).forEach(function(m){ if(!venue&&m.venue) venue=m.venue; });
+        $('hp-next-h').textContent=(today?'Tonight · ':'Up next · ')+weekLabel(nw.week);
+        $('hp-next-sub').textContent=[fmtDay(ms,true), fmtTime(ms), venue, today?'':whenText(ms)].filter(Boolean).join(' · ');
+        grid.innerHTML=orderMatches((nw.matches||[]).filter(function(m){return !isFinal(m);})).map(function(m,i){ return nextCard(m,i,rows,today); }).join('');
+        grid.hidden=false;
+      } else { $('hp-next-h').textContent='The season'; $('hp-next-sub').textContent=''; grid.innerHTML=''; grid.hidden=true; }
+      // Timeline: one step per week, with a Bye step wherever two weeks sit a fortnight apart.
+      var rail='', prevMs=NaN;
+      WEEKS.forEach(function(wk){ if(!(wk.matches||[]).length) return;
+        var ms2=weekStartMs(wk.week);
+        if(!isNaN(prevMs)&&!isNaN(ms2)&&ms2-prevMs>=13*86400000) rail+='<div class="'+(prevMs+7*86400000<Date.now()?'done':'')+'"><i></i><b>Bye</b><span>'+esc(fmtDay(prevMs+7*86400000))+'</span></div>';
+        var done=(wk.matches||[]).every(isFinal), isNext=nw&&wk.week===nw.week;
+        var lbl=wk.phase==='rivalry'?'Rivalry':wk.phase==='playoff'?'Playoffs':wk.phase==='championship'?'Championship':'Week '+wk.week;
+        rail+='<div class="'+(done?'done':isNext?'next':'')+'"><i></i><b>'+lbl+'</b><span>'+esc(fmtDay(ms2))+(isNext?' · next':'')+'</span></div>';
+        prevMs=ms2; });
+      $('hp-rail').innerHTML=rail;
+      show(sec, !!nw || !!rail);
+    }
+
+    /* ═══ Bracket finish (mirrors the Playoffs tab on /standings.html) ═══
+       Null until a champion exists, so mid-season the table keeps its points order. */
+    function computeBracketFinish(){
+      var map={}, sawGold=false;
+      WEEKS.forEach(function(w){
+        if(w.phase!=='playoff'&&w.phase!=='championship')return;
+        (w.matches||[]).forEach(function(m){
+          if(!m.finalizedAt||m.homeRoundPts==null||m.homeRoundPts===m.awayRoundPts)return;
+          var win=m.homeRoundPts>m.awayRoundPts?m.teamA:m.teamB, lose=m.homeRoundPts>m.awayRoundPts?m.teamB:m.teamA;
+          var medal=String(m.medal||'')+' '+String(m.bracketGroup||m.gameLabel||''), place=String(m.placeLabel||'');
+          if(/🥇|gold/i.test(medal)){ map[win]={n:1,cls:'fm1',chip:'🥇 Champion'}; map[lose]={n:2,cls:'fm2',chip:'🥈 Runner-up'}; sawGold=true; }
+          else if(/🥉|bronze/i.test(medal)){ map[win]={n:3,cls:'fm3',chip:'🥉 Bronze'}; map[lose]={n:4,cls:'',chip:'4th'}; }
+          else if(/5th/i.test(place)||/consolation/i.test(medal)){ map[win]={n:5,cls:'',chip:'5th'}; map[lose]={n:6,cls:'',chip:'6th'}; }
+        });
+      });
+      return sawGold?map:null;
+    }
+
+    /* ═══ Render everything for the selected week ═══ */
+    var TOK=0;
+    function renderAll(){
+      var w=VIEW.week, tok=++TOK;
+      renderWeeknav(); renderHero(); renderStandings(w); renderPerformers(w); renderNumbers(w); renderResults(w, DROPS['week-'+w]||null); renderRace(w); renderNext();
+      var known=DROPS['week-'+w];
+      if(known!==undefined){ var shown0=known||(w>=MAXWEEK?DROP_LATEST:null); renderDrop(shown0); heroPhoto(shown0); }
+      dropFor(w).then(function(drop){
+        if(tok!==TOK) return;
+        var shown=drop||(w>=MAXWEEK?DROP_LATEST:null);   // the latest week falls back to the newest published edition
+        renderDrop(shown); heroPhoto(shown);
+        if(drop&&known===undefined) renderResults(w, drop);
+      });
+      loadWeekLogs(w).then(function(){ if(tok===TOK) renderNumbers(w); });
+    }
+    // Which view the page opens on: the recap for a few days after a night, then
+    // the build-up to the next one, and live once that night's first serve passes.
+    function autoMode(){
+      var nw=nextWeek(); if(!nw) return 'recap';
+      var ms=weekStartMs(nw.week), now=Date.now(); if(isNaN(ms)) return 'recap';
+      if(now>=ms) return (now-ms<6*3600*1000)?'live':'recap';
+      var last=weekStartMs(MAXWEEK); if(isNaN(last)) return 'build';
+      var d=new Date(last); d.setHours(0,0,0,0);
+      return (now>=d.getTime()+4*86400000 || ms-now<36*3600*1000) ? 'build' : 'recap';
+    }
+
+    /* ═══ Fetch + wire — every call is season-scoped ═══ */
+    (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+      if (S) { SEASON = S; SEASON_ID = S.id; SEASON_CODE = S.circuit; LINK_SUFFIX = S.suffix; SEASON_NAME = S.name; SEASON_START = S.startDate; SEASON_TAG = S.tag || ''; if (S.weeks) TOTAL_WEEKS = S.weeks;
+        if (window.dsSeasonLink) document.querySelectorAll('#recap [data-season-link]').forEach(function(a){ a.setAttribute('href', window.dsSeasonLink(a.getAttribute('href'), S)); }); }
     }).catch(function(){}).then(function(){
-      return fetch('/.netlify/functions/public-schedule?season=' + encodeURIComponent(SEASON_ID))
-        .then(function(r){ return r.ok ? r.json() : null; })
-        .then(function(data){ if (data && !data.empty && data.weeks) render(data.weeks); })
-        .catch(function(){});
+      var c=encodeURIComponent(SEASON_CODE), s=encodeURIComponent(SEASON_ID);
+      // Pace and the Drop index only decorate the page, so they never hold up the first paint.
+      var extras=Promise.all([getJSON(FN+'public-pace?view=season&circuit='+c), getJSON(FN+'public-drop?circuit='+c+'&view=index'), getJSON(FN+'public-teams?season='+s)]);
+      return Promise.all([
+        getJSON(FN+'public-leaderboard?circuit='+c), getJSON(FN+'public-standings?season='+s), getJSON(FN+'public-leaderboard?circuit='+c+'&view=players'),
+        getJSON(FN+'public-drop?circuit='+c), getJSON(FN+'public-schedule?season='+s)
+      ]).then(function(res){
+        var lb=res[0], st=res[1], pl=res[2], dropPayload=res[3], sched=res[4];
+        WEEKS=((sched&&!sched.empty&&sched.weeks)||[]).slice().sort(function(a,b){return a.week-b.week;});
+        HOME_FINISH=computeBracketFinish();
+        if(st&&st.divisions){ var dk=Object.keys(st.divisions)[0]; STAND_DIV=st.divisions[dk]||null; TEAMS=(STAND_DIV&&STAND_DIV.teams)||[]; }
+        PLAYERS=(pl&&pl.players)?pl.players:null;
+        D_NEED=(pl&&pl.needGames)||0;
+        try { if(window.DSEntity) DROP_IDX = window.DSEntity.buildIndex({ teams: [], players: PLAYERS ? Object.values(PLAYERS) : [], standings: st || null }); } catch(e){ DROP_IDX = null; }
+        // Weekly points fall back to the season aggregate when a weekly entry has none.
+        PERF=(lb&&lb.weeklyTopPerformers)||[];
+        if(PLAYERS) PERF.forEach(function(entry){['men','women'].forEach(function(g){(entry[g]||[]).forEach(function(p){ if(p.ps==null&&PLAYERS[p.playerId]&&PLAYERS[p.playerId].ps!=null)p.ps=PLAYERS[p.playerId].ps; });});});
+        DROP_LATEST=(dropPayload&&dropPayload.drop)||null;
+        MAXWEEK=PERF.length?PERF[0].week:0;
+        WEEKS.forEach(function(w){ if(finals(w.week).length&&w.week>MAXWEEK) MAXWEEK=w.week; });
+
+        if(!MAXWEEK){
+          // Nothing final yet: say where the season actually is, and count down to first serve.
+          VIEW.mode='pre';
+          $('hp-eyebrow').innerHTML=''; $('hp-lede').hidden=true;
+          $('rc-title').innerHTML=preseasonTitleHtml();
+          mountCountdown();
+          renderStandings(0); renderNext(); renderDrop(DROP_LATEST); heroPhoto(DROP_LATEST);
+        } else {
+          AUTO_MODE=autoMode();
+          var asked=parseInt(new URLSearchParams(location.search).get('week'),10);
+          if(asked>=1&&asked<=MAXWEEK&&finals(asked).length){ VIEW.week=asked; VIEW.mode='recap'; }
+          else { VIEW.week=MAXWEEK; VIEW.mode=AUTO_MODE; }
+          renderAll();
+        }
+        renderLeaders();
+        setTop();
+        return extras;
+      }).then(function(ex){
+        if(!ex) return;
+        PACE=(ex[0]&&!ex[0].empty&&ex[0].matches)?ex[0]:null; DROP_INDEX=ex[1]||null;
+        ((ex[2]&&ex[2].teams)||[]).forEach(function(t){ var o={photoUrl:t.photoUrl||null,color:t.color||null,emoji:t.emoji||''}; TEAMINFO[t.id]=o; TEAMINFO[String(t.name||'').toLowerCase()]=o; });
+        if(MAXWEEK) renderAll(); else { renderStandings(0); renderNext(); }
+      });
     });
   })();
   </script>

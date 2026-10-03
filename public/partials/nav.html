@@ -12,13 +12,17 @@
       <a href="/" class="ds-nav-brand">
         <div class="ds-nav-brand-text"><strong>The Dink Society</strong></div>
       </a>
-      <span class="ds-season" id="ds-season" hidden>
-        <button type="button" class="ds-season__btn" id="ds-season-btn" aria-haspopup="true" aria-expanded="false">
-          <span data-circuit-label>Season 1</span>
-          <svg class="ds-season__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
-        </button>
-        <div class="ds-season__menu" id="ds-season-menu" role="menu"></div>
-      </span>
+      <div class="ds-nav-subrow">
+        <span class="ds-season" id="ds-season" hidden>
+          <button type="button" class="ds-season__btn" id="ds-season-btn" aria-haspopup="true" aria-expanded="false">
+            <span data-circuit-label>Season 1</span>
+            <svg class="ds-season__chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
+          <div class="ds-season__menu" id="ds-season-menu" role="menu"></div>
+        </span>
+        <!-- Game-day pill (phones): beside the season label so the live board is one tap away without opening the menu. -->
+        <a href="/live.html" class="ds-nav-live ds-nav-live--m" data-live-pill hidden><i></i><span data-live-tx>Live</span></a>
+      </div>
     </div>
 
     <div class="ds-nav-links">
@@ -195,6 +199,64 @@
   buildNavLinks(desktopLinks, desktopLinks ? desktopLinks.querySelector('.ds-nav-login') : null, 'desktop');
   buildNavLinks(document.querySelector('.ds-nav-drawer-links'), null, 'drawer');
 
+  /* ── Game-day LIVE pill ─────────────────────────────────────────
+     Hidden all week. On a match day it appears on every page and links to
+     the live board: "Tonight" before first serve, a pulsing red "Live" once
+     a match is under way, "Final scores" when the night is done. Desktop
+     shows it first in the link row, phones beside the season label, and the
+     drawer gets it as its first entry. */
+  (function livePill() {
+    var LIVE_HTML = '<i></i><span data-live-tx>Live</span>';
+    if (desktopLinks) {
+      var d = document.createElement('a');
+      d.href = '/live.html'; d.className = 'ds-nav-live'; d.setAttribute('data-live-pill', ''); d.hidden = true; d.innerHTML = LIVE_HTML;
+      desktopLinks.insertBefore(d, desktopLinks.firstChild);
+    }
+    var drawerLinks = document.querySelector('.ds-nav-drawer-links');
+    if (drawerLinks) {
+      var w = document.createElement('a');
+      w.href = '/live.html'; w.className = 'ds-nav-live ds-nav-live--drawer'; w.setAttribute('data-live-pill', ''); w.hidden = true; w.innerHTML = LIVE_HTML;
+      drawerLinks.insertBefore(w, drawerLinks.firstChild);
+    }
+    var seen = false;
+    function paint(data) {
+      seen = true;
+      var ms = (data && data.matches) || [];
+      var on = !!(data && data.gameNight && ms.length);
+      var live = on && ms.some(function (m) { return m.status === 'live'; });
+      var done = on && ms.every(function (m) { return m.status === 'final'; });
+      // The search box folds down to its icon while the pill is showing, so the link row still fits.
+      var navEl = document.getElementById('ds-nav'); if (navEl) navEl.classList.toggle('has-live', on);
+      document.querySelectorAll('[data-live-pill]').forEach(function (a) {
+        a.hidden = !on;
+        a.classList.toggle('is-live', live);
+        var t = a.querySelector('[data-live-tx]');
+        if (t) t.textContent = live ? 'Live' : done ? 'Final scores' : 'Tonight';
+        a.setAttribute('aria-label', live ? 'Live scores, matches in progress' : done ? "Tonight's final scores" : 'Game night: open the live board');
+      });
+    }
+    // Always the CURRENT season's game night, whatever season is being browsed.
+    function check() {
+      if (document.hidden) return;
+      var ready = window.dsSeason ? window.dsSeason() : Promise.resolve(null);
+      ready.then(function (S) {
+        var id = (S && S.current && S.current.id) || (S && S.id) || 'circuit-i';
+        return fetch('/.netlify/functions/public-gameday?season=' + encodeURIComponent(id)).then(function (r) { return r.ok ? r.json() : null; });
+      }).then(function (d) { if (d) paint(d); }).catch(function () {});
+    }
+    // Pages that run the score ticker already poll this data: reuse it.
+    // (Only when the page is showing the current season; otherwise ask for it.)
+    document.addEventListener('ds:gameday', function (e) {
+      var data = e.detail; if (!data) return;
+      (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
+        if (!S || S.isCurrent) paint(data); else if (!seen) check();
+      }).catch(function () { paint(data); });
+    });
+    setTimeout(function () { if (!seen) check(); }, window.DSTicker ? 4000 : 0);
+    setInterval(function () { if (!window.DSTicker) check(); }, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden && !window.DSTicker) check(); });
+  })();
+
   /* ── Season pill + season-aware links ──────────────────────────
      Browsing a past season used to end at the first nav click, because every
      link here is a bare path — one tap on Standings and you were silently back
@@ -217,7 +279,8 @@
         if (!S.isCurrent) {
           document.querySelectorAll('.ds-nav a[href], .ds-nav-drawer a[href], .ds-mega a[href]').forEach(function (a) {
             var href = a.getAttribute('href');
-            if (!href || href.indexOf('season=') >= 0) return;
+            // The live pill always opens the current season's board.
+            if (!href || href.indexOf('season=') >= 0 || a.hasAttribute('data-live-pill')) return;
             a.setAttribute('href', window.dsSeasonLink(href, S));
           });
           document.querySelectorAll('.ds-mega[data-mega-href]').forEach(function (m) {
