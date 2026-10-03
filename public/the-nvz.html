@@ -315,7 +315,7 @@
     body.nvz-embed .nvz-shell { max-width:none; padding:4px 0 20px; }
     body.nvz-embed .tabs { flex-wrap:nowrap; overflow-x:auto; justify-content:flex-start; margin-top:4px; scrollbar-width:none; }
     body.nvz-embed .tabs::-webkit-scrollbar { display:none; }
-    /* Compare tab on the leaderboard: its Players/Teams toggle lives on the host page. */
+    /* Matchup tabs on the leaderboard: the host page's own tabs pick the view. */
     body.nvz-embed.nvz-versus .tabs { display:none; }
   </style>
 </head>
@@ -365,8 +365,8 @@
     // height to the parent so the iframe auto-sizes (no nested scrollbar).
     var QS = new URLSearchParams(location.search);
     var EMBED = QS.get('embed') === '1';
-    // Two sets of views share this page: 'versus' (Player vs Player + Team vs Team, the
-    // leaderboard's Compare tab) and the NVZ proper (everything else).
+    // Two sets of views share this page: 'versus' (Player Matchup + Team Matchup, the
+    // leaderboard's two matchup tabs) and the NVZ proper (everything else).
     var SET = QS.get('set') === 'versus' ? 'versus' : 'nvz', START = QS.get('tab') || '', CURTAB = '';
     if (SET === 'versus') document.body.classList.add('nvz-versus');
     if (EMBED) {
@@ -456,8 +456,8 @@
 
     // ════════ tabs ════════
     var VIEWS=[
-      ['pvp','⚔️ Player vs Player', renderPVP],
-      ['tvt','🌸 Team vs Team', renderTVT],
+      ['pvp','⚔️ Player Matchup', renderPVP],
+      ['tvt','🌸 Team Matchup', renderTVT],
       ['splits','🎯 Game Types', renderSplits],
       ['margins','📊 Margins', renderMargins],
       ['partners','🤝 Partners', renderPartners],
@@ -468,16 +468,16 @@
     ];
     VIEWS = VIEWS.filter(function(v){ return (SET==='versus') === (v[0]==='pvp'||v[0]==='tvt'); });
     function hasView(k){ return VIEWS.some(function(v){ return v[0]===k; }); }
-    // The host page's sub-toggle tells the embedded Compare frame which view to show.
+    // The host page's tabs tell the embedded matchup frame which view to show.
     if (EMBED) window.addEventListener('message', function(e){
       if (e.origin !== location.origin) return;
       var k = e.data && e.data.nvzShow;
       if (typeof k === 'string' && hasView(k) && document.getElementById('np-'+k)) show(k);
     });
     if (SET === 'versus' && !EMBED) {
-      document.title = 'Compare \u00b7 The Dink Society';
+      document.title = 'Matchups \u00b7 The Dink Society';
       var hh = document.querySelector('.nvz-hero h1'), hp = document.querySelector('.nvz-hero p');
-      if (hh) hh.innerHTML = 'Com<span class="lime">pare</span>';
+      if (hh) hh.innerHTML = 'Match<span class="lime">ups</span>';
       if (hp) hp.textContent = 'Any two players, any two teams';
     }
     var rendered={};
@@ -820,7 +820,7 @@
       var top=PLAYERS.filter(function(p){return p.rank!=null;}).sort(function(x,y){return x.rank-y.rank;});
       if(top.length<2) top=PLAYERS.slice().sort(function(x,y){return (y.dsr||0)-(x.dsr||0);});
       var items=sorted.map(function(p){ return {id:p.id, name:p.n, sub:(p.t?p.t+' · ':'')+p.w+'–'+p.l, right:p.dsr!=null?'DSR '+fx(p.dsr,1):''}; });
-      root.innerHTML='<div class="ptitle">⚔️ Player vs Player</div><div class="psub">Compare any two players head-to-head'+(WEEKS?' · through Week '+WEEKS:'')+'</div>'
+      root.innerHTML='<div class="ptitle">⚔️ Player Matchup</div><div class="psub">Compare any two players head-to-head'+(WEEKS?' · through Week '+WEEKS:'')+'</div>'
         +'<div class="vx">'+barHTML('pvp','Player 1','Player 2','Type a name')+'<div id="pvpOut" class="vx-out"></div></div>';
       var out=root.querySelector('#pvpOut'), A, B, token=0;
       function go(){
@@ -1046,7 +1046,7 @@
     function renderTVT(root){
       if(TEAMS.length<2){ root.innerHTML='<div class="card"><div class="empty">No team standings yet.</div></div>'; return; }
       var items=TEAMS.map(function(t){ return {id:t.teamId, name:t.teamName, sub:(t.rank?ord(t.rank)+' · ':'')+(t.matchPointsFor||0)+' match pts', right:(t.wins||0)+'–'+(t.losses||0)+(t.ties?'–'+t.ties:'')}; });
-      root.innerHTML='<div class="ptitle">🌸 Team vs Team</div><div class="psub">Full team comparison &amp; head-to-head'+(WEEKS?' · through Week '+WEEKS:'')+'</div>'
+      root.innerHTML='<div class="ptitle">🌸 Team Matchup</div><div class="psub">Full team comparison &amp; head-to-head'+(WEEKS?' · through Week '+WEEKS:'')+'</div>'
         +'<div class="vx">'+barHTML('tvt','Team 1','Team 2','Type a team')+'<div id="tvtOut" class="vx-out"></div></div>';
       var out=root.querySelector('#tvtOut'), A, B, token=0;
       function go(){
