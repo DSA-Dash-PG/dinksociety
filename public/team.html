@@ -372,9 +372,9 @@
       const dsrByName = {};
       myP.forEach(p => { const d = dsrOf(p); if (d != null) dsrByName[p.name] = d; });
 
-      /* Team DSR = sum of rated players' DSR */
+      /* Team DSR = AVERAGE of rated players' DSR. (An average, not a sum: the sum mostly measured how many players a team had used.) */
       const ratedDsr = roster.map(p => dsrByName[p.name]).filter(d => d != null);
-      const teamDSR = ratedDsr.length ? Math.round(ratedDsr.reduce((a,b) => a + b, 0) * 10) / 10 : null;
+      const teamDSR = ratedDsr.length ? (Math.round((ratedDsr.reduce((a,b) => a + b, 0) / ratedDsr.length) * 10) / 10).toFixed(1) : null;
 
       const divLabel = team.divisionLabel || team.division || 'Mixed Doubles';
       const hasPlayed = !!rec && (rec.wins + rec.losses + (rec.ties || 0)) > 0;
@@ -420,7 +420,7 @@
                 <h1 class="a-name">${esc(team.name)}</h1>
                 <div class="a-callouts">
                   ${hasPlayed && rec?.rank ? `<div class="a-callout"><span class="a-callout__big num-lime">#${rec.rank}</span><span class="a-callout__lbl">Division Rank</span></div>` : ''}
-                  ${teamDSR != null ? `<div class="a-callout"><span class="a-callout__big num-teal">${teamDSR}</span><span class="a-callout__lbl">Team DSR</span></div>` : ''}
+                  ${teamDSR != null ? `<div class="a-callout"><span class="a-callout__big num-teal">${teamDSR}</span><span class="a-callout__lbl" title="Average rating of the players who have played">Team DSR</span></div>` : ''}
                 </div>
                 ${(nextMatch || hasPlayed) ? `<div class="a-next"><span class="a-next__ic">${calIcon}</span><span class="a-next__lbl">Next Match</span><span class="a-next__val"><b>${nextNum}</b> <span>${nextSub}</span></span></div>` : ''}
               </div>

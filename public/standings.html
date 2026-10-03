@@ -319,7 +319,7 @@
   let standingsData = null, teamsData = null, scheduleData = null, activeDivision = '', isPreseason = false, divCount = 0;
   let selectedWeek = 'current'; // 'current' or a week number (snapshot through that week)
   let standingsView = 'overall'; // 'overall' | 'regular' | 'playoff' — Regular/Playoffs/Overall toggle
-  let dsrByTeam = {}; // teamId / lowercased teamName → summed Team DSR
+  let dsrByTeam = {}; // teamId / lowercased teamName → Team DSR (average of rated players)
   // Season ids come in several shapes ('circuit-i', 'season-2', '2'). Strip the
   // prefix and turn a number into the Roman code the stats blobs are keyed by.
   // dsSeason() overwrites this below; this is only the pre-resolution guess.
@@ -340,16 +340,17 @@
   }
   let CIRCUIT = codeFromId(SEASON.id);
 
-  // Team DSR = sum of each rated player's DSR (composite, gamesPlayed>0), keyed by id + name.
+  // Team DSR = AVERAGE of each rated player's DSR (composite, gamesPlayed>0), keyed by id + name.
+  // (An average, not a sum: the sum mostly measured how many players a team had used.)
   function buildDsrByTeam(pstats) {
-    const map = {};
+    const map = {}, sum = {}, cnt = {};
     if (!pstats || pstats.empty) return map;
     Object.values(pstats.players || {}).forEach(p => {
       if (!(p.gamesPlayed > 0) || p.composite == null) return;
       const d = Math.round(p.composite * 10) / 10;
-      [p.teamId, (p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { map[k] = (map[k] || 0) + d; });
+      [p.teamId, (p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { sum[k] = (sum[k] || 0) + d; cnt[k] = (cnt[k] || 0) + 1; });
     });
-    Object.keys(map).forEach(k => { map[k] = Math.round(map[k] * 10) / 10; });
+    Object.keys(sum).forEach(k => { map[k] = Math.round((sum[k] / cnt[k]) * 10) / 10; });
     return map;
   }
   const teamDSR = t => {
@@ -867,7 +868,7 @@
         + finChip
         + badge
         + '</div></td>'
-        + '<td class="col-dsr">' + (dsr != null ? '<span class="dsr-chip">' + dsr + '</span>' : '<span class="col-muted">—</span>') + '</td>'
+        + '<td class="col-dsr">' + (dsr != null ? '<span class="dsr-chip">' + dsr.toFixed(1) + '</span>' : '<span class="col-muted">—</span>') + '</td>'
         + '<td class="col-opt col-muted">' + rds + '</td>'
         + '<td>' + t.wins + '</td>'
         + '<td>' + t.losses + '</td>'
@@ -903,7 +904,7 @@
       + '<thead><tr>'
       + '<th class="col-rank">#</th>'
       + '<th class="col-team">Team</th>'
-      + '<th class="col-dsr-h" title="Total Team DSR (sum of roster ratings)">DSR</th>'
+      + '<th class="col-dsr-h" title="Team DSR: average rating of the players who have played">DSR</th>'
       + '<th class="col-opt" title="Rounds Played (2 per match)">RDS</th>'
       + '<th title="Round Wins">W</th>'
       + '<th title="Round Losses">L</th>'

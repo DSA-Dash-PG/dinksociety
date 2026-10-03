@@ -172,7 +172,7 @@
   }
   let CIRCUIT = codeFromId(SEASON.id);
   let LINK_SUFFIX = SEASON.id === 'circuit-i' ? '' : '&season=' + encodeURIComponent(SEASON.id);
-  const TREND_THRESHOLD = 25; // DSR points of difference to call a run-in harder/easier
+  const TREND_THRESHOLD = 2.5; // Team DSR points of difference to call a run-in harder/easier (was 25 when Team DSR was a roster sum)
 
   let dsrByTeam = {};
   let sort = { k: 'sos', dir: -1 };
@@ -184,18 +184,19 @@
   function slug(s){ return String(s||'').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,30)||'team'; }
   function teamHref(t){ return '/team?id=' + encodeURIComponent(t.id || slug(t.name)) + LINK_SUFFIX; }
   function mean(a){ return a.length ? a.reduce((s,x)=>s+x,0)/a.length : null; }
-  function fmt(v){ return v == null ? '—' : v.toFixed(0); }
+  function fmt(v){ return v == null ? '—' : v.toFixed(1); }
 
-  // Team DSR = sum of each rated player's DSR (composite, gamesPlayed>0).
+  // Team DSR = AVERAGE of each rated player's DSR (composite, gamesPlayed>0).
+  // (An average, not a sum: the sum mostly measured how many players a team had used.)
   function buildDsrByTeam(pstats) {
-    const map = {};
+    const map = {}, sum = {}, cnt = {};
     if (!pstats || pstats.empty) return map;
     Object.values(pstats.players || {}).forEach(p => {
       if (!(p.gamesPlayed > 0) || p.composite == null) return;
       const d = Math.round(p.composite * 10) / 10;
-      [p.teamId, (p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { map[k] = (map[k] || 0) + d; });
+      [p.teamId, (p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { sum[k] = (sum[k] || 0) + d; cnt[k] = (cnt[k] || 0) + 1; });
     });
-    Object.keys(map).forEach(k => { map[k] = Math.round(map[k] * 10) / 10; });
+    Object.keys(sum).forEach(k => { map[k] = Math.round((sum[k] / cnt[k]) * 10) / 10; });
     return map;
   }
   function dsrFor(id, name) {
@@ -349,14 +350,14 @@
         }
         const c = diffColor(od);
         const bg = (!o.played) ? 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',0.16)' : 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
-        const tip = 'Wk ' + o.week + ' ' + (o.played ? '(played)' : '(upcoming)') + '|vs ' + esc(ot ? ot.name : '?') + '|DSR ' + od.toFixed(0) + ' · ' + diffLabel(od);
+        const tip = 'Wk ' + o.week + ' ' + (o.played ? '(played)' : '(upcoming)') + '|vs ' + esc(ot ? ot.name : '?') + '|DSR ' + od.toFixed(1) + ' · ' + diffLabel(od);
         return '<div class="wk ' + (o.played ? '' : 'future') + '" style="background:' + bg + '" data-tip="' + tip + '">' + esc(ot ? ot.emoji : '') + '</div>';
       }).join('');
       const c = r.sos != null ? diffColor(r.sos) : [120,120,120];
       return ''
         + '<div class="team-cell"><div class="team-emoji">' + esc(r.emoji) + '</div>'
         + '<div class="team-meta"><span class="team-nm"><a href="' + teamHref(r) + '">' + esc(r.name) + '</a></span>'
-        + '<span class="team-dsr">DSR ' + (r.dsr != null ? r.dsr.toFixed(0) : '—') + (r.rank ? ' · #' + r.rank : '') + '</span></div></div>'
+        + '<span class="team-dsr">DSR ' + (r.dsr != null ? r.dsr.toFixed(1) : '—') + (r.rank ? ' · #' + r.rank : '') + '</span></div></div>'
         + '<div class="strip-weeks" style="' + colTmpl + '">' + cells + '</div>'
         + '<div class="strip-sos"><div class="v" style="color:rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')">' + fmt(r.sos) + '</div><div class="l">avg opp</div></div>';
     }).join('');
@@ -420,7 +421,7 @@
     return '<div class="sos-card">'
       + '<h2 class="sos-card__title" style="font-size:13px;color:var(--color-text-faint);">— Column Key</h2>'
       + '<div class="key-grid">'
-      + '<div><b>SOS</b> = Average DSR of all scheduled opponents. Higher = tougher schedule.</div>'
+      + '<div><b>SOS</b> = Average Team DSR of all scheduled opponents (Team DSR = average rating of a team\'s players). Higher = tougher schedule.</div>'
       + '<div><b>Played</b> = Avg DSR of opponents already faced — contextualizes the record.</div>'
       + '<div><b>Remaining</b> = Avg DSR of opponents still to come.</div>'
       + '<div><b>Run-in</b> = Whether it gets harder (↑) or easier (↓) from here vs what\'s been played.</div>'

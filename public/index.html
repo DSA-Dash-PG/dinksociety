@@ -345,7 +345,7 @@
             <thead><tr>
               <th class="c-rank" title="Rank · change vs last week">#</th>
               <th class="l c-team">Team</th>
-              <th title="Total Team DSR (sum of roster ratings)">DSR</th>
+              <th title="Team DSR: average rating of the players who have played">DSR</th>
               <th title="Match wins">W</th>
               <th title="Match ties">T</th>
               <th title="Match losses">L</th>
@@ -744,18 +744,19 @@
       showWeek(parseInt(s.getAttribute('data-week'),10));
     });
 
-    /* ---- Team DSR (sum of each rated player's DSR), keyed by id + name ---- */
+    /* ---- Team DSR (AVERAGE of each rated player's DSR), keyed by id + name ----
+       (An average, not a sum: the sum mostly measured how many players a team had used.) */
     var DSR_BY_TEAM = {};
     function buildDsrByTeam(pl){
-      var map={};
+      var map={},sum={},cnt={};
       if(!pl||!pl.players)return map;
       Object.keys(pl.players).forEach(function(k){
         var p=pl.players[k];
         if(!(p.gamesPlayed>0)||p.composite==null)return;
         var d=Math.round(p.composite*10)/10;
-        [p.teamId,(p.teamName||'').toLowerCase()].filter(Boolean).forEach(function(key){map[key]=(map[key]||0)+d;});
+        [p.teamId,(p.teamName||'').toLowerCase()].filter(Boolean).forEach(function(key){sum[key]=(sum[key]||0)+d;cnt[key]=(cnt[key]||0)+1;});
       });
-      Object.keys(map).forEach(function(k){map[k]=Math.round(map[k]*10)/10;});
+      Object.keys(sum).forEach(function(k){map[k]=Math.round((sum[k]/cnt[k])*10)/10;});
       return map;
     }
     function teamDSR(t){
@@ -816,7 +817,7 @@
         return '<tr class="'+(i===0?'leader medal':(i<3?'medal':''))+(fin&&fin.cls?' '+fin.cls:'')+'">'
           +'<td class="c-rank"><div style="display:flex;align-items:center;gap:5px;justify-content:center">'+rankSym+(!HOME_FINISH&&t.rankDelta>0?'<span class="c-delta" style="color:var(--color-lime)">▲'+t.rankDelta+'</span>':!HOME_FINISH&&t.rankDelta<0?'<span class="c-delta" style="color:var(--color-red)">▼'+(-t.rankDelta)+'</span>':'')+'</div></td>'
           +'<td class="l c-team">'+(t.teamEmoji?'<span class="e">'+t.teamEmoji+'</span>':'')+teamLink(t.teamName,t.teamId,'tname')+finChip+win+'</td>'
-          +'<td>'+(teamDSR(t)!=null?'<span class="dsr-chip">'+teamDSR(t)+'</span>':'<span class="c-muted">—</span>')+'</td>'
+          +'<td>'+(teamDSR(t)!=null?'<span class="dsr-chip">'+teamDSR(t).toFixed(1)+'</span>':'<span class="c-muted">—</span>')+'</td>'
           +'<td>'+(t.wins||0)+'</td>'
           +'<td class="c-muted">'+(t.ties||0)+'</td>'
           +'<td class="c-muted">'+(t.losses||0)+'</td>'

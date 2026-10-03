@@ -145,7 +145,9 @@
 
     /* matchup bar — stays in view while you scroll */
     .vx-barwrap { position:sticky; top:var(--vx-top,64px); z-index:30; }
-    body.nvz-embed .vx-barwrap { position:relative; }
+    /* embedded: not sticky (the frame never scrolls), so cancel the sticky offset too;
+       position:relative + top pushed the bar down over the first card */
+    body.nvz-embed .vx-barwrap { position:relative; top:auto; }
     .vx-bar { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px; padding:10px 0 14px; background:var(--color-bg); border-bottom:1px solid var(--color-border); }
     .vx-bar.stuck { box-shadow:0 12px 18px -14px rgba(0,0,0,.7); }
     .vx-field { flex:1 1 140px; min-width:0; position:relative; display:flex; flex-direction:column; gap:6px; }
@@ -877,7 +879,7 @@
         {nm:'scoring', a:na.aps==null?null:r1(na.aps), b:nb.aps==null?null:r1(nb.aps)},
         {nm:'points allowed', a:na.apa==null?null:r1(na.apa), b:nb.apa==null?null:r1(nb.apa), lower:true},
         {nm:'close games', a:na.cl==null?null:Math.round(na.cl), b:nb.cl==null?null:Math.round(nb.cl)},
-        {nm:'average player rating', a:na.dsr==null?null:r1(na.dsr), b:nb.dsr==null?null:r1(nb.dsr)}
+        {nm:'Team DSR', a:na.dsr==null?null:r1(na.dsr), b:nb.dsr==null?null:r1(nb.dsr)}
       ];
       cats.forEach(function(c){ c.lead=edgeOf(c.a,c.b,c.lower); });
       var L={}; ['mp','gwin','mar','aps','apa','cl','dsr'].forEach(function(k,i){ L[k]=cats[i].lead; });
@@ -917,7 +919,7 @@
         +brow({label:'Points scored', hint:'per game', a:v1(na.aps), b:v1(nb.aps), wa:(na.aps||0)/11*100, wb:(nb.aps||0)/11*100, lead:L.aps, sa:na.ps+' points', sb:nb.ps+' points'})
         +brow({label:'Points allowed', hint:'per game · lower is better', a:v1(na.apa), b:v1(nb.apa), wa:(na.apa||0)/11*100, wb:(nb.apa||0)/11*100, lead:L.apa, sa:na.pa+' points', sb:nb.pa+' points'})
         +(gamesOK? brow({label:'Close games', hint:'win rate in games decided by 3 or fewer', a:pc(na.cl), b:pc(nb.cl), wa:na.cl, wb:nb.cl, lead:L.cl, sa:na.clG?na.clW+' of '+na.clG+' close games':'none yet', sb:nb.clG?nb.clW+' of '+nb.clG+' close games':'none yet'}) : '')
-        +brow({label:'Average player DSR', hint:'across everyone who has played', a:v1(na.dsr), b:v1(nb.dsr), wa:na.dsr, wb:nb.dsr, lead:L.dsr, sa:dsrSub(na), sb:dsrSub(nb)})
+        +brow({label:'Team DSR', hint:'average rating of everyone who has played', a:v1(na.dsr), b:v1(nb.dsr), wa:na.dsr, wb:nb.dsr, lead:L.dsr, sa:dsrSub(na), sb:dsrSub(nb)})
         +'</div>';
 
       // head-to-head card

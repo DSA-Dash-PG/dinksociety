@@ -3017,14 +3017,15 @@
       $('st-body').innerHTML = '<div class="muted">Standings populate as matches finalize.</div>';
       return;
     }
-    // Team DSR = sum of each rated player's DSR, keyed by team name (and id when present).
-    const dsrByTeam = {};
+    // Team DSR = AVERAGE of each rated player's DSR, keyed by team name (and id when present).
+    // (An average, not a sum: the sum mostly measured how many players a team had used.)
+    const dsrByTeam = {}, dsrSum = {}, dsrCnt = {};
     (DATA.leaderboard || []).forEach(p => {
       if (p.dsr == null) return;
       const d = Number(p.dsr); if (isNaN(d)) return;
-      [p.teamId, String(p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { dsrByTeam[k] = (dsrByTeam[k] || 0) + d; });
+      [p.teamId, String(p.teamName || '').toLowerCase()].filter(Boolean).forEach(k => { dsrSum[k] = (dsrSum[k] || 0) + d; dsrCnt[k] = (dsrCnt[k] || 0) + 1; });
     });
-    Object.keys(dsrByTeam).forEach(k => { dsrByTeam[k] = Math.round(dsrByTeam[k] * 10) / 10; });
+    Object.keys(dsrSum).forEach(k => { dsrByTeam[k] = Math.round((dsrSum[k] / dsrCnt[k]) * 10) / 10; });
     const teamDSR = t => { const v = dsrByTeam[t.teamId] ?? dsrByTeam[String(t.teamName || '').toLowerCase()]; return v != null ? v : null; };
 
     const rows = teams.map(t => {
@@ -3035,7 +3036,7 @@
       return `<div class="st-row ${mine ? 'st-row--me' : ''}">
         <div class="st-rank">${t.rank}</div>
         <div class="st-team">${teamLink(t.teamId, t.teamName, `<span class="st-emoji">${emo({ emoji: t.teamEmoji })}</span><span class="st-name">${esc(t.teamName)}${mine ? ' · you' : ''}</span>`, 'st-link')}</div>
-        <div class="st-dsr">${dsr != null ? '<span class="dsr-chip">' + dsr + '</span>' : '—'}</div>
+        <div class="st-dsr">${dsr != null ? '<span class="dsr-chip">' + dsr.toFixed(1) + '</span>' : '—'}</div>
         <div class="st-wl">${t.wins}–${t.ties || 0}–${t.losses}</div>
         <div class="st-pts">${t.matchPointsFor ?? 0}</div>
         <div class="st-diff ${diffCls}">${diff > 0 ? '+' : ''}${diff}</div>
@@ -3045,7 +3046,7 @@
       `<div class="label">Standings</div>
        <div class="st-head"><div class="st-rank">#</div><div class="st-team">Team</div><div class="st-dsr">DSR</div><div class="st-wl">W–T–L</div><div class="st-pts">PTS</div><div class="st-diff">DIFF</div></div>
        <div class="st-list">${rows}</div>
-       <div class="st-legend">DSR = total team DSR (sum of player ratings) · PTS = match points (win ×2 + tie ×1) · DIFF = point differential</div>`;
+       <div class="st-legend">DSR = team DSR (average player rating) · PTS = match points (win ×2 + tie ×1) · DIFF = point differential</div>`;
   }
 
   // ---- stats ----  (mirrors the public player profile: rankings, awards, season stats, partners, history)
