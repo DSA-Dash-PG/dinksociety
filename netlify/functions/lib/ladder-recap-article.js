@@ -196,7 +196,14 @@ export async function buildArticleStats(eventId) {
       e.progress.push({ round: g.round, diff: e.pf - e.pa, w: e.w, l: e.l, court: g.court, result: g.sb > g.sa ? 'W' : 'L' });
     });
     g.entA = ka; g.entB = kb;
+    // Every entity on each side. On a fixed-partner night this is one key per
+    // side (the pair); on an individual night it is BOTH players, which is
+    // what the round-by-round board, awards and narrative have to print —
+    // showing only entA/entB made every doubles game read as singles
+    // (2026-10-05).
+    g.sideA = sideAKeys; g.sideB = sideBKeys;
   }
+  const sideName = keys => (keys || []).map(k => entities.get(k)?.name).filter(Boolean).join(' & ');
 
   // MVP shares: per round, whoever won by the largest margin that round gets
   // the credit (both entities on a winning side, since a team win is shared).
@@ -210,9 +217,10 @@ export async function buildArticleStats(eventId) {
       const maxMargin = Math.max(...rGames.map(g => g.margin));
       if (maxMargin <= 0) continue;
       for (const g of rGames.filter(g => g.margin === maxMargin)) {
-        const winnerKey = g.sa > g.sb ? g.entA : g.entB;
-        const e = entities.get(winnerKey);
-        if (e) e.mvp++;
+        for (const k of (g.sa > g.sb ? g.sideA : g.sideB)) {
+          const e = entities.get(k);
+          if (e) e.mvp++;
+        }
       }
     }
   }
@@ -273,7 +281,7 @@ export async function buildArticleStats(eventId) {
     const tied = sorted.filter(r => metric(r) === best);
     return tied.find(r => !awarded.has(r.key)) || tied[0];
   };
-  const push = a => { awards.push(a); awarded.add(a.entity); };
+  const push = a => { awards.push(a); (a.entities || [a.entity]).forEach(k => awarded.add(k)); };
   if (rows[0]) push({
     cls: 'winner', tag: rows.length && rows[0].pair ? `${session.cap} winners` : `${session.cap} winner`,
     entity: rows[0].key,
@@ -305,8 +313,9 @@ export async function buildArticleStats(eventId) {
   if (closest && closest.margin <= 2) push({
     cls: 'kitchen', tag: 'Closest game',
     entity: closest.sa > closest.sb ? closest.entA : closest.entB,
+    entities: closest.sa > closest.sb ? closest.sideA : closest.sideB,
     detail: `${Math.max(closest.sa, closest.sb)}-${Math.min(closest.sa, closest.sb)} over ${
-      esc(nameOfKey(closest.sa > closest.sb ? closest.entB : closest.entA))
+      esc(sideName(closest.sa > closest.sb ? closest.sideB : closest.sideA))
     } in round ${closest.round} on ${courtName(closest.court)}${
       games.filter(g => g.margin === closest.margin).length === 1
         ? ` — the only ${closest.margin}-point game of the ${session.noun}` : ''
@@ -327,8 +336,9 @@ export async function buildArticleStats(eventId) {
   if (widest && widest.margin > 0) push({
     cls: 'kitchen', tag: 'Beat down',
     entity: widest.sa > widest.sb ? widest.entA : widest.entB,
+    entities: widest.sa > widest.sb ? widest.sideA : widest.sideB,
     detail: `${Math.max(widest.sa, widest.sb)}-${Math.min(widest.sa, widest.sb)} over ${
-      esc(nameOfKey(widest.sa > widest.sb ? widest.entB : widest.entA))
+      esc(sideName(widest.sa > widest.sb ? widest.sideB : widest.sideA))
     } in round ${widest.round} on ${courtName(widest.court)}${
       games.filter(g => g.margin === widest.margin).length === 1
         ? `, the widest margin of the ${session.noun}` : ''
@@ -366,10 +376,16 @@ export async function buildArticleStats(eventId) {
     for (const r of rows) acc[r.key] = { key: r.key, name: r.name, w: 0, l: 0, pf: 0, pa: 0, dr: r.dr };
     for (const g of games) {
       if (g.round >= lastRound) continue;
-      const A = acc[g.entA], B = acc[g.entB];
-      if (!A || !B) continue;
-      A.pf += g.sa; A.pa += g.sb; B.pf += g.sb; B.pa += g.sa;
-      if (g.sa > g.sb) { A.w++; B.l++; } else if (g.sb > g.sa) { B.w++; A.l++; }
+      for (const k of g.sideA) {
+        const A = acc[k]; if (!A) continue;
+        A.pf += g.sa; A.pa += g.sb;
+        if (g.sa > g.sb) A.w++; else if (g.sb > g.sa) A.l++;
+      }
+      for (const k of g.sideB) {
+        const B = acc[k]; if (!B) continue;
+        B.pf += g.sb; B.pa += g.sa;
+        if (g.sb > g.sa) B.w++; else if (g.sa > g.sb) B.l++;
+      }
     }
     const list = Object.values(acc).map(x => ({ ...x, diff: x.pf - x.pa }));
     list.sort((a, b) => (b.w - a.w) || (b.diff - a.diff) || ((b.dr ?? -1) - (a.dr ?? -1)));
@@ -467,13 +483,17 @@ export function buildNarrative(stats, { notes = '' } = {}) {
 
   // Did the two pairs who were level actually meet in the final round?
   const finalGames = stats.games.filter(g => g.round === stats.lastRound);
+  const onSide = (g, side, key) => (g[side] || [g[side === 'sideA' ? 'entA' : 'entB']]).includes(key);
   const decider = (deadHeat && finalGames.find(g =>
-    (g.entA === bLead.key && g.entB === bSecond.key) || (g.entA === bSecond.key && g.entB === bLead.key))) || null;
+    (onSide(g, 'sideA', bLead.key) && onSide(g, 'sideB', bSecond.key)) ||
+    (onSide(g, 'sideA', bSecond.key) && onSide(g, 'sideB', bLead.key)))) || null;
 
   // ── the lead ──
   if (deadHeat && decider) {
-    const winnerKey = decider.sa > decider.sb ? decider.entA : decider.entB;
-    const loserKey = winnerKey === decider.entA ? decider.entB : decider.entA;
+    const leadOnA = onSide(decider, 'sideA', bLead.key);
+    const leadWon = leadOnA ? decider.sa > decider.sb : decider.sb > decider.sa;
+    const winnerKey = leadWon ? bLead.key : bSecond.key;
+    const loserKey = leadWon ? bSecond.key : bLead.key;
     const wn = stats.entities.get(winnerKey)?.name;
     const ln = stats.entities.get(loserKey)?.name;
     const score = `${Math.max(decider.sa, decider.sb)}-${Math.min(decider.sa, decider.sb)}`;
@@ -585,8 +605,9 @@ export function buildNarrative(stats, { notes = '' } = {}) {
   }
   const closest = [...stats.games].sort((a, b) => (a.margin - b.margin) || (a.round - b.round))[0];
   if (closest && closest.margin <= 2) {
-    const cw = nm(closest.sa > closest.sb ? closest.entA : closest.entB);
-    const cl = nm(closest.sa > closest.sb ? closest.entB : closest.entA);
+    const sideNm = keys => (keys || []).map(nm).filter(Boolean).join(' & ');
+    const cw = sideNm(closest.sa > closest.sb ? closest.sideA : closest.sideB);
+    const cl = sideNm(closest.sa > closest.sb ? closest.sideB : closest.sideA);
     const only = stats.games.filter(g => g.margin === closest.margin).length === 1;
     field.push(
       `the tightest game of the ${stats.session.noun} was ${cw} over ${cl}, ` +
@@ -689,16 +710,20 @@ const CSS = `
   .legend { display:flex; gap:18px; font-size:12px; color:var(--txt-muted); margin-bottom:14px; }
   .legend span { display:inline-flex; align-items:center; gap:6px; }
   .swatch { width:10px; height:10px; border-radius:3px; display:inline-block; }
-  .diffrow { display:flex; align-items:center; height:30px; margin-bottom:6px; }
-  .diffname { width:150px; font-size:12.5px; color:var(--txt-muted); flex-shrink:0; text-align:right; padding-right:12px; }
-  .diffbar { position:relative; flex:1; height:30px; }
-  .diffbar-mid { position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--surf3); }
-  .wlrow { display:flex; align-items:center; height:26px; margin-bottom:8px; }
-  .wlname { width:150px; font-size:12.5px; color:var(--txt-muted); flex-shrink:0; text-align:right; padding-right:12px; }
-  .wlbarwrap { display:flex; align-items:center; height:22px; position:relative; }
-  .wlbar { height:22px; border-radius:4px; }
-  .wlgap { width:2px; }
-  .wlrecord { margin-left:10px; font-size:12px; font-weight:700; color:var(--txt); }
+  /* Shared bar-chart grid: name | track | value. Both charts use it so their
+     tracks are exactly the same width on every screen. */
+  .crow { display:grid; grid-template-columns:150px minmax(0,1fr) 52px; align-items:center; column-gap:12px; height:30px; margin-bottom:6px; }
+  .cname { font-size:12.5px; color:var(--txt-muted); text-align:right; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .ctrack { position:relative; height:22px; min-width:0; }
+  .ctrack.diff { background:var(--surf1); border-radius:4px; }
+  .ctrack.wl { display:flex; gap:2px; }
+  .cmid { position:absolute; left:50%; top:0; bottom:0; width:1px; background:var(--surf3); }
+  .cbar { height:22px; border-radius:4px; }
+  .ctrack.diff .cbar { position:absolute; top:0; }
+  .ctrack.diff .cbar.pos { left:50%; background:#b8ff2c; border-radius:0 4px 4px 0; }
+  .ctrack.diff .cbar.neg { right:50%; background:#ff5c47; border-radius:4px 0 0 4px; }
+  .cbar.win { background:#b8ff2c; } .cbar.loss { background:#ff5c47; }
+  .cval { font-size:12.5px; font-weight:700; color:var(--txt); font-variant-numeric:tabular-nums; white-space:nowrap; }
   .progress-wrap { border:1px solid var(--surf3); border-radius:10px; padding:16px; background:var(--surf2); }
   .pgSel { background:var(--surf3); color:var(--txt); border:1px solid var(--surf3); border-radius:8px; padding:8px 12px; font-size:13px; font-weight:600; margin-bottom:14px; max-width:100%; }
   #pgSvg { width:100%; height:auto; display:block; }
@@ -712,19 +737,23 @@ const CSS = `
   thead th.sortable::after { content:'\\2195'; display:inline-block; margin-left:5px; opacity:.35; font-size:10px; }
   thead th.sortable[data-sort-dir="asc"]::after { content:'\\25B2'; opacity:1; color:var(--teal); }
   thead th.sortable[data-sort-dir="desc"]::after { content:'\\25BC'; opacity:1; color:var(--teal); }
-  tbody td { padding:10px; border-bottom:1px solid var(--surf1); font-variant-numeric:tabular-nums; }
+  tbody td { padding:10px; border-bottom:1px solid var(--surf1); font-variant-numeric:tabular-nums; white-space:nowrap; }
   tbody tr:hover { background:var(--surf1); }
   td.rank { color:var(--txt-faint); } td.pname { font-weight:600; }
   .rounds { display:grid; grid-template-columns:repeat(2,1fr); gap:14px; }
   .rnd { background:var(--surf1); border-radius:12px; padding:14px 16px; }
   .rnd h3 { font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--txt-faint); font-weight:800; margin:0 0 10px; }
-  .gm { display:flex; align-items:baseline; gap:8px; font-size:12.5px; padding:5px 0; border-bottom:1px solid var(--surf2); }
-  .gm:last-child { border-bottom:0; }
-  .gm .ct { color:var(--txt-faint); font-weight:700; font-size:10.5px; width:30px; flex-shrink:0; }
-  .gm .tm { flex:1; color:var(--txt-muted); }
-  .gm .tm.won { color:var(--txt); font-weight:700; }
-  .gm .sc { font-variant-numeric:tabular-nums; font-weight:700; color:var(--txt); flex-shrink:0; }
-  .gm .kt { color:var(--gold); font-size:10px; font-weight:800; flex-shrink:0; }
+  .gm { display:grid; grid-template-columns:34px minmax(0,1fr); column-gap:10px; align-items:center; padding:8px 0; border-bottom:1px solid var(--surf2); }
+  .gm:last-child { border-bottom:0; padding-bottom:2px; }
+  .gm .ct { color:var(--txt-faint); font-weight:800; font-size:11px; line-height:1.2; text-align:center; }
+  .gm .ct .kt { display:block; color:var(--gold); font-size:8.5px; letter-spacing:.06em; text-transform:uppercase; margin-top:2px; }
+  .gm.king .ct { color:var(--gold); }
+  .gm .sides { display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .gm .side { display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:12.5px; color:var(--txt-muted); min-width:0; }
+  .gm .side .tm { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gm .side .sc { font-variant-numeric:tabular-nums; font-weight:700; flex-shrink:0; width:22px; text-align:right; color:var(--txt-faint); }
+  .gm .side.won { color:var(--txt); font-weight:700; }
+  .gm .side.won .sc { color:var(--lime); }
   @media (max-width:900px) {
     .article-wrap { grid-template-columns:1fr; }
     .podium-aside { grid-column:1; order:-1; margin-bottom:8px; position:static; flex-direction:row; overflow-x:auto; }
@@ -732,10 +761,11 @@ const CSS = `
   }
   @media (max-width:640px) {
     .kpirow,.awards,.rounds { grid-template-columns:1fr 1fr; }
-    .diffname,.wlname { width:90px; font-size:11px; }
-    .diffbar { width:auto; } .podium-aside { flex-direction:column; }
+    .crow { grid-template-columns:96px minmax(0,1fr) 44px; column-gap:8px; }
+    .cname { font-size:11px; } .cval { font-size:11.5px; }
+    .podium-aside { flex-direction:column; }
   }
-  @media (max-width:520px) { .rounds { grid-template-columns:1fr; } }
+  @media (max-width:520px) { .rounds { grid-template-columns:1fr; } .gm .side { font-size:13px; } }
 `;
 
 const SORT_SCRIPT = `
@@ -945,7 +975,7 @@ export function renderArticleHtml(stats, narrative) {
     for (const a of stats.awards) {
       A(`    <div class="award ${a.cls}">`);
       A(`      <div class="tag">${esc(a.tag)}</div>`);
-      A(`      <div class="who">${entLink(a.entity)}</div>`);
+      A(`      <div class="who">${(a.entities && a.entities.length ? a.entities : [a.entity]).map(entLink).join(' &amp; ')}</div>`);
       A(`      <div class="detail">${a.detail}</div>`);
       A('    </div>');
     }
@@ -1012,24 +1042,26 @@ export function renderArticleHtml(stats, narrative) {
   A('      <span><span class="swatch" style="background:#b8ff2c"></span>Net positive</span>');
   A('      <span><span class="swatch" style="background:#ff5c47"></span>Net negative</span>');
   A('    </div>');
+  // Both charts share one grid (name | track | value) so their tracks are
+  // exactly the same width — the old W/L chart used a fixed 200px bar that
+  // looked like a thumbnail next to the full-width differential chart
+  // (2026-10-05). Values sit in their own column, never over the bar.
   for (const r of rows) {
-    const w = (Math.abs(r.diff) / mx * 44).toFixed(1);
-    A(`    <div class="diffrow" title="${esc(r.name)}: ${r.w}-${r.l}, point diff ${signed(r.diff)}">`);
-    A(`      <div class="diffname">${entShort(r.key)}</div>`);
-    A('      <div class="diffbar"><div class="diffbar-mid"></div>');
-    if (r.diff >= 0) {
-      A(`        <div style="position:absolute;left:50%;width:${w}%;top:4px;height:20px;background:#b8ff2c;border-radius:4px;"></div><span style="position:absolute;left:calc(50% + ${w}% + 8px);top:5px;font-weight:600;color:#f0f0ec;font-size:12.5px;">${signed(r.diff)}</span>`);
-    } else {
-      A(`        <div style="position:absolute;right:50%;width:${w}%;top:4px;height:20px;background:#ff5c47;border-radius:4px;"></div><span style="position:absolute;right:calc(50% + ${w}% + 8px);top:5px;font-weight:600;color:#f0f0ec;font-size:12.5px;">${r.diff}</span>`);
-    }
+    const w = (Math.abs(r.diff) / mx * 50).toFixed(1);
+    const pos = r.diff >= 0;
+    A(`    <div class="crow" title="${esc(r.name)}: ${r.w}-${r.l}, point diff ${signed(r.diff)}">`);
+    A(`      <div class="cname">${entShort(r.key)}</div>`);
+    A('      <div class="ctrack diff"><div class="cmid"></div>');
+    A(`        <div class="cbar ${pos ? 'pos' : 'neg'}" style="width:${w}%;"></div>`);
     A('      </div>');
+    A(`      <div class="cval" style="color:${pos ? '#b8ff2c' : '#ff5c47'};">${signed(r.diff)}</div>`);
     A('    </div>');
   }
   A('  </section>');
 
-  // W/L chart
+  // W/L chart — each row's bar is scaled to the games played, so the busiest
+  // row fills the track; wins and losses split it.
   const maxGames = Math.max(1, ...rows.map(r => r.games));
-  const px = 200 / maxGames;
   A('  <section>');
   A(`    <h2>Win / loss record by ${unit}</h2>`);
   A('    <div class="legend">');
@@ -1037,14 +1069,15 @@ export function renderArticleHtml(stats, narrative) {
   A('      <span><span class="swatch" style="background:#ff5c47"></span>Losses</span>');
   A('    </div>');
   for (const r of rows) {
-    A(`    <div class="wlrow" title="${esc(r.name)}: ${r.w} wins, ${r.l} losses">`);
-    A(`      <div class="wlname">${entShort(r.key)}</div>`);
-    A('      <div class="wlbarwrap">');
-    A(`        <div class="wlbar" style="width:${Math.round(r.w * px)}px;background:#b8ff2c;"></div>`);
-    A('        <div class="wlgap"></div>');
-    A(`        <div class="wlbar" style="width:${Math.round(r.l * px)}px;background:#ff5c47;"></div>`);
-    A(`        <span class="wlrecord">${r.w}-${r.l}</span>`);
+    const wPct = (r.w / maxGames * 100).toFixed(1);
+    const lPct = (r.l / maxGames * 100).toFixed(1);
+    A(`    <div class="crow" title="${esc(r.name)}: ${r.w} wins, ${r.l} losses">`);
+    A(`      <div class="cname">${entShort(r.key)}</div>`);
+    A('      <div class="ctrack wl">');
+    if (r.w) A(`        <div class="cbar win" style="width:${wPct}%;"></div>`);
+    if (r.l) A(`        <div class="cbar loss" style="width:${lPct}%;"></div>`);
     A('      </div>');
+    A(`      <div class="cval">${r.w}-${r.l}</div>`);
     A('    </div>');
   }
   A('  </section>');
@@ -1060,11 +1093,22 @@ export function renderArticleHtml(stats, narrative) {
     A('      <div class="rnd">');
     A(`        <h3>Round ${rn}</h3>`);
     // Top court first, so the board reads the way the ladder is stacked.
+    // Each game is a stacked pair of team rows (names left, score right) so
+    // a doubles side — two names — never has to share one line with the
+    // other side's two names and the score. Winner is bold with a lime score.
     for (const g of byRound[rn].sort((x, y) => y.court - x.court)) {
-      const aw = g.sa > g.sb ? 'won' : '';
-      const bw = g.sb > g.sa ? 'won' : '';
+      const sideA = g.sideA && g.sideA.length ? g.sideA : [g.entA];
+      const sideB = g.sideB && g.sideB.length ? g.sideB : [g.entB];
+      const aw = g.sa > g.sb, bw = g.sb > g.sa;
+      const isKing = g.court === stats.maxCourt;
       const cname = cn(g.court).replace(/^Court /, '');
-      A(`        <div class="gm"><span class="ct">${esc(cname)}</span><span class="tm ${aw}">${entShort(g.entA)}</span><span class="sc">${g.sa}&ndash;${g.sb}</span><span class="tm ${bw}" style="text-align:right;">${entShort(g.entB)}</span></div>`);
+      A(`        <div class="gm${isKing ? ' king' : ''}">`);
+      A(`          <div class="ct">${esc(cname)}${isKing ? '<span class="kt">King</span>' : ''}</div>`);
+      A(`          <div class="sides">`);
+      A(`            <div class="side${aw ? ' won' : ''}"><span class="tm">${sideA.map(entShort).join(' &amp; ')}</span><span class="sc">${g.sa}</span></div>`);
+      A(`            <div class="side${bw ? ' won' : ''}"><span class="tm">${sideB.map(entShort).join(' &amp; ')}</span><span class="sc">${g.sb}</span></div>`);
+      A(`          </div>`);
+      A(`        </div>`);
     }
     A('      </div>');
   }
@@ -1125,6 +1169,16 @@ function slugify(s) {
 }
 
 /**
+ * Bump this whenever the rendered HTML/CSS changes shape. Stored on every
+ * article record; ladder-recap-page.js rebuilds an article whose stamp is
+ * older on its next view, so already-published nights pick up template fixes
+ * (doubles sides on the round board, the chart grid, …) without an admin
+ * having to force-regenerate each one.
+ *   2 — 2026-10-05: round-by-round shows both players per side; charts share a grid.
+ */
+export const TEMPLATE_VERSION = 2;
+
+/**
  * Build and store the full recap article for one finished event.
  * @returns {Promise<{ok, skipped?, reason?, record?}>}
  */
@@ -1151,6 +1205,7 @@ export async function generateRecapArticle(eventId, { force = false, notes = '' 
     html,
     notes: useNotes,
     generatedBy: narrative.engine,
+    templateVersion: TEMPLATE_VERSION,
     // Keep the numbers that went into the page, for debugging a bad article.
     stats: {
       event: stats.event,

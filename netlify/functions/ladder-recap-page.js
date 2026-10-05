@@ -10,6 +10,7 @@
 // than a 404, because the recap email and the hub link to the URL immediately.
 
 import { getArticle, listArticles } from './lib/recap-article-store.js';
+import { generateRecapArticle, TEMPLATE_VERSION } from './lib/ladder-recap-article.js';
 
 function pathId(req) {
   const url = new URL(req.url);
@@ -40,6 +41,18 @@ export default async (req) => {
     }
 
     if (!rec || !rec.html) return html(placeholder(id), 200);
+
+    // An article rendered by an older template gets rebuilt on first view
+    // (notes are carried forward). If the rebuild fails for any reason the
+    // stored page still serves.
+    if ((rec.templateVersion || 0) < TEMPLATE_VERSION) {
+      try {
+        const r = await generateRecapArticle(rec.eventId, { force: true });
+        if (r.ok && r.record?.html) rec = r.record;
+      } catch (err) {
+        console.error('ladder-recap-page: template refresh failed for', rec.eventId, err);
+      }
+    }
 
     return new Response(rec.html, {
       status: 200,
