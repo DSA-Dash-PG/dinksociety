@@ -5,6 +5,12 @@
 // GET /api/public-ladder-stats?division=womens → the SAME season response, but
 //                                          every field scoped to one division
 //                                          (powers queen.html / king boards).
+// GET /api/public-ladder-stats?period=2026-10 → the SAME response scoped to one
+//                                          calendar month (the leaderboard's
+//                                          monthly ladder boards). Every
+//                                          response also carries `periods`
+//                                          (months with scored ladders) and
+//                                          `champions` (#1 of each month).
 //
 // LADDER RANKING RULE: wins → point differential → Dink Rating. Applies to the
 // season leaderboard, each night's standings, and who counts as a winner.
@@ -90,6 +96,8 @@ export default async (req) => {
   // other than a real division name is ignored, so a junk value degrades to
   // the normal season-wide response rather than an empty page.
   const division = ['mixed', 'mens', 'womens'].includes(params.get('division')) ? params.get('division') : null;
+  // Optional calendar-month scope, YYYY-MM. Anything else is ignored.
+  const period = /^\d{4}-\d{2}$/.test(params.get('period') || '') ? params.get('period') : null;
 
   // ── one night ──
   if (eventId) {
@@ -235,7 +243,7 @@ export default async (req) => {
   const recentWinners = recent.map(p => {
     const ev = eventCache.get(p.eventId) || null;
     const nr = nightRows(p, ev);
-    return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || 'mixed', format: isPairNight(nr) ? 'fixed-partner' : 'individual', winners: winnersFrom(nr), standings: nr };
+    return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, place: ev?.place || null, type: ev?.type || 'mixed', format: isPairNight(nr) ? 'fixed-partner' : 'individual', players: playersFromPlay([p]).length, winners: winnersFrom(nr), standings: nr };
   });
 
   // Top-3 finishers for EVERY event with a play, so the Completed tab can show the
@@ -257,14 +265,70 @@ export default async (req) => {
   // scores that follow a player across every format she plays — the same reason
   // buildDivisionRows reuses them. A player's DR shouldn't change depending on
   // which board you're looking at her from.
+  // ── Calendar months (?period=YYYY-MM) ──────────────────────────────────
+  // Richard, 2026-10-05: the ladder season is broken into automatic calendar
+  // months — every scored ladder dated in October is the October board, no
+  // admin step. One ladder is enough to be ranked on a month. The month list
+  // and each month's #1 ride along on every response so the leaderboard can
+  // draw the month chips and the "Month by month" column from one call.
+  const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthOf = p => String(p.date || eventCache.get(p.eventId)?.date || '').slice(0, 7);
+  const monthLabel = m => { const [y, mm] = m.split('-'); return `${MONTH_NAMES[+mm - 1] || mm} ${y}`; };
+  const thisMonth = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' }).slice(0, 7);
+  const byMonth = new Map();
+  for (const p of plays) {
+    const m = monthOf(p);
+    if (!/^\d{4}-\d{2}$/.test(m)) continue;
+    if (!byMonth.has(m)) byMonth.set(m, []);
+    byMonth.get(m).push(p);
+  }
+  const monthKeys = [...byMonth.keys()].sort().reverse();
+  const periods = monthKeys.map(m => {
+    const ps = byMonth.get(m);
+    return { key: m, label: monthLabel(m), short: monthLabel(m).slice(0, 3), ladders: new Set(ps.map(p => p.eventId)).size, players: playersFromPlay(ps).length, live: m === thisMonth };
+  });
+  const champions = monthKeys.map(m => {
+    const ps = byMonth.get(m);
+    const top = buildDivisionRows(ps, allDr, allBonus, allMvp)[0] || null;
+    return { period: m, label: monthLabel(m), live: m === thisMonth, ladders: new Set(ps.map(p => p.eventId)).size,
+      champion: top ? { id: top.id, name: top.name, w: top.w, l: top.l, diff: top.diff, nights: top.nights, dr: top.dr } : null };
+  });
+  const inPeriod = p => !period || monthOf(p) === period;
+
   let scoped = null;
-  if (division) {
-    const dPlays = poolFor(division).filter(p => (typeByEvent[p.eventId] || 'mixed') === division);
+  if (division || period) {
+    const dPlays = (division ? poolFor(division).filter(p => (typeByEvent[p.eventId] || 'mixed') === division) : plays).filter(inPeriod);
     const dPlayers = playersFromPlay(dPlays);
     const dSessions = dPlays.map(toSession);
     const dStats = calcStats(dSessions, dPlayers);
     const dBonus = calcBonusPts(dSessions, dPlayers);
-    const dRows = divisions[division] || [];
+    // A whole-season division board is already computed above; a month board
+    // (with or without a division) is built fresh over the month's plays, with
+    // the same career-wide DR / bonus / MVP that every other board reuses.
+    const dRows = period ? buildDivisionRows(dPlays, drFor(division || 'mixed'), bonusFor(division || 'mixed'), mvpFor(division || 'mixed')) : (divisions[division] || []);
+    attachXP(dRows);
+
+    // Movement within the month: where each player stood before the month's
+    // most recent ladder. Positive = climbed. Null = first ladder this month.
+    if (period && dPlays.length) {
+      const latest = dPlays.map(p => String(p.date || '')).sort().pop();
+      const before = dPlays.filter(p => String(p.date || '') !== latest);
+      const prevRank = new Map();
+      if (before.length) buildDivisionRows(before, drFor(division || 'mixed'), bonusFor(division || 'mixed'), mvpFor(division || 'mixed')).forEach((r, i) => prevRank.set(r.id, i + 1));
+      dRows.forEach((r, i) => { r.rankDelta = prevRank.has(r.id) ? prevRank.get(r.id) - (i + 1) : null; });
+    }
+
+    // Per-division boards for the month, so the leaderboard's division switch
+    // stays month-scoped without a second request.
+    const dDivisions = { all: dRows };
+    if (period && !division) {
+      for (const d of ['mixed', 'mens', 'womens']) {
+        const sub = poolFor(d).filter(p => (typeByEvent[p.eventId] || 'mixed') === d).filter(inPeriod);
+        const subRows = buildDivisionRows(sub, drFor(d), bonusFor(d), mvpFor(d));
+        attachXP(subRows);
+        dDivisions[d] = subRows;
+      }
+    }
 
     const dQualified = new Set(dRows
       .filter(r => (r.w + r.l) >= MIN_KITCHEN_GAMES && (r.nights || 0) >= MIN_KITCHEN_NIGHTS)
@@ -275,19 +339,21 @@ export default async (req) => {
       .filter(p => dQualified.has(p.p1.id) && dQualified.has(p.p2.id))
       .map(p => ({ a: p.p1.name, b: p.p2.name, w: p.w, l: p.l, pct: (p.w + p.l) ? Math.round(100 * p.w / (p.w + p.l)) : 0 }));
 
-    const dRecent = dPlays.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, 4);
+    // A month shows EVERY ladder it held; the season views keep the latest 4.
+    const dRecent = dPlays.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))).slice(0, period ? 50 : 4);
     const dWinnersByEvent = {};
     dPlays.forEach(p => { if (winnersByEvent[p.eventId]) dWinnersByEvent[p.eventId] = winnersByEvent[p.eventId]; });
 
     scoped = {
       leaderboard: dRows,
+      ...(period && !division ? { divisions: dDivisions } : {}),
       kitchen: buildKitchen(dSessions, dPlayers, dStats, dBonus),
       mvpLeaders: limitWithTies(dMvpSorted, r => r.count),
       partnerships: limitWithTies(dPartnerSorted, r => r.pct),
       recentWinners: dRecent.map(p => {
         const ev = eventCache.get(p.eventId) || null;
         const nr = nightRows(p, ev);
-        return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, type: ev?.type || division, format: isPairNight(nr) ? 'fixed-partner' : 'individual', winners: winnersFrom(nr), standings: nr };
+        return { eventId: p.eventId, eventName: ev?.name || null, date: p.date, place: ev?.place || null, type: ev?.type || division || 'mixed', format: isPairNight(nr) ? 'fixed-partner' : 'individual', players: playersFromPlay([p]).length, winners: winnersFrom(nr), standings: nr };
       }),
       winnersByEvent: dWinnersByEvent,
       hasData: dRows.length > 0,
@@ -313,6 +379,7 @@ export default async (req) => {
     // season-wide ones — so the caller reads the same field names either
     // way. `divisions` and `xp` stay whole for the board switcher.
     ...(scoped || {}), division,
+    period, periods, champions,
   }, 'private, max-age=10');
 };
 
