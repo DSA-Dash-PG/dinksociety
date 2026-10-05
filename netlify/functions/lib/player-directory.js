@@ -34,6 +34,17 @@ export async function setPlayerInfo(id, info = {}) {
   if ('name' in info && info.name) next.name = String(info.name).trim().slice(0, 60);
   if ('gender' in info && info.gender) next.gender = info.gender === 'F' ? 'F' : 'M';
   if ('duprId' in info) next.duprId = String(info.duprId || '').trim().slice(0, 30);
+  // DUPR club membership: 'confirmed' = the player ticked "I've joined" at
+  // sign-up; 'verified' = an admin checked the club and saw them. A player's
+  // own confirmation never downgrades a verification — only an explicit
+  // admin change (info.duprClubForce) can do that.
+  if ('duprClub' in info) {
+    const v = ['confirmed', 'verified'].includes(info.duprClub) ? info.duprClub : '';
+    if (info.duprClubForce || !(next.duprClub === 'verified' && v !== 'verified')) {
+      if (v !== (next.duprClub || '')) next.duprClubAt = v ? new Date().toISOString() : null;
+      next.duprClub = v;
+    }
+  }
   dir[id] = next;
   await store().setJSON('directory.json', dir);
   return next;
@@ -50,7 +61,10 @@ export async function setPlayerInfo(id, info = {}) {
 // master record, same as name and gender, so it takes precedence here too.
 export function applyDirectoryToSignups(rec, dir) {
   if (!rec || !dir || !Object.keys(dir).length) return rec;
-  const fix = p => { if (!p) return; const o = dir[p.playerId]; if (o) { if (o.name) p.name = o.name; if (o.gender) p.gender = o.gender; if (o.duprId) p.duprId = o.duprId; } };
+  // duprClub: 'verified' on the directory always shows (it is the admin's
+  // check and follows the player to every ladder); otherwise the directory
+  // only fills in an entry that has nothing of its own.
+  const fix = p => { if (!p) return; const o = dir[p.playerId]; if (o) { if (o.name) p.name = o.name; if (o.gender) p.gender = o.gender; if (o.duprId) p.duprId = o.duprId; if (o.duprClub && (o.duprClub === 'verified' || !p.duprClub)) p.duprClub = o.duprClub; } };
   (rec.roster || []).forEach(fix);
   (rec.waitlist || []).forEach(fix);
   fix(rec.pendingClaim);

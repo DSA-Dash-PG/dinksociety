@@ -232,6 +232,7 @@ export function addSignup(rec, event, person, now = Date.now()) {
       invitedBy: person.invitedBy || null,
       heldUntil: new Date(now + PAY_HOLD_MS).toISOString(),
       duprId: person.duprId || null,
+      duprClub: person.duprClub || null,
     });
     return { list: 'roster', position: rec.roster.length };
   }
@@ -244,6 +245,7 @@ export function addSignup(rec, event, person, now = Date.now()) {
     joinedAt: new Date(now).toISOString(),
     invitedBy: person.invitedBy || null,
     duprId: person.duprId || null,
+    duprClub: person.duprClub || null,
   });
   return { list: 'waitlist', position: rec.waitlist.length };
 }
@@ -302,7 +304,7 @@ export function addPairSignup(rec, event, registrant, partner, now = Date.now())
   const iso = new Date(now).toISOString();
   const base = (p, id, linkId) => ({
     playerId: id, name: p.name || '', email: (p.email || '').toLowerCase(),
-    gender: p.gender || null, duprId: p.duprId || null, partnerId: linkId,
+    gender: p.gender || null, duprId: p.duprId || null, duprClub: p.duprClub || null, partnerId: linkId,
     invitedBy: p.invitedBy || null,
   });
   if (spotsLeft(event, rec) >= 2) {
@@ -347,6 +349,7 @@ export function moveWaitlistToRoster(rec, { playerId, email } = {}, now = Date.n
     signedUpAt: new Date(now).toISOString(), paymentMethod: null, paymentStatus: 'pending',
     amountCents: null, checkoutSessionId: null, invitedBy: w.invitedBy || null,
     heldUntil: new Date(now + PAY_HOLD_MS).toISOString(),
+    duprId: w.duprId || null, duprClub: w.duprClub || null,
   });
   return rec.roster[rec.roster.length - 1];
 }
@@ -382,12 +385,14 @@ export function promoteHead(rec, event, now = Date.now()) {
       signedUpAt: new Date(now).toISOString(), paymentMethod: null, paymentStatus: 'pending',
       amountCents: null, checkoutSessionId: null, invitedBy: next.invitedBy || null,
       heldUntil: new Date(now + PAY_HOLD_MS).toISOString(),
+      duprId: next.duprId || null, duprClub: next.duprClub || null,
     });
     return { ...next, autoClaimed: true };
   }
   rec.pendingClaim = {
     playerId: next.playerId || null, name: next.name, email: next.email, gender: next.gender || null,
     invitedBy: next.invitedBy || null,
+    duprId: next.duprId || null, duprClub: next.duprClub || null,
     promotedAt: new Date(now).toISOString(),
     claimDeadline: new Date(now + HOLD_MS).toISOString(),
     nudgedAt: null,
@@ -408,6 +413,7 @@ export function claimSpot(rec, { playerId, email } = {}, now = Date.now()) {
     signedUpAt: new Date(now).toISOString(), paymentMethod: null, paymentStatus: 'pending',
     amountCents: null, checkoutSessionId: null, invitedBy: pc.invitedBy || null,
     heldUntil: new Date(now + PAY_HOLD_MS).toISOString(),
+    duprId: pc.duprId || null, duprClub: pc.duprClub || null,
   });
   rec.pendingClaim = null;
   return true;

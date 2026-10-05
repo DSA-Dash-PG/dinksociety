@@ -26,7 +26,7 @@ export async function promoteAndNotify(event, signups) {
       await sendEmail({
         to: next.email,
         subject: `You're in — a spot opened for ${event.name}`,
-        html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: next.playerId, email: next.email }) }),
+        html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId: next.playerId, email: next.email }) }),
       });
       return { opened: next.name };
     }

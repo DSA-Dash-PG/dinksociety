@@ -52,6 +52,20 @@
   .mtabbar{ display:flex;gap:4px;background:#1c1f18;border:1px solid rgba(255,255,255,.1);border-radius:11px;padding:4px;margin:0 0 18px; }
   .mtabbar button{ flex:1;padding:10px 6px;border:0;border-radius:8px;background:transparent;color:#9aa094;font:inherit;font-size:.78rem;font-weight:800;cursor:pointer;white-space:nowrap; }
   .mtabbar button.on{ background:var(--lime);color:#000; }
+  .mtabbar{ overflow-x:auto;scrollbar-width:none; } .mtabbar::-webkit-scrollbar{ display:none; }
+  @media(max-width:600px){ .mtabbar button{ flex:0 0 auto;padding:10px 14px; } }
+  textarea.i{ width:100%;min-height:150px;padding:12px 13px;border-radius:10px;border:1px solid rgba(255,255,255,.1);background:#1c1f18;color:#f0f2ec;font:inherit;font-size:.9rem;line-height:1.55;box-sizing:border-box;resize:vertical; }
+  textarea.i:focus{ outline:none;border-color:var(--lime); }
+  .ckrow{ display:flex;align-items:flex-start;gap:9px;font-size:.86rem;color:#d9dcd3;padding:7px 0;cursor:pointer; }
+  .ckrow input{ width:18px;height:18px;margin:1px 0 0;accent-color:var(--lime);flex:none; } .ckrow b{ color:#9aa094;font-weight:700; }
+  .chgnote{ border:1px solid rgba(240,192,64,.4);background:rgba(240,192,64,.08);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:.84rem;line-height:1.55; }
+  .chgnote b{ color:var(--gold); } .chgnote ul{ margin:6px 0 8px 18px;padding:0; }
+  .chgnote button{ background:none;border:0;color:#9aa094;font:inherit;font-size:.78rem;text-decoration:underline;cursor:pointer;padding:0; }
+  .mh-row{ border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;margin-top:8px; }
+  .mh-row summary{ cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px; } .mh-row summary::-webkit-details-marker{ display:none; }
+  .mh-row .mh-s{ font-weight:800;font-size:.88rem; } .mh-row .mh-m{ font-size:.72rem;color:#9aa094; }
+  .mh-row .mh-b{ margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:.86rem;line-height:1.6;color:#d9dcd3; } .mh-row .mh-b a{ color:var(--lime); }
+  .mh-row .mh-b ul,.mh-row .mh-b ol{ margin:6px 0 8px 20px;padding:0; } .mh-row .mh-b p{ margin:0 0 8px; }
   .mpanel{ display:none; } .mpanel.on{ display:block; }
   .prow{ display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.86rem; }
   .prow:last-child{ border-bottom:none; } .prow .pn{ flex:1;font-weight:700; } .prow .pe{ font-size:.68rem;color:#5e655a;font-weight:500;margin-top:1px; }
@@ -95,13 +109,14 @@
 const API='/.netlify/functions';
 const $=(id)=>document.getElementById(id);
 const esc=(s)=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let DRAFT=null, OM_COUNTS={roster:0,waitlist:0}; // unsent ladder update + who it would reach
 let ME=null, LADDERS=[], MASTER=[], ROSTER_IDS=new Set(), CUR=null; // CUR = current event object being managed (null=create)
 
 /* ---- on-brand toast + confirm ---- */
 let _toastT;
 function toast(msg,err){ const t=$('dstoast'); t.textContent=msg; t.classList.toggle('err',!!err); t.classList.add('on'); clearTimeout(_toastT); _toastT=setTimeout(()=>t.classList.remove('on'),2600); }
 let _onOk=null;
-function askConfirm(msg,okLabel,onOk){ $('cdlg-msg').textContent=msg; const b=$('cdlg-ok'); b.textContent=okLabel||'Confirm'; _onOk=onOk; $('cdlg').classList.add('on'); }
+function askConfirm(msg,okLabel,onOk,tone){ $('cdlg-msg').textContent=msg; const b=$('cdlg-ok'); b.textContent=okLabel||'Confirm'; b.className='btn btn-sm '+(tone==='go'?'btn-lime':'btn-danger'); _onOk=onOk; $('cdlg').classList.add('on'); }
 function cdlgClose(){ $('cdlg').classList.remove('on'); _onOk=null; }
 $('cdlg-ok').addEventListener('click',()=>{ const f=_onOk; cdlgClose(); if(f)f(); });
 
@@ -167,7 +182,7 @@ function renderList(){
 /* ---- manage (tabbed) ---- */
 let TAB='info';
 async function openLadder(id){
-  TAB='info';
+  TAB='info'; DRAFT=null;
   $('app').innerHTML=`<div class="back" onclick="loadLadders()">← My ladders</div><div class="empty">Loading…</div>`;
   CUR=null;
   if(id){
@@ -182,7 +197,7 @@ function renderManage(){
   const e=CUR, isNew=!e;
   const title=isNew?'New ladder':esc(e.name);
   const meta=isNew?'Set it up — one night, individual sign-ups.':`${esc(e.date||'')}${e.startTime?' · '+esc(e.startTime):''}${e.place?' · '+esc(e.place):''} · roster ${(e._roster||[]).length}/${e.capacity||0}`;
-  const tabs=isNew?[['info','Ladder Info']]:[['info','Ladder Info'],['signups','Sign-ups'],['scoring','Scoring'],['recap','Recap'],['photos','Photos']];
+  const tabs=isNew?[['info','Ladder Info']]:[['info','Ladder Info'],['signups','Sign-ups'],['messages','Messages'],['scoring','Scoring'],['recap','Recap'],['photos','Photos']];
   $('app').innerHTML=`
     <div class="back" onclick="loadLadders()">← My ladders</div>
     <h2 class="mh">${title}</h2>
@@ -196,6 +211,7 @@ function renderTab(){
   const b=$('mbody');
   if(TAB==='info') return b.innerHTML=infoPanel();
   if(TAB==='signups') return b.innerHTML=signupsPanel();
+  if(TAB==='messages'){ b.innerHTML=messagesPanel(); return loadOrgMessages(); }
   if(TAB==='scoring') return b.innerHTML=scoringPanel();
   if(TAB==='recap'){ b.innerHTML='<div class="card"><div class="empty">Loading recap…</div></div>'; return loadRecap(); }
   if(TAB==='photos'){ b.innerHTML=photosPanel(); return loadOrgPhotos(); }
@@ -502,8 +518,78 @@ async function saveLadder(){
   };
   if(CUR) body.id=CUR.id;
   if(!body.name||!body.date) return toast('Name and date are required.',true);
-  try{ const d=await api('/organizer-ladder-save',{method:'POST',body:JSON.stringify(body)}); toast(CUR?'Saved.':'Ladder created.'); CUR=d.event; CUR._roster=CUR._roster||[]; if(!d.created){ await loadLadders(); } else { openLadder(d.event.id); } }
+  try{
+    const keep=CUR?{_roster:CUR._roster||[],_waitlist:CUR._waitlist||[]}:{_roster:[],_waitlist:[]};
+    const d=await api('/organizer-ladder-save',{method:'POST',body:JSON.stringify(body)});
+    CUR=Object.assign(d.event,keep);
+    if(d.created){ toast('Ladder created.'); return openLadder(d.event.id); }
+    // Date, time, place or courts changed on a ladder people signed up for:
+    // stay here and open Messages with the update written. Nothing is sent
+    // until you press Send.
+    const aff=d.affected||{};
+    if(Array.isArray(d.changes)&&d.changes.length&&((aff.roster||0)+(aff.waitlist||0))>0){
+      DRAFT={ changes:d.changes, subject:'Update: '+(CUR.name||'your ladder'),
+        body:'Heads up, the details for '+(CUR.name||'this ladder')+' have changed:\n\n'+d.changes.map(c=>'• '+changeLineTxt(c)).join('\n')+'\n\nEverything else stays the same. See you on the courts.',
+        waitlist:(aff.waitlist||0)>0 };
+      TAB='messages'; renderManage(); toast('Saved. Your update is ready to send.');
+      return;
+    }
+    toast('Saved.'); await loadLadders();
+  }
   catch(e){ toast(e.message,true); }
+}
+
+/* Messages: email this ladder's players (roster, waitlist or both). They also
+   see it on this ladder in their player portal. Nothing is posted publicly. */
+function changeLineTxt(c){ return !c.from ? (c.label+': '+c.to) : !c.to ? (c.label+': removed (was '+c.from+')') : (c.label+': '+c.from+' → '+c.to); }
+function fmtSent(iso){ try{ return new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+function messagesPanel(){
+  const d=DRAFT;
+  return `<div class="card">
+    ${d?`<div class="chgnote"><b>This update is ready to send.</b> Edit it if you like, check who it goes to, then press Send.<ul>${d.changes.map(c=>'<li>'+esc(changeLineTxt(c))+'</li>').join('')}</ul><button type="button" onclick="DRAFT=null;renderTab()">Discard this draft</button></div>`:''}
+    <div class="frow"><label class="l" for="om-subject">Subject (optional)</label><input class="i" id="om-subject" placeholder="Defaults to the ladder name" value="${d?esc(d.subject):''}"></div>
+    <div class="frow"><label class="l" for="om-body">Message</label><textarea class="i" id="om-body" placeholder="e.g. Courts have moved to 5A and 5B. See you there!">${d?esc(d.body):''}</textarea></div>
+    <div class="frow"><label class="l">Send to</label>
+      <label class="ckrow"><input type="checkbox" id="om-roster" checked onchange="omSync()"> <span>Roster <b id="om-n-roster"></b></span></label>
+      <label class="ckrow"><input type="checkbox" id="om-wait" ${d&&d.waitlist?'checked':''} onchange="omSync()"> <span>Waitlist <b id="om-n-wait"></b></span></label>
+    </div>
+    <button class="btn btn-lime" style="width:100%" id="om-send" onclick="sendOrgMessage()">Send message</button>
+    <div class="help" style="margin-top:8px">Emails the players you ticked and shows as an update on this ladder in their player portal. It is not posted on the public ladder page. Replies come to you.</div>
+  </div>
+  <div class="card"><div class="l" style="margin-bottom:4px">Sent to this ladder</div><div id="om-history"><div class="empty">Loading…</div></div></div>`;
+}
+function omSync(){
+  const r=$('om-roster'), w=$('om-wait'); if(!r||!w) return;
+  const n=(r.checked?OM_COUNTS.roster:0)+(w.checked?OM_COUNTS.waitlist:0);
+  const b=$('om-send'); if(b) b.textContent=n?('Send to '+n+' player'+(n===1?'':'s')):'Send message';
+}
+async function loadOrgMessages(){
+  if(!CUR) return; const id=CUR.id;
+  let d=null; try{ d=await api('/admin-ladder-message?eventId='+encodeURIComponent(id)); }catch(e){ const el=$('om-history'); if(el) el.innerHTML='<div class="empty">'+esc(e.message)+'</div>'; return; }
+  if(!CUR||CUR.id!==id||TAB!=='messages') return;
+  OM_COUNTS=Object.assign({roster:0,waitlist:0},d.counts||{});
+  if($('om-n-roster')) $('om-n-roster').textContent='· '+OM_COUNTS.roster;
+  if($('om-n-wait')) $('om-n-wait').textContent='· '+OM_COUNTS.waitlist;
+  omSync();
+  const list=d.messages||[], el=$('om-history'); if(!el) return;
+  el.innerHTML=list.length? list.map(m=>{ const a=m.audience||{roster:true}; const to=[a.roster!==false?'roster':'',a.waitlist?'waitlist':''].filter(Boolean).join(' + ');
+    return `<details class="mh-row"><summary><span class="mh-s">${esc(m.subject||'Message')}</span><span class="mh-m">${esc(fmtSent(m.sentAt))} · ${m.sent||0} sent${m.failed?(' · '+m.failed+' failed'):''} · ${esc(to)}</span></summary><div class="mh-b">${m.messageHtml||esc(m.message||'')}</div></details>`; }).join('') : '<div class="empty">Nothing sent yet.</div>';
+}
+function sendOrgMessage(){
+  if(!CUR) return;
+  const subject=$('om-subject').value.trim(), message=$('om-body').value.trim();
+  const audience={ roster:$('om-roster').checked, waitlist:$('om-wait').checked };
+  if(!message) return toast('Write a message first.',true);
+  if(!audience.roster&&!audience.waitlist) return toast('Tick who to send it to.',true);
+  const n=(audience.roster?OM_COUNTS.roster:0)+(audience.waitlist?OM_COUNTS.waitlist:0);
+  const who=[audience.roster?'the roster':'',audience.waitlist?'the waitlist':''].filter(Boolean).join(' and ');
+  askConfirm('Send this to '+who+' ('+n+') for '+(CUR.name||'this ladder')+'?','Send',async()=>{
+    try{
+      const d=await api('/admin-ladder-message',{method:'POST',body:JSON.stringify({eventId:CUR.id,subject,message,format:'text',audience,kind:DRAFT?'update':'message',changes:DRAFT?DRAFT.changes:undefined})});
+      toast(d.sent?('Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.'):(d.note||'Nobody to send to.'), !d.sent);
+      DRAFT=null; renderTab();
+    }catch(e){ toast(e.message,true); }
+  },'go');
 }
 async function delLadder(){
   if(!CUR) return;

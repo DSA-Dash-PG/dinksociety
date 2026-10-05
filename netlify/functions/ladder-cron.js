@@ -116,7 +116,7 @@ export default async () => {
             await sendEmail({
               to: next.email,
               subject: `You're in — a spot opened for ${ev.name}`,
-              html: renderLadderConfirmed({ playerName: next.name, eventName: ev.name, dateLine: dateLineOf(ev), cancelUrl: await cancelLinkFor(ev, { playerId: next.playerId, email: next.email }) }),
+              html: renderLadderConfirmed({ playerName: next.name, eventName: ev.name, dateLine: dateLineOf(ev), dupr: !!(ev && ev.duprRated), cancelUrl: await cancelLinkFor(ev, { playerId: next.playerId, email: next.email }) }),
             });
           } else {
             const token = await createLadderToken({ type: 'claim', eventId: ev.id, playerId: next.playerId, email: next.email, ttlMs: HOLD_MS });

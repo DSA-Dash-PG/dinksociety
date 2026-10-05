@@ -19,12 +19,12 @@ import {
   addPairSignup, removeLinkedPartner, genderLockOf, genderGate,
 } from './lib/ladder.js';
 import { earn, spend } from './lib/credits.js';
-import { setPlayerInfo } from './lib/player-directory.js';
+import { setPlayerInfo, getDirectory } from './lib/player-directory.js';
 import { getLiteById, isLiteId } from './lib/ladder-players.js';
 import { createLadderToken } from './lib/ladder-token.js';
 import {
   claimUrl, venmoConfirmUrl, venmoDeclineUrl, dateLineOf, organizerEmails, fmtCents, siteUrl,
-  cancelLinkFor,
+  cancelLinkFor, DUPR_CLUB_NAME, duprClubUrl,
 } from './lib/ladder-notify.js';
 import {
   sendEmail, renderVenmoClaimToAdmin, renderLadderSpotOpened, renderLadderConfirmed, renderLadderFcfsOpen,
@@ -216,11 +216,21 @@ export default async (req) => {
         if (!pd) return json({ error: "Enter your partner's DUPR ID — this is a DUPR-rated ladder." }, 400);
         partner.duprId = pd.slice(0, 40);
       }
+      // The league's DUPR club: scores can only be posted for members, so
+      // joining is required. We can't check DUPR ourselves — the player
+      // confirms here and an admin verifies on the roster. Someone an admin
+      // has already verified isn't asked again.
+      const known = (await getDirectory().catch(() => ({})))[playerId] || {};
+      if (known.duprClub !== 'verified' && body.duprClub !== true) {
+        return json({ error: `Join the ${DUPR_CLUB_NAME} club on DUPR, then tick the box to confirm. It's required so your scores can be posted.`, duprClubUrl: duprClubUrl() }, 400);
+      }
+      person.duprClub = known.duprClub === 'verified' ? 'verified' : 'confirmed';
+      if (isPair) partner.duprClub = 'confirmed';
       // Store the DUPR ID on their master player profile (the directory the
       // admin Players page reads), not just on this event's roster entry —
       // otherwise it was re-asked every ladder and never showed on the profile.
       // Best-effort: this signup already carries the value it needs.
-      try { await setPlayerInfo(playerId, { duprId: person.duprId }); }
+      try { await setPlayerInfo(playerId, { duprId: person.duprId, duprClub: person.duprClub }); }
       catch (e) { console.warn('[ladder-signup] directory DUPR save failed:', e?.message || e); }
     }
 
@@ -277,7 +287,7 @@ export default async (req) => {
       entry.paymentMethod = 'credit'; entry.paymentStatus = 'paid'; entry.amountCents = 0; entry.heldUntil = null;
       mirrorPay();
       await setSignups(signups);
-      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: displayName, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
+      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: displayName, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
       const cOrgs = organizerEmails(event);
       await Promise.allSettled(cOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup — paid</h2><p style="margin:0 0 4px"><b>${displayName}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Paid by ladder credit${email ? ' · ' + email : ''}</p></div>` })));
       return json({ ok: true, status: 'in', paid: 'credit' });
@@ -290,7 +300,7 @@ export default async (req) => {
       entry.paymentMethod = 'free'; entry.paymentStatus = 'paid'; entry.amountCents = 0; entry.heldUntil = null;
       mirrorPay();
       await setSignups(signups);
-      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: displayName, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
+      await sendEmail({ to: email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: displayName, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId, email }) }) }).catch(() => {});
       const fOrgs = organizerEmails(event);
       await Promise.allSettled(fOrgs.map(to => sendEmail({ to, subject: `New signup: ${person.name.split(' ')[0]} · ${event.name}`, html: `<div style="font-family:system-ui,Arial,sans-serif"><h2 style="margin:0 0 8px">New ladder signup</h2><p style="margin:0 0 4px"><b>${displayName}</b> registered for <b>${event.name}</b>.</p><p style="margin:0 0 4px">${dateLineOf(event)}</p><p style="margin:0 0 4px">Free ladder — no payment to collect${email ? ' · ' + email : ''}</p></div>` })));
       return json({ ok: true, status: 'in', paid: 'free' });
@@ -338,7 +348,7 @@ export default async (req) => {
 async function notifyPromoted(event, next) {
   try {
     if (next.autoClaimed) {
-      await sendEmail({ to: next.email, subject: `You're in — a spot opened for ${event.name}`, html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: next.playerId, email: next.email }) }) });
+      await sendEmail({ to: next.email, subject: `You're in — a spot opened for ${event.name}`, html: renderLadderConfirmed({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId: next.playerId, email: next.email }) }) });
     } else {
       const tok = await createLadderToken({ type: 'claim', eventId: event.id, playerId: next.playerId, email: next.email, ttlMs: HOLD_MS });
       await sendEmail({ to: next.email, subject: `A spot opened for ${event.name}`, html: renderLadderSpotOpened({ playerName: next.name, eventName: event.name, dateLine: dateLineOf(event), minutesLeft: 30, claimUrl: claimUrl(tok) }) });

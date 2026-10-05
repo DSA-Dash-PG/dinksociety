@@ -24,6 +24,7 @@ let ACTIVE=[], COMPLETED=[], STATS=null, MYCREDIT=0, MYREG={};
 // ladders need it to check eligibility; null means the signup sheet asks.
 let MYGENDER=null;
 let MYDUPR=null; // DUPR ID on file (master player profile) — prefills DUPR-rated signups
+let MYCLUB=null; // DUPR club status on file: 'verified' (an admin checked) | 'confirmed' (ticked before) | null
 let DIV=HUB.division||'all', TAB='overview';
 const DSTATS={};          // division → its scoped stats response (kitchen, top performers…)
 let PHALBUMS=null;        // public-ladder-photos albums
@@ -222,7 +223,7 @@ async function init(){
   // Signed-in player's own signups → powers the "You're in / Cancel my spot"
   // state on each card. 401 (not signed in) just leaves MYREG empty.
   MYREG={}; MYGENDER=null;
-  try{ const r=await fetch(`${API}/player-ladder-events`,{credentials:'include'}); if(r.ok){ const me=await r.json(); (me.registered||[]).forEach(ev=>{ MYREG[ev.id]={list:ev.list,paymentStatus:ev.paymentStatus}; }); MYGENDER=(me.me&&me.me.gender)||null; MYDUPR=(me.me&&me.me.duprId)||null; } }catch(e){}
+  try{ const r=await fetch(`${API}/player-ladder-events`,{credentials:'include'}); if(r.ok){ const me=await r.json(); (me.registered||[]).forEach(ev=>{ MYREG[ev.id]={list:ev.list,paymentStatus:ev.paymentStatus}; }); MYGENDER=(me.me&&me.me.gender)||null; MYDUPR=(me.me&&me.me.duprId)||null; MYCLUB=(me.me&&me.me.duprClub)||null; } }catch(e){}
   ACTIVE=pl.ladders||[]; COMPLETED=pl.completed||[]; STATS=st||{}; MYCREDIT=(st&&st.youCreditCents)||0;
   Object.keys(DSTATS).forEach(k=>delete DSTATS[k]);
   route();
@@ -768,7 +769,17 @@ function extrasHtml(l){
   if(l.duprRated){
     const dv=MYDUPR?` value="${String(MYDUPR).replace(/"/g,'&quot;')}"`:'';
     h+=`<div class="frow" style="margin-bottom:10px"><label class="l" for="su-dupr">Your DUPR ID</label><input class="i" id="su-dupr" placeholder="e.g. ABC1234"${dv}></div>`;
-    h+=`<div class="dupr">This is a <b>DUPR-rated</b> ladder — before your first ladder, join the <b>Dink Society - South Bay</b> club on DUPR so your matches get rated: <a href="${DUPR_CLUB_URL}" target="_blank" rel="noopener">Join the club on DUPR</a></div>`;
+    // Joining the league's club on DUPR is required: scores can only be posted
+    // for members. We can't check DUPR from here, so the player confirms and an
+    // admin verifies on the roster. Once verified, they are not asked again.
+    if(MYCLUB==='verified'){
+      h+=`<div class="dupr ok"><b>DUPR-rated ladder.</b> You're in the Dink Society - South Bay club on DUPR, so you're set.</div>`;
+    } else {
+      const pair=l.format==='fixed-partner';
+      h+=`<div class="dupr"><b>Required: join our club on DUPR.</b> This is a DUPR-rated ladder, and your scores can only be posted if you're a member of the <b>Dink Society - South Bay</b> club. It's free and takes a minute.
+        <a class="dupr-btn" href="${DUPR_CLUB_URL}" target="_blank" rel="noopener">Join the club on DUPR</a>
+        <label class="dupr-ck"><input type="checkbox" id="su-dupr-club"> <span>${pair?"My partner and I have both joined the club.":"I've joined the club."}</span></label></div>`;
+    }
   }
   if(l.format==='fixed-partner'){
     h+=`<div class="frow" style="margin-bottom:8px"><span class="l" style="margin:2px 0 8px">Your partner · you'll play together the whole time</span><label class="l" for="su-p-name">Partner's full name</label><input class="i" id="su-p-name" placeholder="Full name"></div>`;
@@ -798,6 +809,11 @@ function collectSignupExtras(l){
     const v=(document.getElementById('su-dupr')?.value||'').trim();
     if(!v) return {ok:false, err:'Enter your DUPR ID.'};
     body.duprId=v;
+    if(MYCLUB!=='verified'){
+      const ck=document.getElementById('su-dupr-club');
+      if(!ck||!ck.checked) return {ok:false, err:'Join the Dink Society - South Bay club on DUPR, then tick the box. It\'s required so your scores can be posted.'};
+      body.duprClub=true;
+    }
   }
   if(l.format==='fixed-partner'){
     const name=(document.getElementById('su-p-name')?.value||'').trim();

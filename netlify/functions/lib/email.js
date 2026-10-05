@@ -2,6 +2,7 @@
 // Shared email helpers — uses Resend for transactional email.
 
 import { Resend } from 'resend';
+import { DUPR_CLUB_NAME, duprClubUrl } from './ladder-notify.js';
 
 let resend;
 
@@ -617,7 +618,16 @@ export function renderLadderNudge({ playerName, eventName, minutesLeft = 5, clai
 }
 
 /** Confirmation once a spot is claimed / paid. */
-export function renderLadderConfirmed({ playerName, eventName, dateLine, cancelUrl }) {
+// DUPR-rated ladders: joining the league's club on DUPR is required, because
+// scores can only be posted for club members. Shown on every confirmation.
+const _duprClubBlock = () => `
+      <div style="background: #161616; border: 1px solid rgba(240,192,64,.35); border-radius: 12px; padding: 14px 16px; margin: 0 0 18px;">
+        <div style="font-size: 11px; color: #f0c040; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 800; margin-bottom: 6px;">Required for this ladder</div>
+        <p style="font-size: 14px; color: #cfcfcf; line-height: 1.6; margin: 0 0 12px;">This is a DUPR-rated ladder. Join the <b style="color:#fff;">${escapeBody(DUPR_CLUB_NAME)}</b> club on DUPR before you play, so your scores can be posted. Already a member? You're set.</p>
+        <a href="${duprClubUrl()}" style="display:inline-block; padding: 11px 22px; background: #f0c040; color: #0e0e0e; font-size: 13px; font-weight: 800; text-decoration: none; border-radius: 9999px;">Join the club on DUPR</a>
+      </div>`;
+
+export function renderLadderConfirmed({ playerName, eventName, dateLine, cancelUrl, dupr = false }) {
   const cancelLine = cancelUrl
     ? `<p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">It's on your profile now. Plans change? <a href="${cancelUrl}" style="color:#f0c040;font-weight:700;text-decoration:none;">Cancel your spot</a> — it reopens for the next player and you get ladder credit for a future night. This link works right up until the ladder starts.</p>`
     : `<p style="font-size: 13px; color: #777; margin-top: 4px; line-height: 1.5;">It's on your profile now. Need to cancel? Open the ladder and tap cancel — you'll get ladder credit for a future night.</p>`;
@@ -625,6 +635,7 @@ export function renderLadderConfirmed({ playerName, eventName, dateLine, cancelU
       <h1 style="font-size: 22px; font-weight: 800; color: #b8ff2c; margin: 0 0 14px; line-height: 1.25;">You're in!</h1>
       <p style="font-size: 15px; color: #cfcfcf; line-height: 1.65; margin: 0 0 18px;">See you at <b style="color:#fff;">${escapeBody(eventName)}</b>${playerName ? ', ' + escapeBody(playerName) : ''}.</p>
       ${_ladderEventCard(eventName, dateLine)}
+      ${dupr ? _duprClubBlock() : ''}
       ${cancelLine}
   `);
 }

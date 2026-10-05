@@ -20,7 +20,9 @@
 import crypto from 'crypto';
 import { requireOrganizer } from './lib/organizer-auth.js';
 import { isAdminEmail } from './lib/admin-auth.js';
-import { getEvent, setEvent, capacityFromCourts } from './lib/ladder.js';
+import { getEvent, setEvent, getSignups, capacityFromCourts } from './lib/ladder.js';
+import { describeChanges, changesMoveStart, audienceCounts } from './lib/ladder-messages.js';
+import { resetRemindersForReschedule } from './lib/ladder-reminders.js';
 import { normalizeEmail } from './lib/identity.js';
 
 function json(body, status = 200) {
@@ -96,6 +98,13 @@ export default async (req) => {
     // Organizers collect their own money, so the league credit system doesn't apply.
     cancelPolicy: ['auto_credit', 'credit_if_refilled', 'no_credit'].includes(b.cancelPolicy) ? b.cancelPolicy : 'no_credit',
     type: ['mixed', 'mens', 'womens'].includes(b.type) ? b.type : (existing?.type || 'mixed'),
+    // Set on the admin side only, but an organizer edit must not wipe them:
+    // this object replaces the stored event, so anything left out is lost.
+    format: existing?.format || 'individual',
+    duprRated: !!existing?.duprRated,
+    description: existing?.description || '',
+    rules: existing?.rules || '',
+    adminNotes: existing?.adminNotes || '',
     fcfsWindowHours: Number.isFinite(+b.fcfsWindowHours) ? +b.fcfsWindowHours : (existing?.fcfsWindowHours ?? 24),
     // Venmo-claim confirmations and drop notices go to the organizer.
     organizers: [org.email],
@@ -112,7 +121,17 @@ export default async (req) => {
   };
 
   await setEvent(event);
-  return json({ ok: true, created: !b.id, event });
+
+  // Same as admin-ladder-save: report what changed for the players and how
+  // many it affects, so the portal can offer to tell them. Nothing is sent here.
+  const changes = existing ? describeChanges(existing, event) : [];
+  let affected = null;
+  if (changes.length) {
+    try { affected = audienceCounts(await getSignups(event.id)); } catch { affected = null; }
+    if (changesMoveStart(changes)) { try { await resetRemindersForReschedule(event); } catch (e) { console.warn('reminder reset failed:', e?.message || e); } }
+  }
+
+  return json({ ok: true, created: !b.id, event, changes, affected });
 };
 
 export const config = { path: '/.netlify/functions/organizer-ladder-save' };

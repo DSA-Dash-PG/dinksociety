@@ -88,7 +88,7 @@ export default async (req) => {
           await sendEmail({
             to: entry.email,
             subject: `You're in — ${ladderEvent?.name || 'your ladder'}`,
-            html: renderLadderConfirmed({ playerName: entry.name, eventName: ladderEvent?.name || 'your ladder', dateLine: dateLineOf(ladderEvent || {}), cancelUrl: await cancelLinkFor(ladderEvent, { playerId: entry.playerId, email: entry.email }) }),
+            html: renderLadderConfirmed({ playerName: entry.name, eventName: ladderEvent?.name || 'your ladder', dateLine: dateLineOf(ladderEvent || {}), dupr: !!(ladderEvent && ladderEvent.duprRated), cancelUrl: await cancelLinkFor(ladderEvent, { playerId: entry.playerId, email: entry.email }) }),
           }).catch(() => {});
         }
         await notifyOrganizersPaid(ladderEvent, entry).catch(() => {});

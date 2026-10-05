@@ -13,6 +13,8 @@
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { getDirectory } from './lib/player-directory.js';
 import { listEvents, getSignups, findEntry, effectiveCapacity, spotsLeft, eventStartMs } from './lib/ladder.js';
+import { updatesForPlayer } from './lib/ladder-messages.js';
+import { duprClubUrl } from './lib/ladder-notify.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -54,9 +56,19 @@ export default async (req) => {
       // Payment info so the portal can offer a one-tap Venmo deep link.
       venmoHandle: e.venmoHandle || null, feeCents: Number(e.feeCents) || 0,
       paymentMethods: Array.isArray(e.paymentMethods) && e.paymentMethods.length ? e.paymentMethods : null,
+      duprRated: !!e.duprRated,
     };
     if (entry) {
-      registered.push({ ...base, list: entry.list, paymentStatus: entry.entry?.paymentStatus || null });
+      // Updates the organizer sent to this ladder's players (time moved, courts
+      // changed…). Only for people signed up; never on the public page.
+      let updates = [];
+      try { updates = await updatesForPlayer(e.id, entry.list); } catch { updates = []; }
+      registered.push({
+        ...base, list: entry.list, paymentStatus: entry.entry?.paymentStatus || null,
+        endTime: e.endTime || null, address: e.address || null, courtNumbers: e.courtNumbers || null,
+        duprClub: entry.entry?.duprClub || null,
+        updates,
+      });
     } else if (e.status === 'open' && left > 0) {
       open.push(base);
     }
@@ -70,7 +82,10 @@ export default async (req) => {
   // instead of asking every time.
   const dir = await getDirectory().catch(() => ({}));
   const duprId = dir[ctx.playerId]?.duprId || null;
-  return json({ registered, open, me: { gender: gender === 'F' || gender === 'M' ? gender : null, duprId } });
+  // 'verified' = an admin has seen them in the league's DUPR club, so sign-up
+  // doesn't ask again; 'confirmed' = they ticked the box before.
+  const duprClub = dir[ctx.playerId]?.duprClub || null;
+  return json({ registered, open, me: { gender: gender === 'F' || gender === 'M' ? gender : null, duprId, duprClub }, duprClubUrl: duprClubUrl() });
 };
 
 export const config = { path: '/.netlify/functions/player-ladder-events' };

@@ -14,8 +14,8 @@ import {
   getEvent, getSignups, setSignups, findEntry, addSignup, spotsLeft,
   cardTotalCents, surchargeCents, addPairSignup,
 } from './lib/ladder.js';
-import { siteUrl, dateLineOf, fmtCents } from './lib/ladder-notify.js';
-import { setPlayerInfo } from './lib/player-directory.js';
+import { siteUrl, dateLineOf, fmtCents, DUPR_CLUB_NAME, duprClubUrl } from './lib/ladder-notify.js';
+import { setPlayerInfo, getDirectory } from './lib/player-directory.js';
 
 function json(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -95,8 +95,15 @@ export default async (req) => {
       if (!pd) return json({ error: "Enter your partner's DUPR ID — this is a DUPR-rated ladder." }, 400);
       partner.duprId = pd.slice(0, 40);
     }
+    // DUPR club membership is required (see ladder-signup.js).
+    const known = (await getDirectory().catch(() => ({})))[playerId] || {};
+    if (known.duprClub !== 'verified' && body.duprClub !== true) {
+      return json({ error: `Join the ${DUPR_CLUB_NAME} club on DUPR, then tick the box to confirm. It's required so your scores can be posted.`, duprClubUrl: duprClubUrl() }, 400);
+    }
+    person.duprClub = known.duprClub === 'verified' ? 'verified' : 'confirmed';
+    if (isPair) partner.duprClub = 'confirmed';
     // Persist to the master player profile too (see ladder-signup.js).
-    try { await setPlayerInfo(playerId, { duprId: person.duprId }); }
+    try { await setPlayerInfo(playerId, { duprId: person.duprId, duprClub: person.duprClub }); }
     catch (e) { console.warn('[ladder-checkout] directory DUPR save failed:', e?.message || e); }
   }
 

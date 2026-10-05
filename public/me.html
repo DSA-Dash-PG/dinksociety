@@ -861,6 +861,20 @@
   .ldr__n { font-size:15px; font-weight:800; overflow-wrap:anywhere; }
   .ldr__m { font-size:13px; color:var(--color-text-muted); margin-top:2px; line-height:1.35; }
   .ldr__pill { font-size:11px; font-weight:800; padding:4px 10px; border-radius:var(--radius-full); white-space:nowrap; }
+  /* Updates sent to a ladder you're signed up for */
+  .ldr-upd { border-top:1px solid var(--color-border); padding:2px 14px; }
+  .ldr-upd details + details { border-top:1px solid var(--color-border); }
+  .ldr-upd summary { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; padding:10px 0; cursor:pointer; list-style:none; }
+  .ldr-upd summary::-webkit-details-marker { display:none; }
+  .ldr-upd summary b { font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:var(--color-gold); }
+  .ldr-upd.is-new details:first-child summary b::before { content:''; display:inline-block; width:8px; height:8px; margin-right:6px; border-radius:50%; background:var(--color-lime); }
+  .ldr-upd summary span { flex:1 1 150px; min-width:0; font-size:14px; font-weight:700; overflow-wrap:anywhere; }
+  .ldr-upd summary small { font-size:12px; color:var(--color-text-muted); }
+  .ldr-upd__b { padding:0 0 12px; font-size:14px; line-height:1.55; overflow-wrap:anywhere; }
+  .ldr-upd__b p, .ldr-upd__b div { margin:0 0 8px; } .ldr-upd__b ul, .ldr-upd__b ol { margin:0 0 8px 18px; padding:0; }
+  .ldr-upd__b a { color:var(--color-lime); font-weight:700; }
+  .ldr-club { border-top:1px solid var(--color-border); padding:11px 14px 13px; font-size:13px; line-height:1.5; color:var(--color-text-muted); }
+  .ldr-club b { color:var(--color-gold); } .ldr-club a { display:inline-block; margin-top:4px; color:var(--color-lime); font-weight:800; }
   .ldr__go { min-height:40px; padding:0 16px; display:inline-flex; align-items:center; border-radius:var(--radius-full); background:var(--color-lime); color:var(--color-text-inverse); font-size:13px; font-weight:800; text-decoration:none; white-space:nowrap; }
   .cp { display:block; width:100%; text-align:left; cursor:pointer; color:inherit; }
   .cp__who { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:700; color:var(--color-text-muted); }
@@ -2207,6 +2221,13 @@
   document.querySelectorAll('.nb').forEach(b => b.addEventListener('click', () => goTab(b.dataset.tab)));
   $('appbar-chat').addEventListener('click', () => goTab('chat'));
 
+  // Ladder updates: once you open or close one, it stops showing as new.
+  document.addEventListener('click', e => {
+    const box = e.target.closest('.ldr-upd'); if (!box || !e.target.closest('summary')) return;
+    try { localStorage.setItem('ds-ladupd-' + box.dataset.updEv, box.dataset.updId); } catch (err) {}
+    box.classList.remove('is-new');
+  });
+
   // Profile sheet: intercept name links so they open in-app instead of leaving
   // the portal. Delegated, so it covers every current and future name link.
   document.addEventListener('click', e => {
@@ -2363,6 +2384,23 @@
     const pill = (txt, c, bg) => '<span class="ldr__pill" style="color:' + c + ';background:' + bg + ';">' + txt + '</span>';
     const dblock = iso => { const d = iso ? new Date(iso + 'T12:00:00') : null; return (d && !isNaN(d)) ? '<div class="ldr__d"><small>' + d.toLocaleDateString('en-US', { month: 'short' }) + '</small><b>' + d.getDate() + '</b></div>' : '<div class="ldr__d"><b>–</b></div>'; };
     const metaT = ev => [ev.date ? new Date(ev.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short' }) : '', ev.startTime, ev.place ? String(ev.place).split(' - ')[0] : ''].filter(Boolean).join(' · ');
+    // Updates the organizer sent to this ladder's players (time moved, courts
+    // changed…). The newest one opens by itself until you've looked at it.
+    const updHtml = ev => {
+      const ups = Array.isArray(ev.updates) ? ev.updates : [];
+      if (!ups.length) return '';
+      let seen = ''; try { seen = localStorage.getItem('ds-ladupd-' + ev.id) || ''; } catch (e) {}
+      const isNew = ups[0].id !== seen;
+      const when = iso => { try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }); } catch (e) { return ''; } };
+      return '<div class="ldr-upd' + (isNew ? ' is-new' : '') + '" data-upd-ev="' + esc(ev.id) + '" data-upd-id="' + esc(ups[0].id) + '">'
+        + ups.map((u, i) => '<details' + (i === 0 && isNew ? ' open' : '') + '><summary><b>' + (u.kind === 'update' ? 'Update' : 'Message') + '</b><span>' + esc((u.changes && u.changes.length) ? u.changes.join(' · ') : (String(u.subject || '').replace(/^Update:\s*/i, '') || 'From the organizer')) + '</span><small>' + esc(when(u.sentAt)) + '</small></summary>'
+          + '<div class="ldr-upd__b">' + (u.html || esc(u.text || '')) + '</div></details>').join('')
+        + '</div>';
+    };
+    // DUPR-rated ladder and no word yet that they joined the league's club.
+    const clubHtml = ev => (ev.duprRated && !ev.duprClub && d.duprClubUrl)
+      ? '<div class="ldr-club"><b>Required:</b> join the Dink Society - South Bay club on DUPR so your scores can be posted. <a href="' + esc(d.duprClubUrl) + '" target="_blank" rel="noopener">Join the club on DUPR</a></div>'
+      : '';
     let h = '<div class="label">Ladders <a class="more" href="/ladders">All ladders</a></div>';
     reg.forEach(ev => {
       const duePay = ev.paymentStatus === 'pending' || ev.paymentStatus === 'venmo_pending';
@@ -2379,6 +2417,7 @@
         + '<div class="ldr__m">' + esc(metaT(ev)) + '</div></div>'
         + tag + '</a>'
         + (venmo ? '<div style="padding:0 14px 14px;">' + venmo + '</div>' : '')
+        + updHtml(ev) + clubHtml(ev)
         + '</div>';
     });
     open.forEach(ev => {

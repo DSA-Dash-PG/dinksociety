@@ -12,7 +12,9 @@
 
 import crypto from 'crypto';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { getEvent, setEvent, capacityFromCourts } from './lib/ladder.js';
+import { getEvent, setEvent, getSignups, capacityFromCourts } from './lib/ladder.js';
+import { describeChanges, changesMoveStart, audienceCounts } from './lib/ladder-messages.js';
+import { resetRemindersForReschedule } from './lib/ladder-reminders.js';
 import { announceNewLadder } from './lib/ladder-announce.js';
 
 function json(body, status = 200) {
@@ -130,7 +132,20 @@ export default async (req) => {
   }
 
   await setEvent(event);
-  return json({ ok: true, created: isNew, event, announced });
+
+  // Edited a ladder people are already signed up for? Report what changed
+  // (date, time, place, courts) and how many players it affects, so the editor
+  // can offer to tell them. Nothing is sent from here.
+  const changes = existing ? describeChanges(existing, event) : [];
+  let affected = null;
+  if (changes.length) {
+    try { affected = audienceCounts(await getSignups(event.id)); } catch { affected = null; }
+    // A new date or start time gets its own reminders, even if some were
+    // already pushed by hand for the old one.
+    if (changesMoveStart(changes)) { try { await resetRemindersForReschedule(event); } catch (e) { console.warn('reminder reset failed:', e?.message || e); } }
+  }
+
+  return json({ ok: true, created: isNew, event, announced, changes, affected });
 };
 
 export const config = { path: '/.netlify/functions/admin-ladder-save' };

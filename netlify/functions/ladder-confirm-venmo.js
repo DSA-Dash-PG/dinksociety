@@ -46,7 +46,7 @@ export default async (req) => {
     await sendEmail({
       to: entry.email,
       subject: `You're in — ${event.name}`,
-      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }),
+      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }),
     }).catch(() => {});
     return resultPage('Confirmed ✓', `${escapeName(entry.name)} is in for ${escapeName(event.name)}. We emailed them the good news — nothing else to do.`);
   }

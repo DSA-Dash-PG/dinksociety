@@ -16,7 +16,8 @@
 
 import { getStore } from '@netlify/blobs';
 import { sendNotify } from './notify-prefs.js';
-import { siteUrl, dateLineOf, fmtCents } from './ladder-notify.js';
+import { siteUrl, dateLineOf, fmtCents, DUPR_CLUB_NAME, duprClubUrl } from './ladder-notify.js';
+import { getDirectory } from './player-directory.js';
 import { listEvents, getSignups, eventStartMs, effectiveCapacity, zonedTimeMs, parseTime } from './ladder.js';
 import { buildLadderProfile } from './profile-data.js';
 import { createLadderToken } from './ladder-token.js';
@@ -88,6 +89,27 @@ async function setMarker(eventId, kind, info) {
   await markers().setJSON(markerKey(eventId, kind), { eventId, kind, at: new Date().toISOString(), ...info });
 }
 
+/**
+ * The ladder's date or start time just moved. Forget any reminder whose send
+ * time for the NEW start is still ahead, so the new date gets its full set.
+ * Automatic sends already recover on their own (runDueReminders re-sends a
+ * marker written before its trigger); this covers the ones pushed by hand,
+ * which are otherwise never second-guessed. A reminder whose time has already
+ * passed for the new start stays marked, so nothing fires late.
+ * @returns {string[]} the kinds that were cleared
+ */
+export async function resetRemindersForReschedule(event, now = Date.now()) {
+  const cleared = [];
+  for (const kind of REMINDER_KINDS) {
+    const trig = triggerMs(event, kind);
+    if (trig == null || trig <= now) continue;
+    if (!(await markerExists(event.id, kind))) continue;
+    await markers().delete(markerKey(event.id, kind)).catch(() => {});
+    cleared.push(kind);
+  }
+  return cleared;
+}
+
 // ── next open ladder (for cross-promo) ──
 async function nextOpenEvent(circuit, afterStart, excludeId) {
   const all = await listEvents({ circuit });
@@ -139,7 +161,7 @@ function rosterChips(roster, profileById, meEmail) {
   }).join('');
 }
 
-export function renderReminderEmail({ event, kind, recipient, profile, roster, profileById, waitlistCount, capacity, nextEvent, cancelUrl }) {
+export function renderReminderEmail({ event, kind, recipient, profile, roster, profileById, waitlistCount, capacity, nextEvent, cancelUrl, needsDuprClub = false }) {
   const meta = KIND_META[kind] || KIND_META.two_day;
   const fn = firstName(recipient.name);
   const site = siteUrl();
@@ -193,6 +215,12 @@ export function renderReminderEmail({ event, kind, recipient, profile, roster, p
       <div style="font-size:12px;color:#8a8a8a;margin-top:7px;padding-top:8px;border-top:1px solid #2a2a2a">📍 ${event.place ? `<a href="https://maps.google.com/?q=${encodeURIComponent(event.address || event.place)}" style="color:#8a8a8a;text-decoration:underline">${esc(event.place)}</a>` : ''} · ${courts} · ${capacity} players · ${esc(event.type || 'mixed')}</div>
     </div>
 
+    ${needsDuprClub ? `<div style="background:#161616;border:1px solid rgba(240,192,64,.35);border-radius:12px;padding:15px 18px;margin:0 0 18px">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#f0c040;margin-bottom:6px">Required before you play</div>
+      <p style="font-size:13.5px;color:#cfcfcf;line-height:1.6;margin:0 0 12px">This is a DUPR-rated ladder. Join the <b style="color:#fff">${esc(DUPR_CLUB_NAME)}</b> club on DUPR so your scores can be posted. Already joined? You're set, and this note goes away once we've confirmed it on our side.</p>
+      <a href="${duprClubUrl()}" style="display:inline-block;padding:11px 22px;background:#f0c040;color:#0e0e0e;font-size:13px;font-weight:800;text-decoration:none;border-radius:9999px">Join the club on DUPR</a>
+    </div>` : ''}
+
     ${strip}${hype}
 
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:#8a8a8a;margin:18px 0 10px">Who's coming · <span style="color:#17d7b0">${roster.length} registered</span></div>
@@ -239,6 +267,9 @@ export async function sendEventReminder(event, signups, kind, { force = false } 
   const capacity = effectiveCapacity(event);
   const waitlistCount = (signups.waitlist || []).length;
   const nextEvent = await nextOpenEvent(event.circuit, eventStartMs(event), event.id);
+  // DUPR-rated ladder: everyone not yet verified in the club gets the link.
+  const dir = event.duprRated ? await getDirectory().catch(() => ({})) : {};
+  const clubVerified = (p) => p.duprClub === 'verified' || (p.playerId && dir[p.playerId] && dir[p.playerId].duprClub === 'verified');
   const from = ladderFrom();
   const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
@@ -255,7 +286,7 @@ export async function sendEventReminder(event, signups, kind, { force = false } 
       cancelUrl = `${siteUrl()}/.netlify/functions/ladder-cancel?t=${tok}`;
     } catch { /* fall back to the logged-in cancel page */ }
     try {
-      const html = renderReminderEmail({ event, kind, recipient: p, profile, roster, profileById, waitlistCount, capacity, nextEvent, cancelUrl });
+      const html = renderReminderEmail({ event, kind, recipient: p, profile, roster, profileById, waitlistCount, capacity, nextEvent, cancelUrl, needsDuprClub: !!event.duprRated && !clubVerified(p) });
       const r = await sendNotify({ to: p.email, from, replyTo: from, category: 'reminders', subject: subjectFor(event, kind), html });
       if (r && r.skipped) { skipped++; continue; }
       sent++;

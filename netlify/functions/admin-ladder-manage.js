@@ -24,7 +24,7 @@ import {
 import { promoteAndNotify } from './lib/ladder-promote.js';
 import { findPlayerByEmail } from './lib/player-auth.js';
 import { createLitePlayer } from './lib/ladder-players.js';
-import { getDirectory, applyDirectoryToSignups } from './lib/player-directory.js';
+import { getDirectory, applyDirectoryToSignups, setPlayerInfo } from './lib/player-directory.js';
 import { earn } from './lib/credits.js';
 import { dateLineOf, cancelLinkFor } from './lib/ladder-notify.js';
 import { getPlay } from './lib/ladder-play.js';
@@ -175,7 +175,7 @@ export default async (req) => {
     await setSignups(signups);
     let emailed = false;
     if (entry.email) {
-      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }) }).catch(() => {});
+      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }) }).catch(() => {});
       emailed = true;
     }
     return json({ ok: true, paid: entry.name, name: entry.name, emailed });
@@ -211,7 +211,7 @@ export default async (req) => {
     await setSignups(signups);
     // Marking paid sends the player the same "you're in" confirmation as Confirm.
     if (action === 'mark-paid' && entry.email) {
-      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }) }).catch(() => {});
+      await sendEmail({ to: entry.email, subject: `You're in — ${event.name}`, html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }) }).catch(() => {});
     }
     return json({ ok: true, paid: action === 'mark-paid', method: entry.paymentMethod, name: entry.name, emailed: action === 'mark-paid' && !!entry.email });
   }
@@ -340,6 +340,26 @@ export default async (req) => {
     return json({ ok: true, name: entry.name, email: newEmail });
   }
 
+  // DUPR club check for a DUPR-rated ladder. status: 'verified' (an admin saw
+  // them in the club), 'confirmed' (back to "they said they joined"), or ''
+  // (not confirmed). Saved on this ladder's entry and on the player's profile,
+  // so a verified player is not asked again at the next ladder.
+  if (action === 'dupr-club') {
+    const norm = normalizeEmail(body.email);
+    const entry = findRosterEntry(signups, body.playerId, body.email)
+      || (signups.waitlist || []).find(p => (body.playerId && p.playerId === body.playerId) || (norm && normalizeEmail(p.email) === norm));
+    if (!entry) return json({ error: 'Player not on this ladder' }, 404);
+    const status = ['verified', 'confirmed'].includes(body.status) ? body.status : '';
+    entry.duprClub = status || null;
+    await setSignups(signups);
+    // A fixed partner's placeholder id is not a real profile — keep it on the entry only.
+    if (entry.playerId && !String(entry.playerId).startsWith('partner_')) {
+      try { await setPlayerInfo(entry.playerId, { duprClub: status, duprClubForce: true }); }
+      catch (e) { console.warn('[admin-ladder-manage] dupr club save failed:', e?.message || e); }
+    }
+    return json({ ok: true, name: entry.name, duprClub: status });
+  }
+
   // Resend (or send) the "You're in" confirmation to a roster player on demand.
   if (action === 'send-confirmation') {
     const entry = findRosterEntry(signups, body.playerId, body.email);
@@ -348,7 +368,7 @@ export default async (req) => {
     await sendEmail({
       to: entry.email,
       subject: `You're in — ${event.name}`,
-      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }),
+      html: renderLadderConfirmed({ playerName: entry.name, eventName: event.name, dateLine: dateLineOf(event), dupr: !!(event && event.duprRated), cancelUrl: await cancelLinkFor(event, { playerId: entry.playerId, email: entry.email }) }),
     }).catch(() => {});
     return json({ ok: true, name: entry.name, email: entry.email, emailed: true });
   }

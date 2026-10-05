@@ -40,6 +40,21 @@
   .rte-body:focus{ outline:none; }
   .rte-body:empty:before{ content:attr(data-placeholder);color:#5e655a; }
   .rte-body a{ color:var(--lime); }
+  /* Phones: name and menu on one line, the status chips wrap underneath. */
+  @media(max-width:600px){ #rosterList .prow{ flex-wrap:wrap;row-gap:6px; } #rosterList .prow .pn{ flex:1 1 calc(100% - 56px);order:-2; } #rosterList .prow .kebab{ order:-1; } }
+  .ckrow{ display:flex;align-items:flex-start;gap:9px;font-size:.84rem;color:#d9dcd3;padding:7px 0;cursor:pointer; }
+  .ckrow input{ width:18px;height:18px;margin:1px 0 0;accent-color:var(--lime);flex:none; }
+  .ckrow b{ color:#9aa094;font-weight:700; }
+  .chgnote{ border:1px solid rgba(240,192,64,.4);background:rgba(240,192,64,.08);border-radius:12px;padding:12px 14px;margin:0 0 14px;font-size:.84rem;line-height:1.55;color:#f0f2ec; }
+  .chgnote b{ color:var(--gold); } .chgnote ul{ margin:6px 0 8px 18px;padding:0; }
+  .chgnote button{ background:none;border:0;color:#9aa094;font:inherit;font-size:.78rem;text-decoration:underline;cursor:pointer;padding:0; }
+  .mh-row{ border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 14px;margin-bottom:8px;background:#161914; }
+  .mh-row summary{ cursor:pointer;list-style:none;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px; }
+  .mh-row summary::-webkit-details-marker{ display:none; }
+  .mh-row .mh-s{ font-weight:800;font-size:.88rem; } .mh-row .mh-m{ font-size:.74rem;color:#9aa094; }
+  .mh-row .mh-b{ margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08);font-size:.86rem;line-height:1.6;color:#d9dcd3; }
+  .mh-row .mh-b a{ color:var(--lime); }
+  .mh-row .mh-b ul,.mh-row .mh-b ol{ margin:6px 0 8px 20px;padding:0; } .mh-row .mh-b p{ margin:0 0 8px; }
   .rte-body ul,.rte-body ol{ margin:6px 0;padding-left:22px; }
   .rte-body p{ margin:0 0 10px; }
   /* Description / rules / admin notes editor — markdown textarea + live preview, mirrors .i input styling. */
@@ -249,7 +264,7 @@
           <div class="frow"><label class="l">Format</label><div class="seg" id="seg-format"><button class="on" data-v="individual">Individual</button><button data-v="fixed-partner">Fixed Partner (pairs)</button><button data-v="round-robin">Round Robin (blocks)</button></div></div>
           <div class="help" style="margin:-2px 0 13px">Fixed Partner: one signup registers a locked pair — they stay teamed up the whole night, moving up/down courts together on wins/losses (no re-pairing each round). <b>Round Robin</b>: built for 2-court nights — random courts, then 3 games on the same court rotating partners; after every 3rd game the top 2 on each court (wins → point diff → DR) move up and the bottom 2 move down. Sets Rounds to 9.</div>
           <div class="frow"><label class="l">Rating</label><div class="seg" id="seg-dupr"><button class="on" data-v="0">Non-DUPR</button><button data-v="1">DUPR-rated</button></div></div>
-          <div class="help" style="margin:-2px 0 13px">DUPR-rated asks each player for their DUPR ID at signup and reminds them to join the Dink Society DUPR club before the night.</div>
+          <div class="help" style="margin:-2px 0 13px">DUPR-rated asks each player for their DUPR ID at signup and requires them to confirm they joined the Dink Society club on DUPR. The roster shows who you have verified, so you know scores can be posted.</div>
           <div class="frow"><label class="l">Location name</label><input class="i" id="f-place" placeholder="SBTC"></div>
           <div class="frow"><label class="l">Address</label><input class="i" id="f-address" placeholder="123 Main St, Charlotte, NC"></div>
           <div class="help" style="margin:-2px 0 13px">Location name is what players see (kept short). Address powers the "get directions" map link — add it for accurate directions.</div>
@@ -383,7 +398,7 @@
     <div class="mtabbar">
       <button id="mtab-info" onclick="mTab('info')">Ladder Info</button>
       <button id="mtab-roster" class="on" onclick="mTab('roster')">Roster</button>
-      <button id="mtab-rem" onclick="mTab('rem')">Reminders</button>
+      <button id="mtab-rem" onclick="mTab('rem')">Messages</button>
       <button id="mtab-score" onclick="mTab('score')">Ladder Scoring</button>
       <button id="mtab-photos" onclick="mTab('photos')">Photos</button>
     </div>
@@ -498,15 +513,8 @@
 
   <!-- ===== REMINDERS TAB ===== -->
   <div class="mpanel" id="mpanel-rem">
-  <div class="sec" style="margin:8px 0 8px">Reminders</div>
-  <div class="frow row2">
-    <div><label class="l">Send a reminder now</label><select class="i" id="m-remkind"><option value="two_day">2 days out</option><option value="morning">Morning of (5am)</option><option value="three_hour">3 hours out</option></select></div>
-    <div style="display:flex;align-items:flex-end"><button class="btn btn-lime" style="width:100%" onclick="sendReminder()">Send to roster now</button></div>
-  </div>
-  <div class="help" style="margin:-4px 0 6px">Emails everyone registered right now — the field, each player's last-ladder line, court #s, a cancel link, and the next ladder. Auto-sends also fire 2 days out, 5am day-of, and 3 hours out.</div>
-  <div id="mRemMsg"></div>
-
-  <div class="sec" style="margin:22px 0 8px">Message the roster</div>
+  <div class="sec" style="margin:8px 0 8px">Message this ladder's players</div>
+  <div id="mMsgChange" class="chgnote" style="display:none"></div>
   <div class="frow"><label class="l">Subject (optional)</label><input class="i" id="m-msg-subject" placeholder="Defaults to the ladder name"></div>
   <div class="frow">
     <label class="l">Message</label>
@@ -525,9 +533,27 @@
       <div class="rte-body" id="m-msg-body" contenteditable="true" data-placeholder="e.g. Courts have moved to 5A &amp; 5B tonight — see you there!"></div>
     </div>
   </div>
-  <button class="btn btn-lime" style="width:100%" onclick="sendLadderMessage()">Send to roster now</button>
-  <div class="help" style="margin:6px 0 4px">Goes to everyone currently confirmed on this ladder's roster (not the waitlist). Always delivers — this is an operational message, not subject to email preference opt-outs.</div>
+  <div class="frow">
+    <label class="l">Send to</label>
+    <label class="ckrow"><input type="checkbox" id="m-msg-roster" checked onchange="msgAudienceSync()"> <span>Roster <b id="m-msg-n-roster"></b></span></label>
+    <label class="ckrow"><input type="checkbox" id="m-msg-wait" onchange="msgAudienceSync()"> <span>Waitlist <b id="m-msg-n-wait"></b></span></label>
+    <label class="ckrow" id="m-msg-unver-row" style="display:none"><input type="checkbox" id="m-msg-unver" onchange="msgAudienceSync()"> <span>Only players not yet verified in the DUPR club <b id="m-msg-n-unver"></b></span></label>
+  </div>
+  <button class="btn btn-lime" style="width:100%" id="m-msg-send" onclick="sendLadderMessage()">Send message</button>
+  <div class="help" style="margin:6px 0 4px">Emails the players you ticked, and shows as an update on this ladder in their player portal. It is not posted on the public ladder page. Always delivers: this is about a ladder they signed up for, so email opt-outs don't apply.</div>
   <div id="mMsgMsg"></div>
+
+  <div class="sec" style="margin:22px 0 8px">Sent to this ladder</div>
+  <div id="mMsgHistory"><div class="empty">Nothing sent yet.</div></div>
+
+  <div class="sec" style="margin:26px 0 8px">Reminders</div>
+  <div class="frow row2">
+    <div><label class="l">Send a reminder now</label><select class="i" id="m-remkind"><option value="two_day">2 days out</option><option value="morning">Morning of (5am)</option><option value="three_hour">3 hours out</option></select></div>
+    <div style="display:flex;align-items:flex-end"><button class="btn btn-lime" style="width:100%" onclick="sendReminder()">Send to roster now</button></div>
+  </div>
+  <div class="help" style="margin:-4px 0 6px">Emails everyone registered right now — the field, each player's last-ladder line, court #s, a cancel link, and the next ladder. Auto-sends also fire 2 days out, 5am day-of, and 3 hours out.</div>
+  <div id="mRemMsg"></div>
+
 
   <div class="sec" style="margin:22px 0 8px">Recruit players</div>
   <div class="frow row2">
@@ -965,6 +991,7 @@ async function viewAsPlayer(){
   if(d&&d.ok){ location.href=d.redirect||'/me.html'; return; }
   msg('vaMsg','err',(d&&d.error)||('Could not start ('+status+').'));
 }
+const DUPR_CLUB_URL='https://dashboard.dupr.com/dashboard/browse/clubs/5171426386';
 function duprUrl(id){ return id?('https://dashboard.dupr.com/dashboard/player/'+encodeURIComponent(id)):''; }
 function plRosterHtml(d){
   let h='<div style="font-size:.78rem;color:#9aa094;margin-bottom:10px">Set a player\'s email (links their league profile), DUPR ID (cross-references their DUPR account), or fix name/gender. Changes apply across every ladder.</div>';
@@ -1172,6 +1199,8 @@ async function openManage(id){
   h+='<div class="sec" style="margin:14px 0 6px">Waitlist'+(_MCLAIM?` · held: ${esc(_MCLAIM.name)}`:'')+'</div><div id="waitList"></div>';
   document.getElementById('mBody').innerHTML=h; renderRosterList(); renderWaitList();
   document.getElementById('mMsg').innerHTML='';
+  if(_MSG_FOR!==d.event.id){ _MSG_FOR=d.event.id; clearChangeMessage(); document.getElementById('mMsgMsg').innerHTML=''; document.getElementById('m-msg-wait').checked=false; { const u=document.getElementById('m-msg-unver'); if(u) u.checked=false; } }
+  loadLadderMessages();
   { const pl=document.getElementById('ap-paylink'), pd=document.getElementById('ap-paid'); if(pl)pl.checked=false; if(pd)pd.checked=false; }
   mTab((d.event.status==='final')?'info':'roster');
   document.getElementById('ov').classList.add('on');
@@ -1439,8 +1468,65 @@ async function saveEdit(){
   if(!body.name||!body.date){ msg('mEditMsg','err','Name and date are required.'); return; }
   const {status,d}=await api('/admin-ladder-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(status===401){ msg('mEditMsg','err','Sign in as admin first.'); return; }
-  if(d.ok){ CURRENT=d.event; msg('mEditMsg','ok','Saved.'); document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · ${d.event.courts} courts · ${fmt(d.event.feeCents)}`; loadList(); }
+  if(d.ok){ CURRENT=d.event; msg('mEditMsg','ok','Saved.'); document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · ${d.event.courts} courts · ${fmt(d.event.feeCents)}`; loadList(); offerChangeMessage(d.changes, d.affected); }
   else msg('mEditMsg','err',d.error||'Save failed.');
+}
+
+/* ---- Messages to this ladder's players ----
+   The save endpoint reports what a player would care about (date, time, place,
+   courts) and how many people are signed up. If anything changed, ask whether
+   to tell them, then open the Messages tab with the update already written.
+   Nothing is ever sent without pressing Send. */
+let _MSG_CHANGES=null, _MSG_COUNTS={roster:0,waitlist:0,duprUnverified:0}, _MSG_FOR=null;
+function changeLineTxt(c){ return !c.from ? (c.label+': '+c.to) : !c.to ? (c.label+': removed (was '+c.from+')') : (c.label+': '+c.from+' → '+c.to); }
+async function offerChangeMessage(changes, affected){
+  if(!CURRENT || !Array.isArray(changes) || !changes.length) return;
+  const n=(affected&&affected.roster)||0, w=(affected&&affected.waitlist)||0;
+  if(!n && !w) return;                       // nobody signed up yet, nobody to tell
+  const who=[n?(n+' on the roster'):'', w?(w+' on the waitlist'):''].filter(Boolean).join(' and ');
+  if(!(await dsConfirm({ title:'Tell the players?', message:'You changed '+changes.map(c=>c.label.toLowerCase()).join(', ')+'. '+who+' signed up for '+(CURRENT.name||'this ladder')+'. Nothing is sent until you press Send.', confirmLabel:'Write the update', cancelLabel:'Not now' }))) return;
+  _MSG_CHANGES=changes;
+  document.getElementById('m-msg-subject').value='Update: '+(CURRENT.name||'your ladder');
+  document.getElementById('m-msg-body').innerHTML='<p>Heads up, the details for <b>'+esc(CURRENT.name||'this ladder')+'</b> have changed:</p><ul>'+changes.map(c=>'<li>'+esc(changeLineTxt(c))+'</li>').join('')+'</ul><p>Everything else stays the same. See you on the courts.</p>';
+  document.getElementById('m-msg-roster').checked=true;
+  document.getElementById('m-msg-wait').checked=w>0;
+  { const u=document.getElementById('m-msg-unver'); if(u) u.checked=false; }
+  const note=document.getElementById('mMsgChange');
+  note.innerHTML='<b>This update is ready to send.</b> Edit it if you like, check who it goes to, then press Send.<ul>'+changes.map(c=>'<li>'+esc(changeLineTxt(c))+'</li>').join('')+'</ul><button type="button" onclick="clearChangeMessage()">Discard this draft</button>';
+  note.style.display='block';
+  mTab('rem'); loadLadderMessages();
+}
+function clearChangeMessage(){
+  _MSG_CHANGES=null;
+  const note=document.getElementById('mMsgChange'); if(note){ note.style.display='none'; note.innerHTML=''; }
+  document.getElementById('m-msg-subject').value=''; document.getElementById('m-msg-body').innerHTML='';
+}
+function msgAudienceSync(){
+  const r=document.getElementById('m-msg-roster'), w=document.getElementById('m-msg-wait'), u=document.getElementById('m-msg-unver');
+  // "Not verified in the club" narrows the roster, so it replaces the other two.
+  const only=!!(u&&u.checked&&CURRENT&&CURRENT.duprRated);
+  if(only){ r.checked=true; w.checked=false; }
+  const n=only?_MSG_COUNTS.duprUnverified:((r.checked?_MSG_COUNTS.roster:0)+(w.checked?_MSG_COUNTS.waitlist:0));
+  const b=document.getElementById('m-msg-send'); if(b) b.textContent=n?('Send to '+n+' player'+(n===1?'':'s')):'Send message';
+}
+function fmtSent(iso){ try{ return new Date(iso).toLocaleString('en-US',{month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return ''; } }
+async function loadLadderMessages(){
+  if(!CURRENT) return;
+  const id=CURRENT.id;
+  const {status,d}=await api('/admin-ladder-message?eventId='+encodeURIComponent(id));
+  if(!CURRENT || CURRENT.id!==id || status!==200 || !d) return;
+  _MSG_COUNTS=Object.assign({roster:0,waitlist:0,duprUnverified:0}, d.counts||{});
+  document.getElementById('m-msg-n-roster').textContent='· '+_MSG_COUNTS.roster;
+  document.getElementById('m-msg-n-wait').textContent='· '+_MSG_COUNTS.waitlist;
+  document.getElementById('m-msg-n-unver').textContent='· '+_MSG_COUNTS.duprUnverified;
+  document.getElementById('m-msg-unver-row').style.display=CURRENT.duprRated?'flex':'none';
+  msgAudienceSync();
+  const list=d.messages||[], el=document.getElementById('mMsgHistory');
+  el.innerHTML=list.length? list.map(m=>{
+    const a=m.audience||{roster:true};
+    const to=a.only==='dupr-unverified'?'not verified in the DUPR club':[a.roster!==false?'roster':'',a.waitlist?'waitlist':''].filter(Boolean).join(' + ');
+    return `<details class="mh-row"><summary><span class="mh-s">${esc(m.subject||'Message')}</span><span class="mh-m">${esc(fmtSent(m.sentAt))} · ${m.sent||0} sent${m.failed?(' · '+m.failed+' failed'):''} · ${esc(to)}${m.sentBy?(' · '+esc(m.sentBy)):''}</span></summary><div class="mh-b">${m.messageHtml||esc(m.message||'')}</div></details>`;
+  }).join('') : '<div class="empty">Nothing sent yet.</div>';
 }
 
 async function sendReminder(){
@@ -1489,13 +1575,19 @@ async function sendLadderMessage(){
   const rte=document.getElementById('m-msg-body');
   const message=rte.innerHTML.trim();
   if(!rte.textContent.trim()){ msg('mMsgMsg','err','Write a message first.'); return; }
-  if(!(await dsConfirm({ title:'Send message?', message:'Send this message to everyone on the roster for '+(CURRENT.name||'this ladder')+'?', confirmLabel:'Send', cancelLabel:'Cancel' }))) return;
+  const unver=!!(document.getElementById('m-msg-unver')&&document.getElementById('m-msg-unver').checked&&CURRENT.duprRated);
+  const audience={ roster:document.getElementById('m-msg-roster').checked, waitlist:document.getElementById('m-msg-wait').checked };
+  if(unver){ audience.roster=true; audience.waitlist=false; audience.only='dupr-unverified'; }
+  if(!audience.roster&&!audience.waitlist){ msg('mMsgMsg','err','Tick who to send it to.'); return; }
+  const n=unver?_MSG_COUNTS.duprUnverified:((audience.roster?_MSG_COUNTS.roster:0)+(audience.waitlist?_MSG_COUNTS.waitlist:0));
+  const who=unver?'the '+n+' player'+(n===1?'':'s')+' not yet verified in the DUPR club':[audience.roster?'the roster':'',audience.waitlist?'the waitlist':''].filter(Boolean).join(' and ')+' ('+n+')';
+  if(!(await dsConfirm({ title:'Send message?', message:'Send this to '+who+' for '+(CURRENT.name||'this ladder')+'?', confirmLabel:'Send', cancelLabel:'Cancel' }))) return;
   const box=document.getElementById('mMsgMsg'); if(box) box.innerHTML='<div style="color:#9aa094;font-size:.76rem;margin-top:6px">Sending…</div>';
-  const {status,d}=await api('/admin-ladder-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:CURRENT.id,subject,message,format:'html'})});
+  const {status,d}=await api('/admin-ladder-message',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({eventId:CURRENT.id,subject,message,format:'html',audience,kind:_MSG_CHANGES?'update':'message',changes:_MSG_CHANGES||undefined})});
   if(status===401){ msg('mMsgMsg','err','Sign in as admin first.'); return; }
   if(d&&d.ok){
-    msg('mMsgMsg','ok','Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'.');
-    rte.innerHTML='';
+    msg('mMsgMsg','ok',d.sent?('Sent to '+d.sent+' player'+(d.sent===1?'':'s')+(d.failed?(' · '+d.failed+' failed'):'')+'. It also shows in their player portal.'):(d.note||'Nobody to send to.'));
+    clearChangeMessage(); loadLadderMessages();
   }
   else msg('mMsgMsg','err',(d&&(d.reason||d.error))||('Could not send ('+status+').'));
 }
@@ -1676,6 +1768,22 @@ async function removeWait(index){
 }
 const PAY_METHODS=['cash','venmo','zelle','card','other'];
 let _MROSTER=[], _MWAIT=[], _MCLAIM=null;
+// DUPR club, on DUPR-rated ladders. Scores can only be posted for club members.
+//   verified  = you checked the club on DUPR and saw them
+//   confirmed = they ticked "I've joined" at sign-up; not yet checked
+//   (nothing) = signed up before the step existed, or added by hand
+function _clubChip(p){
+  if(p.duprClub==='verified') return ' <span class="chip chip-teal" title="You verified them in the Dink Society club on DUPR">Club verified</span>';
+  if(p.duprClub==='confirmed') return ' <span class="chip chip-gold" title="They ticked that they joined. Check the club on DUPR, then mark verified.">Says joined</span>';
+  return ' <span class="chip chip-red" title="No confirmation that they joined the DUPR club">Club not confirmed</span>';
+}
+async function setClub(playerId,email,status){
+  if(!CURRENT) return;
+  const {status:st,d}=await api('/admin-ladder-manage?event='+encodeURIComponent(CURRENT.id),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'dupr-club',playerId,email,status})});
+  if(!d||!d.ok){ msg('mMsg','err',(d&&d.error)||('Failed ('+st+').')); return; }
+  const e=_MROSTER.find(x=>(playerId&&x.playerId===playerId)||(email&&x.email===email)); if(e) e.duprClub=status||null;
+  renderRosterList(); loadLadderMessages();
+}
 function _statusChip(p){
   if(p.paymentStatus==='paid') return `<span class="chip ${p.paymentMethod==='venmo'?'chip-teal':'chip-lime'}">paid · ${esc(p.paymentMethod||'?')}</span>`;
   if(p.paymentStatus==='venmo_pending') return '<span class="chip chip-gold">Venmo pending</span>';
@@ -1704,6 +1812,11 @@ function _rosterMenu(p,i){
     if(p.partnerId) b+=`<button onclick="rmCall(unlinkPartner,'${esc(p.playerId||'')}')">👥 Unlink partner</button>`;
   }
   b+=`<button onclick="rmCall(setDuprFor,'${esc(p.playerId||'')}')">🏷 ${p.duprId?'Edit DUPR ID':'Set DUPR ID'}</button>`;
+  if(CURRENT&&CURRENT.duprRated){
+    if(p.duprClub!=='verified') b+=`<button onclick="_closeRowMenus();setClub('${esc(p.playerId||'')}','${esc(p.email||'')}','verified')">Mark DUPR club verified</button>`;
+    else b+=`<button onclick="_closeRowMenus();setClub('${esc(p.playerId||'')}','${esc(p.email||'')}','confirmed')">Undo club verified</button>`;
+    b+=`<a href="${DUPR_CLUB_URL}" target="_blank" rel="noopener" style="display:block;padding:9px 12px;color:inherit;text-decoration:none;font-size:.8rem">Open the club on DUPR ↗</a>`;
+  }
   if(p.paymentStatus!=='paid'&&p.email) b+=`<button onclick="rmCall(sendPaylink,'${esc(p.playerId||'')}','${esc(p.email)}')">✉ Send payment link</button>`;
   if(p.paymentStatus==='paid'&&p.email) b+=`<button onclick="rmCall(resendConfirm,'${esc(p.email)}','${esc(p.playerId||'')}')">✉ Resend confirmation</button>`;
   if(!p.email) b+=`<button onclick="rmCall(setEmailFor,'${esc(p.playerId||'')}','')">✉ Add email</button>`;
@@ -1719,14 +1832,16 @@ function renderRosterList(){
   const pTest=p=> fp===''||(fp==='unpaid'&&p.paymentStatus!=='paid')||(p.paymentStatus==='paid'&&(p.paymentMethod||'')===fp);
   const rows=_MROSTER.slice().sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''))).filter(p=>String(p.name||'').toLowerCase().includes(q)&&sTest(p)&&pTest(p));
   const paid=_MROSTER.filter(p=>p.paymentStatus==='paid').length;
-  const cc=document.getElementById('rcount'); if(cc) cc.textContent=`· ${rows.length} shown · ${paid}/${_MROSTER.length} paid`;
+  const club=(CURRENT&&CURRENT.duprRated)?` · ${_MROSTER.filter(p=>p.duprClub==='verified').length}/${_MROSTER.length} verified in the DUPR club`:'';
+  const cc=document.getElementById('rcount'); if(cc) cc.textContent=`· ${rows.length} shown · ${paid}/${_MROSTER.length} paid${club}`;
   const el=document.getElementById('rosterList'); if(!el) return;
   el.innerHTML= rows.length? rows.map((p,i)=>{
     const noEmail=p.email?'':'<span class="chip chip-gray" title="No email on file">no email</span>';
     const po=p.partnerId?_MROSTER.find(x=>x.playerId===p.partnerId):null;
     const partner=po?` <span class="chip chip-gray" title="Fixed partner">👥 w/ ${esc(po.name)}</span>`:(CURRENT&&CURRENT.format==='fixed-partner'?` <span class="chip chip-gold" title="No partner linked — won’t be seated when the night starts. Use ⋯ → Set partner.">👥 no partner</span>`:'');
     const duprChip=p.duprId?` <span class="chip chip-gold" title="DUPR ID">DUPR ${esc(p.duprId)}</span>`:'';
-    return `<div class="prow" style="position:relative"><span class="pn">${esc(p.name)}</span>${_statusChip(p)} ${noEmail}${partner}${duprChip}<button class="kebab" aria-label="Actions" onclick="toggleRowMenu(event,${i})">⋯</button>${_rosterMenu(p,i)}</div>`;
+    const clubChip=(CURRENT&&CURRENT.duprRated)?_clubChip(p):'';
+    return `<div class="prow" style="position:relative"><span class="pn">${esc(p.name)}</span>${_statusChip(p)} ${noEmail}${partner}${duprChip}${clubChip}<button class="kebab" aria-label="Actions" onclick="toggleRowMenu(event,${i})">⋯</button>${_rosterMenu(p,i)}</div>`;
   }).join(''):'<div class="empty">No players match these filters.</div>';
 }
 function renderWaitList(){

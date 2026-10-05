@@ -7,6 +7,15 @@ export function siteUrl() {
     || process.env.SITE_URL || 'https://dinksociety.netlify.app';
 }
 
+// The league's club on DUPR. A DUPR-rated ladder's scores can only be posted
+// for players who are members, so sign-up, the confirmation and every reminder
+// point here. Override with DUPR_CLUB_URL if the club ever moves.
+export const DUPR_CLUB_NAME = 'Dink Society - South Bay';
+export function duprClubUrl() {
+  return (typeof Netlify !== 'undefined' && Netlify.env.get('DUPR_CLUB_URL'))
+    || process.env.DUPR_CLUB_URL || 'https://dashboard.dupr.com/dashboard/browse/clubs/5171426386';
+}
+
 const fn = (name, token) => `${siteUrl()}/.netlify/functions/${name}?t=${token}`;
 export const claimUrl = (token) => fn('ladder-claim', token);
 export const venmoConfirmUrl = (token) => fn('ladder-confirm-venmo', token);
