@@ -25,104 +25,172 @@
        current one, which flips a week before its start date). -->
   <script src="/js/season.js"></script>
   <script src="/js/short-name.js"></script>
+  <link rel="stylesheet" href="/css/pages.css" />
   <style>
-    .lb-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
-    /* The shared hero reserves room under "Presented by" for pages that need it;
-       here it just left a hole above the filters. Pull them back up. */
-    .page-hero--sponsor { margin-bottom: var(--space-3); }
-    /* The shared hero pads 80px above the eyebrow so a short title sits at the
-       same height on every page; with the MVP cards making this hero tall
-       anyway, that read as a hole. Trim it here only. */
-    /* The nav is fixed and 64px tall, so the hero's top ~64px sits under it —
-       the padding has to clear that first. What made the old hero feel hollow
-       wasn't the padding, it was bottom-aligning a short title beside a tall
-       MVP block; centring the two columns removes the hole without pushing
-       anything under the nav. */
-    .page-hero--sponsor .page-hero__content { padding-top: 84px; padding-bottom: 22px; }
-    .page-hero.page-hero--sponsor { min-height: 0; }
-    @media (min-width:900px){ .page-hero--sponsor .page-hero__presented { margin-top: 12px; } }
-
-    /* ── Hero: title left, Season MVPs in the empty right half ── */
-    .page-hero--sponsor .page-hero__content {
-      display:flex; align-items:center; justify-content:space-between; gap:30px; flex-wrap:wrap;
-    }
-    .lb-heroL { min-width:min(100%,300px); }
-    .lb-mvp { flex:1 1 460px; max-width:660px; }
-    .lb-mvp__hd { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:9px; }
-    .lb-mvp__hd b { font-size:10.5px; font-weight:900; letter-spacing:.18em; text-transform:uppercase; color:var(--color-gold,#f0c040); }
-    .lb-mvp__hd span { font-size:10.5px; color:var(--color-text-faint); }
-    .lb-mvp__grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-    @media (max-width:620px){ .lb-mvp__grid { grid-template-columns:1fr; } }
-    .lb-mvpc { position:relative; border:1px solid rgba(240,192,64,.3); border-radius:14px; padding:13px 14px; overflow:hidden;
-      background:radial-gradient(120% 90% at 50% 0%, rgba(240,192,64,.13), transparent 62%), rgba(14,14,14,.72);
-      backdrop-filter:blur(6px); }
-    .lb-mvpc--f { border-color:rgba(230,225,213,.3);
-      background:radial-gradient(120% 90% at 50% 0%, rgba(230,225,213,.13), transparent 62%), rgba(14,14,14,.72); }
-    .lb-mvpc__tag { display:inline-block; font-size:8px; font-weight:900; letter-spacing:.16em; text-transform:uppercase;
-      color:#0b0d0a; background:#f0c040; border-radius:9999px; padding:3px 9px; }
-    .lb-mvpc--f .lb-mvpc__tag { background:#E6E1D5; }
-    .lb-mvpc__who { display:flex; align-items:center; gap:10px; margin:10px 0 10px; }
-    .lb-mvpc__ring { width:42px; height:42px; flex:none; border-radius:50%; display:flex; align-items:center; justify-content:center; overflow:hidden;
-      font-size:13px; font-weight:900; background:#0b0d0a; border:2px solid #f0c040; box-shadow:0 0 14px rgba(240,192,64,.4); }
-    .lb-mvpc--f .lb-mvpc__ring { border-color:#E6E1D5; box-shadow:0 0 14px rgba(230,225,213,.32); }
-    .lb-mvpc__nm { font-size:15px; font-weight:900; font-style:italic; line-height:1.15; }
-    .lb-mvpc__tm { font-size:10.5px; color:var(--color-text-muted); font-weight:700; margin-top:2px; }
-    .lb-mvpc__st { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
-    .lb-mvpc__st div { background:rgba(0,0,0,.45); border:1px solid var(--color-border); border-radius:8px; padding:6px 2px; text-align:center; }
-    .lb-mvpc__st b { display:block; font-size:12.5px; font-weight:900; }
-    .lb-mvpc__st b.g{color:#f0c040} .lb-mvpc__st b.t{color:var(--color-teal,#17d7b0)} .lb-mvpc__st b.li{color:var(--color-lime)}
-    .lb-mvpc__st span { font-size:7.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--color-text-faint); font-weight:800; }
+    /* ═══════════════════════════════════════════════════════════════
+       LEADERBOARD. Shared pieces live in /css/pages.css (.dk-*).
+       Header (headline, lede, four tiles) → sticky bar (tabs, then the
+       filters for the open tab) → the tab's content.
+       ═══════════════════════════════════════════════════════════════ */
+    .lb .dk-hero__in { align-items: flex-end; padding-bottom: 0; }
+    .lb-head__txt { flex: 999 1 480px; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+    .lb-controls { flex: 0 1 auto; display: flex; flex-direction: column; }
+    .lb-controls select { height: 46px; padding: 0 16px; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .lb-controls select:focus { outline: 2px solid var(--color-lime); outline-offset: 1px; }
+    #lb-tiles { margin-bottom: 16px; }
+    .lb .dk-tile a.nm + span { margin-top: 2px; }
+    .lb-shell { padding-top: 20px; padding-bottom: 80px; }
     a.ds-link { color: inherit; text-decoration: none; cursor: pointer; }
     a.ds-link:hover { color: var(--color-lime); text-decoration: underline; }
 
-    /* Controls */
-    /* Toolbar: tabs · sub-toggle ……… season/division, one row (wraps on phones).
-       Was three stacked rows under the hero — the season selects, then the
-       tabs, then Players/Team Leaders — which left the right half empty. */
-    .lb-bar { display:flex; align-items:center; gap:10px 14px; flex-wrap:wrap; margin:0 0 var(--space-4); }
-    .lb-bar .lb-controls { margin:0 0 0 auto; }
-    .lb-controls { display:flex; gap:8px; flex-wrap:wrap; margin-top:var(--space-3); }
-    .lb-controls select { padding:8px 14px; background:var(--color-surface-2); border:1px solid var(--color-border); color:var(--color-text); border-radius:var(--radius-sm); font-size:12px; font-family:inherit; cursor:pointer; }
-    .lb-controls select:focus { border-color:var(--color-lime); outline:none; }
+    /* ── Sticky bar: six tabs, then the open tab's controls ── */
+    .lb-tabs { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .lb-tab { display: flex; align-items: center; justify-content: center; height: 50px; padding: 0 6px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--color-text-muted); font: inherit; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: .03em; cursor: pointer; white-space: nowrap; }
+    .lb-tab:hover { color: var(--color-text); }
+    .lb-tab.is-active { color: var(--color-text); border-bottom-color: var(--color-lime); }
+    .lb-section { display: none; }
+    .lb-section.is-active { display: block; }
+    .lb-subseg { display: none; }
+    .lb-subseg.is-active { display: flex; }
+    .lb-subseg.dk-chips { border-top: 1px solid var(--color-divider); padding: 8px 0; }
+    #nvz-frame, #cmp-frame { width: 100%; border: 0; display: block; min-height: 70vh; }
 
-    /* Tabs */
-    .lb-tabs { display:flex; gap:3px; margin:0; flex-wrap:wrap; }
-    .lb-tab { padding:8px 16px; border-radius:var(--radius-full); font-size:11px; font-weight:700; border:1px solid var(--color-border); background:transparent; color:var(--color-text-faint); cursor:pointer; transition:all var(--transition); font-family:inherit; }
-    .lb-tab:hover { color:var(--color-text); background:var(--color-surface-2); }
-    .lb-tab.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
+    .rk-stick { position: sticky; top: calc(var(--dk-top, 65px) + var(--lb-tabsh, 51px)); z-index: 25; margin: 0 calc(-1 * var(--gutter)) 20px; padding: 0 var(--gutter); background: var(--color-bg); border-bottom: 1px solid var(--color-border); }
+    .rk-stick[hidden] { display: none; }
+    .rk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 9px 0; }
+    .rk-games { display: flex; gap: 6px; }
+    .rk-games button { height: 40px; padding: 0 12px; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: transparent; color: var(--color-text); font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+    .rk-games button:hover { border-color: var(--color-lime); }
+    .rk-games button.on { background: var(--color-lime); border-color: var(--color-lime); color: var(--color-text-inverse); font-weight: 800; }
+    .rk-games .s { display: none; }
+    .rk-find { flex: 1 1 200px; min-width: 0; display: flex; align-items: center; gap: 6px; }
+    .rk-find .dk-find { height: 42px; font-size: 14px; padding: 0 16px; }
+    .rk-sort { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .rk-sort .dk-lbl { margin: 0; white-space: nowrap; }
+    .rk-bar .dk-seg { padding: 3px; flex-wrap: nowrap; }
+    .rk-bar .dk-seg button { height: 34px; padding: 0 10px; }
+    #rk-sortsel, .rk-findbtn, .rk-x { display: none; }
+    #rk-sortsel { height: 42px; padding: 0 12px; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 13px; font-weight: 800; cursor: pointer; }
+    .rk-findbtn, .rk-x { flex: 0 0 42px; width: 42px; height: 42px; border-radius: 50%; border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); align-items: center; justify-content: center; cursor: pointer; font: inherit; font-size: 20px; line-height: 1; }
+    .rk-findbtn svg { width: 18px; height: 18px; }
+    .rk-viewrow { display: none; }
 
-    .lb-section { display:none; }
-    .lb-section.is-active { display:block; }
-    .lb-subseg { display:none; gap:6px; margin:0; flex-wrap:wrap; align-items:center; }
-    .lb-subseg.is-active { display:flex; }
-    .lb-subseg::before { content:""; width:1px; height:22px; background:var(--color-border); margin-right:4px; }
-    @media (max-width:700px){ .lb-bar { gap:8px; } .lb-bar .lb-controls { margin-left:0; width:100%; } .lb-subseg::before { display:none; } }
-    .lb-sub { padding:6px 13px; border-radius:var(--radius-full); font-size:11px; font-weight:700; border:1px solid var(--color-border); background:var(--color-surface-2); color:var(--color-text-muted); cursor:pointer; font-family:inherit; }
-    .lb-sub:hover { color:var(--color-text); }
-    .lb-sub.is-active { border-color:var(--color-lime); color:var(--color-lime); background:var(--color-lime-dim); }
-    #nvz-frame, #cmp-frame { width:100%; border:0; display:block; min-height:70vh; }
-    .lb-filter-note { font-size:11px; color:var(--color-text-muted); margin:-8px 0 var(--space-4); }
+    /* ── Rankings: the list ── */
+    .rk-cols { align-items: flex-start; }
+    .rk-cols > .wide, .rk-cols > .side { gap: 16px; }
+    .rk-cols > .side { flex: 1 1 320px; }
+    .rk-cols > * > .dk-card { flex: 0 0 auto; }
+    .rk-listhead { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 16px; }
+    .rk-listhead .dk-sub { display: block; margin-top: 4px; }
+    .rk-top { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    .rk-top .dk-pc__k { display: flex; align-items: center; gap: 8px; }
+    .rk-mv { font-size: 11px; font-weight: 800; letter-spacing: 0; font-variant-numeric: tabular-nums; color: var(--color-text-muted); white-space: nowrap; }
+    .rk-mv.up { color: var(--color-lime); }
+    .rk-mv.down { color: var(--color-red); }
+    .rk-row { cursor: pointer; }
+    .rk-row .who { flex: 1.3 1 300px; }
+    .rk-row .who > div { flex: 1 1 auto; }
+    .rk-pos { flex: 0 0 32px; display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+    .rk-pos b { font-size: 16px; line-height: 1.1; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .rk-big { flex: 0 0 auto; margin-left: auto; text-align: right; }
+    .rk-big b { display: block; font-size: 22px; line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--color-lime); }
+    .rk-big small { display: block; margin-top: 3px; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-muted); }
+    .rk-big.nr b { color: var(--color-text-muted); }
+    .rk-stats { flex: 1 1 340px; min-width: 0; display: flex; align-items: center; gap: 8px; }
+    .rk-stats .dk-cells { flex: 1 1 auto; }
+    .rk-tog { flex: 0 0 36px; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--color-border); background: transparent; color: var(--color-text-muted); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+    .rk-tog:hover { border-color: var(--color-lime); color: var(--color-text); }
+    .rk-tog svg { width: 16px; height: 16px; transition: transform .15s; }
+    .rk-row.open .rk-tog svg { transform: rotate(180deg); }
+    .rk-more { flex: 1 1 100%; min-width: 0; box-sizing: border-box; padding: 14px; border-radius: var(--radius-md); background: var(--color-surface-2); cursor: default; display: flex; flex-direction: column; gap: 14px; }
+    .rk-more__cap { font-size: 12px; color: var(--color-text-muted); }
+    .rk-more__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px 8px; font-variant-numeric: tabular-nums; }
+    .rk-more__grid .dk-cell b { font-size: 16px; font-weight: 800; color: var(--color-text); }
+    .rk-more .dk-cell small { white-space: normal; }
+    .rk-more__grid .dk-cell em { display: block; font-style: normal; font-size: 12px; color: var(--color-text-muted); }
+    .rk-more h3 { margin: 0 0 8px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); }
+    .rk-weeks { display: flex; flex-wrap: wrap; gap: 6px; font-variant-numeric: tabular-nums; }
+    .rk-weeks span { padding: 5px 10px; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); font-size: 12px; font-weight: 700; white-space: nowrap; }
+    .rk-weeks span small { font-size: 11px; font-weight: 700; color: var(--color-text-muted); margin-right: 4px; }
+    .rk-more__acts { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+    .rk-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 14px 0 4px; font-size: 13px; color: var(--color-text-muted); }
+    .rk-unq__hd { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; }
+    .rk-unq__hd b { display: block; font-size: 15px; font-weight: 800; }
+    .rk-unq .dk-rows { padding: 8px 0 0; }
+    .rk-team__hd { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; padding: 16px 18px 6px; }
+    .rk-team__hd a { font-size: 18px; line-height: 1.1; font-weight: 900; font-style: italic; text-transform: uppercase; color: var(--color-text); overflow-wrap: anywhere; }
+    .rk-team__hd a:hover { color: var(--color-lime); }
+    .rk-team .dk-row { cursor: default; flex-wrap: nowrap; }
+
+    /* ── Rankings: side column ── */
+    .rk-side .dk-head { margin-bottom: 4px; }
+    .rk-srow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border: 0; border-top: 1px solid var(--color-divider); width: 100%; background: none; color: var(--color-text); font: inherit; text-align: left; min-width: 0; }
+    .rk-srow .d { flex: 0 0 46px; font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .rk-srow .n { flex: 1; min-width: 0; font-size: 14px; font-weight: 700; color: var(--color-text); overflow-wrap: anywhere; }
+    .rk-srow a.n:hover { color: var(--color-lime); }
+    .rk-srow .t { font-size: 13px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .rk-srow .k { flex: 0 0 74px; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); }
+    .rk-srow .v { font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--color-lime); }
+    button.rk-srow { cursor: pointer; min-height: 48px; }
+    button.rk-srow:hover .n { color: var(--color-lime); }
+    .rk-part { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+    .rk-part > span:first-child { flex: 0 0 92px; font-size: 13px; font-weight: 700; }
+    .rk-part .dk-track { flex: 1; }
+    .rk-part > b { flex: 0 0 26px; text-align: right; font-size: 13px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .rk-how summary { margin-top: 8px; font-size: 13px; font-weight: 700; color: var(--color-lime); cursor: pointer; }
+    .rk-how dl { margin: 10px 0 0; }
+    .rk-how dt { font-size: 13px; font-weight: 800; margin-top: 10px; }
+    .rk-how dd { margin: 2px 0 0; font-size: 13px; line-height: 1.5; color: var(--color-text-muted); }
+    .rk-how p { margin: 12px 0 0; font-size: 12px; line-height: 1.5; color: var(--color-text-muted); max-width: none; }
+
+    /* ── Season MVPs (shown on the season they were won in) ── */
+    .lb-mvp { margin-bottom: 24px; }
+    .lb-mvp__hd { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 4px 12px; margin-bottom: 10px; }
+    .lb-mvp__hd b { font-size: 12px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--color-gold); }
+    .lb-mvp__hd span { font-size: 12px; color: var(--color-text-muted); }
+    .lb-mvp__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .lb-mvpc { border: 1px solid rgba(240,192,64,.4); border-radius: var(--radius-lg); padding: 16px; background: radial-gradient(120% 90% at 50% 0%, rgba(240,192,64,.12), transparent 62%), var(--color-surface); }
+    .lb-mvpc__tag { display: inline-block; font-size: 10px; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; color: #0b0d0a; background: #f0c040; border-radius: 9999px; padding: 4px 10px; }
+    .lb-mvpc--f .lb-mvpc__tag { background: #E6E1D5; }
+    .lb-mvpc__who { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+    .lb-mvpc__ring { width: 48px; height: 48px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; overflow: hidden; font-size: 14px; font-weight: 900; color: #f0f0ec; background: #0b0d0a; border: 2px solid #f0c040; }
+    .lb-mvpc__nm { font-size: 18px; font-weight: 900; font-style: italic; text-transform: uppercase; line-height: 1.1; }
+    .lb-mvpc__tm { font-size: 12px; color: var(--color-text-muted); font-weight: 700; margin-top: 2px; }
+    .lb-mvpc__st { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+    .lb-mvpc__st div { background: var(--color-surface-2); border-radius: 10px; padding: 8px 2px; text-align: center; }
+    .lb-mvpc__st b { display: block; font-size: 15px; font-weight: 900; font-variant-numeric: tabular-nums; }
+    .lb-mvpc__st span { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-muted); font-weight: 800; }
+
+    @media (max-width: 760px) {
+      .lb-tabs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .lb-tab { height: 40px; font-size: 12px; letter-spacing: .01em; }
+      .lb .dk-bar { margin-top: 14px; }
+      /* One pinned row: games, rank by, find. Find swaps in over the row. */
+      .rk-bar { flex-wrap: nowrap; gap: 6px; padding: 8px 0; }
+      .rk-stick { margin-bottom: 16px; }
+      .rk-games { flex: 1 1 auto; min-width: 0; gap: 0; padding: 3px; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); background: var(--color-surface); }
+      .rk-games button { flex: 1 1 auto; min-width: 0; height: 34px; padding: 0 6px; border: 0; font-size: 12px; }
+      .rk-games .l { display: none; } .rk-games .s { display: inline; }
+      .rk-find, .rk-sort .dk-lbl, #rk-sortseg, .rk-view { display: none; }
+      #rk-sortsel { display: block; flex: 0 0 auto; max-width: 104px; }
+      .rk-findbtn { display: inline-flex; }
+      .rk-bar.finding > * { display: none; }
+      .rk-bar.finding > .rk-find { display: flex; }
+      .rk-bar.finding .rk-x { display: inline-flex; }
+      .rk-find .dk-find { font-size: 16px; }
+      .rk-viewrow { display: inline-flex; }
+      .rk-viewrow button { height: 36px; }
+      .rk-more { padding: 12px; }
+      .rk-more__grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (max-width: 340px) { .rk-games button { font-size: 11px; padding: 0 4px; } }
 
     /* Generic card */
     .lb-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:var(--space-5); margin-bottom:var(--space-4); }
     .lb-card__title { font-size:14px; font-weight:800; font-style:italic; text-transform:uppercase; letter-spacing:0.04em; margin:0 0 4px; }
     .lb-card__sub   { font-size:12px; color:var(--color-text-faint); margin:0 0 var(--space-4); }
 
-    /* ── RANKINGS ──────────────────────────────────────────────────── */
-    .lb-search-row { display:flex; gap:8px; margin-bottom:var(--space-4); flex-wrap:wrap; }
-    .lb-search {
-      flex:1; min-width:200px; padding:8px 14px 8px 36px;
-      background:var(--color-surface-2); border:1px solid var(--color-border);
-      color:var(--color-text); border-radius:var(--radius-sm); font-size:12px;
-      font-family:inherit; outline:none; position:relative;
-    }
-    .lb-search:focus { border-color:var(--color-lime); }
-    .lb-search-wrap { position:relative; flex:1; min-width:200px; }
-    .lb-search-wrap::before { content:'🔍'; position:absolute; left:10px; top:50%; transform:translateY(-50%); font-size:13px; pointer-events:none; }
-    .lb-filter-row { display:flex; gap:4px; flex-wrap:wrap; margin-bottom:var(--space-4); }
-    .lb-filter-btn { padding:5px 12px; font-size:10px; border-radius:var(--radius-full); border:1px solid var(--color-border); background:transparent; color:var(--color-text-faint); cursor:pointer; font-family:inherit; font-weight:600; transition:all var(--transition); }
-    .lb-filter-btn.is-active { background:var(--color-lime); color:var(--color-text-inverse); border-color:var(--color-lime); }
-
+    /* Tables still used by the Awards and Ladder tabs */
     .rank-table { width:100%; border-collapse:collapse; font-size:12px; }
     .rank-table th { text-align:left; padding:8px 8px; font-size:9px; letter-spacing:0.12em; text-transform:uppercase; color:var(--color-text-faint); font-weight:700; border-bottom:1px solid var(--color-border-strong); white-space:nowrap; }
     .rank-table th.r { text-align:right; }
@@ -212,12 +280,7 @@
     .chefs-grid { display:grid; grid-template-columns:1fr 1fr; gap:var(--space-4); }
     @media(max-width:600px){ .chefs-grid { grid-template-columns:1fr; } }
 
-    /* ── TEAM LEADERS ─────────────────────────────────────────────── */
-    .teams-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:var(--space-4); }
-    .team-card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); overflow:hidden; }
-    .team-card__hd { padding:12px var(--space-4); border-bottom:1px solid var(--color-border); display:flex; align-items:center; gap:8px; }
-    .team-card__name { font-size:13px; font-weight:800; font-style:italic; text-transform:uppercase; letter-spacing:0.04em; }
-    .team-card__body { padding:var(--space-3) 0; }
+    /* Player rows used by the Awards tab */
     .team-player { display:flex; align-items:center; gap:10px; padding:8px var(--space-4); border-bottom:1px solid var(--color-border); }
     .team-player:last-child { border-bottom:none; }
     .team-player__rank { width:18px; font-size:11px; font-weight:800; color:var(--color-text-faint); flex-shrink:0; }
@@ -279,60 +342,90 @@
 </head>
 <body data-page="leaderboard">
   <div data-partial="nav"></div>
-  <div class="page-hero page-hero--sponsor">
-    <div class="page-hero__bg page-hero__bg--fallback" data-hero-slot="leaderboard"></div>
-    <div class="page-hero__gradient"></div>
-    <div class="page-hero__content">
-      <div class="lb-heroL">
-        <div class="page-hero__eyebrow"><span data-circuit-label>Season 1</span> · <span data-start-month-year>June 2026</span></div>
-        <h1 class="page-hero__title" id="lb-title">Leaderboard</h1>
+  <main class="dk lb" id="lb">
+  <header class="dk-hero">
+    <div class="dk-wrap dk-hero__in">
+      <div class="lb-head__txt">
+        <div class="dk-eyebrow"><span class="dk-pill dk-pill--lime">Leaderboard</span><span class="a" id="lb-season-name">Season 1</span><span class="b" id="lb-thru"></span></div>
+        <h1 class="dk-h1" id="lb-title">Leaderboard</h1>
+        <p class="dk-lede" id="lb-lede" hidden></p>
       </div>
-      <!-- Season MVPs — filled by renderHero() for the season they belong to. -->
-      <div class="lb-mvp" id="lb-mvp" hidden></div>
+      <div class="lb-controls">
+        <!-- Options are filled from public-seasons (test + archived seasons are
+             excluded server-side). Season 1 is the placeholder until it loads. -->
+        <label class="dk-lbl" for="circuit-select">Season</label>
+        <select id="circuit-select"><option value="I">Season 1</option></select>
+        <!-- One division today, so nothing to choose; kept for ?division= links. -->
+        <select id="division-select" hidden>
+          <option value="">All divisions</option>
+          <option value="3-5-mixed">3.0–3.5 Mixed</option>
+        </select>
+      </div>
     </div>
-  </div>
+  </header>
 
-  <main class="lb-shell">
-
-    <div class="lb-bar">
-    <nav class="lb-tabs">
-      <button class="lb-tab is-active" data-top="rankings">Rankings</button>
-      <button class="lb-tab" data-top="pvp" title="Compare any two players">Player Matchup</button>
-      <button class="lb-tab" data-top="tvt" title="Compare any two teams">Team Matchup</button>
-      <button class="lb-tab" data-top="awards">Awards</button>
-      <button class="lb-tab" data-top="nvz">The NVZ</button>
-      <button class="lb-tab" data-top="ladder">Ladder</button>
+  <!-- Stays pinned under the nav: the six tabs (and the Awards switch). -->
+  <div class="dk-bar" id="lb-bar"><div class="dk-wrap">
+    <nav class="lb-tabs" aria-label="Leaderboard sections">
+      <button type="button" class="lb-tab is-active" data-top="rankings">Rankings</button>
+      <button type="button" class="lb-tab" data-top="pvp" title="Compare any two players">Player Matchup</button>
+      <button type="button" class="lb-tab" data-top="tvt" title="Compare any two teams">Team Matchup</button>
+      <button type="button" class="lb-tab" data-top="awards">Awards</button>
+      <button type="button" class="lb-tab" data-top="nvz">The NVZ</button>
+      <button type="button" class="lb-tab" data-top="ladder">Ladder</button>
     </nav>
 
-    <!-- Rankings sub-toggle: Players vs Team Leaders -->
-    <div class="lb-subseg is-active" data-subfor="rankings">
-      <button class="lb-sub is-active" data-section="rankings">Players</button>
-      <button class="lb-sub" data-section="leaders">🎯 Team Leaders</button>
+    <!-- Awards: Player of the Week or Hot Streaks -->
+    <div class="lb-subseg dk-chips" data-subfor="awards">
+      <button type="button" class="lb-sub is-active" data-section="topchefs">Player of the Week</button>
+      <button type="button" class="lb-sub" data-section="streaks">Hot Streaks</button>
     </div>
-    <!-- Awards sub-toggle: Player of the Week vs Hot Streaks -->
-    <div class="lb-subseg" data-subfor="awards">
-      <button class="lb-sub is-active" data-section="topchefs">🏆 SuprDupr Player of the Week</button>
-      <button class="lb-sub" data-section="streaks">🔥 Hot Streaks</button>
-    </div>
-    <div class="lb-controls">
-      <!-- Options are filled from public-seasons (test + archived seasons are
-           excluded server-side). Season 1 is the placeholder until it loads. -->
-      <select id="circuit-select"><option value="I">Season 1</option></select>
-      <select id="division-select">
-        <option value="">All divisions</option>
-        <option value="3-5-mixed">3.0–3.5 Mixed</option>
-      </select>
-    </div>
-    </div>
+  </div></div>
 
-    <!-- RANKINGS -->
+  <div class="dk-wrap lb-shell">
+
+    <!-- RANKINGS (players, or the same list grouped by team) -->
     <section class="lb-section is-active" data-section="rankings">
-      <div id="rankings-content"><div class="empty-state">Loading…</div></div>
-    </section>
-
-    <!-- TEAM LEADERS -->
-    <section class="lb-section" data-section="leaders">
-      <div id="leaders-content"><div class="empty-state">Loading…</div></div>
+      <section class="dk-tiles" id="lb-tiles" aria-label="The season so far" hidden></section>
+      <!-- Season MVPs, filled by renderHero() for the season they belong to. -->
+      <div class="lb-mvp" id="lb-mvp" hidden></div>
+      <!-- Pinned under the tabs: games, find, rank by, players or by team.
+           Never re-rendered, so the find field keeps focus while you type. -->
+      <div class="rk-stick" id="rk-stick">
+      <div class="rk-bar" id="rk-bar">
+        <div class="rk-games" role="group" aria-label="Games">
+          <button type="button" data-filter="all" class="on" aria-pressed="true"><span class="l">All games</span><span class="s">All</span></button>
+          <button type="button" data-filter="womens" aria-pressed="false">Women's</button>
+          <button type="button" data-filter="mens" aria-pressed="false">Men's</button>
+          <button type="button" data-filter="mixed" aria-pressed="false">Mixed</button>
+        </div>
+        <div class="rk-find">
+          <input class="dk-find" id="rank-search" type="search" placeholder="Find a player or team" aria-label="Find a player or team" autocomplete="off" />
+          <button type="button" class="rk-x" id="rk-find-close" aria-label="Close find">&times;</button>
+        </div>
+        <div class="rk-sort">
+          <span class="dk-lbl" id="rk-sortlbl">Rank by</span>
+          <div class="dk-seg" role="group" aria-labelledby="rk-sortlbl" id="rk-sortseg">
+            <button type="button" data-sort="dsr" class="on" aria-pressed="true">DSR</button>
+            <button type="button" data-sort="won" aria-pressed="false">Wins</button>
+            <button type="button" data-sort="pct" aria-pressed="false">Win %</button>
+            <button type="button" data-sort="diff" aria-pressed="false">Diff</button>
+            <button type="button" data-sort="avgdiff" aria-pressed="false">Avg diff</button>
+            <button type="button" data-sort="ps" aria-pressed="false">Points</button>
+          </div>
+          <select id="rk-sortsel" aria-label="Rank by">
+            <option value="dsr">DSR</option><option value="won">Wins</option><option value="pct">Win %</option>
+            <option value="diff">Diff</option><option value="avgdiff">Avg diff</option><option value="ps">Points</option>
+          </select>
+        </div>
+        <div class="dk-seg rk-view" role="group" aria-label="Show">
+          <button type="button" class="lb-sub is-active on" data-section="rankings">Players</button>
+          <button type="button" class="lb-sub" data-section="leaders">By team</button>
+        </div>
+        <button type="button" class="rk-findbtn" id="rk-find-open" aria-label="Find a player or team"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></button>
+      </div>
+      </div>
+      <div id="rankings-content"><div class="dk-empty">Loading…</div></div>
     </section>
 
     <!-- SUPRDUPR PLAYER OF THE WEEK -->
@@ -360,6 +453,7 @@
       <div id="ladder-content"><div class="empty-state">Loading…</div></div>
     </section>
 
+  </div>
   </main>
 
   <div data-partial="footer"></div>
@@ -375,6 +469,7 @@
     circuit:'I', division:'', section:'rankings',
     lastSub:{ rankings:'rankings', awards:'topchefs' },
     filter:'all', genderFilter:'all', search:'', sort:'dsr', sortDir:'desc',
+    showAll:false, showUnq:false, finding:false, open:new Set(),
     playerStats:null, standings:null, potw:null
   };
   // Which top tab owns each content section.
@@ -406,6 +501,8 @@
     // the leaderboard sits on Season 1 while the rest of the site is on 2.
     else if (p.get('season')) state.circuit = codeFromSeasonId(p.get('season'));
     if (p.get('division')) state.division = p.get('division');
+    if (['womens','mens','mixed'].includes(p.get('games'))) state.filter = p.get('games');
+    if (['won','pct','diff','avgdiff','ps'].includes(p.get('sort'))) state.sort = p.get('sort');
     const v = p.get('view');
     // Legacy redirects: society/standings → rankings, analytics → the NVZ.
     if (v) {
@@ -421,6 +518,8 @@
     if (state.circuit !== CURRENT_CODE) p.set('circuit', state.circuit);
     if (state.division)               p.set('division', state.division);
     if (state.section !== 'rankings') p.set('view', state.section);
+    if (state.filter !== 'all')       p.set('games', state.filter);
+    if (state.sort !== 'dsr')         p.set('sort', state.sort);
     const q = p.toString();
     history.replaceState({}, '', q ? `?${q}` : window.location.pathname);
   }
@@ -488,25 +587,93 @@
       : esc(m.initials)) + '</div>';
   }
 
+  // Small formatters shared by the header and the list.
+  const ord = n => { const s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+  const signed = (n, d) => (n > 0 ? '+' : n < 0 ? '−' : '') + (d != null ? Math.abs(n).toFixed(d) : Math.abs(n));
+  const firstName = n => String(n || '').trim().split(/\s+/)[0] || '';
+  const playerHref = p => '/player?team=' + encodeURIComponent(_slug(p.teamName)) + '&name=' + encodeURIComponent(p.name) + _seasonSuffix();
+  const plural = (n, w, many) => n + ' ' + (n === 1 ? w : (many || w + 's'));
+  function seasonName() {
+    const c = String(state.circuit || 'I').toUpperCase();
+    const hit = (SEASONS_LOADED || []).find(s => String(s.circuit || '').toUpperCase() === c);
+    if (hit && (hit.name || hit.label)) return hit.name || hit.label;
+    if (c === 'TEST') return 'Test season';
+    const i = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X'].indexOf(c);
+    return 'Season ' + (i < 0 ? c : i + 1);
+  }
+  // Qualified players in canonical DSR order (same order dsrRankMap() numbers).
+  function rankedOverall() {
+    return playerList()
+      .filter(p => p.composite != null && p.dsrQualified !== false)
+      .sort((a, b) => (b.composite - a.composite) || ((b.gamesWon || 0) - (a.gamesWon || 0)) || (a.name || '').localeCompare(b.name || ''));
+  }
+
+  // The header tells the story of the rankings: who is number one and how they
+  // got there, then four tiles. On the other tabs it is just the page title.
   function renderHero() {
-    /* Title is static ("Leaderboard"). The hero's empty right half carries the
-       season's MVPs — but only on the season they were won in. */
+    const title = $('lb-title'), lede = $('lb-lede'), tiles = $('lb-tiles');
+    if (!title) return;
+    const onRank = (SECTION_TOP[state.section] || 'rankings') === 'rankings';
+    const ps = state.playerStats, all = playerList();
+    const has = !!(ps && !ps.empty && all.length);
+    const past = state.circuit !== CURRENT_CODE;
+    const wk = has ? (ps.weeksPlayed || 0) : 0;
+    $('lb-season-name').textContent = seasonName();
+    $('lb-thru').textContent = wk ? (past ? plural(wk, 'week') + ' played' : 'Through week ' + wk) : '';
+
+    const R = has ? rankedOverall() : [], one = R[0], two = R[1];
+    if (!onRank || !one) {
+      title.textContent = 'Leaderboard';
+      tiles.hidden = true; tiles.innerHTML = '';
+      const msg = !onRank || !ps ? ''
+        : !has ? (ps.message || 'Rankings start once the first week is played.')
+        : 'Nobody has played enough games to hold a rank yet' + (ps.needGames ? '. It takes ' + ps.needGames + '.' : '.');
+      lede.textContent = msg; lede.hidden = !msg;
+    } else {
+      const rankOf = dsrRankMap(), need = ps.needGames;
+      const rec = p => (p.gamesWon || 0) + '–' + ((p.gamesPlayed || 0) - (p.gamesWon || 0));
+      const verb = past ? 'finished' : one.rankDelta > 0 ? 'takes' : wk <= 1 ? 'opens at' : 'holds';
+      title.innerHTML = esc(firstName(one.name)) + ' ' + verb + ' <span class="lime">number one.</span>';
+      const gap = two ? (one.composite - two.composite) : 0;
+      lede.innerHTML = '<b>' + one.composite.toFixed(1) + ' DSR</b>, ' + rec(one) + ' in games' +
+        (one.rankDelta > 0 ? ', up ' + plural(one.rankDelta, 'place') + (past ? ' in the last week' : ' this week') : '') + '. ' +
+        (two ? esc(shortName(two.name)) + (past ? ' was ' : ' is ') + (gap < 0.05 ? 'level on the rating' : gap.toFixed(1) + ' behind') + '. ' : '') +
+        R.length + ' of ' + plural(all.length, 'player') + (past ? ' were' : ' are') + ' ranked' +
+        (need && !past ? '; it takes ' + plural(need, 'game') + ' to qualify.' : '.');
+      lede.hidden = false;
+
+      const withG = all.filter(p => (p.gamesPlayed || 0) > 0);
+      const climb = R.filter(p => p.rankDelta > 0).sort((a, b) => b.rankDelta - a.rankDelta)[0];
+      const bestDiff = withG.slice().sort((a, b) => (b.diff || 0) - (a.diff || 0))[0];
+      const mostW = withG.slice().sort((a, b) => ((b.gamesWon || 0) - (a.gamesWon || 0)) || ((b.composite || 0) - (a.composite || 0)))[0];
+      const tile = (cls, k, v, p, sub) => '<div class="dk-tile ' + cls + '"><small>' + k + '</small><b>' + v + '</b>' +
+        (p ? '<a class="nm" href="' + esc(playerHref(p)) + '">' + esc(shortName(p.name)) + '</a>' : '') + '<span>' + sub + '</span></div>';
+      tiles.innerHTML =
+        tile('hot', 'Number one', one.composite.toFixed(1), one, esc(one.teamName || '') + ' · ' + rec(one)) +
+        (climb
+          ? tile('', 'Biggest climb', '▲' + climb.rankDelta, climb, ord(rankOf.get(climb.playerId) + climb.rankDelta) + ' to ' + ord(rankOf.get(climb.playerId)) + (past ? ' in the last week' : ' this week'))
+          : tile('', 'Ranked players', R.length, null, 'of ' + all.length + (need && !past ? ' · ' + plural(need, 'game') + ' to qualify' : ''))) +
+        (bestDiff ? tile('', 'Best point diff', signed(bestDiff.diff || 0), bestDiff, (bestDiff.ps || 0) + '–' + (bestDiff.pa || 0) + ' over ' + plural(bestDiff.gamesPlayed || 0, 'game')) : '') +
+        (mostW ? tile('', 'Most wins', mostW.gamesWon || 0, mostW, rec(mostW) + ' · ' + esc(mostW.teamName || '')) : '');
+      tiles.hidden = false;
+    }
+
+    /* Season MVPs: only on the season they were won in, above the rankings. */
     const box = $('lb-mvp');
     if (!box) return;
     if (state.circuit !== MVP_CIRCUIT) { box.hidden = true; box.innerHTML = ''; return; }
-    const seasonName = (SEASONS_LOADED || []).find(s => String(s.circuit || '').toUpperCase() === MVP_CIRCUIT);
-    const label = (seasonName && (seasonName.name || seasonName.label)) || 'Season 1';
+    const label = seasonName();
     const card = (m, cls) => '<div class="lb-mvpc ' + cls + '">' +
       '<span class="lb-mvpc__tag">' + esc(m.tag) + '</span>' +
       '<div class="lb-mvpc__who">' + mvpRing(m) +
         '<div><div class="lb-mvpc__nm">' + esc(m.name) + '</div>' +
         '<div class="lb-mvpc__tm">' + esc(m.team) + ' · ' + esc(label) + '</div></div></div>' +
       '<div class="lb-mvpc__st">' + m.stats.map(st =>
-        '<div><b class="' + st[2] + '">' + esc(st[0]) + '</b><span>' + esc(st[1]) + '</span></div>').join('') +
+        '<div><b>' + esc(st[0]) + '</b><span>' + esc(st[1]) + '</span></div>').join('') +
       '</div></div>';
     box.innerHTML =
       '<div class="lb-mvp__hd"><b>' + esc(label) + ' MVPs</b>' +
-      '<span>Voted by the league · stats made the shortlist</span></div>' +
+      '<span>Voted by the league. The stats made the shortlist.</span></div>' +
       '<div class="lb-mvp__grid">' + card(SEASON_MVPS.male, '') + card(SEASON_MVPS.female, 'lb-mvpc--f') + '</div>';
     box.hidden = false;
   }
@@ -598,7 +765,7 @@
       });
 
     // Sort by the active column (default: DSR desc). Nulls sink to the bottom.
-    const KEY = { dsr:'_dsr', gp:'_played', won:'_won', loss:'_lost',
+    const KEY = { dsr:'_dsr', gp:'_played', won:'_won', loss:'_lost', pct:'_rate',
                   ps:'_ps', pa:'_pa', diff:'_diff', aps:'_aps', apa:'_apa', avgdiff:'_avgDiff' };
     const k = KEY[state.sort] || '_dsr';
     const dir = state.sortDir === 'asc' ? 1 : -1;
@@ -641,194 +808,293 @@
   }
 
   // ── RANKINGS ─────────────────────────────────────────────────────
-  // ── DSR explainer card (transparency) ────────────────────────────
-  function dsrExplainerHtml() {
-    const cards = [
-      ['60','Win %','var(--color-lime)','Games won ÷ games played. Winning is king — even a scrappy 11–10 win counts.'],
-      ['15','Avg Diff','var(--color-teal)','Average point differential per game, normalized. Margin matters, but doesn’t dominate.'],
-      ['10','Clutch','#a78bfa','Win rate in close games only (margin ≤ 3 pts). Rewards players who perform under pressure.'],
-      ['10','Volume','#e8b33a','Games played vs the most active player. Showing up counts — but doesn’t overpower skill.'],
-      ['5','Consistency','#5b9dff','Low variance in game-to-game performance. Reliable players score higher than streaky ones.'],
-    ].map(c => `<div style="background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:8px;padding:12px;">
-        <div style="font-size:22px;font-weight:900;line-height:1;color:${c[2]}">${c[0]}</div>
-        <div style="font-size:12px;font-weight:800;margin:3px 0 5px;">${c[1]}</div>
-        <div style="font-size:11px;line-height:1.5;color:var(--color-text-faint);">${c[3]}</div>
-      </div>`).join('');
-    return `<details style="margin-top:14px;border-top:1px solid var(--color-border);padding-top:12px;">
-      <summary style="cursor:pointer;font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--color-lime);">How the Composite Score (DSR) works</summary>
-      <p style="font-size:12.5px;line-height:1.6;color:var(--color-text-muted);margin:10px 0 12px;">Players are ranked by a <b style="color:var(--color-text)">Composite Score</b> out of 100 that measures five dimensions of performance — not just point differential. A player who wins close games consistently ranks higher than one who blows out weak opponents but folds under pressure.</p>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;">${cards}</div>
-      <p style="font-size:11px;color:var(--color-text-faint);margin:12px 0 0;">Max 100 points. To hold a rank, a player must average 2 games per week, up to a 10-game minimum for the season; others are rated but listed under “Not yet qualified.”</p>
-    </details>`;
+  // One list, as rows, no sideways scroll. The pinned bar holds the controls
+  // (games, find, rank by, players or by team) and is never re-rendered, so the
+  // find field keeps focus while you type. Every stat the old 14-column table
+  // had is still here: open a row for the full set.
+  const RK_CAP = 12;   // players shown before "Show all"
+  const SORT_LABEL = { dsr: 'DSR', won: 'Wins', pct: 'Win %', diff: 'Diff', avgdiff: 'Avg diff', ps: 'Points' };
+  const RK_METRIC = {
+    dsr:     p => p._dsr != null ? p._dsr.toFixed(1) : '—',
+    won:     p => p._won,
+    pct:     p => p._played ? Math.round(100 * p._rate) + '%' : '—',
+    diff:    p => signed(p._diff),
+    avgdiff: p => p._played ? signed(p._avgDiff, 1) : '—',
+    ps:      p => p._ps,
+  };
+  const RK_CELL = {
+    dsr:     p => ['DSR', RK_METRIC.dsr(p), 'main'],
+    rec:     p => ['W–L', p._won + '–' + p._lost, 'main'],
+    pct:     p => ['Win %', RK_METRIC.pct(p), ''],
+    diff:    p => ['Diff', signed(p._diff), p._diff > 0 ? 'pos' : p._diff < 0 ? 'neg' : ''],
+    avgdiff: p => ['Avg', RK_METRIC.avgdiff(p), ''],
+    ps:      p => ['Points', p._ps + '–' + p._pa, ''],
+  };
+  // Five cells beside the big number; the big number is whatever you rank by.
+  const rkCells = sort => sort === 'dsr' ? ['rec', 'pct', 'diff', 'avgdiff', 'ps']
+    : sort === 'won' ? ['dsr', 'rec', 'pct', 'diff', 'avgdiff']
+    : ['dsr', 'rec', 'pct', 'diff', 'avgdiff', 'ps'].filter(k => k !== sort);
+  const rkChev = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
+  const rkMv = d => d > 0 ? '<span class="rk-mv up" title="Up ' + plural(d, 'place') + ' this week">▲' + d + '</span>'
+    : d < 0 ? '<span class="rk-mv down" title="Down ' + plural(-d, 'place') + ' this week">▼' + (-d) + '</span>' : '';
+  const rkAv = p => '<span class="dk-av" aria-hidden="true">' + avInner(p) + '</span>';
+  const rkKey = p => p.playerId || p.name;
+
+  // The full list for the active games filter and sort (no find applied), split
+  // into ranked and not-yet-ranked, each player stamped with their position.
+  function rankingData() {
+    const sm = splitMode();
+    const full = filteredPlayers(state.filter, '');
+    const isRanked = p => sm ? p._rank != null : (p._dsr != null && p.dsrQualified !== false);
+    const ranked = full.filter(isRanked), unq = full.filter(p => !isRanked(p));
+    const rankOf = dsrRankMap(), gRankOf = genderRankMap();
+    ranked.forEach((p, i) => {
+      p._ov = rankOf.get(p.playerId) || null;                 // overall DSR rank, whatever the view
+      p._pos = state.sort !== 'dsr' ? i + 1 : sm ? p._rank : p._ov;
+      p._g = gRankOf.get(p.playerId) || null;
+    });
+    unq.forEach(p => { p._ov = null; p._pos = null; p._g = null; });
+    return { sm, ranked, unq };
+  }
+
+  // The line under a player's name: team, then where else they stand.
+  function rkSub(p, sm) {
+    const bits = [teamLinkHtml(p.teamName, p.teamId)];
+    if (p._pos == null) bits.push(p._played ? plural(p._played, 'game') + ' played' : 'no games yet');
+    else if (state.sort !== 'dsr') { const r = sm ? p._rank : p._ov; if (r) bits.push(ord(r) + ' in DSR'); }
+    else if (sm) { if (p._ov) bits.push(ord(p._ov) + ' overall'); }
+    else if (p._g) bits.push(ord(p._g) + (lbGenderOf(p) === 'F' ? ' woman' : ' man'));
+    return bits.filter(Boolean).join(' · ');
+  }
+
+  // Everything else about a player, for the open row.
+  function rkMore(p, sm) {
+    const flabel = state.filter === 'all' ? '' : SLOT_LABELS[state.filter];
+    const bt = sm ? ((p.byType && p.byType[state.filter]) || {}) : p;
+    const cg = bt.clutchG || 0, cw = bt.clutchW || 0;
+    const cell = (k, v, sub) => '<div class="dk-cell"><small>' + k + '</small><b>' + v + '</b>' + (sub ? '<em>' + sub + '</em>' : '') + '</div>';
+    const grid = [
+      cell('Games played', p._played),
+      cell('Won', p._won),
+      cell('Lost', p._lost),
+      cell('Points for', p._ps, p._played ? p._aps.toFixed(1) + ' a game' : ''),
+      cell('Points against', p._pa, p._played ? p._apa.toFixed(1) + ' a game' : ''),
+      cell('Point diff', signed(p._diff), p._played ? signed(p._avgDiff, 1) + ' a game' : ''),
+      cg ? cell('Close games', cw + '–' + (cg - cw), 'decided by 3 or fewer') : '',
+    ].join('');
+    // Each game type on its own line, only on "All games" (a filter already is one).
+    let types = '';
+    if (!sm && p.byType) {
+      const g = lbGenderOf(p);
+      const rows = ['womens', 'mens', 'mixed'].map(t => {
+        const b = p.byType[t]; if (!b || !b.played) return '';
+        const gen = t !== 'mixed';
+        if (gen && ((t === 'womens') !== (g === 'F'))) return '';
+        const d = gen ? p.dsrGender : p.dsrMixed, r = gen ? p.dsrGenderRank : p.dsrMixedRank;
+        return cell(SLOT_LABELS[t] + ' doubles', (b.won || 0) + '–' + ((b.played || 0) - (b.won || 0)), d != null ? d.toFixed(1) + ' DSR' + (r ? ' · ' + ord(r) : '') : '');
+      }).join('');
+      if (rows) types = '<div><h3>By game</h3><div class="rk-more__grid">' + rows + '</div></div>';
+    }
+    const wk = (!sm && Array.isArray(p.weeklyGameRecords) ? p.weeklyGameRecords : []).filter(w => w && w.week != null);
+    const weeks = wk.length ? '<div><h3>Week by week</h3><div class="rk-weeks">' +
+      wk.map(w => '<span><small>Week ' + esc(w.week) + '</small>' + (w.w || 0) + '–' + (w.l || 0) + '</span>').join('') + '</div></div>' : '';
+    return '<div class="rk-more">' +
+      (flabel && sm ? '<div class="rk-more__cap">' + esc(flabel) + ' doubles games only.</div>' : '') +
+      '<div class="rk-more__grid">' + grid + '</div>' + types + weeks +
+      '<div class="rk-more__acts"><a class="dk-more" href="' + esc(playerHref(p)) + '">' + esc(shortName(p.name)) + '’s player page</a>' +
+      (p.teamName ? '<a class="dk-more" href="/team?id=' + encodeURIComponent(p.teamId || _slug(p.teamName)) + _seasonSuffix() + '">' + esc(p.teamName) + '</a>' : '') + '</div></div>';
+  }
+
+  function rkRow(p, sm) {
+    const open = state.open.has(rkKey(p)), id = esc(rkKey(p));
+    const cells = rkCells(state.sort).map(k => { const c = RK_CELL[k](p); return '<div><small>' + c[0] + '</small><b class="' + c[2] + '">' + c[1] + '</b></div>'; }).join('');
+    const delta = state.sort === 'dsr' && p._pos != null ? rkMv(p._delta) : '';
+    return '<div class="dk-row rk-row' + (open ? ' open' : '') + '" data-pid="' + id + '">' +
+      '<div class="who"><span class="rk-pos"><b>' + (p._pos != null ? p._pos : '–') + '</b>' + delta + '</span>' + rkAv(p) +
+        '<div><a class="nm" href="' + esc(playerHref(p)) + '">' + esc(shortName(p.name)) + '</a><span class="sm">' + rkSub(p, sm) + '</span></div>' +
+        '<span class="rk-big' + (p._pos == null ? ' nr' : '') + '"><b>' + RK_METRIC[state.sort](p) + '</b><small>' + SORT_LABEL[state.sort] + '</small></span></div>' +
+      '<div class="rk-stats"><div class="dk-cells" style="--n:5">' + cells + '</div>' +
+        '<button type="button" class="rk-tog" data-more="' + id + '" aria-expanded="' + open + '" aria-label="' + (open ? 'Hide' : 'Show') + ' all stats for ' + esc(shortName(p.name)) + '">' + rkChev + '</button></div>' +
+      (open ? rkMore(p, sm) : '') + '</div>';
+  }
+
+  // The top three as photo cards.
+  function rkCard(p, i, sm) {
+    const extra = state.sort === 'dsr' ? (sm ? (p._ov ? ord(p._ov) + ' overall' : '') : (p._g ? ord(p._g) + (lbGenderOf(p) === 'F' ? ' woman' : ' man') : ''))
+      : (p._dsr != null ? p._dsr.toFixed(1) + ' DSR' : '');
+    return '<a class="dk-pc' + (i === 0 ? ' first' : '') + '" href="' + esc(playerHref(p)) + '">' +
+      '<span class="dk-pc__pic" aria-hidden="true">' + avInner(p) + '</span>' +
+      '<span class="dk-pc__b"><span class="dk-pc__k">' + ord(p._pos) + (state.sort === 'dsr' ? rkMv(p._delta) : '') + '</span>' +
+        '<span class="dk-pc__n">' + esc(shortName(p.name)) + '</span>' +
+        '<span class="dk-sub" style="font-size:12px;">' + esc(p.teamName || '') + '</span>' +
+        '<span class="dk-pc__v"><b>' + RK_METRIC[state.sort](p) + '</b><span>' + SORT_LABEL[state.sort] + '</span></span>' +
+        '<span class="dk-pc__s"><span>' + p._won + '–' + p._lost + '</span><span>' + signed(p._diff) + '</span>' + (extra ? '<span>' + extra + '</span>' : '') + '</span>' +
+      '</span></a>';
+  }
+
+  const rkViewSeg = cls => '<div class="dk-seg ' + cls + '" role="group" aria-label="Show">' +
+    '<button type="button" class="lb-sub' + (state.section !== 'leaders' ? ' is-active on' : '') + '" data-section="rankings">Players</button>' +
+    '<button type="button" class="lb-sub' + (state.section === 'leaders' ? ' is-active on' : '') + '" data-section="leaders">By team</button></div>';
+
+  // Players view.
+  function rkPlayersHtml(D, q) {
+    const sm = D.sm, flabel = state.filter === 'all' ? '' : SLOT_LABELS[state.filter];
+    const hit = p => !q || (p.name || '').toLowerCase().includes(q) || (p.teamName || '').toLowerCase().includes(q);
+    const ranked = D.ranked.filter(hit), unq = D.unq.filter(hit);
+    const ps = state.playerStats, need = ps && ps.needGames;
+    const title = q ? plural(ranked.length + unq.length, 'match', 'matches') + ' for “' + esc(state.search.trim()) + '”'
+      : state.sort !== 'dsr' ? 'Ranked by ' + SORT_LABEL[state.sort].toLowerCase()
+      : sm ? esc(flabel) + ' doubles rankings' : 'Player rankings';
+    const note = sm ? 'Rank, movement and stats here are for ' + esc(flabel.toLowerCase()) + ' doubles games only.'
+      : state.sort !== 'dsr' ? 'Ranked players only. The rating that sets the official order is DSR.'
+      : plural(D.ranked.length, 'ranked player') + (ps.weeksPlayed ? ' after ' + plural(ps.weeksPlayed, 'week') : '');
+    let html = '<div class="rk-listhead"><div><h2 class="dk-h2">' + title + '</h2><span class="dk-sub">' + note + '</span></div>' + rkViewSeg('rk-viewrow') + '</div>';
+
+    if (!ranked.length && !unq.length) {
+      return html + '<div class="dk-card"><div class="dk-empty">' + (q ? 'No player or team matches that.' : 'No ' + esc(flabel ? flabel.toLowerCase() + ' doubles' : 'ranked') + ' games yet.') + '</div></div>';
+    }
+    let rows = ranked, cards = 0;
+    if (!q && ranked.length >= 3) { cards = 3; html += '<div class="rk-top">' + ranked.slice(0, 3).map((p, i) => rkCard(p, i, sm)).join('') + '</div>'; rows = ranked.slice(3); }
+    const long = !q && ranked.length > RK_CAP, capped = long && !state.showAll;
+    const shown = capped ? rows.slice(0, RK_CAP - cards) : rows;
+    if (shown.length) {
+      html += '<div class="dk-card dk-rows rk-list">' + shown.map(p => rkRow(p, sm)).join('') +
+        (long ? '<div class="rk-foot"><span>' + (capped ? 'Showing ' + RK_CAP + ' of ' + ranked.length + ' ranked players.' : 'All ' + ranked.length + ' ranked players.') + '</span>' +
+          '<button type="button" class="dk-btn dk-btn--out dk-btn--sm" data-act="showall">' + (capped ? 'Show all ' + ranked.length : 'Show fewer') + '</button></div>' : '') + '</div>';
+    }
+    if (unq.length) {
+      const openU = !!q || state.showUnq;
+      const why = sm ? 'No ' + esc(flabel.toLowerCase()) + ' doubles games yet' + (need ? ', or fewer than ' + need + ' games overall.' : '.')
+        : need ? 'Fewer than ' + plural(need, 'game') + ' played. They have a rating, and join the ranking at ' + need + '.'
+        : 'They have a rating but have not played enough to hold a rank.';
+      html += '<div class="dk-card dk-card--pad rk-unq"><div class="rk-unq__hd"><div><b>Not yet ranked · ' + plural(unq.length, 'player') + '</b><span class="dk-sub">' + why + '</span></div>' +
+        (q ? '' : '<button type="button" class="dk-btn dk-btn--out dk-btn--sm" data-act="unq" aria-expanded="' + openU + '">' + (openU ? 'Hide them' : 'Show them') + '</button>') + '</div>' +
+        (openU ? '<div class="dk-rows">' + unq.map(p => rkRow(p, sm)).join('') + '</div>' : '') + '</div>';
+    }
+    return html;
+  }
+
+  // By team: the same list, grouped. Each team's top three by the active "Rank by".
+  function rkTeamsHtml(D, q) {
+    const sm = D.sm, flabel = state.filter === 'all' ? '' : SLOT_LABELS[state.filter];
+    const pool = D.ranked.concat(D.unq.filter(p => p._played > 0));
+    const teams = new Map();
+    pool.forEach(p => { const k = p.teamId || p.teamName || 'Unknown'; if (!teams.has(k)) teams.set(k, { id: p.teamId, name: p.teamName || 'Unknown', players: [] }); teams.get(k).players.push(p); });
+    const list = [...teams.values()]
+      .filter(t => !q || t.name.toLowerCase().includes(q) || t.players.some(p => (p.name || '').toLowerCase().includes(q)))
+      .sort((a, b) => a.name.localeCompare(b.name));
+    let html = '<div class="rk-listhead"><div><h2 class="dk-h2">Team leaders</h2><span class="dk-sub">Each team’s top three by ' + (state.sort === 'dsr' ? 'DSR' : SORT_LABEL[state.sort].toLowerCase()) +
+      (sm ? ', ' + esc(flabel.toLowerCase()) + ' doubles games only' : '') + '.</span></div>' + rkViewSeg('rk-viewrow') + '</div>';
+    if (!list.length) return html + '<div class="dk-card"><div class="dk-empty">' + (q ? 'No player or team matches that.' : 'No games played yet.') + '</div></div>';
+    const where = state.sort === 'dsr' ? (sm ? ' in ' + esc(flabel.toLowerCase()) + ' doubles' : ' overall') : ' in the league';
+    html += '<div class="dk-grid" style="--min:290px;">' + list.map(t => {
+      const rows = t.players.slice(0, 3).map((p, i) =>
+        '<div class="dk-row"><div class="who"><span class="rk-pos"><b>' + (i + 1) + '</b></span>' + rkAv(p) +
+          '<div><a class="nm" href="' + esc(playerHref(p)) + '">' + esc(shortName(p.name)) + '</a><span class="sm">' + p._won + '–' + p._lost +
+            ' · ' + (p._pos != null ? ord(p._pos) + where : 'not ranked yet') + '</span></div>' +
+          '<span class="rk-big' + (p._pos == null ? ' nr' : '') + '"><b>' + RK_METRIC[state.sort](p) + '</b><small>' + SORT_LABEL[state.sort] + '</small></span></div></div>').join('');
+      return '<article class="dk-card rk-team"><div class="rk-team__hd"><a href="/team?id=' + encodeURIComponent(t.id || _slug(t.name)) + _seasonSuffix() + '">' + esc(t.name) + '</a>' +
+        '<span class="dk-sub">' + plural(t.players.length, 'player') + ' with games</span></div><div class="dk-rows">' + rows + '</div></article>';
+    }).join('') + '</div>';
+    return html;
+  }
+
+  // Side column: who moved, who leads each game type, and how the rating works.
+  function rkSideHtml() {
+    const R = rankedOverall(), rankOf = dsrRankMap();
+    const past = state.circuit !== CURRENT_CODE;
+    let html = '';
+    const ups = R.filter(p => p.rankDelta > 0).sort((a, b) => b.rankDelta - a.rankDelta).slice(0, 3);
+    const downs = R.filter(p => p.rankDelta < 0).sort((a, b) => a.rankDelta - b.rankDelta).slice(0, 3);
+    if (ups.length || downs.length) {
+      html += '<div class="dk-card dk-card--pad"><div class="dk-head"><h2 class="dk-h2" style="font-size:18px;">' + (past ? 'Last week’s movers' : 'Movers this week') + '</h2><span>places gained or lost</span></div>' +
+        ups.concat(downs).map(p => '<div class="rk-srow"><span class="d ' + (p.rankDelta > 0 ? 'pos' : 'neg') + '">' + (p.rankDelta > 0 ? '▲' : '▼') + Math.abs(p.rankDelta) + '</span>' +
+          '<a class="n" href="' + esc(playerHref(p)) + '">' + esc(shortName(p.name)) + '</a><span class="t">' + (past ? '' : 'now ') + ord(rankOf.get(p.playerId)) + '</span></div>').join('') + '</div>';
+    }
+    if (playerList().some(p => p.dsrGender != null || p.dsrMixed != null)) {
+      const best = (rankKey, valKey, g) => playerList().filter(p => p[rankKey] != null && p[valKey] != null && (!g || lbGenderOf(p) === g)).sort((a, b) => a[rankKey] - b[rankKey])[0];
+      const ones = [['womens', "Women's", best('dsrGenderRank', 'dsrGender', 'F'), 'dsrGender'], ['mens', "Men's", best('dsrGenderRank', 'dsrGender', 'M'), 'dsrGender'], ['mixed', 'Mixed', best('dsrMixedRank', 'dsrMixed'), 'dsrMixed']].filter(o => o[2]);
+      if (ones.length) html += '<div class="dk-card dk-card--pad"><div class="dk-head"><h2 class="dk-h2" style="font-size:18px;">Number one by game</h2><span>open that ranking</span></div>' +
+        ones.map(o => '<button type="button" class="rk-srow" data-filter="' + o[0] + '"><span class="k">' + o[1] + '</span><span class="n">' + esc(shortName(o[2].name)) + '</span><span class="v">' + o[2][o[3]].toFixed(1) + '</span></button>').join('') + '</div>';
+    }
+    const parts = [
+      ['Win %', 60, 'Games won out of games played. Winning counts most, and an 11–10 win is still a win.'],
+      ['Avg diff', 15, 'Average point margin per game. Margin matters, but it does not dominate.'],
+      ['Clutch', 10, 'Win rate in close games only, those decided by 3 points or fewer.'],
+      ['Volume', 10, 'Games played, measured against the most active player. Showing up counts.'],
+      ['Consistency', 5, 'How steady the results are from game to game. Reliable beats streaky.'],
+    ];
+    html += '<div class="dk-card dk-card--pad rk-how"><div class="dk-head"><h2 class="dk-h2" style="font-size:18px;">How DSR works</h2></div>' +
+      '<p class="dk-sub" style="margin:0 0 10px;line-height:1.5;">One score out of 100, made of five parts. Winning counts most.</p>' +
+      parts.map(w => '<div class="rk-part"><span>' + w[0] + '</span><span class="dk-track"><i style="width:' + Math.round(100 * w[1] / 60) + '%"></i></span><b>' + w[1] + '</b></div>').join('') +
+      '<details><summary>What each part measures</summary><dl>' + parts.map(w => '<dt>' + w[0] + ' · ' + w[1] + ' points</dt><dd>' + w[2] + '</dd>').join('') + '</dl>' +
+      '<p>To hold a rank, a player must average 2 games a week, up to a 10-game minimum for the season. Everyone else has a rating and is listed under “Not yet ranked.”</p></details></div>';
+    return html;
+  }
+
+  // Keep the pinned controls in step with the state.
+  function syncBar() {
+    const bar = $('rk-bar'); if (!bar) return;
+    bar.querySelectorAll('[data-filter]').forEach(b => { const on = b.dataset.filter === state.filter; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    bar.querySelectorAll('[data-sort]').forEach(b => { const on = b.dataset.sort === state.sort; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    const sel = $('rk-sortsel'); if (sel) sel.value = state.sort;
+    const inp = $('rank-search'); if (inp && document.activeElement !== inp && inp.value !== state.search) inp.value = state.search;
+    bar.classList.toggle('finding', !!state.finding || !!state.search);
+    const has = !!(state.playerStats && !state.playerStats.empty && playerList().length);
+    const st = $('rk-stick'); if (st) st.hidden = !has;
   }
 
   function renderRankings() {
-    const el = $('rankings-content');
-    const filters = ['all','womens','mens','mixed'];
-    const fbtns = filters.map(f =>
-      `<button class="lb-filter-btn ${state.filter===f?'is-active':''}" data-filter="${f}">${f==='all'?'All games':SLOT_LABELS[f]}</button>`
-    ).join('');
-    const gbtns = [['all','All'],['M',"Men's"],['F',"Women's"]].map(([k,l]) =>
-      `<button class="lb-filter-btn ${state.genderFilter===k?'is-active':''}" data-gfilter="${k}">${l}</button>`
-    ).join('');
-
-    if (!state.playerStats || state.playerStats.empty) {
-      el.innerHTML = `<div class="lb-card">
-        <div class="lb-search-row">
-          <div class="lb-search-wrap"><input class="lb-search" id="rank-search" placeholder="Search player name…" value="${esc(state.search)}" /></div>
-        </div>
-        <div class="lb-filter-row">${fbtns}</div>
-        <div class="lb-filter-row">${gbtns}</div>
-        ${noData(state.playerStats?.message)}
-      </div>`;
-      wireRankingsControls(el);
+    const el = $('rankings-content'); if (!el) return;
+    syncBar();
+    const ps = state.playerStats;
+    if (!ps) { el.innerHTML = '<div class="dk-empty">Loading…</div>'; return; }
+    if (ps.empty || !playerList().length) {
+      el.innerHTML = '<div class="dk-card"><div class="dk-empty">' + esc(ps.message || 'No data yet. Check back after Week 1.') + '</div></div>';
       return;
     }
-
-    const players = filteredPlayers();
-
-    const signI = n => (n > 0 ? '+' : '') + n;
-    const sign1 = n => (n > 0 ? '+' : '') + n.toFixed(1);
-    const diffCls = n => n > 0 ? 'val-pos' : n < 0 ? 'val-neg' : 'val-zero';
-    const mvCell = d => {
-      if (d == null) return '<span class="rank-change rank-change--same">—</span>';
-      if (d > 0) return `<span class="rank-change rank-change--up">▲${d}</span>`;
-      if (d < 0) return `<span class="rank-change rank-change--down">▼${Math.abs(d)}</span>`;
-      return '<span class="rank-change rank-change--same">—</span>';
-    };
-
-    const rankById = dsrRankMap();
-    const gRankById = genderRankMap();
-    const gf = state.genderFilter || 'all';
-    const sm = splitMode();
-    const isRanked = (p) => sm ? p._rank != null : (p._dsr != null && p.dsrQualified !== false);
-    const unqTag = ' <span style="display:inline-block;padding:1px 6px;border-radius:9999px;font-size:8.5px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;border:1px solid rgba(232,179,58,.45);color:#e8b33a;background:rgba(232,179,58,.10);vertical-align:middle;">Unqualified</span>';
-    const rowHtml = (p) => {
-      // Overall DSR rank + within-gender DSR rank, both stable across filters.
-      const oR = rankById.get(p.playerId) ?? '—';
-      const gOf = lbGenderOf(p);
-      const gR = gRankById.get(p.playerId) ?? '—';
-      let rankCell;
-      if (sm) {
-        // This filter's own rank up top, overall rank underneath for reference.
-        rankCell = `<span class="rank-num">${p._rank != null ? p._rank : '—'}</span><br><span style="font-size:9px;font-weight:700;color:var(--color-text-faint)">#${oR} ov</span>`;
-      } else if (gf === 'all') {
-        const sec = gOf ? `<span style="font-size:9px;font-weight:800;color:${LB_GENDER_COLOR[gOf]}">${gOf==='M'?'M':'W'}#${gR}</span>` : '';
-        rankCell = `<span class="rank-num">${oR}</span>${sec?'<br>'+sec:''}`;
-      } else {
-        rankCell = `<span class="rank-num">${gR}</span><br><span style="font-size:9px;font-weight:700;color:var(--color-text-faint)">#${oR} ov</span>`;
-      }
-      const avCls = /^f/i.test(p.gender || '') ? 'player-avatar--f' : '';
-      const dsr = p._dsr != null ? p._dsr.toFixed(1) : '—';
-      const tag = (!isRanked(p) && p._dsr != null) ? unqTag : '';
-      return `<tr>
-        <td>${rankCell}</td>
-        <td class="col-opt">${mvCell(p._delta)}</td>
-        <td class="r"><span class="${p._dsr != null ? 'val-dsr' : 'val-zero'}">${dsr}</span></td>
-        <td>
-          <div class="player-cell">
-            <div class="player-avatar ${avCls}">${avInner(p)}</div>
-            <div class="player-name">${playerLinkHtml(p.name, p.teamName)}${tag}</div>
-          </div>
-        </td>
-        <td><span class="player-team" style="font-size:11px">${teamLinkHtml(p.teamName, p.teamId)}</span></td>
-        <td class="r">${p._played}</td>
-        <td class="r"><span class="val-pos">${p._won}</span></td>
-        <td class="r"><span class="val-neg">${p._lost}</span></td>
-        <td class="r col-opt"><span class="val-ps">${p._ps}</span></td>
-        <td class="r col-opt"><span class="val-zero">${p._pa}</span></td>
-        <td class="r"><span class="${diffCls(p._diff)}">${signI(p._diff)}</span></td>
-        <td class="r col-opt"><span class="val-acc">${p._aps.toFixed(1)}</span></td>
-        <td class="r col-opt"><span class="val-zero">${p._apa.toFixed(1)}</span></td>
-        <td class="r"><span class="${diffCls(p._avgDiff)}">${sign1(p._avgDiff)}</span></td>
-      </tr>`;
-    };
-    const rankedPlayers = players.filter(isRanked);
-    const unqPlayers = players.filter(p => !isRanked(p));
-    const need = state.playerStats && state.playerStats.needGames;
-    const flabel = state.filter === 'all' ? '' : SLOT_LABELS[state.filter];
-    const dividerSub = sm
-      ? `No ${flabel} doubles games yet${need ? `, or fewer than ${need} games overall` : ''}`
-      : (need ? `Fewer than ${need} games played — rated, not yet ranked` : 'Rated, not yet ranked');
-    const filterNote = sm
-      ? `<div class="lb-filter-note">Ranked by <b>${flabel} doubles DSR</b>. Rank, +/− and stats here are for ${flabel.toLowerCase()} doubles games only.</div>`
-      : '';
-    let rows = rankedPlayers.map(rowHtml).join('');
-    if (unqPlayers.length) {
-      rows += `<tr class="rank-divider"><td colspan="14" style="padding:9px 8px;background:var(--color-surface-2);border-top:1px solid var(--color-border-strong);border-bottom:1px solid var(--color-border-strong);"><span style="font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#e8b33a;">Not yet qualified</span> <span style="font-size:11px;color:var(--color-text-faint);margin-left:8px;">${dividerSub}</span></td></tr>`;
-      rows += unqPlayers.map(rowHtml).join('');
-    }
-
-    // Sortable header cell
-    const th = (key, label, opt) => {
-      const on = state.sort === key;
-      const ar = on ? `<span class="sort-ar">${state.sortDir === 'asc' ? '▲' : '▼'}</span>` : '';
-      return `<th class="r sortable ${on ? 'is-sorted' : ''} ${opt ? 'col-opt' : ''}" data-sort="${key}">${label}${ar}</th>`;
-    };
-
-    el.innerHTML = `<div class="lb-card">
-      <div class="lb-search-row">
-        <div class="lb-search-wrap">
-          <input class="lb-search" id="rank-search" placeholder="Search player name…" value="${esc(state.search)}" />
-        </div>
-      </div>
-      <div class="lb-filter-row">${fbtns}</div>
-      ${filterNote}
-      <div style="overflow-x:auto">
-        <table class="rank-table">
-          <thead><tr>
-            <th style="width:34px">Rank</th>
-            <th class="col-opt" style="width:30px">+/−</th>
-            ${th('dsr','DSR')}
-            <th>Player</th>
-            <th>Team</th>
-            ${th('gp','GP')}
-            ${th('won','Won')}
-            ${th('loss','Loss')}
-            ${th('ps','PS', true)}
-            ${th('pa','PA', true)}
-            ${th('diff','Diff +/−')}
-            ${th('aps','APS', true)}
-            ${th('apa','APA', true)}
-            ${th('avgdiff','Avg Diff')}
-          </tr></thead>
-          <tbody>${rows || '<tr><td colspan="14">' + noData('No players match this filter.') + '</td></tr>'}</tbody>
-        </table>
-      </div>
-      ${dsrExplainerHtml()}
-    </div>`;
-    wireRankingsControls(el);
+    const D = rankingData(), q = state.search.trim().toLowerCase();
+    el.innerHTML = '<div class="dk-cols rk-cols"><div class="wide">' + (state.section === 'leaders' ? rkTeamsHtml(D, q) : rkPlayersHtml(D, q)) +
+      '</div><aside class="side rk-side" aria-label="More on the rankings">' + rkSideHtml() + '</aside></div>';
   }
 
-  function wireRankingsControls(el) {
-    el.querySelectorAll('[data-filter]').forEach(b => b.addEventListener('click', () => {
-      state.filter = b.dataset.filter;
-      renderRankings();
-    }));
-    el.querySelectorAll('[data-gfilter]').forEach(b => b.addEventListener('click', () => {
-      state.genderFilter = b.dataset.gfilter;
-      renderRankings();
-    }));
-    el.querySelectorAll('th[data-sort]').forEach(thEl => thEl.addEventListener('click', () => {
-      const key = thEl.dataset.sort;
-      if (state.sort === key) {
-        state.sortDir = state.sortDir === 'desc' ? 'asc' : 'desc';
-      } else {
-        state.sort = key;
-        state.sortDir = 'desc';
+  // After a filter or sort change from further down the page, bring the top of
+  // the list back under the pinned bar (the order just changed under you).
+  function rkToTop() {
+    const el = $('rankings-content'), bar = $('lb-bar'); if (!el || !bar) return;
+    const st = $('rk-stick');
+    const off = bar.getBoundingClientRect().bottom + (st ? st.offsetHeight : 0) + 12, y = el.getBoundingClientRect().top;
+    if (y < off - 1) window.scrollTo({ top: Math.max(0, window.pageYOffset + y - off), behavior: 'instant' });
+  }
+  function rkSet(patch) {
+    Object.assign(state, patch); state.showAll = false;
+    writeUrl(); renderRankings(); rkToTop();
+  }
+  function wireRankings() {
+    document.addEventListener('click', e => {
+      const t = e.target; let b;
+      if ((b = t.closest('.lb-sub[data-section]'))) { activate(b.dataset.section); return; }
+      if (!t.closest('#lb')) return;
+      if ((b = t.closest('[data-filter]'))) {
+        // "Number one by game" in the side column opens that ranking as the player list.
+        if (b.closest('.rk-side') && state.section !== 'rankings') { state.filter = b.dataset.filter; state.showAll = false; activate('rankings'); rkToTop(); return; }
+        rkSet({ filter: b.dataset.filter }); return;
       }
-      renderRankings();
-    }));
-    const s = $('rank-search');
-    if (s) {
-      s.addEventListener('input', e => {
-        const pos = e.target.selectionStart;
-        state.search = e.target.value;
+      if ((b = t.closest('#rk-sortseg [data-sort]'))) { rkSet({ sort: b.dataset.sort, sortDir: 'desc' }); return; }
+      if (t.closest('[data-act="showall"]')) { state.showAll = !state.showAll; renderRankings(); if (!state.showAll) rkToTop(); return; }
+      if (t.closest('[data-act="unq"]')) { state.showUnq = !state.showUnq; renderRankings(); return; }
+      if (t.closest('#rk-find-open')) { state.finding = true; syncBar(); const i = $('rank-search'); if (i) i.focus(); return; }
+      if (t.closest('#rk-find-close')) { state.finding = false; state.search = ''; const i = $('rank-search'); if (i) i.value = ''; renderRankings(); return; }
+      const row = t.closest('.rk-row');
+      if (row && (t.closest('[data-more]') || !t.closest('a, button, .rk-more'))) {
+        const id = row.dataset.pid; if (state.open.has(id)) state.open.delete(id); else state.open.add(id);
         renderRankings();
-        const ns = $('rank-search');
-        if (ns) { ns.focus(); try { ns.setSelectionRange(pos, pos); } catch {} }
-      });
-    }
+      }
+    });
+    const inp = $('rank-search');
+    if (inp) inp.addEventListener('input', () => { state.search = inp.value; renderRankings(); });
+    const sel = $('rk-sortsel');
+    if (sel) sel.addEventListener('change', () => rkSet({ sort: sel.value, sortDir: 'desc' }));
   }
 
   // ── SUPRDUPR PLAYER OF THE WEEK ───────────────────────────────────────────────
@@ -995,60 +1261,6 @@
       setChefOpen(wk, !openMap[wk]);
       renderTopChefs();
     }));
-  }
-
-  // ── TEAM LEADERS ─────────────────────────────────────────────────
-  function renderTeamLeaders() {
-    const el = $('leaders-content');
-    const players = playerList();
-    if (!players.length) { el.innerHTML = `<div class="lb-card">${noData()}</div>`; return; }
-
-    // Group by team
-    const teamMap = new Map();
-    players.forEach(p => {
-      const key = p.teamId || p.teamName || 'Unknown';
-      if (!teamMap.has(key)) teamMap.set(key, { name: p.teamName||'Unknown', id: key, players: [] });
-      teamMap.get(key).players.push(p);
-    });
-
-    // Build team cards sorted by team name
-    const cards = [...teamMap.values()]
-      .sort((a,b) => a.name.localeCompare(b.name))
-      .map(team => {
-        const sorted = team.players
-          .filter(p => p.gamesPlayed > 0)
-          .sort((a,b) => {
-            const ra = a.gamesPlayed ? a.gamesWon/a.gamesPlayed : 0;
-            const rb = b.gamesPlayed ? b.gamesWon/b.gamesPlayed : 0;
-            return rb !== ra ? rb - ra : b.gamesWon - a.gamesWon;
-          });
-
-        const playerRows = sorted.slice(0, 3).map((p, i) => {
-          const rate = p.gamesPlayed ? Math.round(100*p.gamesWon/p.gamesPlayed) : 0;
-          const avCls = p.gender==='female' ? 'team-player__av--f' : 'team-player__av--m';
-          const pctBadgeCls = 'team-player__pct ' + pctClass(p.gamesPlayed ? p.gamesWon/p.gamesPlayed : 0);
-          return `<div class="team-player">
-            <span class="team-player__rank ${i===0?'team-player__rank--1':''}">${i+1}</span>
-            <div class="team-player__av ${avCls}">${avInner(p)}</div>
-            <div style="flex:1">
-              <div class="team-player__name">${playerLinkHtml(p.name, team.name)}</div>
-              <div class="team-player__stats">${p.gamesWon}W–${p.gamesPlayed-p.gamesWon}L · ${p.gamesPlayed} GP</div>
-            </div>
-            <span class="${pctBadgeCls}">${rate}% Win</span>
-          </div>`;
-        }).join('') || `<div class="team-player"><span style="font-size:12px;color:var(--color-text-faint)">No stats yet</span></div>`;
-
-        return `<div class="team-card">
-          <div class="team-card__hd">
-            <span class="team-card__name">${teamLinkHtml(team.name, team.id)}</span>
-          </div>
-          <div class="team-card__body">${playerRows}</div>
-        </div>`;
-      }).join('');
-
-    el.innerHTML = cards.length
-      ? `<div class="teams-grid">${cards}</div>`
-      : `<div class="lb-card">${noData()}</div>`;
   }
 
   // ── HOT STREAKS ──────────────────────────────────────────────────
@@ -1254,9 +1466,10 @@
     if (top === 'rankings' || top === 'awards') state.lastSub[top] = section;
     document.querySelectorAll('.lb-tab').forEach(b => b.classList.toggle('is-active', b.dataset.top === top));
     document.querySelectorAll('.lb-subseg').forEach(s => s.classList.toggle('is-active', s.dataset.subfor === top));
-    document.querySelectorAll('.lb-sub').forEach(b => b.classList.toggle('is-active', b.dataset.section === section));
-    document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === section || ((top === 'pvp' || top === 'tvt') && s.dataset.section === 'compare')));
+    document.querySelectorAll('.lb-sub').forEach(b => { const on = b.dataset.section === section; b.classList.toggle('is-active', on); b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); });
+    document.querySelectorAll('.lb-section').forEach(s => s.classList.toggle('is-active', s.dataset.section === section || (section === 'leaders' && s.dataset.section === 'rankings') || ((top === 'pvp' || top === 'tvt') && s.dataset.section === 'compare')));
     if (!skipWrite) writeUrl();
+    renderHero(); setTop();
     if (top === 'pvp' || top === 'tvt') { loadCmpFrame(section); return; }
     if (section === 'nvz') { loadNvzFrame(); return; }
     if (section === 'ladder') { loadLadderTab(); return; }
@@ -1266,7 +1479,6 @@
   function renderAll() {
     renderRankings();
     renderTopChefs();
-    renderTeamLeaders();
     renderStreaks();
   }
 
@@ -1287,7 +1499,10 @@
     const top = b.dataset.top;
     activate((top === 'nvz' || top === 'ladder') ? top : (state.lastSub[top] || TOP_DEFAULT[top]));
   }));
-  document.querySelectorAll('.lb-sub').forEach(b => b.addEventListener('click', () => activate(b.dataset.section)));
+  wireRankings();   // also handles the Players / By team and Awards switches
+  // The bar sits under the fixed nav, whatever its height is today.
+  function setTop() { let h = 0; ['.ds-nav', '.ds-pastbar'].forEach(s => { const n = document.querySelector(s); if (!n) return; const r = n.getBoundingClientRect(); if (r.height > 0 && r.bottom > h && r.top <= 0) h = r.bottom; }); if (h) document.documentElement.style.setProperty('--dk-top', Math.max(0, Math.round(h)) + 'px'); const tb = $('lb-bar'); if (tb && tb.offsetHeight) document.documentElement.style.setProperty('--lb-tabsh', tb.offsetHeight + 'px'); }
+  window.addEventListener('resize', setTop); setTimeout(setTop, 300); setTimeout(setTop, 1500);
   $('circuit-select').addEventListener('change', e => {
     state.circuit = e.target.value;
     state.playerStats = state.standings = state.potw = null;
