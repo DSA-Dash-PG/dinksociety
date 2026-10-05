@@ -119,7 +119,9 @@ export default async (req) => {
     // Kitchen for just this one night — fun stats that build live as courts wrap,
     // same categories as the season-wide Kitchen but scoped to tonight only.
     const kitchen = buildKitchen(nightSessions, players);
-    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type, format: event.format || 'individual' } : null, format: isPairNight(rows) ? 'fixed-partner' : 'individual', standings: rows, winners: winnersFrom(rows), history, kitchen });
+    // courtNames (top court first) + times ride along so the results page can label
+    // courts the way the organizer named them and say morning/afternoon/night.
+    return json({ event: event ? { id: event.id, name: event.name, date: event.date, place: event.place, type: event.type, format: event.format || 'individual', startTime: event.startTime || null, endTime: event.endTime || null, courtNames: event.courtNames || play.config?.courtNames || null } : null, format: isPairNight(rows) ? 'fixed-partner' : 'individual', standings: rows, winners: winnersFrom(rows), history, kitchen });
   }
 
   // ── season-wide ──

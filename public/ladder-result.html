@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ladder results · The Dink Society</title>
+<meta name="description" content="Final standings, every round by court, awards and photos from a Dink Society ladder.">
+<meta property="og:title" content="Ladder results · The Dink Society">
+<meta property="og:description" content="Final standings, every round by court, awards and photos from a Dink Society ladder.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="The Dink Society">
+<meta name="theme-color" content="#0e0e0e">
+<link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/shared.css">
+<script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
+<link rel="stylesheet" href="/css/shared-nav.css">
+<link rel="stylesheet" href="/css/pages.css">
+<link rel="stylesheet" href="/css/ladder-hub.css">
+<style>
+  /* ═══════════════════════════════════════════════════════════════
+     LADDER RESULT — one finished ladder: /ladder-result?event=<id>
+     Hero + numbers → sticky tabs: Standings · Rounds · Awards · Photos.
+     Replaces the pop-up sheets on the old ladder and Queen pages.
+     Shared pieces: css/pages.css (.dk-*) and css/ladder-hub.css (.lh-*).
+     ═══════════════════════════════════════════════════════════════ */
+  .lr-pod { flex: 1 1 360px; min-width: 0; align-self: stretch; padding: 8px 18px 10px; display: flex; flex-direction: column; justify-content: center; }
+  .lr-pod .dk-row .big { color: var(--color-text-muted); }
+  .lr-pod .dk-row:first-of-type .rk, .lr-pod .dk-row:first-of-type .big { color: var(--color-lime); }
+  .lr-back { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--color-text-muted); }
+  .lr-back:hover { color: var(--color-lime); }
+  .lr-row .who { flex: 1 1 230px; }
+  .lr-row.cut { box-shadow: inset 0 1px 0 var(--color-border-strong); }
+  /* Round picker stays under the tab bar while the courts scroll. */
+  .lr-rounds { position: sticky; top: calc(var(--dk-top, 65px) + var(--lh-barh, 51px)); z-index: 20; margin: 0 calc(-1 * var(--gutter)); padding: 8px var(--gutter); background: var(--color-bg); border-bottom: 1px solid var(--color-border); display: flex; align-items: center; gap: 12px; }
+  .lr-rounds .dk-lbl { margin: 0; white-space: nowrap; }
+  .lr-rounds .dk-seg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; max-width: 100%; }
+  .lr-rounds .dk-seg::-webkit-scrollbar { display: none; }
+  .lr-rounds .dk-seg button { flex: 0 0 auto; min-width: 40px; padding: 0 12px; }
+  .lr-round + .lr-round { margin-top: 28px; }
+  .lr-courts { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 12px; }
+  .lr-mv { display: flex; flex-wrap: wrap; gap: 6px 18px; padding-top: 12px; font-size: 13px; color: var(--color-text-muted); }
+  .lr-mv b { color: var(--color-text); font-weight: 800; }
+  .lr-nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .lr-nav a { padding: 16px 18px; display: flex; flex-direction: column; gap: 4px; }
+  .lr-nav a:hover { border-color: var(--color-lime); }
+  .lr-nav small { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); }
+  .lr-nav b { font-size: 16px; font-weight: 800; }
+  .lr-nav span { font-size: 13px; color: var(--color-text-muted); }
+  .lr-nav a.next { text-align: right; align-items: flex-end; }
+  /* Phones: the standings come first, the numbers follow them. */
+  @media (max-width: 600px) {
+    .lr-nums { order: 2; }
+    .lr-rounds .dk-lbl { display: none; }
+    .lr-rounds .dk-seg button { height: 36px; }
+  }
+</style>
+</head>
+<body>
+<div data-partial="nav"></div>
+
+<main class="dk" id="lr"><div class="dk-loading">Loading the results…</div></main>
+
+<div data-partial="footer"></div>
+
+<script src="/js/partials.js"></script>
+<script src="/js/recap-urls.js"></script>
+<script>
+(() => {
+  const API = '/.netlify/functions';
+  const ROOT = document.getElementById('lr');
+  const ID = new URLSearchParams(location.search).get('event') || '';
+  const RECAP = window.DS_RECAP_URLS || {};
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const TL = { mixed: 'Mixed', mens: "Men's", womens: "Women's" };
+  const firstName = s => String(s || '').trim().split(/\s+/)[0] || String(s || '');
+  const firstLast = s => { const p = String(s || '').trim().split(/\s+/); return p.length > 1 ? `${p[0]} ${p[p.length - 1][0].toUpperCase()}` : (p[0] || ''); };
+  const rowName = p => p && p.pair && p.names ? p.names.map(firstLast).join(' & ') : firstLast(p && p.name);
+  const signed = d => (d == null ? '–' : d > 0 ? '+' + d : d < 0 ? '−' + Math.abs(d) : '0');
+  const dLong = s => { if (!s) return ''; const d = new Date(s + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }); };
+  const dShort = s => { if (!s) return ''; const d = new Date(s + 'T12:00:00'); return isNaN(d) ? '' : d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+  const profileUrl = p => '/profile?ladderId=' + encodeURIComponent(p && p.pair ? ((p.ids || [])[0] || p.id) : (p && p.id));
+  const ini = n => { const p = String(n || '').split(' & ')[0].trim().split(/\s+/).filter(Boolean); return p.length ? ((p[0][0] || '') + (p.length > 1 ? (p[p.length - 1][0] || '') : '')).toUpperCase() : '?'; };
+  const fpos = p => (Number.isFinite(p.fx) ? p.fx : 50) + '% ' + (Number.isFinite(p.fy) ? p.fy : 50) + '%';
+
+  let D = null, EV = {}, ROWS = [], HIST = [], LIST = [], ALBUM = null, AV = {}, TAB = 'standings', RD = 'all';
+  const hubUrl = () => (EV.type === 'womens' ? '/queen.html' : '/ladders.html');
+
+  /* ── Court labels ──────────────────────────────────────────────
+     The raw `court` number is a bottom-up rank: 1 is the bottom court and
+     the highest number is the King Court. courtNames is entered top court
+     first. So the label for raw court N is courtNames[tC - N], with tC
+     taken from the courts actually played in round 1. The raw number is
+     never shown. */
+  function courtNamer() {
+    const names = Array.isArray(EV.courtNames) ? EV.courtNames : [];
+    const tC = (HIST[0] && HIST[0].courts && HIST[0].courts.length) || (HIST[0] && HIST[0].tC) || 0;
+    return n => { const i = tC - n, v = (i >= 0 && i < names.length) ? String(names[i] || '').trim() : ''; return v ? (/^court/i.test(v) ? v : 'Court ' + v) : 'Court ' + (tC - n + 1); };
+  }
+  // First name only in the court cards, unless two players share one.
+  let DUP = {};
+  const nn = n => { const f = firstName(n); return DUP[f.toLowerCase()] > 1 ? firstLast(n) : f; };
+  const team = a => (a || []).map(x => esc(nn(x))).join(' &amp; ') || '—';
+
+  function av(p) { const id = p.pair ? (p.ids || [])[0] : p.id, u = AV[id], i = esc(ini(rowName(p))); return `<span class="dk-av" data-ini="${i}" aria-hidden="true">${u ? `<img src="${esc(u)}" alt="" loading="lazy" onerror="var b=this.parentNode;this.remove();if(b)b.textContent=b.dataset.ini;">` : i}</span>`; }
+
+  /* ── Hero ── */
+  function heroHtml() {
+    const a = ROWS[0], tt = EV.type || 'mixed', recap = RECAP[ID];
+    const time = EV.startTime ? (EV.endTime ? `${EV.startTime} to ${EV.endTime}` : EV.startTime) : '';
+    const place = EV.place ? String(EV.place).split(' - ')[0] : '';
+    let h1 = esc(EV.name || 'Ladder results'), lede = '';
+    if (a) {
+      const verb = a.pair ? 'take' : 'takes';
+      h1 = `${esc(a.pair ? a.names.map(firstName).join(' & ') : firstName(a.name))} ${verb} <span class="lime">${esc(EV.name || 'the ladder')}.</span>`;
+      lede = `<b>${a.w}–${a.l}</b> with a ${signed(a.diff)} point differential${place ? ' at ' + esc(place) : ''}.`
+        + (ROWS[1] ? ` ${esc(rowName(ROWS[1]))} finished second at ${ROWS[1].w}–${ROWS[1].l}` + (ROWS[2] ? ` and ${esc(rowName(ROWS[2]))} third at ${ROWS[2].w}–${ROWS[2].l}` : '') + `, in a field of ${ROWS.length}${a.pair ? ' pairs' : ''}.` : '');
+    }
+    const pod = ROWS.slice(0, 3).map((p, i) => `<div class="dk-row"><div class="who"><span class="rk">${i + 1}</span>${av(p)}<div><a class="nm" href="${profileUrl(p)}">${esc(rowName(p))}</a><span class="sm">${signed(p.diff)} diff · ${p.dr == null ? '–' : p.dr} DR</span></div></div><span class="big">${p.w}–${p.l}</span></div>`).join('');
+    return `<header class="dk-hero"><div class="dk-wrap dk-hero__in"><div class="dk-hero__txt">
+        <a class="lr-back" href="${hubUrl()}#results">‹ All ${tt === 'womens' ? 'Queen of the Court' : 'ladder'} results</a>
+        <div class="dk-eyebrow"><span class="dk-pill dk-pill--lime">${esc(TL[tt] || 'Mixed')} ladder</span><span class="a">Final</span><span class="b">${esc([dLong(EV.date), time].filter(Boolean).join(' · '))}</span></div>
+        <h1 class="dk-h1 dk-h1--sm">${h1}</h1>${lede ? `<p class="dk-lede">${lede}</p>` : ''}
+        <div class="dk-acts">${recap ? `<a class="dk-btn" href="${esc(recap)}">Read the recap</a>` : ''}<a class="dk-btn dk-btn--out" href="${hubUrl()}#board">${tt === 'womens' ? 'Queen board' : 'Season board'}</a></div>
+      </div>${pod ? `<div class="dk-card dk-card--hot lr-pod"><div class="dk-kicker" style="padding:10px 0 2px;">Podium</div>${pod}</div>` : ''}</div></header>`;
+  }
+
+  /* ── Numbers ── */
+  function tilesHtml() {
+    const games = HIST.flatMap(r => (r.courts || []).filter(c => c.t1 != null && c.t2 != null).map(c => ({ ...c, round: r.round })));
+    if (!games.length) return '';
+    const cname = courtNamer(), pts = games.reduce((n, g) => n + g.t1 + g.t2, 0);
+    const margin = g => Math.abs(g.t1 - g.t2), by = [...games].sort((a, b) => margin(a) - margin(b));
+    const close = by[0], big = by[by.length - 1];
+    const line = g => `${team(g.t1 > g.t2 ? g.teamA : g.teamB)} over ${team(g.t1 > g.t2 ? g.teamB : g.teamA)}`;
+    const kc = {}; games.filter(g => g.top && g.winner).forEach(g => (g.winner === 'A' ? g.teamA : g.teamB).forEach(n => { kc[n] = (kc[n] || 0) + 1; }));
+    const king = Object.entries(kc).sort((a, b) => b[1] - a[1])[0];
+    return `<section class="dk-tiles lr-nums" aria-label="The numbers">
+      <div class="dk-tile"><small>Field</small><b>${ROWS.length}</b><span>${ROWS[0] && ROWS[0].pair ? 'pairs' : 'players'} on ${HIST[0].courts.length} court${HIST[0].courts.length === 1 ? '' : 's'}</span></div>
+      <div class="dk-tile"><small>Games</small><b>${games.length}</b><span>${HIST.length} round${HIST.length === 1 ? '' : 's'}, ${pts.toLocaleString('en-US')} points scored</span></div>
+      <div class="dk-tile"><small>Closest game</small><b>${Math.max(close.t1, close.t2)}–${Math.min(close.t1, close.t2)}</b><span>${line(close)} · round ${close.round}</span></div>
+      <div class="dk-tile"><small>Biggest win</small><b>${Math.max(big.t1, big.t2)}–${Math.min(big.t1, big.t2)}</b><span>${line(big)} · round ${big.round}</span></div>
+      ${king ? `<div class="dk-tile hot"><small>Most King Court wins</small><b>${king[1]}</b><span>${esc(firstLast(king[0]))}, on ${esc(cname(HIST[0].courts.length))}</span></div>` : ''}
+    </section>`;
+  }
+
+  /* ── Standings ── */
+  function standingsHtml() {
+    if (!ROWS.length) return '<div class="dk-card dk-empty">No scores were recorded for this ladder.</div>';
+    const c = (lab, val, cls) => `<div><small>${lab}</small><b class="${cls || ''}">${val}</b></div>`;
+    return `<div><div class="dk-head"><h2 class="dk-h2 dk-h2--lg">Final standings</h2><span>Wins, then point differential, then Dink Rating</span></div>
+      <div class="dk-card dk-rows">${ROWS.map((p, i) => { const g = (p.w || 0) + (p.l || 0);
+        return `<div class="dk-row lr-row${i === 3 ? ' cut' : ''}"><div class="who"><span class="rk${i < 3 ? ' lime' : ''}">${i + 1}</span>${av(p)}<div><a class="nm" href="${profileUrl(p)}">${esc(rowName(p))}</a>${i < 3 ? `<span class="sm">${['Winner', 'Second', 'Third'][i]}</span>` : ''}</div></div>
+          <div class="dk-cells" style="--n:6;">${c('W–L', `${p.w || 0}–${p.l || 0}`, 'main')}${c('Win %', g ? Math.round(100 * (p.w || 0) / g) + '%' : '–')}${c('Diff', signed(p.diff), p.diff > 0 ? 'pos' : p.diff < 0 ? 'neg' : '')}${c('For', p.pf == null ? '–' : p.pf)}${c('Opp', p.pa == null ? '–' : p.pa)}${c('DR', p.dr == null ? '–' : p.dr)}</div></div>`; }).join('')}</div></div>`;
+  }
+
+  /* ── Rounds ── */
+  function courtCard(c, cname) {
+    const has = c.t1 != null && c.t2 != null, a = c.winner === 'A' || (has && !c.winner && c.t1 > c.t2), b = c.winner === 'B' || (has && !c.winner && c.t2 > c.t1);
+    return `<div class="lh-court${c.top ? ' king' : ''}"><div class="lh-court__top"><b>${esc(cname(c.court))}</b><span>${c.top ? 'King Court' : ''}</span></div>
+      <div class="lh-side ${a ? 'win' : has ? '' : 'tbd'}"><span class="n">${team(c.teamA)}</span><b>${has ? c.t1 : ''}</b></div>
+      <div class="lh-side ${b ? 'win' : has ? '' : 'tbd'}"><span class="n">${team(c.teamB)}</span><b>${has ? c.t2 : ''}</b></div></div>`;
+  }
+  function roundHtml(r, cname) {
+    const M = r.mvps || {}, m = (M.male || [])[0], f = (M.female || [])[0];
+    // history[].courts arrives King Court first. Render in that order.
+    return `<section class="lr-round" id="round-${r.round}"><div class="dk-head"><h3 class="dk-h2">Round ${r.round}</h3><span>${(r.courts || []).length} court${(r.courts || []).length === 1 ? '' : 's'}, top court first</span></div>
+      <div class="lr-courts">${(r.courts || []).map(c => courtCard(c, cname)).join('')}</div>
+      ${(m || f) ? `<div class="lr-mv"><span>Best of the round:</span>${[f, m].filter(Boolean).map(x => `<span><b>${esc(nn(x.name))}</b> ${signed(x.diff)} on ${esc(cname(x.court))}</span>`).join('')}</div>` : ''}</section>`;
+  }
+  function roundsHtml() {
+    if (!HIST.length) return '<div class="dk-card dk-empty">Round-by-round scores were not recorded for this ladder.</div>';
+    const cname = courtNamer(), show = RD === 'all' ? HIST : HIST.filter(r => String(r.round) === String(RD));
+    return `<div class="dk-head" style="margin-bottom:0;"><h2 class="dk-h2 dk-h2--lg">Round by round</h2><span>Win and you move up a court. Lose and you move down.</span></div>
+      <div><div class="lr-rounds"><span class="dk-lbl">Round</span><div class="dk-seg" role="group" aria-label="Round"><button type="button" data-rd="all" class="${RD === 'all' ? 'on' : ''}" aria-pressed="${RD === 'all'}">All</button>${HIST.map(r => `<button type="button" data-rd="${r.round}" class="${String(RD) === String(r.round) ? 'on' : ''}" aria-pressed="${String(RD) === String(r.round)}">${r.round}</button>`).join('')}</div></div>
+      <div style="padding-top:20px;">${show.map(r => roundHtml(r, cname)).join('')}</div></div>`;
+  }
+
+  /* ── Awards (this ladder only) ── */
+  const session = () => { const m = String(EV.startTime || '').trim().toLowerCase().match(/^(\d{1,2})(?::?(\d{2}))?\s*(am|pm)?/); if (!m) return 'ladder'; let h = +m[1]; if (m[3] === 'pm' && h < 12) h += 12; if (m[3] === 'am' && h === 12) h = 0; return h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'night'; };
+  const CATS = [
+    { k: 'mostPoints', t: 'Most Points', s: 'points scored', u: r => ({ v: (r.total || 0).toLocaleString('en-US') }) },
+    { k: 'kingOfTheCourt', t: () => EV.type === 'womens' ? 'Queen of the Court' : 'King of the Court', s: 'wins on the King Court', u: r => ({ v: r.wins }) },
+    { k: 'perRoundTop', t: 'Per-Round Top', s: 'average points a round', u: r => ({ v: r.avg }) },
+    { k: 'hotStreak', t: 'Hot Streak', s: 'wins in a row', u: r => ({ v: r.streak }) },
+    { k: 'theWall', t: 'The Wall', s: 'fewest points allowed a round', u: r => ({ v: r.avg }) },
+    { k: 'bigMover', t: 'Big Mover', s: 'biggest court climb', u: r => ({ v: '+' + r.climb }) },
+    { k: 'comebackKid', t: 'Comeback Kid', s: 'wins straight after a loss', u: r => ({ v: r.count }) },
+    { k: 'beatDown', t: 'Beat Down', s: 'biggest single-game margin', u: r => ({ v: '+' + r.margin, x: 'Round ' + r.round }) },
+    { k: 'highestSingleGame', t: 'Highest Single Game', s: 'most points in one round', u: r => ({ v: r.pts, x: 'Round ' + r.round }) },
+    { k: 'bestDuo', t: 'Best Duo', s: 'win % together', u: r => ({ v: r.pct + '%', x: r.w + '–' + r.l }) },
+  ];
+  function awardsHtml() {
+    const K = (D && D.kitchen) || {};
+    const cards = CATS.map(cat => { const rows = (K[cat.k] || []).slice(0, 4); if (!rows.filter(r => !r.tie).length) return '';
+      return `<div class="dk-card lh-kc"><h3>${esc(typeof cat.t === 'function' ? cat.t() : cat.t)}</h3><p>${esc(cat.s)}</p>${rows.map((r, i) => { if (r.tie) return `<div class="lh-kr tie">${r.count} tied for the next spot</div>`; const u = cat.u(r);
+        return `<div class="lh-kr"><span class="rk">${i + 1}</span><span class="nm">${esc(cat.k === 'bestDuo' ? `${firstName(r.a)} & ${firstName(r.b)}` : firstLast(r.name))}</span>${u.x ? `<span class="xt">${esc(String(u.x))}</span>` : ''}<span class="vl">${esc(String(u.v))}</span></div>`; }).join('')}</div>`; }).filter(Boolean).join('');
+    if (!cards) return '<div class="dk-card dk-empty">No awards for this ladder yet.</div>';
+    const s = session();
+    return `<div class="dk-head" style="margin-bottom:0;"><h2 class="dk-h2 dk-h2--lg">The Kitchen <span class="lime">· ${s === 'ladder' ? 'this ladder' : 'this ' + s}</span></h2><span>Awards from this ladder only</span></div><div class="lh-kit">${cards}</div>`;
+  }
+
+  /* ── Photos ── */
+  function photosHtml() {
+    if (!ALBUM) return '';
+    return `<div class="dk-head" style="margin-bottom:0;"><h2 class="dk-h2 dk-h2--lg">Photos <span class="lime">· ${ALBUM.photos.length}</span></h2><span>Tap a photo to open it full size</span></div>
+      <div class="dk-pics">${ALBUM.photos.map((p, i) => `<button type="button" data-ph="${i}" aria-label="Open photo ${i + 1}"><img src="${esc(p.thumb)}" alt="${esc(p.caption || EV.name || '')}" loading="lazy" style="object-position:${fpos(p)}"></button>`).join('')}</div>`;
+  }
+
+  /* ── Newer / older ── */
+  function navHtml() {
+    const sorted = LIST.slice().sort((a, b) => String(b.date || '').localeCompare(String(a.date || ''))), i = sorted.findIndex(x => x.id === ID);
+    if (i < 0) return '';
+    const newer = sorted[i - 1], older = sorted[i + 1];
+    const card = (n, lab, cls) => n ? `<a class="dk-card ${cls}" href="/ladder-result.html?event=${encodeURIComponent(n.id)}"><small>${lab}</small><b>${esc(n.name)}</b><span>${esc([TL[n.type || 'mixed'], dShort(n.date)].filter(Boolean).join(' · '))}</span></a>` : '<span></span>';
+    return (newer || older) ? `<nav class="lr-nav" aria-label="Other results">${card(older, '‹ Earlier', 'prev')}${card(newer, 'Later ›', 'next')}</nav>` : '';
+  }
+
+  function tabs() { const t = [['standings', 'Standings'], ['rounds', 'Rounds'], ['awards', 'Awards']]; if (ALBUM) t.push(['photos', 'Photos']); return t; }
+  function render() {
+    if (EV.type === 'womens') ROOT.classList.add('brand-queen');
+    document.title = `${EV.name || 'Ladder'} results · The Dink Society`;
+    if (!tabs().some(t => t[0] === TAB)) TAB = 'standings';
+    ROOT.innerHTML = heroHtml() + `
+      <div class="dk-bar" id="lh-bar"><div class="dk-wrap dk-bar__in"><div class="dk-tabs" id="lr-tabs" role="tablist" aria-label="Result sections">${tabs().map(([id, lab]) => `<button type="button" role="tab" data-tab="${id}" aria-selected="${TAB === id}" class="${TAB === id ? 'on' : ''}">${lab}${id === 'photos' ? ` <span class="n">${ALBUM.photos.length}</span>` : ''}</button>`).join('')}</div></div></div>
+      <div class="dk-wrap dk-stack">
+        <div class="dk-panel${TAB === 'standings' ? ' on' : ''}" data-panel="standings">${tilesHtml()}${standingsHtml()}</div>
+        <div class="dk-panel${TAB === 'rounds' ? ' on' : ''}" data-panel="rounds" id="lr-rounds">${roundsHtml()}</div>
+        <div class="dk-panel${TAB === 'awards' ? ' on' : ''}" data-panel="awards">${awardsHtml()}</div>
+        ${ALBUM ? `<div class="dk-panel${TAB === 'photos' ? ' on' : ''}" data-panel="photos">${photosHtml()}</div>` : ''}
+        ${navHtml()}
+      </div>`;
+    setTop();
+  }
+  function setTab(t, scroll) {
+    TAB = t; history.replaceState(null, '', location.pathname + location.search + '#' + t);
+    ROOT.querySelectorAll('#lr-tabs [data-tab]').forEach(b => { const on = b.dataset.tab === t; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
+    ROOT.querySelectorAll('.dk-panel').forEach(p => p.classList.toggle('on', p.dataset.panel === t));
+    if (scroll !== false) toBar();
+  }
+  function toBar() { const bar = $('lh-bar'); if (!bar) return; const top = bar.getBoundingClientRect().top + window.pageYOffset - (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dk-top'), 10) || 65); if (window.pageYOffset > top) window.scrollTo({ top, behavior: 'auto' }); }
+  function setTop() { let h = 0; ['.ds-nav', '.ds-pastbar'].forEach(s => { const n = document.querySelector(s); if (!n) return; const r = n.getBoundingClientRect(); if (r.height > 0 && r.bottom > h && r.top <= 0) h = r.bottom; }); const de = document.documentElement; de.style.setProperty('--dk-top', Math.max(0, Math.round(h)) + 'px'); const bar = $('lh-bar'); if (bar) de.style.setProperty('--lh-barh', Math.round(bar.getBoundingClientRect().height) + 'px'); }
+  window.addEventListener('resize', setTop); setTimeout(setTop, 300); setTimeout(setTop, 1500);
+
+  /* ── Lightbox ── */
+  let LBI = 0;
+  function lb() {
+    let el = $('lh-lb'); if (el) return el;
+    el = document.createElement('div'); el.id = 'lh-lb'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-modal', 'true'); el.setAttribute('aria-label', 'Photo viewer');
+    el.innerHTML = '<div class="top"><span id="lh-lbct"></span><button class="x" type="button" data-lbx aria-label="Close">&times;</button></div><div class="body"><button class="nav" type="button" data-lbstep="-1" aria-label="Previous">‹</button><img id="lh-lbimg" alt=""><button class="nav" type="button" data-lbstep="1" aria-label="Next">›</button></div><div class="foot"><div id="lh-lbcap"></div><div class="acts"><a class="pri" id="lh-lbdl" href="#" download>Download</a></div></div>';
+    document.body.appendChild(el);
+    let sx = null;
+    el.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, { passive: true });
+    el.addEventListener('touchend', e => { if (sx === null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 45) step(dx < 0 ? 1 : -1); sx = null; }, { passive: true });
+    return el;
+  }
+  function paintLb() { const p = ALBUM.photos[LBI]; if (!p) return; $('lh-lbimg').src = p.url; $('lh-lbimg').alt = p.caption || EV.name || ''; $('lh-lbcap').textContent = [p.caption, EV.name].filter(Boolean).join(' · '); $('lh-lbct').textContent = `${LBI + 1} / ${ALBUM.photos.length}`; $('lh-lbdl').href = p.download || p.url; }
+  function openLb(i) { LBI = i; lb().classList.add('on'); document.body.style.overflow = 'hidden'; paintLb(); }
+  function step(n) { const i = LBI + n; if (ALBUM && i >= 0 && i < ALBUM.photos.length) { LBI = i; paintLb(); } }
+  function closeLb() { const el = $('lh-lb'); if (!el) return; el.classList.remove('on'); document.body.style.overflow = ''; $('lh-lbimg').src = ''; }
+  document.addEventListener('keydown', e => { const el = $('lh-lb'); if (!el || !el.classList.contains('on')) return; if (e.key === 'Escape') closeLb(); else if (e.key === 'ArrowLeft') step(-1); else if (e.key === 'ArrowRight') step(1); });
+
+  document.addEventListener('click', e => {
+    const t = e.target; let b;
+    if (t.closest('[data-lbx]')) return closeLb();
+    if ((b = t.closest('[data-lbstep]'))) return step(+b.dataset.lbstep);
+    if (t.id === 'lh-lb' || (t.classList && t.classList.contains('body') && t.closest('#lh-lb'))) return closeLb();
+    if ((b = t.closest('#lr [data-tab]'))) return setTab(b.dataset.tab);
+    if ((b = t.closest('#lr [data-rd]'))) { RD = b.dataset.rd; const p = $('lr-rounds'); p.innerHTML = roundsHtml(); const top = p.getBoundingClientRect().top + window.pageYOffset - (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--dk-top'), 10) || 65) - (parseInt(getComputedStyle(document.documentElement).getPropertyValue('--lh-barh'), 10) || 51) - 12; if (window.pageYOffset > top) window.scrollTo({ top, behavior: 'auto' }); return; }
+    if ((b = t.closest('#lr [data-ph]'))) return openLb(+b.dataset.ph);
+  });
+
+  async function load() {
+    if (!ID) { ROOT.innerHTML = '<div class="dk-wrap"><div class="dk-loading">No ladder was picked. <a class="lime" href="/ladders.html#results">See every result</a>.</div></div>'; return; }
+    const get = u => fetch(u).then(r => r.json()).catch(() => null);
+    const [d, pl] = await Promise.all([get(`${API}/public-ladder-stats?event=${encodeURIComponent(ID)}`), get(`${API}/public-ladders`)]);
+    D = d || {}; LIST = (pl && pl.completed) || [];
+    const meta = LIST.find(x => x.id === ID) || {};
+    EV = Object.assign({}, meta, D.event || {}); if (!EV.type) EV.type = meta.type || 'mixed';
+    ROWS = D.standings || []; HIST = D.history || [];
+    if (!D.event && !meta.id) { ROOT.innerHTML = '<div class="dk-wrap"><div class="dk-loading">That ladder could not be found. <a class="lime" href="/ladders.html#results">See every result</a>.</div></div>'; return; }
+    DUP = {}; ROWS.flatMap(r => r.pair ? (r.names || []) : [r.name]).forEach(n => { const f = firstName(n).toLowerCase(); if (f) DUP[f] = (DUP[f] || 0) + 1; });
+    const h = (location.hash || '').replace(/^#/, ''); if (['standings', 'rounds', 'awards', 'photos'].includes(h)) TAB = h;
+    render();
+    // Photos and profile pictures are best-effort, after first paint.
+    get(`${API}/public-ladder-photos`).then(p => { const a = ((p && p.albums) || []).find(x => x.eventId === ID); if (a && (a.photos || []).length) { ALBUM = a; render(); } });
+    const ids = [...new Set(ROWS.flatMap(r => r.pair ? (r.ids || []) : [r.id]).filter(Boolean))];
+    if (ids.length) get(`${API}/public-ladder-avatars?ids=${encodeURIComponent(ids.join(','))}`).then(a => { if (a && a.photos && Object.keys(a.photos).length) { AV = a.photos; const y = window.pageYOffset; render(); window.scrollTo(0, y); } });
+  }
+  load();
+})();
+</script>
+</body>
+</html>
