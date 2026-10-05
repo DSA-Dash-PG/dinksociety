@@ -21,101 +21,50 @@
   <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/css/shared.css" />
   <script>(function(){var t=localStorage.getItem("ds-theme");if(t==="light"){document.documentElement.setAttribute("data-theme","light")}else{document.documentElement.setAttribute("data-theme","dark")}})()</script>
   <link rel="stylesheet" href="/css/shared-nav.css" />
   <!-- Resolves which season this page shows (?season= / ?circuit=, else the
        current one, which flips a week before its start date). -->
   <script src="/js/season.js"></script>
+  <script src="/js/short-name.js"></script>
+  <link rel="stylesheet" href="/css/pages.css" />
   <style>
-    .teams-shell { max-width: var(--max-w); margin: 0 auto; padding: 0 var(--gutter) 80px; }
-
-    .div-tabs { display: flex; gap: 3px; margin-bottom: var(--space-4); flex-wrap: wrap; }
-    .div-tab {
-      padding: 8px 16px; border-radius: var(--radius-full); font-size: 11px; font-weight: 700;
-      border: 1px solid var(--color-border); background: transparent; color: var(--color-text-faint);
-      cursor: pointer; transition: all var(--transition); font-family: inherit;
-    }
-    .div-tab:hover { color: var(--color-text); background: var(--color-surface-2); }
-    .div-tab.is-active { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
-
-    .team-count {
-      font-size: 11px; color: var(--color-text-faint); margin-bottom: var(--space-3);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .teams-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-      gap: 18px;
-    }
-
-    .team-card {
-      background: var(--color-surface); border: 1px solid var(--color-border);
-      border-radius: var(--radius-lg); overflow: hidden;
-      display: flex; flex-direction: column;
-      transition: border-color var(--transition), transform var(--transition);
-    }
-    .team-card:hover { border-color: var(--color-border-strong); transform: translateY(-2px); }
-
-    /* ── Banner: team photo OR emoji fallback ── */
-    .team-banner { position: relative; height: 172px; display: flex; align-items: flex-end; }
-    .team-banner__img { position: absolute; inset: 0; background-size: cover; background-position: center; }
-    .team-banner__emoji { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 72px; }
-    /* Resting dark overlay; lifts on hover to reveal full-colour photo/emoji */
-    .team-banner__overlay { position: absolute; inset: 0; z-index: 1; background: rgba(14,14,14,0.55); transition: background var(--transition); }
-    .team-card:hover .team-banner__overlay { background: rgba(14,14,14,0); }
-    .team-banner__scrim { position: absolute; inset: 0; z-index: 1; background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,0.6) 100%); }
-    .team-banner__rank {
-      position: absolute; top: 12px; right: 12px; z-index: 2; display: flex; align-items: center; gap: 6px;
-      background: rgba(14,14,14,0.72); border: 1px solid var(--color-border-strong);
-      padding: 5px 11px; border-radius: var(--radius-full); font-size: 11px; font-weight: 800; letter-spacing: 0.02em;
-    }
-    .rank-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--color-text-muted); }
-    .rank-dot--1 { background: var(--color-gold); }
-    .rank-dot--2 { background: #c8d0d8; }
-    .rank-dot--3 { background: #d08a4a; }
-    .team-banner__name { position: relative; z-index: 2; padding: 14px 16px; }
-    .team-banner__title {
-      font-size: 18px; font-weight: 800; font-style: italic; text-transform: uppercase; letter-spacing: 0.02em;
-      color: #fff; line-height: 1.1; text-shadow: 0 1px 5px rgba(0,0,0,0.8);
-    }
-    .team-name-link { color: inherit; text-decoration: none; }
-
-    .team-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-
-    .stat-group__label {
-      font-size: 9px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase;
-      color: var(--color-text-faint); margin-bottom: 7px;
-    }
-    .stat-row { display: grid; gap: 7px; }
-    .stat-row--match { grid-template-columns: repeat(4, 1fr); }
-    .stat-row--game { grid-template-columns: repeat(4, 1fr); }
-    .stat-cell { background: var(--color-surface-2); border-radius: var(--radius-sm); padding: 9px 4px; text-align: center; }
-    .stat-cell__num { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
-    .stat-cell__lbl { font-size: 8px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-text-faint); margin-top: 5px; }
-    .n-win { color: var(--color-teal); }
-    .n-loss { color: var(--color-red); }
-    .n-tie { color: var(--color-text-muted); }
-    .n-pts { color: var(--color-lime); }
-    .n-pos { color: var(--color-teal); }
-    .n-neg { color: var(--color-red); }
-    .n-mute { color: var(--color-text-faint); }
-
-    .roster-btn {
-      display: block; width: 100%; text-align: center; padding: 11px; border-radius: var(--radius);
-      background: var(--color-surface-2); border: 1px solid var(--color-border); color: var(--color-text);
-      font-size: 12px; font-weight: 700; letter-spacing: 0.03em; cursor: pointer; text-decoration: none;
-      transition: border-color var(--transition), color var(--transition);
-    }
-    .roster-btn:hover { border-color: var(--color-lime); color: var(--color-lime); }
-
-    .empty-state { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--color-text-faint); }
-
-    @media (max-width: 600px) {
-      .teams-grid { grid-template-columns: 1fr; }
-    }
+    /* ═══════════════════════════════════════════════════════════════
+       TEAMS INDEX. Shared pieces live in /css/pages.css (.dk-*).
+       Photo hero (Site Images slot "teams") → sticky bar (division,
+       order, find a team or player) → one card per team.
+       ═══════════════════════════════════════════════════════════════ */
+    .page-hero { margin-bottom: 0; }
+    .tx-bar .dk-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding-top: 10px; padding-bottom: 10px; }
+    .tx-bar .grow { flex: 1 1 220px; min-width: 0; }
+    .tx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+    .tx-card { display: flex; flex-direction: column; overflow: hidden; }
+    .tx-card.first { border-color: rgba(184,255,44,.45); }
+    .tx-ban { position: relative; display: flex; align-items: center; justify-content: center; aspect-ratio: 16 / 7; background: var(--color-surface-2) center / cover no-repeat; font-size: 64px; line-height: 1; }
+    .tx-ban.art { background: radial-gradient(120% 120% at 50% 20%, rgba(184,255,44,.14), var(--color-surface) 70%); }
+    .tx-ban .dk-pill { position: absolute; top: 12px; left: 12px; background: rgba(14,14,14,.82); color: #f0f0ec; border: 1px solid rgba(255,255,255,.2); }
+    .tx-card.first .tx-ban .dk-pill { background: var(--color-lime); color: var(--color-text-inverse); border-color: var(--color-lime); }
+    .tx-body { flex: 1; padding: 16px 18px 18px; display: flex; flex-direction: column; gap: 12px; }
+    .tx-id { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .tx-id > div { min-width: 0; }
+    .tx-name { display: block; font-size: 20px; line-height: 1.1; font-weight: 900; font-style: italic; text-transform: uppercase; overflow-wrap: anywhere; }
+    .tx-name:hover { color: var(--color-lime); }
+    .tx-cap { font-size: 12px; color: var(--color-text-muted); }
+    .tx-cells { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; font-variant-numeric: tabular-nums; }
+    .tx-cells small { display: block; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-muted); }
+    .tx-cells b { display: block; font-size: 15px; font-weight: 800; padding-top: 5px; }
+    .tx-cells div:first-child b { font-size: 22px; font-weight: 900; padding-top: 0; }
+    .tx-next { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding-top: 12px; border-top: 1px solid var(--color-border); }
+    .tx-next small { display: block; font-size: 11px; color: var(--color-text-muted); }
+    .tx-next b { display: block; font-size: 14px; font-weight: 800; }
+    .tx-form { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+    .tx-form small { margin-right: 4px; }
+    .tx-hit { font-size: 12px; color: var(--color-lime); font-weight: 700; }
+    .tx-acts { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+    .tx-acts .dk-btn { flex: 1 1 120px; }
+    @media (max-width: 600px) { .tx-grid { grid-template-columns: 1fr; } .tx-bar .dk-btn { flex: 1 1 100%; } }
   </style>
 </head>
 <body data-page="teams">
@@ -130,47 +79,67 @@
     </div>
   </div>
 
-  <div class="teams-shell">
-
-    <nav class="div-tabs" id="div-tabs"></nav>
-    <div class="team-count" id="team-count"></div>
-    <div id="teams-grid" class="teams-grid">
-      <div class="empty-state">Loading teams&hellip;</div>
+  <main class="dk">
+    <div class="dk-bar tx-bar" id="tx-bar" style="margin-top:0;"><div class="dk-wrap">
+      <div class="dk-chips" id="tx-divs" style="padding:0;" hidden></div>
+      <div class="dk-seg" role="group" aria-label="Order">
+        <button type="button" class="on" data-order="rank" aria-pressed="true">Standings</button>
+        <button type="button" data-order="az" aria-pressed="false">A to Z</button>
+      </div>
+      <div class="grow"><label class="dk-sr" for="tx-find">Find a team or player</label><input class="dk-find" id="tx-find" type="search" placeholder="Find a team or player" autocomplete="off"></div>
+      <a class="dk-btn dk-btn--out dk-btn--sm" id="tx-compare" href="/leaderboard.html?view=tvt">Compare two teams</a>
+    </div></div>
+    <div class="dk-wrap dk-stack">
+      <div>
+        <div class="dk-head"><h2 class="dk-h2 dk-h2--lg" id="tx-h">Teams</h2><span id="tx-sub"></span></div>
+        <div id="tx-grid" class="tx-grid"><div class="dk-empty">Loading teams…</div></div>
+        <p class="dk-note" id="tx-note" hidden>Last 3 = match points taken each night, out of 4.</p>
+      </div>
     </div>
-  </div>
+  </main>
 
   <div data-partial="footer"></div>
   <script src="/js/partials.js"></script>
   <script>
+    const FN = '/.netlify/functions/';
     const DIVISION_LABELS = { '3-0-mixed': '3.0–3.5 Mixed', '3-5-mixed': '3.0–3.5 Mixed', '3.5M': '3.0–3.5 Mixed', '3.0M': '3.0 Mixed' };
-    let allTeams = [];
-    let activeDivision = '';
-    let statsById = {};       // teamId → { rank, wins, losses, ties, matchPointsFor, totalGamesWon, totalGamesLost, pointDiff }
-    let seasonStarted = false; // rankings + diff only show once Week 1 is in the books
+    const $ = id => document.getElementById(id);
+    const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    const slugify = s => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const SN = n => (window.shortName ? window.shortName(n) : n);
+    const ord = n => { const s = ['th','st','nd','rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+    const signed = n => n > 0 ? '+' + n : n < 0 ? '−' + Math.abs(n) : '0';
+    const initials = name => { const p = String(name || '?').trim().split(/\s+/); return ((p[0][0] || '') + (p.length > 1 ? p[p.length - 1][0] : '')).toUpperCase(); };
+    const getJSON = url => fetch(url).then(r => r.ok ? r.json() : null).catch(() => null);
+    const dayShort = iso => { const t = Date.parse(iso || ''); return isNaN(t) ? '' : new Date(t).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }); };
+
+    let allTeams = [], activeDivision = '', order = 'rank';
+    let statsById = {};        // teamId → standings row
+    let seasonStarted = false; // rank, form and diff only show once Week 1 is in the books
+    let MATCHES = [];          // every match with its week, in week order
 
     // Which season to show: ?season= when given, else the current one (js/season.js).
     let SEASON_ID = new URLSearchParams(location.search).get('season') || 'circuit-i';
     let LINK_SUFFIX = SEASON_ID === 'circuit-i' ? '' : `&season=${encodeURIComponent(SEASON_ID)}`;
+    const withSeason = url => url + (LINK_SUFFIX ? (url.indexOf('?') >= 0 ? LINK_SUFFIX : '?' + LINK_SUFFIX.slice(1)) : '');
 
     async function loadTeams() {
-      const [teamsRes, standRes] = await Promise.allSettled([
-        fetch('/.netlify/functions/public-teams?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
-        fetch('/.netlify/functions/public-standings?season=' + encodeURIComponent(SEASON_ID)).then(r => r.ok ? r.json() : null),
+      const [td, stand, sched] = await Promise.all([
+        getJSON(FN + 'public-teams?season=' + encodeURIComponent(SEASON_ID)),
+        getJSON(FN + 'public-standings?season=' + encodeURIComponent(SEASON_ID)),
+        getJSON(FN + 'public-schedule?season=' + encodeURIComponent(SEASON_ID)),
       ]);
-      allTeams = teamsRes.value?.teams || [];
-
+      allTeams = (td && td.teams) || [];
       // Flatten standings (all divisions) into a teamId → stats map.
-      const stand = standRes.value;
       if (stand && !stand.empty && stand.divisions) {
-        for (const div of Object.values(stand.divisions)) {
-          for (const t of (div.teams || [])) {
-            if (!t.teamId) continue;
-            statsById[t.teamId] = t;
-            if ((t.matchesPlayed || 0) > 0) seasonStarted = true;
-          }
+        for (const div of Object.values(stand.divisions)) for (const t of (div.teams || [])) {
+          if (!t.teamId) continue;
+          statsById[t.teamId] = t;
+          if ((t.matchesPlayed || 0) > 0) seasonStarted = true;
         }
       }
-
+      MATCHES = ((sched && sched.weeks) || []).flatMap(w => (w.matches || []).map(m => ({ ...m, week: w.week }))).sort((a, b) => a.week - b.week);
+      $('tx-compare').href = withSeason('/leaderboard.html?view=tvt');
       renderTabs();
       renderTeams();
     }
@@ -179,118 +148,95 @@
     function divLabel(t) { return t.divisionLabel || DIVISION_LABELS[t.division] || t.division || ''; }
 
     function renderTabs() {
-      // Group by label so teams with different raw values but same label share a tab.
+      // Group by label so teams with different raw values but the same label share a chip.
       const labels = [...new Set(allTeams.map(t => divLabel(t)))].sort();
-      const nav = document.getElementById('div-tabs');
-
-      // One division (single active season) → no tabs / no green pills.
-      if (labels.length <= 1) { nav.innerHTML = ''; activeDivision = labels[0] || ''; return; }
-
+      const nav = $('tx-divs');
+      // One division → no chips.
+      if (labels.length <= 1) { nav.hidden = true; nav.innerHTML = ''; activeDivision = labels[0] || ''; return; }
       if (!activeDivision || !labels.includes(activeDivision)) activeDivision = labels[0];
-
-      nav.innerHTML = labels.map(l =>
-        `<button class="div-tab ${l === activeDivision ? 'is-active' : ''}" data-div="${esc(l)}">${esc(l)}</button>`
-      ).join('');
-
-      nav.querySelectorAll('.div-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeDivision = btn.dataset.div;
-          nav.querySelectorAll('.div-tab').forEach(b => b.classList.toggle('is-active', b.dataset.div === activeDivision));
-          renderTeams();
-        });
-      });
+      nav.innerHTML = labels.map(l => `<button type="button" class="${l === activeDivision ? 'on' : ''}" data-div="${esc(l)}" aria-pressed="${l === activeDivision}">${esc(l)}</button>`).join('');
+      nav.hidden = false;
     }
 
-    // Resting/hover banner: real photo if present, otherwise the team emoji on a colour-tinted field.
-    function bannerInner(t) {
-      const color = t.color || '#b8ff2c';
-      if (t.photoUrl) {
-        return `<div class="team-banner__img" style="background-image:url('${esc(t.photoUrl)}')"></div>`;
-      }
-      return `<div class="team-banner__img" style="background:radial-gradient(120% 120% at 50% 25%, ${esc(color)}22 0%, var(--color-surface) 70%)"></div>
-        <div class="team-banner__emoji">${esc(t.emoji || '🏓')}</div>`;
-    }
-
-    function statCell(num, lbl, cls) {
-      return `<div class="stat-cell"><div class="stat-cell__num ${cls || ''}">${num}</div><div class="stat-cell__lbl">${lbl}</div></div>`;
+    const isFinal = m => m.status === 'final' || (m.scoreA != null && m.scoreB != null);
+    const has = (m, t) => (t.id && (m.teamAId === t.id || m.teamBId === t.id)) || m.teamA === t.name || m.teamB === t.name;
+    const isHome = (m, t) => (t.id && m.teamAId === t.id) || m.teamA === t.name;
+    function badge(t, size) {
+      const e = t.emoji || '', isText = /[a-z0-9]/i.test(e), st = `width:${size}px;height:${size}px;font-size:${Math.round(size * (e && !isText ? 0.52 : 0.34))}px;`;
+      if (t.photoUrl) return `<span class="dk-tb" aria-hidden="true" style="${st}"><img src="${esc(t.photoUrl)}" alt="" loading="lazy" onerror="this.remove()"></span>`;
+      return `<span class="dk-tb" aria-hidden="true" style="${st}">${esc(e ? (isText ? e.slice(0, 2) : e) : initials(t.name))}</span>`;
     }
 
     function renderTeams() {
-      const filtered = activeDivision ? allTeams.filter(t => divLabel(t) === activeDivision) : allTeams;
-      const grid = document.getElementById('teams-grid');
-      const count = document.getElementById('team-count');
+      const q = ($('tx-find').value || '').trim().toLowerCase();
+      const inDiv = activeDivision ? allTeams.filter(t => divLabel(t) === activeDivision) : allTeams;
+      const grid = $('tx-grid');
+      if (!inDiv.length) { grid.innerHTML = '<div class="dk-empty">No teams registered yet.</div>'; $('tx-sub').textContent = ''; $('tx-note').hidden = true; return; }
 
-      if (!filtered.length) {
-        grid.innerHTML = '<div class="empty-state">No teams registered yet.</div>';
-        count.textContent = '';
-        return;
-      }
-
-      // Order by rank once the season has started; alphabetical before that.
+      // A search matches the team name or anyone on its roster.
+      const hits = {};
+      const filtered = !q ? inDiv : inDiv.filter(t => {
+        if (String(t.name).toLowerCase().includes(q)) return true;
+        const who = (t.roster || []).filter(p => String(p.name || '').toLowerCase().includes(q));
+        if (who.length) { hits[t.id] = who; return true; }
+        return false;
+      });
+      // Order by rank once the season has started; alphabetical before that, or when asked.
       const ordered = filtered.slice().sort((a, b) => {
-        if (seasonStarted) {
-          const ra = statsById[a.id]?.rank ?? 999, rb = statsById[b.id]?.rank ?? 999;
-          if (ra !== rb) return ra - rb;
-        }
+        if (order === 'rank' && seasonStarted) { const ra = statsById[a.id]?.rank ?? 999, rb = statsById[b.id]?.rank ?? 999; if (ra !== rb) return ra - rb; }
         return String(a.name).localeCompare(String(b.name));
       });
-
-      count.textContent = `${ordered.length} team${ordered.length === 1 ? '' : 's'}`;
+      const lastWeek = MATCHES.filter(isFinal).reduce((w, m) => Math.max(w, m.week), 0);
+      $('tx-h').innerHTML = `Teams <span class="lime">· ${inDiv.length}</span>`;
+      $('tx-sub').textContent = [activeDivision, lastWeek ? 'After Week ' + lastWeek : ''].filter(Boolean).join(' · ');
+      $('tx-note').hidden = !seasonStarted;
+      if (!ordered.length) { grid.innerHTML = `<div class="dk-empty">No team or player matches “${esc(q)}”.</div>`; return; }
 
       grid.innerHTML = ordered.map(t => {
-        const teamSlug = slugify(t.name);
-        const teamUrl = `/team?id=${teamSlug}${LINK_SUFFIX}`;
+        const teamUrl = `/team?id=${slugify(t.name)}${LINK_SUFFIX}`;
         const s = statsById[t.id] || {};
-        const wins = s.wins || 0, losses = s.losses || 0, ties = s.ties || 0;
-        const pts = s.matchPointsFor || 0, gw = s.totalGamesWon || 0, gl = s.totalGamesLost || 0;
-        const psf = s.pointsScored || 0;
-        const diff = s.pointDiff || 0;
-
-        // Rank badge only after Week 1.
-        const rankBadge = (seasonStarted && s.rank)
-          ? `<div class="team-banner__rank"><span class="rank-dot rank-dot--${s.rank <= 3 ? s.rank : 'x'}"></span>Rank ${s.rank}</div>`
-          : '';
-
-        const diffStr = !seasonStarted ? '—' : (diff > 0 ? '+' + diff : String(diff));
-        const diffCls = !seasonStarted ? 'n-mute' : (diff > 0 ? 'n-pos' : diff < 0 ? 'n-neg' : 'n-tie');
-
-        return `<div class="team-card">
-          <a class="team-banner" href="${teamUrl}" aria-label="View ${esc(t.name)}">
-            ${bannerInner(t)}
-            <div class="team-banner__overlay"></div>
-            <div class="team-banner__scrim"></div>
-            ${rankBadge}
-            <div class="team-banner__name"><span class="team-banner__title">${esc(t.name)}</span></div>
-          </a>
-          <div class="team-body">
-            <div class="stat-group">
-              <div class="stat-group__label">Match Stats</div>
-              <div class="stat-row stat-row--match">
-                ${statCell(wins, 'Win', 'n-win')}
-                ${statCell(losses, 'Loss', 'n-loss')}
-                ${statCell(ties, 'Tie', 'n-tie')}
-                ${statCell(pts, 'Pts', 'n-pts')}
-              </div>
+        const wins = s.wins || 0, losses = s.losses || 0, ties = s.ties || 0, pts = s.matchPointsFor || 0;
+        const gw = s.totalGamesWon || 0, gl = s.totalGamesLost || 0, diff = s.pointDiff || 0;
+        const first = seasonStarted && s.rank === 1;
+        const rankPill = (seasonStarted && s.rank) ? `<span class="dk-pill">${ord(s.rank)}</span>` : '';
+        const ban = t.photoUrl
+          ? `<a class="tx-ban" href="${teamUrl}" aria-label="${esc(t.name)}" style="background-image:url('${esc(t.photoUrl)}')">${rankPill}</a>`
+          : `<a class="tx-ban art" href="${teamUrl}" aria-label="${esc(t.name)}">${rankPill}<span aria-hidden="true">${esc(t.emoji || initials(t.name))}</span></a>`;
+        const mine = MATCHES.filter(m => has(m, t)), done = mine.filter(isFinal), nx = mine.find(m => !isFinal(m));
+        const form = done.slice(-3).map(m => { const f = isHome(m, t) ? m.scoreA : m.scoreB, a = isHome(m, t) ? m.scoreB : m.scoreA, opp = isHome(m, t) ? m.teamB : m.teamA;
+          return `<i class="dk-form ${f >= 3 ? 'w' : f === 2 ? 't' : ''}" title="Week ${m.week}: ${f}–${a} v ${esc(opp)}">${f}</i>`; }).join('');
+        const nextTxt = nx ? `${isHome(nx, t) ? 'v' : 'at'} ${esc(isHome(nx, t) ? nx.teamB : nx.teamA)}` : '';
+        const n = (t.roster || []).length, cap = t.captain ? 'Captain ' + SN(t.captain) : '';
+        const hit = hits[t.id] ? `<div class="tx-hit">On the roster: ${hits[t.id].slice(0, 3).map(p => esc(SN(p.name))).join(', ')}${hits[t.id].length > 3 ? ' +' + (hits[t.id].length - 3) : ''}</div>` : '';
+        return `<article class="dk-card tx-card${first ? ' first' : ''}">
+          ${ban}
+          <div class="tx-body">
+            <div class="tx-id">${badge(t, 44)}<div><a class="tx-name" href="${teamUrl}">${esc(t.name)}</a><div class="tx-cap">${esc([cap, n ? n + ' player' + (n === 1 ? '' : 's') : ''].filter(Boolean).join(' · '))}</div></div></div>
+            ${hit}
+            <div class="tx-cells">
+              <div><small>Pts</small><b>${pts}</b></div>
+              <div><small title="Rounds won, lost and tied">W–L–T</small><b>${wins}–${losses}–${ties}</b></div>
+              <div><small>Games</small><b>${gw}–${gl}</b></div>
+              <div><small>Diff</small><b class="${!seasonStarted ? 'muted' : diff > 0 ? 'pos' : diff < 0 ? 'neg' : ''}">${seasonStarted ? signed(diff) : '—'}</b></div>
             </div>
-            <div class="stat-group">
-              <div class="stat-group__label">Game Stats</div>
-              <div class="stat-row stat-row--game">
-                ${statCell(gw, 'Won', 'n-pts')}
-                ${statCell(gl, 'Lost', 'n-mute')}
-                ${statCell(psf, 'Pts Scored', 'n-pts')}
-                ${statCell(diffStr, 'Diff', diffCls)}
-              </div>
-            </div>
-            <a class="roster-btn" href="${teamUrl}">View Roster &rarr;</a>
+            ${(nx || form) ? `<div class="tx-next"><div>${nx ? `<small>Next · ${esc(dayShort(nx.scheduledAt) || 'Week ' + nx.week)}</small><b>${nextTxt}</b>` : '<small>Season</small><b>Complete</b>'}</div>${form ? `<div class="tx-form"><small>Last 3</small>${form}</div>` : ''}</div>` : ''}
+            <div class="tx-acts"><a class="dk-btn dk-btn--sm" href="${teamUrl}">Team page</a><a class="dk-btn dk-btn--out dk-btn--sm" href="${teamUrl}&tab=roster">Roster${n ? ' · ' + n : ''}</a></div>
           </div>
-        </div>`;
+        </article>`;
       }).join('');
     }
 
-    function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-    function slugify(s) { return String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+    document.addEventListener('click', e => {
+      const d = e.target.closest('#tx-divs [data-div]'); if (d) { activeDivision = d.dataset.div; renderTabs(); renderTeams(); return; }
+      const o = e.target.closest('[data-order]'); if (o) { order = o.dataset.order; document.querySelectorAll('[data-order]').forEach(b => { const on = b === o; b.classList.toggle('on', on); b.setAttribute('aria-pressed', on ? 'true' : 'false'); }); renderTeams(); }
+    });
+    $('tx-find').addEventListener('input', renderTeams);
+    // The bar sits under the fixed nav, whatever its height is today.
+    function setTop() { let h = 0; ['.ds-nav', '.ds-pastbar'].forEach(s => { const n = document.querySelector(s); if (!n) return; const r = n.getBoundingClientRect(); if (r.height > 0 && r.bottom > h && r.top <= 0) h = r.bottom; }); document.documentElement.style.setProperty('--dk-top', Math.max(0, Math.round(h)) + 'px'); }
+    window.addEventListener('resize', setTop); setTimeout(setTop, 300); setTimeout(setTop, 1500);
+
     (window.dsSeason ? window.dsSeason() : Promise.resolve(null)).then(function (S) {
-      if (S) { SEASON_ID = S.id; LINK_SUFFIX = S.suffix; }
+      if (S) { SEASON_ID = S.id; LINK_SUFFIX = S.suffix || ''; }
     }).catch(() => {}).then(loadTeams);
   </script>
 </body>

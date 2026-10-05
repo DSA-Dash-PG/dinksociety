@@ -129,6 +129,9 @@ export default async (req) => {
               isCaptain: capEmail
                 ? (p.email || '').toLowerCase() === capEmail
                 : (p.role === 'captain' || p.isCaptain || false),
+              // Set by the captain portal (captain-cocaptain.js); the team page
+              // shows a Co-captain tag from it.
+              isCoCaptain: !!p.isCoCaptain,
               // MLP-style profile fields (approved only)
               height: prof.height,
               age: prof.age,
