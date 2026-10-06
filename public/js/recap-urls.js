@@ -38,3 +38,10 @@ window.DS_RECAP_URLS = new Proxy(HAND_BUILT_RECAPS, {
     return undefined;
   },
 });
+
+// Hand-built ladder PREVIEW articles, keyed by EVENT ID (upcoming nights).
+// Read by the ladder hub's night cards ("Read the preview"). Add a line here
+// when a new preview ships; the page lives under public/ladders/previews/.
+window.DS_PREVIEW_URLS = {
+  '2f810cf9c396': '/ladders/previews/2026-10-11-kings-court-3.html', // King's Court #3
+};

@@ -29,6 +29,7 @@ let DIV=HUB.division||'all', TAB='overview';
 const DSTATS={};          // division → its scoped stats response (kitchen, top performers…)
 let PHALBUMS=null;        // public-ladder-photos albums
 const RECAP_URLS=window.DS_RECAP_URLS||{};
+const PREVIEW_URLS=window.DS_PREVIEW_URLS||{};
 const MIN_LB_GAMES=10;    // games before a player is ranked on a season board
 const $=id=>document.getElementById(id);
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -300,6 +301,7 @@ function nightCard(l,hero){
     <div class="lh-fill"><span class="dk-track"><i class="${full?'full':pct>=80?'warn':''}" style="width:${Math.min(100,pct)}%"></i></span>
       <div><span>${cap-(l.spotsLeft||0)} of ${cap} in</span>${(!live&&ms!=null&&ms>0)?`<span>Starts in <span class="lh-cd" data-cd="${start}">${countdownLabel(ms)}</span></span>`:''}</div></div>
     <div class="lh-night__acts">${action}
+      ${PREVIEW_URLS[l.id]?`<a class="lh-link" href="${esc(PREVIEW_URLS[l.id])}">Read the preview</a>`:''}
       ${(l.roster&&l.roster.length)?`<button type="button" class="lh-link" data-lineup="${esc(l.id)}" aria-expanded="${LEXP[l.id]?'true':'false'}">${LEXP[l.id]?'Hide who’s in':'See who’s in'}</button>`:''}
       ${(hasDesc||hasRules||names.length)?`<button type="button" class="lh-link" data-desc="${esc(l.id)}" aria-expanded="${LDESC[l.id]?'true':'false'}">${LDESC[l.id]?'Hide details':'Details'}</button>`:''}
       <button type="button" class="lh-link" data-share="${esc(l.id)}">Invite a friend</button>
