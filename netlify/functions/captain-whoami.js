@@ -8,6 +8,9 @@ import { getRelevantAnnouncements } from './lib/announcements.js';
 import { circuitCode } from './lib/circuit.js';
 import { rosterWaiverGaps } from './lib/waiver.js';
 import { isAdminEmail } from './lib/admin-auth.js';
+import { normalizeEmail } from './lib/identity.js';
+import { findPlayerByEmail } from './lib/player-auth.js';
+import { photoResolver } from './lib/player-photo.js';
 
 export default async (req) => {
   const result = await verifyCaptainSession(req);
@@ -73,9 +76,28 @@ export default async (req) => {
     }));
   }
 
+  // The captain's own avatar — the SAME one the player portal and public
+  // pages show (lib/player-photo.js), so switching Captain ⇄ Me never swaps
+  // pictures. Found by email: their entry on this roster, else any profile.
+  let name = null, photoUrl = null;
+  try {
+    const em = normalizeEmail(ctx.user.email);
+    const mine = (t?.roster || []).find(p => (p.normalizedEmail || normalizeEmail(p.email)) === em);
+    let pid = mine?.id || null;
+    name = mine?.name || null;
+    if (!pid) {
+      const found = await findPlayerByEmail(ctx.user.email).catch(() => null);
+      pid = found?.playerId || null;
+      name = name || found?.player?.name || found?.name || null;
+    }
+    if (pid) photoUrl = (await photoResolver()).urlFor(pid);
+  } catch { /* initials */ }
+
   return new Response(JSON.stringify({
     captain: true,
     email: ctx.user.email,
+    name,
+    photoUrl,
     teams,
     team: teamEntry,
     currentTeamId: teamEntry ? teamEntry.id : null,

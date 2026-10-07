@@ -27,6 +27,7 @@ export async function setMerge(fromId, toId, name) {
   if (resolve(map, toId) === fromId) throw new Error('would create a loop');
   map[fromId] = { to: toId, name: name || null };
   await store().setJSON('map.json', map);
+  try { await getStore('player-photos').delete('index.json'); } catch { /* ok — avatar index rebuilds */ }
   return map;
 }
 
@@ -34,6 +35,7 @@ export async function removeMerge(fromId) {
   const map = await getMergeMap();
   delete map[fromId];
   await store().setJSON('map.json', map);
+  try { await getStore('player-photos').delete('index.json'); } catch { /* ok */ }
   return map;
 }
 

@@ -21,26 +21,11 @@ import { getDirectory } from './lib/player-directory.js';
 import { getLiteByEmail } from './lib/ladder-players.js';
 import { normalizeEmail } from './lib/identity.js';
 import { etagJson } from './lib/http-cache.js';
+import { photoResolver } from './lib/player-photo.js';
 
-const CACHE = 'public, max-age=300, stale-while-revalidate=3600';
+const CACHE = 'public, max-age=60, stale-while-revalidate=300';
 const VALID_ID = /^[a-zA-Z0-9_-]{1,80}$/;
 const MAX_IDS = 200;
-
-const photoUrl = (pid, v) =>
-  '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(pid) + (v ? '&v=' + encodeURIComponent(v) : '');
-
-/** Every playerId with an approved photo → its metadata (for cache-busting). */
-async function approvedPhotos() {
-  const out = new Map();
-  try {
-    const { blobs } = await getStore('player-photos').list({ prefix: 'img/' });
-    for (const b of blobs || []) {
-      const pid = b.key.slice(4);
-      if (pid) out.set(pid, b.etag || '');
-    }
-  } catch { /* store not provisioned yet → nobody has a photo */ }
-  return out;
-}
 
 /** email → league roster id, built lazily from every team blob. */
 async function teamIdsByEmail() {
@@ -64,20 +49,21 @@ export default async (req) => {
   const ids = [...new Set(raw.split(',').map(s => s.trim()).filter(id => VALID_ID.test(id)))].slice(0, MAX_IDS);
   if (!ids.length) return etagJson(req, { photos: {} }, { cacheControl: CACHE });
 
-  const photos = await approvedPhotos();
+  // 1. The site-wide resolver (lib/player-photo.js) already knows roster ids,
+  //    lite ids and directory ids, grouped into people — and it picks the SAME
+  //    picture every other page shows.
+  const { urlFor } = await photoResolver();
   const out = {};
-  if (!photos.size) return etagJson(req, { photos: out }, { cacheControl: CACHE });
-
-  // 1. Direct hit.
   const pending = [];
   for (const id of ids) {
-    if (photos.has(id)) out[id] = photoUrl(id, photos.get(id));
-    else pending.push(id);
+    const u = urlFor(id);
+    if (u) out[id] = u; else pending.push(id);
   }
   if (!pending.length) return etagJson(req, { photos: out }, { cacheControl: CACHE });
 
-  // 2. By email. The directory is one small blob; lite pointers are one get
-  //    per email; teams are scanned once only if still needed.
+  // 2. Stragglers: a ladder id the index hasn't met yet. Find the person by
+  //    email (directory → lite pointer → team rosters) and ask the resolver
+  //    about THAT id, so the answer is still the one source of truth.
   const dir = await getDirectory().catch(() => ({}));
   const emailOf = id => normalizeEmail(dir[id]?.email || '');
   const unresolved = [];
@@ -85,14 +71,14 @@ export default async (req) => {
     const norm = emailOf(id);
     if (!norm) return;
     const lite = await getLiteByEmail(norm).catch(() => null);
-    if (lite?.playerId && photos.has(lite.playerId)) out[id] = photoUrl(lite.playerId, photos.get(lite.playerId));
-    else unresolved.push(id);
+    const u = lite?.playerId ? urlFor(lite.playerId) : null;
+    if (u) out[id] = u; else unresolved.push(id);
   }));
   if (unresolved.length) {
     const byEmail = await teamIdsByEmail();
     for (const id of unresolved) {
-      const pid = byEmail.get(emailOf(id));
-      if (pid && photos.has(pid)) out[id] = photoUrl(pid, photos.get(pid));
+      const u = urlFor(byEmail.get(emailOf(id)));
+      if (u) out[id] = u;
     }
   }
 

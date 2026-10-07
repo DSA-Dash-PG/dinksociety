@@ -15,6 +15,7 @@ import { buildLeagueIndex, playedBefore, playedForTeam } from './lib/league-play
 import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 import { logRosterChanges } from './lib/roster-diff.js';
 import { notifyAdminsPendingRosterAdd } from './lib/roster-approvals.js';
+import { photoResolver } from './lib/player-photo.js';
 
 // No roster size cap — rosters are unlimited; every add still goes through admin approval.
 
@@ -28,7 +29,11 @@ export default async (req) => {
 
   if (req.method === 'GET') {
     const rosterLocked = await isRosterLocked(ctx.team);
-    return json({ team: ctx.team, rosterLocked });
+    // Display-only: each player's site-wide avatar (lib/player-photo.js), so
+    // the captain sees the same picture as everywhere else. PUT ignores it.
+    const { urlFor } = await photoResolver();
+    const team = { ...ctx.team, roster: (ctx.team.roster || []).map(p => ({ ...p, photoUrl: urlFor(p.id) })) };
+    return json({ team, rosterLocked });
   }
 
   if (req.method === 'PUT') {

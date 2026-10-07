@@ -49,6 +49,9 @@ export async function getIdentityMap() {
 
 async function saveIdentityMap(map) {
   await store().setJSON(MAP_KEY, { links: map.links || {}, splits: map.splits || {} });
+  // Who-is-who changed → whose photo is whose may have too. Drop the derived
+  // avatar index (lib/player-photo.js) so it rebuilds on the next read.
+  try { await getStore('player-photos').delete('index.json'); } catch { /* ok */ }
   return map;
 }
 

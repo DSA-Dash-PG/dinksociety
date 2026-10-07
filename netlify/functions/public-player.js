@@ -41,6 +41,7 @@ import { getStore } from '@netlify/blobs';
 import { normalizeScore } from './lib/score-helpers.js';
 import { identityIndex, mergeStatRows } from './lib/league-identity.js';
 import { seasonName } from './lib/circuit.js';
+import { photoUrlFor } from './lib/player-photo.js';
 
 // Slot type by slot key (matches lib/standings.js)
 const SLOT_TYPE = {
@@ -127,14 +128,10 @@ export default async (req) => {
     // ── Profile photo, across her ids ──
     // Photos are keyed by the roster id they were uploaded under. A new season
     // means a new roster entry with no photo stamp, so look through every id.
+    // One resolver for the whole site (lib/player-photo.js): newest approved
+    // photo across every id she holds.
     let photoUrl = null;
-    try {
-      const ph = getStore('player-photos');
-      for (const id of ids) {
-        const meta = await ph.getMetadata(`img/${id}`).catch(() => null);
-        if (meta) { photoUrl = '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(id) + (meta.etag ? '&v=' + encodeURIComponent(meta.etag) : ''); break; }
-      }
-    } catch { photoUrl = null; }
+    try { photoUrl = await photoUrlFor(ids); } catch { photoUrl = null; }
 
     history.sort((a, b) => String(a.circuit || '').localeCompare(String(b.circuit || '')));
 

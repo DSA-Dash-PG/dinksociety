@@ -13,6 +13,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyAdminSession } from './lib/auth.js';
 import { peekApprovalToken } from './lib/approval-token.js';
 import { identityIdsFor } from './lib/league-identity.js';
+import { photoResolver } from './lib/player-photo.js';
 
 const VALID_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
@@ -43,13 +44,22 @@ export default async (req) => {
     }
 
     const store = getStore('player-photos');
-    let result = await store.getWithMetadata(key, { type: 'arrayBuffer' });
+    let result = null;
 
-    // No photo under THIS id? One person holds a roster id per season (and a
-    // ladder id), and the photo lives under whichever one it was uploaded to.
-    // Pages build this URL from the id they have, so resolve it here once
-    // rather than teaching every page about the identity layer. Only for the
-    // public (approved) variant; the CDN caches the answer either way.
+    if (!wantPending) {
+      // ONE answer per person: whatever id a page passes (any season's roster
+      // id, a ladder id), serve that person's current avatar — the newest
+      // approved photo across all their ids (lib/player-photo.js). This is
+      // what keeps home, team, player, captain and "me" pages in agreement.
+      const src = (await photoResolver().catch(() => null))?.sourceFor(id)?.src;
+      if (src) result = await store.getWithMetadata(`img/${src}`, { type: 'arrayBuffer' }).catch(() => null);
+    }
+    if (!result || !result.data) {
+      result = await store.getWithMetadata(key, { type: 'arrayBuffer' }).catch(() => null);
+    }
+
+    // Not in the index yet (an id minted since it was built)? Walk the
+    // identity layer directly.
     if ((!result || !result.data) && !wantPending) {
       const ids = await identityIdsFor(id).catch(() => []);
       for (const other of ids) {
@@ -69,10 +79,15 @@ export default async (req) => {
       status: 200,
       headers: {
         'Content-Type': contentType,
-        // Pages append ?v=<updatedAt> so a changed photo busts cache immediately.
+        // Versioned URLs (?v=<approvedAt>, emitted by lib/player-photo.js)
+        // change whenever the avatar changes, so they can cache long. A bare
+        // ?id= URL must stay short-lived or an admin's new photo would hide
+        // behind the old one for a day.
         'Cache-Control': wantPending
           ? 'private, no-store'
-          : 'public, max-age=3600, stale-while-revalidate=86400',
+          : (url.searchParams.get('v')
+              ? 'public, max-age=86400, stale-while-revalidate=604800'
+              : 'public, max-age=60, stale-while-revalidate=300'),
       },
     });
   } catch (err) {

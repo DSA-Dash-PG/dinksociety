@@ -45,8 +45,12 @@ export async function setPlayerInfo(id, info = {}) {
       next.duprClub = v;
     }
   }
+  const emailChanged = (dir[id]?.email || '') !== (next.email || '');
   dir[id] = next;
   await store().setJSON('directory.json', dir);
+  // An email links a ladder id to a person, so it can change whose avatar
+  // this id shows — drop the derived index (lib/player-photo.js).
+  if (emailChanged) { try { await getStore('player-photos').delete('index.json'); } catch { /* ok */ } }
   return next;
 }
 

@@ -16,6 +16,7 @@ import { getTeamAvailability } from './lib/availability.js';
 import { getOrganizer } from './lib/organizers.js';
 import { normalizeEmail } from './lib/identity.js';
 import { isActivePlayer } from './lib/roster.js';
+import { photoUrlFor } from './lib/player-photo.js';
 
 const SLOT_LABEL = {
   r1g1: "R1 · Women's", r1g2: "R1 · Men's", r1g3: 'R1 · Mixed', r1g4: 'R1 · Mixed', r1g5: 'R1 · Mixed', r1g6: 'R1 · Mixed',
@@ -46,6 +47,7 @@ export default async (req) => {
   // public-badges). This MUST come before any team.* access below.
   if (!team) {
     const liteEmail = (player.email || '').toLowerCase();
+    const litePhotoUrl = await photoUrlFor(playerId).catch(() => null);
     const announcements = await getRelevantAnnouncements({ teamId: null, division: null, limit: 3, audiences: ['players'] }).catch(() => []);
     return etagJson(req, {
       profile: {
@@ -59,7 +61,10 @@ export default async (req) => {
         // have no roster entry to hold them) — surface them the same way.
         bio: player.profile || {},
         pendingProfile: player.pendingProfile || null,
-        hasPhoto: !!(player.photo && player.photo.updatedAt),
+        // The person's ONE avatar (lib/player-photo.js) — same picture the
+        // public pages show, wherever it was uploaded.
+        photoUrl: litePhotoUrl,
+        hasPhoto: !!litePhotoUrl,
         photoUpdatedAt: player.photo?.updatedAt || null,
       },
       myTeams: [], currentTeamId: null,
@@ -327,6 +332,8 @@ export default async (req) => {
     };
   }));
 
+  const myPhotoUrl = await photoUrlFor(playerId).catch(() => null);
+
   // ETag + private no-store: the portal's live poller sends If-None-Match,
   // so unchanged payloads come back as an empty 304 instead of the full blob.
   return etagJson(req, {
@@ -339,7 +346,12 @@ export default async (req) => {
       // awaiting admin approval, and whether an approved photo exists.
       bio: player.profile || {},
       pendingProfile: player.pendingProfile || null,
-      hasPhoto: !!(player.photo && player.photo.updatedAt),
+      // The person's ONE avatar (lib/player-photo.js): newest approved photo
+      // across every season's roster id + ladder id. Was this entry's own
+      // stamp, so a new season's entry (or an admin upload under another id)
+      // showed a different picture here than on the public pages.
+      photoUrl: myPhotoUrl,
+      hasPhoto: !!myPhotoUrl,
       photoUpdatedAt: player.photo?.updatedAt || null,
     },
     myTeams,

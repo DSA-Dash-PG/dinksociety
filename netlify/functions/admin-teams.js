@@ -22,6 +22,7 @@ import { rebuildStandings } from './lib/standings.js';
 import { logActivity } from './lib/activity-log.js';
 import { logRosterChanges } from './lib/roster-diff.js';
 import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
+import { photoResolver } from './lib/player-photo.js';
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -133,7 +134,15 @@ export default async (req) => {
     // circuitCode() and got it subtly wrong, which is how the admin Teams tab
     // ended up listing two "Season 1"s. Stamp the canonical code here so there
     // is exactly one implementation and the UI never has to guess.
-    const withCode = (t) => t && { ...t, circuitCode: circuitCode(t.circuit || t.seasonId) };
+    // Each roster entry also gets `photoUrl` — the person's site-wide avatar
+    // (lib/player-photo.js) — so admin shows the same picture as every public
+    // page. Display-only; PUT rebuilds entries field by field and ignores it.
+    const { urlFor } = await photoResolver();
+    const withCode = (t) => t && {
+      ...t,
+      circuitCode: circuitCode(t.circuit || t.seasonId),
+      roster: (t.roster || []).map(p => (p && p.id ? { ...p, photoUrl: urlFor(p.id) } : p)),
+    };
 
     if (teamId) {
       const team = await store.get(`team/${teamId}.json`, { type: 'json' }).catch(() => null);

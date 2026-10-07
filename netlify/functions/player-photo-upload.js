@@ -20,6 +20,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, verifyCaptainSession, verifyPlayerSession } from './lib/auth.js';
 import { notifyAdminsPendingProfile } from './lib/profile.js';
 import { getLiteById, updateLite } from './lib/ladder-players.js';
+import { putApprovedPhoto } from './lib/player-photo.js';
 
 const MAX_BYTES = 6 * 1024 * 1024; // 6 MB — Lambda payload ceiling (client compresses first)
 const ALLOWED_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
@@ -96,7 +97,7 @@ export default async (req) => {
       const stamp = { updatedAt, contentType: file.type };
 
       if (isAdmin) {
-        await photoStore.set(`img/${playerId}`, arrayBuffer, { metadata: { contentType: file.type } });
+        await putApprovedPhoto(playerId, arrayBuffer, file.type, updatedAt);
         const pending = { ...(rec.pendingProfile || {}) };
         delete pending.photo;
         await updateLite(playerId, {
@@ -140,8 +141,9 @@ export default async (req) => {
     const stamp = { updatedAt, contentType: file.type };
 
     if (isAdmin) {
-      // Admin upload → live immediately.
-      await photoStore.set(`img/${playerId}`, arrayBuffer, { metadata: { contentType: file.type } });
+      // Admin upload → live immediately, and becomes this person's avatar on
+      // every page (lib/player-photo.js: newest approved photo wins).
+      await putApprovedPhoto(playerId, arrayBuffer, file.type, updatedAt);
       entry.photo = stamp;
       if (entry.pendingProfile) delete entry.pendingProfile.photo;
     } else {

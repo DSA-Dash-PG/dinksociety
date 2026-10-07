@@ -1346,9 +1346,7 @@
     const opt = (v, cur) => `<option value="${v}"${v === cur ? ' selected' : ''}>${v || '—'}</option>`;
     const pendNote = pend
       ? `<div class="pf-pending">⏳ You have edits awaiting admin approval. Saving again replaces them.</div>` : '';
-    const photoSrc = me.hasPhoto
-      ? `${API}/player-photo-serve?id=${encodeURIComponent(me.playerId)}&v=${encodeURIComponent(me.photoUpdatedAt || '')}`
-      : '';
+    const photoSrc = me.photoUrl || '';
 
     $('psheet-body').innerHTML = `
       <div class="pf-form">
@@ -1768,8 +1766,9 @@
     // Always attempt the photo (404 → onerror reverts to initials), so a stale/absent
     // hasPhoto flag doesn't force initials when the image actually exists.
     const _ini = initials(p.name);
-    const _avImg = p.playerId
-      ? '<img src="' + API + '/player-photo-serve?id=' + encodeURIComponent(p.playerId) + (p.photoUpdatedAt ? '&v=' + encodeURIComponent(p.photoUpdatedAt) : '') + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.remove();this.parentNode.textContent=this.parentNode.dataset.ini;">'
+    // p.photoUrl is the site-wide avatar (server-resolved, lib/player-photo.js).
+    const _avImg = p.photoUrl
+      ? '<img src="' + p.photoUrl + '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:inherit" onerror="this.remove();this.parentNode.textContent=this.parentNode.dataset.ini;">'
       : '';
     $('me-av').dataset.ini = _ini; $('me-av').innerHTML = _avImg || _ini; $('me-av').style.overflow = 'hidden';
     // Drawer identity
@@ -3488,8 +3487,8 @@
     // Hero: photo (or initials), team eyebrow, name, Chef pill, big DSR.
     // Always attempt the photo (404 → img removes itself, revealing initials).
     const ini = esc(initials(me.name));
-    const photoUrl = `${API}/player-photo-serve?id=${encodeURIComponent(me.playerId)}` + (me.photoUpdatedAt ? `&v=${encodeURIComponent(me.photoUpdatedAt)}` : '');
-    const avatarInner = `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">${ini}</span><img src="${esc(photoUrl)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.remove()">`;
+    const photoUrl = me.photoUrl || '';
+    const avatarInner = `<span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center">${ini}</span>` + (photoUrl ? `<img src="${esc(photoUrl)}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%" onerror="this.remove()">` : '');
     const bopts = myBadgeOpts();
     const meCrest = window.dsBadges ? dsBadges.avatarCrest(bopts, 'league') : '';
     // Award pills are intentionally omitted from the Me hero (kept clean + consistent

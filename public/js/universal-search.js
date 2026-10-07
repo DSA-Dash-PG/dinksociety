@@ -130,8 +130,10 @@
       var arr = Array.isArray(raw) ? raw : Object.keys(raw || {}).map(function (k) { return raw[k]; });
       var statBy = {};
       arr.forEach(function (p) { if (p && p.name) statBy[String(p.name).toLowerCase() + '|' + String(p.teamName || '').toLowerCase()] = p; });
-      var mk = function (name, teamName, gender, p) {
+      var mk = function (name, teamName, gender, p, photo) {
         return { name: name, team: teamName, gender: gender || (p && p.gender) || '', season: tag, seasonId: id, current: isCurrent,
+          // Server-resolved site-wide avatar (lib/player-photo.js) — same picture as every page.
+          photo: photo || (p && p.photoUrl) || null,
           dsr: (p && p.composite != null ? Number(p.composite) : (p && p.dsr != null ? Number(p.dsr) : null)),
           cap: (capBy[teamName] === name), emoji: emojiBy[teamName] || '🏓',
           href: '/player?name=' + encodeURIComponent(name) + '&team=' + slugify(teamName) + suf };
@@ -140,7 +142,7 @@
       // Rosters first — a rostered player with no games yet still shows up.
       teams.forEach(function (t) { (t.roster || []).forEach(function (r) {
         if (!r || !r.name) return; var k = String(r.name).toLowerCase() + '|' + String(t.name).toLowerCase();
-        if (seen[k]) return; seen[k] = true; players.push(mk(r.name, t.name, r.gender, statBy[k]));
+        if (seen[k]) return; seen[k] = true; players.push(mk(r.name, t.name, r.gender, statBy[k], r.photoUrl));
       }); });
       // Then anyone in the stats feed who isn't on a roster any more.
       arr.forEach(function (p) {
@@ -216,7 +218,8 @@
             (p.dr != null ? '<div class="ds-srch-dsr' + (p.gender === 'F' ? ' teal' : '') + '">' + p.dr.toFixed(2) + ' <small>DR</small></div>' : '') + '</div>';
         } else {
           html += '<div class="ds-srch-row" data-i="' + i + '">' +
-            '<div class="ds-srch-av" style="background:' + color(p.team) + '">' + esc(initials(p.name)) + '</div>' +
+            '<div class="ds-srch-av" style="background:' + color(p.team) + ';position:relative;overflow:hidden">' + esc(initials(p.name)) +
+              (p.photo ? '<img src="' + esc(p.photo) + '" alt="" loading="lazy" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover" onerror="this.remove()">' : '') + '</div>' +
             '<div class="ds-srch-bd"><div class="ds-srch-nm">' + hl(p.name, q) + (p.season && !p.current ? ' <span class="ds-srch-season">' + esc(p.season) + '</span>' : '') + '</div><div class="ds-srch-sub">' + esc(p.emoji || teamEmoji(p.team)) + ' ' + esc(p.team) + (g ? ' · ' + g : '') + (p.cap ? ' · <span class="cp">Captain</span>' : '') + '</div></div>' +
             (p.dsr != null ? '<div class="ds-srch-dsr' + (p.gender === 'F' ? ' teal' : '') + '">' + p.dsr.toFixed(1) + ' <small>DSR</small></div>' : '') +
             (p.rank != null ? '<div class="ds-srch-rank">#' + p.rank + '</div>' : '') + '</div>';

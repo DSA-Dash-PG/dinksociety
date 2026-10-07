@@ -17,6 +17,7 @@ import { getStore } from '@netlify/blobs';
 import { PROFILE_FIELDS } from './profile.js';
 import { getLiteById, updateLite, isLiteId } from './ladder-players.js';
 import { setPlayerInfo } from './player-directory.js';
+import { putApprovedPhoto } from './player-photo.js';
 
 /** Clean pending name (same rules player-profile.js validates with). */
 function pendingName(pp) {
@@ -91,10 +92,8 @@ export async function decideProfileChange({ teamId, playerId, action }) {
       if (pp.photo) {
         const blob = await photoStore.getWithMetadata(`pending/${playerId}`, { type: 'arrayBuffer' }).catch(() => null);
         if (blob && blob.data) {
-          await photoStore.set(`img/${playerId}`, blob.data, {
-            metadata: { contentType: blob.metadata?.contentType || pp.photo.contentType || 'image/jpeg' },
-          });
-          next.photo = { updatedAt: new Date().toISOString(), contentType: pp.photo.contentType || 'image/jpeg' };
+          const approvedAt = await putApprovedPhoto(playerId, blob.data, blob.metadata?.contentType || pp.photo.contentType || 'image/jpeg');
+          next.photo = { updatedAt: approvedAt, contentType: pp.photo.contentType || 'image/jpeg' };
         }
         await photoStore.delete(`pending/${playerId}`).catch(() => {});
       }
@@ -138,10 +137,8 @@ export async function decideProfileChange({ teamId, playerId, action }) {
     if (pp.photo) {
       const blob = await photoStore.getWithMetadata(`pending/${playerId}`, { type: 'arrayBuffer' }).catch(() => null);
       if (blob && blob.data) {
-        await photoStore.set(`img/${playerId}`, blob.data, {
-          metadata: { contentType: blob.metadata?.contentType || pp.photo.contentType || 'image/jpeg' },
-        });
-        entry.photo = { updatedAt: new Date().toISOString(), contentType: pp.photo.contentType || 'image/jpeg' };
+        const approvedAt = await putApprovedPhoto(playerId, blob.data, blob.metadata?.contentType || pp.photo.contentType || 'image/jpeg');
+        entry.photo = { updatedAt: approvedAt, contentType: pp.photo.contentType || 'image/jpeg' };
       }
       await photoStore.delete(`pending/${playerId}`).catch(() => {});
     }

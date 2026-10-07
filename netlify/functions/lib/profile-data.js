@@ -21,6 +21,7 @@ import { getXpConfig, getXpGrants, grantTotals } from './xp-config.js';
 import { getMergeMap, applyMerges, resolve as resolveMerge } from './player-merge.js';
 import { identityIdsFor, mergeStatRows } from './league-identity.js';
 import { getDirectory, applyDirectory } from './player-directory.js';
+import { photoUrlFor } from './player-photo.js';
 
 const nm = p => (p ? p.name : null);
 
@@ -239,11 +240,7 @@ export async function buildUnifiedProfile({ email, ladderId, leagueId, circuit =
     if (lgId) ids.push(...await identityIdsFor(lgId));
     if (ldId) ids.push(ldId);
     if (lgId) ids.push(lgId);
-    const ph = getStore('player-photos');
-    for (const id of [...new Set(ids.filter(Boolean))]) {
-      const meta = await ph.getMetadata(`img/${id}`).catch(() => null);
-      if (meta) { photoUrl = '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(id) + (meta.etag ? '&v=' + encodeURIComponent(meta.etag) : ''); break; }
-    }
+    photoUrl = await photoUrlFor([...new Set(ids.filter(Boolean))]);
   } catch { photoUrl = null; }
 
   return {

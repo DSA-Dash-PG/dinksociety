@@ -8,6 +8,7 @@
 import { buildLadderProfile } from './lib/profile-data.js';
 import { findPlayerByEmail } from './lib/player-auth.js';
 import { etagJson } from './lib/http-cache.js';
+import { photoUrlFor } from './lib/player-photo.js';
 
 // Ladder stats only change on score entry, so this can cache for a while.
 // ETag lets repeat opens short-circuit with a 304.
@@ -20,7 +21,7 @@ export default async (req) => {
   const r = await buildLadderProfile(id);
   if (!r.found) return etagJson(req, { found: false }, { cacheControl: CACHE });
 
-  let inLeague = false, photoUrl = null;
+  let inLeague = false, photoUrl = null, leagueId = null;
   // r.email is used server-side only (to detect a matching league profile);
   // it is intentionally NOT returned to the client. When the player also has a
   // league profile, pass through their photo URL so the ladder card can show it
@@ -30,10 +31,13 @@ export default async (req) => {
       const lp = await findPlayerByEmail(r.email);
       if (lp) {
         inLeague = true;
-        if (lp.playerId) photoUrl = '/.netlify/functions/player-photo-serve?id=' + encodeURIComponent(lp.playerId);
+        leagueId = lp.playerId || null;
       }
     } catch { inLeague = false; }
   }
+  // Same avatar as every other page (lib/player-photo.js) — ladder-only
+  // players included, which this card used to skip entirely.
+  try { photoUrl = await photoUrlFor(id, leagueId); } catch { photoUrl = null; }
 
   return etagJson(req, { found: true, inLeague, photoUrl, player: r.player }, { cacheControl: CACHE });
 };
