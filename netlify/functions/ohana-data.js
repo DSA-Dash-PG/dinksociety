@@ -71,7 +71,11 @@ export default async (req) => {
     league: { name: league.name, venue: league.venue, night: league.night, teams: league.teams, ourTeamId: league.ourTeamId, photo: league.photo || null },
     weeks,
     standings: computeStandings(league),
-    stats: { team: stats.team, players: stats.players, pairs: stats.pairs.slice(0, 8) },
+    // full=1 → everything the /ohana/stats page needs (every game, every pair,
+    // records vs each team, opponents faced). Names only — no emails in games.
+    stats: new URL(req.url).searchParams.get('full') === '1'
+      ? { team: stats.team, players: stats.players, pairs: stats.pairs, vsTeams: stats.vsTeams, oppPlayers: stats.oppPlayers, games: stats.games }
+      : { team: stats.team, players: stats.players, pairs: stats.pairs.slice(0, 8) },
     eligibility: { total: elig.total, needed: elig.needed },
     announcement: league.announcement === undefined ? DEFAULT_ANNOUNCEMENT : league.announcement,
     roster: league.roster.map(p => ({ ...(v.canEdit ? { email: p.email, gender: p.gender || '' } : { me: p.email === v.email }), name: p.name, manager: !!p.manager, played: elig.played[p.email] || 0 })),

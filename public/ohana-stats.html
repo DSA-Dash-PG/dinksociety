@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ohana Stats · The Dink Society</title>
+  <!-- Private team stats: roster-only (checked server-side in ohana-data), never indexed. -->
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+  <link rel="icon" type="image/svg+xml" href="/img/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <script>(function(){var t=localStorage.getItem("ds-theme");document.documentElement.setAttribute("data-theme",t==="light"?"light":"dark")})()</script>
+  <link rel="stylesheet" href="/css/shared.css" />
+  <link rel="stylesheet" href="/css/shared-nav.css" />
+  <style>
+    .os { max-width: 900px; margin: 0 auto; padding: 0 var(--gutter) 80px; }
+    .page-hero--ohana { min-height: 0; margin-bottom: var(--space-4); }
+    .page-hero--ohana .page-hero__content { padding: 112px var(--gutter) 8px; width: 100%; max-width: 900px; box-sizing: border-box; }
+    @media (max-width: 720px) { .page-hero--ohana .page-hero__content { padding-top: 96px; } }
+    .os-lock { font-size: 9px; letter-spacing: .1em; padding: 2px 8px; border-radius: var(--radius-full); border: 1px solid var(--color-border-strong); color: var(--color-text-muted); }
+    .os-back { display:inline-block; font-size: 12px; font-weight: 700; color: var(--color-lime); text-decoration: none; margin-bottom: 14px; }
+
+    /* Sticky section nav — never scroll back up to switch sections. */
+    .os-nav { position: sticky; top: 64px; z-index: 20; background: var(--color-bg); padding: 10px 0; border-bottom: 1px solid var(--color-divider); margin-bottom: 18px; display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+    .os-nav::-webkit-scrollbar { display:none; }
+    .os-nav a { flex-shrink:0; background: var(--color-surface-2); border:1px solid var(--color-border); color: var(--color-text-muted); border-radius: var(--radius-full); padding:6px 12px; font:700 11px Inter, sans-serif; text-decoration:none; white-space:nowrap; }
+    .os-nav a.on { border-color: var(--color-lime); color: var(--color-lime); background: var(--color-lime-ghost); }
+
+    .os-kpis { display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; margin-bottom: 8px; }
+    .os-kpi { background: var(--color-surface); border:1px solid var(--color-border); border-radius: var(--radius-lg); padding: 14px; }
+    .os-kpi .v { font-size: 26px; font-weight: 800; color: var(--color-lime); font-variant-numeric: tabular-nums; line-height: 1; }
+    .os-kpi .l { font-size: 10px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--color-text-faint); margin-top: 8px; }
+    .os-kpi .s { font-size: 11px; color: var(--color-text-muted); margin-top: 4px; }
+    @media (max-width: 720px) { .os-kpis { grid-template-columns: repeat(2, 1fr); } .os-kpi:first-child { grid-column: 1 / -1; } }
+
+    .os-sec { scroll-margin-top: 130px; }
+    .os-h2 { font-size: 13px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin: 34px 0 6px; }
+    .os-lead { font-size: 12px; color: var(--color-text-muted); margin: 0 0 12px; line-height: 1.55; }
+    .os-card { background: var(--color-surface); border:1px solid var(--color-border); border-radius: var(--radius-lg); padding: 10px 14px; overflow-x: auto; }
+    .os-empty { color: var(--color-text-faint); font-size: 13px; padding: 6px 0; }
+
+    .os-t { width:100%; border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+    .os-t th { text-align:right; font-size:10px; letter-spacing:.08em; text-transform:uppercase; color: var(--color-text-faint); font-weight:800; padding:8px 6px; white-space:nowrap; }
+    .os-t th[data-k] { cursor:pointer; user-select:none; }
+    .os-t th[data-k]:hover, .os-t th.sorted { color: var(--color-text); }
+    .os-t th.sorted::after { content: ' ▼'; font-size: 8px; color: var(--color-teal); }
+    .os-t th.sorted.asc::after { content: ' ▲'; }
+    .os-t td { text-align:right; padding:9px 6px; border-top: 1px solid var(--color-divider); white-space:nowrap; }
+    .os-t th:first-child, .os-t td:first-child { text-align:left; }
+    .os-t td.nm { font-weight: 700; }
+    .os-t td.nm small { display:block; font-size: 10px; font-weight: 500; color: var(--color-text-faint); margin-top: 2px; }
+    .os-t td.dim { color: var(--color-text-faint); }
+    .pos { color: var(--color-teal); } .neg { color: var(--color-red); }
+    .os-t tr.me td.nm { color: var(--color-teal); }
+
+    .os-bar { display:inline-block; vertical-align: middle; width: 54px; height: 6px; border-radius: 3px; background: var(--color-surface-3, #262626); margin-left: 6px; overflow:hidden; }
+    .os-bar i { display:block; height:100%; background: var(--color-lime); }
+
+    .os-split { display:grid; grid-template-columns: repeat(3, 1fr); gap:10px; }
+    .os-split .os-kpi .v { font-size: 22px; }
+    @media (max-width: 720px) { .os-split { grid-template-columns: 1fr 1fr; } }
+
+    /* Partner grid */
+    .os-grid td { text-align:center; font-size: 12px; min-width: 52px; }
+    .os-grid th { text-align:center; }
+    .os-grid th:first-child, .os-grid td:first-child { text-align:left; }
+    .os-grid td.c { border-radius: 4px; }
+    .os-grid td.self { color: var(--color-text-faint); }
+
+    /* Game log */
+    .os-match { margin-bottom: 14px; }
+    .os-match h3 { font-size: 15px; font-weight: 800; margin: 4px 0 2px; }
+    .os-match .meta { font-size: 11px; color: var(--color-text-faint); margin-bottom: 8px; }
+    .os-g { display:grid; grid-template-columns: 30px 48px 1fr 1fr 56px; gap: 8px; align-items: center; font-size: 13px; padding: 7px 0; border-top: 1px solid var(--color-divider); }
+    .os-g .n, .os-g .ty { font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--color-text-faint); }
+    .os-g .us { font-weight: 700; } .os-g .them { color: var(--color-text-muted); }
+    .os-g .sc { text-align: right; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .os-g.w .sc { color: var(--color-teal); } .os-g.l .sc { color: var(--color-red); }
+    @media (max-width: 560px) { .os-g { grid-template-columns: 26px 1fr 52px; } .os-g .ty, .os-g .them { display:none; } }
+
+    .os-gate { text-align:center; padding: 60px 20px; }
+    .os-gate p { color: var(--color-text-muted); font-size:14px; line-height:1.6; max-width: 380px; margin: 10px auto 22px; }
+    .os-btn { display:inline-block; font: 800 12px Inter, sans-serif; border-radius: var(--radius-full); padding: 9px 16px; background: var(--color-lime); color:#0e0e0e; text-decoration:none; }
+  </style>
+</head>
+<body data-page="ohana">
+  <div data-partial="nav"></div>
+  <div class="page-hero page-hero--ohana">
+    <div class="page-hero__bg page-hero__bg--fallback"></div>
+    <div class="page-hero__gradient"></div>
+    <div class="page-hero__content">
+      <div class="page-hero__eyebrow">PVTC Fall 2026 · 3.5 Mixed <span class="os-lock">Private</span></div>
+      <h1 class="page-hero__title">Ohana Stats</h1>
+      <p class="page-hero__sub" id="os-sub">Every game, every pairing, every opponent.</p>
+    </div>
+  </div>
+  <main class="os" id="app"><div class="os-gate"><p>Loading…</p></div></main>
+  <div data-partial="footer"></div>
+  <script src="/js/partials.js"></script>
+  <script>
+  (function () {
+    const $ = (s, r = document) => r.querySelector(s);
+    const esc = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+    const sign = (n) => (n > 0 ? '+' : '') + n;
+    const cls = (n) => n > 0 ? 'pos' : n < 0 ? 'neg' : '';
+    const pct = (w, g) => g ? Math.round(w / g * 100) + '%' : '—';
+    const fmtDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    // Same slot layout as lib/ohana-core.js: per round WD, MD, then four mixed.
+    const ROUND_TYPES = ['WD', 'MD', 'MXD', 'MXD', 'MXD', 'MXD'];
+    const typeOf = (no) => ROUND_TYPES[(no - 1) % 6];
+    const roundOf = (no) => (no <= 6 ? 1 : 2);
+    const TYPE = { WD: "Women's", MD: "Men's", MXD: 'Mixed' };
+    let D = null;
+
+    async function load() {
+      const res = await fetch('/.netlify/functions/ohana-data?full=1', { credentials: 'include' });
+      const body = await res.json().catch(() => ({}));
+      if (res.status === 401) return gate(`<p>This page is just for the South Bay Ohana roster. Sign in with the email you use for The Dink Society.</p><a class="os-btn" href="/me.html?next=${encodeURIComponent('/ohana/stats')}">Sign in</a>`);
+      if (res.status === 403) return gate(`<p><b>Roster only.</b> You're signed in as <b>${esc(body.email || '')}</b>, which isn't on the South Bay Ohana roster.</p>`);
+      D = body; render();
+    }
+    function gate(html) { $('#app').innerHTML = `<div class="os-gate">${html}</div>`; }
+
+    // ── Derived numbers from the game log ───────────────────────────────
+    function derive() {
+      const games = (D.stats.games || []).slice().sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.no - b.no);
+      const rec = () => ({ gp: 0, w: 0, pf: 0, pa: 0 });
+      const add = (r, g) => { r.gp++; if (g.won) r.w++; r.pf += g.us; r.pa += g.them; };
+      const byType = { WD: rec(), MD: rec(), MXD: rec() }, byRound = { 1: rec(), 2: rec() };
+      const pType = {}, grid = {}, streak = {}, close = rec(), blow = rec();
+      for (const g of games) {
+        const t = typeOf(g.no);
+        add(byType[t], g); add(byRound[roundOf(g.no)], g);
+        const m = Math.abs(g.us - g.them);
+        if (m <= 2) add(close, g); else if (m >= 6) add(blow, g);
+        const [a, b] = g.players;
+        for (const [me, pt] of [[a, b], [b, a]]) {
+          if (!me) continue;
+          ((pType[me] ||= { WD: rec(), MD: rec(), MXD: rec() })[t]) && add(pType[me][t], g);
+          if (pt) add(((grid[me] ||= {})[pt] ||= rec()), g);
+          const s = (streak[me] ||= { cur: 0, best: 0 });
+          s.cur = g.won ? (s.cur > 0 ? s.cur + 1 : 1) : (s.cur < 0 ? s.cur - 1 : -1);
+          if (s.cur > s.best) s.best = s.cur;
+        }
+      }
+      return { games, byType, byRound, pType, grid, streak, close, blow };
+    }
+
+    // ── Render ──────────────────────────────────────────────────────────
+    const SECTIONS = [['players', 'Players'], ['splits', 'Splits'], ['pairs', 'Pairs'], ['partners', 'Partner grid'], ['opponents', 'Opponents'], ['log', 'Game log']];
+    let sortKey = 'pct', sortAsc = false;
+
+    function render() {
+      const t = D.stats.team, X = derive();
+      $('#os-sub').textContent = `${D.league.night} · ${D.league.venue} · ${X.games.length} game${X.games.length === 1 ? '' : 's'} logged`;
+      const rank = (D.standings || []).find(s => s.teamId === D.league.ourTeamId);
+      const avg = X.games.length ? (t.pf - t.pa) / X.games.length : 0;
+      $('#app').innerHTML = `
+        <a class="os-back" href="/ohana">← Back to the team page</a>
+        <div class="os-kpis">
+          <div class="os-kpi"><div class="v">${t.mw}-${t.ml}${t.mt ? '-' + t.mt : ''}</div><div class="l">Match record</div><div class="s">${t.pts} league pts${rank ? ` · ${ord(rank.rank)} of ${D.standings.length}` : ''}</div></div>
+          <div class="os-kpi"><div class="v">${t.gw}-${t.gl}</div><div class="l">Games</div><div class="s">${pct(t.gw, t.gw + t.gl)} won</div></div>
+          <div class="os-kpi"><div class="v ${cls(t.pf - t.pa)}">${sign(t.pf - t.pa)}</div><div class="l">Point diff</div><div class="s">${t.pf}-${t.pa} scored</div></div>
+          <div class="os-kpi"><div class="v">${avg ? sign(+avg.toFixed(1)) : '—'}</div><div class="l">Avg margin</div><div class="s">per game</div></div>
+          <div class="os-kpi"><div class="v">${X.close.gp ? `${X.close.w}-${X.close.gp - X.close.w}` : '—'}</div><div class="l">Close games</div><div class="s">decided by 1–2 pts</div></div>
+        </div>
+        <nav class="os-nav" id="os-nav">${SECTIONS.map(([id, l]) => `<a href="#${id}" data-sec="${id}">${l}</a>`).join('')}</nav>
+        ${X.games.length ? `
+          ${playersSec(X)}
+          ${splitsSec(X)}
+          ${pairsSec()}
+          ${partnersSec(X)}
+          ${oppSec()}
+          ${logSec(X)}` : `<div class="os-card"><div class="os-empty">Stats start once the first game scores are in.</div></div>`}
+      `;
+      bind();
+    }
+    const ord = (n) => n + (['th', 'st', 'nd', 'rd'][(n % 100 - 20) % 10] || ['th', 'st', 'nd', 'rd'][n % 100] || 'th');
+
+    function playersSec(X) {
+      const rows = D.stats.players.map(p => ({ ...p, streak: X.streak[p.name] || { cur: 0, best: 0 }, ty: X.pType[p.name] || {} }));
+      const val = { name: p => p.name.toLowerCase(), gp: p => p.gp, w: p => p.w, pct: p => p.pct, diff: p => p.diff, avg: p => p.avgDiff, nights: p => p.nights, streak: p => p.streak.cur };
+      rows.sort((a, b) => { const f = val[sortKey], x = f(a), y = f(b); const c = x < y ? -1 : x > y ? 1 : 0; return (sortAsc ? c : -c) || b.gp - a.gp; });
+      const split = (r) => r && r.gp ? `${r.w}-${r.gp - r.w}` : '<span class="dim">—</span>';
+      const th = (k, l) => `<th data-k="${k}" class="${sortKey === k ? 'sorted' + (sortAsc ? ' asc' : '') : ''}">${l}</th>`;
+      const stk = (s) => s.cur > 0 ? `<span class="pos">W${s.cur}</span>` : s.cur < 0 ? `<span class="neg">L${-s.cur}</span>` : '—';
+      return `<section class="os-sec" id="players"><h2 class="os-h2">Players</h2>
+        <p class="os-lead">Tap a column to sort. Nts = match nights played. Streak is the current run of wins (W) or losses (L).</p>
+        <div class="os-card"><table class="os-t" id="ptable"><thead><tr>
+          ${th('name', 'Player')}${th('nights', 'Nts')}${th('gp', 'GP')}${th('w', 'W-L')}${th('pct', 'Win%')}${th('diff', '+/-')}${th('avg', 'Avg')}<th>Women's</th><th>Men's</th><th>Mixed</th>${th('streak', 'Streak')}
+        </tr></thead><tbody>
+        ${rows.map(p => `<tr class="${D.me.name === p.name ? 'me' : ''}">
+          <td class="nm">${esc(p.name)}${p.partners[0] ? `<small>Most with ${esc(p.partners[0].name)} (${p.partners[0].w}-${p.partners[0].gp - p.partners[0].w})</small>` : ''}</td>
+          <td>${p.nights}</td><td>${p.gp}</td><td>${p.w}-${p.l}</td>
+          <td>${pct(p.w, p.gp)}<span class="os-bar"><i style="width:${Math.round(p.pct * 100)}%"></i></span></td>
+          <td class="${cls(p.diff)}">${sign(p.diff)}</td><td class="${cls(p.avgDiff)}">${sign(+p.avgDiff.toFixed(1))}</td>
+          <td>${split(p.ty.WD)}</td><td>${split(p.ty.MD)}</td><td>${split(p.ty.MXD)}</td><td>${stk(p.streak)}</td>
+        </tr>`).join('')}
+        </tbody></table></div></section>`;
+    }
+
+    function splitCard(label, r, sub) {
+      return `<div class="os-kpi"><div class="v ${r.gp ? '' : 'dim'}">${r.gp ? `${r.w}-${r.gp - r.w}` : '—'}</div><div class="l">${label}</div>
+        <div class="s">${r.gp ? `${pct(r.w, r.gp)} · <span class="${cls(r.pf - r.pa)}">${sign(r.pf - r.pa)}</span>` : 'No games yet'}${sub ? ' · ' + sub : ''}</div></div>`;
+    }
+    function splitsSec(X) {
+      return `<section class="os-sec" id="splits"><h2 class="os-h2">Splits</h2>
+        <p class="os-lead">Team record by game type, by round, and by how close the game was.</p>
+        <div class="os-split">
+          ${splitCard("Women's doubles", X.byType.WD)}${splitCard("Men's doubles", X.byType.MD)}${splitCard('Mixed', X.byType.MXD)}
+          ${splitCard('Round 1', X.byRound[1])}${splitCard('Round 2', X.byRound[2])}${splitCard('Won or lost by 6+', X.blow)}
+        </div></section>`;
+    }
+
+    function pairsSec() {
+      const ps = D.stats.pairs || [];
+      return `<section class="os-sec" id="pairs"><h2 class="os-h2">Pairs</h2>
+        <p class="os-lead">Every pairing we've put on court, best win rate first.</p>
+        <div class="os-card"><table class="os-t"><thead><tr><th>Pair</th><th>GP</th><th>W-L</th><th>Win%</th><th>+/-</th><th>Avg</th></tr></thead><tbody>
+        ${ps.map(p => `<tr><td class="nm">${esc(p.pair)}</td><td>${p.gp}</td><td>${p.w}-${p.gp - p.w}</td><td>${pct(p.w, p.gp)}</td><td class="${cls(p.diff)}">${sign(p.diff)}</td><td class="${cls(p.diff)}">${sign(+(p.diff / p.gp).toFixed(1))}</td></tr>`).join('')}
+        </tbody></table></div></section>`;
+    }
+
+    function partnersSec(X) {
+      const names = D.stats.players.map(p => p.name);
+      const first = (n) => n.split(' ')[0];
+      const cell = (a, b) => {
+        if (a === b) return `<td class="self">·</td>`;
+        const r = X.grid[a]?.[b];
+        if (!r) return `<td class="dim">—</td>`;
+        const share = r.w / r.gp;
+        const bg = share >= .5 ? `rgba(23,215,176,${(.12 + share * .3).toFixed(2)})` : `rgba(255,92,71,${(.12 + (1 - share) * .3).toFixed(2)})`;
+        return `<td class="c" style="background:${bg}" title="${esc(a)} with ${esc(b)}: ${r.w}-${r.gp - r.w}, ${sign(r.pf - r.pa)}">${r.w}-${r.gp - r.w}</td>`;
+      };
+      return `<section class="os-sec" id="partners"><h2 class="os-h2">Partner grid</h2>
+        <p class="os-lead">Each row's record when playing with that column's partner. Teal leans winning, red leans losing; a dash means they haven't played together yet.</p>
+        <div class="os-card"><table class="os-t os-grid"><thead><tr><th></th>${names.map(n => `<th>${esc(first(n))}</th>`).join('')}</tr></thead><tbody>
+        ${names.map(a => `<tr><td class="nm">${esc(a)}</td>${names.map(b => cell(a, b)).join('')}</tr>`).join('')}
+        </tbody></table></div></section>`;
+    }
+
+    function oppSec() {
+      const vt = D.stats.vsTeams || [], op = D.stats.oppPlayers || [];
+      return `<section class="os-sec" id="opponents"><h2 class="os-h2">Opponents</h2>
+        <p class="os-lead">Our record against each team, then every opposing player we've faced, as written on the score sheets.</p>
+        <div class="os-card" style="margin-bottom:10px"><table class="os-t"><thead><tr><th>Team</th><th>Matches</th><th>Games</th><th>Points</th><th>+/-</th></tr></thead><tbody>
+        ${vt.map(v => `<tr><td class="nm">${esc(v.name)}</td><td>${v.mw}-${v.ml}</td><td>${v.gw}-${v.gl}</td><td>${v.pf}-${v.pa}</td><td class="${cls(v.pf - v.pa)}">${sign(v.pf - v.pa)}</td></tr>`).join('')}
+        </tbody></table></div>
+        <div class="os-card"><table class="os-t"><thead><tr><th>Opponent</th><th>Team</th><th>Games vs us</th><th>Our record</th></tr></thead><tbody>
+        ${op.map(o => `<tr><td class="nm">${esc(o.name)}</td><td class="dim" style="text-align:right">${esc(o.teamName)}</td><td>${o.gp}</td><td class="${cls(o.l - o.w)}">${o.l}-${o.w}</td></tr>`).join('')}
+        </tbody></table></div></section>`;
+    }
+
+    function logSec(X) {
+      const by = new Map();
+      for (const g of X.games) { if (!by.has(g.matchId)) by.set(g.matchId, []); by.get(g.matchId).push(g); }
+      const blocks = [...by.values()].reverse().map(gs => {
+        const g0 = gs[0], w = gs.filter(g => g.won).length;
+        const rows = gs.map(g => `<div class="os-g ${g.won ? 'w' : 'l'}"><span class="n">G${g.no}</span><span class="ty">${TYPE[typeOf(g.no)]}</span>
+          <span class="us">${esc(g.players.filter(Boolean).join(' / '))}</span><span class="them">vs ${esc(g.opp.filter(Boolean).join(' / ') || '—')}</span><span class="sc">${g.us}-${g.them}</span></div>`).join('');
+        return `<div class="os-card os-match"><h3>vs ${esc(g0.opponent)}</h3><div class="meta">${esc(g0.week)}${g0.date ? ' · ' + fmtDate(g0.date) : ''} · ${w}-${gs.length - w} in games</div>${rows}</div>`;
+      }).join('');
+      return `<section class="os-sec" id="log"><h2 class="os-h2">Game log</h2><p class="os-lead">Every game, newest match first.</p>${blocks}</section>`;
+    }
+
+    function bind() {
+      document.querySelectorAll('#ptable th[data-k]').forEach(th => th.addEventListener('click', () => {
+        const k = th.dataset.k;
+        if (sortKey === k) sortAsc = !sortAsc; else { sortKey = k; sortAsc = k === 'name'; }
+        const y = window.scrollY; render(); window.scrollTo(0, y);
+      }));
+      // Highlight the section in view.
+      const links = [...document.querySelectorAll('#os-nav a')];
+      const io = new IntersectionObserver((es) => es.forEach(e => {
+        if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.dataset.sec === e.target.id));
+      }), { rootMargin: '-140px 0px -60% 0px' });
+      document.querySelectorAll('.os-sec').forEach(s => io.observe(s));
+    }
+
+    load();
+  })();
+  </script>
+</body>
+</html>
