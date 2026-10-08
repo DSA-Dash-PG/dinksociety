@@ -11,7 +11,7 @@
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './lib/circuit.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
-import { buildBracketWeeks, resolveBracketDisplay } from './lib/bracket.js';
+import { buildBracketWeeks, resolveBracketDisplay, inferFormat } from './lib/bracket.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -73,7 +73,8 @@ export default async (req) => {
         // synthesize the placeholders on the fly so the bracket always shows.
         let bracketMatches = bracketByDiv[div];
         if (!bracketMatches || !bracketMatches.length) {
-          const built = buildBracketWeeks({ circuit: circuitLetter, division: div, numTeams });
+          const format = inferFormat({ realMatches: realByDiv[div], numTeams });
+          const built = buildBracketWeeks({ circuit: circuitLetter, division: div, numTeams, format });
           bracketMatches = Object.entries(built).flatMap(([wk, arr]) =>
             arr.map(m => ({ ...m, week: Number(wk), division: div }))
           );
@@ -249,6 +250,7 @@ function pushPublicMatch(weekMap, w, division, m, emojiById, br, emojiByName = {
     seedLabelB: br ? (br.seedLabelB || null) : null,
     seedLocked: br ? !!br.seedLocked : null,
     championship: m.championship ? true : (br ? !!br.championship : false),
+    format: br ? (br.format || null) : null,
   });
 }
 

@@ -755,8 +755,12 @@
       rivalry: 'Rivalry Week counts toward the regular season. Matchups seed off the standings through the round-robin — #1 plays #2, #3 plays #4, #5 plays #6.',
       playoff: 'Seeds lock from the final regular-season standings. The two semifinal winners meet for the title; #5 and #6 play a consolation match for 5th place.',
       championship: 'Built from the semifinal results — the two winners play for Gold/Silver, the two losers play for Bronze.',
+      // DOUBLE format: no semis — Championship Night seeds straight off the standings.
+      championshipNight: 'Seeded straight off the final regular-season standings after both round robins. #1 plays #2 for the title — the champion is crowned tonight. #3 plays #4 and #5 plays #6.',
     };
-    const PHASE_LOCK = { rivalry: 'the round-robin', playoff: 'Rivalry Week', championship: 'the semifinals' };
+    const PHASE_LOCK = { rivalry: 'the round-robin', playoff: 'Rivalry Week', championship: 'the semifinals', championshipNight: 'the regular season' };
+    // Championship Night (double round-robin seasons) reads its own note/lock copy.
+    const phaseKey = (phase, ms) => (phase === 'championship' && (ms || []).some(x => x.format === 'double')) ? 'championshipNight' : phase;
 
     // Small seed chip from a "#N Seed" label (no chip for Winner/Loser labels).
     function seedChip(label) {
@@ -804,7 +808,7 @@
       if (!isFinal) {
         hint = m.seedLocked
           ? `<div class="m-hint locked">Seeded · matchup locked</div>`
-          : `<div class="m-hint">Teams set once ${esc(PHASE_LOCK[m.phase] || 'the prior round')} is complete</div>`;
+          : `<div class="m-hint">Teams set once ${esc(PHASE_LOCK[phaseKey(m.phase, [m])] || 'the prior round')} is complete</div>`;
       }
 
       // Serve / side rules only once teams are locked (avoid implying a projection is final).
@@ -841,7 +845,8 @@
     function renderBracketWeek(wData, weekNum, weeksData) {
       const matches = wData.matches || [];
       if (!matches.length) return `<p class="week-tbd">Matchups published closer to game night</p>`;
-      const note = PHASE_NOTE[wData.phase] ? `<p class="bracket-note">${esc(PHASE_NOTE[wData.phase])}</p>` : '';
+      const pk = phaseKey(wData.phase, wData.matches);
+      const note = PHASE_NOTE[pk] ? `<p class="bracket-note">${esc(PHASE_NOTE[pk])}</p>` : '';
 
       // Group by bracketGroup, preserving order. Show group headers only when a
       // week spans more than one group (Playoffs, Championship).

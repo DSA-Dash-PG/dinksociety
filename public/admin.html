@@ -4083,7 +4083,11 @@
       parts.push('Next match <b>' + h(next.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })) + ' ' + h(next.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })) + '</b>' + (days > 0 ? ' <span class="sub">(in ' + days + ' day' + (days === 1 ? '' : 's') + ')</span>' : days === 0 ? ' <span class="sub">(tonight)</span>' : ''));
     }
     if (venues.length) parts.push(h(venues.join(' / ')));
-    if (week && weeks >= 6) {
+    if (week && weeks >= 9) {
+      // Double round-robin season (e.g. 10 regular weeks + Championship Night).
+      if (week < weeks) parts.push('<span class="sub">Championship Night Week ' + weeks + ' · ' + (weeks - week) + ' week' + (weeks - week === 1 ? '' : 's') + ' away</span>');
+      else parts.push('<span class="sub">Championship Night</span>');
+    } else if (week && weeks >= 6) {
       const po = weeks - 2; // Rivalry Wk (weeks-2), Playoffs (weeks-1), Championship (weeks)
       if (week < po) parts.push('<span class="sub">Playoffs start Week ' + po + ' · ' + (po - week) + ' week' + (po - week === 1 ? '' : 's') + ' away</span>');
       else parts.push('<span class="sub">' + (week === po ? 'Rivalry Week' : week === po + 1 ? 'Playoffs' : 'Championship') + '</span>');
@@ -7346,6 +7350,7 @@
     rivalry: 'Rivalry Week counts toward the regular season. Matchups seed off the standings through the round-robin (#1 v #2, #3 v #4, #5 v #6) and lock automatically once Week 5 is final.',
     playoff: 'Seeds lock from the final regular-season standings (through Rivalry Week): Semifinals #1 v #4 and #2 v #3; #5 v #6 play a consolation match for 5th.',
     championship: 'Built from the semifinal results — the two winners play for Gold/Silver, the two losers play for Bronze. Resolves automatically once Week 7 is final.',
+    championshipNight: 'Double round-robin season: seeds straight off the final regular-season standings — #1 v #2 for the title, #3 v #4, #5 v #6. Locks automatically once the last regular-season week is final.',
   };
   const BK_TITLE = { rivalry: 'Rivalry Week', playoff: 'Playoffs', championship: 'Championship' };
 
@@ -7381,7 +7386,8 @@
       '</div>';
   }
   function renderBracketPanel(card, wk, weeks) {
-    const note = BK_NOTE[wk.phase] || '';
+    const note = (wk.phase === 'championship' && (wk.matches || []).some(x => x.format === 'double' || /^#\d/.test(x.seedLabelA || '')))
+      ? BK_NOTE.championshipNight : (BK_NOTE[wk.phase] || '');
     // group by bracketGroup preserving order
     const groups = []; const seen = {};
     wk.matches.forEach(m => {

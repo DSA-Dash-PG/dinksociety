@@ -13,6 +13,18 @@
 //   Week 8  CHAMPIONSHIP   — built from Week 7 results. Gold/Silver = the two
 //                           semifinal WINNERS; Bronze = the two semifinal LOSERS.
 //
+// ── DOUBLE format (Season 2 onward, 6 teams) ────────────────────────────────
+// The round-robin runs TWICE (weeks 1–10, every team plays every other team
+// home and away), then ONE Championship Night (week 11) seeded straight off the
+// full regular-season standings:
+//   gold        #1 v #2  — the title (🥇 / 🥈)
+//   bronze      #3 v #4  — 3rd place (🥉)
+//   consolation #5 v #6  — 5th place
+// No Rivalry Week, no semifinals. The slot ids deliberately reuse gold / bronze /
+// consolation so every finish/medal reader (standings, home, player pages) keeps
+// working unchanged. Placeholders are stamped `format: 'double'`; the format is
+// also inferred from the schedule (round-robin weeks beyond N-1) when synthesized.
+//
 // This module is pure (no I/O) so it can be unit-tested and reused by:
 //   - public-schedule.js  (resolve seed previews for the public page)
 //   - admin-matches.js    (resolve seed previews for the admin schedule tab)
@@ -26,10 +38,28 @@
 import { COURT_SETS } from './courts.js';
 
 export const PHASE = { RIVALRY: 'rivalry', PLAYOFF: 'playoff', CHAMPIONSHIP: 'championship' };
+export const FORMAT = { SINGLE: 'single', DOUBLE: 'double' };
 
-// Round-robin rounds for an even team count (each team plays each other once).
-export function regularRounds(numTeams) {
-  return Math.max(0, (numTeams | 0) - 1);
+// Regular-season round-robin weeks for an even team count. SINGLE: each team
+// plays each other once (N-1 weeks). DOUBLE: twice (2 × (N-1) weeks).
+export function regularRounds(numTeams, format = FORMAT.SINGLE) {
+  const once = Math.max(0, (numTeams | 0) - 1);
+  return format === FORMAT.DOUBLE ? once * 2 : once;
+}
+
+// Which format a division is playing. Explicit stamp on a bracket placeholder
+// wins; a championship slot seeded by RANK (not semifinal winners) means DOUBLE;
+// otherwise round-robin matches past week N-1 mean the round-robin repeats.
+export function inferFormat({ bracketMatches = [], realMatches = [], numTeams = 0 } = {}) {
+  for (const m of bracketMatches) {
+    if (m?.format === FORMAT.DOUBLE) return FORMAT.DOUBLE;
+    if (m?.format === FORMAT.SINGLE) return FORMAT.SINGLE;
+  }
+  if (bracketMatches.some(m => m?.phase === PHASE.CHAMPIONSHIP && m?.seedA?.rank)) return FORMAT.DOUBLE;
+  if (bracketMatches.some(m => m?.phase === PHASE.RIVALRY || m?.phase === PHASE.PLAYOFF)) return FORMAT.SINGLE;
+  const once = Math.max(0, (numTeams | 0) - 1);
+  const maxWeek = Math.max(0, ...realMatches.map(m => Number(m?.week) || 0));
+  return once > 0 && maxWeek > once ? FORMAT.DOUBLE : FORMAT.SINGLE;
 }
 
 // Bracket support is defined for a 6-team division (Season 1). Other even counts
@@ -45,7 +75,21 @@ export function bracketSupported(numTeams) {
 //   { rank: n }              → the n-th seed by standings at this phase's cutoff
 //   { winnerOf: 'semi-A' }   → winner of an earlier bracket slot
 //   { loserOf:  'semi-A' }   → loser of an earlier bracket slot
-export function bracketSlots(numTeams) {
+export function bracketSlots(numTeams, format = FORMAT.SINGLE) {
+  if (format === FORMAT.DOUBLE) {
+    // One Championship Night, every team plays: adjacent seeds pair off.
+    const names = ['gold', 'bronze', 'consolation'];
+    const ms = [];
+    for (let i = 0; i < numTeams; i += 2) {
+      const k = i / 2;
+      const slot = names[k] || `place-${i + 1}`;
+      const base = { phase: PHASE.CHAMPIONSHIP, weekOffset: 1, slot, seedA: { rank: i + 1 }, seedB: { rank: i + 2 } };
+      if (k === 0) ms.push({ ...base, group: 'Championship', medal: '🥇', championship: true });
+      else if (k === 1) ms.push({ ...base, group: '3rd Place', medal: '🥉', placeLabel: '3rd place', championship: true });
+      else ms.push({ ...base, group: `${ordinal(i + 1)} Place`, placeLabel: `${ordinal(i + 1)} place` });
+    }
+    return ms;
+  }
   if (!bracketSupported(numTeams)) {
     // Generic rivalry only: pair adjacent seeds.
     const ms = [];
@@ -72,14 +116,22 @@ export function bracketSlots(numTeams) {
   ];
 }
 
+function ordinal(n) {
+  const s = ['th', 'st', 'nd', 'rd'], v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
 // Stable id for a bracket placeholder match.
 export function bracketMatchId(circuit, division, week, slot) {
   return `m_${circuit}_${String(division).toLowerCase()}_w${week}_${slot}`;
 }
 
 // Phase metadata for a week number (given the round-robin size), or null.
-export function phaseForWeek(week, numTeams) {
-  const R = regularRounds(numTeams);
+export function phaseForWeek(week, numTeams, format = FORMAT.SINGLE) {
+  const R = regularRounds(numTeams, format);
+  if (format === FORMAT.DOUBLE) {
+    return week === R + 1 ? { phase: PHASE.CHAMPIONSHIP, label: 'Championship Night' } : null;
+  }
   if (week === R + 1) return { phase: PHASE.RIVALRY, label: 'Rivalry Week' };
   if (week === R + 2) return { phase: PHASE.PLAYOFF, label: 'Playoffs' };
   if (week === R + 3) return { phase: PHASE.CHAMPIONSHIP, label: 'Championship' };
@@ -99,10 +151,10 @@ function seedLabel(seed, slotLabels) {
 // Returns { [weekNumber]: [match, …] }. Each match carries phase/slot/seed
 // metadata plus a rotating court set and empty score fields. teamA/teamB start
 // null and are filled in later (resolution preview, or persisted lock).
-export function buildBracketWeeks({ circuit, division, numTeams, startWeek }) {
-  const R = regularRounds(numTeams);
+export function buildBracketWeeks({ circuit, division, numTeams, startWeek, format = FORMAT.SINGLE }) {
+  const R = regularRounds(numTeams, format);
   const base = startWeek != null ? startWeek - 1 : R; // bracket weeks follow the RR
-  const slots = bracketSlots(numTeams);
+  const slots = bracketSlots(numTeams, format);
   const byWeek = {};
   // Court-set assignment per week: distinct sets within a week (A, B, C…).
   const weekCourtCursor = {};
@@ -119,6 +171,7 @@ export function buildBracketWeeks({ circuit, division, numTeams, startWeek }) {
       medal: s.medal || null,
       seedA: s.seedA, seedB: s.seedB,
       championship: !!s.championship,
+      format,
       courtSet: set.id, courtA: set.courtA, courtB: set.courtB,
       court: `Courts ${set.courtA} & ${set.courtB}`,
       scheduledAt: null, startTime: null,
@@ -228,13 +281,14 @@ function countFinalizedThrough(matches, cutoff) {
 // Returns the bracket matches enriched with resolved teamA/teamB (when known),
 // seedLabelA/seedLabelB, and seedLocked (true once the source phase is complete
 // so the matchup can no longer change). Does NOT mutate inputs.
-export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, numTeams }) {
-  const R = regularRounds(numTeams);
+export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, numTeams, format }) {
+  format = format || inferFormat({ bracketMatches, realMatches, numTeams });
+  const R = regularRounds(numTeams, format);
   const perWin = numTeams / 2;            // matches per round-robin week
   const expectedRR = R * perWin;          // full round-robin match count
 
   const slotLabels = {};
-  for (const s of bracketSlots(numTeams)) slotLabels[s.slot] = s.gameLabel || s.group;
+  for (const s of bracketSlots(numTeams, format)) slotLabels[s.slot] = s.gameLabel || s.group;
 
   // Phase-completion gates (how many regular matches are in the books).
   const rrFinal = countFinalizedThrough(realMatches, R);
@@ -267,7 +321,7 @@ export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, n
   };
 
   for (const m of sorted) {
-    const phaseObj = phaseForWeek(m.week, numTeams) || { phase: m.phase };
+    const phaseObj = phaseForWeek(m.week, numTeams, format) || { phase: m.phase };
     let teamA = m.teamA || null, teamB = m.teamB || null; // honour a persisted lock
     let locked = false;
     let labelA = seedLabel(m.seedA, slotLabels);
@@ -286,6 +340,13 @@ export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, n
       const rivFinal = sorted.filter(x => x.phase === PHASE.RIVALRY)
         .every(x => bySlot[x.bracketSlot]?.finalizedAt);
       locked = rivalryLocked && rivFinal;
+    } else if (m.phase === PHASE.CHAMPIONSHIP && (m.seedA?.rank || m.seedB?.rank)) {
+      // DOUBLE format: Championship Night seeds straight off the full regular
+      // season (both round-robins) and locks once every regular match is final.
+      const ranks = getRanksRR();
+      teamA = teamA || pickRank(ranks, m.seedA);
+      teamB = teamB || pickRank(ranks, m.seedB);
+      locked = rivalryLocked;
     } else if (m.phase === PHASE.CHAMPIONSHIP) {
       teamA = teamA || pickFromSlot(bySlot, m.seedA);
       teamB = teamB || pickFromSlot(bySlot, m.seedB);
@@ -302,6 +363,7 @@ export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, n
       seedLocked: locked,
       phase: m.phase,
       phaseLabel: phaseObj.label || null,
+      format,
     };
     bySlot[m.bracketSlot] = resolved;
     out.push(resolved);

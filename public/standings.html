@@ -311,7 +311,24 @@
   // Week 6 = Rivalry Week, the LAST week of the regular season. The playoff
   // picture (badges, cutline, points-back-of-line) only turns on then —
   // weeks 1–5 are a plain standings table.
-  const RIVALRY_WEEK = 6;
+  let RIVALRY_WEEK = 6;
+  // DOUBLE format (Season 2+): the round-robin runs twice (Wk 1–10), then ONE
+  // Championship Night seeded straight off the standings (1v2 title, 3v4, 5v6).
+  // No Rivalry Week, no semis — RIVALRY_WEEK then means "last regular week".
+  // Read off the schedule (Championship Night placeholders carry format:'double').
+  let IS_DOUBLE = false;
+  function applyFormat() {
+    const ws = (scheduleData && scheduleData.weeks) || [];
+    IS_DOUBLE = ws.some(w => (w.matches || []).some(m => m.format === 'double'));
+    if (IS_DOUBLE) {
+      const reg = ws.filter(w => !w.phase).map(w => w.week || 0);
+      SEASON.totalMatches = reg.length ? Math.max(...reg) : 10;
+      RIVALRY_WEEK = SEASON.totalMatches;
+      SEASON.playoffSpots = 2;   // the title-game line: top 2 play for the championship
+    } else {
+      SEASON.totalMatches = 6; RIVALRY_WEEK = 6; SEASON.playoffSpots = 4;
+    }
+  }
   const DIV_LABELS = { '3-5-mixed':'3.0 - 3.5 Mixed','3-0-mixed':'3.0 - 3.5 Mixed','3.5M':'3.0 - 3.5 Mixed','3.0M':'3.0 - 3.5 Mixed' };
   const TEAM_COLORS = ['#b8ff2c','#17d7b0','#f0c040','#ff7b54','#a78bfa','#f472b6','#60a5fa','#34d399'];
 
@@ -375,6 +392,7 @@
       standingsData = sr;
       teamsData     = tr;
       scheduleData  = sc;
+      applyFormat();
       dsrByTeam     = buildDsrByTeam(pr);
     } catch { standingsData = { empty: true }; }
 
@@ -537,7 +555,7 @@
     const played = playedWeeksSet();
     let chips = '';
     for (let w = 1; w <= SEASON.totalMatches; w++) {
-      const rivalry = w === RIVALRY_WEEK;
+      const rivalry = !IS_DOUBLE && w === RIVALRY_WEEK;
       const on = selectedWeek === w;
       const enabled = played.has(w);
       chips += '<button class="wk-chip' + (on ? ' is-active' : '') + (rivalry ? ' is-rivalry' : '') + '"'
@@ -603,7 +621,8 @@
       let teams, cut = null;
       const finish = standingsView === 'playoff' ? bracketFinishMap() : null;
       if (standingsView === 'playoff') {
-        const spots  = SEASON.playoffSpots;
+        // DOUBLE: every team plays Championship Night, so nobody sits below a cutline.
+        const spots  = IS_DOUBLE ? mapped.length : SEASON.playoffSpots;
         const fcmp = finish
           ? (a, b) => ((finish[a.teamName]?.n || 99) - (finish[b.teamName]?.n || 99)) || cmp(a, b)
           : cmp;
@@ -620,7 +639,7 @@
       const note = standingsView === 'playoff'
         ? (finish
             ? '<div class="wk-note">Playoffs · ranked by <b>bracket finish</b> — the medal round decides placement, playoff points are shown for the story. Regular-season seeding is on the <b>Regular season</b> tab.</div>'
-            : '<div class="wk-note">Playoffs only · Week 7 bracket. Regular-season seeding is on the <b>Regular season</b> tab.</div>')
+            : '<div class="wk-note">Playoffs only · ' + (IS_DOUBLE ? 'Championship Night' : 'Week 7 bracket') + '. Regular-season seeding is on the <b>Regular season</b> tab.</div>')
         : '<div class="wk-note">Overall · regular season and playoffs combined.</div>';
       el.innerHTML = viewToggleHtml(hasPlayoffs) + note
         + standingsCardHtml(teams, false, '', divLabel, false, cut)
@@ -646,7 +665,9 @@
       updated = standingsData.lastUpdated
         ? '<span class="stand-card__updated">Updated ' + fmtDate(standingsData.lastUpdated) + '</span>' : '';
       if (hunt && weeksPlayedLive < RIVALRY_WEEK) {
-        preTable = '<div class="rivalry-banner">Rivalry week · last week of the regular season</div>';
+        preTable = IS_DOUBLE
+          ? '<div class="rivalry-banner">Final week of the regular season · Championship Night seeds lock tonight</div>'
+          : '<div class="rivalry-banner">Rivalry week · last week of the regular season</div>';
       }
     } else {
       teams = buildSnapshot(selectedWeek);
@@ -754,7 +775,7 @@
           map[winner] = { n:3, cls:'m3', chip:'🥉 Bronze' };
           map[loser]  = { n:4, cls:'',   chip:'4th place' };
         } else if (/5th/i.test(place) || /consolation/i.test(medal)) {
-          map[winner] = { n:5, cls:'', chip:'5th · won consolation' };
+          map[winner] = { n:5, cls:'', chip: IS_DOUBLE ? '5th' : '5th · won consolation' };
           map[loser]  = { n:6, cls:'', chip:'6th' };
         }
       }
@@ -935,7 +956,9 @@
       ? '<hr class="legend-divider" />'
         + '<div class="legend-tiebreak">'
         + '  The <strong>playoff picture</strong> (Clinched / In the Hunt badges, the playoff line, and points back of it) '
-        + '  appears in <strong>Week ' + RIVALRY_WEEK + ' — Rivalry Week</strong>, the last week of the regular season. '
+        + (IS_DOUBLE
+            ? '  appears in the closing weeks of the regular season (Week ' + RIVALRY_WEEK + ' is the last). '
+            : '  appears in <strong>Week ' + RIVALRY_WEEK + ' — Rivalry Week</strong>, the last week of the regular season. ')
         + '  Until then this is the straight table.'
         + '</div>'
       : '<hr class="legend-divider" />'
@@ -945,7 +968,9 @@
         + '  <div class="legend-badge-item"><span class="team-badge team-badge--eliminated">Out</span>Mathematically can’t reach the top ' + SEASON.playoffSpots + '</div>'
         + '</div>'
         + '<div class="legend-tiebreak">'
-        + '  Top ' + SEASON.playoffSpots + ' seeds after Rivalry Week advance to the Week 7 playoff bracket; the rest play a consolation match.'
+        + (IS_DOUBLE
+            ? '  Championship Night (Week ' + (RIVALRY_WEEK + 1) + '): #1 vs #2 for the title, #3 vs #4 and #5 vs #6 — every team plays. The line marks the top ' + SEASON.playoffSpots + '.'
+            : '  Top ' + SEASON.playoffSpots + ' seeds after Rivalry Week advance to the Week 7 playoff bracket; the rest play a consolation match.')
         + '</div>';
     return '<div class="legend-card">'
       + '<p class="legend-title">Column Key</p>'
@@ -1052,7 +1077,7 @@
       // newly finalized matches (CDN-cached 60s — cheap).
       fetch('/.netlify/functions/public-schedule?season=' + SEASON.id)
         .then(r => r.ok ? r.json() : null)
-        .then(sc => { if (sc) { scheduleData = sc; render(); } })
+        .then(sc => { if (sc) { scheduleData = sc; applyFormat(); render(); } })
         .catch(() => {});
       renderTabs();   // keeps the active division selection
       render();
