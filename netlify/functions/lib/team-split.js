@@ -27,6 +27,7 @@
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
 import { countGames, buildLedger } from './team-split-math.js';
+import { isRosterLocked as checkRosterLocked } from './roster-lock.js';
 
 const splitStore = () => getStore({ name: 'team-splits', consistency: 'strong' });
 const keyOf = (teamId) => `split/${teamId}.json`;
@@ -64,20 +65,9 @@ export async function listSplits() {
   return out;
 }
 
-/**
- * Same rule captain-roster.js enforces: the roster locks once the team's Week 2
- * match is finalized, unless an admin set the per-team unlock flag. Kept in step
- * with isRosterLocked() there — if that rule changes, change it here too.
- */
-export async function isRosterLocked(team) {
-  if (!team || team.rosterUnlocked === true) return false;
-  try {
-    const key = `schedule/${circuitCode(team.circuit)}/${team.division}/week-2.json`;
-    const data = await getStore({ name: 'schedule', consistency: 'strong' }).get(key, { type: 'json' }).catch(() => null);
-    const m = data?.matches?.find(x => x.teamA?.id === team.id || x.teamB?.id === team.id);
-    return !!(m && m.finalizedAt);
-  } catch { return false; }
-}
+// The roster-lock rule lives in lib/roster-lock.js (shared with captain-roster.js).
+// Strong read here, as before: fee shares freeze on it.
+export const isRosterLocked = (team) => checkRosterLocked(team, { strong: true });
 
 /**
  * Per-game tabs: every FINALIZED match this team played, all season (regular

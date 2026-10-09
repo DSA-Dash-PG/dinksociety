@@ -137,9 +137,12 @@ export default async (req) => {
         for (const m of ms) {
           const sheet = await scoresStore.get(`score/${m.id}.json`, { type: 'json' }).catch(() => null);
           if (sheet) return json({ error: `${division} Week ${w} match ${m.id} has a score sheet. Not touching it.` }, 409);
-          const lu = await lineupStore.list({ prefix: `lineup/${m.id}/` }).catch(() => ({ blobs: [] }));
-          if (lu.blobs?.length) {
-            return json({ error: `${division} Week ${w} match ${m.id} already has a lineup. Clear that week in the admin schedule first.` }, 409);
+          // Exact keys, not a prefix listing: the division id carries a "+"
+          // ("3.5+Mix") and listings by a prefix containing it come back empty.
+          for (const t of [m.teamA, m.teamB]) {
+            if (!t?.id) continue;
+            const lu = await lineupStore.get(`lineup/${m.id}/${t.id}.json`, { type: 'json' }).catch(() => null);
+            if (lu) return json({ error: `${division} Week ${w} match ${m.id} already has a lineup. Clear that week in the admin schedule first.` }, 409);
           }
         }
         backups.push({ key: weeks[w].key, data: weeks[w].data });

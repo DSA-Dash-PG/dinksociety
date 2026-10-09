@@ -16,6 +16,7 @@ import { sendRosterWelcomesSafe } from './lib/roster-welcome.js';
 import { logRosterChanges } from './lib/roster-diff.js';
 import { notifyAdminsPendingRosterAdd } from './lib/roster-approvals.js';
 import { photoResolver } from './lib/player-photo.js';
+import { isRosterLocked, rosterLockWeek } from './lib/roster-lock.js';
 
 // No roster size cap — rosters are unlimited; every add still goes through admin approval.
 
@@ -33,15 +34,16 @@ export default async (req) => {
     // the captain sees the same picture as everywhere else. PUT ignores it.
     const { urlFor } = await photoResolver();
     const team = { ...ctx.team, roster: (ctx.team.roster || []).map(p => ({ ...p, photoUrl: urlFor(p.id) })) };
-    return json({ team, rosterLocked });
+    return json({ team, rosterLocked, rosterLockWeek: rosterLockWeek(ctx.team.circuit) });
   }
 
   if (req.method === 'PUT') {
     try {
-      // Roster locks once the team's Week 2 match is complete, unless an admin
-      // has set the per-team unlock flag. Server-enforced so it can't be bypassed.
+      // Roster locks once the season's lock week has been played (lib/roster-lock.js),
+      // unless an admin has set the per-team unlock flag. Server-enforced so it
+      // can't be bypassed.
       if (await isRosterLocked(ctx.team)) {
-        return json({ error: 'Your roster is locked for the season (Week 2 has been played). Ask a league admin to unlock it if you need a change.' }, 423);
+        return json({ error: `Your roster is locked for the season (Week ${rosterLockWeek(ctx.team.circuit)} has been played). Ask a league admin to unlock it if you need a change.` }, 423);
       }
 
       const body = await req.json();
@@ -263,25 +265,6 @@ export default async (req) => {
 
   return new Response('Method not allowed', { status: 405 });
 };
-
-/**
- * Roster locks once the team's Week 2 match has been finalized.
- * Admin can reopen it per-team by setting team.rosterUnlocked = true.
- */
-async function isRosterLocked(team) {
-  if (!team) return false;
-  if (team.rosterUnlocked === true) return false; // admin override
-  try {
-    const scheduleStore = getStore('schedule');
-    const key = `schedule/${circuitCode(team.circuit)}/${team.division}/week-2.json`;
-    const data = await scheduleStore.get(key, { type: 'json' }).catch(() => null);
-    if (!data?.matches) return false;
-    const m = data.matches.find(x => x.teamA?.id === team.id || x.teamB?.id === team.id);
-    return !!(m && m.finalizedAt);
-  } catch {
-    return false; // never block a save because the lock check itself errored
-  }
-}
 
 function sanitize(val, maxLen) {
   if (!val) return null;

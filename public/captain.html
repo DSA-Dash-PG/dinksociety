@@ -3780,6 +3780,7 @@
         const data = await res.json();
         state.roster = data.team?.roster || [];
         state.rosterLocked = !!data.rosterLocked;
+        state.rosterLockWeek = Number(data.rosterLockWeek) || 2;
         if (typeof syncBottomNavTabs === 'function') syncBottomNavTabs();
         if (!silent) renderRoster();
       } catch {
@@ -4174,12 +4175,12 @@
           <div class="ros-pend__note">Anyone who hasn't played for your team before is reviewed by the league first. They can't be picked for a lineup until then. Your own past players join straight away.</div>
         </div>` : '';
 
-      // Locked for the season (Week 2 played) — roster is read-only, BUT subs can
+      // Locked for the season (lock week played) — roster is read-only, BUT subs can
       // still be changed (it only affects reminders, not who's on the team).
       if (state.rosterLocked) {
         if (addBtn) addBtn.style.display = 'none';
         container.innerHTML = `
-          <div class="cap-status is-info" style="margin-bottom:12px;">🔒 Roster is locked for the season (Week 2 has been played). You can still mark players as subs; contact a league admin for any other change.</div>
+          <div class="cap-status is-info" style="margin-bottom:12px;">🔒 Roster is locked for the season (Week ${state.rosterLockWeek || 2} has been played). You can still mark players as subs; contact a league admin for any other change.</div>
           ${pendingBlock}
           ${activeRoster().length ? rosterSorted().map(p => rosterRowHtml(p, true)).join('') : '<div class="empty-state">No players on the roster.</div>'}
         `;
@@ -5312,7 +5313,7 @@
             cls: thin ? 'urgent' : 'soon', ic: '👤',
             t: thin ? 'Your roster can’t field a lineup' : 'Finish your roster',
             d: bits.join(' · '),
-            due: { cls: thin ? 'red' : 'gold', txt: 'Locks after Week 2' },
+            due: { cls: thin ? 'red' : 'gold', txt: 'Locks after Week ' + (state.rosterLockWeek || 2) },
             go: () => document.querySelector('.cap-tab[data-tab="roster"]')?.click(),
             sort: now + 1e6,
           });

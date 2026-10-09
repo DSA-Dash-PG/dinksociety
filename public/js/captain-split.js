@@ -164,7 +164,7 @@
       ${flat ? '' : `<div class="spl-fld"><label>Collect</label><div class="spl-seg" id="spl-collect" style="margin:0"><button data-c="weekly" class="${dr.collect === 'weekly' ? 'on' : ''}">After each week</button><button data-c="season" class="${dr.collect === 'season' ? 'on' : ''}">End of season</button></div></div>`}
       <div class="spl-fld"><label for="spl-venmo">Your Venmo handle</label><div class="spl-inp"><span>@</span><input id="spl-venmo" autocomplete="off" autocapitalize="off" spellcheck="false" style="font-size:15px" value="${esc(dr.venmoHandle)}" placeholder="your-handle"></div>
         <p class="spl-hint">Players get a Pay-on-Venmo button that opens your profile. Leave blank if you collect another way.</p></div>
-      ${flat ? `<div class="spl-note"><span>🔒</span><div><b>Shares follow your roster until it locks</b> (after your Week 2 match), then freeze. You can also lock them early from the ledger.</div></div>` : ''}
+      ${flat ? `<div class="spl-note"><span>🔒</span><div><b>Shares follow your roster until it locks</b>, then freeze. You can also lock them early from the ledger.</div></div>` : ''}
       <div class="spl-actions">
         <button class="cap-btn cap-btn--primary" id="spl-save">Save split</button>
         ${cfg ? `<button class="cap-btn cap-btn--ghost" id="spl-cancel">Cancel</button>` : ''}
@@ -273,7 +273,7 @@
     const lockNote = !flat ? ''
       : cfg.lockedAt
         ? `<div class="spl-note"><span>🔒</span><div><b>Shares locked</b> ${shortDate(cfg.lockedAt)}${cfg.lockedBy === 'roster-lock' ? ' when your roster locked' : ''}. Roster changes no longer move anyone's share. <button class="spl-link" data-act="unlock">${d.rosterLocked ? 'Re-sync to current roster' : 'Unlock'}</button></div></div>`
-        : `<div class="spl-note"><span>🔓</span><div><b>Shares still follow your roster.</b> They freeze when your roster locks after Week 2. <button class="spl-link" data-act="lock">Lock shares now</button></div></div>`;
+        : `<div class="spl-note"><span>🔓</span><div><b>Shares still follow your roster.</b> They freeze when your roster locks. <button class="spl-link" data-act="lock">Lock shares now</button></div></div>`;
     const gap = L.unassignedCents > 0 ? `<div class="spl-msg err">${fmt(L.unassignedCents)} of the amount isn't assigned to anyone — every player has a custom share and they don't add up. Clear one to fix it.</div>` : '';
 
     $('split-area').innerHTML = `
