@@ -397,7 +397,19 @@ export async function rebuildStandings(circuit) {
     const date = (weekMeta[wk] && weekMeta[wk].date) || null;
     for (const [pid, wp] of m) {
       if (!weeklyRecById.has(pid)) weeklyRecById.set(pid, []);
-      weeklyRecById.get(pid).push({ week: weekNum, w: wp.gamesWon || 0, l: wp.gamesLost || 0, date });
+      // w / l / date are the original fields. The rest is that night's detail,
+      // so The Drop's team card can be scoped to ONE week (js/team-breakdown.js):
+      // the team the player suited up for, rally points, close games, and the
+      // women's / men's / mixed split (only the types they actually played).
+      const byType = {};
+      for (const [k, b] of Object.entries(wp.byType || {})) if (b.played) byType[k] = b;
+      weeklyRecById.get(pid).push({
+        week: weekNum, w: wp.gamesWon || 0, l: wp.gamesLost || 0, date,
+        teamId: wp.teamId || null,
+        ps: wp.ps || 0, pa: wp.pa || 0,
+        clutchW: wp.clutchW || 0, clutchG: wp.clutchG || 0,
+        byType,
+      });
     }
   }
   for (const p of playerStats.values()) {
@@ -405,7 +417,8 @@ export async function rebuildStandings(circuit) {
     // Season-to-date DSR snapshot at the end of each week: [{ week, dsr, rank }].
     // Powers the match-log "DSR at time of game" column + the DSR trend chart.
     p.dsrHistory = dsrHistory.get(p.playerId) || [];
-    // Per-week game record: [{ week, w, l, date }] → per-match Undefeated badge.
+    // Per-week game record: [{ week, w, l, date, teamId, ps, pa, clutchW,
+    // clutchG, byType }] → per-match Undefeated badge + The Drop's week card.
     p.weeklyGameRecords = (weeklyRecById.get(p.playerId) || []).sort((a, b) => a.week - b.week);
   }
   attachAwards(playerStats, weeklyTopPerformers);
@@ -757,9 +770,12 @@ function ensureWeeklyPlayer(weekly, week, pid, player, team) {
   if (!m.has(pid)) m.set(pid, {
     playerId: pid, name: player.name, gender: player.gender || null,
     teamId: team?.id || null, teamName: team?.name || null,
-    gamesPlayed: 0, gamesWon: 0, gamesLost: 0, ps: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0,
+    gamesPlayed: 0, gamesWon: 0, gamesLost: 0, ps: 0, pa: 0, diff: 0, gameDiffs: [], clutchW: 0, clutchG: 0,
     // Discipline splits for the week (g = gender line, x = mixed)
     g: newWeeklySplit(), x: newWeeklySplit(),
+    // The same night by slot type, in the season `byType` shape
+    // ({ played, won, ps, pa }) — feeds weeklyGameRecords[].byType.
+    byType: {},
   });
   return m.get(pid);
 }
@@ -774,8 +790,12 @@ function bumpWeeklyPlayer(weekly, week, pid, player, team, won, myScore, oppScor
   p.gamesPlayed++; if (won) p.gamesWon++; else p.gamesLost++;
   const sp = slotType === 'mixed' ? p.x : (slotType === 'mens' || slotType === 'womens') ? p.g : null;
   if (sp) { sp.gamesPlayed++; if (won) sp.gamesWon++; }
+  const bt = slotType ? (p.byType[slotType] || (p.byType[slotType] = { played: 0, won: 0, ps: 0, pa: 0 })) : null;
+  if (bt) { bt.played++; if (won) bt.won++; }
   if (Number.isInteger(myScore)) p.ps += myScore;
   if (Number.isInteger(myScore) && Number.isInteger(oppScore)) {
+    p.pa += oppScore;
+    if (bt) { bt.ps += myScore; bt.pa += oppScore; }
     const d = myScore - oppScore; p.diff += d; p.gameDiffs.push(d);
     if (Math.abs(d) <= 3) { p.clutchG++; if (won) p.clutchW++; }
     if (sp) {
