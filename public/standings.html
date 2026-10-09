@@ -325,7 +325,11 @@
       const reg = ws.filter(w => !w.phase).map(w => w.week || 0);
       SEASON.totalMatches = reg.length ? Math.max(...reg) : 10;
       RIVALRY_WEEK = SEASON.totalMatches;
-      SEASON.playoffSpots = 2;   // the title-game line: top 2 play for the championship
+      // The line: when every team plays Championship Night (#5 v #6 included) it
+      // marks the title game (top 2). When the last seed has no match (odd team
+      // count) it marks who plays that night at all (top 4).
+      const champ = ws.flatMap(w => (w.matches || []).filter(m => m.phase === 'championship' && m.format === 'double'));
+      SEASON.playoffSpots = champ.some(m => m.bracketSlot === 'consolation') ? 2 : Math.max(2, champ.length * 2);
     } else {
       SEASON.totalMatches = 6; RIVALRY_WEEK = 6; SEASON.playoffSpots = 4;
     }
@@ -644,7 +648,7 @@
       const finish = standingsView === 'playoff' ? bracketFinishMap() : null;
       if (standingsView === 'playoff') {
         // DOUBLE: every team plays Championship Night, so nobody sits below a cutline.
-        const spots  = IS_DOUBLE ? mapped.length : SEASON.playoffSpots;
+        const spots  = (IS_DOUBLE && hasFifthPlaceMatch()) ? mapped.length : SEASON.playoffSpots;
         const fcmp = finish
           ? (a, b) => ((finish[a.teamName]?.n || 99) - (finish[b.teamName]?.n || 99)) || cmp(a, b)
           : cmp;
@@ -652,7 +656,7 @@
         const missed = mapped.filter(t => (t.rank || 99) >  spots).sort(fcmp);
         teams = made.concat(missed);
         if (finish) teams.forEach(t => { t.finish = finish[t.teamName] || null; });
-        if (made.length && missed.length) cut = { at: made.length, label: 'CONSOLATION · DIDN’T MAKE THE BRACKET' };
+        if (made.length && missed.length) cut = { at: made.length, label: IS_DOUBLE ? 'DIDN’T REACH CHAMPIONSHIP NIGHT' : 'CONSOLATION · DIDN’T MAKE THE BRACKET' };
       } else {
         teams = mapped.sort(cmp);
       }
@@ -938,7 +942,11 @@
       : '<div class="pts-note">'
         + '<span><strong>Point System:</strong> Win = 2 pts · Tie = 1 pt · Loss = 0 pts · Max 4 pts per match (2 rounds)</span>'
         + '<span><strong>Tiebreaker:</strong> PTS → GW → Head-to-Head → DIFF</span>'
-        + (hunt && teams.length > spots ? '<span>Top ' + spots + ' advance to playoffs · Bottom ' + (teams.length - spots) + ' play consolation bracket</span>' : '')
+        + (hunt && teams.length > spots
+            ? (IS_DOUBLE
+                ? '<span>Top ' + spots + (hasFifthPlaceMatch() ? ' play for the title on Championship Night' : ' play on Championship Night') + '</span>'
+                : '<span>Top ' + spots + ' advance to playoffs · Bottom ' + (teams.length - spots) + ' play consolation bracket</span>')
+            : '')
         + '</div>';
 
     // With a single known division, the title is redundant — show only the updated stamp
@@ -1043,8 +1051,12 @@
   }
 
   // ── Status computation ───────────────────────────────────────────
-  function computeStatus(teams) {
+  function computeStatus(allTeams) {
     const spots = SEASON.playoffSpots;
+    // A team whose season ended early keeps its row but isn't in the race.
+    const gone = new Set((scheduleData?.withdrawn || []).map(w => w.id));
+    allTeams.forEach(t => { if (gone.has(t.teamId)) t.status = null; });
+    const teams = allTeams.filter(t => !gone.has(t.teamId));
     if (teams.length <= spots) { teams.forEach(t => t.status = null); return; }
     const sorted = [...teams].sort((a, b) => b.matchPointsFor - a.matchPointsFor);
     teams.forEach(t => {
