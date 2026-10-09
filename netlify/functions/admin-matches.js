@@ -48,6 +48,8 @@ export default async (req) => {
         for (const m of (data.matches || [])) {
           weekMap[wk].matches.push({ ...m, division: div, week: wk });
         }
+        const byes = weekByes(data);
+        if (byes.length) weekMap[wk].byes = (weekMap[wk].byes || []).concat(byes);
       }
       const weeks = Object.values(weekMap).sort((a, b) => a.week - b.week);
       return json({ circuit, all: true, divisions: [...divisions], weeks });
@@ -63,6 +65,7 @@ export default async (req) => {
         circuit, division,
         phase: data.phase || null,
         matches: (data.matches || []).map(m => ({ ...m, division, week: w })),
+        byes: weekByes(data),
         generatedAt: data.generatedAt,
         updatedAt: data.updatedAt,
       });
@@ -241,6 +244,13 @@ async function purgeMatchArtifacts(matchIds) {
     }
   }
   return { lineups, scores };
+}
+
+// Teams on a bye in a week blob (odd team count), minus any that were given a
+// match that week after all.
+function weekByes(data) {
+  const playing = new Set((data?.matches || []).flatMap(m => [m.teamA?.id, m.teamB?.id]).filter(Boolean));
+  return (data?.byes || []).filter(t => t?.id && !playing.has(t.id)).map(t => ({ id: t.id, name: t.name || '' }));
 }
 
 // Overlay resolved seed previews onto the bracket weeks (Wk6–8). Display-only:

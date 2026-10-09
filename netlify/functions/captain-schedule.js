@@ -31,6 +31,7 @@ export default async (req) => {
 
   try {
     const myMatches = [];
+    const myByes = [];     // weeks this team sits out (odd team count)
 
     // Scan all weeks for this division in this circuit (incl. championship
     // week 8 and any admin-added make-up weeks)
@@ -38,6 +39,12 @@ export default async (req) => {
       const key = `schedule/${circuit}/${division}/week-${week}.json`;
       const data = await scheduleStore.get(key, { type: 'json' });
       if (!data?.matches) continue;
+
+      // Bye week: listed on the week and not given a match after all.
+      if ((data.byes || []).some(t => t?.id === teamId)
+          && !data.matches.some(m => m.teamA?.id === teamId || m.teamB?.id === teamId)) {
+        myByes.push({ week, scheduledAt: data.matches.find(m => m.scheduledAt)?.scheduledAt || null });
+      }
 
       for (const m of data.matches) {
         const isHome = m.teamA?.id === teamId;
@@ -95,7 +102,7 @@ export default async (req) => {
 
     myMatches.sort((a, b) => a.week - b.week);
 
-    return new Response(JSON.stringify({ matches: myMatches, lineupLockOffsetMin }), {
+    return new Response(JSON.stringify({ matches: myMatches, byes: myByes, lineupLockOffsetMin }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', 'Cache-Control': 'private, no-store' },
     });

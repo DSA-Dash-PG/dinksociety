@@ -40,6 +40,7 @@ export default async (req) => {
       const realByDiv = {};        // division → [round-robin match (raw, with .week)]
       const bracketByDiv = {};     // division → [bracket placeholder match (raw, with .week)]
       const teamsByDiv = {};       // division → Map(id → {id,name})
+      const withdrawn = new Map(); // team id → {id,name,division} (season ended early)
 
       for (const b of schedBlobs) {
         const data = await schedStore.get(b.key, { type: 'json' }).catch(() => null);
@@ -61,14 +62,23 @@ export default async (req) => {
             pushPublicMatch(weekMap, w, div, m, emojiById, undefined, emojiByName);
           }
         }
-        // Odd team count (a team left mid-season): who sits out this week.
+        // Odd team count (a team left mid-season): who sits out this week. A
+        // team that was later given a match this week is no longer on a bye.
         if (Array.isArray(data.byes) && data.byes.length) {
-          if (!weekMap[w]) weekMap[w] = { week: w, division: div, matches: [] };
-          weekMap[w].byes = data.byes.map(t => ({
-            id: t?.id || null,
-            name: t?.name || '',
-            emoji: (t?.id && emojiById[t.id]) || (t?.name && emojiByName[t.name.toLowerCase()]) || '',
+          const playing = new Set(data.matches.flatMap(m => [m.teamA?.id, m.teamB?.id]).filter(Boolean));
+          const byes = data.byes.filter(t => t?.id && !playing.has(t.id)).map(t => ({
+            id: t.id,
+            name: t.name || '',
+            emoji: emojiById[t.id] || (t.name && emojiByName[t.name.toLowerCase()]) || '',
           }));
+          if (byes.length) {
+            if (!weekMap[w]) weekMap[w] = { week: w, division: div, matches: [] };
+            weekMap[w].byes = byes;
+          }
+        }
+        // Teams whose season ended early (not playing the second half).
+        for (const t of (Array.isArray(data.withdrawn) ? data.withdrawn : [])) {
+          if (t?.id) withdrawn.set(t.id, { id: t.id, name: t.name || '', division: div });
         }
       }
 
@@ -99,7 +109,7 @@ export default async (req) => {
 
       const weeks = Object.values(weekMap).sort((a, b) => a.week - b.week);
       if (weeks.length > 0) {
-        return json({ weeks });
+        return json(withdrawn.size ? { weeks, withdrawn: [...withdrawn.values()] } : { weeks });
       }
     }
 

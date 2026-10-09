@@ -104,6 +104,7 @@
     .team-badge--clinched   { background: var(--color-lime-dim);  color: var(--color-lime); }
     .team-badge--eliminated { background: var(--color-red-dim);   color: var(--color-red); }
     .team-badge--inhunt     { background: var(--color-gold-dim);  color: var(--color-gold); }
+    .team-badge--done       { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
 
     /* Week filter chips + snapshot note + rivalry banner */
     .wk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
@@ -901,7 +902,11 @@
       const psFor    = !seasonStarted ? '—' : (t.pointsScored || 0);
       const psAg     = !seasonStarted ? '—' : (t.pointsAgainst || 0);
       const dsr      = teamDSR(t);
-      const badge    = hunt ? badgeHtml(t.status) : '';
+      // A team that isn't playing the second half keeps its results but is out
+      // of the playoff picture — one neutral tag instead of a hunt badge.
+      const seasonDone = (scheduleData?.withdrawn || []).some(w => w.id === t.teamId);
+      const badge    = seasonDone ? '<span class="team-badge team-badge--done">Season complete</span>'
+                     : hunt ? badgeHtml(t.status) : '';
 
       const finCls  = t.finish && t.finish.cls ? ' stand-row--' + t.finish.cls : '';
       const finChip = t.finish ? '<span class="fin-chip fin-' + t.finish.n + '">' + t.finish.chip + '</span>' : '';

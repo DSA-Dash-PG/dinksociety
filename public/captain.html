@@ -144,6 +144,8 @@
     .m__role--away { background: var(--color-teal-dim); color: var(--color-teal); }
     .m__pill { margin-left: auto; font-size: 11px; font-weight: 800; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-full); white-space: normal; line-height: 1.25; max-width: 9.5em; text-align: center; }
     .pill-final { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
+    .m--bye { cursor: default; border-style: dashed; }
+    .m--bye .m__foot { margin-top: 8px; }
     .pill-up { background: var(--color-gold-dim); color: var(--color-gold); }
     .pill-live { background: var(--color-lime-dim); color: var(--color-lime); }
     .pill-win { background: var(--color-lime-dim); color: var(--color-lime); }
@@ -2069,6 +2071,7 @@
         if (!res.ok) throw new Error();
         const data = await res.json();
         state.matches = data.matches || [];
+        state.byes = data.byes || [];
         if (Number.isFinite(data.lineupLockOffsetMin)) CAP_LOCK_OFFSET_MIN = data.lineupLockOffsetMin;
         if (!silent) renderMatches();
       } catch {
@@ -2113,6 +2116,16 @@
       </div>`;
     }
 
+    // Bye week (odd team count): a plain card in the Upcoming list — nothing to
+    // set, nothing to open.
+    function capByeCard(b) {
+      const dt = b.scheduledAt ? formatDateShort(b.scheduledAt) : '';
+      return `<div class="m m--bye">
+        <div class="m__top"><span class="m__wk">WEEK ${b.week}</span><span class="m__pill pill-final">Bye</span></div>
+        <div class="m__foot">Bye week · no match${dt ? ' · ' + escapeHtml(dt) : ''}</div>
+      </div>`;
+    }
+
     function renderMatches() {
       if (!state.matches.length) {
         $id('matches-list').innerHTML = '<div class="empty-state">No matches scheduled yet. The schedule drops before the season starts.</div>';
@@ -2123,7 +2136,13 @@
       const upcoming = sorted.filter(m => !m.finalizedAt);
       const results = sorted.filter(m => m.finalizedAt);
       let html = tonightBanner;
-      if (upcoming.length) html += '<div class="label">Upcoming</div>' + upcoming.map(capMatchCard).join('');
+      // Upcoming byes slot in by date alongside the matches still to play.
+      const endOfDay = (iso) => { const d = new Date(iso); d.setHours(23, 59, 59, 999); return d.getTime(); };
+      const byes = (state.byes || [])
+        .filter(b => !b.scheduledAt || endOfDay(b.scheduledAt) >= Date.now())
+        .map(b => ({ ...b, bye: true }));
+      const coming = upcoming.concat(byes).sort(matchOrder);
+      if (coming.length) html += '<div class="label">Upcoming</div>' + coming.map(x => x.bye ? capByeCard(x) : capMatchCard(x)).join('');
       if (results.length) html += '<div class="label">Results</div>' + results.map(capMatchCard).join('');
       $id('matches-list').innerHTML = html;
 
