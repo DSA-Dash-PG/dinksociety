@@ -924,8 +924,13 @@
       const psAg     = !seasonStarted ? '—' : (t.pointsAgainst || 0);
       const dsr      = teamDSR(t);
       // A team that isn't playing the second half keeps its results but is out
-      // of the playoff picture — one neutral tag instead of a hunt badge.
-      const seasonDone = (scheduleData?.withdrawn || []).some(w => w.id === t.teamId);
+      // of the playoff picture — one neutral tag instead of a hunt badge. The tag
+      // only appears once the team has actually finished: while it still has a
+      // match on the schedule that isn't final, it shows like any other team.
+      const leaving = (scheduleData?.withdrawn || []).some(w => w.id === t.teamId);
+      const gamesLeft = leaving && (scheduleData?.weeks || []).some(w => (w.matches || []).some(m =>
+        (m.teamAId === t.teamId || m.teamBId === t.teamId) && !m.finalizedAt));
+      const seasonDone = leaving && !gamesLeft;
       const badge    = seasonDone ? '<span class="team-badge team-badge--done">Season complete</span>'
                      : hunt ? badgeHtml(t.status) : '';
 
