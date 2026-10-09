@@ -545,6 +545,30 @@
        with the live table's tiebreakers (PTS → GW → H2H → DIFF). Also carries
        round W–L–T and each night's match points (the "Last 3" squares). ── */
     var TABLES = {};
+    // League tiebreak order — an inline copy of netlify/functions/lib/tiebreak.js;
+    // keep the two in step. PTS → GW → head-to-head (only when exactly two teams
+    // are level) → DIFF → PS → name. Three or more level teams skip head-to-head.
+    function dsSortStandings(items, f) {
+      var base = items.slice().sort(function (a, b) { return (f.pts(b) - f.pts(a)) || (f.gw(b) - f.gw(a)); });
+      var rest = function (a, b) {
+        return (f.diff(b) - f.diff(a)) || (f.ps(b) - f.ps(a)) || String(f.name(a)).localeCompare(String(f.name(b)));
+      };
+      var out = [], i = 0;
+      while (i < base.length) {
+        var j = i + 1;
+        while (j < base.length && f.pts(base[j]) === f.pts(base[i]) && f.gw(base[j]) === f.gw(base[i])) j++;
+        var g = base.slice(i, j);
+        if (g.length === 2) {
+          var ab = f.h2h(g[0], g[1]), ba = f.h2h(g[1], g[0]);
+          if (ab != null && ba != null && ab !== ba) { if (ba > ab) g.reverse(); }
+          else g.sort(rest);
+        } else {
+          g.sort(rest);
+        }
+        out = out.concat(g); i = j;
+      }
+      return out;
+    }
     function tableThrough(w){
       if(TABLES[w]) return TABLES[w];
       var rows={}, byName={};
@@ -569,13 +593,9 @@
         });
       });
       var list=Object.keys(rows).map(function(k){ var r=rows[k]; r.diff=r.ps-r.pa; return r; });
-      list.sort(function(a,b){
-        if(b.pts!==a.pts) return b.pts-a.pts;
-        if(b.gw!==a.gw) return b.gw-a.gw;
-        var ab=a.h2h[b.id], ba=b.h2h[a.id];
-        if(ab!=null&&ba!=null&&ab!==ba) return ba-ab;
-        if(b.diff!==a.diff) return b.diff-a.diff;
-        return String(a.name).localeCompare(String(b.name));
+      list=dsSortStandings(list,{
+        pts:function(r){return r.pts;}, gw:function(r){return r.gw;}, diff:function(r){return r.diff;}, ps:function(r){return r.ps;},
+        name:function(r){return r.name;}, h2h:function(a,b){ var v=a.h2h[b.id]; return v==null?null:v; }
       });
       list.forEach(function(r,i){ r.rank=i+1; });
       TABLES[w]=list; return list;

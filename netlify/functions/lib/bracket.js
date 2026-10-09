@@ -43,6 +43,7 @@
 // played — it is always "rank as of week N", frozen by the cutoff.
 
 import { COURT_SETS } from './courts.js';
+import { sortStandings } from './tiebreak.js';
 
 export const PHASE = { RIVALRY: 'rivalry', PLAYOFF: 'playoff', CHAMPIONSHIP: 'championship' };
 export const FORMAT = { SINGLE: 'single', DOUBLE: 'double' };
@@ -190,9 +191,9 @@ export function buildBracketWeeks({ circuit, division, numTeams, startWeek, form
 
 // ── Ranking ─────────────────────────────────────────────────────────────────
 // Rank a division's teams from finalized matches with week ≤ cutoffWeek.
-// Mirrors lib/standings.js standingsComparator:
-//   1. match points for (desc)  2. games won (desc)
-//   3. head-to-head match points (desc)  4. rally-point differential (desc)
+// Same order as the standings table (lib/tiebreak.js):
+//   1. match points  2. games won  3. head-to-head match points — only when
+//   exactly two teams are level  4. rally-point differential  5. points scored
 // Falls back to alphabetical for teams that are still even / unplayed, matching
 // the standings page's "no games yet → alphabetical" behaviour.
 export function rankTeams({ matches, teamList, cutoffWeek }) {
@@ -235,16 +236,11 @@ export function rankTeams({ matches, teamList, cutoffWeek }) {
     return list.sort((x, y) => String(x.name).localeCompare(String(y.name)))
       .map(r => ({ id: r.id, name: r.name }));
   }
-  list.sort((x, y) => {
-    if (y.mp !== x.mp) return y.mp - x.mp;
-    if (y.gw !== x.gw) return y.gw - x.gw;
-    const xy = x.h2h[y.id], yx = y.h2h[x.id];
-    if (xy != null && yx != null && xy !== yx) return yx - xy;
-    const xd = x.ps - x.pa, yd = y.ps - y.pa;
-    if (yd !== xd) return yd - xd;
-    return String(x.name).localeCompare(String(y.name));
+  const ordered = sortStandings(list, {
+    pts: r => r.mp, gw: r => r.gw, diff: r => r.ps - r.pa, ps: r => r.ps, name: r => r.name,
+    h2h: (a, b) => a.h2h[b.id] ?? null,
   });
-  return list.map(r => ({ id: r.id, name: r.name }));
+  return ordered.map(r => ({ id: r.id, name: r.name }));
 }
 
 // Winner/loser of a finalized match (by match points, then games). null if not

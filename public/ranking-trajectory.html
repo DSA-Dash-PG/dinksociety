@@ -97,11 +97,29 @@
   }
 
   // ── Snapshot: rebuild a division's ranking through a given week ──
-  // Mirrors the standings page's week-snapshot tiebreakers: PTS → GW → H2H → DIFF.
-  function h2hCmp(a, b) {
-    const ab = a.h2h[b.teamId], ba = b.h2h[a.teamId];
-    if (ab && ba && ab.for !== ba.for) return ba.for - ab.for;
-    return 0;
+  // League tiebreak order — an inline copy of netlify/functions/lib/tiebreak.js;
+  // keep the two in step. PTS → GW → head-to-head (only when exactly two teams
+  // are level) → DIFF → PS → name. Three or more level teams skip head-to-head.
+  function dsSortStandings(items, f) {
+    var base = items.slice().sort(function (a, b) { return (f.pts(b) - f.pts(a)) || (f.gw(b) - f.gw(a)); });
+    var rest = function (a, b) {
+      return (f.diff(b) - f.diff(a)) || (f.ps(b) - f.ps(a)) || String(f.name(a)).localeCompare(String(f.name(b)));
+    };
+    var out = [], i = 0;
+    while (i < base.length) {
+      var j = i + 1;
+      while (j < base.length && f.pts(base[j]) === f.pts(base[i]) && f.gw(base[j]) === f.gw(base[i])) j++;
+      var g = base.slice(i, j);
+      if (g.length === 2) {
+        var ab = f.h2h(g[0], g[1]), ba = f.h2h(g[1], g[0]);
+        if (ab != null && ba != null && ab !== ba) { if (ba > ab) g.reverse(); }
+        else g.sort(rest);
+      } else {
+        g.sort(rest);
+      }
+      out = out.concat(g); i = j;
+    }
+    return out;
   }
   function snapshot(div, throughWeek) {
     const base = standingsData.divisions[div].teams || [];
@@ -125,14 +143,12 @@
       }
     }
     const teams = [...rows.values()].map(t => { t.pointDiff = t.pointsScored - t.pointsAgainst; return t; });
-    teams.sort((a, b) =>
-      (b.matchPointsFor - a.matchPointsFor) ||
-      (b.totalGamesWon - a.totalGamesWon) ||
-      h2hCmp(a, b) ||
-      (b.pointDiff - a.pointDiff) ||
-      String(a.teamName).localeCompare(String(b.teamName)));
-    teams.forEach((t, i) => { t.rank = i + 1; });
-    return teams;
+    const ranked = dsSortStandings(teams, {
+      pts: t => t.matchPointsFor, gw: t => t.totalGamesWon, diff: t => t.pointDiff, ps: t => t.pointsScored,
+      name: t => t.teamName, h2h: (a, b) => { const e = a.h2h && a.h2h[b.teamId]; return e ? e.for : null; },
+    });
+    ranked.forEach((t, i) => { t.rank = i + 1; });
+    return ranked;
   }
 
   function playedWeeks(div) {

@@ -16,6 +16,7 @@ import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
 import { normalizeScore } from './score-helpers.js';
 import { resolveBracketDisplay } from './bracket.js';
+import { sortStandings } from './tiebreak.js';
 
 const DIVISIONS = ['3.0M', '3.5M', '3.5W'];
 
@@ -255,7 +256,7 @@ export async function rebuildStandings(circuit) {
     // captain portal) reads this same sorted array, so the order stays in sync.
     const anyPlayed = teams.some(t => (t.matchesPlayed || 0) > 0);
     if (anyPlayed) {
-      teams.sort(standingsComparator);
+      teams.splice(0, teams.length, ...sortStandings(teams, STANDING_FIELDS));
     } else {
       teams.sort((a, b) => String(a.teamName).localeCompare(String(b.teamName)));
     }
@@ -438,28 +439,16 @@ export async function rebuildStandings(circuit) {
   return { standings, playerStats: playerStatsOut };
 }
 
-/**
- * Standings comparator following Aloha-style tiebreakers:
- *   1. Match points (more = better)
- *   2. Total games won (more = better)
- *   3. Head-to-head match points (between tied teams)
- *   4. Rally-point differential (PS − PA)
- */
-function standingsComparator(a, b) {
-  if (b.matchPointsFor !== a.matchPointsFor) return b.matchPointsFor - a.matchPointsFor;
-  if (b.totalGamesWon !== a.totalGamesWon) return b.totalGamesWon - a.totalGamesWon;
-
-  // Head-to-head: compare a.headToHead[b.id] vs b.headToHead[a.id]
-  const aVsB = a.headToHead[b.teamId];
-  const bVsA = b.headToHead[a.teamId];
-  if (aVsB && bVsA) {
-    if (aVsB.for !== bVsA.for) return bVsA.for - aVsB.for;
-  }
-
-  const aDiff = a.pointsScored - a.pointsAgainst;
-  const bDiff = b.pointsScored - b.pointsAgainst;
-  return bDiff - aDiff;
-}
+// Field readers for the shared tiebreak order (lib/tiebreak.js):
+// PTS → GW → head-to-head (two-team ties only) → DIFF → PS.
+const STANDING_FIELDS = {
+  pts: t => t.matchPointsFor,
+  gw: t => t.totalGamesWon,
+  diff: t => t.pointsScored - t.pointsAgainst,
+  ps: t => t.pointsScored,
+  name: t => t.teamName,
+  h2h: (a, b) => a.headToHead?.[b.teamId]?.for ?? null,
+};
 
 /**
  * Pulls lineup + score for a match, updates the playerStats map in place.
