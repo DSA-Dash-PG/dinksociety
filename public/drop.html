@@ -764,8 +764,12 @@
        A storyline that names a team (storyline.team) gets the live Breakdown
        card (js/team-breakdown.js) under the copy — the same block the team
        page shows on its Overview tab — built from the teams / players /
-       standings payloads already loaded for the entity index. */
-    var SCOUT = { teams: [], standings: null };
+       standings payloads already loaded for the entity index.
+       A numbered-week recap scopes the card to THAT week (SCOUT.week): only
+       the players who played that night and that night's numbers — season
+       stats live on the team page. Previews and specials have no week of
+       their own, so they keep the season card. */
+    var SCOUT = { teams: [], standings: null, week: null };
     function teamSlug(n){ return (window.DSBreakdown && window.DSBreakdown.slug) ? window.DSBreakdown.slug(n) : String(n||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
     function scoutFindTeam(name){
       var n = String(name||'').trim().toLowerCase(); if(!n) return null;
@@ -787,9 +791,16 @@
     }
     function scoutPlayers(team){
       if(!DROP_PLAYERS || !team) return [];
-      var nm = String(team.name||'').toLowerCase();
+      var nm = String(team.name||'').toLowerCase(), wk = SCOUT.week;
       return Object.keys(DROP_PLAYERS).map(function(k){ return DROP_PLAYERS[k]; }).filter(function(p){
-        return p && ((team.id && p.teamId===team.id) || String(p.teamName||'').toLowerCase()===nm);
+        if(!p) return false;
+        // Week scope: go by the team they suited up for THAT night when the
+        // week record says (a player who has since moved still belongs here).
+        if(wk!=null && team.id){
+          var rec = (p.weeklyGameRecords||[]).filter(function(r){ return r && +r.week===+wk; })[0];
+          if(rec && rec.teamId) return rec.teamId===team.id;
+        }
+        return (team.id && p.teamId===team.id) || String(p.teamName||'').toLowerCase()===nm;
       });
     }
     function scoutCardHtml(teamName){
@@ -798,7 +809,7 @@
       var stx = scoutStanding(team);
       return window.DSBreakdown.html({
         team: team, players: scoutPlayers(team), row: stx ? stx.row : null, divCount: stx ? stx.n : 0,
-        header: true, teamHref: '/team?id='+encodeURIComponent(teamSlug(team.name)),
+        week: SCOUT.week, header: true, teamHref: '/team?id='+encodeURIComponent(teamSlug(team.name)),
         shortName: SN, playerHref: function(n){ return window.DSEntity ? window.DSEntity.playerHref(n, team.name) : '/player?name='+encodeURIComponent(n); }
       });
     }
@@ -942,6 +953,8 @@
 
       var rest = (drop.storylines||[]).slice(0);
       var stories = '';
+      // Recap of a numbered week → team cards show that week only.
+      SCOUT.week = (drop.week!=null && /^week-\d+$/.test(String(drop.edition||('week-'+drop.week)))) ? drop.week : null;
       if(rest.length){
         var allTeams = rest.every(function(s){ return s && s.team; });
         var secTitle = allTeams ? 'Team Breakdowns' : 'Also This Week';
