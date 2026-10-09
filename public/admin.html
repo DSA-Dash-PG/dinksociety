@@ -7351,6 +7351,7 @@
     playoff: 'Seeds lock from the final regular-season standings (through Rivalry Week): Semifinals #1 v #4 and #2 v #3; #5 v #6 play a consolation match for 5th.',
     championship: 'Built from the semifinal results — the two winners play for Gold/Silver, the two losers play for Bronze. Resolves automatically once Week 7 is final.',
     championshipNight: 'Double round-robin season: seeds straight off the final regular-season standings — #1 v #2 for the title, #3 v #4, #5 v #6. Locks automatically once the last regular-season week is final.',
+    championshipNightTop4: 'Double round-robin season: seeds straight off the final regular-season standings — #1 v #2 for the title and #3 v #4 for third. The last seed has no match (a team left mid-season, so the count is odd). Locks automatically once the last regular-season week is final.',
   };
   const BK_TITLE = { rivalry: 'Rivalry Week', playoff: 'Playoffs', championship: 'Championship' };
 
@@ -7387,7 +7388,8 @@
   }
   function renderBracketPanel(card, wk, weeks) {
     const note = (wk.phase === 'championship' && (wk.matches || []).some(x => x.format === 'double' || /^#\d/.test(x.seedLabelA || '')))
-      ? BK_NOTE.championshipNight : (BK_NOTE[wk.phase] || '');
+      ? ((wk.matches || []).some(x => x.bracketSlot === 'consolation') ? BK_NOTE.championshipNight : BK_NOTE.championshipNightTop4)
+      : (BK_NOTE[wk.phase] || '');
     // group by bracketGroup preserving order
     const groups = []; const seen = {};
     wk.matches.forEach(m => {

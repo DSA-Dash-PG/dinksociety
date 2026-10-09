@@ -282,6 +282,8 @@
 
     /* ── Placeholder / empty ─────────────────────────────────────── */
     .week-tbd { text-align: center; padding: var(--space-6) 0 var(--space-2); font-size: 13px; color: var(--color-text-faint); }
+    .week-bye { text-align: center; padding: var(--space-3) 0 0; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-faint); }
+    .week-bye b { color: var(--color-text-muted); font-weight: 800; }
     .empty-state { text-align: center; padding: 60px 20px; font-size: 14px; color: var(--color-text-faint); }
 
     /* ── Bracket phases (Wk 6 Rivalry / Wk 7 Playoffs / Wk 8 Champ) ─ */
@@ -380,7 +382,9 @@
     // js/season.js resolves, so week dates follow the season instead of being
     // pinned to Season 1's calendar.
     let SEASON_START = new Date('2026-06-08T00:00:00');
-    const TOTAL_WEEKS  = 8;
+    // 8 by default; grows to the season's real length once the schedule loads
+    // (a double round-robin season runs 11 weeks).
+    let   TOTAL_WEEKS  = 8;
     // The viewed season's code ('I', 'II', …). Planned week dates are stored
     // per season, so this is what picks the right bucket.
     let   SEASON_CODE = 'I';
@@ -563,6 +567,10 @@
       const ms = wData?.matches || [];
       return selectedTeam ? ms.filter(m => m.teamAId === selectedTeam || m.teamBId === selectedTeam) : ms;
     }
+    // Is the picked team sitting out this week?
+    function teamOnBye(wData) {
+      return !!selectedTeam && ((wData && wData.byes) || []).some(b => b.id === selectedTeam);
+    }
     function renderTeamFilter(weeksData) {
       const el = $id('team-filter'), label = $id('team-strip-label');
       if (!el) return;
@@ -589,7 +597,10 @@
       let weekNums = Array.from({ length: TOTAL_WEEKS }, (_, i) => i + 1)
         .filter(n => selectedWeek == null || n === selectedWeek);
       if (selectedTeam) {
-        weekNums = weekNums.filter(n => teamMatches(weeksData?.find(w => w.week === n)).length > 0);
+        weekNums = weekNums.filter(n => {
+          const w = weeksData?.find(w => w.week === n);
+          return teamMatches(w).length > 0 || teamOnBye(w);
+        });
       }
       // Grid layout only when a team is picked and more than one week shows.
       $id('weeks-list').classList.toggle('is-team', !!selectedTeam && weekNums.length > 1);
@@ -615,16 +626,26 @@
         const wData  = weeksData?.find(w => w.week === n);
         const wMatches = teamMatches(wData);
         const matchCount = wMatches.length;
-        const collapsedSummary = matchCount
-          ? `${matchCount} match${matchCount !== 1 ? 'es' : ''} · click to expand`
+        // Bye week: with an odd team count one team sits out each week.
+        const byes = (wData && wData.byes) || [];
+        const myBye = teamOnBye(wData);
+        const byeNote = (byes.length && !selectedTeam)
+          ? `<p class="week-bye">Bye week · <b>${byes.map(b => esc(b.name)).join(', ')}</b></p>`
+          : '';
+        const collapsedSummary = myBye && !matchCount
+          ? 'Bye week · no match'
+          : matchCount
+          ? `${matchCount} match${matchCount !== 1 ? 'es' : ''}${byes.length && !selectedTeam ? ' · bye: ' + byes.map(b => esc(b.name)).join(', ') : ''} · click to expand`
           : 'Click to expand';
 
         const phasePill = wData?.phase
           ? `<span class="week-phase ${wData.phase}">${esc(wData.phaseLabel || wData.phase)}</span>`
           : '';
-        const body = wData?.phase
-          ? renderBracketWeek(selectedTeam ? { ...wData, matches: wMatches } : wData, n, weeksData)
-          : renderMatches(wMatches, n, weeksData);
+        const body = (myBye && !matchCount)
+          ? `<p class="week-tbd">Bye week — no match this week</p>`
+          : (wData?.phase
+              ? renderBracketWeek(selectedTeam ? { ...wData, matches: wMatches, allMatches: wData.matches } : wData, n, weeksData)
+              : renderMatches(wMatches, n, weeksData)) + byeNote;
 
         return `
           <div class="${cardCls}" data-week="${n}">
@@ -757,10 +778,14 @@
       championship: 'Built from the semifinal results — the two winners play for Gold/Silver, the two losers play for Bronze.',
       // DOUBLE format: no semis — Championship Night seeds straight off the standings.
       championshipNight: 'Seeded straight off the final regular-season standings after both round robins. #1 plays #2 for the title — the champion is crowned tonight. #3 plays #4 and #5 plays #6.',
+      // Odd team count (a team left mid-season): no 5th-place match.
+      championshipNightTop4: 'Seeded straight off the final regular-season standings after both round robins. #1 plays #2 for the title — the champion is crowned tonight. #3 plays #4 for third place.',
     };
-    const PHASE_LOCK = { rivalry: 'the round-robin', playoff: 'Rivalry Week', championship: 'the semifinals', championshipNight: 'the regular season' };
+    const PHASE_LOCK = { rivalry: 'the round-robin', playoff: 'Rivalry Week', championship: 'the semifinals', championshipNight: 'the regular season', championshipNightTop4: 'the regular season' };
     // Championship Night (double round-robin seasons) reads its own note/lock copy.
-    const phaseKey = (phase, ms) => (phase === 'championship' && (ms || []).some(x => x.format === 'double')) ? 'championshipNight' : phase;
+    const phaseKey = (phase, ms) => (phase === 'championship' && (ms || []).some(x => x.format === 'double'))
+      ? ((ms || []).some(x => x.bracketSlot === 'consolation') ? 'championshipNight' : 'championshipNightTop4')
+      : phase;
 
     // Small seed chip from a "#N Seed" label (no chip for Winner/Loser labels).
     function seedChip(label) {
@@ -845,7 +870,7 @@
     function renderBracketWeek(wData, weekNum, weeksData) {
       const matches = wData.matches || [];
       if (!matches.length) return `<p class="week-tbd">Matchups published closer to game night</p>`;
-      const pk = phaseKey(wData.phase, wData.matches);
+      const pk = phaseKey(wData.phase, wData.allMatches || wData.matches);
       const note = PHASE_NOTE[pk] ? `<p class="bracket-note">${esc(PHASE_NOTE[pk])}</p>` : '';
 
       // Group by bracketGroup, preserving order. Show group headers only when a
@@ -999,6 +1024,9 @@
         if (!r.ok) throw 0;
         scheduleData = await r.json();
         const weeksData = scheduleData?.empty ? null : scheduleData?.weeks;
+        if (weeksData && weeksData.length) {
+          TOTAL_WEEKS = Math.max(8, ...weeksData.map(w => Number(w.week) || 0));
+        }
         renderDateStrip(weeksData);
         renderTeamFilter(weeksData);
         renderAllWeeks(weeksData);

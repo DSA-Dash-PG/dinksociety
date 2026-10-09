@@ -7,6 +7,7 @@ import {
   regularRounds, bracketSupported, bracketSlots, buildBracketWeeks,
   phaseForWeek, rankTeams, matchResult, resolveBracketDisplay, PHASE,
 } from '../netlify/functions/lib/bracket.js';
+import { drawRounds, seededRng } from '../netlify/functions/lib/rematch-draw.js';
 
 const TEAMS = [
   { id: 't1', name: 'Alpha' }, { id: 't2', name: 'Bravo' },
@@ -152,4 +153,72 @@ test('matchResult breaks MP ties on games won, else null', () => {
   assert.equal(matchResult({ finalizedAt: 'x', teamA: TEAMS[0], teamB: TEAMS[1], scoreA: 4, scoreB: 0 }).winner.name, 'Alpha');
   const tie = matchResult({ finalizedAt: 'x', teamA: TEAMS[0], teamB: TEAMS[1], scoreA: 2, scoreB: 2, round1: { homeGames: 1, awayGames: 1 }, round2: {} });
   assert.equal(tie, null);
+});
+
+// ── DOUBLE format with a team that left after the first round-robin ──────────
+// 6 teams play Wk 1–5; Foxtrot leaves; the other 5 play Wk 6–10 with a bye each
+// week; Championship Night (Wk 11) is #1 v #2 and #3 v #4 only.
+function doubleWithWithdrawal({ secondHalfFinal }) {
+  const byId = Object.fromEntries(TEAMS.map(t => [t.id, t]));
+  const real = [];
+  // First half: Foxtrot (t6) wins everything, so it would be the #1 seed if it
+  // were still seeded. Otherwise the lower-numbered team wins 3–1.
+  drawRounds(TEAMS.map(t => t.id), { rng: seededRng(11) }).forEach((r, i) => {
+    for (const [a, b] of r.pairs) {
+      const [w, l] = (a === 't6' || (b !== 't6' && a < b)) ? [a, b] : [b, a];
+      real.push(rr(i + 1, byId[w], byId[l], w === 't6' ? 4 : 3, w === 't6' ? 0 : 1));
+    }
+  });
+  const active = TEAMS.filter(t => t.id !== 't6');
+  drawRounds(active.map(t => t.id), { rng: seededRng(12) }).forEach((r, i) => {
+    for (const [a, b] of r.pairs) {
+      const [w, l] = a < b ? [a, b] : [b, a];
+      const m = rr(6 + i, byId[w], byId[l], 3, 1);
+      if (!secondHalfFinal) { m.finalizedAt = null; m.scoreA = null; m.scoreB = null; }
+      real.push(m);
+    }
+  });
+  const bracket = (buildBracketWeeks({ circuit: 'II', division: 'D', numTeams: 5, startWeek: 11, format: 'double' })[11] || [])
+    .map(m => ({ ...m, week: 11, withdrawn: ['t6'] }));
+  return { real, bracket };
+}
+
+test('double format: 5 teams → title and 3rd-place match only', () => {
+  assert.deepEqual(bracketSlots(5, 'double').map(s => s.slot), ['gold', 'bronze']);
+  assert.deepEqual(bracketSlots(6, 'double').map(s => s.slot), ['gold', 'bronze', 'consolation']);
+  const wk = buildBracketWeeks({ circuit: 'II', division: 'D', numTeams: 5, startWeek: 11, format: 'double' });
+  assert.deepEqual(Object.keys(wk), ['11']);
+  assert.equal(wk[11].length, 2);
+});
+
+test('withdrawn team: seeds stay open until every scheduled match is final', () => {
+  const { real, bracket } = doubleWithWithdrawal({ secondHalfFinal: false });
+  assert.equal(real.length, 25);                     // 15 + 10, not 30
+  const res = resolveBracketDisplay({ realMatches: real, bracketMatches: bracket, teamList: TEAMS, numTeams: 6 });
+  assert.ok(res.every(m => m.seedLocked === false));
+  assert.ok(res.every(m => m.format === 'double' && m.phaseLabel === 'Championship Night'));
+});
+
+test('withdrawn team: locks on 25 matches and is never seeded', () => {
+  const { real, bracket } = doubleWithWithdrawal({ secondHalfFinal: true });
+  const res = resolveBracketDisplay({ realMatches: real, bracketMatches: bracket, teamList: TEAMS, numTeams: 6 });
+  assert.ok(res.every(m => m.seedLocked === true));
+  const seeded = res.flatMap(m => [m.teamA.id, m.teamB.id]);
+  assert.equal(new Set(seeded).size, 4);
+  assert.ok(!seeded.includes('t6'));                 // Foxtrot has the most points but left
+  const gold = res.find(m => m.bracketSlot === 'gold');
+  const ranks = rankTeams({ matches: real, teamList: TEAMS, cutoffWeek: 10 }).filter(t => t.id !== 't6');
+  assert.equal(gold.teamA.id, ranks[0].id);
+  assert.equal(gold.teamB.id, ranks[1].id);
+  const bronze = res.find(m => m.bracketSlot === 'bronze');
+  assert.equal(bronze.teamA.id, ranks[2].id);
+  assert.equal(bronze.teamB.id, ranks[3].id);
+});
+
+test('double format without a withdrawal still needs the full 30 matches', () => {
+  const { real } = doubleWithWithdrawal({ secondHalfFinal: true });
+  const bracket = (buildBracketWeeks({ circuit: 'II', division: 'D', numTeams: 6, startWeek: 11, format: 'double' })[11] || [])
+    .map(m => ({ ...m, week: 11 }));
+  const res = resolveBracketDisplay({ realMatches: real, bracketMatches: bracket, teamList: TEAMS, numTeams: 6 });
+  assert.ok(res.every(m => m.seedLocked === false));  // only 25 of 30 in the books
 });

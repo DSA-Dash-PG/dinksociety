@@ -61,6 +61,15 @@ export default async (req) => {
             pushPublicMatch(weekMap, w, div, m, emojiById, undefined, emojiByName);
           }
         }
+        // Odd team count (a team left mid-season): who sits out this week.
+        if (Array.isArray(data.byes) && data.byes.length) {
+          if (!weekMap[w]) weekMap[w] = { week: w, division: div, matches: [] };
+          weekMap[w].byes = data.byes.map(t => ({
+            id: t?.id || null,
+            name: t?.name || '',
+            emoji: (t?.id && emojiById[t.id]) || (t?.name && emojiByName[t.name.toLowerCase()]) || '',
+          }));
+        }
       }
 
       // ── Resolve the bracket weeks per division and merge them in ──

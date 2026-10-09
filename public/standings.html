@@ -476,6 +476,27 @@
     }
     return out;
   }
+  // Regular-season matches a team has on the schedule. In a double round-robin
+  // season with an odd team count (a team left mid-season) teams get a bye week,
+  // so this is fewer than the number of weeks — and fewer still for the team
+  // that left. Other formats keep the fixed season length.
+  function regMatchesFor(teamId) {
+    if (!IS_DOUBLE || !teamId) return SEASON.totalMatches;
+    let n = 0;
+    for (const w of (scheduleData?.weeks || [])) {
+      if (w.phase) continue;
+      for (const m of (w.matches || [])) {
+        if (m.phase) continue;
+        if (activeDivision && m.division && m.division !== activeDivision) continue;
+        if (m.teamAId === teamId || m.teamBId === teamId) n++;
+      }
+    }
+    return n || SEASON.totalMatches;
+  }
+  // Does Championship Night include a 5th-place match? (Not with five teams.)
+  function hasFifthPlaceMatch() {
+    return (scheduleData?.weeks || []).some(w => (w.matches || []).some(m => m.bracketSlot === 'consolation'));
+  }
   function playedWeeksSet() {
     const set = new Set();
     for (const w of (scheduleData?.weeks || [])) {
@@ -535,7 +556,7 @@
     }
     const teams = [...rows.values()].map(t => {
       t.pointDiff = t.pointsScored - t.pointsAgainst;   // DIFF = PS − PA
-      t.remaining = SEASON.totalMatches - t.matchesPlayed;
+      t.remaining = Math.max(0, regMatchesFor(t.teamId) - t.matchesPlayed);
       t.maxPts = t.matchPointsFor + t.remaining * SEASON.maxPtsPerMatch;
       return t;
     });
@@ -652,11 +673,13 @@
     }
 
     // ── Regular season (with week snapshots) ─────────────────────────
-    const weeksPlayedLive = Math.max(0, ...divData.teams.map(t => t.matchesPlayed || 0));
+    const weeksPlayedLive = IS_DOUBLE
+      ? Math.max(0, ...playedWeeksSet())
+      : Math.max(0, ...divData.teams.map(t => t.matchesPlayed || 0));
     let teams, hunt, updated = '', preTable = '';
     if (selectedWeek === 'current') {
       teams = divData.teams.map(t => {
-        const remaining = SEASON.totalMatches - (t.matchesPlayed || 0);
+        const remaining = Math.max(0, regMatchesFor(t.teamId) - (t.matchesPlayed || 0));
         return { ...t, remaining, maxPts: t.matchPointsFor + remaining * SEASON.maxPtsPerMatch };
       });
       // The hunt turns on once Week 5 is complete — i.e. Rivalry Week (the
@@ -969,7 +992,7 @@
         + '</div>'
         + '<div class="legend-tiebreak">'
         + (IS_DOUBLE
-            ? '  Championship Night (Week ' + (RIVALRY_WEEK + 1) + '): #1 vs #2 for the title, #3 vs #4 and #5 vs #6 — every team plays. The line marks the top ' + SEASON.playoffSpots + '.'
+            ? '  Championship Night (Week ' + (RIVALRY_WEEK + 1) + '): #1 vs #2 for the title' + (hasFifthPlaceMatch() ? ', #3 vs #4 and #5 vs #6 — every team plays.' : ' and #3 vs #4 for third.') + ' The line marks the top ' + SEASON.playoffSpots + '.'
             : '  Top ' + SEASON.playoffSpots + ' seeds after Rivalry Week advance to the Week 7 playoff bracket; the rest play a consolation match.')
         + '</div>';
     return '<div class="legend-card">'
