@@ -25,6 +25,13 @@
 // working unchanged. Placeholders are stamped `format: 'double'`; the format is
 // also inferred from the schedule (round-robin weeks beyond N-1) when synthesized.
 //
+// A team that LEAVES after the first round-robin (Season 2: FOURPLAY) is listed
+// in `withdrawn: [teamId]` on the Championship Night placeholders. The second
+// round-robin then runs with an odd team count — one bye a week, fewer matches —
+// so: the withdrawn team is never seeded, only complete pairs get a Championship
+// Night match (5 teams → #1 v #2 and #3 v #4, #5 has no game), and the seeds
+// lock once every regular match actually ON THE SCHEDULE is final.
+//
 // This module is pure (no I/O) so it can be unit-tested and reused by:
 //   - public-schedule.js  (resolve seed previews for the public page)
 //   - admin-matches.js    (resolve seed previews for the admin schedule tab)
@@ -80,7 +87,7 @@ export function bracketSlots(numTeams, format = FORMAT.SINGLE) {
     // One Championship Night, every team plays: adjacent seeds pair off.
     const names = ['gold', 'bronze', 'consolation'];
     const ms = [];
-    for (let i = 0; i < numTeams; i += 2) {
+    for (let i = 0; i + 1 < numTeams; i += 2) {   // complete pairs only (odd count: last seed sits)
       const k = i / 2;
       const slot = names[k] || `place-${i + 1}`;
       const base = { phase: PHASE.CHAMPIONSHIP, weekOffset: 1, slot, seedA: { rank: i + 1 }, seedB: { rank: i + 2 } };
@@ -285,7 +292,22 @@ export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, n
   format = format || inferFormat({ bracketMatches, realMatches, numTeams });
   const R = regularRounds(numTeams, format);
   const perWin = numTeams / 2;            // matches per round-robin week
-  const expectedRR = R * perWin;          // full round-robin match count
+
+  // Teams that left mid-season (stamped on the bracket placeholders). They keep
+  // their results in the table but are never seeded into the bracket.
+  const withdrawn = new Set();
+  for (const m of bracketMatches) {
+    for (const t of (m?.withdrawn || [])) withdrawn.add(typeof t === 'object' ? t?.id : t);
+  }
+  const seedable = (ranks) => (withdrawn.size ? ranks.filter(t => !withdrawn.has(t.id)) : ranks);
+
+  // Full regular-season match count. Normally R weeks × N/2 matches. Once a team
+  // has withdrawn the later weeks carry fewer matches (and byes), so count what
+  // is actually scheduled — but only when the schedule runs all the way to week R.
+  const scheduled = realMatches.filter(m => m?.week != null && m.week <= R);
+  const expectedRR = (withdrawn.size && scheduled.some(m => m.week === R))
+    ? scheduled.length
+    : R * perWin;
 
   const slotLabels = {};
   for (const s of bracketSlots(numTeams, format)) slotLabels[s.slot] = s.gameLabel || s.group;
@@ -305,7 +327,7 @@ export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, n
 
   // Rank snapshots, computed lazily.
   let ranksThruRR = null, ranksThruRivalry = null;
-  const getRanksRR = () => (ranksThruRR ||= rankTeams({ matches: realMatches, teamList, cutoffWeek: R }));
+  const getRanksRR = () => (ranksThruRR ||= seedable(rankTeams({ matches: realMatches, teamList, cutoffWeek: R })));
   const getRanksRivalry = () => {
     if (ranksThruRivalry) return ranksThruRivalry;
     // Rivalry counts toward the regular season, so include locked+finalized
@@ -314,9 +336,9 @@ export function resolveBracketDisplay({ realMatches, bracketMatches, teamList, n
       .filter(m => m.phase === PHASE.RIVALRY)
       .map(m => bySlot[m.bracketSlot])
       .filter(m => m && m.finalizedAt);
-    ranksThruRivalry = rankTeams({
+    ranksThruRivalry = seedable(rankTeams({
       matches: [...realMatches, ...rivalryFinals], teamList, cutoffWeek: R + 1,
-    });
+    }));
     return ranksThruRivalry;
   };
 
