@@ -116,7 +116,7 @@ test('inbox: no key → nothing filed; a bare GET only says it is deployed', { s
   assert.equal(r.status, 401);
   assert.equal(await Drop.getDrop('II', 'week-9'), null);
   const ping = await (await inboxHandler(new Request(`${BASE}/desk-inbox`))).json();
-  assert.deepEqual(ping, { ok: true, service: 'desk-inbox' });
+  assert.deepEqual(ping, { ok: true, service: 'desk-inbox', configured: true });
 });
 
 test('inbox: the title line and the edition must agree', { skip }, async () => {

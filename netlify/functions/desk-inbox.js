@@ -11,7 +11,8 @@
 //        { kind:'ladder-recap', eventId, title, dek, html, seasonNote, notes?, replace? }
 //   GET  ?kind=&circuit=   (with the key) → what is already filed / approved,
 //        so a task can check before it writes and never redo an edition
-//   GET  (no key)          → { ok:true } — "is this deployed?" and nothing else
+//   GET  (no key)          → { ok:true, configured } — "is this deployed, and is
+//                            the key set?" and nothing else
 //
 // Filing only ever creates a DRAFT and emails the admins a one-tap approve
 // link (lib/desk-inbox.js). The approve link is never returned to the caller:
@@ -37,7 +38,8 @@ export default async (req) => {
   const q = (k) => (url.searchParams.get(k) || '').trim();
 
   if (req.method === 'GET') {
-    if (!keyMatches(givenKey(req))) return json({ ok: true, service: 'desk-inbox' });
+    // `configured` says only whether a key is set on the site, never what it is.
+    if (!keyMatches(givenKey(req))) return json({ ok: true, service: 'desk-inbox', configured: inboxKey().length >= 24 });
     const items = await listItems({ kind: q('kind') || null, circuit: q('circuit') || null });
     return json({ ok: true, items });
   }
