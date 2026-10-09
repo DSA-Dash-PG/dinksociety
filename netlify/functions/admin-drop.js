@@ -80,7 +80,12 @@ function editionOf(body) {
 // to admin-broadcast-email-background. Sending ~70 emails inline blew through
 // the 10s function limit: the request 504'd, the admin saw "Publish failed",
 // clicked again, and every captain got the announcement twice a minute apart.
-async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = 'players' } = {}) {
+//
+// Exported for desk-approve.js (the one-tap approve link in the review email).
+// That path has no admin cookie to hand the background sender, so it passes a
+// one-time `kickToken` instead: it is pinned on the broadcast record here and
+// the sender accepts it for exactly that record.
+export async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = 'players', kickToken = null } = {}) {
   const site = siteUrl();
   const link = `${site}/drop.html?edition=${encodeURIComponent(rec.edition)}`;
   const subject = rec.kicker || `The Drop · ${rec.label || 'Week ' + rec.week}`;
@@ -132,6 +137,7 @@ async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = '
     emailStatus: doEmail ? (recipients ? 'queued' : 'none') : 'none',
     sentBy: rec.sentBy || 'desk@dinksociety.app', sentAt: new Date().toISOString(),
     kind: 'drop', dropWeek: rec.week, dropEdition: rec.edition, circuit: rec.circuit,
+    ...(kickToken ? { kickToken } : {}),
   });
 
   let queued = false;
@@ -139,7 +145,11 @@ async function broadcastDrop(rec, req, { sendEmail: doEmail = true, audience = '
     try {
       const r = await fetch(`${site}/.netlify/functions/admin-broadcast-email-background`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', cookie: req.headers.get('cookie') || '' },
+        headers: {
+          'Content-Type': 'application/json',
+          cookie: (req && req.headers.get('cookie')) || '',
+          ...(kickToken ? { 'x-broadcast-kick': kickToken } : {}),
+        },
         body: JSON.stringify({ broadcastId }),
       });
       queued = r.status === 202 || r.ok;

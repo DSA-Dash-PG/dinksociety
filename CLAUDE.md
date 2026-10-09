@@ -86,6 +86,19 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   is ever publicly visible. Note `matchPoints` (`scoreA`/`scoreB`) is written **only at
   finalize**; for a running score use games-won across confirmed games.
 
+- **The Desk inbox files write-ups; an admin approves them from email.** The scheduled
+  Claude tasks (Friday Drop recap, weekly Drop preview, ladder recap editorial) POST their
+  finished write-up to `desk-inbox.js` (header `x-desk-key` = env `DESK_INBOX_KEY`). That
+  saves a DRAFT (`lib/drop.js saveDraft`, `updatedBy: 'desk-inbox'`) or holds a ladder
+  write-up, and emails the admins a review with one Approve button. The button opens
+  `desk-approve.js`, whose page submits itself; only that POST publishes (Drop: publish +
+  portal post + player email; ladder: save write-up + `sendRecapToAll`). Logic and guards
+  are in `lib/desk-inbox.js`: never touches a published edition or a draft an admin saved in
+  the composer, refuses a second filing while one is pending, carries photos over.
+  `DESK_INBOX_KEY` is its own secret on purpose. `DROP_INGEST_TOKEN` also signs the
+  availability and POTW shirt-size links, so never hand that one to a task or a prompt.
+  Tests: `node --test --experimental-test-module-mocks tests/desk-inbox.test.js`.
+
 ## Known open issues
 
 - Partner impact on leaderboard/player detail shows only 3 partners — likely a `slice` limit.

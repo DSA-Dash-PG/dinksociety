@@ -34,9 +34,22 @@ function json(data, status = 200) {
   });
 }
 
+// A Drop approved from the emailed one-tap link has no admin cookie to pass
+// along. That publish pins a one-time `kickToken` on its own broadcast record
+// (admin-drop.js broadcastDrop) and sends the same value in `x-broadcast-kick`;
+// it is good for that one record, and is cleared the moment sending starts.
+function kickMatches(given, want) {
+  const a = String(given || ''), b = String(want || '');
+  if (b.length < 32 || a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < b.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export default async (req) => {
   const verified = await verifyAdminSession(req);
-  if (!verified.valid) return unauthResponse(verified.error);
+  const kick = req.headers.get('x-broadcast-kick') || '';
+  if (!verified.valid && !kick) return unauthResponse(verified.error);
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
   let body;
@@ -47,6 +60,7 @@ export default async (req) => {
   const store = getStore('broadcasts');
   const key = `broadcast/${broadcastId}.json`;
   const rec = await store.get(key, { type: 'json' }).catch(() => null);
+  if (!verified.valid && !(rec && kickMatches(kick, rec.kickToken))) return unauthResponse('Unauthorized');
   if (!rec) return json({ error: 'Broadcast not found' }, 404);
   if (rec.emailStatus && rec.emailStatus !== 'queued') {
     // Already sent (or in flight) — never double-email the league.
@@ -57,7 +71,7 @@ export default async (req) => {
     Object.assign(rec, patch);
     await store.setJSON(key, rec).catch(e => console.error('broadcast progress save failed:', e));
   };
-  await save({ emailStatus: 'sending', emailStartedAt: new Date().toISOString() });
+  await save({ emailStatus: 'sending', emailStartedAt: new Date().toISOString(), kickToken: null });
 
   const site = siteUrl();
   const template = await getEmailTemplate();

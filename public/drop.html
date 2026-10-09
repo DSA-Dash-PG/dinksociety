@@ -885,6 +885,22 @@
       });
     })();
 
+    // The pull-quote is a <blockquote>. Editions saved before the server kept
+    // that tag stored it as a paragraph starting with "> " — show those the
+    // same way instead of printing the ">".
+    function pullQuote(html){
+      return String(html||'').replace(/<p>\s*&gt;\s*([\s\S]*?)<\/p>/gi, '<blockquote>$1</blockquote>');
+    }
+    // Shown on ?preview=1 while the edition is still a draft, so a preview is
+    // never mistaken for the live article.
+    function draftBar(){
+      if(document.getElementById('dp-draftbar')) return;
+      var d = document.createElement('div'); d.id = 'dp-draftbar';
+      d.textContent = 'Draft preview · not published yet';
+      d.style.cssText = 'position:sticky;top:0;z-index:60;background:#f5c842;color:#0e0e0e;font:800 12px/1 Inter,system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase;text-align:center;padding:10px 12px;';
+      var m = document.getElementById('drop'); if(m && m.parentNode) m.parentNode.insertBefore(d, m);
+    }
+
     function render(drop){
       var root = document.getElementById('dp-root');
       LB_SETS = {}; LB_DROP = drop; // lightbox sets are rebuilt as the photos render
@@ -893,7 +909,7 @@
       // lead then weaves in the photos flagged "Show in lead" (minus the hero).
       var hero = heroPhoto(drop);
       var heroGalleryId = (drop.cover && drop.cover.id) ? null : (hero ? hero.id : null);
-      var leadBody = leadWithPhotos(Lhtml(drop.leadHtml), drop.gallery, heroGalleryId);
+      var leadBody = leadWithPhotos(Lhtml(pullQuote(drop.leadHtml)), drop.gallery, heroGalleryId);
 
       var kick = esc(drop.kicker||edLabel(drop));
       var byline = esc(drop.byline||'By The Society Desk');
@@ -986,6 +1002,9 @@
     // endpoint, so editors can see a week before it's published. Normal mode
     // uses the public endpoint (published Drops only).
     var reqPreview = qs('preview');
+    // ?t=<token> comes from the review email (desk-approve): it lets an admin
+    // read the draft as the article without being signed in to admin here.
+    var pvToken = reqPreview ? qs('t') : null;
     function getJSON(u, creds){ return fetch(u, creds?{credentials:'include'}:undefined).then(function(r){ return r.ok?r.json():null; }).catch(function(){ return null; }); }
 
     // The Drop carried no season at all, so it was pinned to Season 1 for good.
@@ -997,7 +1016,9 @@
       var c    = '&circuit=' + encodeURIComponent(code);
       if (S && Number(S.weeks) > 0) TOTAL_WEEKS = Number(S.weeks);
       var api = reqPreview
-        ? ('/.netlify/functions/admin-drop?edition=' + encodeURIComponent(reqEdition||'') + c)
+        ? (pvToken
+            ? ('/.netlify/functions/desk-approve?view=json&t=' + encodeURIComponent(pvToken))
+            : ('/.netlify/functions/admin-drop?edition=' + encodeURIComponent(reqEdition||'') + c))
         : ('/.netlify/functions/public-drop?circuit=' + encodeURIComponent(code) + (reqEdition?('&edition='+encodeURIComponent(reqEdition)):''));
       return Promise.all([
       getJSON(api, !!reqPreview),
@@ -1025,7 +1046,8 @@
       if(reqPreview){
         if(data && data.record){ dropObj = data.record; var pf=dropObj.performers; if(!pf || !pf.potw || (!pf.potw.men && !pf.potw.women)) dropObj.performers = data.livePerformers || pf; }
       } else if(data && !data.empty && data.drop){ dropObj = data.drop; }
-      if(!dropObj){ showEmpty(reqPreview ? 'Nothing to preview yet — save the draft first, and make sure you are logged into admin in this browser.' : (data && data.message)); renderWeekpick(null, pubEds); return; }
+      if(!dropObj){ showEmpty(reqPreview ? (pvToken ? 'This preview link has expired. Open The Drop in admin to see the draft.' : 'Nothing to preview yet — save the draft first, and make sure you are logged into admin in this browser.') : (data && data.message)); renderWeekpick(null, pubEds); return; }
+      if(reqPreview && dropObj.status && dropObj.status !== 'published') draftBar();
       render(dropObj);
       renderWeekpick(dropObj.edition || ('week-'+dropObj.week), pubEds);
     });

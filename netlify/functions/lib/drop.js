@@ -119,9 +119,20 @@ export function defaultKicker(meta) {
 
 // Clean a rich-text fragment the same way broadcasts are sanitized; fall back to
 // an empty string for anything that doesn't look like HTML.
+//
+// The shared sanitizer's allowlist has no <blockquote>, so every pull-quote was
+// silently flattened into an ordinary paragraph on save (the article page has
+// styled `.lead blockquote` all along). Park the tag around the sanitizer and
+// put it back bare, so the Drop keeps its pull-quote without widening what
+// waivers and broadcast emails accept.
+const BQ_OPEN = '\u0001bq\u0001', BQ_CLOSE = '\u0001/bq\u0001';
 function cleanHtml(html) {
   if (typeof html !== 'string' || !html.trim()) return '';
-  return messageLooksHtml(html) ? sanitizeMessageHtml(html) : sanitizeMessageHtml(`<p>${html}</p>`);
+  const looksHtml = messageLooksHtml(html) || /<blockquote\b/i.test(html);
+  const parked = html.replace(/\u0001/g, '')
+    .replace(/<blockquote\b[^>]*>/gi, BQ_OPEN).replace(/<\/blockquote\s*>/gi, BQ_CLOSE);
+  const clean = sanitizeMessageHtml(looksHtml ? parked : `<p>${parked}</p>`);
+  return clean.split(BQ_OPEN).join('<blockquote>').split(BQ_CLOSE).join('</blockquote>');
 }
 
 // Focal point for a photo, as percentages of the image box: { x, y } where

@@ -93,7 +93,7 @@ function makeEl(id) {
   };
 }
 
-async function renderFixture(record, players) {
+async function renderFixture(record, players, opts = {}) {
   const html = readFileSync(join(ROOT, 'public', 'drop.html'), 'utf8');
   const scripts = [...html.matchAll(/<script(?![^>]*src)[^>]*>([\s\S]*?)<\/script>/g)];
   const code = scripts[scripts.length - 1][1]; // the page script
@@ -111,6 +111,7 @@ async function renderFixture(record, players) {
   // contain the endpoint name. Every URL is season-scoped now (?circuit= /
   // ?season=), so these match on the endpoint rather than an exact query.
   const routes = {
+    ...(opts.routes || {}),
     'view=index': { weeks: [{ week: 5 }, { week: 6 }] },
     'view=players': { players },
     'public-drop': { drop: record },
@@ -118,6 +119,7 @@ async function renderFixture(record, players) {
     'public-teams': { teams: [] },
   };
   const fetchStub = (url) => {
+    if (opts.fetched) opts.fetched.push(String(url));
     const key = Object.keys(routes).find((k) => String(url).includes(k));
     return Promise.resolve({ ok: true, json: () => Promise.resolve(key ? routes[key] : null) });
   };
@@ -140,7 +142,7 @@ async function renderFixture(record, players) {
   const sandbox = {
     document,
     window: { DSEntity, dsSeason },
-    location: { search: '?week=6' },
+    location: { search: opts.search || '?week=6' },
     fetch: fetchStub,
     URLSearchParams,
     console,
@@ -308,4 +310,29 @@ test('a record with no performers still renders the editorial', async () => {
   assert.ok(!out.includes('Top Performers'));
   assert.match(out, /Around the League/);
   assert.match(out, /Rivalry Week ends in three straight sweeps/);
+});
+
+test('a pull-quote renders as a blockquote, including the old "> " paragraph form', async () => {
+  // Stored the new way (the server keeps <blockquote>)…
+  const fresh = await renderFixture({ ...RECORD, leadHtml: '<p>One.</p><blockquote>The quote.</blockquote><p>Two.</p>' }, PLAYERS);
+  assert.match(fresh, /<blockquote>The quote\.<\/blockquote>/);
+  // …and the way every edition pasted before that was stored.
+  const legacy = await renderFixture({ ...RECORD, leadHtml: '<p>One.</p><p>&gt; The quote.</p><p>Two.</p>' }, PLAYERS);
+  assert.match(legacy, /<blockquote>The quote\.<\/blockquote>/);
+  assert.doesNotMatch(legacy, /&gt; The quote/);
+  // A paragraph that merely contains a ">" is left alone.
+  const plain = await renderFixture({ ...RECORD, leadHtml: '<p>Five &gt; four.</p>' }, PLAYERS);
+  assert.doesNotMatch(plain, /<blockquote>/);
+});
+
+test('?preview=1&t=<token> reads the draft through the review-email token, not the admin session', async () => {
+  const fetched = [];
+  const out = await renderFixture(null, PLAYERS, {
+    search: '?edition=week-6&preview=1&t=abc123',
+    routes: { 'desk-approve': { record: { ...RECORD, status: 'draft', title: 'Draft headline for review' }, livePerformers: RECORD.performers } },
+    fetched,
+  });
+  assert.match(out, /Draft headline for review/);
+  assert.ok(fetched.some((u) => u.includes('/desk-approve?view=json&t=abc123')));
+  assert.ok(!fetched.some((u) => u.includes('admin-drop')));
 });
