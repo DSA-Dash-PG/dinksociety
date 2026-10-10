@@ -55,7 +55,7 @@ CHIPS: Kaithlyn R: +7 overall, Kyle U: #1 mixed DSR (ZZT), Ryan Hom: #2 men's DS
 **Storyline 4**
 TAG: Bronze on the Line
 HEADLINE: K'CHN and Big Dink Energy play for third
-BODY: The two semifinal losers get a second Monday and a real prize. K'CHN leaned on captain Patrick (3–1) and a season's worth of mixed-doubles reps; Big Dink Energy finished the regular season a single match point off the two-seed and only lost their semi once the first round slipped. On paper it's a coin flip — BDE's +46 regular-season differential against K'CHN's +20, two sides separated by one match point in the final table. Third place is worth playing for, and both of these teams have the résumé to want it.
+BODY: The two semifinal losers get a second Monday and a real prize. K'CHN leaned on captain Patrick (3–1) and a season's worth of mixed-doubles reps; Big Dink Energy finished the regular season a single match point off the two-seed and only lost their semi once the first round slipped. On paper it's a coin flip — BDE's +46 regular-season differential against K'CHN's +20, two sides separated by one match point in the final standings. Third place is worth playing for, and both of these teams have the résumé to want it.
 CHIPS: Bronze: K'CHN vs BDE, Reg-season gap: 1 match pt, Meeting: Week 8
 
 **Storyline 5**
@@ -73,5 +73,5 @@ CHIPS: New: Official DUPR club, Rolling out: Season 2 + Ladder, Ratings: DUPR + 
 **Storyline 7**
 TAG: What's Next
 HEADLINE: The Circuit ends Monday — and Season 2 registration is open
-BODY: One more league night decides everything: gold between ZERO ZERO TWO and Smash Society, bronze between K'CHN and Big Dink Energy. And whatever happens under the lights, the next Circuit is already taking shape — Season 2 registration is open now at dinksociety.app/register, a fresh table, a clean slate, a standings page that resets to zero for everybody, and for the first time, every result feeding your official DUPR. [Richard — confirm the Season 2 deadline / any early-bird or roster details you want in this chip.]
+BODY: One more league night decides everything: gold between ZERO ZERO TWO and Smash Society, bronze between K'CHN and Big Dink Energy. And whatever happens under the lights, the next Circuit is already taking shape — Season 2 registration is open now at dinksociety.app/register, a fresh start, a clean slate, a standings page that resets to zero for everybody, and for the first time, every result feeding your official DUPR. [Richard — confirm the Season 2 deadline / any early-bird or roster details you want in this chip.]
 CHIPS: Register: dinksociety.app/register, Season 2: open now · DUPR-rated, Deadline: TBD

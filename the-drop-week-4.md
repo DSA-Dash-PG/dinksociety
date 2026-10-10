@@ -10,7 +10,7 @@ The Drop · Week 4
 Week Four: The Leaders Hold, the Hunters Sweep, and K'CHN's New Crew Starts Cooking
 
 ## Dek
-Smash Society survived Big Dink Energy 3-1 to stay perfect, ZERO ZERO TWO and K'CHN answered with clean sweeps, and the top of the table is now separated by a single point heading into a monster Week Five.
+Smash Society survived Big Dink Energy 3-1 to stay perfect, ZERO ZERO TWO and K'CHN answered with clean sweeps, and the top of the standings is now separated by a single point heading into a monster Week Five.
 
 ## Byline
 By The Society Desk
@@ -78,7 +78,7 @@ Chips: Matchup:Timog Cal vs What the Dink?!, Timog leaders:Ricky Pedernal, Noel 
 Type: note
 Tag: The Playoff Picture
 Headline: Who Is In, Who Is Fighting, and Who Needs a Miracle
-Body: At the season's midpoint, the table is starting to sort itself. Smash Society (164 Circuit points) and ZERO ZERO TWO (131) have separated from the field and are essentially playing for the No. 1 seed and bracket control; both are locked into the playoff conversation barring a collapse. Big Dink Energy (86) is comfortably in the picture at third but cannot coast, because a red-hot K'CHN (66) is climbing fast and the Week Five head-to-head could swing the seeding order. For What the Dink?! (15) and Timog Cal (0), the path to a top seed has narrowed sharply, and the realistic mission for the second half is clear: bank a first win, play spoiler against the contenders, and integrate the wave of new players before the Rivalry and playoff weeks arrive. Nobody is mathematically finished, but the contenders and the builders are now on very different clocks.
+Body: At the season's midpoint, the standings are starting to sort themselves. Smash Society (164 Circuit points) and ZERO ZERO TWO (131) have separated from the field and are essentially playing for the No. 1 seed and bracket control; both are locked into the playoff conversation barring a collapse. Big Dink Energy (86) is comfortably in the picture at third but cannot coast, because a red-hot K'CHN (66) is climbing fast and the Week Five head-to-head could swing the seeding order. For What the Dink?! (15) and Timog Cal (0), the path to a top seed has narrowed sharply, and the realistic mission for the second half is clear: bank a first win, play spoiler against the contenders, and integrate the wave of new players before the Rivalry and playoff weeks arrive. Nobody is mathematically finished, but the contenders and the builders are now on very different clocks.
 Chips: 1st:Smash 164, 2nd:ZERO ZERO TWO 131, 3rd:Big Dink 86, 4th:K'CHN 66, 5th:WTD 15, 6th:Timog 0
 
 ### Storyline 7

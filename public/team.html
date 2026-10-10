@@ -273,7 +273,7 @@
       teamSlug = slug(team.name);
       document.title = `${team.name} · The Dink Society`;
 
-      /* standings: this team's row and its division, in table order */
+      /* standings: this team's row and its division, in standings order */
       if (lb && !lb.empty && lb.divisions) {
         for (const div of Object.values(lb.divisions)) {
           const rows = div.teams || [];
@@ -317,7 +317,7 @@
     const nextMatch = () => MY.find(m => !isFinal(m)) || null;
     function clutch() { let w = 0, g = 0; MYP.forEach(p => { w += p.clutchW || 0; g += p.clutchG || 0; }); return { w: Math.round(w / 2), g: Math.round(g / 2) }; }
 
-    /* ─── The opening line, written from the table ────────── */
+    /* ─── The opening line, written from the standings ────────── */
     function lede() {
       const roster = team.roster || [], nx = nextMatch();
       if (!hasPlayed()) {
@@ -327,7 +327,7 @@
       const pts = REC.matchPointsFor || 0, rk = REC.rank || 0, out = [];
       const above = DIV.find(t => t.rank === rk - 1), below = DIV.find(t => t.rank === rk + 1);
       const P = n => n + (n === 1 ? ' point' : ' points');
-      if (rk === 1 && below) { const gap = pts - (below.matchPointsFor || 0); out.push(gap > 0 ? `Top of the table on ${P(pts)}, <b>${gap} clear</b> of ${esc(below.teamName)}.` : `Top of the table on ${P(pts)}, level with ${esc(below.teamName)}.`); }
+      if (rk === 1 && below) { const gap = pts - (below.matchPointsFor || 0); out.push(gap > 0 ? `Top of the standings on ${P(pts)}, <b>${gap} clear</b> of ${esc(below.teamName)}.` : `Top of the standings on ${P(pts)}, level with ${esc(below.teamName)}.`); }
       else if (above) { const gap = (above.matchPointsFor || 0) - pts; out.push(gap === 0 ? `${ord(rk)} on ${P(pts)}, <b>level with ${esc(above.teamName)}</b> in ${ord(above.rank)}.` : `${ord(rk)} on ${P(pts)}, ${gap} behind ${esc(above.teamName)}.`); }
       else out.push(`${ord(rk)} on ${P(pts)}.`);
       const diff = REC.pointDiff != null ? REC.pointDiff : (REC.pointsScored || 0) - (REC.pointsAgainst || 0);
@@ -416,7 +416,7 @@
       let stake = '';
       if (REC && opp && hasPlayed()) {
         const a = REC.matchPointsFor || 0, b = opp.matchPointsFor || 0, hi = Math.min(REC.rank || 9, opp.rank || 9);
-        stake = a === b ? `Level on ${a} point${a === 1 ? '' : 's'}. The winner holds ${ord(hi)} place.` : `${esc(a > b ? team.name : opp.teamName)} lead this one by ${Math.abs(a - b)} point${Math.abs(a - b) === 1 ? '' : 's'} in the table.`;
+        stake = a === b ? `Level on ${a} point${a === 1 ? '' : 's'}. The winner holds ${ord(hi)} place.` : `${esc(a > b ? team.name : opp.teamName)} lead this one by ${Math.abs(a - b)} point${Math.abs(a - b) === 1 ? '' : 's'} in the standings.`;
       }
       const tagTxt = REC && opp && REC.rank && opp.rank && hasPlayed() ? `${ord(REC.rank)} v ${ord(opp.rank)}` : weekLong(nx);
       return `<article class="dk-card dk-card--hot dk-card--pad" style="display:flex;flex-direction:column;gap:14px;">

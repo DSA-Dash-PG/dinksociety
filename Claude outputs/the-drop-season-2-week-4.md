@@ -194,9 +194,9 @@ FOURPLAY: a roster built on short notice, a 10–11 against first place, and one
 ```
 **Body**
 ```
-Thursday's match against Dink or Swim on Courts 5 & 6 is FOURPLAY's last of Season 2. The second round robin goes on with five teams, so this is the place to say it properly. Carolina Millan and Ron Levin put a thirteen-player roster together on short notice and brought it into a league where the competition is fierce. The table has not been kind, 0–16 after four weeks. The effort has never been in question: nine of them dressed last Thursday. Congratulations on building a team that fast, and thank you for the four weeks so far.
+Thursday's match against Dink or Swim on Courts 5 & 6 is FOURPLAY's last of Season 2. The second round robin goes on with five teams, so this is the place to say it properly. Carolina Millan and Ron Levin put a thirteen-player roster together on short notice and brought it into a league where the competition is fierce. The standings have not been kind, 0–16 after four weeks. The effort has never been in question: nine of them dressed last Thursday. Congratulations on building a team that fast, and thank you for the four weeks so far.
 
-**The games have been closer than the table.** Against a six-player Smash Society lineup that filled both weekly podiums, Camille and Miguel took Annie Kang and Matthew Pasqualetto to 11–10 over about 17 minutes, the one game Smash nearly lost. Carolina and Miguel lost 8–11 to Jennifer Witkowski and Matthew. FOURPLAY scored 39 of their 56 points in round one, which lasted 45 minutes.
+**The games have been closer than the standings.** Against a six-player Smash Society lineup that filled both weekly podiums, Camille and Miguel took Annie Kang and Matthew Pasqualetto to 11–10 over about 17 minutes, the one game Smash nearly lost. Carolina and Miguel lost 8–11 to Jennifer Witkowski and Matthew. FOURPLAY scored 39 of their 56 points in round one, which lasted 45 minutes.
 
 **Miguel is the find.** He has dressed twice this season. In four mixed games he has been outscored 35–34, and his pairing with Carolina is 24–24 on points across three games, one of them an 11–2 win in Week Two. Thursday was the first time those two had shared a court since.
 

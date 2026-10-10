@@ -101,7 +101,7 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
 
 - **The game-night recap email sends itself.** Every player who played a league night
   gets a personal recap ("the Receipt") the next morning: their games, rank movement, their
-  team's night, the table, and one-tap I'm in / I'm out for next week (the same signed links
+  team's night, the standings, and one-tap I'm in / I'm out for next week (the same signed links
   as the availability reminder, `availability-confirm.js`). `night-recap-cron.js` checks every
   15 minutes and, when a week is due, kicks `night-recap-send-background.js`. Three files:
   `lib/night-recap-data.js` (pure: every number, every sentence, and `dueWeek()`),
@@ -112,6 +112,14 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   auto-send only covers nights played after it was switched on. Admin → Player of the Week →
   "Game-night recap email" previews any player's email, sends a test, or sends a week by hand.
   Tests: `node --test --experimental-test-module-mocks tests/night-recap*.test.js`.
+
+## Wording
+
+- **Say "Standings", never "The Table".** The league rankings are "the standings" in every
+  piece of reader-facing copy: pages, emails, Drop editions, previews, recaps, ladder
+  write-ups ("top of the standings", "second in the standings", "Full standings"). Richard
+  does not call that chart the table. Code identifiers (`tableThrough`, `m.table`) and HTML
+  `<table>` are fine; `tests/night-recap.test.js` fails if the recap email says "the table".
 
 ## Known open issues
 

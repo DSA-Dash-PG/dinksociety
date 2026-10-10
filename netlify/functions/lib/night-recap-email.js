@@ -7,7 +7,7 @@
 //   ① Your Night   record, rank movement, every game, "the receipt says"
 //   ② Next Up      next week's match with one-tap I'm in / I'm out
 //   ③ Your Team    the match, round by round, and everyone who played
-//   ④ The Table    standings with movement, the playoff line, weekly honors
+//   ④ Standings    every team with movement, the playoff line, weekly honors
 //
 // Inline styles and tables only (email clients strip <style>, Outlook has no
 // flexbox). Same palette and header as lib/ladder-recap-email.js so the two
@@ -240,7 +240,7 @@ function yourTeam(m, n) {
   </td></tr>`;
 }
 
-// ── ④ The Table ────────────────────────────────────────────────────────────
+// ── ④ Standings ────────────────────────────────────────────────────────────
 function theTable(m, n, links) {
   const th = `font-size:9.5px;font-weight:900;letter-spacing:.08em;text-transform:uppercase;color:${C.lbl};background:${C.surf}`;
   let rows = '';
@@ -264,7 +264,7 @@ function theTable(m, n, links) {
   const mx = [m.mixed?.men, m.mixed?.women].filter(Boolean)
     .map(w => `${esc(w.name)} (${w.w}&ndash;${w.l}, ${sign(w.diff)})`);
   return `<tr><td style="padding:22px 24px 0">
-    ${label(`${n} The Table`)}
+    ${label(`${n} Standings`)}
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top:14px;border:1px solid ${C.bd};border-radius:12px;border-collapse:separate;overflow:hidden">
       <tr><td style="padding:9px 0 9px 16px;${th}">#</td><td style="padding:9px 0;${th}">Move</td><td style="padding:9px 0;${th}">Team</td><td align="right" style="padding:9px 0;${th}">Pts</td><td align="right" style="padding:9px 0;${th}">Games</td><td align="right" style="padding:9px 16px 9px 0;${th}">Diff</td></tr>
       ${rows}

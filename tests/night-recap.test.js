@@ -131,7 +131,7 @@ test('the playoff line sentence says only what the table shows', () => {
   assert.equal(of('kayo').tableRead, 'Bonkerz: 2nd, 4 points behind Smash Society.');
   const t = tableThrough(seasonMatches, 4);
   assert.equal(tableRead(t, 'bde', 4), 'Big Dink Energy: 5th, 1 point behind Happy Hour Hitters for the last playoff spot.');
-  assert.equal(tableRead(t, 'smash', 4), 'Smash Society: top of the table, 4 points clear of Bonkerz.');
+  assert.equal(tableRead(t, 'smash', 4), 'Smash Society: top of the standings, 4 points clear of Bonkerz.');
   assert.equal(of('rich').playoffSpots, 4);
 });
 
@@ -207,7 +207,9 @@ test('the rendered email carries the numbers, the in/out links, and escapes name
     'Thursday, Oct 15', '6:00 PM', 'Courts 7 &amp; 8', 'utm_source=night-recap', 'season=circuit-ii', 'Season 2 &middot; Week 4 &middot; Thu, Oct 8']) {
     assert.ok(html.includes(s), `missing: ${s}`);
   }
-  assert.ok(html.indexOf('Next Up') < html.indexOf('Your Team') && html.indexOf('Your Team') < html.indexOf('The Table'));
+  assert.ok(html.indexOf('Next Up') < html.indexOf('Your Team') && html.indexOf('Your Team') < html.indexOf(' Standings</div>'));
+  // House wording: the standings are never called "the table".
+  assert.ok(html.includes(' Standings</div>') && !/the table/i.test(html));
   // Already answered → the status and a way to change it, not two fresh buttons.
   const answered = renderNightRecapEmail(m, { inUrl: 'https://x.test/in', outUrl: 'https://x.test/out', availability: 'in' }).html;
   assert.ok(answered.includes('marked <b') && answered.includes('https://x.test/out') && !answered.includes("I'm in for Week 5"));

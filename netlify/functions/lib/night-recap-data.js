@@ -410,8 +410,8 @@ export function tableRead(table, teamId, playoffSpots) {
     const second = at(2);
     if (!second) return '';
     const gap = me.pts - second.pts;
-    return gap > 0 ? `${me.teamName}: top of the table, ${pts(gap)} clear of ${second.teamName}.`
-      : `${me.teamName}: top of the table, level on points with ${second.teamName}.`;
+    return gap > 0 ? `${me.teamName}: top of the standings, ${pts(gap)} clear of ${second.teamName}.`
+      : `${me.teamName}: top of the standings, level on points with ${second.teamName}.`;
   }
   if (cut && me.rank === cut) {
     const below = at(cut + 1);
