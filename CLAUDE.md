@@ -99,6 +99,20 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   availability and POTW shirt-size links, so never hand that one to a task or a prompt.
   Tests: `node --test --experimental-test-module-mocks tests/desk-inbox.test.js`.
 
+- **The game-night recap email sends itself.** Every player who played a league night
+  gets a personal recap ("the Receipt") the next morning: their games, rank movement, their
+  team's night, the table, and one-tap I'm in / I'm out for next week (the same signed links
+  as the availability reminder, `availability-confirm.js`). `night-recap-cron.js` checks every
+  15 minutes and, when a week is due, kicks `night-recap-send-background.js`. Three files:
+  `lib/night-recap-data.js` (pure: every number, every sentence, and `dueWeek()`),
+  `lib/night-recap-email.js` (pure render), `lib/night-recap.js` (blobs, ledger, sending).
+  Nobody reads these before they go out, so a sentence may only state what the numbers in
+  hand support — add copy in `night-recap-data.js` with a test, never in the template. One
+  email per person per week is enforced by the `night-recap` blob store (`state/…`, `sent/…`);
+  auto-send only covers nights played after it was switched on. Admin → Player of the Week →
+  "Game-night recap email" previews any player's email, sends a test, or sends a week by hand.
+  Tests: `node --test --experimental-test-module-mocks tests/night-recap*.test.js`.
+
 ## Known open issues
 
 - Partner impact on leaderboard/player detail shows only 3 partners — likely a `slice` limit.

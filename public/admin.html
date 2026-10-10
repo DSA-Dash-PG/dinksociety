@@ -1516,6 +1516,29 @@
             </div>
             <div id="potw-winners"><div class="loading">Loading…</div></div>
           </div>
+
+          <!-- Game-night recap: the morning-after email every player who played gets (admin-night-recap) -->
+          <div class="ac" id="nr-card">
+            <div class="ac__h"><h2 class="ac__t">Game-night recap email</h2><span class="ac__s" id="nr-status"></span></div>
+            <p style="font-size:11px;color:var(--color-text-faint);margin:0 0 12px;line-height:1.5;max-width:680px;">Every player who played gets their own recap the morning after league night (7:30 AM Pacific, once every match is finalized): their games, their team, the table, and one-tap <b>I'm in / I'm out</b> for next week. It sends on its own. Type a name below to see exactly what that player gets.</p>
+            <div class="nr-bar">
+              <label class="drop-ck" title="On: the recap goes out by itself the morning after each league night. Off: nothing sends until you press Send week now."><input type="checkbox" id="nr-autosend"> Send automatically</label>
+              <span class="potw-draftpast">Week <input type="number" id="nr-week" min="1" max="30"></span>
+              <button class="ab ab--outline ab--sm" id="nr-load-btn">Load week</button>
+              <button class="ab ab--outline ab--sm" id="nr-send-btn" title="Mails this week now to everyone who played and has not had it yet">Send week now</button>
+            </div>
+            <div class="nr-find">
+              <input type="text" id="nr-find" placeholder="Type a player's name to preview their email" autocomplete="off">
+              <div id="nr-matches" class="nr-matches" style="display:none;"></div>
+            </div>
+            <div id="nr-result" class="potw-meta" style="display:none;"></div>
+            <div id="nr-preview" style="display:none;">
+              <div class="potw-meta">Subject: <b id="nr-subject"></b></div>
+              <div class="potw-meta" id="nr-preheader"></div>
+              <div class="potw-actions"><button class="ab ab--lime ab--sm" id="nr-test-btn">Send this one to me</button></div>
+              <div class="potw-prevwrap"><iframe class="potw-prev" id="nr-frame" title="Email preview" style="height:900px;"></iframe></div>
+            </div>
+          </div>
         </section>
 
         <section class="admin-section" data-section="badges">
@@ -9137,6 +9160,7 @@
   }
   function renderPotw(){
     if(!POTW.wired) wirePotw();
+    renderNightRecap();
     var box=$d('potw-weeks'); var st=$d('potw-list-status');
     if(st) st.textContent='Loading…';
     apiJSON(potwApi()).then(function(d){
@@ -9284,6 +9308,133 @@
     var ts=$d('potw-autosend'); if(ts) ts.addEventListener('change',function(){ toggleAutoSend(ts.checked, ts); });
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // GAME-NIGHT RECAP — the morning-after player email (wired to admin-night-recap)
+  // ═══════════════════════════════════════════════════════════
+  var NR = { wired:false, week:null, players:[], pick:null, circuit:null };
+  function nrApi(q){ return '/.netlify/functions/admin-night-recap?circuit='+encodeURIComponent(adminCircuit())+(q||''); }
+  function nrPost(body){
+    return api(nrApi(),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok,j:j}; }); });
+  }
+  function nrWeekStatus(d){
+    var wk=(d.weeks||[]).filter(function(w){ return w.week===NR.week; })[0];
+    if(wk && wk.status==='sent'){
+      var bits=['Week '+NR.week+' sent to '+(wk.sent||0)];
+      if(wk.optedOut) bits.push(wk.optedOut+' opted out');
+      if((wk.noEmail||[]).length) bits.push(wk.noEmail.length+' no email');
+      if((wk.failed||[]).length) bits.push(wk.failed.length+' failed');
+      return bits.join(' · ');
+    }
+    if(wk && (wk.status==='queued'||wk.status==='sending')) return 'Week '+NR.week+' sending… '+(wk.sent||0)+' of '+(wk.total||'?');
+    if(wk && wk.status==='failed') return 'Week '+NR.week+' did not send: '+(wk.error||'unknown error');
+    if(NR.week===d.latestWeek){
+      if(!(d.settings&&d.settings.autoSend)) return 'Week '+NR.week+' not sent · automatic send is off';
+      if(!d.coveredByAutoSend) return 'Week '+NR.week+' not sent · played before automatic send was switched on';
+      return 'Week '+NR.week+' not sent yet · '+(d.due?'due now':(d.dueReason||'waiting'));
+    }
+    return 'Week '+NR.week+' not sent';
+  }
+  function nrDetail(d){
+    var box=$d('nr-result'); if(!box) return;
+    var wk=(d.weeks||[]).filter(function(w){ return w.week===NR.week; })[0];
+    var lines=[];
+    if(wk && (wk.noEmail||[]).length) lines.push('No email on file: '+wk.noEmail.map(dEsc).join(', '));
+    if(wk && (wk.failed||[]).length) lines.push('<span style="color:var(--color-red)">Failed: '+wk.failed.map(function(f){ return dEsc(f.name)+' ('+dEsc(f.reason)+')'; }).join(', ')+'</span>');
+    if(d.playersReason) lines.push(dEsc(d.playersReason));
+    box.innerHTML=lines.join('<br>'); box.style.display=lines.length?'':'none';
+  }
+  function renderNightRecap(){
+    if(!$d('nr-card')) return;
+    if(!NR.wired) wireNightRecap();
+    // A different working season starts over on that season's latest week.
+    if(NR.circuit!==adminCircuit()){ NR.circuit=adminCircuit(); NR.week=null; NR.pick=null; nrClearPreview(); }
+    var st=$d('nr-status'); if(st) st.textContent='Loading…';
+    apiJSON(nrApi(NR.week!=null?'&week='+NR.week:'')).then(function(d){
+      var ck=$d('nr-autosend'); if(ck) ck.checked=!!(d.settings&&d.settings.autoSend);
+      if(NR.week==null){
+        if(d.latestWeek==null){ if(st) st.textContent='No finalized week yet'; return; }
+        NR.week=d.latestWeek; $d('nr-week').value=d.latestWeek; return renderNightRecap();
+      }
+      NR.players=d.players||[];
+      if(st) st.textContent=nrWeekStatus(d)+(NR.players.length?' · '+NR.players.length+' played':'');
+      nrDetail(d);
+    }).catch(function(e){ if(st) st.textContent='Could not load: '+(e.message||e); });
+  }
+  function nrClearPreview(){
+    var p=$d('nr-preview'); if(p) p.style.display='none';
+    var f=$d('nr-find'); if(f) f.value='';
+    var m=$d('nr-matches'); if(m){ m.style.display='none'; m.innerHTML=''; }
+  }
+  function nrShowMatches(){
+    var q=($d('nr-find').value||'').trim().toLowerCase(); var box=$d('nr-matches');
+    if(!q){ box.style.display='none'; box.innerHTML=''; return; }
+    var hits=NR.players.filter(function(p){ return (p.name||'').toLowerCase().indexOf(q)>=0 || (p.teamName||'').toLowerCase().indexOf(q)>=0; }).slice(0,8);
+    box.innerHTML = hits.length
+      ? hits.map(function(p){ return '<button type="button" class="nr-hit" data-id="'+dEsc(p.playerId)+'"><b>'+dEsc(p.name)+'</b> <span>'+dEsc(p.teamName)+' · '+dEsc(p.record)+(p.hasEmail?'':' · no email')+(p.sent?' · sent':'')+'</span></button>'; }).join('')
+      : '<div class="nr-none">Nobody by that name played in Week '+NR.week+'.</div>';
+    box.style.display='';
+    box.querySelectorAll('.nr-hit').forEach(function(b){ b.addEventListener('click',function(){ nrPick(b.dataset.id); }); });
+  }
+  function nrPick(id){
+    var p=NR.players.filter(function(x){ return x.playerId===id; })[0]; if(!p) return;
+    NR.pick=p; $d('nr-find').value=p.name; $d('nr-matches').style.display='none';
+    var st=$d('nr-status'); var was=st?st.textContent:'';
+    if(st) st.textContent='Building '+p.name+"'s email…";
+    apiJSON(nrApi('&week='+NR.week+'&player='+encodeURIComponent(id))).then(function(d){
+      if(st) st.textContent=was;
+      $d('nr-subject').textContent=d.subject||'';
+      $d('nr-preheader').textContent=d.preheader?('Preview line: '+d.preheader):'';
+      $d('nr-frame').srcdoc=d.html||'';
+      $d('nr-test-btn').textContent='Send this one to me';
+      $d('nr-preview').style.display='';
+    }).catch(function(e){ if(st) st.textContent=was; alert('Could not build the preview: '+(e.message||e)); });
+  }
+  function nrSendTest(){
+    if(!NR.pick) return;
+    var b=$d('nr-test-btn'); b.disabled=true; b.textContent='Sending…';
+    nrPost({action:'test',week:NR.week,playerId:NR.pick.playerId}).then(function(res){
+      b.disabled=false;
+      if(res.ok && res.j.ok){ b.textContent='Sent to '+res.j.to+' ✓'; }
+      else { b.textContent='Send this one to me'; alert('Could not send the test: '+((res.j&&(res.j.reason||res.j.error))||'unknown error')); }
+    }).catch(function(e){ b.disabled=false; b.textContent='Send this one to me'; alert('Test failed: '+(e.message||e)); });
+  }
+  function nrSendWeek(){
+    if(NR.week==null) return;
+    var owed=NR.players.filter(function(p){ return p.hasEmail && !p.sent; }).length;
+    if(!owed){ alert('Everyone who played in Week '+NR.week+' and has an email on file has already had it.'); return; }
+    if(!confirm('Send the Week '+NR.week+' recap now to '+owed+' player'+(owed===1?'':'s')+'? Each gets their own email from dink@dinksociety.app. This cannot be unsent.')) return;
+    var b=$d('nr-send-btn'); b.disabled=true; b.textContent='Starting…';
+    nrPost({action:'send',week:NR.week}).then(function(res){
+      b.disabled=false; b.textContent='Send week now';
+      if(res.ok && res.j.ok){ renderNightRecap(); setTimeout(renderNightRecap, 20000); setTimeout(renderNightRecap, 90000); }
+      else alert('Could not start the send: '+((res.j&&(res.j.reason||res.j.error))||'unknown error'));
+    }).catch(function(e){ b.disabled=false; b.textContent='Send week now'; alert('Send failed: '+(e.message||e)); });
+  }
+  function nrToggleAuto(el){
+    var on=el.checked;
+    if(on && !confirm('Turn ON the automatic send? From the next league night on, every player who played gets their recap the following morning with no review step.')){ el.checked=false; return; }
+    el.disabled=true;
+    nrPost({action:'settings',autoSend:on}).then(function(res){
+      el.disabled=false;
+      if(res.ok && res.j.ok){ el.checked=!!(res.j.settings&&res.j.settings.autoSend); renderNightRecap(); }
+      else { el.checked=!on; alert('Could not save the setting.'); }
+    }).catch(function(e){ el.disabled=false; el.checked=!on; alert('Could not save: '+(e.message||e)); });
+  }
+  function wireNightRecap(){
+    NR.wired=true;
+    $d('nr-autosend').addEventListener('change',function(){ nrToggleAuto(this); });
+    $d('nr-load-btn').addEventListener('click',function(){
+      var v=parseInt($d('nr-week').value,10);
+      if(!v||v<1){ alert('Enter a week number.'); return; }
+      NR.week=v; NR.pick=null; nrClearPreview(); renderNightRecap();
+    });
+    $d('nr-send-btn').addEventListener('click',nrSendWeek);
+    $d('nr-test-btn').addEventListener('click',nrSendTest);
+    $d('nr-find').addEventListener('input',nrShowMatches);
+    $d('nr-find').addEventListener('focus',nrShowMatches);
+  }
+
   // ─── Init ─────────────────────────────────────────────────
   checkAuth();
 })();
@@ -9398,6 +9549,15 @@
   .potw-prevwrap { margin-top: 12px; }
   .potw-prev { width: 100%; height: 700px; border: 1px solid var(--color-border); border-radius: 8px; background: #0e0e0e; }
   .potw-draftpast { display: inline-flex; align-items: center; gap: 6px; }
+  .nr-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 12px; color: var(--color-text-muted); }
+  .nr-find { position: relative; max-width: 440px; }
+  .nr-find input { width: 100%; padding: 9px 12px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font-family: inherit; font-size: 13px; }
+  .nr-matches { position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 20; background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: 8px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.45); }
+  .nr-hit { display: block; width: 100%; text-align: left; padding: 10px 12px; background: transparent; border: 0; border-bottom: 1px solid var(--color-border); color: var(--color-text); font-family: inherit; font-size: 13px; cursor: pointer; }
+  .nr-hit:last-child { border-bottom: 0; }
+  .nr-hit:hover, .nr-hit:focus { background: rgba(184,255,44,.08); outline: none; }
+  .nr-hit span { color: var(--color-text-faint); font-size: 11px; margin-left: 4px; }
+  .nr-none { padding: 10px 12px; font-size: 12px; color: var(--color-text-faint); }
   .potw-draftpast input { width: 52px; padding: 6px 8px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font-family: inherit; font-size: 13px; }
 </style>
 </body>
