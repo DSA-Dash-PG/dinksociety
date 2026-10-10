@@ -257,6 +257,49 @@
     document.addEventListener('visibilitychange', function () { if (!document.hidden && !window.DSTicker) check(); });
   })();
 
+  /* ── "New" on The Drop ──────────────────────────────────────────
+     For 48 hours after any edition publishes (recap, preview or special) the
+     Drop link wears a "New" tag on every page, until this viewer opens that
+     edition (drop.html records it in localStorage 'ds-drop-seen'). Always the
+     CURRENT season. The answer is kept for ten minutes per tab so browsing the
+     site does not ask on every page. */
+  (function dropBadge() {
+    var FRESH = 48 * 3600 * 1000, TTL = 10 * 60 * 1000, KEY = 'ds-drop-newest';
+    function paint(n) {
+      if (!n || !n.at || Date.now() - n.at >= FRESH) return;
+      var seen = ''; try { seen = localStorage.getItem('ds-drop-seen') || ''; } catch (e) {}
+      var st = parseInt(seen.split('@')[1], 10);
+      if (seen === n.edition + '@' + n.at || (!isNaN(st) && st > n.at)) return;
+      document.querySelectorAll('.ds-nav-links a[data-nav="drop"], .ds-nav-drawer-links a[data-nav="drop"]').forEach(function (a) {
+        if (a.querySelector('.ds-nav-badge')) return;
+        var b = document.createElement('span');
+        b.className = 'ds-nav-badge ds-nav-badge--new'; b.textContent = 'New';
+        a.appendChild(b);
+      });
+      // Same fold the live pill uses, so the link row still fits with the tag on it.
+      var navEl = document.getElementById('ds-nav'); if (navEl) navEl.classList.add('has-new');
+    }
+    function ask() {
+      window.dsSeason().then(function (S) {
+        var cur = S && (S.current || (S.isCurrent ? S : null));
+        var code = cur && (cur.circuit || String(cur.id || '').replace(/^circuit-/i, '').toUpperCase());
+        if (!code) return null;
+        return fetch('/.netlify/functions/public-drop?circuit=' + encodeURIComponent(code) + '&view=index').then(function (r) { return r.ok ? r.json() : null; });
+      }).then(function (d) {
+        if (!d) return;
+        var n = null;
+        (d.editions || []).forEach(function (e) { var t = Date.parse(e.publishedAt || ''); if (!isNaN(t) && (!n || t > n.at)) n = { edition: e.edition, at: t }; });
+        try { sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), n: n })); } catch (e) {}
+        paint(n);
+      }).catch(function () {});
+    }
+    var cached = null; try { cached = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (cached && Date.now() - cached.t < TTL) { paint(cached.n); return; }
+    // season.js may still be loading (the season pill below fetches it when a page did not).
+    var tries = 0;
+    (function wait() { if (window.dsSeason) return ask(); if (++tries < 20) setTimeout(wait, 250); })();
+  })();
+
   /* ── Season pill + season-aware links ──────────────────────────
      Browsing a past season used to end at the first nav click, because every
      link here is a bare path — one tap on Standings and you were silently back

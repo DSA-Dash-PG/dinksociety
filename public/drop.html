@@ -912,9 +912,25 @@
       var m = document.getElementById('drop'); if(m && m.parentNode) m.parentNode.insertBefore(d, m);
     }
 
+    // The nav's "New" tag on The Drop clears for this viewer once they have opened the
+    // newest edition. Stored as edition@publishedAt; an older edition never overwrites a newer one.
+    function markSeen(drop){
+      try {
+        var at = Date.parse(drop && drop.publishedAt || ''); if(isNaN(at) || !drop.edition) return;
+        var prev = parseInt(String(localStorage.getItem('ds-drop-seen') || '').split('@')[1], 10);
+        if(!isNaN(prev) && prev > at) return;
+        localStorage.setItem('ds-drop-seen', drop.edition + '@' + at);
+        // Only the tag for THIS edition comes off; a newer unread one keeps it.
+        var newest = null; try { newest = (JSON.parse(sessionStorage.getItem('ds-drop-newest') || 'null') || {}).n; } catch(e){}
+        if(newest && newest.at > at) return;
+        document.querySelectorAll('.ds-nav-badge--new').forEach(function(b){ b.remove(); });
+        var nav = document.getElementById('ds-nav'); if(nav) nav.classList.remove('has-new');
+      } catch(e){}
+    }
     function render(drop){
       var root = document.getElementById('dp-root');
       LB_SETS = {}; LB_DROP = drop; // lightbox sets are rebuilt as the photos render
+      markSeen(drop);
 
       // Hero comes from the cover, or falls back to the first gallery photo; the
       // lead then weaves in the photos flagged "Show in lead" (minus the hero).
