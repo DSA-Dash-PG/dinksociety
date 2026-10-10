@@ -34,7 +34,7 @@ import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
 import { normalizeScore } from './score-helpers.js';
 import { normalizeEmail } from './identity.js';
-import { listRosterEntries, getIdentityMap, groupEntries } from './league-identity.js';
+import { rosterEmailResolver, EMAIL_RE } from './roster-email.js';
 import { isActivePlayer } from './roster.js';
 import { getTeamAvailability } from './availability.js';
 import { signAvailabilityToken } from './availability-token.js';
@@ -58,7 +58,6 @@ const SETTINGS_KEY = 'config/settings.json';
 // the admin panel moves the line to that moment.
 const DEFAULT_SINCE = '2026-10-10T07:00:00.000Z';
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 export function siteUrl() {
@@ -181,37 +180,6 @@ export async function loadWeek(circuit, week) {
 }
 
 /**
- * Who is who, and where to reach them. Reads `normalizedEmail` first, then raw
- * `email`; a roster entry with neither falls back to any other entry the
- * identity layer says is the same person (their Season 1 entry, a linked id) —
- * the same rule admin-drop.js uses, for the same reason: Season 2 entries added
- * through the picker carry no address of their own.
- */
-async function identityAndEmails() {
-  const emailById = new Map();
-  let personOf = (id) => id, idsFor = (id) => [id];
-  try {
-    const [entries, map] = await Promise.all([listRosterEntries(), getIdentityMap()]);
-    for (const e of entries) {
-      const em = e.normalizedEmail || normalizeEmail(e.email);
-      if (em && EMAIL_RE.test(em)) emailById.set(e.id, em);
-    }
-    const { canonicalOf, membersOf } = groupEntries(entries, map);
-    personOf = (id) => canonicalOf[id] || id;
-    idsFor = (id) => { const c = canonicalOf[id]; return c ? (membersOf[c] || [id]) : [id]; };
-  } catch (e) {
-    console.error('[night-recap] identity lookup failed, using roster emails only:', e?.message || e);
-  }
-  const emailOf = (rosterEntry, playerId) => {
-    const direct = rosterEntry && (rosterEntry.normalizedEmail || normalizeEmail(rosterEntry.email));
-    if (direct && EMAIL_RE.test(direct)) return direct;
-    for (const id of idsFor(playerId)) { const em = emailById.get(id); if (em) return em; }
-    return null;
-  };
-  return { personOf, emailOf };
-}
-
-/**
  * The per-recipient extras: the one-tap in/out links for next week and what the
  * player has already answered. `live:false` (admin preview + test sends) points
  * the buttons at the portal instead, so looking at someone's email can never
@@ -246,7 +214,7 @@ async function extrasFor(model, teamsById, availCache, { live = true } = {}) {
 export async function listWeekPlayers(circuit, week) {
   const wk = await loadWeek(circuit, week);
   if (!wk.ok) return { ok: false, reason: wk.reason, players: [] };
-  const [{ personOf, emailOf }, sent] = await Promise.all([identityAndEmails(), sentIds(wk.code, wk.week)]);
+  const [{ personOf, emailOf }, sent] = await Promise.all([rosterEmailResolver(), sentIds(wk.code, wk.week)]);
   const players = wk.models.map(m => {
     const entry = (wk.teamsById.get(m.teamId)?.roster || []).find(p => p.id === m.playerId);
     return {
@@ -328,7 +296,7 @@ export async function sendWeek(circuit, week, { by = 'cron' } = {}) {
     await saveState(code, week, { ...cur, status: 'failed', kickToken: null, error: wk.reason });
     return { ok: false, reason: wk.reason };
   }
-  const [{ personOf, emailOf }, already] = await Promise.all([identityAndEmails(), sentIds(code, wk.week)]);
+  const [{ personOf, emailOf }, already] = await Promise.all([rosterEmailResolver(), sentIds(code, wk.week)]);
   const availCache = new Map();
   const eventId = `league-${code}-week-${wk.week}`;
 

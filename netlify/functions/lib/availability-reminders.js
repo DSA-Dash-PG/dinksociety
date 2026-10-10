@@ -20,6 +20,7 @@ import { hardLockTime, DEFAULT_LOCK_OFFSET_MIN } from './lineup-helpers.js';
 import { signAvailabilityToken } from './availability-token.js';
 import { sendEmail, renderAvailabilityReminder } from './email.js';
 import { isActivePlayer } from './roster.js';
+import { rosterEmailResolver } from './roster-email.js';
 
 const TZ = 'America/Los_Angeles';
 const FOUR_DAYS_MS = 4 * 24 * 60 * 60 * 1000;
@@ -86,8 +87,8 @@ function buildLockLine(lockAt) {
 }
 
 // Send one reminder to one player and record the marker. Returns true if sent.
-async function sendOneReminder({ team, match, player, opponent, oppEmoji, lockAt, when }) {
-  const to = (player.email || '').trim();
+async function sendOneReminder({ team, match, player, opponent, oppEmoji, lockAt, when, emailOf }) {
+  const to = emailOf(player);
   if (!to) return false;
   const inUrl = `${siteUrl()}/.netlify/functions/availability-confirm?t=` +
     encodeURIComponent(signAvailabilityToken({ matchId: match.id, teamId: team.id, playerId: player.id, status: 'in' }));
@@ -129,19 +130,21 @@ async function loadTeam(id, cache) {
   return t;
 }
 
-// Players eligible for an AUTO reminder: active, not a sub, has an email, and has
-// not responded yet (no availability record).
-function autoTargets(team, availRec) {
+// Players eligible for an AUTO reminder: active, not a sub, reachable, and has
+// not responded yet (no availability record). "Reachable" goes through
+// lib/roster-email.js — a Season 2 entry often has no address of its own, only
+// the one on the same person's Season 1 entry.
+function autoTargets(team, availRec, emailOf) {
   const responded = availRec.players || {};
   return (team.roster || []).filter(p =>
-    !isActivePlayer(p) ? false : (!p.isSub && (p.email || '').trim() && !responded[p.id]));
+    !isActivePlayer(p) ? false : (!p.isSub && !!emailOf(p) && !responded[p.id]));
 }
 
 /**
  * Automatic path (cron). Send any due reminders for one team in one match.
  * Returns the number of emails sent.
  */
-async function remindTeamAuto({ match, team, teamCache, now }) {
+async function remindTeamAuto({ match, team, teamCache, now, getEmailOf }) {
   if (match.finalizedAt) return 0;
   const startMs = match.scheduledAt ? new Date(match.scheduledAt).getTime() : NaN;
   if (isNaN(startMs) || now.getTime() >= startMs) return 0;          // no time / already started
@@ -155,10 +158,11 @@ async function remindTeamAuto({ match, team, teamCache, now }) {
   const availRec = await getTeamAvailability(match.id, team.id);
   const remRec = await getReminderRec(match.id, team.id);
   const today = laDateKey(now);
+  const emailOf = await getEmailOf();
   let sent = 0;
-  for (const player of autoTargets(team, availRec)) {
+  for (const player of autoTargets(team, availRec, emailOf)) {
     if (remRec.players?.[player.id]?.dates?.[today]) continue;       // already sent today
-    try { if (await sendOneReminder({ team, match, player, opponent, oppEmoji, lockAt, when: now })) sent++; }
+    try { if (await sendOneReminder({ team, match, player, opponent, oppEmoji, lockAt, when: now, emailOf })) sent++; }
     catch (e) { console.warn('availability reminder send failed:', e?.message || e); }
   }
   return sent;
@@ -174,6 +178,10 @@ export async function runDueAvailabilityReminders(circuit = 'I') {
   const teamCache = new Map();
   const now = new Date();
   const summary = [];
+  // The address lookup reads every team, so load it once — and only on a tick
+  // that actually has someone to remind.
+  let resolver = null;
+  const getEmailOf = async () => (resolver ||= rosterEmailResolver()).then(r => r.emailOf);
   const { blobs } = await scheduleStore.list({ prefix: `schedule/${code}/` });
   for (const b of blobs) {
     const data = await scheduleStore.get(b.key, { type: 'json' }).catch(() => null);
@@ -185,7 +193,7 @@ export async function runDueAvailabilityReminders(circuit = 'I') {
         if (!side?.id) continue;
         const team = await loadTeam(side.id, teamCache);
         if (!team) continue;
-        const sent = await remindTeamAuto({ match, team, teamCache, now }).catch(() => 0);
+        const sent = await remindTeamAuto({ match, team, teamCache, now, getEmailOf }).catch(() => 0);
         if (sent) summary.push({ match: match.id, team: team.name, sent });
       }
     }
@@ -205,20 +213,21 @@ export async function nudgeTeam({ team, match, playerIds }) {
   const { opponent, oppEmoji, lockAt } = await matchContext(match, team, teamCache);
   const availRec = await getTeamAvailability(match.id, team.id);
   const responded = availRec.players || {};
+  const { emailOf } = await rosterEmailResolver();
 
   let targets;
   if (Array.isArray(playerIds) && playerIds.length) {
     const wanted = new Set(playerIds);
     targets = (team.roster || []).filter(p => isActivePlayer(p) && wanted.has(p.id) && !responded[p.id]);
   } else {
-    targets = autoTargets(team, availRec); // regular non-sub, unconfirmed, has email
+    targets = autoTargets(team, availRec, emailOf); // regular non-sub, unconfirmed, has email
   }
 
   let sent = 0, skipped = 0, noEmail = 0;
   for (const player of targets) {
-    if (!(player.email || '').trim()) { noEmail++; continue; }
+    if (!emailOf(player)) { noEmail++; continue; }
     try {
-      if (await sendOneReminder({ team, match, player, opponent, oppEmoji, lockAt, when: now })) sent++;
+      if (await sendOneReminder({ team, match, player, opponent, oppEmoji, lockAt, when: now, emailOf })) sent++;
       else skipped++;
     } catch (e) { console.warn('nudge send failed:', e?.message || e); skipped++; }
   }
