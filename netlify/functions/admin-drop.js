@@ -7,6 +7,10 @@
 //   POST action=publish        → approve + go live: mark published, snapshot performers,
 //                                fire the email + portal broadcast (homepage reads it live)
 //   POST action=unpublish      → pull a published Drop back to draft
+//   POST action=reword         → swap exact phrases in an edition's copy in place
+//                                ({ edition, pairs:[{from,to}], dryRun? }). Works on
+//                                published editions too and never re-publishes or
+//                                re-notifies: status, photos and stamps are untouched.
 //
 //   POST action=receive-draft  → INGEST a machine-generated draft from the weekly
 //                                scheduled task. Guarded by the DROP_INGEST_TOKEN env
@@ -22,7 +26,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import {
-  getDrop, saveDraft, publishDrop, unpublishDrop, listDrops, parseEdition, markBroadcast,
+  getDrop, saveDraft, publishDrop, unpublishDrop, listDrops, parseEdition, markBroadcast, rewordDrop,
 } from './lib/drop.js';
 import { livePerformers } from './lib/drop-insights.js';
 import { appendMessage, generateId } from './lib/messages.js';
@@ -274,6 +278,15 @@ export default async (req) => {
         rec = (await markBroadcast(code, wk, broadcast.broadcastId)) || rec;
       }
       return json({ ok: true, record: rec, broadcast, alreadyBroadcast: alreadyBroadcast && !wantBroadcast });
+    }
+
+    if (body.action === 'reword') {
+      const wk = editionOf(body);
+      if (wk == null) return json({ error: 'edition (or week) required' }, 400);
+      if (!Array.isArray(body.pairs) || !body.pairs.length) return json({ error: 'pairs required' }, 400);
+      const res = await rewordDrop(body.circuit || circuit, wk, body.pairs, admin.email, { dryRun: body.dryRun === true });
+      if (!res) return json({ error: 'No edition with that id' }, 404);
+      return json({ ok: true, ...res });
     }
 
     if (body.action === 'unpublish') {

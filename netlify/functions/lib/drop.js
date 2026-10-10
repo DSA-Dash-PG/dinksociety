@@ -347,9 +347,65 @@ export async function saveDraft(circuit, edition, input, who = null) {
     publishedAt: existing?.publishedAt || null,
     sentBy: existing?.sentBy || null,
     updatedBy: who,
+    // An edit must not forget that this edition already went out: without the
+    // broadcast marker the next Publish would email every player again.
+    ...(existing?.broadcastId ? { broadcastId: existing.broadcastId, broadcastAt: existing.broadcastAt || null } : {}),
+    ...(existing?.rePublishedAt ? { rePublishedAt: existing.rePublishedAt } : {}),
   };
   await store().setJSON(dropKey(code, ed.id), rec);
   return rec;
+}
+
+// ── Wording fixes ───────────────────────────────────────────────
+// Swap exact phrases in an edition's copy (headline, dek, lead, Around the
+// League, storylines and their chips) and leave everything else on the record
+// alone: status, photos, performers, publish and broadcast stamps. This is how
+// a house-style change ("Standings", never "The Table") reaches editions that
+// are already published without re-publishing or re-notifying anyone.
+const REWORD_FIELDS = ['title', 'dek', 'leadHtml', 'teamReports', 'storylines'];
+const REWORD_SKIP = new Set(['image', 'images', 'team', 'tagKind', 'teamId', 'id']);
+
+/** Pure: returns { rec, counts } where counts[i] = replacements made for pairs[i]. */
+export function rewordRecord(rec, pairs) {
+  const list = (Array.isArray(pairs) ? pairs : [])
+    .map(p => ({ from: String(p?.from ?? ''), to: String(p?.to ?? '') }))
+    .filter(p => p.from && p.from !== p.to);
+  const counts = list.map(() => 0);
+  const fix = (v) => {
+    if (typeof v === 'string') {
+      let s = v;
+      list.forEach((p, i) => {
+        const parts = s.split(p.from);
+        if (parts.length > 1) { counts[i] += parts.length - 1; s = parts.join(p.to); }
+      });
+      return s;
+    }
+    if (Array.isArray(v)) return v.map(fix);
+    if (v && typeof v === 'object') {
+      const out = {};
+      for (const k of Object.keys(v)) out[k] = REWORD_SKIP.has(k) ? v[k] : fix(v[k]);
+      return out;
+    }
+    return v;
+  };
+  const out = { ...rec };
+  for (const f of REWORD_FIELDS) if (rec[f] != null) out[f] = fix(rec[f]);
+  return { rec: out, counts };
+}
+
+/** Apply wording fixes to a stored edition. Saves only when something changed. */
+export async function rewordDrop(circuit, edition, pairs, who = null, { dryRun = false } = {}) {
+  const code = circuitCode(circuit);
+  const existing = await getDrop(code, edition);
+  if (!existing) return null;
+  const { rec, counts } = rewordRecord(existing, pairs);
+  const changed = counts.reduce((a, b) => a + b, 0);
+  if (changed && !dryRun) {
+    const now = new Date().toISOString();
+    Object.assign(rec, { updatedAt: now, rewordedAt: now, updatedBy: who || existing.updatedBy || null });
+    await store().setJSON(dropKey(code, existing.edition), rec);
+  }
+  return { edition: existing.edition, status: existing.status, changed, counts, saved: !!changed && !dryRun };
 }
 
 /**
