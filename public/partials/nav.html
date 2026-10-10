@@ -300,6 +300,41 @@
     (function wait() { if (window.dsSeason) return ask(); if (++tries < 20) setTimeout(wait, 250); })();
   })();
 
+  /* ── "New" on Ladders ───────────────────────────────────────────
+     The same idea for the ladders: for 48 hours after a ladder write-up goes
+     out (a recap as it is sent, a preview as it is published) the Ladders item
+     wears a teal "New" tag, until this viewer opens that write-up. Every
+     write-up page carries this nav, so opening one is noticed right here.
+     public-ladder-home is the source; the answer is kept ten minutes per tab. */
+  (function ladderBadge() {
+    var FRESH = 48 * 3600 * 1000, TTL = 10 * 60 * 1000, KEY = 'ds-ladder-newest', SEEN = 'ds-ladder-seen';
+    function norm(p) { return String(p || '').split(/[?#]/)[0].replace(/\.html$/i, '').replace(/\/+$/, ''); }
+    function paint(n) {
+      if (!n || !n.at || Date.now() - n.at >= FRESH) return;
+      var tag = n.kind + ':' + n.eventId + '@' + n.at;
+      try {
+        if (n.url && norm(location.pathname) === norm(n.url)) { localStorage.setItem(SEEN, tag); return; }
+        if (localStorage.getItem(SEEN) === tag) return;
+      } catch (e) {}
+      document.querySelectorAll('.ds-mega-trigger[data-nav="ladders"], .ds-drawer-acc-btn[data-nav="ladders"]').forEach(function (b) {
+        if (b.querySelector('.ds-nav-badge')) return;
+        var s = document.createElement('span');
+        s.className = 'ds-nav-badge ds-nav-badge--lad'; s.textContent = 'New';
+        b.insertBefore(s, b.querySelector('svg'));
+      });
+      var navEl = document.getElementById('ds-nav'); if (navEl) navEl.classList.add('has-new');
+    }
+    var cached = null; try { cached = JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch (e) {}
+    if (cached && Date.now() - cached.t < TTL) { paint(cached.n); return; }
+    fetch('/.netlify/functions/public-ladder-home').then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d) return;
+      var w = (d.writeups || [])[0], at = w ? Date.parse(w.publishedAt || '') : NaN;
+      var n = (w && !isNaN(at)) ? { kind: w.kind, eventId: w.eventId, at: at, url: w.url } : null;
+      try { sessionStorage.setItem(KEY, JSON.stringify({ t: Date.now(), n: n })); } catch (e) {}
+      paint(n);
+    }).catch(function () {});
+  })();
+
   /* ── Season pill + season-aware links ──────────────────────────
      Browsing a past season used to end at the first nav click, because every
      link here is a bare path — one tap on Standings and you were silently back

@@ -121,6 +121,18 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   does not call that chart the table. Code identifiers (`tableThrough`, `m.table`) and HTML
   `<table>` are fine; `tests/night-recap.test.js` fails if the recap email says "the table".
 
+- **The home page headline rotates on publish time** (`paintDrop()` in `public/index.html`).
+  A newly published Drop edition of any kind is the headline for 48 hours (`FRESH_MS`), then
+  a card under the standings until it is four days old (`PROMO_MS`), then back below the
+  results. A ladder write-up (a recap as it is SENT, a preview as it is published) gets the
+  same 48 hours only when no league Drop is inside its own 48; otherwise it is a card. The
+  ladder strip under the headline (next ladder + sign-up state, or the last podium for two
+  days) and the write-ups come from `public-ladder-home.js` / `lib/ladder-home.js`.
+  **Shipping a hand-built ladder preview means two entries:** its URL in
+  `public/js/recap-urls.js` (`DS_PREVIEW_URLS`) and its headline, dek, `publishedAt` and
+  section ids in `netlify/functions/lib/ladder-previews.js`. Without the second one it never
+  reaches the home page. Tests: `node --test tests/ladder-home.test.js`.
+
 ## Known open issues
 
 - Partner impact on leaderboard/player detail shows only 3 partners — likely a `slice` limit.

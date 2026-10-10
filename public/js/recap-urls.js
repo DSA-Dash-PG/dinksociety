@@ -42,6 +42,9 @@ window.DS_RECAP_URLS = new Proxy(HAND_BUILT_RECAPS, {
 // Hand-built ladder PREVIEW articles, keyed by EVENT ID (upcoming nights).
 // Read by the ladder hub's night cards ("Read the preview"). Add a line here
 // when a new preview ships; the page lives under public/ladders/previews/.
+// KEEP IN SYNC with netlify/functions/lib/ladder-previews.js, which carries the
+// same ids plus each preview's headline, dek and publish time — that is what
+// puts a new preview on the home page (headline for 48 hours, then a card).
 window.DS_PREVIEW_URLS = {
   '2f810cf9c396': '/ladders/previews/2026-10-11-kings-court-3.html', // King's Court #3
 };
