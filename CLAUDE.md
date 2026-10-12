@@ -113,6 +113,14 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   "Game-night recap email" previews any player's email, sends a test, or sends a week by hand.
   Tests: `node --test --experimental-test-module-mocks tests/night-recap*.test.js`.
 
+- **iPhone photos (HEIC) are converted in the browser, site-wide.** `public/js/heic-upload.js`
+  catches every `<input type=file>` change in the capture phase, turns HEIC/HEIF into JPEG,
+  swaps it into `input.files` and re-fires `change`, so page upload code only ever sees JPEG.
+  It also widens `accept` on desktop (not iOS — iOS hands over JPEG on its own). The decoder
+  (`public/js/vendor/heic-to.js`, ~3 MB) lazy-loads only when an HEIC is picked. Every page
+  with an upload loads it in `<head>`; `partials.js` injects it on the rest. A new upload
+  page needs nothing extra; custom drag-and-drop should `await DSImage.normalize(file)`.
+
 ## Wording
 
 - **Say "Standings", never "The Table".** The league rankings are "the standings" in every

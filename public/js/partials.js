@@ -12,6 +12,11 @@
 // public-settings, NOT admin-settings: this response is readable by anyone who
 // opens the site, so it carries only the fields the public pages render (venue,
 // fees, season length, planned week dates). admin-settings is admin-only.
+// iPhone (HEIC) photo support for any upload on the page — see /js/heic-upload.js.
+if (!window.DSImage && !document.querySelector('script[src*="heic-upload"]')) {
+  const s = document.createElement('script'); s.src = '/js/heic-upload.js'; document.head.appendChild(s);
+}
+
 window.DS_SETTINGS = fetch('/.netlify/functions/public-settings').then(r => r.json()).catch(() => ({}));
 
 (async function loadPartials() {

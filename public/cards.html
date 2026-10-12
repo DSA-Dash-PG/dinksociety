@@ -139,6 +139,7 @@
     .card .cbr .cd.on{ background:#b8ff2c; } .card .cbr .cd.top{ background:var(--cd-gold); }
     .card .av{ width:150px; height:150px; border-radius:50%; object-fit:cover; border:4px solid #b8ff2c; background:#1d1d1d; flex:none; }
   </style>
+  <script src="/js/heic-upload.js"></script>
 </head>
 <body>
   <div data-partial="nav"></div>
@@ -768,7 +769,7 @@
     $('cd-drop').addEventListener('click', function () { $('cd-file').click(); });
     $('cd-file').addEventListener('change', function () { readPhoto(this.files && this.files[0]); });
     ['dragover', 'dragenter'].forEach(function (ev) { $('cd-drop').addEventListener(ev, function (e) { e.preventDefault(); }); });
-    $('cd-drop').addEventListener('drop', function (e) { e.preventDefault(); readPhoto(e.dataTransfer.files && e.dataTransfer.files[0]); });
+    $('cd-drop').addEventListener('drop', function (e) { e.preventDefault(); var f = e.dataTransfer.files && e.dataTransfer.files[0]; if (!f) return; (window.DSImage ? DSImage.normalize(f) : Promise.resolve(f)).then(readPhoto, function () { status('Could not read that photo'); }); });
     function readPhoto(file) {
       if (!file || !/^image\//.test(file.type)) return;
       var rd = new FileReader();
