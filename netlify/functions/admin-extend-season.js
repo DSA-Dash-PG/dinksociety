@@ -32,6 +32,12 @@
 //   circuit           season code (default: the live season)
 //   championshipDate  YYYY-MM-DD for the last week (default: last regular week + 7 days)
 //   withdrawn         ['FOURPLAY'] — team name(s) or id(s) not playing the second half
+//   replacement       a team (name or id) that takes the withdrawn team's place
+//                     for the second half — registered through the invite link
+//                     (admin-late-entry). It starts at 0–0, inherits nothing but
+//                     the departing team's home/away and court slot, and brings
+//                     the count back to even: no byes, Championship Night for
+//                     the full count. Requires exactly one withdrawn team.
 //   seed              number — repeats a draw. The dry run returns the seed it used;
 //                     pass it back on the live run so the same draw is written.
 //   rounds            pin the draw by hand instead of a seed:
@@ -67,6 +73,7 @@ export default async (req) => {
     const shuffle = body.shuffle !== false;
     const withdrawnIn = [].concat(body.withdrawn || []).map(x => String(x).trim()).filter(Boolean);
     const roundsIn = Array.isArray(body.rounds) && body.rounds.length ? body.rounds : null;
+    const replacementIn = String(body.replacement || '').trim();
     let seed = (body.seed != null && body.seed !== '' && Number.isFinite(Number(body.seed)))
       ? (Number(body.seed) >>> 0) : null;
 
@@ -93,6 +100,20 @@ export default async (req) => {
     const plannedDates = {};    // week → iso
     const withdrawnOut = [];    // names
     const matchedWithdrawn = new Set();
+    let replacementOut = null;
+
+    // The replacement team, from the teams store (it has no first-half matches).
+    let replacementTeam = null;
+    if (replacementIn) {
+      const teamsStore = getStore('teams');
+      const { blobs: tBlobs } = await teamsStore.list({ prefix: 'team/' });
+      for (const b of tBlobs) {
+        const t = await teamsStore.get(b.key, { type: 'json' }).catch(() => null);
+        if (!t || t.status === 'archived' || circuitCode(t.circuit || '') !== circuit) continue;
+        if (t.id === replacementIn || norm(t.name) === norm(replacementIn)) { replacementTeam = t; break; }
+      }
+      if (!replacementTeam) return json({ error: `No team called "${replacementIn}" in season ${circuit}.` }, 400);
+    }
 
     for (const [division, weeks] of Object.entries(byDiv)) {
       // ── Round 1 must be the complete single round-robin ──
@@ -122,6 +143,23 @@ export default async (req) => {
         return json({ error: `${division}: only one team can leave mid-season (got ${gone.map(t => t.name).join(', ')}).` }, 409);
       }
       const active = all.filter(t => !gone.includes(t));
+      // ── Replacement: steps into the withdrawn team's slot ──
+      let rep = null;
+      if (replacementTeam && sameDivision(replacementTeam, division)) {
+        if (gone.length !== 1) {
+          return json({ error: `${division}: a replacement team needs exactly one withdrawn team (pass "withdrawn").` }, 409);
+        }
+        if (teams.has(replacementTeam.id)) {
+          return json({ error: `${replacementTeam.name} already played the first half of ${division}.` }, 409);
+        }
+        rep = { id: replacementTeam.id, name: replacementTeam.name };
+        teams.set(rep.id, rep.name);
+        active.push(rep);
+        replacementOut = { id: rep.id, name: rep.name, replaces: { id: gone[0].id, name: gone[0].name }, division };
+      }
+      // For first-meeting lookups (home/away flip, courts) the replacement
+      // stands in the slot of the team it replaces.
+      const slotOf = (id) => (rep && id === rep.id ? gone[0].id : id);
       const nameOf = (id) => teams.get(id) || id;
       gone.forEach(t => withdrawnOut.push(t.name));
       const R = once * 2;                           // one team out of an even count still needs N-1 weeks
@@ -182,7 +220,8 @@ export default async (req) => {
           }
           seed = Math.floor(Math.random() * 2147483647) + 1;
         }
-        const lastWeek = rr1[rr1.length - 1].data.matches.map(m => [m.teamA.id, m.teamB.id]);
+        const unslot = (id) => (rep && id === gone[0].id ? rep.id : id);
+        const lastWeek = rr1[rr1.length - 1].data.matches.map(m => [unslot(m.teamA.id), unslot(m.teamB.id)]);
         rounds = drawRounds(activeIds, { rng: seededRng(seed), avoidFirst: lastWeek });
         drawnFrom = 'draw';
       } else {
@@ -225,11 +264,11 @@ export default async (req) => {
         const week = once + k + 1;
         const at = dateFor(week);
         // [home, away] — the away side of the first meeting hosts the rematch.
-        const pairs = round.pairs.map(([a, b]) => (firstHome[pairKey(a, b)] === a ? [b, a] : [a, b]));
-        const courts = pickCourts(pairs, pool, usage, firstCourt, k);
+        const pairs = round.pairs.map(([a, b]) => (firstHome[pairKey(slotOf(a), slotOf(b))] === slotOf(a) ? [b, a] : [a, b]));
+        const courts = pickCourts(pairs.map(([a, b]) => [slotOf(a), slotOf(b)]), pool, usage, firstCourt, k);
         const matches = pairs.map(([home, away], idx) => {
           const c = courts[idx] || {};
-          bump(home, c.label); bump(away, c.label);
+          bump(slotOf(home), c.label); bump(slotOf(away), c.label);
           return {
             id: matchId(circuit, division, week, idx),
             teamA: { id: home, name: nameOf(home) },
@@ -252,6 +291,7 @@ export default async (req) => {
             circuit, division, week, matches,
             ...(byes.length ? { byes } : {}),
             ...(gone.length ? { withdrawn: gone } : {}),
+            ...(rep ? { replacement: { ...rep, replaces: { id: gone[0].id, name: gone[0].name } } } : {}),
             generatedAt: now, generatedBy: admin.email,
             extendedFrom: drawnFrom === 'replay' ? `week-${k + 1}` : drawnFrom,
             ...(drawnFrom === 'draw' ? { drawSeed: seed } : {}),
@@ -309,13 +349,16 @@ export default async (req) => {
       for (const w of laterWeeks) if (w > champWeek) writes.push({ key: weeks[w].key, data: null });
     }
 
+    if (replacementTeam && !replacementOut) {
+      return json({ error: `${replacementTeam.name} is not in a division of season ${circuit} that has a withdrawn team.` }, 409);
+    }
     const unmatched = withdrawnIn.filter(w => !matchedWithdrawn.has(w));
     if (unmatched.length) {
       return json({ error: `No team called "${unmatched.join('", "')}" in season ${circuit}.` }, 400);
     }
 
     const totalWeeks = Math.max(...Object.keys(plannedDates).map(Number));
-    const summary = { circuit, totalWeeks, seed, withdrawn: withdrawnOut, plan, draw };
+    const summary = { circuit, totalWeeks, seed, withdrawn: withdrawnOut, replacement: replacementOut, plan, draw };
     if (dryRun) {
       return json({ ok: true, dryRun: true, ...summary, backups: backups.map(b => b.key) });
     }
@@ -375,6 +418,10 @@ export default async (req) => {
 // ── helpers ──
 function matchId(circuit, division, week, idx) {
   return `m_${circuit}_${String(division).toLowerCase()}_w${week}_${idx + 1}`;
+}
+// A team record's division vs a schedule division (ids, loosely).
+function sameDivision(team, division) {
+  return norm(team.division) === norm(division) || norm(team.divisionLabel) === norm(division);
 }
 // Loose team-name match: "Four Play" === "FOURPLAY".
 function norm(s) {

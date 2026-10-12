@@ -138,7 +138,9 @@ export async function run(body, admin) {
 
   // Venmo registrations never hit the Stripe webhook, so the confirmation
   // email goes out from here.
-  if (reg.paymentMethod === 'venmo') {
+  // `quiet`: an invite registration is confirmed before any money arrives
+  // (lib/late-entry.js sends its own "build your roster" email instead).
+  if (reg.paymentMethod === 'venmo' && !body.quiet) {
     await sendVenmoConfirmedEmail(reg);
   }
 

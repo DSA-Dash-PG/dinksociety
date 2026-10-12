@@ -11,7 +11,7 @@
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './lib/circuit.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
-import { buildBracketWeeks, resolveBracketDisplay, inferFormat } from './lib/bracket.js';
+import { buildBracketWeeks, resolveBracketDisplay, inferFormat, bracketTeamCount } from './lib/bracket.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -85,7 +85,7 @@ export default async (req) => {
       // ── Resolve the bracket weeks per division and merge them in ──
       for (const div of Object.keys(realByDiv)) {
         const teamList = [...(teamsByDiv[div]?.values() || [])];
-        const numTeams = teamList.length;
+        const numTeams = bracketTeamCount(realByDiv[div], teamList.length);
         if (numTeams < 2 || numTeams % 2 !== 0) continue;
 
         // Use persisted bracket blobs if the admin generated them; otherwise

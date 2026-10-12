@@ -32,6 +32,7 @@ import { circuitCode } from './lib/circuit.js';
 import { carryOverRoster } from './lib/league-players.js';
 import { normalizeEmail, normalizePhone } from './lib/identity.js';
 import { rebuildStandings } from './lib/standings.js';
+import { registerLateEntry } from './lib/late-entry.js';
 import { resolveDepositTerms, VENMO_HANDLE, venmoProfileUrl, fmtDueDate, CARD_PAYMENTS_ENABLED, DEFAULT_TEAM_FEE, DEFAULT_AGENT_FEE } from './lib/payment-terms.js';
 
 export default async (req) => {
@@ -112,6 +113,13 @@ export default async (req) => {
         console.error('Returning-team carry-over failed:', carryErr?.message || carryErr);
       }
       delete team.returningFrom;
+    }
+
+    // ── Invite link (a replacement team joining mid-season) ────────────
+    // Bypasses the closed-registration check; division and price come from
+    // the invite, the spot is confirmed immediately. See lib/late-entry.js.
+    if (body.invite) {
+      return registerLateEntry({ invite: body.invite, path, team, paymentMethod });
     }
 
     // Look up the season to get the Stripe price ID (if seasonId provided)

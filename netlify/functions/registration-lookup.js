@@ -88,6 +88,15 @@ export default async (req, context) => {
       };
     }
 
+    // Invite (replacement team): confirmed at once, fee still owed — keep the
+    // Venmo instructions on the success page until the payment is logged.
+    if (reg.lateEntry) {
+      safe.lateEntry = { startWeek: reg.lateEntry.startWeek || null };
+      if (reg.venmo && balanceOf(reg) > 0) {
+        safe.venmo = { handle: reg.venmo.handle, url: reg.venmo.url, amount: balanceOf(reg), note: reg.venmo.note };
+      }
+    }
+
     if (reg.path === 'team' && reg.team) {
       safe.team = {
         name: reg.team.name,

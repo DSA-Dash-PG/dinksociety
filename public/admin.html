@@ -6813,6 +6813,144 @@
       + '</div><div id="am-status" style="font-size:11px;margin-top:8px;"></div></div>';
   }
 
+  // ── Replacement team: invite link + second-half redraw ────────────────
+  // A team leaving after the first round-robin can be replaced: email the new
+  // captain a private registration link (admin-late-entry), then — once they
+  // have registered — redraw the second half with them in the departing team's
+  // slot (admin-extend-season with `replacement`). Shown only once a team has
+  // withdrawn.
+  async function renderLateEntry(div, weeks, divTeams) {
+    const box = $id('late-entry-card');
+    if (!box) return;
+    const gone = (weeks.find(w => (w.withdrawn || []).length) || {}).withdrawn || [];
+    const placed = (weeks.find(w => w.replacement) || {}).replacement || null;
+    if (!gone.length) { box.innerHTML = ''; return; }
+    const firstHalfIds = new Set(weeks.filter(w => !w.phase && w.week <= 5)
+      .flatMap(w => (w.matches || []).flatMap(m => [m.teamA && m.teamA.id, m.teamB && m.teamB.id])).filter(Boolean));
+    const fresh = divTeams.filter(t => !firstHalfIds.has(t.id));
+    let le = null, url = null;
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-late-entry?circuit=' + encodeURIComponent(adminCircuit()));
+      le = d.lateEntry; url = d.url;
+    } catch (e) { /* card still renders the form */ }
+    const leaving = gone[0];
+    const inp = (id, ph, val, type) => '<input type="' + (type || 'text') + '" id="' + id + '" placeholder="' + h(ph) + '" value="' + h(val || '') + '" style="width:100%;">';
+    const fld = (lbl, inner) => '<div class="af"><label>' + lbl + '</label>' + inner + '</div>';
+    const regTeam = le && le.teamId ? divTeams.find(t => t.id === le.teamId) : null;
+    const candidate = regTeam || (fresh.length === 1 ? fresh[0] : null);
+
+    let invitePart;
+    if (le && le.registrationId) {
+      invitePart = '<div style="font-size:13px;line-height:1.6;">✓ <b>' + h(le.teamName || (regTeam && regTeam.name) || 'Team') + '</b> registered through the invite' +
+        (le.usedAt ? ' on ' + new Date(le.usedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '') + '. Fee $' + h(le.price) + ' — log the Venmo in Registrations → Payments.</div>';
+    } else if (le && le.code) {
+      invitePart = '<div style="font-size:13px;line-height:1.6;margin-bottom:10px;">Invite ' + (le.sentAt ? 'emailed to <b>' + h(le.invitedEmail) + '</b> ' + new Date(le.sentAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'created (not emailed)') +
+        ' · $' + h(le.price) + ' · from Week ' + h(le.startWeek) + '. Waiting for them to register.</div>' +
+        '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">' +
+          '<input type="text" readonly id="le-url" value="' + h(url || '') + '" style="flex:1;min-width:200px;font-size:12px;">' +
+          '<button class="ab ab--sm" id="le-copy">Copy link</button>' +
+          '<button class="ab ab--sm" id="le-resend">Resend email</button>' +
+          '<button class="ab ab--sm" id="le-revoke">Revoke</button>' +
+        '</div>';
+    } else {
+      invitePart = '<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px;align-items:end;">' +
+        fld('Captain name', inp('le-name', 'e.g. Jane Smith')) +
+        fld('Captain email', inp('le-email', 'jane@example.com', '', 'email')) +
+        fld('Team fee ($)', inp('le-price', '270', '270', 'number')) +
+        fld('First week', inp('le-week', '6', '6', 'number')) +
+        '<div class="af" style="grid-column:1/-1;"><button class="ab ab--lime ab--sm" id="le-send">Email the registration link</button></div>' +
+      '</div>';
+    }
+
+    let drawPart = '';
+    if (placed) {
+      drawPart = '<div style="font-size:13px;margin-top:14px;">✓ <b>' + h(placed.name) + '</b> is on the schedule in ' + h((placed.replaces || {}).name || leaving.name) + '\'s place.</div>';
+    } else if (candidate) {
+      drawPart = '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--color-border,#2a2a2a);">' +
+        '<div style="font-size:13px;line-height:1.6;margin-bottom:10px;">Put <b>' + h(candidate.name) + '</b> into the schedule in <b>' + h(leaving.name) + '</b>\'s place: a fresh random draw for Weeks 6–10 (three matches a night, no byes) and Championship Night for six. Nothing is written until you apply it.</div>' +
+        '<button class="ab ab--sm" id="le-preview">Preview the redraw</button> <button class="ab ab--lime ab--sm" id="le-apply" disabled>Apply this draw</button>' +
+        '<div id="le-plan" style="font-size:12px;margin-top:10px;"></div></div>';
+    }
+
+    box.innerHTML = '<div class="ac" style="margin-top:14px;padding:18px;">' +
+      '<div class="ac__h"><span class="ac__t">Replacement team</span><span class="ac__s">' + h(leaving.name) + ' is done after the first half · new team starts at 0–0</span></div>' +
+      '<div style="margin-top:12px;">' + invitePart + drawPart + '</div>' +
+      '<div id="le-status" style="font-size:11px;margin-top:8px;"></div></div>';
+
+    const stat = $id('le-status');
+    const say = (m, bad) => { if (stat) { stat.textContent = m; stat.style.color = bad ? 'var(--color-red,#ef4444)' : 'var(--color-text-faint)'; } };
+    const post = (body) => apiJSON('/.netlify/functions/admin-late-entry', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(Object.assign({ circuit: adminCircuit(), replaces: leaving.name, division: div }, body)),
+    });
+
+    const send = $id('le-send');
+    if (send) send.addEventListener('click', async () => {
+      const name = $id('le-name').value.trim(), email = $id('le-email').value.trim();
+      if (!email) return say('Enter the captain\'s email.', true);
+      if (!btnBusy(send, 'Sending…')) return;
+      try {
+        await post({ name, email, price: Number($id('le-price').value) || 270, startWeek: Number($id('le-week').value) || 6 });
+        say('Invite emailed.');
+        renderLateEntry(div, weeks, divTeams);
+      } catch (e) { say(e.message, true); btnDone(send); }
+    });
+    const copy = $id('le-copy');
+    if (copy) copy.addEventListener('click', () => {
+      const v = $id('le-url').value;
+      (navigator.clipboard ? navigator.clipboard.writeText(v) : Promise.reject()).then(() => say('Link copied.'), () => { $id('le-url').select(); say('Select and copy the link.'); });
+    });
+    const resend = $id('le-resend');
+    if (resend) resend.addEventListener('click', async () => {
+      if (!btnBusy(resend, 'Sending…')) return;
+      try {
+        await post({ name: le.invitedName, email: le.invitedEmail, price: le.price, startWeek: le.startWeek });
+        say('Sent again to ' + le.invitedEmail + '.');
+        btnDone(resend);
+      } catch (e) { say(e.message, true); btnDone(resend); }
+    });
+    const revoke = $id('le-revoke');
+    if (revoke) revoke.addEventListener('click', async () => {
+      if (!confirm('Revoke this invite? The link will stop working.')) return;
+      try {
+        await apiJSON('/.netlify/functions/admin-late-entry?circuit=' + encodeURIComponent(adminCircuit()), { method: 'DELETE' });
+        renderLateEntry(div, weeks, divTeams);
+      } catch (e) { say(e.message, true); }
+    });
+
+    let seed = null;
+    const extend = (dryRun) => apiJSON('/.netlify/functions/admin-extend-season', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ circuit: adminCircuit(), withdrawn: [leaving.id], replacement: candidate.id, dryRun, ...(seed ? { seed } : {}) }),
+    });
+    const prev = $id('le-preview'), apply = $id('le-apply');
+    if (prev) prev.addEventListener('click', async () => {
+      if (!btnBusy(prev, 'Drawing…')) return;
+      seed = null;
+      try {
+        const r = await extend(true);
+        seed = r.seed;
+        const fmt = (iso) => new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        $id('le-plan').innerHTML = (r.plan || []).map(p =>
+          '<div style="padding:6px 0;border-bottom:1px solid var(--color-border,#2a2a2a);"><b>Week ' + p.week + '</b> · ' + h(fmt(p.date)) +
+          '<div style="color:var(--color-text-muted);">' + p.matches.map(h).join('<br>') + '</div></div>').join('');
+        apply.disabled = false;
+        btnDone(prev); prev.textContent = 'Draw again';
+        say('Preview only. Apply writes this exact draw.');
+      } catch (e) { say(e.message, true); btnDone(prev); }
+    });
+    if (apply) apply.addEventListener('click', async () => {
+      if (!seed) return;
+      if (!confirm('Write this schedule for Weeks 6–10 and Championship Night?')) return;
+      if (!btnBusy(apply, 'Writing…')) return;
+      try {
+        await extend(false);
+        say('Schedule updated.');
+        renderSched();
+      } catch (e) { say(e.message, true); btnDone(apply); }
+    });
+  }
+
   function wireAddMatch(div) {
     const btn = $id('am-add-btn');
     if (!btn) return;
@@ -6893,7 +7031,7 @@
       window.__allTeams = allTeams;
       const divTeams = allTeams.filter(t => t.division === div);
       window.__schedTeams = divTeams;
-      const addForm = addMatchFormHTML(divTeams);
+      const addForm = addMatchFormHTML(divTeams) + '<div id="late-entry-card"></div>';
 
       if (!weeks.length) {
         out.innerHTML = '<div class="empty" style="margin-bottom:14px;">No schedule yet. Generate a round-robin above, or add matches one at a time below.</div>' + addForm;
@@ -6920,6 +7058,7 @@
       const startWeek = weeks.some(w => w.week === _schedWeek) ? _schedWeek : weeks[0].week;
       selectWeek(startWeek, weeks);
       wireAddMatch(div);
+      renderLateEntry(div, weeks, divTeams);
     } catch (e) {
       out.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
     }

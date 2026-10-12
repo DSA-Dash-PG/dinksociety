@@ -48,6 +48,22 @@ import { sortStandings } from './tiebreak.js';
 export const PHASE = { RIVALRY: 'rivalry', PLAYOFF: 'playoff', CHAMPIONSHIP: 'championship' };
 export const FORMAT = { SINGLE: 'single', DOUBLE: 'double' };
 
+// How many seats the division's round-robin has — twice the matches in its
+// first week. Not the number of team names in the schedule: a team that left
+// mid-season and the team that replaced it are two names in one seat (seven
+// names, six seats), and an odd name count used to switch the bracket off.
+// Falls back to `fallback` (the name count) when no week carries a number.
+export function bracketTeamCount(realMatches = [], fallback = 0) {
+  const perWeek = new Map();
+  for (const m of realMatches) {
+    if (!m || m.phase || m.week == null) continue;
+    perWeek.set(Number(m.week), (perWeek.get(Number(m.week)) || 0) + 1);
+  }
+  if (!perWeek.size) return fallback;
+  const first = Math.min(...perWeek.keys());
+  return perWeek.get(first) * 2;
+}
+
 // Regular-season round-robin weeks for an even team count. SINGLE: each team
 // plays each other once (N-1 weeks). DOUBLE: twice (2 × (N-1) weeks).
 export function regularRounds(numTeams, format = FORMAT.SINGLE) {

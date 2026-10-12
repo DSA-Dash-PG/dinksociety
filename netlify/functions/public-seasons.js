@@ -14,11 +14,17 @@ import { getStore } from '@netlify/blobs';
 import { resolveDepositTerms, VENMO_HANDLE, CARD_PAYMENTS_ENABLED } from './lib/payment-terms.js';
 import { seasonCircuitCode } from './lib/circuit.js';
 import { currentSeasonInfo } from './lib/current-season.js';
+import { publicLateEntry, lateEntryWeeks } from './lib/late-entry.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
     return new Response('Method not allowed', { status: 405 });
   }
+
+  // ?invite=<code> — a private late-entry link. The matching season comes back
+  // with its `lateEntry` terms; nothing about an invite is ever exposed
+  // without the code.
+  const invite = (new URL(req.url).searchParams.get('invite') || '').trim();
 
   try {
     const store = getStore('seasons');
@@ -38,7 +44,17 @@ export default async (req) => {
         // real amount due today (and the Venmo handle to send it to).
         const terms = await resolveDepositTerms(season);
 
+        let lateEntry = null;
+        if (invite && season.lateEntry?.code && season.lateEntry.code === invite) {
+          const le = season.lateEntry;
+          const weeks = await lateEntryWeeks({
+            circuit: seasonCircuitCode(season), division: le.division, startWeek: le.startWeek,
+          }).catch(() => []);
+          lateEntry = publicLateEntry(le, weeks);
+        }
+
         seasons.push({
+          ...(lateEntry ? { lateEntry } : {}),
           id: season.id,
           // The canonical code standings/stats are keyed by. Resolved here, once,
           // so no page has to guess it from an id whose shape isn't guaranteed.
@@ -81,7 +97,7 @@ export default async (req) => {
       status: 200,
       headers: {
         'Content-Type': 'application/json',
-        'Cache-Control': 'public, max-age=60',
+        'Cache-Control': invite ? 'no-store' : 'public, max-age=60',
       },
     });
   } catch (err) {

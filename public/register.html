@@ -728,11 +728,75 @@
 
     function esc(s) { return String(s || '').replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c])); }
 
+    // ── Invite link (?invite=…): a team joining a season already under way ──
+    // The season comes back with `lateEntry` (division, price, the weeks the
+    // team plays). Registration is open for that one team even while the
+    // season's sign-ups are closed; paid in full, team path only.
+    const INVITE = (new URLSearchParams(location.search).get('invite') || '').trim();
+
+    function applyInvite(s) {
+      const le = s.lateEntry;
+      s.registration = le.used ? 'closed' : 'open';
+      s.depositAmount = 0;                     // one payment, no deposit
+      const div = (s.divisions || []).find(d => d.id === le.division);
+      s.divisions = [Object.assign({}, div || { id: le.division, name: le.divisionLabel }, { teamPrice: le.price, agentPrice: 0 })];
+      state.path = 'team';
+      const paths = document.getElementById('reg-paths');
+      if (paths) paths.style.display = 'none';
+    }
+
+    function inviteBanner(html, tone) {
+      const card = document.querySelector('.reg-card');
+      if (!card || card.querySelector('.reg-invite')) return;
+      const b = document.createElement('div');
+      b.className = 'reg-invite';
+      b.style.cssText = 'border-radius:12px;padding:13px 15px;font-size:13.5px;line-height:1.5;margin:0 0 16px;' +
+        (tone === 'warn'
+          ? 'background:var(--color-gold-dim);border:1px solid rgba(240,192,64,.3);color:var(--color-gold);font-weight:600;text-align:center;'
+          : 'background:rgba(23,215,176,.08);border:1px solid rgba(23,215,176,.35);color:var(--color-text);');
+      b.innerHTML = html;
+      card.insertBefore(b, card.firstChild);
+    }
+
+    function renderInvite(s) {
+      const le = s.lateEntry;
+      if (le.used) {
+        inviteBanner('This invite has already been used to register a team. Need help? Reply to your invite email.', 'warn');
+        return;
+      }
+      const regular = (le.weeks || []).filter(w => w.phase !== 'championship');
+      const first = regular[0], last = regular[regular.length - 1];
+      const day = (iso) => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '';
+      inviteBanner(
+        '<b style="color:var(--color-teal);text-transform:uppercase;letter-spacing:.06em;font-size:11px;">Private invite</b><br>' +
+        (le.invitedName ? esc(le.invitedName.split(' ')[0]) + ', your' : 'Your') + ' team joins <b>' + esc(s.name || s.label || 'the season') + '</b> (' + esc(le.divisionLabel) + ')' +
+        (first ? ' for <b>' + regular.length + ' weeks</b>, ' + day(first.at) + ' – ' + day(last.at) : '') +
+        '. You start at 0–0 and play every week. Team fee <b>$' + Number(le.price).toLocaleString() + '</b>. Once you submit, you can build your roster in the Captain Portal right away.'
+      );
+      const el = document.getElementById('season-schedule');
+      const sec = document.getElementById('ln-sched-sec');
+      if (el && (le.weeks || []).length) {
+        if (sec) sec.style.display = 'block';
+        el.style.display = 'block';
+        const t = le.weeks.find(w => w.at);
+        el.innerHTML =
+          '<div class="reg-schedule__t">Your schedule</div>' +
+          '<div class="reg-schedule__d"><b style="color:var(--color-text)">' + regular.length + ' weeks</b>' +
+          (t ? ' · ' + new Date(t.at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Los_Angeles' }) : '') +
+          (le.weeks.find(w => w.venue) ? ', at <b style="color:var(--color-text)">' + esc(le.weeks.find(w => w.venue).venue) + '</b>' : '') + '.</div>' +
+          '<div class="reg-schedule__wks">' + le.weeks.map(w =>
+            '<span class="reg-wk">' + (w.phase === 'championship' ? 'Championship' : 'W' + w.week) + ' · ' + day(w.at) + '</span>'
+          ).join('') + '</div>';
+      }
+    }
+
     async function loadSeasons() {
       try {
-        const res = await fetch('/.netlify/functions/public-seasons');
+        const res = await fetch('/.netlify/functions/public-seasons' + (INVITE ? '?invite=' + encodeURIComponent(INVITE) : ''));
         const data = await res.json();
         const seasons = data.seasons || [];
+        const invited = INVITE ? seasons.find(s => s.lateEntry) : null;
+        if (invited) applyInvite(invited);
         const container = document.getElementById('divisions');
 
         if (!seasons.length) {
@@ -744,7 +808,7 @@
         // Feature the right season: the one taking registrations, else the soonest
         // upcoming, else the most recent. Lets the page render even when registration
         // is closed (private preview) — the CTA + form reflect the open/closed state.
-        activeSeason = pickFeatured(seasons);
+        activeSeason = invited || pickFeatured(seasons);
         // The season you REGISTER for is not always the season the site is
         // showing: Season 1 stays live until Season 2 flips a week before its
         // start, so during that window this page sells Season 2 while the rest
@@ -759,6 +823,8 @@
         renderLanding(activeSeason);
         applyRegState(activeSeason);
         renderRegisteredTeams(activeSeason);
+        if (invited) renderInvite(invited);
+        else if (INVITE) inviteBanner('This invite link is no longer valid. Ask the league for a new one.', 'warn');
       } catch (e) {
         document.getElementById('divisions').innerHTML = '<p style="font-size:12px;color:var(--color-red);">Could not load divisions. Please refresh and try again.</p>';
       }
@@ -1565,6 +1631,7 @@
         divisionLabel: activeDiv ? activeDiv.name : '',
         paymentMethod: state.pay === 'card' ? 'card' : 'venmo',
         agreed: { liability: true, conduct: true },
+        ...(activeSeason && activeSeason.lateEntry ? { invite: INVITE } : {}),
       };
       if (isAgent()) {
         const agentName = (val('a-first') + ' ' + val('a-last')).trim();

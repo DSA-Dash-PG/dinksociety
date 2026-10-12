@@ -160,6 +160,40 @@
             setText('s-note', 'You\'re on the free-agent list. We place free agents with teams that need players before the season starts — your captain will reach out once you\'re drafted.');
           }
 
+          // Invite (replacement team): the spot is confirmed straight away and
+          // the captain can build the roster now; the fee is still owed.
+          if (reg.lateEntry) {
+            document.getElementById('s-badge').textContent = 'You\'re in · roster open';
+            document.getElementById('s-title').textContent = 'You\'re in.';
+            document.getElementById('s-sub').innerHTML = (reg.team && reg.team.name ? '<strong>' + reg.team.name.replace(/[&<>"']/g, '') + '</strong> is' : 'Your team is') +
+              ' on the board for <span id="s-circuit-text"></span>, starting at 0–0. Build your roster in the Captain Portal now.';
+            setText('s-circuit-text', seasonLabelOf(reg.circuit));
+            setText('s-note', 'We just emailed you the Captain Portal link and your schedule. Sign in with the email you registered with. Reference: ' + String(reg.id || '').toUpperCase());
+            var ctas = document.querySelector('.success__ctas');
+            if (ctas) ctas.innerHTML = '<a href="/captain.html" class="btn btn-lime">Build your roster →</a><a href="/schedule.html" class="btn btn-outline">View schedule</a>';
+            if (reg.venmo) {
+              var lv = reg.venmo, lh = '@' + String(lv.handle || 'dink-society').replace(/^@/, '');
+              setText('v-title', 'Team fee — send it on Venmo');
+              setText('v-amount', '$' + lv.amount);
+              setText('v-handle', lh);
+              setText('v-handle-2', lh);
+              setText('v-note', lv.note || 'Dink Society');
+              if (lv.url) document.getElementById('v-open').href = lv.url;
+              setText('v-step-2', 'No need to wait for it to land — your roster is open now.');
+              setText('s-amount', '$' + lv.amount + ' via Venmo (due)');
+              document.querySelector('.success').classList.add('success--venmo');
+              document.getElementById('s-venmo').style.display = 'block';
+              var lcopy = document.getElementById('v-copy');
+              lcopy.addEventListener('click', function() {
+                var txt = document.getElementById('v-note').textContent;
+                var done = function() { lcopy.textContent = 'Copied ✓'; setTimeout(function() { lcopy.textContent = 'Copy note'; }, 1800); };
+                if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, done);
+                else done();
+              });
+            }
+            return;
+          }
+
           // Venmo: deposit not matched yet — swap the "payment received" copy
           // for the exact amount / handle / note to send.
           if (reg.paymentMethod === 'venmo' && reg.status === 'pending' && reg.venmo) {

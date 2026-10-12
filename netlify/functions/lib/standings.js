@@ -15,7 +15,7 @@
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
 import { normalizeScore } from './score-helpers.js';
-import { resolveBracketDisplay } from './bracket.js';
+import { resolveBracketDisplay, bracketTeamCount } from './bracket.js';
 import { sortStandings } from './tiebreak.js';
 
 const DIVISIONS = ['3.0M', '3.5M', '3.5W'];
@@ -977,7 +977,7 @@ async function lockBracketSeeds(scheduleStore, weekFiles) {
       }
     }
     if (!bracketMatches.length) continue;
-    const numTeams = teamMap.size;
+    const numTeams = bracketTeamCount(realMatches, teamMap.size);
     if (numTeams < 2 || numTeams % 2 !== 0) continue;
 
     const resolved = resolveBracketDisplay({

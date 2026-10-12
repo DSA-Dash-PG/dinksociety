@@ -6,7 +6,7 @@
 
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
-import { resolveBracketDisplay } from './lib/bracket.js';
+import { resolveBracketDisplay, bracketTeamCount } from './lib/bracket.js';
 
 export default async (req) => {
   const verified = await verifyAdminSession(req);
@@ -66,6 +66,8 @@ export default async (req) => {
         phase: data.phase || null,
         matches: (data.matches || []).map(m => ({ ...m, division, week: w })),
         byes: weekByes(data),
+        ...(Array.isArray(data.withdrawn) && data.withdrawn.length ? { withdrawn: data.withdrawn } : {}),
+        ...(data.replacement ? { replacement: data.replacement } : {}),
         generatedAt: data.generatedAt,
         updatedAt: data.updatedAt,
       });
@@ -262,14 +264,14 @@ function resolveBracketWeeksInPlace(weeks) {
     for (const m of wk.matches) {
       if (m.phase) { bracket.push(m); }
       else {
-        real.push(m);
+        real.push(m.week == null && wk.week != null ? { ...m, week: wk.week } : m);
         if (m.teamA?.id) teamMap.set(m.teamA.id, { id: m.teamA.id, name: m.teamA.name });
         if (m.teamB?.id) teamMap.set(m.teamB.id, { id: m.teamB.id, name: m.teamB.name });
       }
     }
   }
   if (!bracket.length) return;
-  const numTeams = teamMap.size;
+  const numTeams = bracketTeamCount(real, teamMap.size);
   if (numTeams < 2 || numTeams % 2 !== 0) return;
 
   const resolved = resolveBracketDisplay({
