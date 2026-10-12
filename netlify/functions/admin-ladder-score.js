@@ -37,7 +37,27 @@ export default async (req) => {
   const round = play.rounds?.[ri];
   if (!round) return json({ error: 'Round not found.' }, 404);
 
-  const isPastRound = Number.isInteger(play.currentRound) && ri < play.currentRound;
+  let isPastRound = Number.isInteger(play.currentRound) && ri < play.currentRound;
+
+  // Score-only correction: on a past round, if every edited court keeps the
+  // SAME winner, the next round's pairings (built from winners only in the
+  // individual / fixed-partner formats) don't change — so just patch the
+  // score in place. No re-draw, no reopen, later rounds stay intact. Round
+  // Robin is excluded: its block re-rank uses point differential.
+  if (isPastRound) {
+    const ev = await getEvent(eventId);
+    if (ev?.format !== 'round-robin') {
+      const edits = Array.isArray(body.courts)
+        ? body.courts.map(c => ({ ci: parseInt(c.court), t1: num(c.t1), t2: num(c.t2) }))
+        : [{ ci: parseInt(body.court), t1: num(body.t1), t2: num(body.t2) }];
+      const sameWinner = edits.length && edits.every(({ ci, t1, t2 }) => {
+        const old = round.courts?.[ci]?.score;
+        if (!old || !old.winner || t1 === null || t2 === null || t1 === t2) return false;
+        return (t1 > t2 ? 'A' : 'B') === old.winner;
+      });
+      if (sameWinner) isPastRound = false;
+    }
+  }
 
   // Editing a round that's already fed into a later one — make the admin say
   // so explicitly before we discard anything downstream of it.
