@@ -3161,7 +3161,7 @@
     const pill = revealed
       ? '<span class="lu__status is-revealed">Revealed</span>'
       : '<span class="lu__status is-locked">Locked</span>';
-    const note = revealed ? '' : `<div class="lu__reveal-note">🔒 Opponent's lineup reveals 15 min before match — here's your team's.</div>`;
+    const note = revealed ? '' : `<div class="lu__reveal-note">🔒 Opponent's lineup reveals at game time — here's your team's.</div>`;
     return `<div class="label">Lineup <span class="sub">${revealed ? 'Full matchup' : 'Your team'}</span></div>
       <div class="lu">
         <div class="lu__head"><h3>Match lineup</h3>${pill}</div>
@@ -3177,12 +3177,12 @@
   // 3 sets per round (G1+G2 / G3+G4 / G5+G6 play simultaneously on two courts),
   // my pair left, opponent right. No lock pills or warnings — the opponent
   // column simply shows a dashed placeholder until the matchup reveals.
-  // Lineup reveal moment for a match: scheduledAt minus the season's lock
-  // offset (server default 15 min). Null when the match has no time.
+  // Lineup reveal moment for a match: scheduledAt minus the season's reveal
+  // offset (server default 0 = at game time). Null when the match has no time.
   function revealTimeFor(m) {
     if (!m || !m.scheduledAt) return null;
     const t = new Date(m.scheduledAt).getTime(); if (isNaN(t)) return null;
-    const off = Number(m.revealOffsetMin) || 15;
+    const off = Number(m.revealOffsetMin) || 0;   // 0 = reveals at game time
     return t - off * 60000;
   }
   function fmtReveal(ms) {
@@ -3226,14 +3226,13 @@
     const revealed = !!lu.opp;
     const nameEl = (side, pos, isMe) =>
       `<div class="pl${isMe ? ' you' : ''}">${side && side[pos] ? esc(side[pos]) : '—'}${isMe ? '<span class="g__mine-tag">YOU</span>' : ''}</div>`;
-    // On match day the placeholder counts down to the reveal (start − lock
-    // offset, 15 min by default) instead of the static "reveals 15 min before
-    // start". A 1s ticker (startRevealTicker) keeps every cell current.
+    // On match day the placeholder counts down to the reveal (game time by
+    // default) instead of the static "reveals at game time". A 1s ticker (startRevealTicker) keeps every cell current.
     const revealAt = revealTimeFor(next);
     const matchDay = !!(next.scheduledAt && new Date(next.scheduledAt).toDateString() === new Date().toDateString());
     const phCell = (matchDay && revealAt && revealAt > Date.now())
       ? `<div class="g__pair g__pair--right"><span class="lus__ph lus__cd" data-t="${revealAt}">reveals in<br><b>${fmtReveal(revealAt - Date.now())}</b></span></div>`
-      : `<div class="g__pair g__pair--right"><span class="lus__ph">reveals 15 min<br>before start</span></div>`;
+      : `<div class="g__pair g__pair--right"><span class="lus__ph">reveals at<br>game time</span></div>`;
     const setBlock = (r, s) => {
       const rows = [2 * s - 1, 2 * s].map(gi => {
         const slot = `r${r}g${gi}`;

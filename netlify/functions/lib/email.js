@@ -788,7 +788,7 @@ export function renderLadderFcfsOpen({ eventName, dateLine, openUrl }) {
 // place (gameNo() in lineup-helpers.js).
 //
 // NOTE: never include the opponent's lineup here. Locking can happen days ahead
-// and the matchup is blind until the T-15 reveal.
+// and the matchup is blind until the game-time reveal.
 
 const _LU_ACCENT = '#b8ff2c';
 
@@ -1060,8 +1060,8 @@ export function renderRosterWelcome({
     ? `Mark yourself for ${eachNight}. Your captain can’t put you in a lineup if you’re out — and can’t leave you out by accident if you’re in.`
     : `Mark yourself for ${eachNight}. It’s how ${addedBy ? escapeBody(addedBy.split(/\s+/)[0]) : 'your captain'} knows who can go in the lineup — do this one first.`;
   const lineupBody = returning
-    ? 'Who you’re partnered with, which games, which court. Both teams’ lineups unlock 15 minutes before first serve.'
-    : 'Who you’re partnered with, which games, which court. Both teams’ lineups unlock 15 minutes before first serve — nobody sees yours early.';
+    ? 'Who you’re partnered with, which games, which court. Both teams’ lineups reveal at first serve.'
+    : 'Who you’re partnered with, which games, which court. Both teams’ lineups reveal at first serve — nobody sees yours early.';
   const statsTitle = returning ? 'Track your stats' : 'Watch your rating build';
   const statsBody = returning
     ? 'Your DSR week by week, your record, who you play best with, and where you land on the leaderboard.'

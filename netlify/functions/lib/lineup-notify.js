@@ -16,7 +16,7 @@
 // us when THEIR OWN games changed.
 //
 // Never includes the opponent's lineup — locking can happen days before the
-// T-15 reveal and the matchup is blind until then.
+// game-time reveal and the matchup is blind until then.
 
 import { getStore } from '@netlify/blobs';
 import { getTeamAvailability } from './availability.js';

@@ -120,7 +120,7 @@ export default async (req) => {
       const aLocked = !!la?.lockedAt, bLocked = !!lb?.lockedAt;
       const bothLocked = aLocked && bLocked;
       // A match is only "live" once it has REVEALED — both lineups locked AND
-      // we're inside the reveal window (15 min before start). Before that a
+      // we're past the reveal time (match start). Before that a
       // both-locked match is just "ready", not live. (Without the time gate the
       // admin showed matches as live hours early the moment captains locked.)
       const revealed = bothLocked && isRevealTime(mt.scheduledAt);

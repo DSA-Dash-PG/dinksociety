@@ -42,9 +42,9 @@ export default async (req) => {
   const WEEKS = seasonData?.weeks || 8;
   const ROUNDS_PER_MATCH = seasonData?.roundsPerMatch || 2;
   const GAMES_PER_ROUND = seasonData?.gamesPerRound || 6;
-  // Lineups hard-lock this many minutes before match start (default 1 hour), and
-  // the matchup reveals this many minutes before start (default 15) — BOTH locked
-  // AND inside the reveal window. Season-configurable; keep in sync with
+  // Lineups hard-lock this many minutes before match start (default 10), and
+  // the matchup reveals this many minutes before start (default 0 = at match
+  // start) — BOTH locked AND past the reveal time. Season-configurable; keep in sync with
   // [[lineup-system]] and the copy in captain.html / me.html.
   const LINEUP_LOCK_OFFSET_MIN = Number(seasonData?.lineupLockOffsetMin) || DEFAULT_LOCK_OFFSET_MIN;
   const LINEUP_REVEAL_OFFSET_MIN = Number(seasonData?.lineupRevealOffsetMin) || DEFAULT_REVEAL_OFFSET_MIN;
@@ -68,12 +68,12 @@ export default async (req) => {
     const myLocked = !!mine?.lockedAt;
     const oppLocked = !!opp?.lockedAt;
     // Simultaneous reveal: both locked AND we're inside the reveal window
-    // (15 min before start by default). Locking early no longer reveals early.
+    // (at match start by default). Locking early no longer reveals early.
     const revealed = myLocked && oppLocked && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
 
     // A locked lineup can be reopened by the captain while it's still before the
     // hard-lock window AND the matchup hasn't revealed. The opponent locking no
-    // longer blocks unlock: since reveal became time-gated (T-15), both-locked
+    // longer blocks unlock: since reveal became time-gated (match start), both-locked
     // shows nobody anything, so reopening is harmless until the reveal.
     const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
     const unlockable = myLocked && !revealed && (cutoff === null || Date.now() < cutoff);

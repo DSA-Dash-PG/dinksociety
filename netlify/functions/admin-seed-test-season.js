@@ -182,10 +182,10 @@ export default async (req) => {
         let scheduledAt = new Date(baseDate.getTime() + (w * 7 * 86400000)).toISOString();
 
         const state = weekState(week);
-        // Reveal is time-gated (both locked AND within 15 min of start), so the
-        // seeded 'revealed' QA week must sit INSIDE that window — schedule it
-        // 10 minutes from now or the matchup would stay hidden.
-        if (state === 'revealed') scheduledAt = new Date(Date.now() + 10 * 60000).toISOString();
+        // Reveal is time-gated (both locked AND match start has arrived), so the
+        // seeded 'revealed' QA week must already have started — schedule it a
+        // minute ago or the matchup would stay hidden.
+        if (state === 'revealed') scheduledAt = new Date(Date.now() - 60000).toISOString();
         const cp = courtPlan[w][idx];
         const match = {
           id: matchId,

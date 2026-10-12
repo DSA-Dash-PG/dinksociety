@@ -113,7 +113,7 @@ test('nothing goes out more than four days ahead, at night, or once the lineup l
   t.after(() => mock.timers.reset());
   for (const when of ['2026-10-10T17:00:00Z',             // Saturday: five days out
     '2026-10-13T05:30:00Z',                               // Monday 10:30 PM Pacific
-    '2026-10-16T00:45:00Z']) {                            // Thursday 5:45 PM: lineups locked at 5:30
+    '2026-10-16T00:55:00Z']) {                            // Thursday 5:55 PM: lineups locked at 5:50 (10 min before a 6:00 start)
     mock.timers.reset(); at(when);
     await cron();
     assert.equal(MAIL.length, 0, when);

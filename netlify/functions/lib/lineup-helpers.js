@@ -131,8 +131,8 @@ export function checkRosterDepth(roster) {
 }
 
 // Season-configurable defaults — keep in sync with UI copy in captain.html / me.html.
-export const DEFAULT_LOCK_OFFSET_MIN = 30;    // lineups hard-lock 30 minutes before match start (was 60 — 2026-09-24)
-export const DEFAULT_REVEAL_OFFSET_MIN = 15;  // matchup reveals 15 minutes before match start
+export const DEFAULT_LOCK_OFFSET_MIN = 10;    // lineups hard-lock 10 minutes before match start (was 30 — 2026-10-12; 60 before 2026-09-24)
+export const DEFAULT_REVEAL_OFFSET_MIN = 0;   // matchup reveals AT match start (was 15 minutes before — 2026-10-12)
 
 /**
  * The instant a lineup hard-locks: match start − offset (in minutes).
@@ -156,7 +156,7 @@ export function revealTime(scheduledAt, offsetMin = DEFAULT_REVEAL_OFFSET_MIN) {
 
 /**
  * Time gate for the simultaneous reveal: true once we're within `offsetMin`
- * minutes of match start. FAILS CLOSED: a match with no scheduled time never
+ * minutes of match start (offset 0 = at match start, the default). FAILS CLOSED: a match with no scheduled time never
  * reveals (admin must set scheduledAt — see admin "Set match times" backfill).
  * Failing open here leaked opponent lineups days early the moment both
  * captains locked (June 2026 Season 1 bug). Both-locked is checked by

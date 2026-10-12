@@ -218,7 +218,7 @@ export default async (req) => {
           opp?.id ? lineupStore.get(`lineup/${mt.id}/${opp.id}.json`, { type: 'json' }).catch(() => null) : null,
         ]);
         myLocked = !!mine?.lockedAt;
-        // Simultaneous reveal: both locked AND within 15 min of match start.
+        // Simultaneous reveal: both locked AND match start has arrived.
         revealed = myLocked && !!oppLu?.lockedAt && isRevealTime(mt.scheduledAt);
         if (mine?.games) {
           for (const [slot, g] of Object.entries(mine.games)) {
@@ -285,7 +285,7 @@ export default async (req) => {
         final, myMp, oppMp, result,
         myLocked, revealed, myGames, lineup, scores, availability,
         // Minutes before scheduledAt the matchup reveals — the portal counts
-        // down to it on match day instead of saying "15 min" as a constant.
+        // down to it on match day instead of hard-coding the offset.
         revealOffsetMin: DEFAULT_REVEAL_OFFSET_MIN,
         status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
       });

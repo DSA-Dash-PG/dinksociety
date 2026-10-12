@@ -76,7 +76,7 @@ export default async (req) => {
     lineupStore.get(`lineup/${matchId}/${match.teamA.id}.json`, { type: 'json' }).catch(() => null),
     lineupStore.get(`lineup/${matchId}/${match.teamB.id}.json`, { type: 'json' }).catch(() => null),
   ]);
-  // Scoring opens at reveal: both lineups locked AND within 15 min of match start.
+  // Scoring opens at reveal: both lineups locked AND match start has arrived.
   const revealed = !!lineupHome?.lockedAt && !!lineupAway?.lockedAt
     && isRevealTime(match.scheduledAt, Number(seasonData?.lineupRevealOffsetMin) || undefined);
 

@@ -65,7 +65,7 @@ export default async (req) => {
 
         const myLocked = !!myLineup?.lockedAt;
         const oppLocked = !!oppLineup?.lockedAt;
-        // Simultaneous reveal: both locked AND within 15 min of match start.
+        // Simultaneous reveal: both locked AND match start has arrived.
         const revealed = myLocked && oppLocked && isRevealTime(m.scheduledAt);
 
         myMatches.push({
