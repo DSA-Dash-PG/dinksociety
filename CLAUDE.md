@@ -121,6 +121,16 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   with an upload loads it in `<head>`; `partials.js` injects it on the rest. A new upload
   page needs nothing extra; custom drag-and-drop should `await DSImage.normalize(file)`.
 
+- **DUPR-rated ladders mail their own DUPR upload file.** `ladder-dupr-cron.js` (every 15 min)
+  emails every admin the night's DUPR club import CSV once a DUPR-rated ladder is finished, and
+  again, marked as a correction, if it is reopened and re-finished (ledger: blob store `ladder-dupr`,
+  `sent/<eventId>.json`). Admin → Ladders → a DUPR ladder → **Download DUPR CSV** serves the same
+  file (`admin-ladder-dupr.js`). The columns are DUPR's current single-match template, verbatim, in
+  `DUPR_HEADER` (`lib/ladder-dupr-export.js`); DUPR rejects the upload if one is renamed or missing.
+  Tied, unscored and no-DUPR-ID games are left out and listed; players not verified in the DUPR club
+  stay in and are flagged. `scoreType` is SIDEOUT unless the event has `duprScoreType: 'RALLY'`.
+  Tests: `node --test tests/ladder-dupr-export.test.js` (fixture: the real King's Court #3 night).
+
 ## Wording
 
 - **Say "Standings", never "The Table".** The league rankings are "the standings" in every

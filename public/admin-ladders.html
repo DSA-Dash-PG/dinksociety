@@ -504,6 +504,12 @@
     <div class="help" style="margin-top:6px"><b>Live</b> and <b>Final</b> are automatic — they follow the scorer. <b>Close registration</b> shuts new signups while the ladder otherwise carries on as normal: it still shows on the Ladders page with its roster, and you can still add players here. <b>Cancel</b> pulls it off the Ladders page entirely.</div>
   </div>
 
+  <div class="frow" id="duprExportRow" style="margin-top:18px;display:none"><label class="l">DUPR upload</label>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center"><button class="btn btn-out btn-sm" onclick="downloadDuprCsv()">⬇ Download DUPR CSV</button><span id="duprExportInfo" style="font-size:.78rem;color:#9aa094"></span></div>
+    <div id="mDuprMsg"></div>
+    <div class="help" style="margin-top:6px">Every scored game in DUPR's club import format (DUPR → club → Matches → Import Matches via CSV, date format YYYY-MM-DD). When the night is finished, admins are emailed this file automatically. Games with a tie or a player missing a DUPR ID are left out.</div>
+  </div>
+
   <div class="sec" style="margin:22px 0 8px;color:var(--red)">Danger zone</div>
   <div style="border:1px solid rgba(255,92,71,.3);border-radius:12px;padding:13px 14px">
     <div class="help" style="margin:0 0 10px">Reset wipes every round and score but keeps the roster and settings — the night goes back to not-started (a finalized night is un-finalized and its results come off the leaderboard). Deleting removes the ladder, its roster, and scores. Neither can be undone.</div>
@@ -1152,7 +1158,7 @@ async function openManage(id){
   const rs=document.getElementById('ros-search'); if(rs)rs.value=''; const rr=document.getElementById('rosResults'); if(rr)rr.innerHTML='';
   document.getElementById('mTitle').textContent=d.event.name;
   document.getElementById('mMeta').textContent=`${d.event.date||''} ${d.event.startTime||''} · ${d.event.place||''} · roster ${d.roster.length}/${d.capacity} · ${d.spotsLeft} left`;
-  { const st=(d.event.status||'open'); const el=document.getElementById('statusLine'); if(el){ el.textContent=STATUS_LABEL[st]||(st.charAt(0).toUpperCase()+st.slice(1)); el.style.color=STATUS_COLOR[st]||'#9aa094'; } renderStatusBtns(st); }
+  { const st=(d.event.status||'open'); const el=document.getElementById('statusLine'); if(el){ el.textContent=STATUS_LABEL[st]||(st.charAt(0).toUpperCase()+st.slice(1)); el.style.color=STATUS_COLOR[st]||'#9aa094'; } renderStatusBtns(st); renderDuprExport(d.event); }
   const setv=(id,val)=>{const el=document.getElementById(id);if(el)el.value=(val??'');};
   setv('m-name',d.event.name); setv('m-date',d.event.date); setv('m-time',d.event.startTime); setv('m-end',d.event.endTime); setv('m-place',d.event.place); setv('m-address',d.event.address); setv('m-type',d.event.type||'mixed');
   setv('m-courts',d.event.courts); setv('m-cap',d.event.capacity); setv('m-fee',((d.event.feeCents||0)/100)); setv('m-venmo',d.event.venmoHandle);
@@ -1869,6 +1875,30 @@ const STATUS_LABEL={open:'Open — accepting signups',closed:'Closed — signups
 // Which status changes an admin can make by hand. Live/Final are driven by the
 // scorer, so they're deliberately not offered here — once a night is live or
 // final the only manual move left is cancelling it.
+function renderDuprExport(ev){
+  const row=document.getElementById('duprExportRow'); if(!row) return;
+  const info=document.getElementById('duprExportInfo'); if(info) info.textContent='';
+  const m=document.getElementById('mDuprMsg'); if(m) m.innerHTML='';
+  row.style.display=(ev&&ev.duprRated)?'':'none';
+  if(!(ev&&ev.duprRated)) return;
+  api('/admin-ladder-dupr?format=json&event='+encodeURIComponent(ev.id)).then(({d})=>{
+    if(!info||!CURRENT||CURRENT.id!==ev.id) return;
+    if(d&&d.ok){
+      let t=`${d.games} of ${d.total} games ready`;
+      if(d.skipped&&d.skipped.length) t+=` · ${d.skipped.length} left out`;
+      if(d.unverified&&d.unverified.length) t+=` · ${d.unverified.length} not club-verified`;
+      info.textContent=t;
+      if(d.skipped&&d.skipped.length&&m) m.innerHTML='<div class="help" style="color:var(--red)">Left out: '+d.skipped.map(x=>`R${x.round} ${esc(x.court)} (${esc(x.reason)})`).join(' · ')+'</div>';
+    } else info.textContent=(d&&d.error)||'';
+  });
+}
+async function downloadDuprCsv(){
+  if(!CURRENT) return;
+  const r=await fetch(API+'/admin-ladder-dupr?event='+encodeURIComponent(CURRENT.id),{credentials:'include'});
+  if(!r.ok){ let e=''; try{ e=(await r.json()).error; }catch{} msg('mDuprMsg','err',esc(e)||('Could not build the file ('+r.status+').')); return; }
+  const cd=r.headers.get('Content-Disposition')||''; const fn=(cd.match(/filename="([^"]+)"/)||[])[1]||'dupr.csv';
+  const url=URL.createObjectURL(await r.blob()); const a=document.createElement('a'); a.href=url; a.download=fn; document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),2000);
+}
 function renderStatusBtns(st){
   const el=document.getElementById('statusBtns'); if(!el) return;
   const btn=(to,label,danger)=>`<button class="${danger?'btn-danger':'btn btn-out btn-sm'}" onclick="setLadderStatus('${to}')">${label}</button>`;
