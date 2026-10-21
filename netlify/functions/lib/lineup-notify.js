@@ -1,13 +1,16 @@
 // netlify/functions/lib/lineup-notify.js
 //
-// Emails the team when a captain LOCKS a lineup, and again when a re-lock
-// actually changes someone's games. Called from captain-lineup.js.
+// Emails the players in the lineup when a captain LOCKS it, and again when a
+// re-lock actually changes someone's games. Called from captain-lineup.js.
 //
-// Who gets what:
-//   · in the lineup          → renderLineupPlaying   (their games + full grid)
-//   · available, not picked  → renderLineupNotIn     (plain FYI + full grid)
-//   · marked OUT             → nothing. They already told us they can't play.
-//   · captain + co-captains  → renderLineupReceipt   (who got what + the grid)
+// ONLY players with games in the current lineup are ever emailed.
+//   · in the lineup                → renderLineupPlaying  (their games + full grid)
+//   · in it, games changed on re-lock → renderLineupChanged
+//   · available, not picked        → nothing
+//   · marked OUT                   → nothing
+//   · taken out of the lineup on a re-lock → nothing (the captain receipt names
+//     them so the captain can tell them directly)
+//   · captain + co-captains        → renderLineupReceipt  (who got what + the grid)
 //
 // Re-lock diffing: we snapshot what was last EMAILED onto the lineup record as
 // `notifiedGames`, and diff against that rather than against the previous lock.
@@ -22,7 +25,7 @@ import { getStore } from '@netlify/blobs';
 import { getTeamAvailability } from './availability.js';
 import { SLOT_KEYS, gameNoOf, slotTypeLabel, formatOffset } from './lineup-helpers.js';
 import {
-  sendEmail, renderLineupPlaying, renderLineupNotIn, renderLineupChanged, renderLineupReceipt,
+  sendEmail, renderLineupPlaying, renderLineupChanged, renderLineupReceipt,
 } from './email.js';
 import { isActivePlayer } from './roster.js';
 
@@ -83,6 +86,50 @@ export function diffForPlayer(prevList, nextList, nameOf) {
     if (!next.has(slot)) changes.push({ kind: 'dropped', no: g.no, typeLabel: g.typeLabel });
   }
   return changes.sort((a, b) => a.no - b.no);
+}
+
+/**
+ * Decide who on the roster gets a lineup email. Pure — no I/O.
+ *
+ * Only players with at least one game in the CURRENT lineup are ever emailed.
+ * First send: every one of them. Re-lock: only those whose own games changed.
+ * Everyone else is recorded on the summary for the captain receipt and never
+ * mailed: not picked (notIn), marked out (skipped), or in the lineup last time
+ * and taken out now (removed).
+ *
+ * @returns {{ sends: Array<{player, mine, changes}>, summary: object }}
+ */
+export function planLineupEmails({ roster, nextByPlayer, prevByPlayer, isFirstSend, isOut, nameOf, hasEmail }) {
+  const sends = [];
+  const summary = { playing: [], emailed: [], notIn: [], skipped: [], removed: [], noEmail: [], changed: [] };
+
+  for (const p of roster || []) {
+    const mine = nextByPlayer.get(p.id) || [];
+
+    if (!mine.length) {
+      if (!isFirstSend && (prevByPlayer.get(p.id) || []).length) summary.removed.push(p.name);
+      else if (isOut(p.id)) summary.skipped.push(p.name);
+      else summary.notIn.push(p.name);
+      continue;
+    }
+
+    summary.playing.push(p.name);
+    if (!hasEmail(p)) { summary.noEmail.push(p.name); continue; }
+
+    if (isFirstSend) {
+      sends.push({ player: p, mine, changes: null });
+      summary.emailed.push(p.name);
+      continue;
+    }
+
+    const changes = diffForPlayer(prevByPlayer.get(p.id), mine, nameOf);
+    if (!changes.length) continue;
+    summary.changed.push(p.name);
+    summary.emailed.push(p.name);
+    sends.push({ player: p, mine, changes });
+  }
+
+  return { sends, summary };
 }
 
 /** "Week 6 · Thu, Jul 23 · 7:00 PM · Courts 5C & 5D" + opponent emoji. */
@@ -157,45 +204,32 @@ export async function notifyTeamOfLock({ team, match, games, notifiedGames, lock
 
   const decorate = (list) => (list || []).map(g => ({ ...g, partner: nameOf(g.partnerId) }));
 
+  const plan = planLineupEmails({
+    roster, nextByPlayer, prevByPlayer, isFirstSend, isOut, nameOf,
+    hasEmail: (p) => !!norm(p.email),
+  });
+  const { summary } = plan;
+
   const jobs = [];
-  const summary = { playing: [], notIn: [], skipped: [], noEmail: [], changed: [] };
-
-  for (const p of roster) {
-    const mine = nextByPlayer.get(p.id) || [];
-    const playing = mine.length > 0;
-
-    if (isOut(p.id) && !playing) { summary.skipped.push(p.name); continue; }
-    if (playing) summary.playing.push(p.name); else summary.notIn.push(p.name);
-
-    if (playing && !norm(p.email)) { summary.noEmail.push(p.name); continue; }
-    if (!norm(p.email)) continue;
-
+  for (const { player: p, mine, changes } of plan.sends) {
     if (isFirstSend) {
-      const html = playing
-        ? renderLineupPlaying({ ...ctx, playerName: p.name, myGames: decorate(mine), grid: gridFor(p.id), lockLine })
-        : renderLineupNotIn({ ...ctx, playerName: p.name, grid: gridFor(null) });
-      const subject = playing
-        ? `Your Week ${match.week} lineup — ${mine.length} game${mine.length === 1 ? '' : 's'} vs ${ctx.opponentName}`
-        : `You're not in the Week ${match.week} lineup`;
-      jobs.push(sendEmail({ to: p.email, subject, html }));
-      continue;
+      jobs.push(sendEmail({
+        to: p.email,
+        subject: `Your Week ${match.week} lineup — ${mine.length} game${mine.length === 1 ? '' : 's'} vs ${ctx.opponentName}`,
+        html: renderLineupPlaying({ ...ctx, playerName: p.name, myGames: decorate(mine), grid: gridFor(p.id), lockLine }),
+      }));
+    } else {
+      jobs.push(sendEmail({
+        to: p.email,
+        subject: `Your Week ${match.week} lineup changed`,
+        html: renderLineupChanged({ ...ctx, playerName: p.name, changes, myGames: decorate(mine), lockLine }),
+      }));
     }
-
-    // Re-lock: only mail players whose own night changed.
-    const changes = diffForPlayer(prevByPlayer.get(p.id), mine, nameOf);
-    if (!changes.length) continue;
-    summary.changed.push(p.name);
-    jobs.push(sendEmail({
-      to: p.email,
-      subject: `Your Week ${match.week} lineup changed`,
-      html: renderLineupChanged({
-        ...ctx, playerName: p.name, changes, myGames: decorate(mine), lockLine,
-      }),
-    }));
   }
 
-  // Nothing actually changed for anybody on a re-lock — stay silent entirely.
-  if (!isFirstSend && !summary.changed.length) {
+  // Nothing changed for anyone still playing, and nobody was taken out — stay
+  // silent entirely.
+  if (!isFirstSend && !summary.changed.length && !summary.removed.length) {
     return { sent: 0, notifiedGames: games, summary };
   }
 
@@ -207,12 +241,13 @@ export async function notifyTeamOfLock({ team, match, games, notifiedGames, lock
     const lockedBy = roster.find(p => norm(p.email) === norm(lockedByEmail));
     const receipt = renderLineupReceipt({
       ...ctx, grid: gridFor(null), lockedByName: lockedBy?.name || null,
-      playing: summary.playing, notIn: summary.notIn, skipped: summary.skipped,
+      playing: summary.playing, emailed: summary.emailed, removed: summary.removed,
+      notIn: summary.notIn, skipped: summary.skipped,
       noEmail: summary.noEmail, changed: !isFirstSend,
     });
     const subject = isFirstSend
       ? `Week ${match.week} lineup sent — ${summary.playing.length} playing, ${summary.notIn.length} not in`
-      : `Week ${match.week} lineup updated — ${summary.changed.length} player${summary.changed.length === 1 ? '' : 's'} notified`;
+      : `Week ${match.week} lineup updated — ${summary.emailed.length} player${summary.emailed.length === 1 ? '' : 's'} notified`;
     for (const to of capEmails) jobs.push(sendEmail({ to, subject, html: receipt }));
   }
 

@@ -5,7 +5,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { byPlayer, diffForPlayer } from '../netlify/functions/lib/lineup-notify.js';
+import { byPlayer, diffForPlayer, planLineupEmails } from '../netlify/functions/lib/lineup-notify.js';
 import { gameNoOf } from '../netlify/functions/lib/lineup-helpers.js';
 
 const NAMES = { kayo: 'Kayo Hayashi', arica: 'Arica Green', yoshi: 'Yoshi Nogimura', fiat: 'Fiat Tapaneeyakorn', rich: 'Richard Hak' };
@@ -83,4 +83,50 @@ test('an empty seat does not invent a partner', () => {
   const d = diffFor('kayo', prev, next);
   // Note the typographic apostrophe — it comes from slotTypeLabel(), not this test.
   assert.deepEqual(d, [{ kind: 'partner', no: 1, typeLabel: 'Women’s', partner: 'Arica Green', wasPartner: null }]);
+});
+
+// ── Who gets an email at all ────────────────────────────────────────────────
+// Only players with games in the current lineup. Not picked, marked out, or
+// taken out on an update → no email; the captain receipt lists them instead.
+
+const ROSTER = Object.entries(NAMES).map(([id, name]) => ({ id, name, email: `${id}@x.test` }))
+  .concat([{ id: 'nate', name: 'Nate Out', email: 'nate@x.test' }]);
+const plan = (prev, next, { out = [] } = {}) => planLineupEmails({
+  roster: ROSTER,
+  nextByPlayer: byPlayer(next),
+  prevByPlayer: prev ? byPlayer(prev) : new Map(),
+  isFirstSend: !prev,
+  isOut: (id) => out.includes(id),
+  nameOf,
+  hasEmail: (p) => !!p.email,
+});
+const sentIds = (r) => r.sends.map(s => s.player.id).sort();
+
+test('first lock emails only the players in the lineup', () => {
+  const r = plan(null, baseGames, { out: ['nate'] });
+  assert.deepEqual(sentIds(r), ['arica', 'kayo', 'rich', 'yoshi']);
+  assert.deepEqual(r.summary.notIn, ['Fiat Tapaneeyakorn']);
+  assert.deepEqual(r.summary.skipped, ['Nate Out']);
+});
+
+test('update emails only players still in the lineup whose games changed', () => {
+  const next = { ...baseGames, r1g4: { p1: 'kayo', p2: 'fiat' } };
+  const r = plan(baseGames, next, { out: ['nate'] });
+  assert.deepEqual(sentIds(r), ['fiat', 'kayo'], 'Yoshi was taken out — no email; Arica/Rich unchanged');
+  assert.deepEqual(r.summary.removed, ['Yoshi Nogimura']);
+  assert.ok(!r.summary.emailed.includes('Nate Out'));
+});
+
+test('a player taken out of the lineup completely gets nothing', () => {
+  const next = { r1g1: { p1: 'arica', p2: 'fiat' } };
+  const r = plan(baseGames, next);
+  assert.ok(!sentIds(r).includes('kayo'));
+  assert.ok(!sentIds(r).includes('yoshi'));
+  assert.deepEqual(r.summary.removed.sort(), ['Kayo Hayashi', 'Richard Hak', 'Yoshi Nogimura']);
+});
+
+test('a re-lock with no edit sends nothing', () => {
+  const r = plan(baseGames, baseGames);
+  assert.equal(r.sends.length, 0);
+  assert.equal(r.summary.removed.length, 0);
 });

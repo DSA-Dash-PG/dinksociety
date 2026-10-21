@@ -777,9 +777,9 @@ export function renderLadderFcfsOpen({ eventName, dateLine, openUrl }) {
 
 // ── Lineup emails ────────────────────────────────────────────────────────
 // Sent when a captain LOCKS a lineup (and again if a re-lock changes someone's
-// games). Four shapes, all built from the same pieces:
+// games). Only players with games in the lineup are emailed (lineup-notify.js).
 //   renderLineupPlaying  → a player with games
-//   renderLineupNotIn    → an available player who wasn't selected
+//   renderLineupNotIn    → (no longer sent — kept for reference)
 //   renderLineupChanged  → a player whose games changed after a previous send
 //   renderLineupReceipt  → captain + co-captains, a record of what went out
 //
@@ -932,27 +932,38 @@ export function renderLineupChanged({ playerName, teamName, teamEmoji, opponentN
 }
 
 /** Captain + co-captain receipt: who got what, plus the lineup itself. */
-export function renderLineupReceipt({ teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, lockedByName, playing, notIn, skipped, noEmail, grid, portalUrl, changed }) {
-  const line = (n, label, names) => !n ? '' : `<tr>
-      <td style="padding:7px 0;color:#cfcfcf;border-top:1px solid #2a2a2a;"><b style="color:${label === 'playing' ? _LU_ACCENT : '#8a8a8a'};">${n}</b> ${escapeBody(label)}</td>
-      <td style="padding:7px 0;color:#8a8a8a;font-size:12px;text-align:right;border-top:1px solid #2a2a2a;">${escapeBody((names || []).join(', '))}</td>
+export function renderLineupReceipt({ teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, lockedByName, playing, emailed, removed, notIn, skipped, noEmail, grid, portalUrl, changed }) {
+  const sentNames = emailed || playing || [];
+  const line = (n, label, names, first = false) => !n ? '' : `<tr>
+      <td style="padding:7px 0;color:#cfcfcf;${first ? '' : 'border-top:1px solid #2a2a2a;'}"><b style="color:#8a8a8a;">${n}</b> ${escapeBody(label)}</td>
+      <td style="padding:7px 0;color:#8a8a8a;font-size:12px;text-align:right;${first ? '' : 'border-top:1px solid #2a2a2a;'}">${escapeBody((names || []).join(', '))}</td>
     </tr>`;
-  const rows = [
-    playing?.length ? `<tr><td style="padding:7px 0;color:#cfcfcf;"><b style="color:${_LU_ACCENT};">${playing.length}</b> playing</td><td style="padding:7px 0;color:#8a8a8a;font-size:12px;text-align:right;">${escapeBody(playing.join(', '))}</td></tr>` : '',
-    line((notIn || []).length, 'not in', notIn),
-    line((skipped || []).length, 'skipped (out)', skipped),
+  const sentRow = sentNames.length
+    ? `<tr><td style="padding:7px 0;color:#cfcfcf;"><b style="color:${_LU_ACCENT};">${sentNames.length}</b> ${changed ? 'games changed' : 'playing'}</td><td style="padding:7px 0;color:#8a8a8a;font-size:12px;text-align:right;">${escapeBody(sentNames.join(', '))}</td></tr>`
+    : `<tr><td style="padding:7px 0;color:#8a8a8a;" colspan="2">Nobody &mdash; no player's games changed.</td></tr>`;
+  const notSentRows = [
+    line((notIn || []).length, 'not in the lineup', notIn, true),
+    line((skipped || []).length, 'marked out', skipped, !(notIn || []).length),
   ].filter(Boolean).join('');
+  const removedWarn = (removed || []).length
+    ? `<div style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;padding:12px 14px;background:#161616;border-left:3px solid #ff5c47;border-radius:6px;">
+         <span style="color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;">Taken out of the lineup &middot; not emailed</span>
+         <b style="color:#f5f5f5;">${escapeBody(removed.join(', '))}</b> ${removed.length === 1 ? 'was' : 'were'} in the last lineup sent and ${removed.length === 1 ? 'isn&rsquo;t' : 'aren&rsquo;t'} playing now. Let them know directly.</div>`
+    : '';
   const warn = (noEmail || []).length
     ? `<div style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;padding:12px 14px;background:#161616;border-left:3px solid #f5a623;border-radius:6px;">
          <span style="color:#8a8a8a;font-size:11px;text-transform:uppercase;letter-spacing:0.06em;font-weight:700;display:block;margin-bottom:4px;">${noEmail.length} player${noEmail.length === 1 ? '' : 's'} with no email on file</span>
          <b style="color:#f5f5f5;">${escapeBody(noEmail.join(', '))}</b> ${noEmail.length === 1 ? 'is' : 'are'} in the lineup but didn't get an email. Add an address on the Roster tab.</div>`
     : '';
   const body = `
-  <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">${lockedByName ? 'Locked by ' + escapeBody(lockedByName) + '. ' : ''}Here's exactly what went out to the team.</p>
+  <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">${lockedByName ? 'Locked by ' + escapeBody(lockedByName) + '. ' : ''}Only players in the lineup get an email. Here's exactly what went out.</p>
   ${_lineupMatchCard({ teamName, teamEmoji, opponentName, oppEmoji, dateLine })}
   <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:${_LU_ACCENT};margin:0 0 10px;">Emails sent</div>
-  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 18px;border-collapse:collapse;font-size:13px;">${rows}</table>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 18px;border-collapse:collapse;font-size:13px;">${sentRow}</table>
+  ${removedWarn}
   ${warn}
+  ${notSentRows ? `<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#8a8a8a;margin:0 0 10px;">Not emailed</div>
+  <table role="presentation" cellpadding="0" cellspacing="0" width="100%" style="margin:0 0 18px;border-collapse:collapse;font-size:13px;">${notSentRows}</table>` : ''}
   ${_lineupGrid(grid, 'The lineup')}
   ${_luBtn(portalUrl, 'Open the lineup', false)}`;
   return _lineupShell({
