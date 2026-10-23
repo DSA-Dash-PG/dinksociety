@@ -703,7 +703,11 @@
     const past = state.circuit !== CURRENT_CODE;
     const wk = has ? (ps.weeksPlayed || 0) : 0;
     $('lb-season-name').textContent = seasonName();
-    $('lb-thru').textContent = wk ? (past ? plural(wk, 'week') + ' played' : 'Through week ' + wk) : '';
+    // Live / unofficial: the stats blob includes a match still in progress
+    // (lib/live-results.js) — say so until every match is signed off.
+    const liveN = (!past && ps && ps.provisional && ps.provisional.count) || 0;
+    $('lb-thru').innerHTML = (wk ? esc(past ? plural(wk, 'week') + ' played' : 'Through week ' + wk) : '')
+      + (liveN ? ' <span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:2px 9px;border-radius:9999px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#e8b542;background:rgba(232,181,66,0.12);border:1px solid rgba(232,181,66,0.35);" title="' + liveN + ' match' + (liveN === 1 ? '' : 'es') + ' in progress — numbers are unofficial until finalized"><span style="width:6px;height:6px;border-radius:50%;background:#e8b542;"></span>Live · unofficial</span>' : '');
 
     const R = has ? rankedOverall() : [], one = R[0], two = R[1];
     if (!onRank || !one) {

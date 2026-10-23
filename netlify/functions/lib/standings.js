@@ -14,9 +14,10 @@
 
 import { getStore } from '@netlify/blobs';
 import { circuitCode } from './circuit.js';
-import { normalizeScore } from './score-helpers.js';
+import { normalizeScore, decorate } from './score-helpers.js';
 import { resolveBracketDisplay, bracketTeamCount } from './bracket.js';
 import { sortStandings } from './tiebreak.js';
+import { countState, isSuspended } from './live-results.js';
 
 const DIVISIONS = ['3.0M', '3.5M', '3.5W'];
 
@@ -51,6 +52,16 @@ export async function rebuildStandings(circuit) {
   const scheduleStore = getStore({ name: 'schedule', consistency: 'strong' });
   const lineupStore = getStore({ name: 'lineups', consistency: 'strong' });
   const teamsStore = getStore({ name: 'teams', consistency: 'strong' });
+  const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
+
+  // LIVE (unofficial) results — see lib/live-results.js. A match that has
+  // started and has at least one confirmed game counts toward the standings
+  // before both captains sign off; everything it touches is flagged
+  // `provisional` so the pages can say "unofficial" until the finalize.
+  const provisionalMatches = [];        // [{ id, week, division, teamA, teamB, gamesConfirmed, suspended }]
+  const provisionalTeamIds = new Set();
+  const provisionalPlayerIds = new Set();
+  const provisionalWeeks = new Set();
 
   // Load all schedule files for this circuit. Keep the blob key alongside the
   // data so we can backfill per-match rally totals (pointsA/pointsB) into any
@@ -114,7 +125,29 @@ export async function rebuildStandings(circuit) {
     if (!divisionBuckets[div].weekly[week]) divisionBuckets[div].weekly[week] = [];
 
     for (const match of weekFile.matches) {
-      if (!match.finalizedAt) continue;
+      // Official (finalized) matches read their result off the schedule blob,
+      // which captain-score / admin-scores write at finalize. Anything else is
+      // checked against its live score record: started + ≥1 confirmed game
+      // counts provisionally, computed straight from the confirmed games.
+      let liveScore = null, liveDec = null;
+      if (!match.finalizedAt) {
+        if (!match.teamA?.id || !match.teamB?.id) continue;
+        liveScore = await scoresStore.get(`score/${match.id}.json`, { type: 'json' }).catch(() => null);
+        if (countState(match, liveScore) !== 'live') continue;
+        liveDec = decorate(liveScore, !!match.championship);
+        provisionalMatches.push({
+          id: match.id, week, division: div,
+          teamA: { id: match.teamA.id, name: match.teamA.name },
+          teamB: { id: match.teamB.id, name: match.teamB.name },
+          gamesConfirmed: liveDec.computed.counts.confirmed,
+          suspended: isSuspended(match),
+          resumeAt: isSuspended(match) ? (match.suspended.resumeAt || null) : null,
+        });
+        provisionalTeamIds.add(match.teamA.id);
+        provisionalTeamIds.add(match.teamB.id);
+        provisionalWeeks.add(week);
+      }
+      const live = !!liveDec;
       // Playoffs & Championship are post-season. They do NOT feed the regular
       // standings table (team W/L, match points, PS/PA, seeding) — that stays
       // frozen at the regular season (round-robin + Rivalry Week). They DO now
@@ -136,8 +169,8 @@ export async function rebuildStandings(circuit) {
 
       const teamA = match.teamA;
       const teamB = match.teamB;
-      const matchPointsA = match.scoreA ?? 0;
-      const matchPointsB = match.scoreB ?? 0;
+      const matchPointsA = live ? liveDec.computed.matchPoints.home : (match.scoreA ?? 0);
+      const matchPointsB = live ? liveDec.computed.matchPoints.away : (match.scoreB ?? 0);
 
       // Ensure both team rows exist (they're pre-seeded from rosters above,
       // but a team could first appear here). Regular + post-season both need them.
@@ -150,8 +183,12 @@ export async function rebuildStandings(circuit) {
       const b = divisionBuckets[div].teams.get(teamB.id);
 
       // Games won from round1/round2 (used by the core accrual + tiebreakers).
-      const r1 = match.round1 || { homeGames: 0, awayGames: 0 };
-      const r2 = match.round2 || { homeGames: 0, awayGames: 0 };
+      const r1 = live ? liveDec.computed.round1 : (match.round1 || { homeGames: 0, awayGames: 0 });
+      const r2 = live ? liveDec.computed.round2 : (match.round2 || { homeGames: 0, awayGames: 0 });
+
+      // A live match still has rounds open: points those rounds can still add
+      // (2 each) — the standings page folds this into MAX during the hunt.
+      const openRounds = live ? [r1, r2].filter(r => (r.scoredGames || 0) < 6).length : 0;
 
       if (isPostSeason) {
         // ── Post-season: accrue into each team's PLAYOFF-ONLY bucket. This
@@ -161,6 +198,10 @@ export async function rebuildStandings(circuit) {
       } else {
         // ── Regular season: the flat row IS the regular-season table. ──
         accrueTeamCore(a, b, matchPointsA, matchPointsB, r1, r2);
+        if (live) {
+          a.pendingMatches++; b.pendingMatches++;
+          a.pendingRoundPts += openRounds * 2; b.pendingRoundPts += openRounds * 2;
+        }
 
         // Head-to-head (regular season only — seeds the bracket)
         if (!a.headToHead[teamB.id]) a.headToHead[teamB.id] = { for: 0, against: 0 };
@@ -170,12 +211,16 @@ export async function rebuildStandings(circuit) {
         b.headToHead[teamA.id].for += matchPointsB;
         b.headToHead[teamA.id].against += matchPointsA;
 
-        // Society-Circuit bonuses (match win / tie / sweep) — regular season only.
-        if (matchPointsA > matchPointsB) a.weeklyBonusPoints += BONUS_MATCH_WIN;
-        else if (matchPointsB > matchPointsA) b.weeklyBonusPoints += BONUS_MATCH_WIN;
-        else { a.weeklyBonusPoints += BONUS_MATCH_TIE; b.weeklyBonusPoints += BONUS_MATCH_TIE; }
-        if (matchPointsA === 4 && matchPointsB === 0) a.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
-        else if (matchPointsB === 4 && matchPointsA === 0) b.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
+        // Society-Circuit bonuses (match win / tie / sweep) — regular season
+        // only, and only once both rounds are in (a live match with a round
+        // still open has no match result yet).
+        if (openRounds === 0) {
+          if (matchPointsA > matchPointsB) a.weeklyBonusPoints += BONUS_MATCH_WIN;
+          else if (matchPointsB > matchPointsA) b.weeklyBonusPoints += BONUS_MATCH_WIN;
+          else { a.weeklyBonusPoints += BONUS_MATCH_TIE; b.weeklyBonusPoints += BONUS_MATCH_TIE; }
+          if (matchPointsA === 4 && matchPointsB === 0) a.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
+          else if (matchPointsB === 4 && matchPointsA === 0) b.weeklyBonusPoints += BONUS_SWEEP_EXTRA;
+        }
 
         // Track week's match-point totals for top-team-of-week computation
         divisionBuckets[div].weekly[week].push({ teamId: teamA.id, matchPoints: matchPointsA });
@@ -198,13 +243,16 @@ export async function rebuildStandings(circuit) {
         week,
         weeklyPlayers,
         championship: !!match.championship,
+        score: liveScore,
+        touched: live ? provisionalPlayerIds : null,
       });
 
       // Backfill per-match rally totals (pointsA/pointsB) onto the schedule for
       // any match finalized before captain-score started writing them, so the
       // week-snapshot views (which read the schedule) get PS/PA too. Only marks
-      // the file dirty when a value is actually missing or stale.
-      if (acc) {
+      // the file dirty when a value is actually missing or stale. Never for a
+      // live match — the schedule only ever carries OFFICIAL results.
+      if (acc && !live) {
         if (match.pointsA !== acc.pointsA || match.pointsB !== acc.pointsB) {
           match.pointsA = acc.pointsA;
           match.pointsB = acc.pointsB;
@@ -267,6 +315,8 @@ export async function rebuildStandings(circuit) {
       t.placementBonus = PLACEMENT_BONUS[idx] ?? 0;
       t.societyCircuitPoints = t.weeklyBonusPoints + t.placementBonus;
       t.pointDiff = t.pointsScored - t.pointsAgainst;  // DIFF = PS − PA (regular)
+      // Live / unofficial: this row includes an in-progress match.
+      t.provisional = (t.pendingMatches || 0) > 0;
 
       // Playoff-only + combined "overall" slices for the standings-page toggle.
       const po = t.post || newPostBucket();
@@ -297,13 +347,25 @@ export async function rebuildStandings(circuit) {
     divisions[div] = {
       teams,
       weeklyTopTeams: divisionBuckets[div].weeklyTopTeams,
+      provisional: provisionalMatches.filter(m => m.division === div).length,
     };
   }
+
+  // Shared "unofficial" stamp for both aggregates. `count` > 0 means at least
+  // one in-progress match is folded in; the pages show it as LIVE · UNOFFICIAL
+  // until every match of the night is finalized.
+  const provisional = {
+    count: provisionalMatches.length,
+    weeks: [...provisionalWeeks].sort((a, b) => a - b),
+    matches: provisionalMatches,
+    asOf: new Date().toISOString(),
+  };
 
   const standings = {
     circuit,
     lastUpdated: new Date().toISOString(),
     divisions,
+    provisional,
   };
 
   // ── Composite score (Aloha formula) ──────────────────────────
@@ -422,6 +484,10 @@ export async function rebuildStandings(circuit) {
     p.weeklyGameRecords = (weeklyRecById.get(p.playerId) || []).sort((a, b) => a.week - b.week);
   }
   attachAwards(playerStats, weeklyTopPerformers);
+  // A week that still has a live match is an unofficial week — its Player of
+  // the Week and leaders can still change.
+  for (const wk of weeklyTopPerformers) wk.provisional = provisionalWeeks.has(Number(wk.week));
+  for (const p of playerStats.values()) p.provisional = provisionalPlayerIds.has(p.playerId);
   standings.weeklyTopPerformers = weeklyTopPerformers;
 
   const playerStatsOut = {
@@ -429,6 +495,7 @@ export async function rebuildStandings(circuit) {
     lastUpdated: new Date().toISOString(),
     weeksPlayed,
     needGames,
+    provisional,
     players: Object.fromEntries(playerStats),
   };
 
@@ -466,16 +533,20 @@ const STANDING_FIELDS = {
 /**
  * Pulls lineup + score for a match, updates the playerStats map in place.
  */
-async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, teamRowB, teamsById, lineupStore, playerStats, week, weeklyPlayers, championship = false }) {
+async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, teamRowB, teamsById, lineupStore, playerStats, week, weeklyPlayers, championship = false, score = null, touched = null }) {
   // Strong read — the score record was written moments before finalize (see rebuildStandings).
   const scoresStore = getStore({ name: 'scores', consistency: 'strong' });
 
-  const [lineupA, lineupB, score] = await Promise.all([
+  const [lineupA, lineupB, loadedScore] = await Promise.all([
     lineupStore.get(`lineup/${matchId}/${teamAId}.json`, { type: 'json' }).catch(() => null),
     lineupStore.get(`lineup/${matchId}/${teamBId}.json`, { type: 'json' }).catch(() => null),
-    scoresStore.get(`score/${matchId}.json`, { type: 'json' }).catch(() => null),
+    score ? Promise.resolve(score) : scoresStore.get(`score/${matchId}.json`, { type: 'json' }).catch(() => null),
   ]);
+  score = loadedScore;
   if (!lineupA || !lineupB || !score?.games) return null;
+  // `touched` (live matches only): collect every player credited with a game
+  // so their profile can say the numbers are unofficial.
+  const note = (pid) => { if (touched) touched.add(pid); };
 
   // Migrate any legacy score shape and re-derive the canonical agreed
   // home/away values that the per-slot reads below depend on.
@@ -523,12 +594,14 @@ async function accumulatePlayerStats({ matchId, teamAId, teamBId, teamRowA, team
       if (!player) continue;
       bumpPlayer(playerStats, pid, player, teamA, slotType, homeWon, homePlayers.filter(p => p !== pid), homeScore, awayScore, awayPlayers);
       if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamA, homeWon, homeScore, awayScore, slotType);
+      note(pid);
     }
     for (const pid of awayPlayers) {
       const player = rosterB.get(pid);
       if (!player) continue;
       bumpPlayer(playerStats, pid, player, teamB, slotType, !homeWon, awayPlayers.filter(p => p !== pid), awayScore, homeScore, homePlayers);
       if (weeklyPlayers) bumpWeeklyPlayer(weeklyPlayers, week, pid, player, teamB, !homeWon, awayScore, homeScore, slotType);
+      note(pid);
     }
 
     // Track distinct matches each player appeared in (handled separately below)
@@ -571,6 +644,7 @@ function newTeamRow(teamId, teamName, division) {
     teamName,
     division,
     matchesPlayed: 0,
+    roundsPlayed: 0,                     // rounds with a result (2 per finished match)
     wins: 0, losses: 0, ties: 0,
     matchPointsFor: 0, matchPointsAgainst: 0,
     pointsScored: 0, pointsAgainst: 0,   // rally points across all games (PS/PA)
@@ -579,6 +653,11 @@ function newTeamRow(teamId, teamName, division) {
     totalGamesWon: 0, totalGamesLost: 0,
     weeklyBonusPoints: 0,
     headToHead: {}, // { opponentId: { for, against } }
+    // Live / unofficial bookkeeping (lib/live-results.js): matches in progress
+    // folded into this row, and the points its open rounds can still add.
+    pendingMatches: 0,
+    pendingRoundPts: 0,
+    provisional: false,
     post: newPostBucket(), // playoff-only counters (see accrueTeamCore)
   };
 }
@@ -620,6 +699,8 @@ function accrueTeamCore(A, B, mpA, mpB, r1, r2) {
     if (hp > ap) { A.wins++; B.losses++; }
     else if (ap > hp) { B.wins++; A.losses++; }
     else { A.ties++; B.ties++; }
+    if ('roundsPlayed' in A) A.roundsPlayed++;
+    if ('roundsPlayed' in B) B.roundsPlayed++;
   }
   if (mpA === 4 && mpB === 0) A.sweeps++;
   else if (mpB === 4 && mpA === 0) B.sweeps++;

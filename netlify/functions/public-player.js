@@ -38,7 +38,8 @@
 // never a sum.
 
 import { getStore } from '@netlify/blobs';
-import { normalizeScore } from './lib/score-helpers.js';
+import { normalizeScore, decorate } from './lib/score-helpers.js';
+import { countState } from './lib/live-results.js';
 import { identityIndex, mergeStatRows } from './lib/league-identity.js';
 import { seasonName } from './lib/circuit.js';
 import { photoUrlFor } from './lib/player-photo.js';
@@ -169,6 +170,10 @@ export default async (req) => {
       history,
       careerAwards,
       photoUrl,
+      // Live / unofficial: the season's stats blob includes an in-progress
+      // match (lib/live-results.js); `player.provisional` says this player is
+      // in one of them.
+      provisional: psData?.provisional?.count ? psData.provisional : null,
       // Transparency for the UI: how many roster entries this profile covers.
       identity: { ids, merged: ids.length > 1 },
       ...(games ? { games } : {}),
@@ -237,11 +242,17 @@ async function buildGameLog(circuit, playerId, teamId, psData, ids = [playerId])
       if (!isHome && !isAway) continue;
       const oppTeam = isHome ? match.teamB : match.teamA;
 
+      // Unfinished match: it's the next one up — unless it's underway with
+      // confirmed games, in which case its games show in the log as LIVE
+      // (unofficial) too (lib/live-results.js).
+      let liveMatch = false;
       if (!match.finalizedAt) {
         const cand = { week: wf.week ?? null, phase: match.phase || null, date: match.scheduledAt || null,
           opponentTeamId: oppTeam?.id || null, opponentTeamName: oppTeam?.name || null };
         if (!upcoming || (cand.week ?? 99) < (upcoming.week ?? 99)) upcoming = cand;
-        continue;
+        const liveScore = await scoresStore.get(`score/${match.id}.json`, { type: 'json' }).catch(() => null);
+        if (countState(match, liveScore) !== 'live') continue;
+        liveMatch = true;
       }
 
       // Bracket placement. Week 8 has TWO championship-flagged matches (gold
@@ -263,10 +274,15 @@ async function buildGameLog(circuit, playerId, teamId, psData, ids = [playerId])
 
       normalizeScore(score, !!match.championship);
 
-      // Team result for the night (match points from the finalized schedule).
-      const teamResult = (Number.isFinite(match.scoreA) && Number.isFinite(match.scoreB))
+      // Team result for the night (match points from the finalized schedule;
+      // a live match reads its running points off the confirmed games).
+      let teamResult = (Number.isFinite(match.scoreA) && Number.isFinite(match.scoreB))
         ? { for: isHome ? match.scoreA : match.scoreB, against: isHome ? match.scoreB : match.scoreA }
         : null;
+      if (liveMatch) {
+        const mp = decorate(score, !!match.championship).computed.matchPoints;
+        teamResult = { for: isHome ? mp.home : mp.away, against: isHome ? mp.away : mp.home, live: true };
+      }
 
       for (const slot of SLOT_KEYS) {
         const picks = myLineup.games?.[slot];
@@ -305,6 +321,7 @@ async function buildGameLog(circuit, playerId, teamId, psData, ids = [playerId])
           myScore,
           oppScore,
           won: myScore > oppScore ? true : myScore < oppScore ? false : null,
+          live: liveMatch,
         });
       }
     }

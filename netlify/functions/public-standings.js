@@ -93,6 +93,12 @@ export default async (req) => {
             // (null on pre-toggle blobs; the page falls back to regular-only).
             playoff:             t.playoff ?? null,
             overall:             t.overall ?? null,
+            // Live / unofficial (lib/live-results.js): rounds actually played,
+            // in-progress matches folded in, and points still open in them.
+            roundsPlayed:        t.roundsPlayed ?? ((t.matchesPlayed ?? 0) * 2),
+            pendingMatches:      t.pendingMatches ?? 0,
+            pendingRoundPts:     t.pendingRoundPts ?? 0,
+            provisional:         !!t.provisional,
           };
         });
 
@@ -100,10 +106,12 @@ export default async (req) => {
           divisionLabel: DIVISION_LABELS[divId] || divId,
           teams,
           weeklyTopTeams: divData.weeklyTopTeams || {},
+          provisional: divData.provisional || 0,
         };
       }
       if (newBlob.lastUpdated) lastUpdated = newBlob.lastUpdated;
     }
+    const provisional = newBlob?.provisional || null;
 
     // ── Fall back to old per-division blob format ────────────────────
     if (!Object.keys(divisions).length) {
@@ -158,7 +166,7 @@ export default async (req) => {
       });
     }
 
-    return etagJson(req, { divisions, lastUpdated });
+    return etagJson(req, { divisions, lastUpdated, provisional });
 
   } catch (err) {
     console.error('public-standings error:', err);

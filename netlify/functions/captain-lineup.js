@@ -23,6 +23,7 @@ import {
 import { logActivity } from './lib/activity-log.js';
 import { getTeamAvailability, unavailableIds } from './lib/availability.js';
 import { notifyTeamOfLock } from './lib/lineup-notify.js';
+import { isSuspended, frozenSlots, effectiveStart, publicSuspension } from './lib/live-results.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -58,6 +59,22 @@ export default async (req) => {
   const myKey = `lineup/${matchId}/${myTeamId}.json`;
   const oppKey = `lineup/${matchId}/${oppTeamId}.json`;
 
+  // Suspended (carried-over) match: the games already played are frozen in
+  // both lineups, and the lock / reveal clock for the rest runs off the
+  // RESUME time instead of the original start (lib/live-results.js).
+  const suspended = isSuspended(match);
+  const frozen = frozenSlots(match);
+  const startAt = effectiveStart(match);
+  const suspension = publicSuspension(match);
+  // The frozen games were revealed and played on the original night — they stay
+  // visible to both captains while the rest of the lineups are hidden again.
+  const frozenView = (lu) => {
+    if (!lu?.games || !frozen.size) return null;
+    const games = {};
+    for (const slot of frozen) if (lu.games[slot]) games[slot] = lu.games[slot];
+    return { teamId: lu.teamId, teamName: lu.teamName, games, lockedAt: lu.lockedAt || null, partial: true };
+  };
+
   // ========== GET ==========
   if (req.method === 'GET') {
     const [mine, opp] = await Promise.all([
@@ -69,15 +86,15 @@ export default async (req) => {
     const oppLocked = !!opp?.lockedAt;
     // Simultaneous reveal: both locked AND we're inside the reveal window
     // (at match start by default). Locking early no longer reveals early.
-    const revealed = myLocked && oppLocked && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
+    const revealed = myLocked && oppLocked && isRevealTime(startAt, LINEUP_REVEAL_OFFSET_MIN);
 
     // A locked lineup can be reopened by the captain while it's still before the
     // hard-lock window AND the matchup hasn't revealed. The opponent locking no
     // longer blocks unlock: since reveal became time-gated (match start), both-locked
     // shows nobody anything, so reopening is harmless until the reveal.
-    const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
+    const cutoff = hardLockTime(startAt, LINEUP_LOCK_OFFSET_MIN);
     const unlockable = myLocked && !revealed && (cutoff === null || Date.now() < cutoff);
-    const revealAt = revealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
+    const revealAt = revealTime(startAt, LINEUP_REVEAL_OFFSET_MIN);
 
     // My team's availability for this match — drives the hard-block in the
     // lineup builder (unavailable players are removed from the slot pickers).
@@ -93,8 +110,10 @@ export default async (req) => {
       },
       court: match.court || null,
       scheduledAt: match.scheduledAt || null,
+      resumeAt: suspended ? (match.suspended.resumeAt || null) : null,
+      suspended: suspension,
       myLineup: mine || null,
-      oppLineup: revealed ? sanitizeRevealedLineup(opp) : null,
+      oppLineup: revealed ? sanitizeRevealedLineup(opp) : frozenView(opp),
       availability: avail.players || {},
       status: {
         myLocked, oppLocked, revealed, unlockable,
@@ -126,10 +145,10 @@ export default async (req) => {
         return json({ error: 'Lineup is not locked.' }, 409);
       }
       const opp = await lineupStore.get(oppKey, { type: 'json' }).catch(() => null);
-      if (opp?.lockedAt && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN)) {
+      if (opp?.lockedAt && isRevealTime(startAt, LINEUP_REVEAL_OFFSET_MIN)) {
         return json({ error: 'The matchup has been revealed and can no longer be unlocked. Ask a league admin if you need a change.' }, 409);
       }
-      const cutoff = hardLockTime(match.scheduledAt, LINEUP_LOCK_OFFSET_MIN);
+      const cutoff = hardLockTime(startAt, LINEUP_LOCK_OFFSET_MIN);
       if (cutoff !== null && Date.now() >= cutoff) {
         return json({ error: `Too close to match time — lineups hard-lock ${formatOffset(LINEUP_LOCK_OFFSET_MIN)} before the match and can no longer be unlocked. Ask a league admin if you need a change.` }, 403);
       }
@@ -185,6 +204,16 @@ export default async (req) => {
       if (shortfall) return json({ error: shortfall }, 400);
     }
 
+    // Suspended match: the games played before the stoppage keep exactly the
+    // pairs that played them — whatever the client sends for those slots is
+    // replaced with the stored picks, so only the remaining games can change.
+    if (frozen.size) {
+      for (const slot of frozen) {
+        const was = existing?.games?.[slot];
+        if (was?.p1 && was?.p2) games[slot] = { p1: was.p1, p2: was.p2 };
+      }
+    }
+
     // Validate all 12 slots if locking, allow partial if drafting
     const normalizedGames = {};
     for (const slot of SLOT_KEYS) {
@@ -217,11 +246,12 @@ export default async (req) => {
         return json({ error: `${prettySlot(slot)} has a player not on the roster` }, 400);
       }
 
-      // Unavailable players can't be slotted (default is available).
-      if (outIds.has(p1Id)) {
+      // Unavailable players can't be slotted (default is available). A frozen
+      // game already happened, so its pair is exempt.
+      if (outIds.has(p1Id) && !frozen.has(slot)) {
         return json({ error: `${p1.name} is marked unavailable for this match. Set them available first to use them.` }, 400);
       }
-      if (outIds.has(p2Id)) {
+      if (outIds.has(p2Id) && !frozen.has(slot)) {
         return json({ error: `${p2.name} is marked unavailable for this match. Set them available first to use them.` }, 400);
       }
 
@@ -309,7 +339,8 @@ export default async (req) => {
       // failed send is retried on the next lock rather than being swallowed.
       try {
         const res = await notifyTeamOfLock({
-          team: ctx.team, match, games: denormalizedGames,
+          // Carried-over match: the mail's date line is the resume time.
+          team: ctx.team, match: { ...match, scheduledAt: startAt }, games: denormalizedGames,
           notifiedGames: record.notifiedGames,
           lockedByEmail: ctx.user.email,
           lockOffsetMin: LINEUP_LOCK_OFFSET_MIN,
@@ -327,14 +358,14 @@ export default async (req) => {
     // Re-check reveal status after save (both locked AND inside the reveal window)
     const opp = await lineupStore.get(oppKey, { type: 'json' }).catch(() => null);
     const revealed = !!record.lockedAt && !!opp?.lockedAt
-      && isRevealTime(match.scheduledAt, LINEUP_REVEAL_OFFSET_MIN);
+      && isRevealTime(startAt, LINEUP_REVEAL_OFFSET_MIN);
 
     return json({
       ok: true,
       locked: !!record.lockedAt,
       revealed,
       myLineup: record,
-      oppLineup: revealed ? sanitizeRevealedLineup(opp) : null,
+      oppLineup: revealed ? sanitizeRevealedLineup(opp) : frozenView(opp),
     });
   }
 

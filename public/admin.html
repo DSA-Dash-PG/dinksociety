@@ -7095,7 +7095,7 @@
       ? '<div style="font-size:10px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--color-text-faint);margin:14px 0 4px;">' + h(divName(m.division)) + ' · Week ' + h(m.week) + '</div>'
       : '';
     return meta +
-      '<div class="mr"><div class="mr__t">' + h(A.name || 'TBD') + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(B.name || 'TBD') + '</div><div class="mr__m">' + (fin ? '<span style="color:var(--color-teal);font-weight:700">FINAL</span>' : '&nbsp;') + '</div></div>' +
+      '<div class="mr"><div class="mr__t">' + h(A.name || 'TBD') + '</div><div class="mr__vs">VS</div><div class="mr__t mr__t--r">' + h(B.name || 'TBD') + '</div><div class="mr__m">' + (fin ? '<span style="color:var(--color-teal);font-weight:700">FINAL</span>' : (m.suspended ? '<span style="color:#e8b542;font-weight:700" title="Resumes ' + h(fmtResume(m.suspended.resumeAt)) + '">SUSPENDED</span>' : '&nbsp;')) + '</div></div>' +
       '<div style="display:flex;align-items:center;gap:8px;padding:2px 0 12px;margin-bottom:10px;border-bottom:1px solid var(--color-border);font-size:11px;color:var(--color-text-faint);flex-wrap:wrap;">' +
         '<button class="schedpill' + (m.scheduledAt ? '' : ' schedpill--empty') + ' sched-edit" data-mid="' + h(m.id) + '" id="sp-' + h(m.id) + '">' + schedPillLabel(m) + '</button>' +
         '<span style="display:inline-flex;align-items:center;gap:4px;">Home <select class="team-edit" data-side="A" data-mid="' + h(m.id) + '" style="background:var(--color-bg);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:3px 6px;font-size:11px;">' + teamEditOptionsFor(m, A.id) + '</select></span>' +
@@ -8146,23 +8146,76 @@
     }
   }
 
+  // Rain-out / carry-over state for the Scores tab. A suspended match
+  // (admin-suspend-match.js) has its played games frozen and the rest
+  // scheduled for `resumeAt`; both captains' lineups are reopened for the
+  // remaining games. Frozen games count in the standings right away, marked
+  // unofficial until the match is finalized.
+  const _suspendOpen = {}; // matchId → true while the suspend form is open
+
+  function fmtResume(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return '—';
+    return d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  // Default resume time: the same weekday next week, one hour before this
+  // match's start (the carry-over is played before the regular games).
+  function defaultResume(m) {
+    const d = m.scheduledAt ? new Date(m.scheduledAt) : new Date();
+    if (isNaN(d)) return toLocalInput(new Date().toISOString());
+    const r = new Date(d.getTime() + 7 * 86400000 - 60 * 60000);
+    return toLocalInput(r.toISOString());
+  }
+
+  function suspendBannerHTML(m) {
+    const s = m.suspended;
+    if (!s || m.finalizedAt) return '';
+    const snap = s.snapshot;
+    const so = snap
+      ? ' · so far ' + h(m.teamA.name) + ' ' + snap.gamesHome + '–' + snap.gamesAway + ' ' + h(m.teamB.name) + ' in games, ' + snap.matchPoints.home + '–' + snap.matchPoints.away + ' match pts'
+      : '';
+    return '<div style="margin:0 0 12px;padding:10px 12px;border:1px solid rgba(232,181,66,0.45);background:rgba(232,181,66,0.08);border-radius:8px;font-size:12px;line-height:1.5;">' +
+      '<div style="font-weight:800;color:#e8b542;text-transform:uppercase;letter-spacing:0.06em;font-size:10px;">⛈ Suspended · resumes ' + h(fmtResume(s.resumeAt)) + '</div>' +
+      '<div style="margin-top:4px;color:var(--color-text-muted);">' + (s.lockedSlots || []).length + ' game' + ((s.lockedSlots || []).length === 1 ? '' : 's') + ' frozen (score final), ' + (12 - (s.lockedSlots || []).length) + ' still to play' + so + '. Both lineups are reopened for the remaining games; the frozen games already count in the standings as <b>unofficial</b>.' + (s.note ? ' <i>' + h(s.note) + '</i>' : '') + '</div>' +
+      '<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;">' +
+        '<button class="ab ab--outline ab--sm" onclick="window._suspendForm(\'' + h(m.id) + '\', true)">Change time / note</button>' +
+        '<button class="ab ab--outline ab--sm" style="border-color:rgba(239,68,68,0.5);color:#ef4444;" onclick="window._suspendCancel(\'' + h(m.id) + '\', this)">Remove suspension</button>' +
+      '</div>' +
+    '</div>';
+  }
+
   function renderScoreMatches(matches, week) {
     const container = $id('sc-matches');
-    container.innerHTML = matches.map(m => {
+    const open = matches.filter(m => !m.finalizedAt && m.teamA?.id && m.teamB?.id);
+    const weekBar = open.length
+      ? '<div class="ac" style="margin-bottom:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">' +
+          '<div style="font-size:12px;color:var(--color-text-muted);flex:1 1 auto;min-width:200px;"><b>Rained out?</b> Suspend every unfinished match in Week ' + h(week) + ' at once — played games stay final, lineups reopen for the rest, and the night resumes when you say.</div>' +
+          '<button class="ab ab--outline ab--sm" style="border-color:rgba(232,181,66,0.5);color:#e8b542;" onclick="window._suspendForm(\'week:' + h(week) + '\')">⛈ Suspend all open matches (' + open.length + ')</button>' +
+          '<div id="sc-suspend-week"></div>' +
+        '</div>'
+      : '';
+    container.innerHTML = weekBar + matches.map(m => {
       const isFinal = !!m.finalizedAt;
+      const isSusp = !!m.suspended && !isFinal;
       return '<div class="ac" data-match="' + h(m.id) + '" style="margin-bottom:12px;">' +
         '<div class="ac__h" style="margin-bottom:12px;">' +
           '<h2 class="ac__t">' + h(m.teamA.name) + ' vs ' + h(m.teamB.name) + '</h2>' +
-          '<span class="ac__s">' + h(m.court || '') + (isFinal ? ' · <span style="color:var(--color-lime);font-weight:700;">FINAL</span>' : '') + '</span>' +
+          '<span class="ac__s">' + h(m.court || '') + (isFinal ? ' · <span style="color:var(--color-lime);font-weight:700;">FINAL</span>' : isSusp ? ' · <span style="color:#e8b542;font-weight:700;">SUSPENDED</span>' : '') + '</span>' +
         '</div>' +
+        suspendBannerHTML(m) +
+        '<div id="sc-suspend-' + h(m.id) + '"></div>' +
         '<div id="sc-form-' + h(m.id) + '"><div class="loading">Loading scores…</div></div>' +
-        '<div style="display:flex;gap:8px;margin-top:12px;">' +
+        '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">' +
           '<button class="ab ab--lime ab--sm" onclick="window._saveScores(\'' + h(m.id) + '\', this)">' + (isFinal ? 'Update & Re-finalize' : 'Save Scores') + '</button>' +
           (isFinal
             ? '<button class="ab ab--sm ab--ghost" onclick="window._reopenMatch(\'' + h(m.id) + '\', this)">Reopen</button>'
             : '<button class="ab ab--sm ab--teal" onclick="window._finalizeMatch(\'' + h(m.id) + '\', this)">Finalize</button>'
           ) +
           '<button class="ab ab--sm ab--ghost" onclick="window._editLineup(\'' + h(m.id) + '\', this)">✏️ Edit who played</button>' +
+          (!isFinal && !isSusp
+            ? '<button class="ab ab--sm ab--ghost" style="color:#e8b542;" onclick="window._suspendForm(\'' + h(m.id) + '\')">⛈ Suspend / carry over</button>'
+            : '') +
           '<button class="ab ab--sm ab--ghost" style="margin-left:auto;color:var(--color-red);" onclick="window._restartMatch(\'' + h(m.id) + '\', this)">Restart</button>' +
         '</div>' +
         '<div id="sc-lineup-edit-' + h(m.id) + '"></div>' +
@@ -8170,8 +8223,89 @@
       '</div>';
     }).join('');
 
+    window.__scoreMatches = matches;
+    window.__scoreWeek = week;
     matches.forEach(m => loadMatchScores(m.id));
   }
+
+  // Inline suspend form — for one match (`target` = matchId) or the whole
+  // week (`target` = 'week:N'). `isUpdate` edits an existing suspension.
+  window._suspendForm = function(target, isUpdate) {
+    const isWeek = String(target).startsWith('week:');
+    const week = isWeek ? Number(String(target).slice(5)) : null;
+    const m = isWeek ? null : (window.__scoreMatches || []).find(x => x.id === target);
+    const host = isWeek ? $id('sc-suspend-week') : $id('sc-suspend-' + target);
+    if (!host) return;
+    if (host.innerHTML) { host.innerHTML = ''; return; } // toggle closed
+    const cur = m?.suspended || null;
+    const resumeVal = cur?.resumeAt ? toLocalInput(cur.resumeAt) : (m ? defaultResume(m) : defaultResume((window.__scoreMatches || [])[0] || {}));
+    const division = $id('sc-division').value;
+    host.innerHTML =
+      '<div style="margin:0 0 12px;padding:12px;border:1px dashed rgba(232,181,66,0.5);border-radius:8px;' + (isWeek ? 'flex-basis:100%;' : '') + '">' +
+        '<div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:#e8b542;margin-bottom:8px;">' +
+          (isUpdate ? 'Update suspension' : isWeek ? 'Suspend all open Week ' + week + ' matches' : 'Suspend / carry over this match') + '</div>' +
+        '<div style="font-size:12px;color:var(--color-text-muted);line-height:1.5;margin-bottom:10px;">' +
+          (isUpdate ? 'Change when the remaining games are played, or the note the captains see.'
+            : 'Every game both captains have <b>confirmed</b> is frozen — its score is final and counts in the standings now (shown as unofficial until the match is finalized). Both lineups reopen so captains can change who plays the remaining games; those re-lock ' + '10 minutes before the resume time and reveal at the resume time.') +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:auto 1fr;gap:8px 10px;align-items:center;font-size:12px;">' +
+          '<label>Resumes</label><input type="datetime-local" id="susp-when" value="' + h(resumeVal) + '" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px;">' +
+          '<label>Note to captains</label><input type="text" id="susp-note" value="' + h(cur?.note || '') + '" placeholder="e.g. Courts 5 & 6, 5:00 PM — before the Week 7 games" style="background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px;">' +
+          (isUpdate ? '' : '<label></label><label style="display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" id="susp-freeze" checked> Freeze the confirmed games (scores final)</label>') +
+          '<label></label><label style="display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" id="susp-notify" checked> Email both captains (and co-captains)</label>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px;margin-top:10px;align-items:center;">' +
+          '<button class="ab ab--lime ab--sm" id="susp-go">' + (isUpdate ? 'Save changes' : isWeek ? 'Suspend ' + ((window.__scoreMatches || []).filter(x => !x.finalizedAt).length) + ' matches' : 'Suspend match') + '</button>' +
+          '<button class="ab ab--outline ab--sm" id="susp-x">Cancel</button>' +
+          '<span id="susp-stat" style="font-size:11px;color:var(--color-text-faint);"></span>' +
+        '</div>' +
+      '</div>';
+    host.querySelector('#susp-x').addEventListener('click', () => { host.innerHTML = ''; });
+    host.querySelector('#susp-go').addEventListener('click', async () => {
+      const whenEl = host.querySelector('#susp-when');
+      const stat = host.querySelector('#susp-stat');
+      const when = whenEl.value ? new Date(whenEl.value) : null;
+      if (!when || isNaN(when)) { stat.textContent = 'Pick a resume date and time.'; stat.style.color = '#ef4444'; return; }
+      const body = {
+        resumeAt: when.toISOString(),
+        note: host.querySelector('#susp-note').value,
+        notify: host.querySelector('#susp-notify').checked,
+      };
+      const fz = host.querySelector('#susp-freeze'); if (fz) body.freeze = fz.checked;
+      if (isWeek) { body.week = week; body.division = division; } else { body.matchId = target; }
+      const action = isUpdate ? 'update' : 'suspend';
+      if (!isUpdate && !confirm(isWeek
+        ? 'Suspend every unfinished Week ' + week + ' match? Confirmed games freeze, lineups reopen for the rest, and captains are emailed the resume time.'
+        : 'Suspend this match? Confirmed games freeze, both lineups reopen for the remaining games, and the captains are emailed the resume time.')) return;
+      const btn = host.querySelector('#susp-go');
+      btn.disabled = true; stat.textContent = 'Working…'; stat.style.color = 'var(--color-text-faint)';
+      try {
+        const r = await apiJSON('/.netlify/functions/admin-suspend-match?action=' + action + '&circuit=' + encodeURIComponent(adminCircuit()), {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+        });
+        const done = (r.results || []).filter(x => !x.skipped);
+        const emailed = done.reduce((n, x) => n + (x.emailed || 0), 0);
+        stat.textContent = done.length + ' match' + (done.length === 1 ? '' : 'es') + ' ' + (isUpdate ? 'updated' : 'suspended') + ' · ' + emailed + ' email' + (emailed === 1 ? '' : 's') + ' sent. Standings rebuilt.';
+        stat.style.color = 'var(--color-teal)';
+        setTimeout(loadScoreMatches, 900);
+      } catch (e) {
+        stat.textContent = e.message; stat.style.color = '#ef4444'; btn.disabled = false;
+      }
+    });
+  };
+
+  window._suspendCancel = async function(matchId, srcBtn) {
+    if (!confirm('Remove the suspension? The match goes back to a normal unfinished match at its original time. Scores are untouched; captains will need to re-lock their lineups.')) return;
+    if (srcBtn) srcBtn.disabled = true;
+    try {
+      await apiJSON('/.netlify/functions/admin-suspend-match?action=cancel&circuit=' + encodeURIComponent(adminCircuit()), {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ matchId }),
+      });
+      loadScoreMatches();
+    } catch (e) {
+      alert(e.message); if (srcBtn) srcBtn.disabled = false;
+    }
+  };
 
   async function loadMatchScores(matchId) {
     const formEl = $id('sc-form-' + matchId);
@@ -8190,6 +8324,7 @@
       const slots = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
       const labels = ['R1 G1 · W Doubles','R1 G2 · M Doubles','R1 G3 · Mixed','R1 G4 · Mixed','R1 G5 · Mixed','R1 G6 · Mixed',
                        'R2 G1 · W Doubles','R2 G2 · M Doubles','R2 G3 · Mixed','R2 G4 · Mixed','R2 G5 · Mixed','R2 G6 · Mixed'];
+      const frozenSet = new Set((data.match?.suspended?.lockedSlots) || []);
 
       formEl.innerHTML =
         '<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px 8px;font-size:12px;align-items:center;">' +
@@ -8215,8 +8350,9 @@
           const playersNote = (hNames || aNames)
             ? '<div style="font-size:10px;color:var(--color-text-faint);line-height:1.35;">' + h(hNames || '—') + ' <span style="opacity:.6;">vs</span> ' + h(aNames || '—') + '</div>'
             : '';
+          const frozenTag = frozenSet.has(slot) ? ' <span title="Played before the stoppage — score is final for captains (admins can still correct it here)" style="font-size:10px;color:#e8b542;">🔒 final</span>' : '';
           return (isR2 && i === 6 ? '<div style="grid-column:1/-1;border-top:1px solid var(--color-border);margin:4px 0;"></div>' : '') +
-            '<div style="color:var(--color-text-muted);">' + labels[i] + playersNote + '</div>' +
+            '<div style="color:var(--color-text-muted);">' + labels[i] + frozenTag + playersNote + '</div>' +
             '<input type="number" min="0" max="30" value="' + hv + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="home" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">' +
             '<input type="number" min="0" max="30" value="' + av + '" data-match="' + matchId + '" data-slot="' + slot + '" data-side="away" style="width:60px;padding:4px 8px;text-align:center;background:var(--color-surface-2);border:1px solid var(--color-border);border-radius:4px;color:var(--color-text);font-size:13px;font-family:inherit;">' +
             conflictNote;

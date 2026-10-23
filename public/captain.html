@@ -2098,6 +2098,17 @@
           : '<span class="m__pill pill-final">Final</span>';
         center = `<div class="m__sc"><span class="${hMp > aMp ? 'w' : ''}">${hMp}</span>-<span class="${aMp > hMp ? 'w' : ''}">${aMp}</span></div>`;
         foot = '<div class="m__foot">Match points</div>';
+      } else if (m.suspended) {
+        // Rained out: the games played so far are final; the rest resume later.
+        const snap = m.suspended.snapshot;
+        pill = m.status?.revealed ? '<span class="m__pill pill-live">Live</span>'
+          : m.status?.myLocked ? '<span class="m__pill pill-final">Lineup set</span>'
+          : '<span class="m__pill pill-up">Reopened · set lineup</span>';
+        center = snap
+          ? `<div class="m__sc"><span class="${snap.matchPoints.home > snap.matchPoints.away ? 'w' : ''}">${snap.matchPoints.home}</span>-<span class="${snap.matchPoints.away > snap.matchPoints.home ? 'w' : ''}">${snap.matchPoints.away}</span></div>`
+          : '<div class="m__vs">VS</div>';
+        const resume = m.resumeAt ? formatLockCutoff(m.resumeAt) : 'TBD';
+        foot = `<div class="m__foot">⛈ Rained out · ${m.suspended.lockedCount} games final · ${m.suspended.remaining} resume ${escapeHtml(resume)}</div>`;
       } else {
         pill = m.status?.revealed ? '<span class="m__pill pill-live">Live</span>'
           : m.status?.myLocked ? '<span class="m__pill pill-final">Lineup set</span>'
@@ -2477,6 +2488,10 @@
         state.oppLineup = data.oppLineup;
         state.lineupDraft = (data.myLineup?.games) || {};
         state.lineupAvail = data.availability || {};
+        // Rain-out carry-over: games played before the stoppage are frozen —
+        // their pairs can't change and their scores are final.
+        state.suspended = data.suspended || null;
+        state.frozenSlots = new Set((data.suspended && data.suspended.lockedSlots) || []);
         // If a player went unavailable after being drafted, pull them out of the
         // working draft so the builder reflects the hard block (server rejects on
         // lock anyway). Never touch an already-locked lineup.
@@ -2516,6 +2531,27 @@
       return !!(state.currentScore?.score?.finalizedAt || state.currentMatch?.finalizedAt);
     }
 
+    function isFrozenSlot(slotKey) {
+      return !!(state.frozenSlots && state.frozenSlots.has(slotKey));
+    }
+
+    // Amber "rained out — resumes …" banner for a suspended match.
+    function suspendedBannerHtml(sus, status) {
+      if (!sus) return '';
+      const when = sus.resumeAt ? formatLockCutoff(sus.resumeAt) : 'TBD';
+      const frozenNos = (sus.lockedSlots || []).map(k => SLOT_RULES[k] ? gno(SLOT_RULES[k].round, SLOT_RULES[k].game) : null).filter(Boolean);
+      const played = frozenNos.length ? `Games ${frozenNos.join(', ')} are <strong>final</strong> — they already count in the standings.` : 'No games were finished before the stoppage.';
+      const lockNote = status && status.hardLockAt
+        ? ` Lineups hard-lock <strong>${formatLockCutoff(status.hardLockAt)}</strong> and the matchup reveals when play resumes.`
+        : ' Lineups hard-lock 10 minutes before play resumes.';
+      return `
+        <div class="locked-notice" style="border-color:rgba(232,181,66,0.5);background:rgba(232,181,66,0.08);margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#e8b542;margin-bottom:6px;">⛈ Rained out · resumes ${when}</div>
+          <div>${played} The remaining <strong>${sus.remaining} game${sus.remaining === 1 ? '' : 's'}</strong> are played ${when}. You can change who plays those games — the pairs that already played keep their games.${lockNote}</div>
+          ${sus.note ? `<div style="margin-top:8px;opacity:0.9;">${escapeHtml(sus.note)}</div>` : ''}
+        </div>`;
+    }
+
     // Pre-game preview: build a synthetic scoresheet record from MY lineup only.
     // The opponent's lineup is never fetched pre-reveal (blind-lineup rule) —
     // their pair cells render a "Reveals at game time" placeholder and
@@ -2531,6 +2567,9 @@
       const myRole = m.myRole;
       const myTeamName = state.me?.team?.name || 'Your team';
       const mine = { games: myGames };
+      // Carried-over match: the opponent's pairs for the games already played
+      // are public, so the preview shows them (the rest reveal at resume).
+      const oppKnown = { games: (lineupData?.oppLineup?.games) || {} };
       renderScoresheet({
         preview: true,
         revealed: false,
@@ -2544,8 +2583,8 @@
           home: { name: myRole === 'home' ? myTeamName : m.opponent.name },
           away: { name: myRole === 'away' ? myTeamName : m.opponent.name },
         },
-        homeLineup: myRole === 'home' ? mine : { games: {} },
-        awayLineup: myRole === 'away' ? mine : { games: {} },
+        homeLineup: myRole === 'home' ? mine : oppKnown,
+        awayLineup: myRole === 'away' ? mine : oppKnown,
         score: { games: {}, computed: {}, finalizedAt: null, homeSubmittedAt: null, awaySubmittedAt: null },
       });
     }
@@ -2595,10 +2634,11 @@
       const revealEl = $id('match-reveal-area');
       const lockBtn = $id('lock-lineup-btn');
       const saveBtn = $id('save-draft-btn');
+      const susBanner = suspendedBannerHtml(data.suspended, data.status);
 
       if (data.status.revealed) {
         pillEl.innerHTML = '<span class="match-pill match-pill--revealed">Revealed</span>';
-        revealEl.innerHTML = renderReveal(data);
+        revealEl.innerHTML = susBanner + renderReveal(data);
         lockBtn.style.display = 'none';
         saveBtn.style.display = 'none';
         // Builder is redundant post-reveal — scoresheet shows the locked lineup already
@@ -2616,7 +2656,7 @@
         const waitingMsg = data.status.oppLocked
           ? revealNote
           : `Your lineup is locked. Waiting on ${escapeHtml(m.opponent.name)} — both lineups reveal together at game time.`;
-        revealEl.innerHTML = `
+        revealEl.innerHTML = susBanner + `
           <div class="locked-notice">
             <span>${waitingMsg}</span>
             ${canUnlock ? `<div style="margin-top:12px; opacity:0.85;">${cutoffNote}</div>
@@ -2632,8 +2672,10 @@
           if (ub) ub.addEventListener('click', unlockLineup);
         }
       } else {
-        pillEl.innerHTML = '<span class="match-pill match-pill--unlocked">Unlocked</span>';
-        revealEl.innerHTML = '';
+        pillEl.innerHTML = data.suspended
+          ? '<span class="match-pill match-pill--unlocked">Lineup reopened</span>'
+          : '<span class="match-pill match-pill--unlocked">Unlocked</span>';
+        revealEl.innerHTML = susBanner;
 
         // Gate: a captain can't even START a lineup until the roster can fill one.
         const shortfall = lineupRosterShortfall();
@@ -2718,11 +2760,12 @@
         const p1Name = picks.p1Name || lookupPlayerName(picks.p1);
         const p2Name = picks.p2Name || lookupPlayerName(picks.p2);
 
-        if (locked || revealed) {
+        if (locked || revealed || isFrozenSlot(slotKey)) {
+          const frozen = !locked && !revealed && isFrozenSlot(slotKey);
           return `
-            <div class="lineup-game">
+            <div class="lineup-game" ${frozen ? 'style="opacity:0.7;" title="Played before the stoppage — this pair is final"' : ''}>
               <div class="lineup-game__type">
-                <span class="lineup-game__type-num">G${gno(slot.round, slot.game)}</span>${slot.label}
+                <span class="lineup-game__type-num">G${gno(slot.round, slot.game)}</span>${slot.label}${frozen ? ' <span style="color:#e8b542;">🔒 played</span>' : ''}
               </div>
               <div style="font-size: 15px; font-weight: 500;">${escapeHtml(p1Name ? shortName(p1Name) : '—')}</div>
               <div style="font-size: 15px; font-weight: 500;">${escapeHtml(p2Name ? shortName(p2Name) : '—')}</div>
@@ -2949,8 +2992,8 @@
             const slot = `r${round}g${g}`;
             const gs = games[slot] || {};
             const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
-            const homePair = (data.preview && !myRoleIsHome) ? oppPairPlaceholder : formatPair(homeLineup[slot]);
-            const awayPair = (data.preview && myRoleIsHome) ? oppPairPlaceholder : formatPair(awayLineup[slot]);
+            const homePair = (data.preview && !myRoleIsHome && !homeLineup[slot]) ? oppPairPlaceholder : formatPair(homeLineup[slot]);
+            const awayPair = (data.preview && myRoleIsHome && !awayLineup[slot]) ? oppPairPlaceholder : formatPair(awayLineup[slot]);
 
             // Enter/confirm: HOME types the numbers; AWAY sees them read-only
             // and confirms (or flags) per game.
@@ -2965,15 +3008,18 @@
               return cls.join(' ');
             };
 
+            const frozenGame = !!gs.frozen;
             const scoreCell = (side, val) => myRoleIsHome
               ? `<input type="number" inputmode="numeric" min="0" max="30"
                     class="${inputClass()}"
                     value="${val}"
                     data-slot="${slot}" data-side="${side}"
-                    ${!canEdit ? 'disabled' : ''}>`
+                    ${(!canEdit || frozenGame) ? 'disabled' : ''}>`
               : `<span class="ss-ro ${status === 'confirmed' ? 'ss-ro--confirmed' : ''} ${gs.disputed ? 'ss-ro--disputed' : ''}">${val === '' ? '—' : val}</span>`;
 
-            const cell = gameStatusCell(status, gs, final, myRoleIsHome, slot, canEdit);
+            const cell = frozenGame
+              ? '<span class="ss-pill ss-pill--confirmed">🔒 Final (played before stoppage)</span>'
+              : gameStatusCell(status, gs, final, myRoleIsHome, slot, canEdit);
             const rowClass = status === 'confirmed' ? 'ss-row--confirmed'
                            : gs.disputed            ? 'ss-row--mismatch' : '';
 
@@ -4921,7 +4967,11 @@
         }
         return `<div class="lmob-round"><div class="lmob-round__head"><span>Round ${r}</span><span class="lmob-round__tally">${done}/${keys.length} set</span></div>${pairs.join('')}</div>`;
       };
+      const frozenNote = (state.frozenSlots && state.frozenSlots.size)
+        ? `<div class="lmob-rules" style="border-color:rgba(232,181,66,0.5);color:#e8b542;">🔒 ${state.frozenSlots.size} game${state.frozenSlots.size === 1 ? '' : 's'} already played — those pairs are final. Set the rest.</div>`
+        : '';
       $id('lineup-builder').innerHTML = `
+        ${frozenNote}
         <div class="lmob-rules">Mixed = woman + man (woman listed first) · max <b>${LINEUP_MAX_GAMES} games</b> per player a night</div>
         <div class="lmob-progress">Lineup <b>${setCount}/12</b> games set</div>
         <div class="lmob-usage">${chips || '<span class="lmob-empty">No players yet — add them in the Roster tab.</span>'}</div>
@@ -4938,6 +4988,10 @@
       const picks = state.lineupDraft[slotKey] || {};
       const pid = pos === 0 ? picks.p1 : picks.p2;
       const allow = eligibleSexFor(slot.type, pos);
+      if (isFrozenSlot(slotKey)) {
+        const nm = pid ? (lookupPlayerName(pid) || picks[pos === 0 ? 'p1Name' : 'p2Name'] || '—') : '—';
+        return `<button type="button" class="lmob-slot is-filled" disabled style="opacity:0.7;cursor:default;" title="Played before the stoppage — this pair is final"><span class="lmob-av">🔒</span><span class="lmob-nm">${escapeHtml(nm)}</span></button>`;
+      }
       if (pid) {
         const nm = lookupPlayerName(pid) || picks[pos === 0 ? 'p1Name' : 'p2Name'] || '—';
         return `<button type="button" class="lmob-slot is-filled" onclick="openCapSheet('${slotKey}',${pos})"><span class="lmob-av">${escapeHtml(initialsOf(nm))}</span><span class="lmob-nm">${escapeHtml(nm)}</span></button>`;
@@ -5020,7 +5074,7 @@
       const sideStep = (slot, side, isUs) => {
         const ent = games[slot]?.entered || {};
         const raw = Number.isInteger(ent[side]) ? ent[side] : '';
-        const inner = (isHome && canEdit)
+        const inner = (isHome && canEdit && !games[slot]?.frozen)
           ? `<input type="number" inputmode="numeric" min="0" max="30" class="ss-score-input bgm__input" id="inp-${slot}-${side}" data-slot="${slot}" data-side="${side}" data-orig="${raw}" value="${raw}">`
           : `<div class="bgm__ro">${raw === '' ? '' : raw}</div>`;
         return `<div class="bgm__side ${isUs ? 'bgm__side--us' : ''}">
@@ -5034,13 +5088,15 @@
         const gs = games[slot] || {};
         const status = (c.gameStatuses || []).find(s => s.slot === slot)?.status || 'empty';
         const usPair = mySide === 'home' ? formatPair(homeLineup[slot]) : formatPair(awayLineup[slot]);
-        const themPair = data.preview ? 'Reveals at game time'
+        const themKnown = mySide === 'home' ? awayLineup[slot] : homeLineup[slot];
+        const themPair = (data.preview && !themKnown) ? 'Reveals at game time'
           : (mySide === 'home' ? formatPair(awayLineup[slot]) : formatPair(homeLineup[slot]));
         const entered = !!gs.enteredComplete;
-        const confirmable = !isHome && canEdit && entered && status !== 'confirmed' && !gs.disputed;
+        const confirmable = !isHome && canEdit && entered && status !== 'confirmed' && !gs.disputed && !gs.frozen;
 
         let pillTxt, pillCls = status;
-        if (status === 'confirmed') { pillTxt = 'Confirmed ✓'; }
+        if (gs.frozen) { pillTxt = '🔒 Final — played before stoppage'; pillCls = 'confirmed'; }
+        else if (status === 'confirmed') { pillTxt = 'Confirmed ✓'; }
         else if (gs.disputed) {
           pillCls = 'mismatch';
           pillTxt = isHome ? 'They flagged this — fix & resave' : 'Flagged — waiting on their fix';

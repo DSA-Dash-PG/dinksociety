@@ -13,10 +13,11 @@
 // team's locked lineup. Only confirmed games (both scores entered) appear.
 
 import { getStore } from '@netlify/blobs';
-import { normalizeScore } from './lib/score-helpers.js';
+import { normalizeScore, decorate } from './lib/score-helpers.js';
 import { etagJson } from './lib/http-cache.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
 import { circuitCode } from './lib/circuit.js';
+import { effectiveStart, lineupSlotVisible, publicSuspension, countState } from './lib/live-results.js';
 
 // Slot → discipline label. Matches lib ordering: g1 women's, g2 men's, rest mixed.
 const SLOT_TYPE = {
@@ -75,23 +76,29 @@ export default async (req) => {
     // the match is finalized, or both lineups are locked AND we're inside
     // the reveal window. Draft/early-locked lineups stay hidden.
     const final = !!(found.finalizedAt || score?.finalizedAt);
+    // Suspended match: the reveal clock for the REMAINING games is the resume
+    // time; the frozen games stay visible regardless (lib/live-results.js).
     const lineupsVisible = final
-      || (!!lineupA?.lockedAt && !!lineupB?.lockedAt && isRevealTime(found.scheduledAt));
+      || (!!lineupA?.lockedAt && !!lineupB?.lockedAt && isRevealTime(effectiveStart(found)));
+    const slotVisible = lineupSlotVisible(found, lineupsVisible);
+    const suspension = publicSuspension(found);
+    const frozen = new Set(suspension?.lockedSlots || []);
 
     const games = [];
     let totalHome = 0, totalAway = 0;
     const sg = score?.games || {};
-    const lgA = lineupsVisible ? (lineupA?.games || {}) : {};
-    const lgB = lineupsVisible ? (lineupB?.games || {}) : {};
+    const lgAll = lineupA?.games || {};
+    const lgBll = lineupB?.games || {};
 
     for (const slot of SLOT_KEYS) {
       const g = sg[slot];
       const h = g?.home, a = g?.away;
       const hasScore = Number.isInteger(h) && Number.isInteger(a);
       if (hasScore) { totalHome += h; totalAway += a; }
+      const show = slotVisible(slot);
       // Skip rows with no score AND no lineup — nothing to show.
-      const hp = [lgA[slot]?.p1Name, lgA[slot]?.p2Name].filter(Boolean);
-      const ap = [lgB[slot]?.p1Name, lgB[slot]?.p2Name].filter(Boolean);
+      const hp = show ? [lgAll[slot]?.p1Name, lgAll[slot]?.p2Name].filter(Boolean) : [];
+      const ap = show ? [lgBll[slot]?.p1Name, lgBll[slot]?.p2Name].filter(Boolean) : [];
       if (!hasScore && !hp.length && !ap.length) continue;
 
       games.push({
@@ -104,8 +111,14 @@ export default async (req) => {
         homeWin: hasScore ? h > a : null,
         homePlayers: hp,
         awayPlayers: ap,
+        frozen: frozen.has(slot),
       });
     }
+
+    // Live view of an unfinished match: round/match points from the confirmed
+    // games (the schedule only carries OFFICIAL numbers, written at finalize).
+    const dec = (!final && score) ? decorate(score, !!found.championship) : null;
+    const liveState = countState(found, score);
 
     return etagJson(req, {
       match: {
@@ -115,11 +128,16 @@ export default async (req) => {
         courtA: found.courtA ?? null,
         courtB: found.courtB ?? null,
         finalizedAt: found.finalizedAt || score?.finalizedAt || null,
+        suspended: suspension,
+        live: liveState === 'live',
+        provisional: liveState === 'live',
         home: { id: homeId, name: found.teamA?.name || 'Home' },
         away: { id: awayId, name: found.teamB?.name || 'Away' },
-        matchPoints: { home: found.scoreA ?? null, away: found.scoreB ?? null },
-        round1: found.round1 || null,
-        round2: found.round2 || null,
+        matchPoints: final
+          ? { home: found.scoreA ?? null, away: found.scoreB ?? null }
+          : (dec ? { ...dec.computed.matchPoints } : { home: null, away: null }),
+        round1: final ? (found.round1 || null) : (dec?.computed.round1 || null),
+        round2: final ? (found.round2 || null) : (dec?.computed.round2 || null),
         totals: { home: totalHome, away: totalAway },
         games,
       },

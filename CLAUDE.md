@@ -86,6 +86,33 @@ Resend (email, `FROM_EMAIL`) · Anthropic API (recap generation) · Capacitor 8 
   is ever publicly visible. Note `matchPoints` (`scoreA`/`scoreB`) is written **only at
   finalize**; for a running score use games-won across confirmed games.
 
+- **Standings are LIVE (unofficial) on game night; finalize makes them official.**
+  `lib/standings.js` counts a match once it has started and has ≥1 confirmed game
+  (`countState()` in `lib/live-results.js`), computing points from the confirmed games
+  via `decorate()`; the schedule blob still only ever carries OFFICIAL numbers
+  (`scoreA`/`round1`… written at finalize). Every team row, player, weekly-performer
+  block and both aggregate blobs carry `provisional` (+ `standings.provisional.matches`),
+  and the pages render it as "Live · unofficial". `captain-score.js` rebuilds the
+  aggregates whenever the set of CONFIRMED games changes (confirm / dispute / an edit to
+  a confirmed game), `admin-scores.js` on an edit to an unfinished match. Rows also carry
+  `roundsPlayed` (use it for RDS, not `matchesPlayed × 2`) and `pendingRoundPts`.
+  Match-level Society-Circuit bonuses wait until both rounds are in.
+
+- **Rain-outs: suspend the match, don't reschedule it.** Admin → Scores →
+  "Suspend / carry over" (`admin-suspend-match.js`, per match or whole week) stamps
+  `m.suspended = { resumeAt, lockedSlots, snapshot, note }`: every CONFIRMED game is
+  frozen (score final for captains; admins can still correct it), both lineups are
+  reopened for the remaining games, captains are emailed. `effectiveStart(m)` =
+  `resumeAt` while suspended — the lineup hard-lock and the reveal run off it
+  (`captain-lineup.js`, `captain-score.js`, `captain-schedule.js`, `player-me.js`,
+  `public-match.js`, `public-gameday.js`). Frozen games stay public while the rest of the
+  lineups are hidden again (`lineupSlotVisible()`); `captain-lineup.js` silently keeps the
+  stored pair for a frozen slot whatever the client sends. The match finalizes the normal
+  way once all 12 games are confirmed and both captains sign off. "Unlock lineups (both)"
+  on the Schedule tab is the nuclear option — it wipes scores AND the suspension.
+  Tests: `node --test --experimental-test-module-mocks tests/live-standings.test.js`,
+  `node --test tests/live-results.test.js`.
+
 - **The Desk inbox files write-ups; an admin approves them from email.** The scheduled
   Claude tasks (Friday Drop recap, weekly Drop preview, ladder recap editorial) POST their
   finished write-up to `desk-inbox.js` (header `x-desk-key` = env `DESK_INBOX_KEY`). That

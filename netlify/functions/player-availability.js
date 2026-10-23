@@ -13,6 +13,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { getTeamAvailability, setPlayerAvailability } from './lib/availability.js';
+import { effectiveStart } from './lib/live-results.js';
 import { logActivity } from './lib/activity-log.js';
 import { notifyCaptainsOfChange } from './lib/availability-notify.js';
 
@@ -38,7 +39,9 @@ export default async (req) => {
 
   if (req.method === 'PUT') {
     if (match.finalizedAt) return json({ error: 'This match is already final.' }, 409);
-    if (match.scheduledAt && Date.now() >= new Date(match.scheduledAt).getTime()) {
+    // A carried-over (suspended) match reopens availability until it resumes.
+    const startIso = effectiveStart(match);
+    if (startIso && Date.now() >= new Date(startIso).getTime()) {
       return json({ error: 'This match has already started — availability is locked.' }, 409);
     }
 

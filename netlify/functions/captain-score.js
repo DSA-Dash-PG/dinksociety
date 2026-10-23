@@ -39,6 +39,7 @@ import {
 } from './lib/score-helpers.js';
 import { logActivity } from './lib/activity-log.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
+import { isSuspended, frozenSlots, effectiveStart, confirmedSlots, publicSuspension } from './lib/live-results.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -77,15 +78,34 @@ export default async (req) => {
     lineupStore.get(`lineup/${matchId}/${match.teamB.id}.json`, { type: 'json' }).catch(() => null),
   ]);
   // Scoring opens at reveal: both lineups locked AND match start has arrived.
+  // For a suspended (carried-over) match the clock is the RESUME time.
   const revealed = !!lineupHome?.lockedAt && !!lineupAway?.lockedAt
-    && isRevealTime(match.scheduledAt, Number(seasonData?.lineupRevealOffsetMin) || undefined);
+    && isRevealTime(effectiveStart(match), Number(seasonData?.lineupRevealOffsetMin) || undefined);
+
+  // Suspended match: the games played before the stoppage are frozen — their
+  // scores are final and can't be edited, confirmed or disputed any more.
+  const suspended = isSuspended(match);
+  const frozen = frozenSlots(match);
+  const suspension = publicSuspension(match);
+
+  // Live standings: any change in which games are CONFIRMED moves the
+  // unofficial standings, so those writes rebuild the aggregates right away
+  // (lib/standings.js counts a started match with ≥1 confirmed game).
+  const liveRebuild = async (before, after) => {
+    if (before.size === after.size && [...before].every(s => after.has(s))) return;
+    try { await rebuildStandings(match.circuit); }
+    catch (err) { console.error('live rebuildStandings failed for match', matchId, ':', err); }
+  };
 
   // ===== GET =====
   if (req.method === 'GET') {
     if (!revealed) {
       return json({
         matchId, myRole, revealed: false,
-        message: 'Both lineups must be locked before scoring.',
+        suspended: suspension,
+        message: suspended
+          ? 'Lineups for the remaining games lock and reveal at the resume time.'
+          : 'Both lineups must be locked before scoring.',
       });
     }
     const score = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
@@ -94,9 +114,10 @@ export default async (req) => {
     return json({
       matchId, myRole, revealed: true,
       match: publicMatchInfo(match),
+      suspended: suspension,
       homeLineup: sanitizeLineup(lineupHome),
       awayLineup: sanitizeLineup(lineupAway),
-      score: viewForCaptain(decorate(score, match.championship), myRole),
+      score: viewForCaptain(decorate(score, match.championship), myRole, frozen),
     });
   }
 
@@ -116,6 +137,7 @@ export default async (req) => {
     // mid-flight, re-read and re-apply MY changes on top of theirs (the
     // unguarded version silently wiped scores in week-1 QA).
     let existing = null, changed = false, saved = false, changedSlots = [];
+    let confirmedBefore = new Set();
     for (let attempt = 0; attempt < 5 && !saved; attempt++) {
       const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
       existing = got?.data || newScoreRecord(match);
@@ -125,6 +147,7 @@ export default async (req) => {
       if (existing.finalizedAt) {
         return json({ error: 'Match is final. Contact admin to reopen.' }, 409);
       }
+      confirmedBefore = confirmedSlots(existing, match.championship);
 
       const now = new Date().toISOString();
       changed = false;
@@ -146,6 +169,9 @@ export default async (req) => {
             return json({ error: `${prettySlot(slot)}: scores must be integers 0-30` }, 400);
           }
           if (myEntry[side] === newVal) continue; // no change
+          if (frozen.has(slot)) {
+            return json({ error: `${prettySlot(slot)} was played before the stoppage — its score is final. Ask a league admin if it needs a correction.` }, 409);
+          }
           myEntry[side] = newVal;
           slotChanged = true;
         }
@@ -222,9 +248,11 @@ export default async (req) => {
         matchId, week: match.week, circuit: match.circuit,
         details: `${ctx.team.name} updated their Week ${match.week} scoresheet (${match.teamA.name} vs ${match.teamB.name}) · ${changedSlots.map(prettySlot).join(', ')}`,
       });
+      // An edit to an already-confirmed game drops it out of the live standings.
+      await liveRebuild(confirmedBefore, confirmedSlots(existing, match.championship));
     }
 
-    return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
+    return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole, frozen) });
   }
 
   // ===== POST confirm / dispute / submit / withdraw =====
@@ -246,8 +274,13 @@ export default async (req) => {
       if (!slots.length || slots.some(s => !SLOT_KEYS.includes(s))) {
         return json({ error: 'Provide valid game slot(s) to ' + action }, 400);
       }
+      const frozenHit = slots.find(s => frozen.has(s));
+      if (frozenHit) {
+        return json({ error: `${prettySlot(frozenHit)} was played before the stoppage — its score is final.` }, 409);
+      }
 
       let existing = null, saved = false;
+      let confirmedBefore = new Set();
       for (let attempt = 0; attempt < 5 && !saved; attempt++) {
         const got = await scoresStore.getWithMetadata(scoreKey, { type: 'json' }).catch(() => null);
         existing = got?.data || newScoreRecord(match);
@@ -256,6 +289,7 @@ export default async (req) => {
         if (existing.finalizedAt) {
           return json({ error: 'Match is final. Contact admin to reopen.' }, 409);
         }
+        confirmedBefore = confirmedSlots(existing, match.championship);
 
         const now = new Date().toISOString();
         for (const slot of slots) {
@@ -307,7 +341,10 @@ export default async (req) => {
           : `${ctx.team.name} flagged ${prettySlot(slots[0])} as incorrect — home team to fix`,
       });
 
-      return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
+      // Confirmed games feed the live standings the moment they're confirmed.
+      await liveRebuild(confirmedBefore, confirmedSlots(existing, match.championship));
+
+      return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole, frozen) });
     }
 
     const body = action === 'submit' ? await req.json().catch(() => ({})) : null;
@@ -421,7 +458,7 @@ export default async (req) => {
         matchId, week: match.week, circuit: match.circuit,
         details: `Week ${match.week} match finalized: ${match.teamA.name} vs ${match.teamB.name} (both captains signed off)`,
       });
-      return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
+      return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole, frozen) });
     }
 
     await logActivity({
@@ -434,7 +471,7 @@ export default async (req) => {
         : `${ctx.team.name} withdrew their Week ${match.week} sign-off (${match.teamA.name} vs ${match.teamB.name})`,
     });
 
-    return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole) });
+    return json({ ok: true, score: viewForCaptain(decorate(existing, match.championship), myRole, frozen) });
   }
 
   return new Response('Method not allowed', { status: 405 });
@@ -472,6 +509,7 @@ function publicMatchInfo(match) {
     championship: !!match.championship,
     venue: match.venue || null,
     scheduledAt: match.scheduledAt || null,
+    resumeAt: isSuspended(match) ? (match.suspended.resumeAt || null) : null,
     circuit: match.circuit, division: match.division,
     home: { id: match.teamA.id, name: match.teamA.name },
     away: { id: match.teamB.id, name: match.teamB.name },
@@ -491,13 +529,14 @@ function captainName(ctx) {
 //   - `confirmed` = away has confirmed home's numbers (entries agree)
 //   - `disputed` = away flagged the game "not right" — home to fix
 //   - submitter emails are not exposed; signed names are.
-function viewForCaptain(decorated, myRole) {
+function viewForCaptain(decorated, myRole, frozen = new Set()) {
   const games = {};
   for (const slot of SLOT_KEYS) {
     const g = decorated.games[slot] || {};
     const entered = g.homeEntry ? { home: g.homeEntry.home, away: g.homeEntry.away } : null;
     games[slot] = {
       home: g.home, away: g.away, // canonical agreed score (null until confirmed)
+      frozen: frozen.has(slot),   // suspended match: played before the stoppage, score is final
       entered,                                       // home's entry (both sides see it)
       enteredComplete: entryComplete(g.homeEntry),
       confirmed: entryComplete(g.homeEntry) && entryComplete(g.awayEntry)

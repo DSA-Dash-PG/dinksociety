@@ -2964,6 +2964,15 @@
         foot += `<button class="m__toggle" onclick="toggleGameScores(this, '${esc(m.matchId)}')"><span class="lbl">Show game scores</span> <span class="chev">▾</span></button>
           <div class="m__detail"></div>`;
       }
+    } else if (m.suspended) {
+      // Rained out part way: played games are final, the rest resume later.
+      const sn = m.suspended.snapshot;
+      const resume = m.resumeAt ? new Date(m.resumeAt).toLocaleString([], { weekday:'short', month:'short', day:'numeric', hour:'numeric', minute:'2-digit' }) : 'TBD';
+      pill = m.status === 'live' ? '<span class="m__pill pill-live">Live</span>' : m.myLocked ? '<span class="m__pill pill-final">Lineup set</span>' : '<span class="m__pill pill-up">Resumes</span>';
+      center = sn
+        ? `<div class="m__sc"><span class="${sn.matchPoints.home > sn.matchPoints.away ? 'w' : ''}">${sn.matchPoints.home}</span>–<span class="${sn.matchPoints.away > sn.matchPoints.home ? 'w' : ''}">${sn.matchPoints.away}</span></div>`
+        : '<div class="m__vs">VS</div>';
+      foot = `<div class="m__foot">⛈ Rained out · ${m.suspended.lockedCount} games final · ${m.suspended.remaining} resume ${esc(resume)}${m.venue ? ' · ' + esc(m.venue) : ''}</div>`;
     } else {
       pill = m.status === 'live' ? '<span class="m__pill pill-live">Live</span>' : m.myLocked ? '<span class="m__pill pill-final">Lineup set</span>' : '<span class="m__pill pill-up">Upcoming</span>';
       center = '<div class="m__vs">VS</div>';

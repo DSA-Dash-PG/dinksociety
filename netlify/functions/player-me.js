@@ -8,6 +8,7 @@ import { verifyPlayerSession, unauthResponse } from './lib/auth.js';
 import { findAllPlayerTeamsByEmail } from './lib/player-auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { isRevealTime, DEFAULT_REVEAL_OFFSET_MIN } from './lib/lineup-helpers.js';
+import { effectiveStart, frozenSlots, publicSuspension } from './lib/live-results.js';
 import { getRelevantAnnouncements } from './lib/announcements.js';
 import { getActiveWaivers, getSignatureAcross, isWaiverSatisfied, waiverSeasonFor } from './lib/waiver.js';
 import { identityIdsFor } from './lib/league-identity.js';
@@ -197,7 +198,9 @@ export default async (req) => {
       if (!final) {
         const ar = await getTeamAvailability(mt.id, teamId);
         const a = ar.players?.[playerId] || null;
-        const started = mt.scheduledAt ? Date.now() >= new Date(mt.scheduledAt).getTime() : false;
+        // For a carried-over match the night that matters is the resume time.
+        const startIso = effectiveStart(mt);
+        const started = startIso ? Date.now() >= new Date(startIso).getTime() : false;
         availability = {
           status: a?.status || null,
           reason: a?.reason || '',
@@ -218,19 +221,23 @@ export default async (req) => {
           opp?.id ? lineupStore.get(`lineup/${mt.id}/${opp.id}.json`, { type: 'json' }).catch(() => null) : null,
         ]);
         myLocked = !!mine?.lockedAt;
-        // Simultaneous reveal: both locked AND match start has arrived.
-        revealed = myLocked && !!oppLu?.lockedAt && isRevealTime(mt.scheduledAt);
+        // Simultaneous reveal: both locked AND match start has arrived. For a
+        // suspended (carried-over) match that clock is the resume time, and the
+        // games already played stay visible for both sides.
+        const frozen = frozenSlots(mt);
+        revealed = myLocked && !!oppLu?.lockedAt && isRevealTime(effectiveStart(mt));
         if (mine?.games) {
           for (const [slot, g] of Object.entries(mine.games)) {
             if (g && (g.p1 === playerId || g.p2 === playerId)) myGames.push(SLOT_LABEL[slot] || slot);
           }
         }
-        if (myLocked && mine?.games) {
+        if ((myLocked || frozen.size) && mine?.games) {
           // Names only — no PII. Mixed slots are already stored woman-first.
-          const side = (lu) => {
+          const side = (lu, only) => {
             if (!lu?.games) return null;
             const o = {};
             for (const s of LINEUP_SLOTS) {
+              if (only && !only.has(s)) continue;
               const g = lu.games[s];
               o[s] = { p1: g?.p1Name || null, p2: g?.p2Name || null };
             }
@@ -242,7 +249,12 @@ export default async (req) => {
             if (g?.p1 === playerId) mySlots[s] = 'p1';
             else if (g?.p2 === playerId) mySlots[s] = 'p2';
           }
-          lineup = { mine: side(mine), opp: revealed ? side(oppLu) : null, mySlots };
+          lineup = {
+            mine: side(mine, myLocked ? null : frozen),
+            opp: revealed ? side(oppLu) : (frozen.size ? side(oppLu, frozen) : null),
+            mySlots,
+            frozenSlots: [...frozen],
+          };
         }
       }
 
@@ -253,11 +265,14 @@ export default async (req) => {
       // otherwise fall back to the HOME team's entry — the home captain is
       // the single score-enterer, so that's the live number for BOTH teams.
       let scores = null;
-      if (!final && revealed) {
+      const frozenForScores = frozenSlots(mt);
+      if (!final && (revealed || frozenForScores.size)) {
         const sc = await scoresStore.get(`score/${mt.id}.json`, { type: 'json' }).catch(() => null);
         if (sc?.games) {
           scores = {};
           for (const s of LINEUP_SLOTS) {
+            // Before the resumed games reveal, only the frozen games are public.
+            if (!revealed && !frozenForScores.has(s)) continue;
             const g = sc.games[s];
             if (!g) continue;
             // Canonical agreed score first (also covers legacy records where
@@ -284,10 +299,12 @@ export default async (req) => {
         championship: !!mt.championship,
         final, myMp, oppMp, result,
         myLocked, revealed, myGames, lineup, scores, availability,
+        suspended: publicSuspension(mt),
+        resumeAt: publicSuspension(mt)?.resumeAt || null,
         // Minutes before scheduledAt the matchup reveals — the portal counts
         // down to it on match day instead of hard-coding the offset.
         revealOffsetMin: DEFAULT_REVEAL_OFFSET_MIN,
-        status: final ? 'final' : revealed ? 'live' : myLocked ? 'locked' : 'upcoming',
+        status: final ? 'final' : revealed ? 'live' : publicSuspension(mt) ? 'suspended' : myLocked ? 'locked' : 'upcoming',
       });
       }
     }

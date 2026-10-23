@@ -931,6 +931,26 @@ export function renderLineupChanged({ playerName, teamName, teamEmoji, opponentN
   return _lineupShell({ accent: '#f5a623', h1: `Your Week ${week} lineup changed`, bodyHtml: body, teamName });
 }
 
+/**
+ * A match was stopped part way (rain) and carries over. Sent to the captains
+ * and co-captains of BOTH teams by admin-suspend-match.js. Says what is final,
+ * what is still to play, when, and that the lineup for the remaining games is
+ * open again. Never includes the other team's lineup.
+ */
+export function renderMatchSuspended({ teamName, teamEmoji, opponentName, oppEmoji, week, resumeLine, lockLine, lockedCount, remaining, resultLine, note, portalUrl }) {
+  const body = `
+  <p style="font-size:15px;color:#cfcfcf;line-height:1.65;margin:0 0 18px;">Your Week ${escapeBody(String(week))} match was stopped before it finished. The rest of it is being played <b>${escapeBody(resumeLine)}</b>, before the regular game night starts.</p>
+  ${_lineupMatchCard({ teamName, teamEmoji, opponentName, oppEmoji, dateLine: `Resumes ${resumeLine}` })}
+  ${_lineupCards([
+    { color: '#17d7b0', title: `${lockedCount} game${lockedCount === 1 ? '' : 's'} are final`, sub: resultLine ? `Scores stand as played. ${resultLine}` : 'Scores stand as played — they already count in the standings.' },
+    { color: _LU_ACCENT, title: `${remaining} game${remaining === 1 ? '' : 's'} still to play`, sub: 'Your lineup for these games is open again — swap anyone in or out, then lock it.' },
+  ])}
+  ${note ? `<p style="font-size:14px;color:#cfcfcf;line-height:1.6;margin:0 0 18px;padding:12px 14px;background:#161616;border-left:3px solid #f5a623;border-radius:6px;">${escapeBody(note)}</p>` : ''}
+  ${_luBtn(portalUrl, 'Set the lineup')}
+  <p style="font-size:13px;color:#777;margin-top:22px;line-height:1.5;">The games already played keep the pairs that played them. ${lockLine ? escapeBody(lockLine) : ''} The matchup for the remaining games reveals when play resumes.</p>`;
+  return _lineupShell({ accent: '#f5a623', h1: `Week ${week} resumes — lineup reopened`, bodyHtml: body, teamName });
+}
+
 /** Captain + co-captain receipt: who got what, plus the lineup itself. */
 export function renderLineupReceipt({ teamName, teamEmoji, opponentName, oppEmoji, week, dateLine, lockedByName, playing, emailed, removed, notIn, skipped, noEmail, grid, portalUrl, changed }) {
   const sentNames = emailed || playing || [];

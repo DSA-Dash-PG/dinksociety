@@ -182,6 +182,9 @@
     }
     .match-badge.is-final { color: var(--color-teal); border-color: rgba(45,212,191,0.4); }
     .match-badge.is-next  { color: var(--color-lime); border-color: rgba(184,255,44,0.4); }
+    .match-badge.is-susp  { color: #e8b542; border-color: rgba(232,181,66,0.5); }
+    .m-susp { margin: 8px 0 0; padding: 8px 10px; border: 1px solid rgba(232,181,66,0.35); background: rgba(232,181,66,0.07); border-radius: var(--radius-sm); font-size: 11px; line-height: 1.45; color: var(--color-text-muted); }
+    .m-susp b { color: #e8b542; }
     .match-badge.is-live  {
       color: var(--color-bg); background: var(--color-lime); border-color: var(--color-lime);
       display: inline-flex; align-items: center; gap: 5px;
@@ -692,6 +695,13 @@
       return { label, color };
     }
 
+    function fmtResumeShort(iso) {
+      try { return new Date(iso).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' }); } catch { return 'TBD'; }
+    }
+    function fmtResumeLong(iso) {
+      try { return new Date(iso).toLocaleString('en-US', { weekday: 'long', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); } catch { return 'TBD'; }
+    }
+
     /* ── Render matches for one week ─────────────────────────────── */
     function renderMatches(matches, weekNum, weeksData) {
       if (!matches.length) {
@@ -707,15 +717,27 @@
         const isTbd = teamAName === 'TBD' && teamBName === 'TBD';
         const meta  = courtMeta(m, idx);
 
-        // Top-right badge: Final / Live / Up Next / blank.
+        // Rained out part way: played games are final, the rest resume later.
+        const susp = (!isFinal && m.suspended) ? m.suspended : null;
+
+        // Top-right badge: Final / Live / Up Next / Suspended / blank.
         let badge = '';
         if (isFinal)              badge = `<span class="match-badge is-final">Final</span>`;
+        else if (susp)            badge = `<span class="match-badge is-susp">⛈ Resumes ${esc(fmtResumeShort(susp.resumeAt))}</span>`;
         else if (today && !isTbd) badge = `<span class="match-badge is-live"><span class="ldot"></span>Live</span>`;
         else if (next && !isTbd)  badge = `<span class="match-badge is-next">Up Next</span>`;
 
         // Center column.
         let center;
-        if (isFinal && m.homeRoundPts != null) {
+        if (susp && susp.snapshot) {
+          const sn = susp.snapshot;
+          const hp = sn.matchPoints?.home ?? 0, ap = sn.matchPoints?.away ?? 0;
+          center = `<div class="m-center">
+            <div class="m-tally"><span class="${hp > ap ? 'w' : ''}">${hp}</span><span class="dash">–</span><span class="${ap > hp ? 'w' : ''}">${ap}</span></div>
+            <div class="m-sub">${sn.gamesHome}–${sn.gamesAway} games · ${susp.lockedCount} of 12 played</div>
+            <div class="m-result tie">In progress</div>
+          </div>`;
+        } else if (isFinal && m.homeRoundPts != null) {
           const hWin = m.homeRoundPts > m.awayRoundPts;
           const aWin = m.awayRoundPts > m.homeRoundPts;
           const tie  = m.homeRoundPts === m.awayRoundPts;
@@ -741,10 +763,12 @@
             <div class="m-srow"><span class="m-rtag r2">R2</span><span><b>${esc(teamAName)}</b> <span class="act side">pick side</span> · <b>${esc(teamBName)}</b> <span class="act">serve</span></span></div>
           </div>` : '';
 
-        // Lazy game-score toggle — only meaningful when final.
-        const scores = isFinal ? `
+        // Lazy game-score toggle — final matches, plus a rained-out one (its
+        // played games are public).
+        const scores = (isFinal || susp) ? `
           <button class="m-toggle" onclick="toggleScores(this, '${esc(m.id)}')"><span class="lbl">Show game scores</span> <span class="chev">▾</span></button>
           <div class="m-scorebody" data-match="${esc(m.id)}"></div>` : '';
+        const suspNote = susp ? `<div class="m-susp"><b>Rained out.</b> ${susp.lockedCount} game${susp.lockedCount === 1 ? '' : 's'} already played — those scores are final and count in the standings. The remaining ${susp.remaining} resume <b>${esc(fmtResumeLong(susp.resumeAt))}</b>.${susp.note ? ' ' + esc(susp.note) : ''}</div>` : '';
 
         return `
           <div class="match-entry${isFinal ? ' is-final' : ''}">
@@ -765,7 +789,7 @@
                 ${teamLink(teamBName, m.teamBId, 'm-team' + (isTbd ? ' is-tbd' : ''))}
               </div>
             </div>
-            ${serves}
+            ${suspNote}${serves}
             ${scores}
           </div>`;
       }).join('')}</div>`;

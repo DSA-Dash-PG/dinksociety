@@ -32,6 +32,7 @@ import { normalizeScore, decorate } from './lib/score-helpers.js';
 import { etagJson } from './lib/http-cache.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
 import { circuitCode } from './lib/circuit.js';
+import { effectiveStart, lineupSlotVisible, publicSuspension } from './lib/live-results.js';
 
 // Slot → discipline. Mirrors public-match.js exactly.
 const SLOT_TYPE = {
@@ -127,11 +128,19 @@ export default async (req) => {
       const dec = score ? decorate(score, !!m.championship) : null;
 
       const final = !!(m.finalizedAt || score?.finalizedAt);
+      // Suspended match: remaining games reveal at the resume time; the frozen
+      // games (played on the original night) stay visible.
       const lineupsVisible = final
-        || (!!lineupA?.lockedAt && !!lineupB?.lockedAt && isRevealTime(m.scheduledAt));
-
-      const lgA = lineupsVisible ? (lineupA?.games || {}) : {};
-      const lgB = lineupsVisible ? (lineupB?.games || {}) : {};
+        || (!!lineupA?.lockedAt && !!lineupB?.lockedAt && isRevealTime(effectiveStart(m)));
+      const slotVisible = lineupSlotVisible(m, lineupsVisible);
+      const suspension = publicSuspension(m);
+      const visibleGames = (lu) => {
+        const out = {};
+        for (const slot of SLOT_KEYS) if (slotVisible(slot) && lu?.games?.[slot]) out[slot] = lu.games[slot];
+        return out;
+      };
+      const lgA = visibleGames(lineupA);
+      const lgB = visibleGames(lineupB);
       const statusBySlot = Object.fromEntries(
         (dec?.computed?.gameStatuses || []).map(g => [g.slot, g.status]));
 
@@ -180,8 +189,9 @@ export default async (req) => {
           round: slot.startsWith('r1') ? 1 : 2,
           gameNum: Number(slot.slice(-1)),
           type: SLOT_TYPE[slot],
-          homePlayers: lineupsVisible ? pairNames(lgA[slot]) : [],
-          awayPlayers: lineupsVisible ? pairNames(lgB[slot]) : [],
+          homePlayers: pairNames(lgA[slot]),
+          awayPlayers: pairNames(lgB[slot]),
+          frozen: !!suspension?.lockedSlots?.includes(slot),
           entered: !!(score?.games?.[slot] && (Number.isInteger(score.games[slot].home) || Number.isInteger(score.games[slot].away))),
         }));
 
@@ -200,10 +210,12 @@ export default async (req) => {
       // "live" is time-boxed. A match that was played but never formally
       // finalized must not sit on the ticker as LIVE for days — once it falls
       // out of the recent window we present whatever was confirmed as done.
-      const started = m.scheduledAt ? Date.parse(m.scheduledAt) <= Date.now() : false;
-      const inWindow = inLiveWindow(m.scheduledAt);
+      const startIso = effectiveStart(m);
+      const started = startIso ? Date.parse(startIso) <= Date.now() : false;
+      const inWindow = inLiveWindow(startIso);
       const status = final ? 'final'
         : (inWindow && (gamesConfirmed > 0 || (started && lineupsVisible))) ? 'live'
+        : suspension ? 'suspended'
         : gamesConfirmed > 0 ? 'final'
         : 'awaiting';
 
@@ -219,6 +231,8 @@ export default async (req) => {
         startTime: m.startTime || null,
         championship: !!m.championship,
         status,
+        suspended: suspension,
+        provisional: !final && gamesConfirmed > 0,
         lineupsVisible,
         home: teamSide(homeId, m.teamA, m.emojiA, m.seedLabelA, teamMeta),
         away: teamSide(awayId, m.teamB, m.emojiB, m.seedLabelB, teamMeta),
@@ -244,6 +258,7 @@ export default async (req) => {
 
     // ---- 5. season standings for the charts ----
     const standings = await loadStandings(circuitLetter, divisionFilter, teamMeta);
+    const standingsProvisional = standings.some(t => t.provisional);
 
     // Bracket blobs often carry no seedLabel (it's synthesized at render time
     // by public-schedule). Rivalry pairings ARE the seeding, so fall back to
@@ -272,6 +287,7 @@ export default async (req) => {
       matches: enriched,
       feed,
       standings,
+      standingsProvisional,
       updatedAt: new Date().toISOString(),
     });
   } catch (err) {
@@ -455,6 +471,7 @@ async function loadStandings(circuitLetter, divisionFilter, teamMeta) {
           emoji: t.teamEmoji || meta.emoji || '',
           color: meta.color || null,
           rank: i + 1,
+          provisional: !!t.provisional,
           mp: t.matchPointsFor ?? t.pts ?? 0,
           mpAgainst: t.matchPointsAgainst ?? 0,
           pointsFor: t.pointsScored ?? null,

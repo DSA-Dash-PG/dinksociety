@@ -14,6 +14,7 @@ import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import {
   SLOT_KEYS, PAIRS, gameStatus, computeRound, normalizeScore,
 } from './lib/score-helpers.js';
+import { publicSuspension } from './lib/live-results.js';
 
 export default async (req) => {
   const verified = await verifyAdminSession(req);
@@ -123,8 +124,10 @@ export default async (req) => {
       const matchPoints = { home: r1.homePoints + r2.homePoints, away: r1.awayPoints + r2.awayPoints };
 
       // Overall match status
+      const suspension = publicSuspension(m);
       let matchState;
       if (scoreRec?.finalizedAt || m.finalizedAt) matchState = 'final';
+      else if (suspension) matchState = 'suspended';
       else if (mismatches.length > 0) matchState = 'conflict';
       else if (counts.confirmed === 12) matchState = 'ready';
       else if (counts.confirmed > 0 || counts.partial > 0) matchState = 'active';
@@ -144,6 +147,7 @@ export default async (req) => {
         scheduledAt: m.scheduledAt || null,
         startTime: m.startTime || null,
         championship: !!m.championship,
+        suspended: suspension,
         home: { id: homeId, name: m.teamA?.name },
         away: { id: awayId, name: m.teamB?.name },
         lineup: {

@@ -7,6 +7,7 @@ import { getStore } from '@netlify/blobs';
 import { verifyCaptainSession, unauthResponse } from './lib/auth.js';
 import { circuitCode } from './lib/circuit.js';
 import { isRevealTime, DEFAULT_LOCK_OFFSET_MIN } from './lib/lineup-helpers.js';
+import { effectiveStart, publicSuspension } from './lib/live-results.js';
 
 export default async (req) => {
   const verified = await verifyCaptainSession(req);
@@ -65,8 +66,10 @@ export default async (req) => {
 
         const myLocked = !!myLineup?.lockedAt;
         const oppLocked = !!oppLineup?.lockedAt;
-        // Simultaneous reveal: both locked AND match start has arrived.
-        const revealed = myLocked && oppLocked && isRevealTime(m.scheduledAt);
+        // Simultaneous reveal: both locked AND match start has arrived (the
+        // resume time for a suspended / carried-over match).
+        const revealed = myLocked && oppLocked && isRevealTime(effectiveStart(m));
+        const suspension = publicSuspension(m);
 
         myMatches.push({
           id: m.id,
@@ -96,6 +99,8 @@ export default async (req) => {
           scoreA: m.scoreA ?? null,
           scoreB: m.scoreB ?? null,
           finalizedAt: m.finalizedAt || null,
+          suspended: suspension,
+          resumeAt: suspension?.resumeAt || null,
         });
       }
     }

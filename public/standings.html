@@ -105,6 +105,13 @@
     .team-badge--eliminated { background: var(--color-red-dim);   color: var(--color-red); }
     .team-badge--inhunt     { background: var(--color-gold-dim);  color: var(--color-gold); }
     .team-badge--done       { background: rgba(255,255,255,0.07); color: var(--color-text-faint); }
+    /* Live / unofficial — an in-progress match is folded into this row */
+    .team-badge--live       { background: rgba(232,181,66,0.14); color: #e8b542; }
+    .live-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: #e8b542; background: rgba(232,181,66,0.12); border: 1px solid rgba(232,181,66,0.35); border-radius: 9999px; padding: 3px 10px; }
+    .live-chip__dot { width: 7px; height: 7px; border-radius: 50%; background: #e8b542; animation: live-pulse 1.4s ease-in-out infinite; }
+    @keyframes live-pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+    .live-note { margin: 0 0 var(--space-4); padding: 10px 14px; border: 1px solid rgba(232,181,66,0.35); background: rgba(232,181,66,0.07); border-radius: var(--radius-md); font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
+    .live-note b { color: #e8b542; }
 
     /* Week filter chips + snapshot note + rivalry banner */
     .wk-chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
@@ -592,6 +599,31 @@
   }
 
   // ── Live season ──────────────────────────────────────────────────
+  // ── Live / unofficial standings ────────────────────────────────
+  // lib/live-results.js: a match that has started and has confirmed games
+  // counts straight away. Until every match of the night is signed off the
+  // standings are unofficial — the chip, the row badge and this note say so.
+  function liveCount() {
+    const divData = standingsData?.divisions?.[activeDivision];
+    if (divData && typeof divData.provisional === 'number') return divData.provisional;
+    return (standingsData?.provisional?.count) || 0;
+  }
+  function liveNoteHtml() {
+    const ms = ((standingsData?.provisional?.matches) || []).filter(m => !activeDivision || m.division === activeDivision);
+    const susp = ms.filter(m => m.suspended);
+    const parts = [];
+    if (ms.length) parts.push('<b>Live · unofficial.</b> ' + ms.length + ' match' + (ms.length === 1 ? ' is' : 'es are') + ' still in progress — every confirmed game counts the moment it\'s confirmed, and the standings become official once both captains sign off.');
+    if (susp.length) {
+      const when = susp[0].resumeAt ? fmtDateTime(susp[0].resumeAt) : null;
+      parts.push(susp.length + ' rained-out match' + (susp.length === 1 ? '' : 'es') + ' resume' + (susp.length === 1 ? 's' : '') + (when ? ' ' + when : ' next game night') + ' — the games already played are final.');
+    }
+    return parts.length ? '<div class="live-note">' + parts.join(' ') + '</div>' : '';
+  }
+  function fmtDateTime(iso) {
+    try { return new Date(iso).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }); }
+    catch { return ''; }
+  }
+
   function renderLive(el) {
     const divData = standingsData?.divisions?.[activeDivision];
     if (!divData?.teams?.length) {
@@ -677,15 +709,17 @@
     if (selectedWeek === 'current') {
       teams = divData.teams.map(t => {
         const remaining = Math.max(0, regMatchesFor(t.teamId) - (t.matchesPlayed || 0));
-        return { ...t, remaining, maxPts: t.matchPointsFor + remaining * SEASON.maxPtsPerMatch };
+        // A live match still has rounds open — those points are still on the table.
+        return { ...t, remaining, maxPts: t.matchPointsFor + remaining * SEASON.maxPtsPerMatch + (t.pendingRoundPts || 0) };
       });
       // The hunt turns on once Week 5 is complete — i.e. Rivalry Week (the
       // last week of the regular season) is the week being played.
       hunt = weeksPlayedLive >= RIVALRY_WEEK - 1;
       updated = standingsData.lastUpdated
-        ? '<span class="stand-card__updated">Updated ' + fmtDate(standingsData.lastUpdated) + '</span>' : '';
+        ? '<span class="stand-card__updated">' + (liveCount() ? '<span class="live-chip"><span class="live-chip__dot"></span>Live · unofficial</span> &nbsp;' : '') + 'Updated ' + fmtDate(standingsData.lastUpdated) + '</span>' : '';
+      if (liveCount()) preTable += liveNoteHtml();
       if (hunt && weeksPlayedLive < RIVALRY_WEEK) {
-        preTable = IS_DOUBLE
+        preTable += IS_DOUBLE
           ? '<div class="rivalry-banner">Final week of the regular season · Championship Night seeds lock tonight</div>'
           : '<div class="rivalry-banner">Rivalry week · last week of the regular season</div>';
       }
@@ -894,7 +928,7 @@
       const diffStr  = !seasonStarted ? '—' : (diff===0 ? '0' : diff>0 ? '+'+diff : String(diff));
       const diffCls  = !seasonStarted ? 'col-muted' : diff>0 ? 'col-diff-pos' : diff<0 ? 'col-diff-neg' : '';
       const ptsCls   = pts===0 ? 'col-pts col-pts--zero' : 'col-pts';
-      const rds      = !seasonStarted ? '—' : (t.matchesPlayed || 0) * 2;
+      const rds      = !seasonStarted ? '—' : (t.roundsPlayed != null ? t.roundsPlayed : (t.matchesPlayed || 0) * 2);
       const psFor    = !seasonStarted ? '—' : (t.pointsScored || 0);
       const psAg     = !seasonStarted ? '—' : (t.pointsAgainst || 0);
       // A team that isn't playing the second half keeps its results but is out
@@ -905,8 +939,9 @@
       const gamesLeft = leaving && (scheduleData?.weeks || []).some(w => (w.matches || []).some(m =>
         (m.teamAId === t.teamId || m.teamBId === t.teamId) && !m.finalizedAt));
       const seasonDone = leaving && !gamesLeft;
-      const badge    = seasonDone ? '<span class="team-badge team-badge--done">Season complete</span>'
-                     : hunt ? badgeHtml(t.status) : '';
+      const liveBadge = t.provisional ? '<span class="team-badge team-badge--live" title="Includes a match still in progress — unofficial until it\'s finalized">● Live</span>' : '';
+      const badge    = (seasonDone ? '<span class="team-badge team-badge--done">Season complete</span>'
+                     : hunt ? badgeHtml(t.status) : '') + liveBadge;
 
       const finCls  = t.finish && t.finish.cls ? ' stand-row--' + t.finish.cls : '';
       const finChip = t.finish ? '<span class="fin-chip fin-' + t.finish.n + '">' + t.finish.chip + '</span>' : '';
@@ -1092,9 +1127,9 @@
   }).catch(() => {}).then(load).then(startLivePoll);
 
   // ── Live refresh ─────────────────────────────────────────────────
-  // Standings only move when matches finalize, so a relaxed 30s poll is
-  // plenty. ETag/304 + CDN caching make unchanged polls nearly free, and
-  // the poller sleeps whenever the tab is hidden.
+  // Standings move on every confirmed game on a game night (live, unofficial)
+  // and on finalize, so poll every 15s. ETag/304 + CDN caching make unchanged
+  // polls nearly free, and the poller sleeps whenever the tab is hidden.
   //
   // Started ONLY after the season resolves. start() polls immediately, so
   // starting it at parse time fired a fetch on the 'circuit-i' guess; that
@@ -1103,7 +1138,7 @@
   function startLivePoll() {
   DSLivePoll.create({
     url: function () { return '/.netlify/functions/public-standings?season=' + SEASON.id; },
-    interval: 30000,
+    interval: 15000,
     onUpdate(data) {
       standingsData = data;
       isPreseason = !standingsData?.divisions;

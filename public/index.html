@@ -605,7 +605,7 @@
     var WEEKS = [];            // schedule weeks
     var TEAMS = [];            // standings blob teams (first division), blob order
     var TEAMINFO = {};         // public-teams by id and by lowercased name: { photoUrl, color, emoji }
-    var PERF = [], PLAYERS = null, PACE = null, STAND_DIV = null;
+    var PERF = [], PLAYERS = null, PACE = null, STAND_DIV = null, STAND_LIVE = 0;
     var DROP_LATEST = null, DROP_INDEX = null, DROPS = {};
     var FEATURED = null;       // the most recently PUBLISHED edition, whatever kind it is (recap, preview, special)
     var LAD = null;            // public-ladder-home: { next, last, writeups } — the ladders' share of the front page
@@ -709,7 +709,9 @@
       var pw=prevPlayed(tw), prev={}; if(pw) tableThrough(pw).forEach(function(r){ prev[r.id]=r.rank; });
       var latest=(w>=MAXWEEK);
       var blobPts=TEAMS.reduce(function(s,t){return s+(t.matchPointsFor||0);},0), calcPts=calc.reduce(function(s,r){return s+r.pts;},0);
-      var useBlob=latest && TEAMS.length && (blobPts===calcPts || !calcPts);
+      // Live night: the blob carries tonight's confirmed games (unofficial) that
+      // the finalized schedule can't — always trust it then.
+      var useBlob=latest && TEAMS.length && (blobPts===calcPts || !calcPts || STAND_LIVE>0);
       var rows;
       if(useBlob){
         rows=TEAMS.map(function(t,i){ var c=byId[t.teamId]||{nights:[]};
@@ -937,7 +939,8 @@
       var rows=standRows(w), latest=w>=MAXWEEK, tw=lastTableWeek(w);
       var topIds=[];
       if(latest&&STAND_DIV&&STAND_DIV.weeklyTopTeams){ var wks=Object.keys(STAND_DIV.weeklyTopTeams).map(Number).sort(function(a,b){return b-a;}); for(var i=0;i<wks.length;i++){ var arr=STAND_DIV.weeklyTopTeams[wks[i]]; if(arr&&arr.length){ topIds=arr; break; } } }
-      $('hp-stand-h').innerHTML=(latest||!tw)?'Standings':'Standings <span class="lime">after Week '+tw+'</span>';
+      var liveTag=(latest&&STAND_LIVE>0)?' <span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:2px 9px;border-radius:9999px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#e8b542;background:rgba(232,181,66,0.12);border:1px solid rgba(232,181,66,0.35);vertical-align:middle;" title="Includes tonight\'s in-progress games — official once every match is signed off"><span style="width:6px;height:6px;border-radius:50%;background:#e8b542;"></span>Live · unofficial</span>':'';
+      $('hp-stand-h').innerHTML=((latest||!tw)?'Standings':'Standings <span class="lime">after Week '+tw+'</span>')+liveTag;
       $('rc-stand-body').innerHTML=rows.map(function(r){
         var fin=(latest&&HOME_FINISH)?(HOME_FINISH[r.name]||null):null;
         var chip=fin&&fin.n<=3?'<span class="fin-chip fin-'+fin.n+'">'+esc(fin.chip)+'</span>':'';
@@ -1625,7 +1628,7 @@
         var lb=res[0], st=res[1], pl=res[2], dropPayload=res[3], sched=res[4];
         WEEKS=((sched&&!sched.empty&&sched.weeks)||[]).slice().sort(function(a,b){return a.week-b.week;});
         HOME_FINISH=computeBracketFinish();
-        if(st&&st.divisions){ var dk=Object.keys(st.divisions)[0]; STAND_DIV=st.divisions[dk]||null; TEAMS=(STAND_DIV&&STAND_DIV.teams)||[]; }
+        if(st&&st.divisions){ var dk=Object.keys(st.divisions)[0]; STAND_DIV=st.divisions[dk]||null; TEAMS=(STAND_DIV&&STAND_DIV.teams)||[]; STAND_LIVE=(STAND_DIV&&STAND_DIV.provisional)||(st.provisional&&st.provisional.count)||0; }
         PLAYERS=(pl&&pl.players)?pl.players:null;
         D_NEED=(pl&&pl.needGames)||0;
         try { if(window.DSEntity) DROP_IDX = window.DSEntity.buildIndex({ teams: [], players: PLAYERS ? Object.values(PLAYERS) : [], standings: st || null }); } catch(e){ DROP_IDX = null; }

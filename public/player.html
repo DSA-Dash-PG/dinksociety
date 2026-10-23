@@ -435,6 +435,8 @@
             // A new season's roster entry has no photo stamp of its own; the
             // endpoint finds the photo under whichever of her ids it was uploaded to.
             if (!rosterPlayer.photoUrl && hd.photoUrl) rosterPlayer.photoUrl = hd.photoUrl;
+            // Live / unofficial: in a match still in progress this season.
+            if (hd.player && hd.player.provisional && (typeof VIEWED_IS_CURRENT === "undefined" || VIEWED_IS_CURRENT)) rosterPlayer.provisional = true;
           }
         } catch {}
       }
@@ -625,12 +627,15 @@
       ].filter(([, v]) => v != null && v !== '');
       const vitals = vitalDefs.map(([l, v]) => vital(l, v)).join('');
 
-      const rankLine = ranks.unqualified
+      const rankLine = (ranks.unqualified
         ? 'Unqualified · not enough games yet'
         : [
             ranks.genderRank != null ? `${fmtRank(ranks.genderRank)} ${ranks.genderLabel.replace(' Ranking','')}` : null,
             ranks.overallRank != null ? `${fmtRank(ranks.overallRank)} Overall` : null,
-          ].filter(Boolean).join(' · ');
+          ].filter(Boolean).join(' · '))
+        // Live / unofficial: this player is in a match still in progress
+        // (lib/live-results.js) — their numbers move until it's finalized.
+        + (rp.provisional ? ` <span style="display:inline-flex;align-items:center;gap:5px;margin-left:6px;padding:1px 8px;border-radius:9999px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#e8b542;background:rgba(232,181,66,0.12);border:1px solid rgba(232,181,66,0.35);vertical-align:middle;" title="Includes a match still in progress — unofficial until it's finalized"><span style="width:6px;height:6px;border-radius:50%;background:#e8b542;"></span>Live</span>` : '');
 
       html += `<div class="mlp-hero">
         <div class="mlp-hero__top">

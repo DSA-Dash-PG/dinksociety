@@ -256,7 +256,16 @@ function pushPublicMatch(weekMap, w, division, m, emojiById, br, emojiByName = {
     pointsA: m.finalizedAt ? (m.pointsA ?? null) : null,
     pointsB: m.finalizedAt ? (m.pointsB ?? null) : null,
     finalizedAt: m.finalizedAt || null,
-    status: m.finalizedAt ? 'final' : 'scheduled',
+    // Rain-out carry-over (lib/live-results.js): when the rest is played, which
+    // games are already final, and the confirmed totals at the stoppage.
+    suspended: (m.suspended && !m.finalizedAt) ? {
+      resumeAt: m.suspended.resumeAt || null,
+      lockedCount: (m.suspended.lockedSlots || []).length,
+      remaining: 12 - (m.suspended.lockedSlots || []).length,
+      snapshot: m.suspended.snapshot || null,
+      note: m.suspended.note || null,
+    } : null,
+    status: m.finalizedAt ? 'final' : (m.suspended ? 'suspended' : 'scheduled'),
     division,
     // ── Bracket fields (null for ordinary round-robin matches) ──
     phase: br ? (br.phase || null) : null,

@@ -64,9 +64,11 @@ export default async (req) => {
     const body = await req.json();
     const incoming = body.games || {};
 
+    let touchedCount = 0;
     const r = await withScore(scoresStore, scoreKey, match, (existing) => {
       const now = new Date().toISOString();
       let touched = 0;
+      touchedCount = 0;
       for (const slot of SLOT_KEYS) {
         if (!(slot in incoming)) continue;
         const g = incoming[slot] || {};
@@ -104,10 +106,17 @@ export default async (req) => {
         existing.updatedBy = admin.email;
         existing.adminEdited = true;
       }
+      touchedCount = touched;
     });
 
     if (r.abort) return json(r.abort, r.abort.status || 400);
     if (r.conflict) return json({ error: 'A captain was saving at the same moment — please try again.' }, 503);
+    // Live (unofficial) standings follow every confirmed-game change on a
+    // match that isn't final yet (lib/live-results.js); finalize rebuilds too.
+    if (touchedCount && !r.record?.finalizedAt) {
+      try { await rebuildStandings(match.circuit); }
+      catch (err) { console.error('live rebuildStandings after admin edit failed:', err); }
+    }
     return json({ ok: true, score: decorate(r.record, !!match.championship) });
   }
 
@@ -287,6 +296,7 @@ function matchInfo(match) {
     home: { id: match.teamA.id, name: match.teamA.name },
     away: { id: match.teamB.id, name: match.teamB.name },
     finalizedAt: match.finalizedAt || null,
+    suspended: match.suspended && !match.finalizedAt ? match.suspended : null,
   };
 }
 

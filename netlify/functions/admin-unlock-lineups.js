@@ -69,6 +69,8 @@ export default async (req) => {
       m.round2 = null;
       m.finalizedAt = null;
       m.playedAt = null;
+      // A full reopen starts the night over — any carry-over state goes too.
+      delete m.suspended;
       data.updatedAt = now;
       data.updatedBy = admin.email;
       await scheduleStore.setJSON(b.key, data);
