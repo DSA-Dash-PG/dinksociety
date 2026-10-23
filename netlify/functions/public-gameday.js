@@ -272,9 +272,18 @@ export default async (req) => {
       }
     }
 
-    // gameNight drives whether the ticker shows at all. Tie it to the clock,
-    // not to match status, so nothing can strand it on-screen.
-    const anyToday = enriched.some(m => isTonight(m.scheduledAt));
+    // gameNight drives whether the ticker / home-page live card shows at all.
+    // Tie it to the clock, not to match status, so nothing can strand it
+    // on-screen — with one exception: a night that was called off part way
+    // (every unfinished match suspended) is OVER the moment the admin
+    // suspends it. The board shouldn't sit on the home page for a day showing
+    // half a night; it comes back for the resume night, which is why the
+    // clock is read off each match's effective start (the resume time while
+    // suspended, the original time otherwise).
+    const nightCalledOff = enriched.length > 0
+      && enriched.every(m => m.status === 'final' || m.suspended)
+      && enriched.some(m => m.suspended);
+    const anyToday = !nightCalledOff && enriched.some(m => isTonight(effectiveStart(m)));
 
     return etagJson(req, {
       season: seasonId,
