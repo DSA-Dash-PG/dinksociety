@@ -238,6 +238,7 @@ function pushPublicMatch(weekMap, w, division, m, emojiById, br, emojiByName = {
     courtSet: m.courtSet ?? null,
     scheduledAt: m.scheduledAt || null,
     startTime: m.startTime || null,
+    startNote: m.startNote || null,
     endTime: m.endTime || null,
     scoreA: m.scoreA ?? null,
     scoreB: m.scoreB ?? null,

@@ -7353,6 +7353,7 @@
         '<div class="we-fld"><label>Start time</label><select id="we-time">' + timeOpts + '</select></div>' +
         '<div class="we-fld"><label>End time</label><select id="we-end">' + endOpts + '</select></div>' +
         '<div class="we-fld"><label>Venue</label><select id="we-venue">' + venueOpts + '</select></div>' +
+        '<div class="we-fld" style="flex-basis:100%;"><label>Start note <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--color-text-faint);">(optional — shown instead of the time, e.g. “After the Week 6 games finish”; the time above still locks and reveals lineups)</span></label><input type="text" id="we-startnote" value="' + h(((wk.matches || []).find(m => m.startNote) || {}).startNote || '') + '" placeholder="Leave blank to show the start time" style="width:100%;background:var(--color-surface-2);color:var(--color-text);border:1px solid var(--color-border);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:12px;"></div>' +
         '<div class="we-hint">All matches in a week start at the same time. Courts are set per match below.</div>' +
         '<label class="we-all" style="flex-basis:100%;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--color-text-muted);cursor:pointer;">' +
           '<input type="checkbox" id="we-all" style="width:16px;height:16px;accent-color:var(--color-lime);">' +
@@ -7401,6 +7402,7 @@
     const timeStr = card.querySelector('#we-time').value;
     const endStr = (card.querySelector('#we-end').value || '').trim() || null;
     const venue = (card.querySelector('#we-venue').value || '').trim() || null;
+    const startNote = ((card.querySelector('#we-startnote') || {}).value || '').trim().slice(0, 80) || null;
     if (endStr) {
       const st = parseTime12(timeStr), et = parseTime12(endStr);
       if (st && et && (et.h * 60 + et.m) <= (st.h * 60 + st.m)) return setErr('End time must be after the start time.');
@@ -7451,7 +7453,7 @@
       }
       for (const d of desired) {
         const A = teamById(d.home), B = teamById(d.away);
-        const body = { teamA: { id: A.id, name: A.name }, teamB: { id: B.id, name: B.name }, venue, endTime: endStr };
+        const body = { teamA: { id: A.id, name: A.name }, teamB: { id: B.id, name: B.name }, venue, endTime: endStr, startNote };
         if (d.ca && d.cb) { body.courtA = d.ca; body.courtB = d.cb; body.court = courtStr(d.ca, d.cb); }
         else { body.courtA = null; body.courtB = null; body.court = null; }
         if (scheduledAt) { body.scheduledAt = scheduledAt; body.startTime = startTime; }
@@ -8159,12 +8161,13 @@
     return d.toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
-  // Default resume time: the same weekday next week, one hour before this
-  // match's start (the carry-over is played before the regular games).
+  // Default resume time: the same weekday and start time next week (the
+  // carry-over is played first; that week's own games follow when teams are
+  // ready — give those a start note in the week editor).
   function defaultResume(m) {
     const d = m.scheduledAt ? new Date(m.scheduledAt) : new Date();
     if (isNaN(d)) return toLocalInput(new Date().toISOString());
-    const r = new Date(d.getTime() + 7 * 86400000 - 60 * 60000);
+    const r = new Date(d.getTime() + 7 * 86400000);
     return toLocalInput(r.toISOString());
   }
 

@@ -136,7 +136,9 @@ export default async (req) => {
 
     let body;
     try { body = await req.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
-    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'endTime', 'venue', 'notes', 'teamA', 'teamB'];
+    // startNote: a display-only "when" (e.g. "after the Week 6 games finish") shown
+    // in place of the clock time; scheduledAt still drives the lineup lock/reveal.
+    const allowedFields = ['court', 'courtA', 'courtB', 'courtSet', 'championship', 'scheduledAt', 'startTime', 'startNote', 'endTime', 'venue', 'notes', 'teamA', 'teamB'];
     const updates = {};
     for (const f of allowedFields) {
       if (f in body) updates[f] = body[f];

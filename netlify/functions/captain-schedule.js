@@ -83,6 +83,7 @@ export default async (req) => {
           venue: m.venue || null,
           scheduledAt: m.scheduledAt || null,
           startTime: m.startTime || null,
+          startNote: m.startNote || null,
           endTime: m.endTime || null,
           myRole,
           myTeam: { id: teamId, name: ctx.team.name, emoji: myEmoji },
