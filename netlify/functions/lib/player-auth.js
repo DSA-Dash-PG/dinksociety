@@ -9,6 +9,35 @@ import { isTestTeam, circuitCode } from './circuit.js';
 import { liveCircuit } from './current-season.js';
 import { getJSON } from './retry.js';
 import { getLiteByEmail, getLiteById } from './ladder-players.js';
+import { identityIndex, listRosterEntries } from './league-identity.js';
+
+// A returning player who registered this season under a DIFFERENT email
+// (work address this year, the family gmail last year) signs in with whichever
+// one she remembers. Email alone would land her on last season's team, so once
+// the email has found at least one roster entry, widen the search to every
+// roster entry the identity map says is the same person (admin-linked or
+// shared-email groups, lib/league-identity.js). `teams` is the loaded team
+// list; `matches` is mutated in place.
+async function widenByIdentity(teams, matches) {
+  if (!matches.length) return;
+  try {
+    const index = await identityIndex();
+    const ids = new Set();
+    for (const m of matches) for (const id of index.idsFor(m.playerId)) ids.add(id);
+    const have = new Set(matches.map(m => `${m.teamId}|${m.playerId}`));
+    for (const team of teams) {
+      if (!team?.roster) continue;
+      for (const p of team.roster) {
+        if (!ids.has(p.id) || p.archived || p.pendingAdd) continue;
+        if (have.has(`${team.id}|${p.id}`)) continue;
+        matches.push({ playerId: p.id, teamId: team.id, name: p.name, team, viaIdentity: true });
+        have.add(`${team.id}|${p.id}`);
+      }
+    }
+  } catch (e) {
+    console.warn('identity widening skipped:', e?.message || e);
+  }
+}
 
 const COOKIE_NAME = 'ds_player_session';
 const SESSION_DAYS = 30;
@@ -104,6 +133,7 @@ export async function findPlayerByEmail(rawEmail) {
     );
     if (entry) matches.push({ playerId: entry.id, teamId: team.id, name: entry.name, team });
   }
+  await widenByIdentity(teams, matches);
   if (matches.length) {
     if (matches.length === 1) return matches[0];
     const live = await liveCircuit().catch(() => null);
@@ -137,6 +167,10 @@ export async function findAllPlayerTeamsByEmail(rawEmail, { includeTest = false 
       ((p.email || '').toLowerCase() === norm)
     );
     if (entry) out.push({ playerId: entry.id, teamId: team.id, name: entry.name, team });
+  }
+  await widenByIdentity(teams, out);
+  if (!includeTest) {
+    for (let i = out.length - 1; i >= 0; i--) if (isTestTeam(out[i].team)) out.splice(i, 1);
   }
   out.sort((a, b) => (a.team.name || '').localeCompare(b.team.name || ''));
   return out;
@@ -193,8 +227,21 @@ export async function requirePlayer(req) {
   const player = team.roster.find(p => p.id === session.playerId);
   if (!player) return null;
   const pEmail = (player.normalizedEmail || (player.email || '').toLowerCase());
-  if (pEmail && pEmail !== session.email) return null;
+  // A session re-pointed through the identity map (widenByIdentity) carries
+  // the email she signed in with, which may be last season's address: accept
+  // it when that address belongs to another roster entry of the same person.
+  if (pEmail && pEmail !== session.email && !(await emailBelongsToPerson(player.id, session.email))) return null;
   return { session: { id: sessionId, email: session.email }, playerId: session.playerId, teamId: session.teamId, team, player };
+}
+
+async function emailBelongsToPerson(playerId, email) {
+  const norm = normalizeEmail(email);
+  if (!norm || !playerId) return false;
+  try {
+    const [index, entries] = await Promise.all([identityIndex(), listRosterEntries()]);
+    const ids = new Set(index.idsFor(playerId));
+    return entries.some(e => ids.has(e.id) && (e.normalizedEmail || normalizeEmail(e.email)) === norm);
+  } catch { return false; }
 }
 
 const RESOLVE_EVERY_MS = 6 * 60 * 60 * 1000;

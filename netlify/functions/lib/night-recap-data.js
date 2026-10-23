@@ -654,14 +654,33 @@ export function dueWeek(matches, now = new Date()) {
   const finalized = matches.filter(m => m.finalizedAt);
   if (!finalized.length) return { week: null, due: false, reason: 'no finalized matches' };
   const week = finalized.reduce((mx, m) => Math.max(mx, m.week || 0), 0);
+  return dueForWeek(matches, week, now);
+}
+
+/**
+ * Every week that should be mailed right now, oldest first — the same rules as
+ * dueWeek() applied to each week that has a finalized match. Normally one
+ * week; after a rain-out the carried-over week and the regular week can both
+ * finalize on the same night, and the older one must not be skipped.
+ */
+export function dueWeeks(matches, now = new Date()) {
+  const weeks = [...new Set(matches.filter(m => m.finalizedAt).map(m => Number(m.week)).filter(Number.isFinite))].sort((a, b) => a - b);
+  return weeks.map(w => dueForWeek(matches, w, now)).filter(d => d.due);
+}
+
+// The night a match was (or will be) played: the resume time for a match that
+// was rained out and carried over, else its scheduled time.
+const playedAt = (m) => (m.suspended && m.suspended.resumeAt) || m.scheduledAt || null;
+
+export function dueForWeek(matches, week, now = new Date()) {
   const ofWeek = matches.filter(m => m.week === week && m.teamA?.id && m.teamB?.id);
-  const started = (m) => m.scheduledAt && new Date(m.scheduledAt).getTime() <= now.getTime();
+  const started = (m) => playedAt(m) && new Date(playedAt(m)).getTime() <= now.getTime();
   const open = ofWeek.filter(m => !m.finalizedAt && started(m));
   if (open.length) return { week, due: false, reason: `${open.length} match${open.length === 1 ? '' : 'es'} not finalized yet` };
 
   const done = ofWeek.filter(m => m.finalizedAt);
   if (!done.length) return { week, due: false, reason: 'no finalized matches with both teams set' };
-  const nightMs = Math.max(...done.map(m => new Date(m.scheduledAt || m.finalizedAt).getTime()));
+  const nightMs = Math.max(...done.map(m => new Date(playedAt(m) || m.finalizedAt).getTime()));
   const lastFinal = Math.max(...done.map(m => new Date(m.finalizedAt).getTime()));
   const nightAt = new Date(nightMs).toISOString();
   if (now.getTime() - nightMs > STALE_MS) return { week, due: false, reason: 'night is more than three days old', nightAt };

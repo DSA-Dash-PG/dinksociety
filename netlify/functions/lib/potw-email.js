@@ -84,10 +84,15 @@ export async function fetchLatestWinners(circuit = 'I', targetWeek = null) {
   const data = await res.json();
   const wk = Array.isArray(data.weeklyTopPerformers) ? data.weeklyTopPerformers : [];
   if (!wk.length) return null;
-  // A specific past week if asked for, otherwise the highest week number present.
+  // A specific past week if asked for, otherwise the highest OFFICIAL week —
+  // a week with a match still in progress (lib/live-results.js: `provisional`)
+  // can change its winners until every match is finalized, so it is never
+  // drafted. Asking for a provisional week explicitly is refused the same way.
+  const official = wk.filter(e => !e.provisional);
+  if (!official.length) return null;
   const entry = targetWeek != null
-    ? wk.find(e => Number(e.week) === Number(targetWeek))
-    : wk.reduce((a, b) => (Number(b.week) > Number(a.week) ? b : a));
+    ? official.find(e => Number(e.week) === Number(targetWeek))
+    : official.reduce((a, b) => (Number(b.week) > Number(a.week) ? b : a));
   if (!entry) return null;
   const winners = [];
   const take = (arr, key, gender) => {
@@ -98,6 +103,17 @@ export async function fetchLatestWinners(circuit = 'I', targetWeek = null) {
   take(entry.women, 'women', 'F');
   if (!winners.length) return null;
   return { week: Number(entry.week), label: entry.label || `Week ${entry.week}`, winners };
+}
+
+/** Every OFFICIAL week number on the leaderboard, highest first. */
+export async function officialWeeks(circuit = 'I') {
+  const res = await fetch(`${siteUrl()}/.netlify/functions/public-leaderboard?circuit=${encodeURIComponent(circuitCode(circuit))}`, {
+    headers: { 'Cache-Control': 'no-cache' },
+  });
+  if (!res.ok) throw new Error(`public-leaderboard ${res.status}`);
+  const data = await res.json();
+  const wk = Array.isArray(data.weeklyTopPerformers) ? data.weeklyTopPerformers : [];
+  return wk.filter(e => !e.provisional).map(e => Number(e.week)).filter(Number.isFinite).sort((a, b) => b - a);
 }
 
 // ── 2. recipient resolution from the teams blob (captain fallback) ───────────

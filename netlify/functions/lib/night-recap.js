@@ -42,7 +42,7 @@ import { sendNotify } from './notify-prefs.js';
 import { sendEmail } from './email.js';
 import { recordSend } from './recap-tracking.js';
 import { liveCircuit } from './current-season.js';
-import { buildNightModels, matchGames, dueWeek } from './night-recap-data.js';
+import { buildNightModels, matchGames, dueWeek, dueWeeks } from './night-recap-data.js';
 import { renderNightRecapEmail } from './night-recap-email.js';
 
 const STORE = 'night-recap';
@@ -383,15 +383,26 @@ export async function runDue(now = new Date()) {
   if (!settings.autoSend) return { ok: true, sent: false, reason: 'auto-send is off' };
   const circuit = await liveCircuit(now.getTime());
   const { code, matches } = await loadSeasonMatches(circuit);
-  const due = dueWeek(matches, now);
-  if (!due.due) return { ok: true, sent: false, circuit: code, week: due.week, reason: due.reason };
-  if (settings.since && new Date(due.nightAt) < new Date(settings.since)) {
-    return { ok: true, sent: false, circuit: code, week: due.week, reason: 'night was played before auto-send was switched on' };
+  // Every due week, oldest first (two can be due after a rain-out carry-over).
+  // One kick per run: the background sender handles one week at a time, and
+  // the cron comes back every 15 minutes for the next.
+  const dues = dueWeeks(matches, now);
+  if (!dues.length) {
+    const due = dueWeek(matches, now);
+    return { ok: true, sent: false, circuit: code, week: due.week, reason: due.reason };
   }
-  const q = await queueWeek(code, due.week, { by: 'cron' });
-  if (!q.ok) return { ok: true, sent: false, circuit: code, week: due.week, reason: q.reason };
-  const kicked = await kickBackground(q).catch(e => { console.error('[night-recap] kick failed:', e?.message || e); return false; });
-  return { ok: true, sent: kicked, circuit: code, week: due.week, reason: kicked ? 'queued' : 'background sender did not accept the job' };
+  let last = null;
+  for (const due of dues) {
+    if (settings.since && new Date(due.nightAt) < new Date(settings.since)) {
+      last = { ok: true, sent: false, circuit: code, week: due.week, reason: 'night was played before auto-send was switched on' };
+      continue;
+    }
+    const q = await queueWeek(code, due.week, { by: 'cron' });
+    if (!q.ok) { last = { ok: true, sent: false, circuit: code, week: due.week, reason: q.reason }; continue; }
+    const kicked = await kickBackground(q).catch(e => { console.error('[night-recap] kick failed:', e?.message || e); return false; });
+    return { ok: true, sent: kicked, circuit: code, week: due.week, reason: kicked ? 'queued' : 'background sender did not accept the job' };
+  }
+  return last || { ok: true, sent: false, circuit: code, week: null, reason: 'nothing to send' };
 }
 
 /** What the admin panel shows for the live week. */

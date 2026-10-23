@@ -1322,6 +1322,7 @@
       <div class="chef-week-head" data-chef-week="${week.week}">
         <span class="chef-week-caret" style="transform:rotate(${open ? '90' : '0'}deg)">▶</span>
         <span class="chef-week-label">📅 ${esc(week.label)}${week.date ? ' · ' + esc(fmtDate(week.date)) : ''}</span>
+        ${week.provisional ? '<span style="display:inline-flex;align-items:center;gap:5px;margin-left:8px;padding:2px 9px;border-radius:9999px;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#e8b542;background:rgba(232,181,66,0.12);border:1px solid rgba(232,181,66,0.35);" title="This week still has games to play — the winners can change until every match is finalized"><span style="width:6px;height:6px;border-radius:50%;background:#e8b542;"></span>Unofficial · games left</span>' : ''}
       </div>
       ${body}
     </div>`;
@@ -1823,6 +1824,13 @@
   }).catch(() => {}).then(() => {
     SEASON_READY = true;
     loadSeasonOptions();
+    // readUrl() activated the section before the season resolved, so a deep
+    // link to a framed tab (?view=tvt / pvp / nvz) loaded its iframe for the
+    // default season (I). Re-activate now that state.circuit is settled so the
+    // frame reloads for the right season — otherwise Team Matchup shows
+    // Season 1 teams under the Season 2 heading.
+    const top = SECTION_TOP[state.section] || 'rankings';
+    if (top === 'pvp' || top === 'tvt' || state.section === 'nvz') activate(state.section, true);
     return Promise.all([loadPlayerStats(), loadStandings(), loadPotw()]).then(() => {
       renderHero(); renderAll();
     });
