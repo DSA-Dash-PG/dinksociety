@@ -2514,6 +2514,10 @@
           // edits — defer to the captain's next blur instead.
           if (!state.scoreDirty) await refreshScoresheet();
           else state.pendingScoreRender = true;
+        } else if (state.frozenSlots && state.frozenSlots.size) {
+          // Rained out: the games already played keep their scores on the
+          // sheet (read-only) while the rest of the lineup is being redone.
+          await refreshFrozenPreview(data);
         } else {
           renderScoresheetPreview(data);
         }
@@ -2588,6 +2592,30 @@
         awayLineup: myRole === 'away' ? mine : oppKnown,
         score: { games: {}, computed: {}, finalizedAt: null, homeSubmittedAt: null, awaySubmittedAt: null },
       });
+    }
+
+    // Suspended match, before the resumed games reveal: captain-score returns
+    // the frozen games (scores + pairs) and nothing else. Render that as the
+    // preview so Round 1 doesn't vanish from the captain's sheet.
+    async function refreshFrozenPreview(lineupData) {
+      if (!state.currentMatch) return;
+      try {
+        const res = await fetch(`/.netlify/functions/captain-score?match=${encodeURIComponent(state.currentMatch.id)}`, { credentials: 'include' });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!data.partial || !data.score) { renderScoresheetPreview(lineupData); return; }
+        // My side of the sheet follows my current draft (names from the roster).
+        const myGames = (lineupData?.myLineup?.games) || {};
+        const mine = { games: myGames };
+        if (data.myRole === 'home') data.homeLineup = mine; else data.awayLineup = mine;
+        data.preview = true;
+        data.revealed = false;
+        data.frozenPreview = true;
+        state.currentScore = data;
+        renderScoresheet(data);
+      } catch {
+        renderScoresheetPreview(lineupData);
+      }
     }
 
     async function refreshScoresheet(force) {
@@ -3346,6 +3374,10 @@
     }
 
     function renderScoresheetBanner(data) {
+      if (data.preview && data.frozenPreview) {
+        const n = state.frozenSlots ? state.frozenSlots.size : 0;
+        return `<div class="ss-banner"><strong>Rained out — ${n} game${n === 1 ? '' : 's'} already in the books.</strong> Those scores are final and already count in the standings. The remaining games show your current lineup; the opponent's pairs for them reveal when play resumes, and score entry unlocks then.</div>`;
+      }
       if (data.preview) {
         return `<div class="ss-banner"><strong>Pre-game preview.</strong> This is your scoresheet exactly as it will look on game day. Your opponent's pairs stay hidden until both lineups reveal at game time — score entry unlocks then. Use this to check your pairs are in line and ready to go.</div>`;
       }

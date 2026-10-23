@@ -264,6 +264,30 @@ test('captain lineup: frozen games keep their pair, the rest can change', { skip
   } finally { thaw(); CAPTAIN = null; }
 });
 
+test('captain score before the resumed games reveal: frozen games still come back', { skip }, async () => {
+  seed(); freeze();
+  try {
+    await Suspend(new Request('https://x.test/f?action=suspend&circuit=II', {
+      method: 'POST', body: JSON.stringify({ matchId: 'live', resumeAt: '2026-10-30T00:00:00.000Z', notify: false }),
+    }));
+    CAPTAIN = { team: DB.teams['team/B.json'], user: { email: 'fay@x.test', role: 'captain' } };
+    const res = await CapScore(new Request('https://x.test/f?match=live'));
+    const got = await res.json();
+    assert.equal(got.revealed, false);
+    assert.equal(got.partial, true);
+    assert.equal(got.myRole, 'away');
+    // Round 1 + R2G1 scores are there; the open games are blank.
+    assert.equal(got.score.games.r1g1.home, 3);
+    assert.equal(got.score.games.r1g1.frozen, true);
+    assert.equal(got.score.games.r2g1.home, 11);
+    assert.equal(got.score.games.r2g2.entered, null, 'the unconfirmed R2G2 entry is not shown');
+    assert.equal(got.score.computed.round1.scoredGames, 6);
+    // Opponent pairs only for the frozen games; my own side is my full draft.
+    assert.equal(Object.keys(got.homeLineup.games).length, 7);
+    assert.equal(Object.keys(got.awayLineup.games).length, 12);
+  } finally { thaw(); CAPTAIN = null; }
+});
+
 test('captain score: a frozen game cannot be edited', { skip }, async () => {
   seed(); freeze();
   try {

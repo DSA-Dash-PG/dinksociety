@@ -100,6 +100,36 @@ export default async (req) => {
   // ===== GET =====
   if (req.method === 'GET') {
     if (!revealed) {
+      // Suspended match, remaining games not yet revealed: the games played
+      // before the stoppage are final and public, so hand them back (scores +
+      // the pairs that played them, both sides) with everything else blanked.
+      // The client renders this as a read-only preview.
+      if (suspended && frozen.size) {
+        const score = await scoresStore.get(scoreKey, { type: 'json' }).catch(() => null)
+          || newScoreRecord(match);
+        normalizeScore(score, match.championship);
+        for (const slot of SLOT_KEYS) if (!frozen.has(slot)) score.games[slot] = { home: null, away: null, homeEntry: null, awayEntry: null };
+        const onlyFrozen = (lu) => {
+          if (!lu) return null;
+          const games = {};
+          for (const slot of frozen) if (lu.games?.[slot]) games[slot] = lu.games[slot];
+          return { teamId: lu.teamId, teamName: lu.teamName, games };
+        };
+        // My own side: every slot I have drafted (so the preview matches my
+        // builder); the opponent: frozen games only.
+        const mine = myRole === 'home' ? lineupHome : lineupAway;
+        const theirs = myRole === 'home' ? lineupAway : lineupHome;
+        const mineView = mine ? { teamId: mine.teamId, teamName: mine.teamName, games: mine.games || {} } : null;
+        return json({
+          matchId, myRole, revealed: false, partial: true,
+          suspended: suspension,
+          match: publicMatchInfo(match),
+          homeLineup: myRole === 'home' ? mineView : onlyFrozen(theirs),
+          awayLineup: myRole === 'away' ? mineView : onlyFrozen(theirs),
+          score: viewForCaptain(decorate(score, match.championship), myRole, frozen),
+          message: 'Lineups for the remaining games lock and reveal at the resume time.',
+        });
+      }
       return json({
         matchId, myRole, revealed: false,
         suspended: suspension,
