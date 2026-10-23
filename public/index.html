@@ -141,6 +141,20 @@
   #recap .hp-dh .hp-facts span{ background:var(--color-surface); }
   @media(max-width:600px){ #recap .hp-lad__b .hp-tbtn{ flex:1 1 auto; justify-content:center; } #recap .hp-dh__act .hp-tbtn{ flex:1 1 100%; justify-content:center; } }
 
+  /* No cover photo: nothing sits to the right of the dek, so the headline block
+     goes two-column instead — dek + CTA on the left, the team links as a card on
+     the right. Otherwise the right half of the hero is empty. */
+  #recap .hp-dh--nopic{ display:grid; grid-template-columns:minmax(0,1fr) minmax(300px,380px); grid-template-areas:"eye eye" "title title" "lede jump" "act jump"; column-gap:36px; row-gap:16px; align-items:start; }
+  #recap .hp-dh--nopic .hp-eyebrow{ grid-area:eye; }
+  #recap .hp-dh--nopic .hp-dh__title{ grid-area:title; }
+  #recap .hp-dh--nopic .hp-lede{ grid-area:lede; max-width:none; }
+  #recap .hp-dh--nopic .hp-dh__act{ grid-area:act; align-self:start; }
+  #recap .hp-dh--nopic .hp-dh__jump{ grid-area:jump; align-self:stretch; padding:16px 18px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); }
+  #recap .hp-dh--nopic .hp-dh__jump .hp-dh__chips{ flex-direction:column; align-items:stretch; gap:6px; }
+  #recap .hp-dh--nopic .hp-dh__jump .hp-dh__chips a{ justify-content:space-between; min-height:40px; white-space:normal; }
+  #recap .hp-dh--nopic .hp-dh__jump .hp-dh__chips a span{ text-align:right; color:var(--color-text-muted); }
+  @media(max-width:935px){ #recap .hp-dh--nopic{ display:flex; flex-direction:column; } #recap .hp-dh--nopic .hp-dh__jump{ padding:0; background:none; border:0; } #recap .hp-dh--nopic .hp-dh__jump .hp-dh__chips{ flex-direction:row; align-items:center; gap:8px; } #recap .hp-dh--nopic .hp-dh__jump .hp-dh__chips a{ justify-content:flex-start; white-space:nowrap; } }
+
   /* Phones and narrow tablets: the cover leads, then the headline; team links become one swipeable row. */
   @media(max-width:935px){ #recap .hp-hero.is-drop .hp-hero__pic{ order:-1; flex-basis:100%; aspect-ratio:16 / 9; min-height:180px; max-height:340px; } }
   @media(max-width:600px){
@@ -621,9 +635,12 @@
     function finals(n){ var w=weekObj(n); return ((w&&w.matches)||[]).filter(isFinal); }
     // Post-season never moves the table (same rule as the standings page).
     function countsForTable(m){ return m.phase!=='playoff' && m.phase!=='championship'; }
+    // A match stopped by rain carries over: it starts again at its resume time.
+    function matchStartIso(m){ return (m&&m.suspended&&m.suspended.resumeAt)||(m&&(m.scheduledAt||m.date))||''; }
+    function weekSuspended(w){ return !!(w&&(w.matches||[]).some(function(m){ return m.suspended&&!isFinal(m); })); }
     function weekStartMs(n){
       var w=weekObj(n), best=NaN;
-      ((w&&w.matches)||[]).forEach(function(m){ var t=Date.parse(m.scheduledAt||m.date||''); if(!isNaN(t)&&(isNaN(best)||t<best)) best=t; });
+      ((w&&w.matches)||[]).forEach(function(m){ var t=Date.parse(matchStartIso(m)); if(!isNaN(t)&&(isNaN(best)||t<best)) best=t; });
       if(!isNaN(best)) return best;
       var s=SEASON_START?Date.parse(SEASON_START+'T19:00:00'):NaN;
       return isNaN(s)?NaN:s+(n-1)*7*86400000;
@@ -796,6 +813,17 @@
       var label=weekLabel(nw.week), U=String(label).toUpperCase();
       var h=(nw.phase==='playoff'?'THE PLAYOFFS ARE':nw.phase==='championship'?'CHAMPIONSHIP NIGHT IS':U+' IS')+' <span class="lime">UP NEXT.</span>';
       var best=null, lede=[];
+      // Rained out part way: the night resumes. Say what is in the book and what is left.
+      if(weekSuspended(nw)){
+        var sus=(nw.matches||[]).filter(function(m){ return m.suspended&&!isFinal(m); });
+        var played=0, left=0, bits=[];
+        sus.forEach(function(m){ var S=m.suspended; played+=S.lockedCount||0; left+=S.remaining||0;
+          var sn=S.snapshot; if(sn&&sn.matchPoints){ var hp=sn.matchPoints.home, ap=sn.matchPoints.away;
+            bits.push(hp===ap?esc(m.teamA)+' and '+esc(m.teamB)+' level '+hp+'–'+ap:esc(hp>ap?m.teamA:m.teamB)+' lead '+esc(hp>ap?m.teamB:m.teamA)+' '+Math.max(hp,ap)+'–'+Math.min(hp,ap)); } });
+        var r=Date.parse(sus[0].suspended.resumeAt||''), day=isNaN(r)?'':new Date(r).toLocaleDateString('en-US',{weekday:'long'}).toUpperCase();
+        var p=played+' of '+(played+left)+' games are in the book'+(bits.length?' — '+joinAnd(bits):'')+'. The other '+left+' get played '+(isNaN(r)?'next game night':fmtDay(r,true)+' at '+fmtTime(r))+', and the standings go official when the night is done.';
+        return { h: U+' <span class="lime">RESUMES'+(day?' '+day:'')+'.</span>', p: p };
+      }
       (nw.matches||[]).forEach(function(m){ var a=by[m.teamA], b=by[m.teamB]; if(!a||!b) return;
         if(Math.abs(a.pts-b.pts)<=1){ var top=Math.min(a.rank,b.rank); if(!best||top<best.top) best={top:top,m:m,a:a,b:b}; } });
       if(best&&!nw.phase){
@@ -825,7 +853,8 @@
           x.innerHTML='<a class="hp-hero__cta" href="/live.html">Open the live board</a>';
         } else {
           var gameDay=!isNaN(ms)&&new Date(ms).toDateString()===new Date().toDateString();
-          eb.innerHTML='<span class="hp-pill'+(gameDay?' hp-pill--lime':'')+'">'+(gameDay?'Game day':'Up next')+'</span><span class="a">'+sn+' · '+esc(weekLabel(nw.week))+'</span><span class="b">'+esc(gameDay?'Tonight':fmtDay(ms,true))+(isNaN(ms)?'':' · '+esc(fmtTime(ms)))+(venue?' · '+esc(venue):'')+'</span>';
+          var rained=weekSuspended(nw);
+          eb.innerHTML='<span class="hp-pill'+(gameDay?' hp-pill--lime':'')+'">'+(gameDay?'Game day':rained?'⛈ Rained out':'Up next')+'</span><span class="a">'+sn+' · '+esc(weekLabel(nw.week))+'</span><span class="b">'+esc(gameDay?'Tonight':fmtDay(ms,true))+(isNaN(ms)?'':' · '+esc(fmtTime(ms)))+(venue?' · '+esc(venue):'')+'</span>';
           t.innerHTML=st.h; p.innerHTML=st.p;
           if(!isNaN(ms)){
             x.innerHTML='<div class="hp-heroact"><div class="hp-cdrow" role="timer" aria-live="off"><div><b data-u="d">0</b><small>Days</small></div><div><b data-u="h">00</b><small>Hours</small></div><div><b data-u="m">00</b><small>Minutes</small></div></div>'
@@ -1314,6 +1343,8 @@
       if(on){ if(txt.parentNode!==strip) strip.appendChild(txt); }
       else if(txt.parentNode!==inn) inn.insertBefore(txt,$('hp-heropic'));
       box.hidden=!on; box.classList.toggle('hp-dh--lad',!drop&&!!lad); strip.hidden=!on; hero.classList.toggle('is-drop',on);
+      // Two-column headline when there is no cover photo to fill the right side.
+      box.classList.toggle('hp-dh--nopic', on && !!drop && !hasArt(drop) && !!box.querySelector('.hp-dh__jump'));
       syncStripRow(); setTop();
     }
     function syncStripRow(){ $('hp-striprow').hidden=$('hp-strip').hidden&&$('hp-lad').hidden; }
@@ -1636,7 +1667,9 @@
         PERF=(lb&&lb.weeklyTopPerformers)||[];
         if(PLAYERS) PERF.forEach(function(entry){['men','women'].forEach(function(g){(entry[g]||[]).forEach(function(p){ if(p.ps==null&&PLAYERS[p.playerId]&&PLAYERS[p.playerId].ps!=null)p.ps=PLAYERS[p.playerId].ps; });});});
         DROP_LATEST=(dropPayload&&dropPayload.drop)||null; FEATURED=DROP_LATEST;
-        MAXWEEK=PERF.length?PERF[0].week:0;
+        // Latest OFFICIAL week: a week with a match still in progress (its
+        // weekly entry is `provisional`, lib/live-results.js) is not final yet.
+        MAXWEEK=0; PERF.forEach(function(e){ if(!e.provisional&&e.week>MAXWEEK) MAXWEEK=e.week; });
         WEEKS.forEach(function(w){ if(finals(w.week).length&&w.week>MAXWEEK) MAXWEEK=w.week; });
 
         if(!MAXWEEK){
