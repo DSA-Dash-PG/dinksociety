@@ -10,6 +10,7 @@
 import { getStore } from '@netlify/blobs';
 import { verifyAdminSession, unauthResponse } from './lib/auth.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
+import { effectiveStart } from './lib/live-results.js';
 
 export default async (req) => {
   if (req.method !== 'GET') return new Response('Method not allowed', { status: 405 });
@@ -69,7 +70,9 @@ export default async (req) => {
         for (const mt of (f.data.matches || [])) {
           if (mt.finalizedAt) continue;
           if (lowestUnfinished == null) lowestUnfinished = w;
-          const t = mt.scheduledAt ? Date.parse(mt.scheduledAt) : NaN;
+          // Resume time for a rained-out match, so its makeup night counts as tonight.
+          const startIso = effectiveStart(mt);
+          const t = startIso ? Date.parse(startIso) : NaN;
           if (Number.isNaN(t)) continue;
           if (!anyDated || t < anyDated.t) anyDated = { week: w, t };
           if (t >= now - RECENT_MS && (!upcoming || t < upcoming.t)) upcoming = { week: w, t };
@@ -123,7 +126,7 @@ export default async (req) => {
       // we're past the reveal time (match start). Before that a
       // both-locked match is just "ready", not live. (Without the time gate the
       // admin showed matches as live hours early the moment captains locked.)
-      const revealed = bothLocked && isRevealTime(mt.scheduledAt);
+      const revealed = bothLocked && isRevealTime(effectiveStart(mt));
       const final = !!mt.finalizedAt;
 
       // Match points: finalized → stored; otherwise compute live from the sheet.

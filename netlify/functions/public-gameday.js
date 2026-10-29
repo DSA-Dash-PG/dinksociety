@@ -32,7 +32,7 @@ import { normalizeScore, decorate } from './lib/score-helpers.js';
 import { etagJson } from './lib/http-cache.js';
 import { isRevealTime } from './lib/lineup-helpers.js';
 import { circuitCode } from './lib/circuit.js';
-import { effectiveStart, lineupSlotVisible, publicSuspension } from './lib/live-results.js';
+import { effectiveStart, isSuspended, lineupSlotVisible, publicSuspension } from './lib/live-results.js';
 
 // Slot → discipline. Mirrors public-match.js exactly.
 const SLOT_TYPE = {
@@ -282,7 +282,8 @@ export default async (req) => {
     // suspended, the original time otherwise).
     const nightCalledOff = enriched.length > 0
       && enriched.every(m => m.status === 'final' || m.suspended)
-      && enriched.some(m => m.suspended);
+      && enriched.some(m => m.suspended)
+      && !enriched.some(m => m.suspended && isTonight(m.suspended.resumeAt));
     const anyToday = !nightCalledOff && enriched.some(m => isTonight(effectiveStart(m)));
 
     return etagJson(req, {
@@ -323,10 +324,10 @@ function summarizeWeeks(weeks) {
     const first = dates.length ? Math.min(...dates) : null;
     const allFinal = ms.length > 0 && ms.every(m => m.finalizedAt);
     const anyScored = ms.some(m => m.finalizedAt);
-    const live = ms.some(m => !m.finalizedAt && m.scheduledAt &&
-      Date.parse(m.scheduledAt) <= now && now - Date.parse(m.scheduledAt) < RECENT_MS);
+    const live = ms.some(m => isLiveNow(m, now));
     const past = first != null && now - first > PUBLIC_MS;
-    const status = live ? 'live' : (allFinal || (past && anyScored)) ? 'final' : past ? 'final' : 'upcoming';
+    // A rained-out week still has games to play: it isn't final until they are.
+    const status = live ? 'live' : ms.some(m => isSuspended(m)) ? 'upcoming' : (allFinal || (past && anyScored)) ? 'final' : past ? 'final' : 'upcoming';
     return {
       week: num,
       date: first != null ? new Date(first).toISOString() : null,
@@ -337,6 +338,17 @@ function summarizeWeeks(weeks) {
       matches: ms.length,
     };
   });
+}
+
+// Unfinished and inside its live window, measured from the effective start:
+// the resume time for a rained-out match, so a makeup night is "tonight" for
+// the week it belongs to (and the lower week wins when two share a night).
+function isLiveNow(m, now = Date.now()) {
+  if (m.finalizedAt) return false;
+  const iso = effectiveStart(m);
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  return !Number.isNaN(t) && t <= now && now - t < RECENT_MS;
 }
 
 function pickWeek(weeks) {
@@ -350,8 +362,7 @@ function pickWeek(weeks) {
   let tonight = null, unfinished = null;
   for (const [num, group] of [...byWeek.entries()].sort((a, b) => a[0] - b[0])) {
     const ms = group.flatMap(g => g.matches);
-    const live = ms.some(m => !m.finalizedAt && m.scheduledAt &&
-      Date.parse(m.scheduledAt) <= now && now - Date.parse(m.scheduledAt) < RECENT_MS);
+    const live = ms.some(m => isLiveNow(m, now));
     if (live && tonight === null) tonight = group;
     if (!unfinished && ms.some(m => !m.finalizedAt)) unfinished = group;
   }
