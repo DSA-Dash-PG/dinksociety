@@ -155,16 +155,25 @@
     @media (max-width: 760px) {
       /* inbox is full-width; the conversation drills in as its own screen */
       #msg-grid { grid-template-columns: 1fr !important; }
-      #msg-thread-card { position: fixed; inset: 0; z-index: 60; margin: 0; border-radius: 0;
-        display: flex; flex-direction: column; padding: 12px 14px; background: var(--color-bg);
+      /* z-index above the fixed bottom nav (1000) so the reply box + Send are never
+         buried under it; safe-area padding keeps them clear of the iPhone home bar. */
+      #msg-thread-card { position: fixed; inset: 0; z-index: 1001; margin: 0; border-radius: 0;
+        display: flex; flex-direction: column; background: var(--color-bg);
+        padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
         transform: translateX(100%); transition: transform .26s cubic-bezier(.4,0,.2,1); }
       #msg-grid.msg-threadopen #msg-thread-card { transform: translateX(0); }
       #msg-thread { display: flex; flex-direction: column; flex: 1; min-height: 0; }
       #msg-bubbles { flex: 1 !important; max-height: none !important; min-height: 0; }
       .msg-back { display: inline-flex; }
       /* broadcast + email-style composers slide up as bottom sheets */
+      /* 2026-10-28: the sheets sat at z-index 70 under the bottom nav (1000) and used
+         92vh (taller than Safari's visible area), so the last ~100px — Add files, Send —
+         could never be scrolled into view. Sit above the nav, size to the VISIBLE
+         viewport (dvh), and pad past the home bar so the action row always clears. */
       #msg-broadcast-card, #msg-emailstyle-card { position: fixed; left: 0; right: 0; bottom: 0; top: auto;
-        margin: 0; max-height: 92vh; overflow-y: auto; z-index: 70; border-radius: 18px 18px 0 0;
+        margin: 0; max-height: 92vh; max-height: 92dvh; overflow-y: auto; z-index: 1001; border-radius: 18px 18px 0 0;
+        -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+        padding-bottom: calc(28px + env(safe-area-inset-bottom));
         border-top: 1px solid var(--color-border-strong); box-shadow: 0 -12px 40px rgba(0,0,0,0.55); }
       #msg-emailstyle-card .two-col { grid-template-columns: 1fr !important; }
     }
@@ -9723,7 +9732,8 @@
   /* Admin mobile bottom nav — phones only */
   .am-bottomnav { display: none; }
   @media (max-width: 860px) {
-    #admin-shell { padding-bottom: 78px; }
+    #admin-shell { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+    html { scroll-padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
     .am-bottomnav {
       display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 1000;
       background: rgba(18,18,18,0.97); backdrop-filter: blur(12px);
