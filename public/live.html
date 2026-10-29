@@ -97,6 +97,23 @@
     #lv .nc .gr{ border-top:1px solid var(--color-border); }
     #lv .nc .gr:first-of-type{ margin-top:10px; }
 
+    /* UP NEXT — compact: who should be warming up */
+    #lv .un{ margin-top:6px; padding:10px 0 8px; border-top:1px dashed var(--lv-dim2); }
+    #lv .un-h{ display:flex; justify-content:space-between; gap:10px; font-size:10px; color:var(--lv-gold); margin-bottom:4px; }
+    #lv .un-r{ display:grid; grid-template-columns:104px minmax(0,1fr) 22px minmax(0,1fr); gap:8px; align-items:baseline; padding:4px 0; font-size:13px; }
+    #lv .un-r .k{ font-size:10px; letter-spacing:.12em; }
+    #lv .un-r .p{ font-weight:600; color:var(--color-text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #lv .un-r .p.a{ text-align:right; }
+    #lv .un-r .v{ text-align:center; font-size:10px; color:var(--color-text-faint); }
+    #lv .un-r .hid.wrap{ grid-column:2 / -1; white-space:normal; font-size:12px; }
+    #lv .un-r .hid{ color:var(--color-text-faint); font-style:italic; font-weight:500; }
+    #lv .nxt{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:10px; margin-top:12px; }
+    #lv .nx{ border:1px solid rgba(240,180,41,.3); border-radius:14px; padding:12px 14px 6px; background:var(--color-surface); cursor:pointer; }
+    #lv .nx-t{ font-family:var(--lv-disp); font-weight:800; font-size:17px; text-transform:uppercase; line-height:1.05; margin-top:4px; }
+    #lv .nx-t .vs{ color:var(--color-text-faint); font-weight:500; margin:0 .25em; }
+    #lv .nx .un{ border-top:0; margin-top:2px; padding-top:4px; }
+    #lv .gr.next .gr-k .st{ color:var(--lv-gold); }
+
     /* MATCH CARD */
     #lv .mc{ border:1px solid var(--color-border); border-radius:18px; background:var(--color-surface); margin-top:14px; overflow:hidden; }
     #lv .mc.live{ border-color:rgba(184,255,44,.35); }
@@ -131,6 +148,7 @@
     #lv .d.h{ background:var(--color-lime); } #lv .d.a{ background:var(--color-teal); } #lv .d.x{ background:var(--color-text-muted); }
     #lv .d.o{ border:2px solid var(--lv-dim2); }
     #lv .d.e{ border:2px solid var(--lv-gold); }
+    #lv .d.n{ border:2px dashed var(--lv-gold); }
     #lv .d.l{ border:2px solid var(--color-lime); animation:lvpulse 1.6s infinite; }
 
     #lv .toggle{ display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 32px); margin:4px 16px 14px; padding:12px 16px; border-radius:9999px; border:1px solid var(--color-border); background:transparent; color:var(--color-text); font-family:var(--lv-mono); font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
@@ -188,7 +206,9 @@
       #lv .rd{ grid-template-columns:24px auto 1fr; gap:8px; }
       #lv .d{ width:12px; height:12px; }
       #lv .rd .dots{ gap:5px; }
-      #lv .now{ grid-template-columns:1fr; }
+      #lv .now, #lv .nxt{ grid-template-columns:1fr; }
+      #lv .un-r{ grid-template-columns:minmax(0,1fr) 18px minmax(0,1fr); row-gap:2px; }
+      #lv .un-r .k, #lv .un-r .hid.wrap{ grid-column:1 / -1; }
     }
   </style>
 </head>
@@ -266,6 +286,28 @@
       if (m.status !== 'live' || m._queued) return [];
       return (m.upcoming || []).filter(function (u) { return !u.entered && !u.frozen; }).slice(0, 2).map(function (u) { return u.slot; });
     }
+    // Who should be getting ready: the next two games after the ones on court
+    // (or a not-yet-started match's first two).
+    function upNextSlots(m) {
+      if (m.status === 'final') return [];
+      var open = (m.upcoming || []).filter(function (u) { return !u.entered && !u.frozen; });
+      if (m.status === 'live' && !m._queued) return open.slice(2, 4).map(function (u) { return u.slot; });
+      return open.slice(0, 2).map(function (u) { return u.slot; });
+    }
+    function upNextHtml(m, slots, title) {
+      if (!slots.length) return '';
+      var by = bySlot(m);
+      var pair = function (l) { return (l || []).map(shortName).join(' & '); };
+      var rows = slots.map(function (s) {
+        var g = by[s].g, hp = pair(g.homePlayers), ap = pair(g.awayPlayers);
+        var hid = !hp && !ap;
+        return '<div class="un-r"><span class="k mono">R' + g.round + ' G' + g.gameNum + ' · ' + (TYPE[g.type] || g.type) + '</span>' +
+          (hid ? '<span class="p hid wrap">Lineups not locked yet · they show here once both captains lock</span>'
+               : '<span class="p lime">' + esc(hp || 'TBD') + '</span><span class="v mono">vs</span><span class="p a teal">' + esc(ap || 'TBD') + '</span>') +
+        '</div>';
+      }).join('');
+      return '<div class="un"><div class="un-h mono"><span>' + title + '</span><span>Get ready</span></div>' + rows + '</div>';
+    }
     function activeRound(m) {
       var u = (m.upcoming || []).filter(function (x) { return !x.frozen; })[0];
       return u ? u.round : null;
@@ -284,6 +326,7 @@
       if (scored) st = 'Final';
       else if (now) { cls += ' live'; st = '● On court'; }
       else if (g.entered) { cls += ' wait'; st = 'Score in · confirming'; }
+      else if (info.next) { cls += ' next'; st = 'Up next · get ready'; }
       else st = m.status === 'final' ? '—' : 'To play';
       var hidden = (!scored && !m.lineupsVisible && !(g.homePlayers || []).length)
         ? (m._revealAt ? 'Lineup at ' + m._revealAt : 'Lineup hidden') : '';
@@ -304,6 +347,7 @@
         if (i && i.scored) k = i.g.home > i.g.away ? 'h' : i.g.away > i.g.home ? 'a' : 'x';
         else if (now.indexOf(s) !== -1) k = 'l';
         else if (i && i.g.entered) k = 'e';
+        else if (m.status === 'live' && !m._queued && upNextSlots(m).indexOf(s) !== -1) k = 'n';
         return '<span class="d ' + k + '"></span>';
       }).join('');
       var hn = esc(m.home.name), an = esc(m.away.name), tx;
@@ -346,7 +390,7 @@
         '<span class="v' + (tbd ? ' tbd' : lead(pMine, pOther)) + '">' + v(pMine) + '</span>';
     }
     function matchCard(m) {
-      var by = bySlot(m), now = onCourtSlots(m), p = mp(m);
+      var by = bySlot(m), now = onCourtSlots(m), nxt = upNextSlots(m), p = mp(m);
       var played = (m.games || []).length;
       var touched = played || (m.upcoming || []).some(function (u) { return u.entered; });
       var tbd = !touched && m.status !== 'final';
@@ -374,7 +418,7 @@
         var r = (rn === 1 ? m.round1 : m.round2) || {};
         html += '<div class="rh mono"><b>Round ' + rn + '</b><span>' + (r.scoredGames ? (r.homeGames || 0) + '–' + (r.awayGames || 0) + ' games' + (r.scoredGames === 6 ? ' · ' + (r.homePoints || 0) + '–' + (r.awayPoints || 0) + ' pts' : '') : '') + '</span></div>';
         SLOTS.slice(rn === 1 ? 0 : 6, rn === 1 ? 6 : 12).forEach(function (s) {
-          if (by[s]) html += gameRow(m, s, by[s], now.indexOf(s) !== -1);
+          if (by[s]) { by[s].next = nxt.indexOf(s) !== -1 && m.status === 'live' && !m._queued; html += gameRow(m, s, by[s], now.indexOf(s) !== -1); }
         });
       });
       html += '</div></article>';
@@ -394,14 +438,26 @@
             '<div class="nc-teams"><span class="lime">' + esc(m.home.name) + '</span><span class="vs">v</span><span class="teal">' + esc(m.away.name) + '</span></div>' +
             '<div class="nc-sub mono">Games <b>' + (m.gamesHome || 0) + '–' + (m.gamesAway || 0) + '</b> · Pts <b>' + (m.pointsHome || 0) + '–' + (m.pointsAway || 0) + '</b>' + (waiting.length ? ' · <span class="gold">' + waiting.length + ' confirming</span>' : '') + '</div></div>' +
             '<div style="text-align:right"><div class="nc-score"><span class="lime">' + p[0] + '</span><i>–</i><span class="teal">' + p[1] + '</span></div><div class="mono" style="font-size:9px;margin-top:4px">Match pts</div></div></div>' +
-          rows +
+          rows + upNextHtml(m, upNextSlots(m), 'Up next') +
         '</div>';
       });
       if (!cards.length) return '';
       return '<div class="sec"><h2 class="disp"><span class="dotp"></span>On court now<small>tap a match for every game</small></h2>' +
         '<div class="now">' + cards.join('') + '</div>' +
-        '<div class="legend mono"><span><span class="d h"></span>Home won</span><span><span class="d a"></span>Away won</span><span><span class="d l"></span>On court</span><span><span class="d e"></span>Score in, confirming</span><span><span class="d o"></span>To play</span></div>' +
+        '<div class="legend mono"><span><span class="d h"></span>Home won</span><span><span class="d a"></span>Away won</span><span><span class="d l"></span>On court</span><span><span class="d n"></span>Up next</span><span><span class="d e"></span>Score in, confirming</span><span><span class="d o"></span>To play</span></div>' +
       '</div>';
+    }
+
+    // ── UP NEXT matches: queued behind an earlier week tonight ──────────
+    function upNextMatches(all) {
+      var q = all.filter(function (m) { return m._queued; });
+      if (!q.length) return '';
+      return '<div class="sec"><h2 class="disp">Up next<small>these teams play again once their current match is done</small></h2><div class="nxt">' +
+        q.map(function (m) {
+          return '<div class="nx" data-jump="' + esc(m.id) + '"><div class="mono">Week ' + (m._week || '') + ' · ' + esc(courts(m).replace('Courts ', 'Cts ')) + ' · after Week ' + m._queued + '</div>' +
+            '<div class="nx-t"><span class="lime">' + esc(m.home.name) + '</span><span class="vs">v</span><span class="teal">' + esc(m.away.name) + '</span></div>' +
+            upNextHtml(m, upNextSlots(m), 'First on court') + '</div>';
+        }).join('') + '</div></div>';
     }
 
     // ── countdown to first serve ─────────────────────────────────────
@@ -496,7 +552,7 @@
         return;
       }
 
-      var html = onCourtNow(all);
+      var html = onCourtNow(all) + upNextMatches(all);
       blocks.forEach(function (b) {
         var bm = b.d.matches || [];
         var rained = bm.some(function (m) { return m.suspended; });
