@@ -61,6 +61,7 @@
   #recap .hp-pill{ display:inline-flex; align-items:center; gap:6px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; padding:4px 10px; border-radius:var(--radius-full); background:var(--color-text); color:var(--color-bg); white-space:nowrap; }
   #recap .hp-pill--lime{ background:var(--color-lime); color:var(--color-text-inverse); }
   #recap .hp-pill--live{ background:var(--color-red); color:#0e0e0e; }
+  #recap .hp-pill--hold{ background:rgba(232,181,66,0.14); color:#e8b542; border:1px solid rgba(232,181,66,0.4); }
   #recap .hp-pill--live i{ width:7px; height:7px; border-radius:50%; background:#0e0e0e; animation:hppulse 1.3s infinite; }
   @keyframes hppulse{ 50%{ opacity:.3; } }
 
@@ -1558,10 +1559,14 @@
       var by={}; rows.forEach(function(r){ by[r.name]=r; });
       var nA=m.teamA||m.seedLabelA||'TBD', nB=m.teamB||m.seedLabelB||'TBD', a=by[m.teamA], b=by[m.teamB];
       if(nA==='TBD'&&m.seedLabelA) nA=m.seedLabelA; if(nB==='TBD'&&m.seedLabelB) nB=m.seedLabelB;
-      var startMs=m.scheduledAt?Date.parse(m.scheduledAt):NaN, underway=!isNaN(startMs)&&Date.now()>=startMs;
+      // A rained-out match is on hold until its resume time, not live.
+      var startMs=Date.parse(matchStartIso(m)), underway=!isNaN(startMs)&&Date.now()>=startMs;
+      var onHold=!!(m.suspended&&!isFinal(m)&&!underway);
       var played=a&&b&&(a.gw+a.gl+b.gw+b.gl)>0;   // nothing to compare before the first night
       var tag=played?(ord(Math.min(a.rank,b.rank))+' v '+ord(Math.max(a.rank,b.rank))):(m.gameLabel||m.placeLabel||m.bracketGroup||(a&&b?'Opening night':'Matchup'));
-      var badge=today&&underway?'<span class="hp-pill hp-pill--live"><i></i>Live</span>':'<span class="hp-pill">'+esc(tag)+'</span>';
+      var badge=today&&underway?'<span class="hp-pill hp-pill--live"><i></i>Live</span>'
+        :onHold?'<span class="hp-pill hp-pill--hold">⛈ On hold'+(isNaN(startMs)?'':' · resumes '+esc(fmtTime(startMs)))+'</span>'
+        :'<span class="hp-pill">'+esc(tag)+'</span>';
       var court=courtLabel(m,idx), right=[court, today&&!underway&&!isNaN(startMs)?'Tonight · '+fmtTime(startMs):''].filter(Boolean).join(' · ');
       var side=function(name,id,emoji,known){ return '<div class="hp-nx__side">'+teamBadge(name,id,64,emoji)+(known?teamLink(name,id,'tn'):'<span>'+esc(name)+'</span>')+'</div>'; };
       var tape='', stake='';
@@ -1594,12 +1599,15 @@
       // Timeline: one step per week, with a Bye step wherever two weeks sit a fortnight apart.
       var rail='', prevMs=NaN;
       WEEKS.forEach(function(wk){ if(!(wk.matches||[]).length) return;
-        var ms2=weekStartMs(wk.week);
-        if(!isNaN(prevMs)&&!isNaN(ms2)&&ms2-prevMs>=13*86400000) rail+='<div class="'+(prevMs+7*86400000<Date.now()?'done':'')+'"><i></i><b>Bye</b><span>'+esc(fmtDay(prevMs+7*86400000))+'</span></div>';
+        var ms2=weekStartMs(wk.week), orig=NaN;
+        (wk.matches||[]).forEach(function(m){ var t=Date.parse(m.scheduledAt||m.date||''); if(!isNaN(t)&&(isNaN(orig)||t<orig)) orig=t; });
+        if(isNaN(orig)) orig=ms2;
+        var makeup=!isNaN(orig)&&!isNaN(ms2)&&ms2-orig>=86400000;
+        if(!isNaN(prevMs)&&!isNaN(orig)&&orig-prevMs>=13*86400000) rail+='<div class="'+(prevMs+7*86400000<Date.now()?'done':'')+'"><i></i><b>Bye</b><span>'+esc(fmtDay(prevMs+7*86400000))+'</span></div>';
         var done=(wk.matches||[]).every(isFinal), isNext=nw&&wk.week===nw.week;
         var lbl=wk.phase==='rivalry'?'Rivalry':wk.phase==='playoff'?'Playoffs':wk.phase==='championship'?'Championship':'Week '+wk.week;
-        rail+='<div class="'+(done?'done':isNext?'next':'')+'"><i></i><b>'+lbl+'</b><span>'+esc(fmtDay(ms2))+(isNext?' · next':'')+'</span></div>';
-        prevMs=ms2; });
+        rail+='<div class="'+(done?'done':isNext?'next':'')+'"><i></i><b>'+lbl+'</b><span>'+esc(fmtDay(ms2))+(makeup?' · makeup':isNext?' · next':'')+'</span></div>';
+        prevMs=orig; });
       $('hp-rail').innerHTML=rail;
       show(sec, !!nw || !!rail);
     }
