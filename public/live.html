@@ -28,10 +28,13 @@
   <script src="/js/season.js"></script>
   <script src="/js/live-poll.js"></script>
   <style>
-    /* ── Live board · "dots" layout ─────────────────────────────────────
-       One dot per game. Lime = home won, teal = away won, hollow = not
-       played, pulsing ring = on court now. Swap --lv-disp to Inter to go
-       strictly on-brand; the dots don't care. */
+    /* ── Live board ──────────────────────────────────────────────────────
+       Built for a phone courtside. Top: what is on court right now, across
+       every match (and both weeks on a makeup night). Then one card per
+       match: the scoreboard (match points, games won, points won), each
+       round's progress, and every game with who played whom — open by
+       default while a match is live, one tap away otherwise.
+       Home team = lime, away team = teal, everywhere on the page. */
     :root{
       --lv-disp:'Barlow Condensed',Inter,sans-serif;
       --lv-mono:'IBM Plex Mono',ui-monospace,monospace;
@@ -42,7 +45,7 @@
     #lv .disp{ font-family:var(--lv-disp); font-weight:900; text-transform:uppercase; letter-spacing:.005em; line-height:.92; }
     #lv .mono{ font-family:var(--lv-mono); font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--color-text-muted); }
     #lv .mono b{ color:var(--color-text); font-weight:600; }
-    #lv .mono .lime{ color:var(--color-lime); } #lv .mono .teal{ color:var(--color-teal); } #lv .mono .gold{ color:var(--lv-gold); }
+    #lv .lime{ color:var(--color-lime); } #lv .teal{ color:var(--color-teal); } #lv .gold{ color:var(--lv-gold); }
     #lv .rule{ height:1px; background:var(--color-border); }
     #lv a{ color:inherit; text-decoration:none; }
 
@@ -50,10 +53,13 @@
     #lv .top{ display:flex; align-items:flex-end; justify-content:space-between; gap:20px; padding:88px 0 14px; flex-wrap:wrap; }
     #lv .top h1{ margin:0; font-size:clamp(40px,6vw,60px); white-space:nowrap; }
     #lv .top h1 small{ display:block; font-weight:500; font-size:.4em; color:var(--color-text-muted); letter-spacing:.04em; margin-bottom:4px; white-space:normal; }
-    #lv .top .right{ text-align:right; padding-bottom:6px; }
+    #lv .top .right{ text-align:left; padding-bottom:6px; }
     #lv .livepill{ display:inline-flex; align-items:center; gap:8px; font-family:var(--lv-mono); font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--color-lime); border:1px solid var(--color-lime-dim); border-radius:999px; padding:6px 12px; margin-bottom:10px; }
     #lv .livepill.off{ color:var(--color-text-muted); border-color:var(--color-border); }
-    /* Game-night countdown to first serve — shown only on a game day, before play starts */
+    #lv .dotp{ width:7px; height:7px; border-radius:50%; background:var(--color-lime); animation:lvpulse 1.6s infinite; flex:none; }
+    @keyframes lvpulse{ 0%{box-shadow:0 0 0 0 rgba(184,255,44,.55)} 70%{box-shadow:0 0 0 8px rgba(184,255,44,0)} 100%{box-shadow:0 0 0 0 rgba(184,255,44,0)} }
+
+    /* countdown to first serve (game day, before play) */
     #lv .count{ display:none; align-items:center; justify-content:space-between; gap:20px; flex-wrap:wrap; margin:18px 0 6px; padding:18px 22px; border:1px solid var(--color-lime-dim); border-radius:16px; background:linear-gradient(90deg, rgba(184,255,44,.07), transparent 60%); }
     #lv .count.on{ display:flex; }
     #lv .count .k{ display:flex; flex-direction:column; gap:6px; }
@@ -61,12 +67,9 @@
     #lv .count .t small{ font-size:.42em; color:var(--color-text-muted); font-weight:700; letter-spacing:.06em; margin-left:2px; }
     #lv .count.soon .t{ animation:lvpulse-text 1.2s infinite; }
     @keyframes lvpulse-text{ 0%,100%{ opacity:1 } 50%{ opacity:.55 } }
-    @media (max-width:640px){ #lv .count{ padding:14px 16px; } }
-    #lv .dotp{ width:7px; height:7px; border-radius:50%; background:var(--color-lime); animation:lvpulse 1.6s infinite; }
-    @keyframes lvpulse{ 0%{box-shadow:0 0 0 0 rgba(184,255,44,.55)} 70%{box-shadow:0 0 0 8px rgba(184,255,44,0)} 100%{box-shadow:0 0 0 0 rgba(184,255,44,0)} }
 
-    /* week strip */
-    #lv .weeks{ display:flex; gap:8px; overflow-x:auto; padding:12px 0 4px; scrollbar-width:none; }
+    /* week strip — sticky under the nav so switching weeks never needs a scroll back up */
+    #lv .weeks{ position:sticky; top:64px; z-index:30; background:var(--color-bg); display:flex; gap:8px; overflow-x:auto; padding:10px 0; margin:0 calc(-1 * var(--gutter)); padding-left:var(--gutter); padding-right:var(--gutter); scrollbar-width:none; border-bottom:1px solid var(--color-border); }
     #lv .weeks::-webkit-scrollbar{ display:none; }
     #lv .weeks button{ flex:none; border:1px solid var(--color-border); background:transparent; color:var(--color-text-muted); border-radius:10px; padding:8px 14px; font-family:var(--lv-disp); font-weight:800; font-size:18px; text-transform:uppercase; letter-spacing:.02em; cursor:pointer; text-align:left; line-height:1; }
     #lv .weeks button small{ display:block; font-family:var(--lv-mono); font-size:9px; letter-spacing:.14em; color:var(--color-text-faint); margin-top:4px; font-weight:600; }
@@ -75,90 +78,117 @@
     #lv .weeks button.next small{ color:var(--lv-gold); }
     #lv .weeks button.on{ border-color:var(--color-text); color:var(--color-text); background:var(--color-surface); }
 
-    /* night grid */
-    #lv .night{ padding:16px 0 18px; }
-    #lv .night .lbl{ display:flex; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
-    #lv .ngrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; }
-    #lv .ng .strip{ margin-top:7px; }
-    #lv .ng .rlab{ width:20px; color:var(--color-text-faint); font-size:10px; }
-    #lv .nglab{ line-height:1.5; }
-    #lv .nglab .vs{ color:var(--color-text-faint); }
-    #lv .nglab .ct{ color:var(--color-text-faint); white-space:nowrap; }
-    #lv .strip{ display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
-    #lv .strip .gap{ width:14px; }
-    #lv .d{ width:16px; height:16px; border-radius:50%; background:var(--lv-dim); flex:none; position:relative; }
-    #lv .d.h{ background:var(--color-lime); } #lv .d.a{ background:var(--color-teal); }
-    #lv .d.o{ background:transparent; border:2px solid var(--lv-dim2); }
-    #lv .d.e{ background:transparent; border:2px solid var(--lv-dim2); box-shadow:inset 0 0 0 3px var(--lv-dim); } /* entered, awaiting confirm */
-    #lv .d.l{ background:transparent; border:2px solid var(--color-lime); animation:lvpulse 1.6s infinite; }
-    #lv .d[data-t]:hover::after{ content:attr(data-t); position:absolute; bottom:22px; left:50%; transform:translateX(-50%); white-space:nowrap; background:#000; border:1px solid var(--lv-dim2); color:#f5f5f5; font:600 11px/1.3 var(--lv-mono); letter-spacing:.06em; padding:6px 9px; border-radius:6px; z-index:5; }
+    /* section heads */
+    #lv .sec{ padding:26px 0 4px; }
+    #lv .sec > h2{ margin:0; font-size:clamp(28px,4.4vw,40px); display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+    #lv .sec > h2 small{ font-family:var(--lv-mono); font-size:11px; font-weight:600; letter-spacing:.14em; color:var(--color-text-muted); }
+    #lv .sec > .note{ margin-top:6px; }
 
-    /* match rows */
-    #lv .match{ padding:18px 0 16px; border-top:1px solid var(--color-border); cursor:pointer; }
-    #lv .match:first-of-type{ border-top:0; }
-    #lv .mrow{ display:grid; grid-template-columns:1fr auto; gap:18px; align-items:start; }
-    #lv .names{ font-size:clamp(26px,3.8vw,36px); }
-    #lv .names .vs{ color:var(--color-text-faint); font-weight:500; margin:0 .22em; }
-    #lv .names .h{ color:var(--color-lime); } #lv .names .a{ color:var(--color-teal); }
-    #lv .names .em{ font-size:.55em; vertical-align:middle; margin-right:.2em; }
-    #lv .mp{ text-align:right; }
-    #lv .mp .n{ font-family:var(--lv-disp); font-weight:900; font-size:clamp(36px,5vw,52px); line-height:.9; letter-spacing:-.01em; font-variant-numeric:tabular-nums; }
-    #lv .mp .n i{ font-style:normal; color:var(--color-text-faint); margin:0 .06em; }
-    #lv .mp .n .h{ color:var(--color-lime); } #lv .mp .n .a{ color:var(--color-teal); }
-    #lv .mp .n.tbd{ color:var(--lv-dim2); }
-    #lv .mp .mono{ margin-top:6px; display:block; }
-    #lv .mdots{ margin:10px 0 8px; }
-    #lv .mdots .strip{ gap:9px; }
-    #lv .mdots .d{ width:20px; height:20px; }
-    #lv .mdots .rlab{ font-family:var(--lv-mono); font-size:10px; letter-spacing:.14em; color:var(--color-text-faint); width:22px; }
-    #lv .mcap{ display:flex; gap:18px; flex-wrap:wrap; }
+    /* ON COURT NOW */
+    #lv .now{ display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:12px; margin-top:14px; }
+    #lv .nc{ border:1px solid var(--color-lime-dim); border-radius:16px; background:linear-gradient(180deg, rgba(184,255,44,.06), transparent 70%), var(--color-surface); padding:14px 16px 6px; cursor:pointer; }
+    #lv .nc-k{ display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    #lv .nc-teams{ font-family:var(--lv-disp); font-weight:800; font-size:20px; text-transform:uppercase; line-height:1.05; margin-top:6px; }
+    #lv .nc-teams .vs{ color:var(--color-text-faint); font-weight:500; margin:0 .25em; }
+    #lv .nc-score{ font-family:var(--lv-disp); font-weight:900; font-size:30px; line-height:1; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    #lv .nc-score i{ font-style:normal; color:var(--color-text-faint); margin:0 .08em; }
+    #lv .nc-top{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    #lv .nc-sub{ margin-top:4px; }
+    #lv .nc .gr{ border-top:1px solid var(--color-border); }
+    #lv .nc .gr:first-of-type{ margin-top:10px; }
 
-    /* box score */
-    #lv .detail{ display:none; margin-top:18px; border-top:1px dashed var(--lv-dim2); padding-top:6px; }
-    #lv .match.open .detail{ display:block; }
-    #lv .gl{ display:grid; grid-template-columns:34px 34px 1fr auto 1fr 96px; gap:10px; align-items:center; padding:9px 0; border-bottom:1px solid var(--color-border); font-size:14px; font-weight:600; }
-    #lv .gl:last-child{ border-bottom:0; }
-    #lv .gl .g{ font-family:var(--lv-mono); font-size:11px; color:var(--color-text-faint); letter-spacing:.1em; }
-    #lv .gl .ty{ font-family:var(--lv-mono); font-size:10px; letter-spacing:.14em; color:var(--color-text-muted); }
-    #lv .gl .p{ color:var(--color-text-muted); min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-    #lv .gl .p.w{ color:var(--color-text); }
-    #lv .gl .p.ar{ text-align:right; }
-    #lv .gl .sc{ font-family:var(--lv-disp); font-weight:800; font-size:22px; letter-spacing:.02em; font-variant-numeric:tabular-nums; color:var(--color-text-muted); text-align:center; min-width:64px; }
-    #lv .gl .sc b{ font-weight:800; color:var(--color-text); }
-    #lv .gl .sc.hw b:first-child{ color:var(--color-lime); } #lv .gl .sc.aw b:last-child{ color:var(--color-teal); }
-    #lv .gl .st{ font-family:var(--lv-mono); font-size:10px; letter-spacing:.12em; text-align:right; color:var(--color-text-faint); }
-    #lv .gl .st.live{ color:var(--color-lime); }
-    #lv .gl.up{ opacity:.55; }
-    #lv .rhead{ font-family:var(--lv-mono); font-size:10px; letter-spacing:.16em; text-transform:uppercase; color:var(--color-text-faint); padding:14px 0 6px; }
-    #lv .rhead b{ color:var(--color-text); }
+    /* MATCH CARD */
+    #lv .mc{ border:1px solid var(--color-border); border-radius:18px; background:var(--color-surface); margin-top:14px; overflow:hidden; }
+    #lv .mc.live{ border-color:rgba(184,255,44,.35); }
+    #lv .mc-k{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--color-border); }
+    #lv .chip{ display:inline-flex; align-items:center; gap:7px; font-family:var(--lv-mono); font-size:10px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; border-radius:999px; padding:5px 10px; border:1px solid var(--color-border); color:var(--color-text-muted); white-space:nowrap; }
+    #lv .chip.live{ color:var(--color-lime); border-color:var(--color-lime-dim); background:rgba(184,255,44,.06); }
+    #lv .chip.final{ color:var(--color-teal); border-color:rgba(23,215,176,.3); }
+    #lv .chip.wait{ color:var(--lv-gold); border-color:rgba(240,180,41,.35); }
 
-    /* on court now */
-    #lv .sec{ padding:22px 0 8px; }
-    #lv .sec h2{ margin:0 0 4px; font-size:clamp(30px,4.5vw,44px); }
-    #lv .sec h2 small{ display:block; font-weight:500; font-size:.5em; color:var(--color-text-muted); }
-    #lv .now{ display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; margin-top:18px; }
-    #lv .ct{ border:1px solid var(--color-border); border-radius:12px; padding:14px 16px; background:var(--color-surface); }
-    #lv .ct .k{ display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; }
-    #lv .ct .side{ display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:4px 0; font-size:15px; font-weight:600; color:var(--color-text); }
-    #lv .ct .side .tm{ font-family:var(--lv-mono); font-size:10px; letter-spacing:.12em; color:var(--color-text-faint); text-transform:uppercase; }
+    /* scoreboard: one row per team — match points, games won, points won */
+    #lv .sb{ display:grid; grid-template-columns:minmax(0,1fr) 70px 58px 58px; align-items:center; column-gap:6px; padding:12px 16px 4px; }
+    #lv .sb .hd{ font-size:9px; text-align:center; padding-bottom:6px; }
+    #lv .sb .hd:first-child{ text-align:left; }
+    #lv .sb .tm{ display:flex; align-items:center; gap:10px; min-width:0; padding:8px 0; }
+    #lv .sb .tm .em{ font-size:22px; flex:none; width:28px; text-align:center; }
+    #lv .sb .tm .nm{ font-family:var(--lv-disp); font-weight:900; text-transform:uppercase; font-size:clamp(22px,3.4vw,30px); line-height:.95; }
+    #lv .sb .tm .ha{ display:block; font-size:9px; margin-top:4px; }
+    #lv .sb .tm.h .nm{ color:var(--color-lime); } #lv .sb .tm.a .nm{ color:var(--color-teal); }
+    #lv .sb .v{ text-align:center; font-family:var(--lv-disp); font-weight:800; font-size:26px; line-height:1; font-variant-numeric:tabular-nums; color:var(--color-text-muted); }
+    #lv .sb .v.mpv{ font-weight:900; font-size:44px; color:var(--color-text); }
+    #lv .sb .v.lead.h{ color:var(--color-lime); } #lv .sb .v.lead.a{ color:var(--color-teal); }
+    #lv .sb .v.tbd{ color:var(--lv-dim2); }
+    #lv .sb .sep{ grid-column:1 / -1; height:1px; background:var(--color-border); }
+    #lv .sb-foot{ padding:2px 16px 0; font-size:9px; }
+
+    #lv .rounds{ padding:8px 16px 12px; display:grid; gap:8px; }
+    #lv .rd{ display:grid; grid-template-columns:30px auto 1fr; align-items:center; gap:10px; }
+    #lv .rd .rl{ font-family:var(--lv-mono); font-size:10px; letter-spacing:.14em; color:var(--color-text-faint); }
+    #lv .rd .dots{ display:flex; gap:6px; }
+    #lv .rd .tx{ text-align:right; font-size:10px; letter-spacing:.1em; }
+    #lv .d{ width:14px; height:14px; border-radius:50%; flex:none; }
+    #lv .d.h{ background:var(--color-lime); } #lv .d.a{ background:var(--color-teal); } #lv .d.x{ background:var(--color-text-muted); }
+    #lv .d.o{ border:2px solid var(--lv-dim2); }
+    #lv .d.e{ border:2px solid var(--lv-gold); }
+    #lv .d.l{ border:2px solid var(--color-lime); animation:lvpulse 1.6s infinite; }
+
+    #lv .toggle{ display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 32px); margin:4px 16px 14px; padding:12px 16px; border-radius:9999px; border:1px solid var(--color-border); background:transparent; color:var(--color-text); font-family:var(--lv-mono); font-size:11px; font-weight:600; letter-spacing:.14em; text-transform:uppercase; cursor:pointer; }
+    #lv .toggle:hover{ border-color:var(--color-text-muted); }
+    #lv .toggle .chev{ display:inline-block; transition:transform .2s; }
+    #lv .mc.open .toggle .chev{ transform:rotate(180deg); }
+    #lv .games{ display:none; border-top:1px solid var(--color-border); padding:4px 16px 12px; }
+    #lv .mc.open .games{ display:block; }
+    #lv .rh{ display:flex; justify-content:space-between; gap:10px; padding:14px 0 4px; }
+
+    /* one game */
+    #lv .gr{ padding:10px 0; border-bottom:1px solid var(--color-border); }
+    #lv .games .gr:last-child{ border-bottom:0; }
+    #lv .gr-k{ display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:10px; }
+    #lv .gr-k .st{ color:var(--color-text-faint); }
+    #lv .gr.live .gr-k .st{ color:var(--color-lime); }
+    #lv .gr.wait .gr-k .st{ color:var(--lv-gold); }
+    #lv .gr-m{ display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center; margin-top:6px; }
+    #lv .pr{ font-size:15px; font-weight:600; line-height:1.3; color:var(--color-text-muted); min-width:0; }
+    #lv .pr span{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    #lv .pr.a{ text-align:right; }
+    #lv .pr.w{ color:var(--color-text); }
+    #lv .pr.hid{ color:var(--color-text-faint); font-size:12px; font-style:italic; font-weight:500; }
+    #lv .gs{ font-family:var(--lv-disp); font-weight:800; font-size:28px; letter-spacing:.02em; font-variant-numeric:tabular-nums; color:var(--color-text-faint); text-align:center; min-width:72px; white-space:nowrap; }
+    #lv .gs b{ font-weight:800; color:var(--color-text-muted); }
+    #lv .gs.hw b:first-child{ color:var(--color-lime); } #lv .gs.aw b:last-child{ color:var(--color-teal); }
+    #lv .gs.vs{ font-size:13px; font-family:var(--lv-mono); letter-spacing:.14em; font-weight:600; }
+    #lv .gr.live{ background:linear-gradient(90deg, rgba(184,255,44,.07), transparent); margin:0 -16px; padding-left:16px; padding-right:16px; }
+    #lv .gr.live .gs.vs{ color:var(--color-lime); }
+
+    #lv .legend{ display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; font-size:10px; }
+    #lv .legend .d{ display:inline-block; width:10px; height:10px; vertical-align:-1px; margin-right:5px; }
 
     #lv .empty{ padding:60px 0; text-align:center; color:var(--color-text-muted); }
     #lv .empty .disp{ font-size:clamp(40px,8vw,80px); color:var(--color-text); margin-bottom:10px; }
     #lv .cta{ display:inline-block; margin-top:14px; padding:12px 22px; border-radius:9999px; background:var(--color-lime); color:#0e0e0e; font-weight:800; font-size:13px; text-transform:uppercase; letter-spacing:.06em; }
+    #lv .cta.ghost{ background:transparent; color:var(--color-text); border:1px solid var(--color-border); margin-left:8px; }
 
     /* this page IS the board — hide the site-wide ticker strip */
     body.is-live #ds-ticker{ display:none !important; }
 
-    @media(max-width:700px){ #lv .ngrid{ grid-template-columns:1fr; } }
     @media(max-width:640px){
       #lv .top{ padding-top:80px; }
       #lv .top h1{ white-space:normal; }
-      #lv .mrow{ grid-template-columns:1fr; }
-      #lv .mp{ text-align:left; }
-      #lv .gl{ grid-template-columns:28px 1fr auto 1fr; gap:8px; }
-      #lv .gl .ty, #lv .gl .st{ display:none; }
-      #lv .mdots .d, #lv .d{ width:14px; height:14px; }
-      #lv .mdots .strip{ gap:7px; }
+      #lv .count{ padding:14px 16px; }
+      #lv .sb{ grid-template-columns:minmax(0,1fr) 54px 44px 44px; padding-left:14px; padding-right:14px; column-gap:4px; }
+      #lv .sb .v{ font-size:22px; } #lv .sb .v.mpv{ font-size:36px; }
+      #lv .sb .tm .em{ font-size:18px; width:22px; } #lv .sb .tm{ gap:8px; }
+      #lv .sb-foot, #lv .rounds{ padding-left:14px; padding-right:14px; }
+      #lv .games{ padding-left:14px; padding-right:14px; }
+      #lv .gr.live{ margin:0 -14px; padding-left:14px; padding-right:14px; }
+      #lv .toggle{ width:calc(100% - 28px); margin-left:14px; margin-right:14px; }
+      #lv .pr{ font-size:14px; }
+      #lv .gs{ font-size:24px; min-width:60px; }
+      #lv .rd{ grid-template-columns:24px auto 1fr; gap:8px; }
+      #lv .d{ width:12px; height:12px; }
+      #lv .rd .dots{ gap:5px; }
+      #lv .now{ grid-template-columns:1fr; }
     }
   </style>
 </head>
@@ -173,7 +203,6 @@
         <div class="mono" id="lv-prog">&nbsp;</div>
       </div>
     </div>
-    <div class="rule"></div>
     <div class="count" id="lv-count" aria-live="polite">
       <div class="k"><span class="mono" id="lv-count-lbl">First serve in</span><div class="t" id="lv-count-t">--:--:--</div></div>
       <div class="k" style="text-align:right;align-items:flex-end;"><span class="mono" id="lv-count-when">&nbsp;</span><span class="mono" id="lv-count-venue" style="color:var(--color-text-faint)">&nbsp;</span></div>
@@ -192,269 +221,373 @@
     var qs = new URLSearchParams(location.search);
     var SEASON_ID = qs.get('season') || null;
     var WEEK = Number(qs.get('week')) || null;      // null → the API picks (tonight / next unfinished / last)
-    var DATA = null, POLL = null, OPEN = {};        // OPEN: matchId → box score expanded
+    var DATA = null, POLL = null;
+    var EXTRA = {}, EXTRA_POLLS = {};               // other weeks playing the same night (makeup nights)
+    var OPEN = {};                                  // matchId → true/false once the viewer toggles it
     // ?match=<id> (the ticker and the home page link here): open that match and bring it into view once.
     var FOCUS = qs.get('match') || null;
     if (FOCUS) OPEN[FOCUS] = true;
 
+    var SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
+    var TYPE = { WD: "Women's", MD: "Men's", MX: 'Mixed' };
+
     function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
-    function shortName(n) { var p = String(n || '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[p.length - 1][0] : (p[0] || ''); }
-    function pair(list) { return (list && list.length) ? list.map(shortName).join(' · ') : ''; }
+    function shortName(n) { var p = String(n || '').trim().split(/\s+/); return p.length > 1 ? p[0] + ' ' + p[p.length - 1][0] + '.' : (p[0] || ''); }
     function fmtDate(iso, opts) { if (!iso) return ''; var d = new Date(iso); if (isNaN(d)) return ''; return d.toLocaleDateString('en-US', opts || { weekday: 'short', month: 'short', day: 'numeric' }); }
     function fmtTime(iso) { if (!iso) return ''; var d = new Date(iso); if (isNaN(d)) return ''; return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); }
-    function typeLabel(t) { return t === 'WD' ? 'W' : t === 'MD' ? 'M' : 'MX'; }
     function courts(m) { if (m.courtA && m.courtB) return 'Courts ' + m.courtA + ' & ' + m.courtB; return m.court || ''; }
+    function startOf(m) { return (m.suspended && m.suspended.resumeAt) || m.scheduledAt || null; }
 
-    function endpoint() {
+    function endpoint(week) {
       var u = '/.netlify/functions/public-gameday?season=' + encodeURIComponent(SEASON_ID || 'circuit-i');
-      if (WEEK) u += '&week=' + WEEK;
+      if (week) u += '&week=' + week;
       return u;
     }
 
-    // ── match points: persisted when final, otherwise derived from round points ──
+    // ── numbers ──────────────────────────────────────────────────────
+    // Match points: persisted when final; otherwise the round points earned so
+    // far (a round's 2 points only land once all 6 of its games are confirmed).
     function mp(m) {
-      if (m.mpHome != null && m.mpAway != null) return [m.mpHome, m.mpAway];
+      if (m.status === 'final' && m.mpHome != null && m.mpAway != null) return [m.mpHome, m.mpAway];
       var h = (m.round1 && m.round1.homePoints || 0) + (m.round2 && m.round2.homePoints || 0);
       var a = (m.round1 && m.round1.awayPoints || 0) + (m.round2 && m.round2.awayPoints || 0);
       return [h, a];
     }
-
-    // ── one dot per slot, in slot order ──
-    function slotMap(m) {
+    function bySlot(m) {
       var by = {};
-      (m.games || []).forEach(function (g) { by[g.slot] = { kind: g.homeWin ? 'h' : (g.home === g.away ? 'x' : 'a'), g: g }; });
-      (m.upcoming || []).forEach(function (u) { by[u.slot] = { kind: u.entered ? 'e' : 'o', g: u }; });
-      if (m.status === 'live' && m.current && by[m.current.slot] && by[m.current.slot].kind !== 'h' && by[m.current.slot].kind !== 'a') by[m.current.slot].kind = 'l';
+      (m.upcoming || []).forEach(function (u) { by[u.slot] = { g: u, scored: false }; });
+      (m.games || []).forEach(function (g) { by[g.slot] = { g: g, scored: true }; });
       return by;
     }
-    var SLOTS = ['r1g1','r1g2','r1g3','r1g4','r1g5','r1g6','r2g1','r2g2','r2g3','r2g4','r2g5','r2g6'];
-    function dots(m, big) {
-      var by = slotMap(m), out = '';
-      SLOTS.forEach(function (s, i) {
-        if (i === 6) out += '<span class="gap"></span><span class="rlab mono">R2</span>';
-        var d = by[s] || { kind: 'o', g: null };
-        var tip = '';
-        if (d.g && d.g.home != null && d.g.away != null) tip = 'G' + d.g.gameNum + ' ' + typeLabel(d.g.type) + ' · ' + d.g.home + '–' + d.g.away;
-        else if (d.g) tip = 'G' + d.g.gameNum + ' ' + typeLabel(d.g.type) + (d.kind === 'l' ? ' · on court' : d.kind === 'e' ? ' · entered, awaiting confirm' : ' · not played');
-        out += '<span class="d ' + d.kind + '"' + (tip ? ' data-t="' + esc(tip) + '"' : '') + '></span>';
-      });
-      return '<span class="rlab mono">R1</span>' + out;
+    // The games being played right now: each match has two courts, so the
+    // first two games that have no score in yet. A game whose score is in but
+    // not confirmed has been played — it shows as "confirming", not on court.
+    function onCourtSlots(m) {
+      if (m.status !== 'live' || m._queued) return [];
+      return (m.upcoming || []).filter(function (u) { return !u.entered && !u.frozen; }).slice(0, 2).map(function (u) { return u.slot; });
+    }
+    function activeRound(m) {
+      var u = (m.upcoming || []).filter(function (x) { return !x.frozen; })[0];
+      return u ? u.round : null;
     }
 
-    function roundCap(m, rn) {
-      var r = rn === 1 ? m.round1 : m.round2; if (!r) return '';
-      var done = r.scoredGames === 6;
-      return 'R' + rn + ' <b>' + (r.homeGames || 0) + '–' + (r.awayGames || 0) + '</b>' +
-        (done ? ' · <span class="lime">' + (r.homePoints || 0) + '–' + (r.awayPoints || 0) + ' pts</span>' : (r.scoredGames ? ' · ' + r.scoredGames + '/6' : ''));
+    // ── one game row ──────────────────────────────────────────────────
+    function pairHtml(list, side, won, hidden) {
+      if (hidden) return '<div class="pr ' + side + ' hid">' + esc(hidden) + '</div>';
+      if (!list || !list.length) return '<div class="pr ' + side + ' hid">TBD</div>';
+      return '<div class="pr ' + side + (won ? ' w' : '') + '">' + list.map(function (n) { return '<span>' + esc(shortName(n)) + '</span>'; }).join('') + '</div>';
     }
-
-    function boxRow(g, live) {
-      var scored = g.home != null && g.away != null;
-      var cls = scored ? (g.home > g.away ? 'hw' : g.away > g.home ? 'aw' : '') : '';
-      var hp = pair(g.homePlayers), ap = pair(g.awayPlayers);
-      var st = live ? '<span class="st live">● On court</span>' : scored ? '<span class="st">Final</span>' : g.entered ? '<span class="st">Entered · unconfirmed</span>' : '<span class="st">—</span>';
-      return '<div class="gl' + (scored ? '' : ' up') + '">' +
-        '<span class="g">G' + g.gameNum + '</span><span class="ty">' + typeLabel(g.type) + '</span>' +
-        '<span class="p' + (scored && g.home > g.away ? ' w' : '') + '">' + esc(hp || '—') + '</span>' +
-        '<span class="sc ' + cls + '">' + (scored ? '<b>' + g.home + '</b>–<b>' + g.away + '</b>' : '–') + '</span>' +
-        '<span class="p ar' + (scored && g.away > g.home ? ' w' : '') + '">' + esc(ap || '—') + '</span>' + st + '</div>';
-    }
-    function boxScore(m) {
-      var all = (m.games || []).concat(m.upcoming || []);
-      var by = {}; all.forEach(function (g) { by[g.slot] = g; });
-      var html = '';
-      [1, 2].forEach(function (rn) {
-        var r = rn === 1 ? m.round1 : m.round2;
-        html += '<div class="rhead">Round ' + rn + (r ? ' · <b>' + (r.homeGames || 0) + '–' + (r.awayGames || 0) + '</b>' + (r.scoredGames === 6 ? ' · <b>' + (r.homePoints || 0) + '–' + (r.awayPoints || 0) + ' pts</b>' : ' · ' + (r.scoredGames || 0) + ' of 6 confirmed') : '') + '</div>';
-        SLOTS.slice(rn === 1 ? 0 : 6, rn === 1 ? 6 : 12).forEach(function (s) {
-          var g = by[s]; if (!g) return;
-          html += boxRow(g, m.status === 'live' && m.current && m.current.slot === s);
-        });
-      });
-      return html;
-    }
-
-    function matchRow(m) {
-      var p = mp(m), final = m.status === 'final';
-      var tbd = m.status === 'awaiting' && !(m.games || []).length;
-      var cap = [];
-      if (!tbd) { cap.push(roundCap(m, 1)); cap.push(roundCap(m, 2)); }
-      if ((m.games || []).length) { cap.push('Games <b>' + m.gamesHome + '–' + m.gamesAway + '</b>'); cap.push('Rally <b>' + m.pointsHome + '–' + m.pointsAway + '</b>'); }
-      if (courts(m)) cap.push('<b>' + esc(courts(m)) + '</b>');
-      if (tbd && m.scheduledAt) cap.push(esc(fmtDate(m.scheduledAt) + ' · ' + fmtTime(m.scheduledAt)));
-      if (tbd && !m.lineupsVisible) cap.push('Lineups reveal at first serve');
-      var sub = final ? 'Final' : m.status === 'live' ? (m.current ? 'Live · R' + m.current.round : 'Live')
-        : m.status === 'suspended' ? ('Resumes ' + (fmtDate(m.suspended && m.suspended.resumeAt, { weekday: 'short', hour: 'numeric', minute: '2-digit' }) || 'TBD'))
-        : 'Match pts';
-      var em = function (s) { return s.emoji ? '<span class="em">' + esc(s.emoji) + '</span>' : ''; };
-      return '<div class="match' + (OPEN[m.id] ? ' open' : '') + '" data-id="' + esc(m.id) + '">' +
-        '<div class="mrow"><div>' +
-          '<div class="disp names"><span class="h">' + em(m.home) + esc(m.home.name) + '</span><span class="vs">vs</span><span class="a">' + em(m.away) + esc(m.away.name) + '</span></div>' +
-          '<div class="mdots"><div class="strip">' + dots(m) + '</div></div>' +
-          '<div class="mcap mono">' + cap.filter(Boolean).map(function (c) { return '<span>' + c + '</span>'; }).join('') + '</div>' +
-        '</div>' +
-        '<div class="mp"><div class="n' + (tbd ? ' tbd' : '') + '">' + (tbd ? '–' : '<span class="h">' + p[0] + '</span><i>–</i><span class="a">' + p[1] + '</span>') + '</div><span class="mono">' + sub + '</span></div>' +
-        '</div>' +
-        '<div class="detail">' + boxScore(m) + '</div>' +
+    function gameRow(m, slot, info, now) {
+      var g = info.g, scored = info.scored;
+      var hw = scored && g.home > g.away, aw = scored && g.away > g.home;
+      var cls = 'gr', st;
+      if (scored) st = 'Final';
+      else if (now) { cls += ' live'; st = '● On court'; }
+      else if (g.entered) { cls += ' wait'; st = 'Score in · confirming'; }
+      else st = m.status === 'final' ? '—' : 'To play';
+      var hidden = (!scored && !m.lineupsVisible && !(g.homePlayers || []).length)
+        ? (m._revealAt ? 'Lineup at ' + m._revealAt : 'Lineup hidden') : '';
+      var score = scored
+        ? '<div class="gs' + (hw ? ' hw' : aw ? ' aw' : '') + '"><b>' + g.home + '</b>–<b>' + g.away + '</b></div>'
+        : '<div class="gs vs">vs</div>';
+      return '<div class="' + cls + '">' +
+        '<div class="gr-k mono"><span>G' + g.gameNum + ' · ' + (TYPE[g.type] || g.type) + '</span><span class="st">' + st + '</span></div>' +
+        '<div class="gr-m">' + pairHtml(g.homePlayers, 'h', hw, hidden) + score + pairHtml(g.awayPlayers, 'a', aw, hidden) + '</div>' +
       '</div>';
     }
 
-    function nightGrid(d) {
-      var ms = d.matches || [];
-      return '<div class="ngrid">' + ms.map(function (m) {
-        var by = slotMap(m);
-        var row = function (from) { return SLOTS.slice(from, from + 6).map(function (s) { return '<span class="d ' + ((by[s] && by[s].kind) || 'o') + '"></span>'; }).join(''); };
-        var p = mp(m);
-        return '<div class="ng"><div class="mono nglab"><span class="lime">' + esc(m.home.name) + '</span> <span class="vs">v</span> <span class="teal">' + esc(m.away.name) + '</span>' +
-          (m.status === 'final' ? ' <span class="ct">· ' + p[0] + '–' + p[1] + '</span>' : courts(m) ? ' <span class="ct">· ' + esc(courts(m).replace('Courts ', 'Cts ')) + '</span>' : '') + '</div>' +
-          '<div class="strip"><span class="rlab mono">R1</span>' + row(0) + '</div>' +
-          '<div class="strip"><span class="rlab mono">R2</span>' + row(6) + '</div></div>';
-      }).join('') + '</div>';
+    // ── a round's progress line ──────────────────────────────────────
+    function roundLine(m, rn, by, now) {
+      var r = (rn === 1 ? m.round1 : m.round2) || { homeGames: 0, awayGames: 0, homePoints: 0, awayPoints: 0, scoredGames: 0 };
+      var dots = SLOTS.slice(rn === 1 ? 0 : 6, rn === 1 ? 6 : 12).map(function (s) {
+        var i = by[s], k = 'o';
+        if (i && i.scored) k = i.g.home > i.g.away ? 'h' : i.g.away > i.g.home ? 'a' : 'x';
+        else if (now.indexOf(s) !== -1) k = 'l';
+        else if (i && i.g.entered) k = 'e';
+        return '<span class="d ' + k + '"></span>';
+      }).join('');
+      var hn = esc(m.home.name), an = esc(m.away.name), tx;
+      if (r.scoredGames === 6) {
+        tx = '<b>' + r.homeGames + '–' + r.awayGames + '</b> games · ' +
+          (r.homePoints > r.awayPoints ? '<span class="lime">' + hn + ' +2</span>' : r.awayPoints > r.homePoints ? '<span class="teal">' + an + ' +2</span>' : 'split · +1 each');
+      } else if (r.scoredGames > 0) {
+        tx = (r.homeGames > r.awayGames ? '<span class="lime">' + hn + ' up ' + r.homeGames + '–' + r.awayGames + '</span>'
+          : r.awayGames > r.homeGames ? '<span class="teal">' + an + ' up ' + r.awayGames + '–' + r.homeGames + '</span>'
+          : '<b>Level ' + r.homeGames + '–' + r.awayGames + '</b>') + ' · ' + r.scoredGames + ' of 6 in';
+      } else {
+        tx = m.status === 'final' ? '—' : 'Not started';
+      }
+      return '<div class="rd"><span class="rl">R' + rn + '</span><span class="dots">' + dots + '</span><span class="tx mono">' + tx + '</span></div>';
     }
 
-    function onCourt(d) {
-      var live = (d.matches || []).filter(function (m) { return m.status === 'live' && m.current; });
-      if (!live.length) return '';
-      return '<div class="sec"><h2 class="disp">On court<small>right now · scores post once both captains confirm</small></h2><div class="now">' +
-        live.map(function (m) {
-          var c = m.current;
-          return '<div class="ct"><div class="k"><span class="mono"><b>' + esc(courts(m).replace('Courts ', 'Cts ')) + '</b> · R' + c.round + ' G' + c.gameNum + ' ' + typeLabel(c.type) + '</span><span class="mono lime">● In play</span></div>' +
-            '<div class="side"><span>' + esc(pair(c.homePlayers) || m.home.name) + '</span><span class="tm">' + esc(m.home.name) + '</span></div>' +
-            '<div class="side"><span>' + esc(pair(c.awayPlayers) || m.away.name) + '</span><span class="tm">' + esc(m.away.name) + '</span></div></div>';
-        }).join('') + '</div></div>';
+    // ── status chip for a match ──────────────────────────────────────
+    function chip(m) {
+      if (m.status === 'final') return '<span class="chip final">Final</span>';
+      if (m._queued) return '<span class="chip wait">Up after Week ' + m._queued + '</span>';
+      if (m.status === 'live') { var r = activeRound(m); return '<span class="chip live"><span class="dotp"></span>Live' + (r ? ' · Round ' + r : '') + '</span>'; }
+      if (m.status === 'suspended') return '<span class="chip wait">⛈ Resumes ' + esc(fmtDate(m.suspended && m.suspended.resumeAt, { weekday: 'short' })) + ' ' + esc(fmtTime(m.suspended && m.suspended.resumeAt)) + '</span>';
+      var s = startOf(m);
+      return '<span class="chip">' + (m.startNote ? esc(m.startNote) : s ? esc(fmtDate(s, { weekday: 'short' }) + ' · ' + fmtTime(s)) : 'Scheduled') + '</span>';
     }
 
-    // ── Countdown to first serve ─────────────────────────────────────
-    // On a game day, before any match goes live, count down to the earliest
-    // scheduledAt. Ticks every second on the client; the data poll only has to
-    // refresh the target. Once a match is live (or the night is final) it hides.
-    var COUNT = { target: null, timer: null, venue: '', label: '' };
-    var GRACE_MS = 90 * 60 * 1000;   // after first serve passes with nothing live: "warming up" for 90 min, then hide
+    function isOpen(m) {
+      if (OPEN[m.id] != null) return OPEN[m.id];
+      return m.status === 'live' && !m._queued;     // live matches open themselves; the rest are a tap away
+    }
 
+    // ── the match card ───────────────────────────────────────────────
+    function teamRow(t, side, ha, mpMine, mpOther, gMine, gOther, pMine, pOther, tbd) {
+      var lead = function (a, b) { return a > b ? ' lead ' + side : ''; };
+      var v = function (x) { return tbd ? '–' : x; };
+      return '<div class="tm ' + side + '">' + (t.emoji ? '<span class="em">' + esc(t.emoji) + '</span>' : '<span class="em"></span>') +
+          '<div><div class="nm">' + esc(t.name) + '</div><span class="ha mono">' + ha + '</span></div></div>' +
+        '<span class="v mpv' + (tbd ? ' tbd' : lead(mpMine, mpOther)) + '">' + v(mpMine) + '</span>' +
+        '<span class="v' + (tbd ? ' tbd' : lead(gMine, gOther)) + '">' + v(gMine) + '</span>' +
+        '<span class="v' + (tbd ? ' tbd' : lead(pMine, pOther)) + '">' + v(pMine) + '</span>';
+    }
+    function matchCard(m) {
+      var by = bySlot(m), now = onCourtSlots(m), p = mp(m);
+      var played = (m.games || []).length;
+      var touched = played || (m.upcoming || []).some(function (u) { return u.entered; });
+      var tbd = !touched && m.status !== 'final';
+      var gh = m.gamesHome || 0, ga = m.gamesAway || 0, ph = m.pointsHome || 0, pa = m.pointsAway || 0;
+      var mpLabel = m.status === 'final' ? 'Final · 2 pts per round won, 1 each for a split round'
+        : played ? 'Match pts so far · a round\'s 2 pts land when all 6 of its games are in'
+        : '2 match pts per round · 1 each if a round splits 3–3';
+
+      var html = '<article class="mc ' + (m._queued ? 'queued' : m.status) + (isOpen(m) ? ' open' : '') + '" id="m-' + esc(m.id) + '" data-id="' + esc(m.id) + '">' +
+        '<div class="mc-k">' + chip(m) + '<span class="mono">' + esc(courts(m)) + '</span></div>' +
+        '<div class="sb">' +
+          '<span class="hd mono"></span><span class="hd mono">Match pts</span><span class="hd mono">Games</span><span class="hd mono">Points</span>' +
+          teamRow(m.home, 'h', 'Home', p[0], p[1], gh, ga, ph, pa, tbd) +
+          '<span class="sep"></span>' +
+          teamRow(m.away, 'a', 'Away', p[1], p[0], ga, gh, pa, ph, tbd) +
+        '</div>' +
+        '<div class="sb-foot mono">' + mpLabel + '</div>';
+      html += '<div class="rounds">' + roundLine(m, 1, by, now) + roundLine(m, 2, by, now) + '</div>';
+
+      var label = isOpen(m) ? 'Hide games' : (played ? 'See all 12 games · ' + played + ' played' : (m.lineupsVisible ? 'See all 12 matchups' : 'See the 12 games'));
+      html += '<button type="button" class="toggle" aria-expanded="' + (isOpen(m) ? 'true' : 'false') + '">' + label + ' <span class="chev">▾</span></button>';
+
+      html += '<div class="games">';
+      [1, 2].forEach(function (rn) {
+        var r = (rn === 1 ? m.round1 : m.round2) || {};
+        html += '<div class="rh mono"><b>Round ' + rn + '</b><span>' + (r.scoredGames ? (r.homeGames || 0) + '–' + (r.awayGames || 0) + ' games' + (r.scoredGames === 6 ? ' · ' + (r.homePoints || 0) + '–' + (r.awayPoints || 0) + ' pts' : '') : '') + '</span></div>';
+        SLOTS.slice(rn === 1 ? 0 : 6, rn === 1 ? 6 : 12).forEach(function (s) {
+          if (by[s]) html += gameRow(m, s, by[s], now.indexOf(s) !== -1);
+        });
+      });
+      html += '</div></article>';
+      return html;
+    }
+
+    // ── ON COURT NOW (every live match, every week shown) ─────────────
+    function onCourtNow(all) {
+      var cards = all.filter(function (m) { return m.status === 'live' && !m._queued; }).map(function (m) {
+        var by = bySlot(m), now = onCourtSlots(m), p = mp(m);
+        var waiting = (m.upcoming || []).filter(function (u) { return u.entered; });
+        var rows = now.map(function (s) { return gameRow(m, s, by[s], true); }).join('');
+        if (!rows && !waiting.length) rows = '<div class="gr"><div class="gr-k mono"><span>Between games</span><span class="st">Waiting on the next score</span></div></div>';
+        if (!m.lineupsVisible && !rows) rows = '';
+        return '<div class="nc" data-jump="' + esc(m.id) + '">' +
+          '<div class="nc-top"><div><div class="mono">' + (m._week ? 'Week ' + m._week + ' · ' : '') + esc(courts(m).replace('Courts ', 'Cts ')) + '</div>' +
+            '<div class="nc-teams"><span class="lime">' + esc(m.home.name) + '</span><span class="vs">v</span><span class="teal">' + esc(m.away.name) + '</span></div>' +
+            '<div class="nc-sub mono">Games <b>' + (m.gamesHome || 0) + '–' + (m.gamesAway || 0) + '</b> · Pts <b>' + (m.pointsHome || 0) + '–' + (m.pointsAway || 0) + '</b>' + (waiting.length ? ' · <span class="gold">' + waiting.length + ' confirming</span>' : '') + '</div></div>' +
+            '<div style="text-align:right"><div class="nc-score"><span class="lime">' + p[0] + '</span><i>–</i><span class="teal">' + p[1] + '</span></div><div class="mono" style="font-size:9px;margin-top:4px">Match pts</div></div></div>' +
+          rows +
+        '</div>';
+      });
+      if (!cards.length) return '';
+      return '<div class="sec"><h2 class="disp"><span class="dotp"></span>On court now<small>tap a match for every game</small></h2>' +
+        '<div class="now">' + cards.join('') + '</div>' +
+        '<div class="legend mono"><span><span class="d h"></span>Home won</span><span><span class="d a"></span>Away won</span><span><span class="d l"></span>On court</span><span><span class="d e"></span>Score in, confirming</span><span><span class="d o"></span>To play</span></div>' +
+      '</div>';
+    }
+
+    // ── countdown to first serve ─────────────────────────────────────
+    var COUNT = { target: null, timer: null };
+    var GRACE_MS = 90 * 60 * 1000;
     function pad2(n) { return (n < 10 ? '0' : '') + n; }
     function sameLocalDay(a, b) { return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate(); }
-
     function setCountdown(d, ms, isLive, allFinal, first) {
-      var box = $('lv-count');
-      var t = first ? new Date(first) : null;
-      var now = new Date();
+      var t = first ? new Date(first) : null, now = new Date();
       var gameDay = !!(t && !isNaN(t) && (d.gameNight || sameLocalDay(t, now)));
       var show = gameDay && !isLive && !allFinal && ms.length && (t.getTime() + GRACE_MS > now.getTime());
       if (!show) { stopCountdown(); return; }
       COUNT.target = t.getTime();
-      COUNT.venue = d.venue || ((d.weeks || []).find(function (w) { return w.week === d.week; }) || {}).venue || '';
-      $('lv-count-when').textContent = 'Tonight · ' + fmtTime(first) + ' first serve';
-      $('lv-count-venue').textContent = COUNT.venue;
-      box.classList.add('on');
+      $('lv-count-when').textContent = (sameLocalDay(t, now) ? 'Tonight' : fmtDate(first)) + ' · ' + fmtTime(first) + ' first serve';
+      $('lv-count-venue').textContent = d.venue || '';
+      $('lv-count').classList.add('on');
       tickCountdown();
       if (!COUNT.timer) COUNT.timer = setInterval(tickCountdown, 1000);
     }
-
     function tickCountdown() {
       if (COUNT.target == null) return;
       var box = $('lv-count'), out = $('lv-count-t'), lbl = $('lv-count-lbl');
       var left = COUNT.target - Date.now();
       if (left <= 0) {
         if (-left > GRACE_MS) { stopCountdown(); return; }
-        lbl.textContent = 'First serve';
-        out.innerHTML = 'Warming up';
-        box.classList.remove('soon');
-        return;
+        lbl.textContent = 'First serve'; out.innerHTML = 'Warming up'; box.classList.remove('soon'); return;
       }
       var s = Math.floor(left / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60;
       lbl.textContent = 'First serve in';
-      out.innerHTML = h > 0
-        ? h + '<small>h</small> ' + pad2(m) + '<small>m</small> ' + pad2(sec) + '<small>s</small>'
-        : pad2(m) + '<small>m</small> ' + pad2(sec) + '<small>s</small>';
+      out.innerHTML = h > 0 ? h + '<small>h</small> ' + pad2(m) + '<small>m</small> ' + pad2(sec) + '<small>s</small>' : pad2(m) + '<small>m</small> ' + pad2(sec) + '<small>s</small>';
       box.classList.toggle('soon', left < 5 * 60 * 1000);
     }
-
     function stopCountdown() {
       COUNT.target = null;
       if (COUNT.timer) { clearInterval(COUNT.timer); COUNT.timer = null; }
       var box = $('lv-count'); if (box) box.classList.remove('on', 'soon');
     }
 
-    function weekStrip(d) {
+    function weekStrip(d, shown) {
       var ws = d.weeks || [];
-      var cur = d.week;
       $('lv-weeks').innerHTML = ws.map(function (w) {
         var tag = w.status === 'live' ? '● Live' : w.status === 'final' ? (fmtDate(w.date, { month: 'short', day: 'numeric' }) || 'Final') : (w.phaseLabel || fmtDate(w.date, { month: 'short', day: 'numeric' }) || 'TBD');
         var next = w.status === 'upcoming' && !ws.some(function (x) { return x.status === 'upcoming' && x.week < w.week; });
-        return '<button data-w="' + w.week + '" class="' + w.status + (next ? ' next' : '') + (w.week === cur ? ' on' : '') + '">Wk ' + w.week + '<small>' + esc(tag) + '</small></button>';
+        return '<button data-w="' + w.week + '" class="' + w.status + (next ? ' next' : '') + (shown.indexOf(w.week) !== -1 ? ' on' : '') + '">Wk ' + w.week + '<small>' + esc(tag) + '</small></button>';
       }).join('');
     }
 
-    function render(d) {
-      DATA = d;
+    // ── render everything shown: the API's week, plus any other week playing tonight ──
+    function render() {
+      var d = DATA; if (!d) return;
+      var blocks = [{ week: d.week, d: d }];
+      Object.keys(EXTRA).forEach(function (k) { if (EXTRA[k] && Number(k) !== d.week) blocks.push({ week: Number(k), d: EXTRA[k] }); });
+      blocks.sort(function (a, b) { return a.week - b.week; });
+
+      // A later week's match waits while either team is still finishing an
+      // earlier week's match tonight — until a score for it comes in.
+      var busy = {};
+      blocks.forEach(function (b) {
+        (b.d.matches || []).forEach(function (m) {
+          m._week = blocks.length > 1 ? b.week : null;
+          var rv = startOf(m); m._revealAt = rv ? fmtTime(rv) : '';
+          var touched = (m.games || []).length || (m.upcoming || []).some(function (u) { return u.entered; });
+          var blockedBy = null;
+          [m.home.id, m.away.id].forEach(function (id) { if (id && busy[id] && busy[id] < b.week) blockedBy = busy[id]; });
+          m._queued = (blockedBy && m.status !== 'final' && !touched) ? blockedBy : null;
+        });
+        (b.d.matches || []).forEach(function (m) {
+          if (m.status !== 'final') [m.home.id, m.away.id].forEach(function (id) { if (id && !busy[id]) busy[id] = b.week; });
+        });
+      });
+
+      var all = []; blocks.forEach(function (b) { all = all.concat(b.d.matches || []); });
       var ms = d.matches || [];
       var wk = (d.weeks || []).find(function (w) { return w.week === d.week; }) || {};
-      var status = wk.status || (d.gameNight ? 'live' : 'final');
-      var isLive = ms.some(function (m) { return m.status === 'live'; });
-      var allFinal = ms.length && ms.every(function (m) { return m.status === 'final'; });
-      var first = ms.map(function (m) { return m.scheduledAt; }).filter(Boolean).sort()[0] || wk.date;
+      var isLive = all.some(function (m) { return m.status === 'live'; });
+      var allFinal = all.length && all.every(function (m) { return m.status === 'final'; });
+      var first = ms.map(startOf).filter(Boolean).sort()[0] || wk.date;
 
-      // header
-      $('lv-sub').textContent = (d.week ? 'Week ' + d.week + ' · ' : '') + (first ? fmtDate(first) : '') + (d.venue || wk.venue ? ' · ' + (d.venue || wk.venue) : '');
+      $('lv-sub').textContent = blocks.map(function (b) { return 'Week ' + b.week; }).join(' + ') + (first ? ' · ' + fmtDate(first) : '') + (d.venue || wk.venue ? ' · ' + (d.venue || wk.venue) : '');
       $('lv-title').innerHTML = isLive ? 'Game Night' : allFinal ? 'Final Score' : (d.phaseLabel ? esc(d.phaseLabel) : 'Up Next');
       var pill = $('lv-pill');
       if (isLive) { pill.className = 'livepill'; pill.innerHTML = '<span class="dotp"></span>Live'; }
       else if (allFinal) { pill.className = 'livepill off'; pill.textContent = 'Final'; }
       else { pill.className = 'livepill off'; pill.textContent = first ? fmtTime(first) + ' first serve' : 'Scheduled'; }
       setCountdown(d, ms, isLive, allFinal, first);
-      var confirmed = ms.reduce(function (n, m) { return n + (m.gamesConfirmed || 0); }, 0), total = ms.length * 12;
-      $('lv-prog').innerHTML = ms.length ? (allFinal ? '<b>' + total + '</b> games · all confirmed' : '<b>' + confirmed + ' of ' + total + '</b> games confirmed') : '&nbsp;';
+      var confirmed = all.reduce(function (n, m) { return n + (m.gamesConfirmed || 0); }, 0), total = all.length * 12;
+      $('lv-prog').innerHTML = all.length ? (allFinal ? '<b>' + total + '</b> games · all confirmed' : '<b>' + confirmed + ' of ' + total + '</b> games confirmed') : '&nbsp;';
+      weekStrip(d, blocks.map(function (b) { return b.week; }));
 
-      weekStrip(d);
-
-      if (!ms.length) {
+      if (!all.length) {
         $('lv-body').innerHTML = '<div class="empty"><div class="disp">See you next week.</div><div class="mono">' + esc(d.message || 'No matches scheduled.') + '</div></div>';
         return;
       }
-      var legend = '<span class="mono"><span class="lime">●</span> home &nbsp;<span class="teal">●</span> away &nbsp;<span style="color:var(--lv-dim2)">○</span> not played' + (isLive ? ' &nbsp;<span class="lime">◌</span> on court' : '') + '</span>';
-      var html = '<div class="night"><div class="lbl"><span class="mono"><b>' + (isLive ? 'Tonight' : allFinal ? 'The night' : 'The slate') + '</b> · one dot per game</span>' + legend + '</div>' + nightGrid(d) +
-        '<div class="mono" style="margin-top:14px;color:var(--color-text-faint)">Tap a match for the box score' + (isLive ? ' · scores appear when both captains confirm' : '') + '</div></div><div class="rule"></div>';
-      html += ms.map(matchRow).join('');
-      html += '<div class="rule"></div>';
-      html += onCourt(d);
-      if (allFinal && d.week) html += '<div class="sec"><h2 class="disp">The recap<small>how the night went</small></h2><a class="cta" href="/drop.html?edition=week-' + d.week + '">Read The Drop · Week ' + d.week + ' →</a></div>';
+
+      var html = onCourtNow(all);
+      blocks.forEach(function (b) {
+        var bm = b.d.matches || [];
+        var rained = bm.some(function (m) { return m.suspended; });
+        var note = rained ? 'Finishing the rained-out games · earlier results already count'
+          : bm.some(function (m) { return m._queued; }) ? 'Starts as each team finishes Week ' + bm.filter(function (m) { return m._queued; })[0]._queued
+          : bm.every(function (m) { return m.status === 'final'; }) ? 'Every game, both rounds · tap a match'
+          : 'Tap a match for every game and who played whom';
+        html += '<div class="sec"><h2 class="disp">' + (b.d.phaseLabel ? esc(b.d.phaseLabel) : 'Week ' + b.week) + '<small>' + bm.length + ' matches</small></h2><div class="note mono">' + esc(note) + '</div></div>';
+        html += bm.map(matchCard).join('');
+      });
+
+      var standingsNote = all.some(function (m) { return m.status !== 'final' && (m.games || []).length; });
+      html += '<div class="sec">' +
+        (standingsNote ? '<div class="mono">Standings move live as games are confirmed · official once every match is final</div>' : '') +
+        '<a class="cta" href="/standings">Standings →</a>' +
+        (allFinal && d.week ? '<a class="cta ghost" href="/drop.html?edition=week-' + d.week + '">The Drop · Week ' + d.week + ' →</a>' : '') +
+      '</div>';
+
       $('lv-body').innerHTML = html;
       if (FOCUS) {
         var want = FOCUS; FOCUS = null;
-        var el = null; $('lv-body').querySelectorAll('.match').forEach(function (x) { if (x.dataset.id === want) el = x; });
-        if (el) setTimeout(function () { var y = el.getBoundingClientRect().top + window.pageYOffset - 90; window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' }); }, 60);
+        var el = document.getElementById('m-' + want);
+        if (el) setTimeout(function () { scrollToEl(el); }, 60);
       }
+    }
+    function scrollToEl(el) {
+      var y = el.getBoundingClientRect().top + window.pageYOffset - 140;
+      window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
     }
 
     // ── interactions ──
     $('lv-body').addEventListener('click', function (e) {
-      var m = e.target.closest('.match'); if (!m) return;
-      OPEN[m.dataset.id] = !OPEN[m.dataset.id];
-      m.classList.toggle('open', OPEN[m.dataset.id]);
+      var jump = e.target.closest('[data-jump]');
+      if (jump) {
+        var id = jump.getAttribute('data-jump'); OPEN[id] = true;
+        var card = document.getElementById('m-' + id);
+        if (card) { card.classList.add('open'); var t = card.querySelector('.toggle'); if (t) { t.setAttribute('aria-expanded', 'true'); t.firstChild.nodeValue = 'Hide games '; } scrollToEl(card); }
+        return;
+      }
+      var btn = e.target.closest('.toggle'), board = e.target.closest('.sb, .sb-foot, .mc-k, .rounds');
+      if (!btn && !board) return;
+      var mc = e.target.closest('.mc'); if (!mc) return;
+      var open = !mc.classList.contains('open');
+      OPEN[mc.dataset.id] = open;
+      render();
     });
     $('lv-weeks').addEventListener('click', function (e) {
       var b = e.target.closest('button'); if (!b) return;
-      WEEK = Number(b.dataset.w); OPEN = {};
+      WEEK = Number(b.dataset.w); OPEN = {}; syncExtras([]);
       var u = new URL(location.href); u.searchParams.set('week', WEEK); history.replaceState(null, '', u);
       window.scrollTo({ top: 0, behavior: 'smooth' });
       if (POLL) POLL.pollNow(); else load();
     });
 
+    // Other weeks playing tonight (a makeup night): poll each alongside the main one.
+    function syncExtras(want) {
+      Object.keys(EXTRA_POLLS).forEach(function (k) {
+        if (want.indexOf(Number(k)) === -1) { EXTRA_POLLS[k].stop && EXTRA_POLLS[k].stop(); delete EXTRA_POLLS[k]; delete EXTRA[k]; }
+      });
+      want.forEach(function (w) {
+        if (EXTRA_POLLS[w]) return;
+        if (window.DSLivePoll) {
+          EXTRA_POLLS[w] = DSLivePoll.create({ url: function () { return endpoint(w); }, interval: 30000, onUpdate: function (x) { EXTRA[w] = x; render(); } });
+          EXTRA_POLLS[w].start();
+        } else {
+          var tick = function () { fetch(endpoint(w)).then(function (r) { return r.ok ? r.json() : null; }).then(function (x) { if (x) { EXTRA[w] = x; render(); } }).catch(function () {}); };
+          tick(); EXTRA_POLLS[w] = { stop: (function (h) { return function () { clearInterval(h); }; })(setInterval(tick, 30000)) };
+        }
+      });
+    }
+    function onPrimary(d) {
+      DATA = d;
+      var want = WEEK ? [] : (d.weeks || []).filter(function (w) { return w.status === 'live' && w.week !== d.week; }).map(function (w) { return w.week; });
+      syncExtras(want);
+      render();
+    }
+
     function load() {
-      return fetch(endpoint(), { headers: { Accept: 'application/json' } })
+      return fetch(endpoint(WEEK), { headers: { Accept: 'application/json' } })
         .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-        .then(render)
+        .then(onPrimary)
         .catch(function (e) { $('lv-body').innerHTML = '<div class="empty"><div class="mono">Live scoring unavailable (' + esc(e.message) + ')</div></div>'; });
     }
 
-    // Poll every 30s while the viewed week is live; every 5 min otherwise
-    // (so a night that starts while the page is open wakes up on its own).
+    // Poll every 30s while anything shown is live; every 5 min otherwise.
     function start() {
       if (!window.DSLivePoll) { load(); setInterval(load, 30000); return; }
       POLL = DSLivePoll.create({
-        url: endpoint,
-        interval: function () { return (DATA && (DATA.matches || []).some(function (m) { return m.status === 'live'; })) ? 30000 : 5 * 60 * 1000; },
-        onUpdate: render,
+        url: function () { return endpoint(WEEK); },
+        interval: function () { return (DATA && (DATA.matches || []).some(function (m) { return m.status === 'live'; })) || (DATA && DATA.gameNight) ? 30000 : 5 * 60 * 1000; },
+        onUpdate: onPrimary,
         onError: function (e) { if (!DATA) $('lv-body').innerHTML = '<div class="empty"><div class="mono">Live scoring unavailable (' + esc(e && e.message || e) + ')</div></div>'; },
       });
       POLL.start();
