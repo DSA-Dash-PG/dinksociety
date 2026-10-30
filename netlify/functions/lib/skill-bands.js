@@ -147,9 +147,9 @@ export function bestWorst(bands) {
  * One sentence, only from numbers the rows show. Needs two bands with a real
  * sample; otherwise null (the card shows no read).
  *
- *  1. Partner explains a dip: the toughest band is NOT the top one, and its
- *     average partner is the lowest of the sampled bands and at least 2 DSR
- *     under the player's season average partner.
+ *  1. Partners tell the story: the toughest band's average partner is the
+ *     lowest of the sampled bands and at least 2 DSR under the player's
+ *     average partner across all their games.
  *  2. Otherwise: best and toughest band, side by side.
  */
 export function readFor(bands, partnerAvg, ranged = true) {
@@ -159,8 +159,7 @@ export function readFor(bands, partnerAvg, ranged = true) {
 
   const withPartner = sampled.filter(b => b.partner != null);
   const lowestPartner = withPartner.reduce((m, b) => (m == null || b.partner < m.partner ? b : m), null);
-  const topSampled = sampled[sampled.length - 1];
-  if (worst !== topSampled && lowestPartner && lowestPartner.idx === worst.idx
+  if (lowestPartner && lowestPartner.idx === worst.idx
       && partnerAvg != null && worst.partner <= partnerAvg - 2) {
     return `Your toughest band (${name(worst)}, ${worst.pct}%) is also where your partners averaged the lowest DSR — ${worst.partner.toFixed(1)}, against ${partnerAvg.toFixed(1)} across all your games.`;
   }

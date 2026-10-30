@@ -125,3 +125,13 @@ test('bestWorst: a win-rate tie goes to the bigger sample', () => {
   const read = readFor([{ ...b(0, 9, 0), tier: 'Bottom fifth', lo: -5, hi: 30, label: 'under 30' }, { ...b(4, 2, 6), tier: 'Top fifth', lo: 56, hi: 75, label: '56+' }], null);
   assert.equal(read, 'Best results vs. under 30 (100%, 9–0); toughest vs. 56+ (25%, 2–6).');
 });
+
+test('read: names the partner gap even when the top band is the toughest', () => {
+  // Real career shape: 2–12 vs 58+ with 35.4 partners, 52–59 everywhere else.
+  const bands = [
+    { idx: 0, tier: 'Bottom fifth', lo: 3, hi: 26, label: 'under 26', played: 13, w: 13, l: 0, pct: 100, partner: 53.8 },
+    { idx: 1, tier: 'Lower-middle', lo: 26, hi: 38, label: '26–38', played: 11, w: 10, l: 1, pct: 91, partner: 52.4 },
+    { idx: 4, tier: 'Top fifth', lo: 58, hi: 80, label: '58+', played: 14, w: 2, l: 12, pct: 14, partner: 35.4 },
+  ];
+  assert.equal(readFor(bands, 48.6), 'Your toughest band (vs. 58+, 14%) is also where your partners averaged the lowest DSR — 35.4, against 48.6 across all your games.');
+});
