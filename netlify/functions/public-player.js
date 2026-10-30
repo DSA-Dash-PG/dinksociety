@@ -159,7 +159,16 @@ export default async (req) => {
           return null;
         })
       ))).filter(Boolean);
-      career = buildCareer(seasons, careerAwards, identity);
+      // Career skill bands: every rated player-season in the league, pooled,
+      // split into fifths — so the career chart reads in real DSR ranges
+      // ("vs. 41–48") like a season does, over far more games.
+      const pooled = [];
+      for (const code of Object.keys(allStats)) {
+        const ps = Object.values(allStats[code]?.players || {});
+        const q = ps.filter(p => p.composite != null && p.dsrQualified !== false).map(p => p.composite);
+        pooled.push(...(q.length >= 10 ? q : ps.map(p => p.composite)));
+      }
+      career = buildCareer(seasons, careerAwards, identity, bandEdges(pooled));
       if (games === undefined && wantGames) {
         const cur = seasons.find(s => s.circuit === circuit);
         if (cur) games = cur.games;
@@ -626,7 +635,7 @@ async function buildSeasonPackage(code, playerId, ids, psData, history) {
 // Career — rolls the season packages up. Counting stats add; DSR never does.
 // ═══════════════════════════════════════════════════════════════════════
 
-function buildCareer(seasons, careerAwards, identity) {
+function buildCareer(seasons, careerAwards, identity, careerEdges = null) {
   const played = seasons.filter(s => s.record.played > 0);
   const sum = f => played.reduce((n, s) => n + (Number(f(s)) || 0), 0);
   const w = sum(s => s.record.w), l = sum(s => s.record.l), gp = sum(s => s.record.played), mp = sum(s => s.record.matches);
@@ -681,9 +690,15 @@ function buildCareer(seasons, careerAwards, identity) {
   }
   const partners = Object.values(byPerson).sort((a, b) => b.played - a.played || b.won - a.won);
 
-  // Performance vs. skill level across every season: each game keeps the band
-  // its own season put it in (bottom fifth … top fifth of that season).
-  const skill = skillSummary(played.flatMap(s => s.games || []), null);
+  // Performance vs. skill level across every season. With league-wide career
+  // edges each game is re-banded by its opponents' DSR that week (the season
+  // band is dropped so the career ranges apply); without them (too few rated
+  // players) each game keeps its own season's fifth, labelled by tier.
+  const allGames = played.flatMap(s => s.games || []);
+  const latestDsr = played.find(s => s.rating?.dsr != null)?.rating?.dsr ?? null;
+  const skill = careerEdges
+    ? skillSummary(allGames.map(g => ({ won: g.won, oppDsr: g.oppDsr, partnerDsr: g.partnerDsr })), careerEdges, { myDsr: latestDsr })
+    : skillSummary(allGames, null);
 
   return {
     seasons: played.length,

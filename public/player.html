@@ -289,10 +289,10 @@
     .pf-sec { flex: 1; font: inherit; font-size: 14.5px; font-weight: 800; padding: 13px 0 11px; min-height: 48px; background: transparent; border: 0; border-bottom: 3px solid transparent; color: var(--color-text-muted); cursor: pointer; }
     .pf-sec:hover { color: var(--color-text); }
     .pf-sec.on { color: var(--color-text); border-bottom-color: var(--color-lime); }
-    #seasons-card[data-sec="overview"] [data-part]:not([data-part="overview"]),
-    #seasons-card[data-sec="matchups"] [data-part]:not([data-part="matchups"]),
-    #seasons-card[data-sec="games"]    [data-part]:not([data-part="games"]),
-    #seasons-card[data-sec="partners"] [data-part]:not([data-part="partners"]) { display: none; }
+    #seasons-card[data-sec="overview"] [data-part]:not([data-part~="overview"]),
+    #seasons-card[data-sec="matchups"] [data-part]:not([data-part~="matchups"]),
+    #seasons-card[data-sec="games"]    [data-part]:not([data-part~="games"]),
+    #seasons-card[data-sec="partners"] [data-part]:not([data-part~="partners"]) { display: none; }
 
     /* story cards */
     .pf-label { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 12px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: var(--color-text-muted); margin: 4px 2px 10px; }
@@ -1016,8 +1016,9 @@
       const top = (c.partners || []).find(p => p.played >= 3);
       if (top) cards.push({ tone: 'teal', big: rec(top.won, top.played - top.won), txt: `with ${esc(SN(top.name))}, your most-played partner.` });
       const { best, worst } = bestWorstBands(c.skill);
-      if (best) cards.push({ tone: 'dark', big: `${best.pct}%`, txt: `vs. the ${bandName(best)} of the league (${rec(best.w, best.l)}) — your best tier.` });
-      if (worst) cards.push({ tone: 'dark', color: 'var(--color-gold)', big: `${worst.pct}%`, txt: `vs. the ${bandName(worst)} of the league (${rec(worst.w, worst.l)}) — your toughest tier.` });
+      const vsB = b => b.lo != null ? `vs. players rated ${bandName(b)}` : `vs. the ${bandName(b)} of the league`;
+      if (best) cards.push({ tone: 'dark', big: `${best.pct}%`, txt: `${vsB(best)} (${rec(best.w, best.l)}) — your best band, all seasons.` });
+      if (worst) cards.push({ tone: 'dark', color: 'var(--color-gold)', big: `${worst.pct}%`, txt: `${vsB(worst)} (${rec(worst.w, worst.l)}) — your toughest band, all seasons.` });
       if (c.peak && c.peak.dsr != null) cards.push({ tone: 'dark', big: fmtDsr(c.peak.dsr), txt: `Career-high DSR · ${esc(c.peak.seasonLabel)}${c.peak.week ? ' Wk ' + c.peak.week : ''}.` });
       if (hw.potw) cards.push({ tone: 'dark', big: `${hw.potw}×`, txt: 'Player of the Week.' });
       return storyHtml('Career story', cards);
@@ -1051,9 +1052,9 @@
     function skillBandsHtml(sk, career) {
       if (!sk || !sk.bands) return `<div class="ss-sub" data-part="matchups"><div class="ml-empty">Not enough rated games yet — this fills in as the season goes.</div></div>`;
       const rows = sk.bands.map(b => {
-        const ranged = !career && b.lo != null;
+        const ranged = b.lo != null;
         const label = ranged ? esc(bandName(b)) : esc(b.tier);
-        const you = !career && sk.you === b.idx ? ' <span class="sk-you">YOU</span>' : '';
+        const you = sk.you != null && sk.you === b.idx ? ' <span class="sk-you">YOU</span>' : '';
         if (!b.played) {
           return `<div class="sk-row sk-row--empty"><div class="sk-top"><span class="sk-vs">vs.<b>${label}</b></span>${you}<span class="sk-pct">—</span></div>
             <div class="sk-bar"><i style="width:0"></i></div>
@@ -1069,10 +1070,14 @@
           <div class="sk-foot"><span>${b.partner != null ? `Avg partner <b>${fmtDsr(b.partner)}</b>` : 'Avg partner —'}${ranged ? ` · ${esc(b.tier)}` : ''}</span><span>${b.w}W · ${b.l}L</span></div>
         </div>`;
       }).join('');
-      const note = career
-        ? 'Every season’s games, grouped by which fifth of that season’s league you faced'
-        : 'Opponent band = their average DSR that week · bands split the league into fifths';
-      return sub('matchups', 'Performance vs. Skill Level', `${sk.games} game${sk.games === 1 ? '' : 's'}`,
+      const careerRanged = career && sk.bands.some(b => b.lo != null);
+      const note = !career
+        ? 'Opponent band = their average DSR that week · bands split the league into fifths'
+        : careerRanged
+          ? 'Every league game you’ve played, by the opponents’ average DSR that week · bands split every rated player, all seasons, into fifths'
+          : 'Every season’s games, grouped by which fifth of that season’s league you faced';
+      // Career shows it on Overview too — the long view is the headline there.
+      return sub(career ? 'overview matchups' : 'matchups', career ? 'Career vs. Skill Level' : 'Performance vs. Skill Level', `${sk.games} game${sk.games === 1 ? '' : 's'}`,
         `<div class="pf-note" style="margin:-4px 0 4px">Win rate by how strong the other side of the net was</div>${rows}
         ${sk.read ? `<div class="sk-read"><b>Read:</b> ${esc(sk.read)}</div>` : ''}
         <div class="pf-note" style="margin-top:10px">${note}</div>`, ' data-skill');
@@ -1309,7 +1314,7 @@
           }).join(''));
       }
 
-      return careerStory(c) + strip + arc + splits + highlights + skillBandsHtml(c.skill, true) + table + partnersHtml;
+      return careerStory(c) + strip + skillBandsHtml(c.skill, true) + arc + splits + highlights + table + partnersHtml;
     }
 
     /* ── Wire: season pills, section tabs, charts, week taps ── */
