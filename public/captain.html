@@ -451,6 +451,30 @@
     .ss-banner--mine-submitted { background: var(--color-teal-dim); border-color: rgba(37,201,164,0.15); color: var(--color-teal); }
     .ss-banner--mine-submitted strong { color: var(--color-teal); }
 
+    /* Away captain: the home team enters scores, the away team confirms. Away
+       captains kept trying to type scores and thought the app was broken, so
+       the away side gets its own big explainer, read-only score boxes that say
+       so when tapped, and role-aware buttons ("Confirm scores", not "Enter"). */
+    .away-card { border: 1px solid rgba(23,215,176,0.4); background: var(--color-teal-dim); border-radius: 20px; padding: 18px; margin-bottom: 16px; }
+    .away-card__eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--color-teal); }
+    .away-card__title { font-size: 20px; font-weight: 900; line-height: 1.2; margin: 6px 0 12px; color: var(--color-text); }
+    .away-card__steps { margin: 0; padding: 0; list-style: none; counter-reset: aw; display: flex; flex-direction: column; gap: 10px; }
+    .away-card__steps li { counter-increment: aw; display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 1.4; color: var(--color-text-muted); }
+    .away-card__steps li::before { content: counter(aw); flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--color-teal); color: #06231d; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+    .away-card__steps b { color: var(--color-text); }
+    .away-card__stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
+    .away-card__stat { background: var(--color-bg); border: 1px solid var(--color-border); border-radius: 14px; padding: 12px; }
+    .away-card__stat b { display: block; font-size: 26px; font-weight: 900; line-height: 1; color: var(--color-text); font-variant-numeric: tabular-nums; }
+    .away-card__stat span { display: block; font-size: 12.5px; font-weight: 700; color: var(--color-text-muted); margin-top: 6px; line-height: 1.3; }
+    .away-card__note { margin-top: 12px; font-size: 14px; line-height: 1.45; color: var(--color-text); font-weight: 600; }
+    .away-card__note--go { color: var(--color-teal); }
+    button.bgm__ro, button.ss-ro { font: inherit; cursor: help; }
+    .bgm__ro.is-empty { border-style: dashed; color: var(--color-text-faint); font-size: 13px; font-weight: 700; background: transparent; }
+    .cap-hint { position: fixed; left: 12px; right: 12px; bottom: calc(140px + env(safe-area-inset-bottom)); z-index: 300; max-width: 520px; margin: 0 auto; background: #0e0e0e; border: 1px solid rgba(23,215,176,0.5); border-radius: 16px; padding: 14px 16px; font-size: 15px; line-height: 1.45; color: var(--color-text); box-shadow: 0 12px 40px rgba(0,0,0,0.6); opacity: 0; transform: translateY(10px); transition: opacity .18s, transform .18s; pointer-events: none; }
+    .cap-hint.is-on { opacity: 1; transform: none; pointer-events: auto; }
+    .cap-hint b { color: var(--color-teal); }
+    @media (min-width: 900px) { .cap-hint { bottom: 32px; } }
+
     /* Dual-entry: the other team's conflicting version of a game */
     .ss-theirs { margin-top: 4px; font-size: 12px; line-height: 1.45; color: var(--color-red, #ef4444); }
     .ss-theirs strong { font-size: 14px; }
@@ -3003,6 +3027,7 @@
       // Pre-reveal: opponent pairs stay hidden (blind lineup) — placeholder text instead
       const oppPairPlaceholder = 'Reveals at game time';
       const myRoleIsHome = myRole === 'home';
+      state.awayHintHome = homeName;
 
       // Courts: A hosts games 1,3,5 · B hosts games 2,4,6 (two games run at once).
       const courtA = data.match.courtA, courtB = data.match.courtB;
@@ -3072,7 +3097,9 @@
                     value="${val}"
                     data-slot="${slot}" data-side="${side}"
                     ${(!canEdit || frozenGame) ? 'disabled' : ''}>`
-              : `<span class="ss-ro ${status === 'confirmed' ? 'ss-ro--confirmed' : ''} ${gs.disputed ? 'ss-ro--disputed' : ''}">${val === '' ? '—' : val}</span>`;
+              : (canEdit && !frozenGame)
+                ? `<button type="button" class="ss-ro ${status === 'confirmed' ? 'ss-ro--confirmed' : ''} ${gs.disputed ? 'ss-ro--disputed' : ''}" onclick="awayScoreHint()" title="The home team enters this score">${val === '' ? '—' : val}</button>`
+                : `<span class="ss-ro ${status === 'confirmed' ? 'ss-ro--confirmed' : ''} ${gs.disputed ? 'ss-ro--disputed' : ''}">${val === '' ? '—' : val}</span>`;
 
             const cell = frozenGame
               ? '<span class="ss-pill ss-pill--confirmed">🔒 Final (played before stoppage)</span>'
@@ -3437,10 +3464,54 @@
 
       const confirmedCount = c.counts?.confirmed || 0;
       const remaining = 12 - confirmedCount;
+      if (!isHome) return awayExplainer(data);
       return isHome
         ? `<div class="ss-banner"><strong>You enter every score; the away captain confirms each game.</strong> Scores save automatically as you type. ${remaining} game${remaining === 1 ? '' : 's'} still to enter or be confirmed.</div>`
         : `<div class="ss-banner"><strong>The home captain enters the scores; you confirm each game.</strong> Tap Confirm on each correct score — or "Not right" to flag one for them to fix. ${remaining} game${remaining === 1 ? '' : 's'} not confirmed yet.</div>`;
     }
+
+    // The away captain's scoresheet header: who does what, and where it stands.
+    function awayExplainer(data) {
+      const homeName = escapeHtml(data.match?.home?.name || 'The home team');
+      const gamesView = data.score?.games || {};
+      const c = data.score?.computed || {};
+      const entered = Object.values(gamesView).filter(g => g && (g.enteredComplete || g.frozen)).length;
+      const confirmed = c.counts?.confirmed || 0;
+      const toConfirm = Object.values(gamesView).filter(g => g && g.enteredComplete && !g.confirmed && !g.disputed && !g.frozen).length;
+      const note = entered === 0
+        ? `<div class="away-card__note">No scores in from ${homeName} yet. If games are done, ask their captain (or co-captain) to open their captain portal and enter them — it's their job tonight, not yours.</div>`
+        : toConfirm > 0
+          ? `<div class="away-card__note away-card__note--go">${toConfirm} game${toConfirm === 1 ? ' is' : 's are'} entered and waiting for your Confirm below.</div>`
+          : '';
+      return `<div class="away-card">
+        <div class="away-card__eyebrow">You're the away team tonight</div>
+        <div class="away-card__title">${homeName} enters the scores. You confirm them.</div>
+        <ol class="away-card__steps">
+          <li><span><b>${homeName}'s captain</b> types each game's score on their phone.</span></li>
+          <li><span>A <b>Confirm</b> button shows up on that game here.</span></li>
+          <li><span>Tap <b>Confirm</b> if it's right, or <b>Not right</b> to send it back to them.</span></li>
+        </ol>
+        <div class="away-card__stats">
+          <div class="away-card__stat"><b>${entered}<small style="font-size:14px;color:var(--color-text-muted)">/12</small></b><span>entered by ${homeName}</span></div>
+          <div class="away-card__stat"><b>${confirmed}<small style="font-size:14px;color:var(--color-text-muted)">/12</small></b><span>confirmed by you</span></div>
+        </div>
+        ${note}
+      </div>`;
+    }
+
+    // Tapping a read-only score box as the away captain explains why it can't
+    // be typed in, instead of silently doing nothing.
+    let capHintTimer = null;
+    function awayScoreHint() {
+      const homeName = escapeHtml(state.awayHintHome || 'The home team');
+      let el = document.getElementById('cap-hint');
+      if (!el) { el = document.createElement('div'); el.id = 'cap-hint'; el.className = 'cap-hint'; el.setAttribute('role', 'status'); el.setAttribute('aria-live', 'polite'); document.body.appendChild(el); }
+      el.innerHTML = `<b>${homeName}</b> (home) enters the scores tonight — you don't type them in. Once they've entered this game, a <b>Confirm</b> button shows up on it.`;
+      el.classList.add('is-on');
+      clearTimeout(capHintTimer);
+      capHintTimer = setTimeout(() => el.classList.remove('is-on'), 6000);
+    }
+    window.awayScoreHint = awayScoreHint;
 
     function formatPair(gamePicks) {
       if (!gamePicks) return '—';
@@ -5132,12 +5203,15 @@
       // the AWAY captain sees the entered numbers read-only and confirms or
       // flags each game.
       const isHome = mySide === 'home';
+      state.awayHintHome = homeName;
       const sideStep = (slot, side, isUs) => {
         const ent = games[slot]?.entered || {};
         const raw = Number.isInteger(ent[side]) ? ent[side] : '';
         const inner = (isHome && canEdit && !games[slot]?.frozen)
           ? `<input type="number" inputmode="numeric" min="0" max="30" class="ss-score-input bgm__input" id="inp-${slot}-${side}" data-slot="${slot}" data-side="${side}" data-orig="${raw}" value="${raw}">`
-          : `<div class="bgm__ro">${raw === '' ? '' : raw}</div>`;
+          : (!isHome && canEdit && !games[slot]?.frozen)
+            ? `<button type="button" class="bgm__ro${raw === '' ? ' is-empty' : ''}" onclick="awayScoreHint()" aria-label="Score entered by the home team">${raw === '' ? 'Home enters' : raw}</button>`
+            : `<div class="bgm__ro">${raw === '' ? '' : raw}</div>`;
         return `<div class="bgm__side ${isUs ? 'bgm__side--us' : ''}">
           <div class="bgm__lbl">${isUs ? 'Us' : 'Them'}</div>
           ${inner}
@@ -5487,8 +5561,8 @@
         const live = nextM.status?.revealed && !nextM.finalizedAt;
         const lockAt = nextM.scheduledAt ? Date.parse(nextM.scheduledAt) - CAP_LOCK_OFFSET_MIN * 60000 : null;
         const cd = live ? '' : (nextM.scheduledAt ? capCountdown(Date.parse(nextM.scheduledAt)) : '');
-        const serve = nextM.myRole === 'home' ? 'R1 you serve first' : 'R1 opponent serves first';
-        const cta = live ? 'Enter scores →' : (nextM.status?.myLocked ? 'View match →' : 'Set lineup →');
+        const serve = nextM.myRole === 'home' ? 'Home · you enter scores · R1 you serve first' : 'Away · they enter scores, you confirm · R1 opponent serves first';
+        const cta = live ? (nextM.myRole === 'home' ? 'Enter scores →' : 'Confirm scores →') : (nextM.status?.myLocked ? 'View match →' : 'Set lineup →');
         cmd = `<div class="ccmd">
           <div class="ccmd__eyebrow"><span class="cpulse"></span> ${live ? 'Match night' : 'Next match'} · Week ${nextM.week}${cd ? ' · in ' + cd : ''}</div>
           <div class="ccmd__row">
@@ -5649,12 +5723,12 @@
         || matches.filter(x => !x.finalizedAt).sort(matchOrder)[0];
       if (!m) return '';
       const live = m.status?.revealed && !m.finalizedAt;
-      const meta = [m.myRole === 'home' ? 'Home' : 'Away', m.court].filter(Boolean).join(' · ');
+      const meta = [m.myRole === 'home' ? 'Home · you enter scores' : 'Away · they enter scores, you confirm', m.court].filter(Boolean).join(' · ');
       return `<div class="mtonight">
         <div class="mtonight__eyebrow">${live ? 'Live now' : 'Up next'} · Week ${m.week}</div>
         <div class="mtonight__row"><span class="mtonight__team">${escapeHtml(state.me?.team?.name || 'You')}</span><span class="mtonight__vs">VS</span><span class="mtonight__team">${escapeHtml(m.opponent.name)}</span></div>
         <div class="mtonight__meta">${escapeHtml(meta)}</div>
-        <button class="mtonight__cta" onclick="capTonightOpen('${escapeAttr(m.id)}')">${live ? 'Enter scores →' : (m.status?.myLocked ? 'View match →' : 'Set lineup →')}</button>
+        <button class="mtonight__cta" onclick="capTonightOpen('${escapeAttr(m.id)}')">${live ? (m.myRole === 'home' ? 'Enter scores →' : 'Confirm scores →') : (m.status?.myLocked ? 'View match →' : 'Set lineup →')}</button>
       </div>`;
     }
     function capTonightOpen(id) {
