@@ -38,6 +38,18 @@
        Hero + season tiles → sticky tabs: Overview · Matches · Roster ·
        Stats · News. One tab row at every width; nothing scrolls sideways.
        ═══════════════════════════════════════════════════════════════ */
+    /* Get to know the team — the captain's questionnaire (team-story.html) */
+    .tm-story { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .tm-story .q { background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-md); padding: 16px 18px; min-width: 0; }
+    .tm-story .q.wide { grid-column: 1 / -1; }
+    .tm-story .q small { display: block; font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--color-text-muted); margin-bottom: 8px; }
+    .tm-story .q p { margin: 0; font-size: 15px; line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+    .tm-story .q p.big { font-size: 18px; font-weight: 700; line-height: 1.35; letter-spacing: -.01em; }
+    .tm-story .q p a { color: var(--color-lime); text-decoration: none; font-weight: 700; }
+    .tm-story .q p a:hover { text-decoration: underline; }
+    .tm-story .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .tm-story .chips span { display: inline-flex; align-items: center; padding: 6px 12px; border-radius: var(--radius-full); background: var(--color-lime-dim); color: var(--color-lime); font-size: 13px; font-weight: 700; }
+    .tm-story__foot { font-size: 12px; color: var(--color-text-faint); margin-top: 10px; }
     /* Season so far */
     .tm-sea { display: grid; grid-template-columns: 64px 26px minmax(0, 1fr) auto 150px; align-items: center; gap: 4px 14px; width: 100%; padding: 12px 0; border: 0; border-bottom: 1px solid var(--color-divider); background: none; color: inherit; font: inherit; text-align: left; }
     button.tm-sea { cursor: pointer; }
@@ -360,7 +372,7 @@
             <div class="dk-eyebrow">${eyebrow}</div>
             <h1 class="dk-h1" id="tm-name" data-name="${esc(team.name)}">${title}</h1>
             <p class="dk-lede">${lede()}</p>
-            ${team.bio ? `<p class="dk-lede" style="font-size:15px;">${esc(team.bio)}</p>` : ''}
+            ${storyIntro() ? `<p class="dk-lede" style="font-size:15px;">${esc(storyIntro())}</p>` : ''}
             <div class="dk-acts">
               <a class="dk-btn" href="${withSeason('/leaderboard.html?view=tvt')}">Compare with a team</a>
               <a class="dk-btn dk-btn--out" href="${withSeason('/teams')}">All teams</a>
@@ -388,6 +400,28 @@
         ${dsr != null ? `<div class="dk-tile"><small>Team DSR</small><b>${dsr.toFixed(1)}</b><span title="Average rating of the players who have played">average of ${MYP.length} players</span></div>` : ''}
         ${c.g ? `<div class="dk-tile ${c.w === 0 ? 'bad' : ''}"><small>Close games</small><b>${c.w}–${c.g - c.w}</b><span>decided by 3 points or fewer</span></div>` : ''}
       </section>`;
+    }
+
+    /* ─── Get to know the team (captain questionnaire) ─────── */
+    // The admin-set bio wins; otherwise the captain's "introduce the team" answer leads the hero.
+    const storyItems = () => (team && team.story && team.story.items) || [];
+    const storyIntro = () => (team && team.bio) || ((storyItems().find(i => i.key === 'intro') || {}).value || '');
+    function storyHtml() {
+      const items = storyItems().filter(i => !(i.key === 'intro' && storyIntro() === i.value));
+      if (!items.length) return '';
+      const BIG = { style: 1, anthem: 1, since: 1 }, WIDE = { origin: 1, shoutout: 1, fun: 1, goal: 1 };
+      const cards = items.map(i => {
+        const v = i.value;
+        let body;
+        if (Array.isArray(v)) body = `<div class="chips">${v.map(x => `<span>${esc(x)}</span>`).join('')}</div>`;
+        else if (i.key === 'rival' && teamBy(null, v)) body = `<p class="big"><a href="${teamHref(v)}">${badge(v, 24)} ${esc(v)}</a></p>`;
+        else body = `<p${BIG[i.key] ? ' class="big"' : ''}>${esc(v)}</p>`;
+        return `<div class="q${WIDE[i.key] && String(v).length > 120 ? ' wide' : ''}"><small>${esc(i.label)}</small>${body}</div>`;
+      }).join('');
+      const last = String(team.name).trim().split(/\s+/).pop();
+      const when = team.story.updatedAt ? dayOnly(team.story.updatedAt) : '';
+      return `<section><div class="dk-head"><h2 class="dk-h2 dk-h2--lg">Get to know <span class="lime">${esc(last)}</span></h2><span>In the captain's words</span></div>
+        <div class="tm-story">${cards}</div>${when ? `<div class="tm-story__foot">From the team's own questionnaire · updated ${esc(when)}</div>` : ''}</section>`;
     }
 
     /* ─── Overview ────────────────────────────────────────── */
@@ -517,6 +551,7 @@
           <section class="side"><div class="dk-head"><h2 class="dk-h2 dk-h2--lg">Up next</h2>${nx ? `<span>${esc([weekLong(nx), dayShort(nx.scheduledAt), timeOf(nx)].filter(Boolean).join(' · '))}</span>` : ''}</div>${upNextHtml()}</section>
           <section class="wide"><div class="dk-head"><h2 class="dk-h2 dk-h2--lg">${finals().length ? 'The season so far' : 'The season ahead'}</h2><button type="button" class="dk-more" data-tab="matches">All matches</button></div><div class="dk-card dk-rows">${seasonHtml()}</div></section>
         </div>
+        ${storyHtml()}
         <div class="dk-cols" style="align-items:flex-start;">
           <section class="wide"><div class="dk-head"><h2 class="dk-h2">Roster <span class="lime">· by DSR</span></h2><button type="button" class="dk-more" data-tab="roster">Full roster</button></div><div class="dk-card dk-rows">${rosterBarsHtml()}</div></section>
           <section class="side"><div class="dk-head"><h2 class="dk-h2">How they win</h2></div><div class="dk-card">${howHtml()}</div></section>

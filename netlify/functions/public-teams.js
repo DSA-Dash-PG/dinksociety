@@ -14,6 +14,7 @@ import { publicProfile } from './lib/profile.js';
 import { shouldHideTestRecord } from './lib/test-data.js';
 import { isActivePlayer } from './lib/roster.js';
 import { photoResolver } from './lib/player-photo.js';
+import { publicStory } from './lib/team-story.js';
 
 export default async (req) => {
   if (req.method !== 'GET') {
@@ -64,6 +65,9 @@ export default async (req) => {
           emoji: team.emoji || '',
           color: team.color || null,
           bio: team.bio || '',
+          // The captain's questionnaire answers (lib/team-story.js), in order,
+          // each with its question — null until the captain has answered one.
+          story: publicStory(team),
           division: team.division,
           divisionLabel: team.divisionLabel || null,
           captain: captainName,

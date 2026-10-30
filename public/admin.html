@@ -530,6 +530,17 @@
     .teams-bar #teams-count { font-size: 11px; color: var(--color-text-faint); margin-left: auto; white-space: nowrap; }
     .teams-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
     .xreq-box { margin-bottom: 16px; border-color: var(--color-gold); }
+    .story-list { display: flex; flex-direction: column; border-top: 1px solid var(--color-divider); }
+    .story-row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.2fr) 110px auto; gap: 8px 14px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--color-divider); font-size: 12px; }
+    .story-row .nm { font-weight: 700; display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .story-row .nm small { font-weight: 500; color: var(--color-text-faint); }
+    .story-row .cp { color: var(--color-text-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .story-row .st { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .story-row .st.ok { color: var(--color-lime); }
+    .story-row .st.none { color: var(--color-text-faint); font-weight: 500; }
+    .story-row .st small { display: block; font-weight: 500; color: var(--color-text-faint); font-size: 10px; }
+    .story-row .acts { display: flex; gap: 6px; justify-content: flex-end; }
+    @media (max-width: 640px) { .story-row { grid-template-columns: 1fr auto; } .story-row .cp { display: none; } .story-row .acts { grid-column: 1 / -1; justify-content: flex-start; } }
     .xreq-n { display: inline-block; min-width: 18px; padding: 1px 6px; margin-left: 6px; border-radius: var(--radius-full); background: var(--color-gold); color: var(--color-text-inverse); font-size: 10px; font-weight: 800; text-align: center; vertical-align: middle; }
     .xlog-box { margin-top: 20px; }
     .xlog-box > summary::-webkit-details-marker { display: none; }
@@ -950,6 +961,31 @@
               <span id="seed-status" style="font-size:11px;color:var(--color-text-faint);"></span>
               <button class="ab ab--outline ab--sm" id="seed-teams-btn">Sync from Registrations</button>
               <button class="ab ab--outline ab--sm" id="transfer-toggle-btn" onclick="toggleXferPanel()">⇄ Transfer player</button>
+              <button class="ab ab--outline ab--sm" id="story-toggle-btn" onclick="toggleStoryPanel()">✍️ Team stories</button>
+            </div>
+          </div>
+
+          <!-- Team story questionnaire — who's answered, copy a captain's link, send the invite -->
+          <div class="xfer-panel" id="story-panel" style="display:none;">
+            <div class="xfer-panel__head">
+              <span class="xfer-panel__title">Team stories <span id="story-sub" style="font-weight:400;color:var(--color-text-faint);font-size:11px;margin-left:6px;"></span></span>
+              <div style="display:flex;gap:6px;align-items:center;">
+                <button class="ab ab--ghost ab--sm" onclick="loadStoryPanel()">Refresh</button>
+                <button class="ab ab--ghost ab--sm" onclick="toggleStoryPanel()">✕</button>
+              </div>
+            </div>
+            <div class="xfer-panel__body" style="flex-direction:column;align-items:stretch;">
+              <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 10px;line-height:1.5;">Each captain gets a personal link (no sign-in) to a 15-question form about their team — how they met, where they play, how they got into pickleball. Answers go live on the team page the moment they save. The same form is in the Captain Portal under Roster.</p>
+              <div class="xfer-field" style="margin-bottom:10px;">
+                <label>Note to captains (optional — goes in the email)</label>
+                <input type="text" id="story-note" placeholder="e.g. Trying to get every team's story up before Championship Night">
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;">
+                <button class="ab ab--lime ab--sm" id="story-send-unanswered" onclick="sendStoryInvites('unanswered')">Send to captains who haven't answered</button>
+                <button class="ab ab--outline ab--sm" id="story-send-all" onclick="sendStoryInvites('all')">Send to every captain</button>
+                <span id="story-status" style="font-size:11px;color:var(--color-text-faint);"></span>
+              </div>
+              <div id="story-list" class="story-list"><div class="loading">Loading…</div></div>
             </div>
           </div>
 
@@ -5360,6 +5396,84 @@
     }
     loadTransferRequests();
     loadTransferLog();
+  }
+
+  // ── Team story questionnaire panel ────────────────────────────
+  let STORY_ROWS = [];
+  function toggleStoryPanel() {
+    const panel = $id('story-panel');
+    const open = panel.style.display === 'none';
+    panel.style.display = open ? 'block' : 'none';
+    if (open) loadStoryPanel();
+  }
+  async function loadStoryPanel() {
+    const list = $id('story-list'); if (!list) return;
+    list.innerHTML = '<div class="loading">Loading…</div>';
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-team-story?circuit=' + encodeURIComponent(TEAMS_SEASON || adminCircuit()));
+      STORY_ROWS = d.teams || [];
+      const done = STORY_ROWS.filter(t => t.answered > 0).length;
+      $id('story-sub').textContent = (d.season || '') + ' · ' + done + ' of ' + STORY_ROWS.length + ' teams answered';
+      if (!STORY_ROWS.length) { list.innerHTML = '<div class="empty">No teams in this season yet.</div>'; return; }
+      const when = iso => iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+      list.innerHTML = STORY_ROWS.map(t => {
+        const st = t.answered > 0
+          ? '<span class="st ok">' + t.answered + '/' + t.total + '<small>' + h((t.updatedByName ? t.updatedByName + ' · ' : '') + when(t.updatedAt)) + '</small></span>'
+          : '<span class="st none">Not yet' + (t.sentAt ? '<small>asked ' + h(when(t.sentAt)) + (t.sentCount > 1 ? ' ×' + t.sentCount : '') + '</small>' : '') + '</span>';
+        return '<div class="story-row" data-team-id="' + h(t.id) + '">' +
+          '<div class="nm">' + (t.emoji ? h(t.emoji) + ' ' : '') + h(t.name) + (t.division ? ' <small>' + h(t.division) + '</small>' : '') + '</div>' +
+          '<div class="cp" title="' + h(t.captainEmail || '') + '">' + h(t.captainName || '—') + (t.captainEmail ? ' · ' + h(t.captainEmail) : '') + (t.cocaptains && t.cocaptains.length ? ' · co ' + h(t.cocaptains.join(', ')) : '') + '</div>' +
+          st +
+          '<div class="acts">' +
+            (t.link ? '<button class="ab ab--ghost ab--sm" data-copylink="' + h(t.id) + '">Copy link</button>' : '<span style="font-size:10px;color:var(--color-red);">No captain email</span>') +
+            (t.captainEmail ? '<button class="ab ab--outline ab--sm" data-sendone="' + h(t.id) + '">' + (t.sentAt ? 'Resend' : 'Send') + '</button>' : '') +
+            (t.answered > 0 ? '<a class="ab ab--ghost ab--sm" href="/team?id=' + encodeURIComponent(String(t.name || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '')) + '" target="_blank" rel="noopener">View</a>' : '') +
+          '</div></div>';
+      }).join('');
+      list.querySelectorAll('[data-copylink]').forEach(b => b.addEventListener('click', async () => {
+        const t = STORY_ROWS.find(x => x.id === b.dataset.copylink); if (!t || !t.link) return;
+        try { await navigator.clipboard.writeText(t.link); b.textContent = 'Copied'; setTimeout(() => { b.textContent = 'Copy link'; }, 1800); }
+        catch { window.prompt('Copy this link for ' + t.name, t.link); }
+      }));
+      list.querySelectorAll('[data-sendone]').forEach(b => b.addEventListener('click', () => sendStoryInvites('one', b.dataset.sendone, b)));
+    } catch (e) {
+      list.innerHTML = '<div class="empty">Failed to load: ' + h(e.message) + '</div>';
+    }
+  }
+  async function sendStoryInvites(mode, teamId, btnEl) {
+    const st = $id('story-status');
+    const circuit = TEAMS_SEASON || adminCircuit();
+    const note = ($id('story-note').value || '').trim();
+    let body, label;
+    if (mode === 'one') {
+      const t = STORY_ROWS.find(x => x.id === teamId); if (!t) return;
+      body = { action: 'send', circuit, teamIds: [teamId], note };
+      label = 'Email ' + t.name + "'s captain" + (t.cocaptains && t.cocaptains.length ? ' and co-captain' : '') + ' the team story link?';
+    } else if (mode === 'unanswered') {
+      const n = STORY_ROWS.filter(t => !t.answered && t.captainEmail).length;
+      if (!n) { st.textContent = 'Every team has answered already.'; return; }
+      body = { action: 'send', circuit, onlyUnanswered: true, note };
+      label = 'Email the team story link to ' + n + ' captain' + (n === 1 ? '' : 's') + " who haven't answered yet?";
+    } else {
+      const n = STORY_ROWS.filter(t => t.captainEmail).length;
+      body = { action: 'send', circuit, note };
+      label = 'Email the team story link to all ' + n + ' captains (including teams that already answered)?';
+    }
+    if (!confirm(label)) return;
+    const btn = btnEl || $id(mode === 'unanswered' ? 'story-send-unanswered' : 'story-send-all');
+    if (!btnBusy(btn, 'Sending…')) return;
+    st.textContent = 'Sending…';
+    try {
+      const d = await apiJSON('/.netlify/functions/admin-team-story', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const emails = (d.sent || []).reduce((a, x) => a + (x.emails || 0), 0);
+      st.textContent = 'Sent ' + emails + ' email' + (emails === 1 ? '' : 's') + ' to ' + (d.sent || []).length + ' team' + ((d.sent || []).length === 1 ? '' : 's') + ((d.skipped || []).length ? ' · skipped ' + d.skipped.map(x => x.name + ' (' + x.reason + ')').join(', ') : '') + '.';
+      adminToast('Team story invites sent', 'ok');
+      btnDone(btn);
+      loadStoryPanel();
+    } catch (e) {
+      st.textContent = 'Send failed: ' + (e.message || 'unknown error');
+      btnDone(btn);
+    }
   }
 
   // ── Transfer panel helpers ────────────────────────────────────

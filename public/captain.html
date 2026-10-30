@@ -798,6 +798,17 @@
 
     <!-- ROSTER -->
     <section class="cap-section" data-section="roster">
+      <div class="cap-card" style="margin-bottom: 14px; border-color: rgba(184,255,44,0.35);" id="team-story-card">
+        <div class="cap-card__header">
+          <h2 class="cap-card__title">Your team story</h2>
+          <span class="cap-card__sub" id="cap-story-sub">Shown on your public team page</span>
+        </div>
+        <div style="display: flex; gap: 14px; align-items: center; flex-wrap: wrap; justify-content: space-between;">
+          <p style="font-size: 14px; color: var(--color-text-muted); margin: 0; flex: 1 1 260px; line-height: 1.5;">Who's on the team, how you all met, where you play, how you got into pickleball. Fifteen quick questions, all optional — whatever you answer goes live on your team page.</p>
+          <a class="cap-btn cap-btn--primary" href="/team-story" id="cap-story-btn">Tell your story</a>
+        </div>
+      </div>
+
       <div class="cap-card" style="margin-bottom: 14px;" id="team-photo-card">
         <div class="cap-card__header">
           <h2 class="cap-card__title">Team photo</h2>
@@ -1603,8 +1614,22 @@
       }
     }
 
+    // "Your team story" card — show how far along the questionnaire is.
+    let _storyChecked = false;
+    function initTeamStory() {
+      if (_storyChecked) return; _storyChecked = true;
+      fetch('/.netlify/functions/team-story', { credentials: 'include' }).then(r => r.ok ? r.json() : null).then(d => {
+        const sub = $id('cap-story-sub'), btn = $id('cap-story-btn');
+        if (!d || !d.story || !sub) return;
+        const n = d.story.answered || 0, tot = d.story.total || 15;
+        if (n > 0) { sub.textContent = n + ' of ' + tot + ' answered · live on your team page'; if (btn) btn.textContent = 'Update your story'; }
+        else sub.textContent = 'Not answered yet · shown on your public team page';
+      }).catch(() => {});
+    }
+
     function initTeamPhoto() {
       setTeamPhotoPreview();
+      initTeamStory();
       const btn = $id('cap-photo-btn');
       if (!btn || btn.dataset.wired) return;
       btn.dataset.wired = '1';

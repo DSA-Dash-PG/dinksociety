@@ -112,6 +112,8 @@ CARDS = {
               'DINK@DINKSOCIETY.APP · @DINKSOCIETY.PB', panel_court()),
   'media': ('THE DINK SOCIETY', 'PHOTOS & VIDEO', 'MEDIA POLICY', 'WHAT WE SHOOT AND WHERE IT GOES',
             'TAG US · @DINKSOCIETY.PB', panel_court()),
+  'team-story': ('THE DINK SOCIETY', 'CAPTAINS', 'TELL YOUR STORY', 'WHO YOU ARE · WHERE YOU PLAY · HOW IT STARTED',
+                 'FIVE MINUTES · GOES ON YOUR TEAM PAGE', panel_checklist('Your team story', [('How you all met', True), ('Where you usually play', True), ('Pregame ritual', False), ('Who you want to beat', False)], 'Save & publish')),
   'waiver': ('THE DINK SOCIETY', 'BEFORE YOU PLAY', 'WAIVER', 'LIABILITY · MEDIA RELEASE · CODE OF CONDUCT',
              'SIGN ONCE · PLAY ALL SEASON', panel_checklist('Quick read.', [('Liability waiver', True), ('Photo & media release', True), ('Code of conduct', False), ('Venue waiver', False), ('Sign', False)], 'Sign waiver')),
   'terms': ('THE DINK SOCIETY', 'THE RULES OF THE ROAD', 'TERMS', 'USING DINKSOCIETY.APP', 'PLAIN ENGLISH, PROMISE', panel_court()),
