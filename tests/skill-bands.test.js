@@ -3,7 +3,7 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bandEdges, bandOf, tagFor, summarize, readFor, MIN_GAMES } from '../netlify/functions/lib/skill-bands.js';
+import { bandEdges, bandOf, tagFor, summarize, readFor, rangeLabel, bestWorst, MIN_GAMES } from '../netlify/functions/lib/skill-bands.js';
 
 // 20 rated players, DSR 30, 32, … 68 → fifths of four players each.
 const RATED = Array.from({ length: 20 }, (_, i) => 30 + i * 2);
@@ -100,4 +100,24 @@ test('read: needs two sampled bands; career names tiers', () => {
     { idx: 4, tier: 'Top fifth', lo: null, hi: null, played: 6, w: 1, l: 5, pct: 17, partner: 41 },
   ], 40.5, false);
   assert.equal(read, 'Best results vs. the bottom fifth (80%, 4–1); toughest vs. the top fifth (17%, 1–5).');
+});
+
+test('labels: end bands are open-ended (the bottom can dip below zero)', () => {
+  assert.equal(rangeLabel(0, -5, 30), 'under 30');
+  assert.equal(rangeLabel(2, 41.2, 51.6), '41–52');
+  assert.equal(rangeLabel(4, 56, 75), '56+');
+  assert.equal(rangeLabel(1, null, null), null);
+  const s = summarize([g(true, 31, 50), g(true, 66, 50)], bandEdges(RATED));
+  assert.equal(s.bands[0].label, 'under 38');
+  assert.equal(summarize([{ won: true, band: 0 }], null).bands[0].label, null);
+});
+
+test('bestWorst: a win-rate tie goes to the bigger sample', () => {
+  const b = (idx, w, l) => ({ idx, w, l, played: w + l, pct: Math.round(w / (w + l) * 100) });
+  // The real Season 2 profile that caught this: 9–0 in the bottom band, 3–0 higher up.
+  const { best, worst } = bestWorst([b(0, 9, 0), b(3, 3, 0), b(4, 2, 6)]);
+  assert.equal(best.idx, 0);
+  assert.equal(worst.idx, 4);
+  const read = readFor([{ ...b(0, 9, 0), tier: 'Bottom fifth', lo: -5, hi: 30, label: 'under 30' }, { ...b(4, 2, 6), tier: 'Top fifth', lo: 56, hi: 75, label: '56+' }], null);
+  assert.equal(read, 'Best results vs. under 30 (100%, 9–0); toughest vs. 56+ (25%, 2–6).');
 });

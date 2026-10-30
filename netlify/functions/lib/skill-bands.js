@@ -108,12 +108,37 @@ export function summarize(games, edges, opts = {}) {
   const bands = acc.map(b => {
     const played = b.w + b.l;
     const pct = played ? Math.round(b.w / played * 100) : null;
-    return { idx: b.idx, tier: b.tier, lo: b.lo, hi: b.hi, played, w: b.w, l: b.l, pct,
+    return { idx: b.idx, tier: b.tier, lo: b.lo, hi: b.hi, label: edges ? rangeLabel(b.idx, b.lo, b.hi) : null, played, w: b.w, l: b.l, pct,
       tag: played ? tagFor(pct, played) : null, partner: mean(b.pS, b.pN), opp: mean(b.oS, b.oN) };
   });
   const you = (edges && opts.myDsr != null) ? bandOf(opts.myDsr, edges) : null;
   const partner = mean(pSum, pN);
   return { bands, you, games: n, partner, read: readFor(bands, partner, !!edges) };
+}
+
+/**
+ * How a band's DSR range reads on screen. The end bands are open-ended (they
+ * also catch everything outside the league's range, and the bottom of the
+ * league can dip below zero), so they read "under 30" and "56+".
+ */
+export function rangeLabel(idx, lo, hi) {
+  if (lo == null || hi == null) return null;
+  if (idx === 0) return `under ${Math.round(hi)}`;
+  if (idx === TIERS.length - 1) return `${Math.round(lo)}+`;
+  return `${Math.round(lo)}–${Math.round(hi)}`;
+}
+
+/** Best / toughest band among those with a real sample. Ties on win rate go
+ *  to the bigger sample (9–0 beats 3–0), then the stronger / weaker band. */
+export function bestWorst(bands) {
+  const sampled = (bands || []).filter(b => b.played >= MIN_GAMES);
+  if (sampled.length < 2) return {};
+  let best = sampled[0], worst = sampled[0];
+  for (const b of sampled) {
+    if (b.pct > best.pct || (b.pct === best.pct && (b.played > best.played || (b.played === best.played && b.idx > best.idx)))) best = b;
+    if (b.pct < worst.pct || (b.pct === worst.pct && (b.played > worst.played || (b.played === worst.played && b.idx < worst.idx)))) worst = b;
+  }
+  return (best.idx === worst.idx || best.pct === worst.pct) ? {} : { best, worst, sampled };
 }
 
 /**
@@ -126,15 +151,9 @@ export function summarize(games, edges, opts = {}) {
  *  2. Otherwise: best and toughest band, side by side.
  */
 export function readFor(bands, partnerAvg, ranged = true) {
-  const sampled = bands.filter(b => b.played >= MIN_GAMES);
-  if (sampled.length < 2) return null;
-  const name = b => ranged && b.lo != null ? `vs. ${Math.round(b.lo)}–${Math.round(b.hi)}` : `vs. the ${b.tier.toLowerCase()}`;
-  let best = sampled[0], worst = sampled[0];
-  for (const b of sampled) {
-    if (b.pct > best.pct || (b.pct === best.pct && b.idx > best.idx)) best = b;
-    if (b.pct < worst.pct || (b.pct === worst.pct && b.idx < worst.idx)) worst = b;
-  }
-  if (best.idx === worst.idx || best.pct === worst.pct) return null;
+  const { best, worst, sampled } = bestWorst(bands);
+  if (!best) return null;
+  const name = b => ranged && b.lo != null ? `vs. ${b.label || `${Math.round(b.lo)}–${Math.round(b.hi)}`}` : `vs. the ${b.tier.toLowerCase()}`;
 
   const withPartner = sampled.filter(b => b.partner != null);
   const lowestPartner = withPartner.reduce((m, b) => (m == null || b.partner < m.partner ? b : m), null);
