@@ -25,7 +25,8 @@
 //   Fewer than MIN_GAMES games in a band: "Small sample" and no verdict.
 //
 // THE READ (one sentence under the rows) may only say what the rows show. See
-// readFor() — every branch states numbers that are on the screen.
+// readFor() — every branch states numbers that are on the screen. It is shown
+// on everyone's public profile, so it never says "you" / "your".
 
 export const TIERS = ['Bottom fifth', 'Lower-middle', 'Middle', 'Upper-middle', 'Top fifth'];
 export const MIN_GAMES = 3;          // below this a band shows "Small sample"
@@ -161,7 +162,7 @@ export function readFor(bands, partnerAvg, ranged = true) {
   const lowestPartner = withPartner.reduce((m, b) => (m == null || b.partner < m.partner ? b : m), null);
   if (lowestPartner && lowestPartner.idx === worst.idx
       && partnerAvg != null && worst.partner <= partnerAvg - 2) {
-    return `Your toughest band (${name(worst)}, ${worst.pct}%) is also where your partners averaged the lowest DSR — ${worst.partner.toFixed(1)}, against ${partnerAvg.toFixed(1)} across all your games.`;
+    return `The toughest band (${name(worst)}, ${worst.pct}%) is also where partners averaged the lowest DSR — ${worst.partner.toFixed(1)}, against ${partnerAvg.toFixed(1)} across all games.`;
   }
   return `Best results ${name(best)} (${best.pct}%, ${best.w}–${best.l}); toughest ${name(worst)} (${worst.pct}%, ${worst.w}–${worst.l}).`;
 }

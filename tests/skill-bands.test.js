@@ -93,7 +93,7 @@ test('read: a dip explained by the weakest partners says so, with the numbers', 
   // Make the middle band the toughest → the partner sentence.
   bands[4] = { ...bands[4], w: 16, l: 20, pct: 44 };
   const read = readFor(bands, 32.3);
-  assert.match(read, /toughest band \(vs\. 32–34, 41%\)/);
+  assert.match(read, /The toughest band \(vs\. 32–34, 41%\)/);
   assert.match(read, /30\.0, against 32\.3/);
 });
 
@@ -133,5 +133,13 @@ test('read: names the partner gap even when the top band is the toughest', () =>
     { idx: 1, tier: 'Lower-middle', lo: 26, hi: 38, label: '26–38', played: 11, w: 10, l: 1, pct: 91, partner: 52.4 },
     { idx: 4, tier: 'Top fifth', lo: 58, hi: 80, label: '58+', played: 14, w: 2, l: 12, pct: 14, partner: 35.4 },
   ];
-  assert.equal(readFor(bands, 48.6), 'Your toughest band (vs. 58+, 14%) is also where your partners averaged the lowest DSR — 35.4, against 48.6 across all your games.');
+  assert.equal(readFor(bands, 48.6), 'The toughest band (vs. 58+, 14%) is also where partners averaged the lowest DSR — 35.4, against 48.6 across all games.');
+});
+
+test('read: never says "you" — it shows on everyone\'s public profile', () => {
+  const bands = [
+    { idx: 0, tier: 'Bottom fifth', lo: 3, hi: 26, label: 'under 26', played: 13, w: 13, l: 0, pct: 100, partner: 53.8 },
+    { idx: 4, tier: 'Top fifth', lo: 58, hi: 80, label: '58+', played: 14, w: 2, l: 12, pct: 14, partner: 35.4 },
+  ];
+  for (const avg of [48.6, 30]) assert.doesNotMatch(readFor(bands, avg), /\byou(r)?\b/i);
 });
