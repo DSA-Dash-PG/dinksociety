@@ -20,7 +20,8 @@
 //   by tier, not by range.
 //
 // THE TAG on each band comes from the win rate, the way DUPR labels it:
-//   ≥ 80% Dominant · ≥ 55% Strong · ≥ 40% Growing · below that Challenge.
+//   ≥ 80% Dominant · ≥ 55% Strong · ≥ 45% Competitive · ≥ 35% Growing ·
+//   below that Challenge.
 //   Fewer than MIN_GAMES games in a band: "Small sample" and no verdict.
 //
 // THE READ (one sentence under the rows) may only say what the rows show. See
@@ -67,7 +68,8 @@ export function tagFor(pct, played) {
   if (!played || played < MIN_GAMES) return 'sample';
   if (pct >= 80) return 'dominant';
   if (pct >= 55) return 'strong';
-  if (pct >= 40) return 'growing';
+  if (pct >= 45) return 'competitive';   // DUPR's newer label for a coin-flip band
+  if (pct >= 35) return 'growing';
   return 'challenge';
 }
 

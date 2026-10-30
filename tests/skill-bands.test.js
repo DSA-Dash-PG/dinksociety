@@ -36,6 +36,10 @@ test('tagFor: DUPR-style verdicts, small samples get none', () => {
   assert.equal(tagFor(61, 31), 'strong');
   assert.equal(tagFor(41, 34), 'growing');
   assert.equal(tagFor(31, 36), 'challenge');
+  assert.equal(tagFor(50, 38), 'competitive');
+  assert.equal(tagFor(45, 20), 'competitive');
+  assert.equal(tagFor(44, 25), 'growing');
+  assert.equal(tagFor(29, 14), 'challenge');
   assert.equal(tagFor(100, MIN_GAMES - 1), 'sample');
 });
 
