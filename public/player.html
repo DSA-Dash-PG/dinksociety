@@ -151,6 +151,33 @@
     .bar.teal i { background: var(--color-teal); }
     .bar.purple i { background: #a78bfa; }
 
+    /* performance vs. skill level */
+    .sk-note { font-size: 10.5px; color: var(--color-text-faint); font-weight: 600; }
+    .sk-row { padding: 12px 0 11px; border-top: 1px solid var(--color-border); }
+    .sk-row:first-of-type { border-top: 0; padding-top: 4px; }
+    .sk-top { display: flex; align-items: center; gap: 10px; }
+    .sk-vs { font-size: 12px; color: var(--color-text-faint); font-weight: 700; white-space: nowrap; }
+    .sk-vs b { font-size: 17px; color: var(--color-text); font-weight: 800; font-variant-numeric: tabular-nums; margin-left: 3px; }
+    .sk-tier { font-size: 10px; color: var(--color-text-faint); font-weight: 600; white-space: nowrap; }
+    .sk-tag { font-size: 10px; font-weight: 800; letter-spacing: 0.04em; padding: 3px 10px; border-radius: 9999px; white-space: nowrap; }
+    .sk-tag--dominant  { color: #c4b5fd; background: rgba(167,139,250,0.14); }
+    .sk-tag--strong    { color: #22c55e; background: rgba(34,197,94,0.12); }
+    .sk-tag--growing   { color: #e8b542; background: rgba(232,181,66,0.13); }
+    .sk-tag--challenge { color: #f87171; background: rgba(239,68,68,0.13); }
+    .sk-tag--sample    { color: var(--color-text-faint); background: var(--color-surface-3, rgba(255,255,255,0.06)); }
+    .sk-you { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; color: #06231d; background: var(--color-lime); padding: 2px 7px; border-radius: 9999px; }
+    .sk-pct { margin-left: auto; font-size: 24px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .sk-bar { height: 6px; border-radius: 3px; background: var(--color-surface-3, rgba(255,255,255,0.08)); margin: 9px 0 7px; overflow: hidden; }
+    .sk-bar i { display: block; height: 100%; border-radius: 3px; }
+    .sk-bar--dominant i { background: #a78bfa; } .sk-bar--strong i { background: #22c55e; }
+    .sk-bar--growing i { background: #e8b542; } .sk-bar--challenge i { background: #ef4444; }
+    .sk-bar--sample i { background: var(--color-text-faint); opacity: .5; }
+    .sk-foot { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; color: var(--color-text-faint); font-weight: 600; }
+    .sk-foot b { color: var(--color-text); font-weight: 800; font-variant-numeric: tabular-nums; }
+    .sk-row--empty .sk-vs b, .sk-row--empty .sk-pct { color: var(--color-text-faint); }
+    .sk-read { margin-top: 6px; padding: 10px 12px; border-radius: 8px; background: var(--color-surface); border: 1px solid var(--color-border); font-size: 12px; line-height: 1.5; color: var(--color-text-muted); }
+    .sk-read b { color: var(--color-lime); }
+
     /* match log */
     .ss-wk { border-top: 1px solid var(--color-border); }
     .ss-wk:first-of-type { border-top: 0; }
@@ -715,6 +742,45 @@
       </div>`;
     }
 
+    /* ── Performance vs. Skill Level (DUPR-style) ──
+       s.skill / career.skill come from lib/skill-bands.js via public-player:
+       five bands = the season's rated players split into fifths by DSR; a game
+       lands in the band holding its opponents' average DSR that week. Career
+       rows are the same fifths rolled up across seasons, so they're labelled by
+       tier instead of a DSR range. */
+    const SK_TAG = { dominant: 'Dominant', strong: 'Strong', growing: 'Growing', challenge: 'Challenge', sample: 'Small sample' };
+    function skillBandsHtml(sk, career) {
+      if (!sk || !sk.bands) return '';
+      const rows = sk.bands.map(b => {
+        const ranged = !career && b.lo != null;
+        const label = ranged ? `${Math.round(b.lo)}–${Math.round(b.hi)}` : esc(b.tier);
+        const you = !career && sk.you === b.idx ? ' <span class="sk-you">YOU</span>' : '';
+        if (!b.played) {
+          return `<div class="sk-row sk-row--empty"><div class="sk-top"><span class="sk-vs">vs.<b>${label}</b></span>${ranged ? `<span class="sk-tier">${esc(b.tier)}</span>` : ''}${you}<span class="sk-pct">—</span></div>
+            <div class="sk-bar"><i style="width:0"></i></div>
+            <div class="sk-foot"><span>No games yet</span><span>0W · 0L</span></div></div>`;
+        }
+        const tag = b.tag || 'sample';
+        return `<div class="sk-row"><div class="sk-top">
+            <span class="sk-vs">vs.<b>${label}</b></span>
+            <span class="sk-tag sk-tag--${tag}">${SK_TAG[tag]}</span>${you}
+            <span class="sk-pct">${b.pct}%</span>
+          </div>
+          <div class="sk-bar sk-bar--${tag}"><i style="width:${Math.max(2, b.pct)}%"></i></div>
+          <div class="sk-foot"><span>${b.partner != null ? `Avg partner <b>${fmtDsr(b.partner)}</b>` : 'Avg partner —'}${ranged ? ` · ${esc(b.tier)}` : ''}</span><span>${b.w}W · ${b.l}L</span></div>
+        </div>`;
+      }).join('');
+      const note = career
+        ? 'Every season’s games, grouped by which fifth of that season’s league you faced'
+        : 'Opponent band = their average DSR that week · bands split the league into fifths';
+      return `<div class="ss-sub" data-skill>
+        <div class="ss-sub__head"><div class="ss-sub__title">🎯 Performance vs. Skill Level</div><span class="sk-note">${sk.games} game${sk.games === 1 ? '' : 's'}</span></div>
+        ${rows}
+        ${sk.read ? `<div class="sk-read"><b>Read:</b> ${esc(sk.read)}</div>` : ''}
+        <div class="sk-note" style="margin-top:8px">${note}</div>
+      </div>`;
+    }
+
     /* ── One season's pane ── */
     function seasonPaneHtml(s, ranks, rp) {
       const code = s.circuit;
@@ -885,7 +951,7 @@
       }
 
       const teamsNote = (s.teams && s.teams.length > 1) ? `<div class="ss-note">Played for ${s.teams.map(t => esc(t.teamName)).join(' and ')} this season — stats are combined.</div>` : '';
-      return teamsNote + strip + trend + `<div class="ss-boxes">${ratingBox}${scoringBox}${matchBox}</div>` + log + partnersHtml;
+      return teamsNote + strip + trend + `<div class="ss-boxes">${ratingBox}${scoringBox}${matchBox}</div>` + skillBandsHtml(s.skill, false) + log + partnersHtml;
     }
 
     /* ── Career pane ── */
@@ -967,7 +1033,7 @@
           </div></div>`;
       }
 
-      return strip + arc + table + `<div class="ss-two">${splits}${highlights}</div>` + partnersHtml;
+      return strip + arc + table + `<div class="ss-two">${splits}${highlights}</div>` + skillBandsHtml(c.skill, true) + partnersHtml;
     }
 
     /* ── Wire: tabs, charts, week taps ── */

@@ -16,7 +16,8 @@
 //                                               Seasons card: headline strip, DSR
 //                                               trend with league average, rating /
 //                                               scoring / matchup boxes, match log
-//                                               with per-game DSR, partners)
+//                                               with per-game DSR, partners,
+//                                               performance vs. skill level)
 //       career:  { ... }                       (&seasons=1 — totals, per-season rows,
 //                                               splits, highlights, all-time partners)
 //     }
@@ -43,6 +44,7 @@ import { countState } from './lib/live-results.js';
 import { identityIndex, mergeStatRows } from './lib/league-identity.js';
 import { seasonName } from './lib/circuit.js';
 import { photoUrlFor } from './lib/player-photo.js';
+import { bandEdges, bandOf, summarize as skillSummary } from './lib/skill-bands.js';
 
 // Slot type by slot key (matches lib/standings.js)
 const SLOT_TYPE = {
@@ -494,7 +496,18 @@ async function buildSeasonPackage(code, playerId, ids, psData, history) {
     const oppRes = (g.oppIds || []).map(pid => dsrAt(pid, g.week, g.type)).filter(Boolean);
     g.oppDsr = oppRes.length ? r1(oppRes.reduce((s, r) => s + r.v, 0) / oppRes.length) : null;
     g.isSnap = !!(mine?.snap && oppRes.length && oppRes.every(r => r.snap));
+    const pr = g.partnerId ? dsrAt(g.partnerId, g.week, g.type) : null;
+    g.partnerDsr = pr ? r1(pr.v) : null;
   }
+
+  // ── Performance vs. skill level (lib/skill-bands.js) ──
+  // Bands = the season's rated players split into fifths by DSR; each game
+  // lands in the band holding its opponents' average DSR. Qualified players
+  // set the bands once there are enough of them, everyone rated before that.
+  const qualDsr = allP.filter(p => p.composite != null && p.dsrQualified !== false).map(p => p.composite);
+  const edges = bandEdges(qualDsr.length >= 10 ? qualDsr : allP.map(p => p.composite));
+  for (const g of log.games) g.band = bandOf(g.oppDsr, edges);
+  const skill = edges ? skillSummary(log.games, edges, { myDsr: stat.composite }) : null;
 
   // ── Weekly records: the chart's x-axis (W–L · ±diff per week, DNP weeks kept) ──
   const dsrHistory = (stat.dsrHistory || []).slice().sort((a, b) => a.week - b.week);
@@ -597,6 +610,7 @@ async function buildSeasonPackage(code, playerId, ids, psData, history) {
     splits: { gender: split(gType), mixed: split('mixed'), genderType: gType },
     strength: { partner: partnerStrength.avg, partners: partnerStrength.n, opponent: opponentStrength.avg, opponents: opponentStrength.n },
     streak, bestStreak: best, keyOpponent, finish,
+    skill,
     awards: (stat.awards || []).map(a => ({ ...a, season: a.season || code })),
     // Trend + log
     dsrHistory, weeks, leagueAvg, pool, range,
@@ -667,6 +681,10 @@ function buildCareer(seasons, careerAwards, identity) {
   }
   const partners = Object.values(byPerson).sort((a, b) => b.played - a.played || b.won - a.won);
 
+  // Performance vs. skill level across every season: each game keeps the band
+  // its own season put it in (bottom fifth … top fifth of that season).
+  const skill = skillSummary(played.flatMap(s => s.games || []), null);
+
   return {
     seasons: played.length,
     record: { w, l, played: gp, matches: mp, pct: pctOf(w, gp) },
@@ -674,6 +692,7 @@ function buildCareer(seasons, careerAwards, identity) {
     clutch: { w: cW, g: cG },
     peak,
     hardware: { finals, titles, medals, potw, awards: (careerAwards || []).length },
+    skill,
     splits: { gender: splitSum('gender'), mixed: splitSum('mixed') },
     highlights: { bestWeek, longestStreak, peak, biggestStage },
     rows: played.map(s => ({
